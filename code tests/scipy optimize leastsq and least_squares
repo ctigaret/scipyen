@@ -1,0 +1,29 @@
+scipy.optimize.leastsq(func, x0, args=(), 
+Dfun=None, full_output=0, col_deriv=0, 
+ftol=1.49012e-08, 
+xtol=1.49012e-08, 
+gtol=0.0, 
+maxfev=0, 
+epsfcn=None, 
+factor=100, 
+diag=None
+
+
+scipy.optimize.least_squares(fun, x0, 
+jac='2-point', bounds=(-inf, inf), 
+method='trf', 
+
+x_scale=1.0, 
+loss='linear', 
+f_scale=1.0, 
+tr_solver=None, 
+tr_options={}, 
+jac_sparsity=None, 
+max_nfev=None, 
+verbose=0, 
+args=(), 
+ftol=1e-08, 
+xtol=1e-08, 
+gtol=1e-08, 
+diff_step=None, 
+kwargs={})

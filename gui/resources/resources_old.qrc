@@ -1,0 +1,26 @@
+ <!DOCTYPE RCC><RCC version="1.0">
+     <qresource>
+         <file>images/document-open.svg</file>
+         <file>images/go-down.svg</file>
+         <file>images/go-home.svg</file>
+         <file>images/go-next.svg</file>
+         <file>images/go-previous.svg</file>
+         <file>images/go-up.svg</file>
+         <file>images/IPythonConsole.svg</file>
+         <file>images/add.svg</file>
+         <file>images/add_multiple.svg</file>
+         <file>images/remove.svg</file>
+         <file>images/remove_many.svg</file>
+         <file>images/remove_many_specified.svg</file>
+         <file>images/remove_multiple.svg</file>
+         <file>images/insert.svg</file>
+         <file>images/tools-wizard.svg</file>
+         <file>images/tools-wizard_multiple.svg</file>
+         <file>images/document-export.svg</file>
+         <file>images/document-export_multiple.svg</file>
+         <file>images/document-import.svg</file>
+         <file>images/document-import_multiple.svg</file>
+         <file>images/document-import-from-workspace.svg</file>
+         <file>images/F_S_Discrimination.png</file>
+     </qresource>
+ </RCC>

@@ -1,0 +1,91 @@
+TODO enable Drag & Drop from PICT window to KDE applications / desktop
+
+NOTE 2019-10-06 00:41:18
+Stop using vigra.pyqt package, as it depends on VigraQt which as of the time of
+writing has build issues with Pyqt5 and python3 and appears unmaintained
+Use instead the quickdialog module directly (copied from vigra.pyqt package)
+
+NOTE: 2016-09-29 11:27:07
+Update period from August to September 2016:
+
+* Python dependencies are now (2016-09-29 11:32:07) as follows: 
+    Python 3.4, 
+    PyQt5, 
+    sip 4.16.9, 
+    jupyter/ipyton/qtconsole (see below)
+    pywavelets 0.4.0 (pywt)
+    javabridge 1.0.14
+    python-bioformats 1.0.8 (make sure this is NOT biopython)
+    qimage2ndarray 1.6
+    
+    numpy & matplotlib & pylab -- these are the distribution ones
+    
+* Other (C++ and python bindings, see README.rst in this directory)
+    boost C++ 1.61 -- built against pytohn 3.4 -> installed in /usr/local; NOT the distribution one
+    vigra 1.11 -- built against boost 1.61 (see above) AND python 3.4, Qt5 AND PyQt5
+    vigraqt -- built against vigra 1.11 (see above), Qt5 and PyQt5
+    
+    
+    
+    
+* best install them as "user" using pip3 (e.g., will be installed in ~/.local/lib/python3.4/site-packages)
+
+* NOTE: installing qtconsole 4.2.1 (Jupyter QtConsole 4.2.1), IPython 5.0.0 will check
+ and install automatically (if enabled, which is the default for pip3) several top-level
+ packages:
+    IPython (ipython 5.0.0), 
+    ipykernel 4.4.1, 
+    ipython_genutils 0.1.0, 
+    jupyter_client 4.3.0, 
+    jupyter_core 4.1.1
+    nbformat 4.1.0
+    nbconvert 4.2.0
+    qtconsole 4.2.1
+    
+    ... and maybe others too ...
+    ? pickleshare, traitlets, prmpt_toolkit, rope, setuptools (easy_install), simplegeneric, entrypoints, pkg_resources
+    ?? (these might have been installed by me on the same day) qtpy, qtawsome
+
+
+
+Here, the console (subclass of RichIPythonWidget) starts an embedded kernel
+then is managed by ScipyenWindow.
+
+NOTE: The ipkernel is embedded in the RichIPythonWidget console -- they are part 
+of the same process. Hence the kernel cannot be initiated independently of the console; in fact
+it can only be started when the console instance is created (because is this instance that
+embeds the new kernel)
+
+* * *
+
+To make this code agnostic with respect to PyQt4 or PySide, install and use python_qt_binding
+
+(1) The IPython console is an EmbedIPython object, connected to an IPython kernel.
+
+EmbedIPython a subclass of RichIPythonWidget and is used to create an 
+IPython console, connected to, an IPython kernel.
+
+RichIPythonWidget is in module IPython.qt.console.rich_ipython_widget, and is a subclass
+of IPythonWidget in module IPython.qt.console.ipython_widget
+
+IPythonWidget is a subclass of FrontendWidget in module IPython.qt.console.frontend_widget
+
+FrontendWidget is "A Qt frontend for a generic Python kernel." and inherits:
+
+HistoryConsoleWidget from module IPython.qt.console.history_console_widget
+
+and
+
+BaseFrontendMixin from module IPython.qt.base_frontend_mixin: "A mix-in class for implementing Qt frontends."
+
+HistoryConsoleWidget inherits ConsoleWidget from module IPython.qt.console.console_widget
+
+ConsoleWidget is "An abstract base class for console-type widgets"
+
+(2) The kernel itself is managed (and started) by QtInProcessKernelManager
+
+(3) The bidirectional exchange of variables between the MainWindow and the kernel occurs via a Python dictionary
+
+
+
+
