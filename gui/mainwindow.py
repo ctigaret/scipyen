@@ -1750,8 +1750,8 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
         self.scriptsTable.acceptDrops = True
         
     def _configureGUI_(self):
-        addScript = self.menuScripts.addAction("Add script...")
-        addScript.triggered.connect(self.slot_addScript)
+        addScript = self.menuScripts.addAction("Add scripts...")
+        addScript.triggered.connect(self.slot_addScripts)
         #pass
         #self.menubar.insertMenu(self.mainMenu.menuAction())
         
@@ -1906,6 +1906,17 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
             if isinstance(fileName, str) and len(fileName) > 0 and os.path.isfile(fileName):
                 self.signal_pythonFileAdded.emit(fileName)
 
+    @pyqtSlot()
+    @safeWrapper
+    def slot_addScripts(self):
+        targetDir = os.getcwd()
+        
+        # NOTE: returns a tuple (path list, filter)
+        fileNames, fileFilter = QtWidgets.QFileDialog.getOpenFileNames(self, caption=u"Run python script", filter="Python script (*.py)", directory = targetDir)
+        
+        for fileName in fileNames:
+            self.signal_pythonFileAdded.emit(fileName)
+        
         
     @pyqtSlot()
     @safeWrapper
