@@ -1,4 +1,5 @@
 {
     "name": "scipyen"
 ,   "files": [ { "git": 1 } ]
+,   "index": true
 } 
