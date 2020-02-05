@@ -1735,6 +1735,7 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
     def __init__(self, parent=None):
         super(ScriptManagerWindow, self).__init__(parent)
         self.setupUi(self)
+        self._configureGUI_()
         
         self.scriptsTable.customContextMenuRequested[QtCore.QPoint].connect(self.slot_customContextMenuRequested)
         self.scriptsTable.cellDoubleClicked[int, int].connect(self.slot_cellDoubleClick)
@@ -1747,6 +1748,13 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
         
         self.acceptDrops = True
         self.scriptsTable.acceptDrops = True
+        
+    def _configureGUI_(self):
+        addScript = self.menuScripts.addAction("Add script...")
+        addScript.triggered.connect(self.slot_addScript)
+        #pass
+        #self.menubar.insertMenu(self.mainMenu.menuAction())
+        
         
     def _load_settings_(self):
         windowSize = self.settings.value("/".join([self.__class__.__name__, "WindowSize"]), None)

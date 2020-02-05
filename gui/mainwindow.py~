@@ -253,8 +253,8 @@ def console_info():
 __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__,"mainwindow.ui"), from_imports=True, import_from="gui")
 
 #__UI_ScriptManagerDialog__, __QDialog__ = loadUiType(os.path.join(__module_path__,"gui","scriptsmanagerdialog.ui"), from_imports=True, import_from="gui")
-#__UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__,"gui","scriptsmanagerwindow.ui"), from_imports=True, import_from="gui")
-__UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__,"scriptsmanagerwindow.ui"), from_imports=True, import_from="gui")
+#__UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__,"gui","scriptmanagerwindow.ui"), from_imports=True, import_from="gui")
+__UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__,"scriptmanagerwindow.ui"), from_imports=True, import_from="gui")
 
 @magics_class
 class PictMagics(Magics):
@@ -1735,6 +1735,7 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
     def __init__(self, parent=None):
         super(ScriptManagerWindow, self).__init__(parent)
         self.setupUi(self)
+        self._configureGUI_()
         
         self.scriptsTable.customContextMenuRequested[QtCore.QPoint].connect(self.slot_customContextMenuRequested)
         self.scriptsTable.cellDoubleClicked[int, int].connect(self.slot_cellDoubleClick)
@@ -1747,6 +1748,11 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
         
         self.acceptDrops = True
         self.scriptsTable.acceptDrops = True
+        
+    def _configureGUI_(self):
+        pass
+        #self.menubar.insertMenu(self.mainMenu.menuAction())
+        
         
     def _load_settings_(self):
         windowSize = self.settings.value("/".join([self.__class__.__name__, "WindowSize"]), None)
