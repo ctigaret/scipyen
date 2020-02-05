@@ -20,6 +20,8 @@ mpl.use("Qt5Agg")
 import numpy as np
 import quantities as pq
 import vigra
+import pandas as pd
+import seaborn as sb
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -100,6 +102,216 @@ mpl_plot_functions["quiver"]                = Axes.quiver
 mpl_plot_functions["quiverkey"]             = Axes.quiverkey
 mpl_plot_functions["streamplot"]            = Axes.streamplot
 
+#def remove_na(arr):
+    #"""Helper method for removing NA values from array-like.
+    #NOTE: for ehatever reason, remove_na is not imported
+    #Parameters
+    #----------
+    #arr : array-like
+        #The array-like from which to remove NA values.
+
+    #Returns
+    #-------
+    #clean_arr : array-like
+        #The original array with NA values removed.
+
+    #"""
+    #return arr[pd.notnull(arr)]
+
+class SB_CategoricalStatPlotter(sb.categorical._CategoricalStatPlotter):
+    """Seaborn's CategoricalPlotter vriant allowing custom statistics.
+    For now, accepts ci as "se" in adddition to Seaborn's options
+    """
+    
+    def estimate_statistic(self, estimator, ci, n_boot):
+        """Also accepts ci given as "se"
+        """
+        from seaborn import utils
+        from seaborn.utils import remove_na
+        from seaborn.algorithms import bootstrap
+        
+        if self.hue_names is None:
+            statistic = []
+            confint = []
+        else:
+            statistic = [[] for _ in self.plot_data]
+            confint = [[] for _ in self.plot_data]
+
+        for i, group_data in enumerate(self.plot_data):
+
+            # Option 1: we have a single layer of grouping
+            # --------------------------------------------
+
+            if self.plot_hues is None:
+
+                if self.plot_units is None:
+                    stat_data = remove_na(group_data)
+                    unit_data = None
+                else:
+                    unit_data = self.plot_units[i]
+                    have = pd.notnull(np.c_[group_data, unit_data]).all(axis=1)
+                    stat_data = group_data[have]
+                    unit_data = unit_data[have]
+
+                # Estimate a statistic from the vector of data
+                if not stat_data.size:
+                    statistic.append(np.nan)
+                else:
+                    statistic.append(estimator(stat_data))
+
+                # Get a confidence interval for this estimate
+                if ci is not None:
+
+                    if stat_data.size < 2:
+                        confint.append([np.nan, np.nan])
+                        continue
+
+                    if ci == "sd":
+
+                        estimate = estimator(stat_data)
+                        sd = np.std(stat_data)
+                        confint.append((estimate - sd, estimate + sd))
+                        
+                    elif ci == "se":
+                        
+                        estimate = estimator(stat_data)
+                        sd = np.std(stat_data)
+                        se = sd / np.sqrt(stat_data.size - 1)
+                        confint.append((estimate - se, estimate + se))
+
+                    else:
+
+                        boots = bootstrap(stat_data, func=estimator,
+                                          n_boot=n_boot,
+                                          units=unit_data)
+                        confint.append(utils.ci(boots, ci))
+
+            # Option 2: we are grouping by a hue layer
+            # ----------------------------------------
+
+            else:
+                for j, hue_level in enumerate(self.hue_names):
+
+                    if not self.plot_hues[i].size:
+                        statistic[i].append(np.nan)
+                        if ci is not None:
+                            confint[i].append((np.nan, np.nan))
+                        continue
+
+                    hue_mask = self.plot_hues[i] == hue_level
+                    if self.plot_units is None:
+                        stat_data = remove_na(group_data[hue_mask])
+                        unit_data = None
+                    else:
+                        group_units = self.plot_units[i]
+                        have = pd.notnull(
+                            np.c_[group_data, group_units]
+                            ).all(axis=1)
+                        stat_data = group_data[hue_mask & have]
+                        unit_data = group_units[hue_mask & have]
+
+                    # Estimate a statistic from the vector of data
+                    if not stat_data.size:
+                        statistic[i].append(np.nan)
+                    else:
+                        statistic[i].append(estimator(stat_data))
+
+                    # Get a confidence interval for this estimate
+                    if ci is not None:
+
+                        if stat_data.size < 2:
+                            confint[i].append([np.nan, np.nan])
+                            continue
+
+                        if ci == "sd":
+
+                            estimate = estimator(stat_data)
+                            sd = np.std(stat_data)
+                            confint[i].append((estimate - sd, estimate + sd))
+                            
+                        elif ci == "se":
+                            estimate = estimator(stat_data)
+                            sd = np.std(stat_data)
+                            se = sd/np.sqrt(stat_data.size -1)
+                            confint[i].append((estimate - se, estimate + se))
+
+                        else:
+
+                            boots = bootstrap(stat_data, func=estimator,
+                                              n_boot=n_boot,
+                                              units=unit_data)
+                            confint[i].append(utils.ci(boots, ci))
+
+        # Save the resulting values for plotting
+        self.statistic = np.array(statistic)
+        self.confint = np.array(confint)
+            
+class SB_BarPlotter(SB_CategoricalStatPlotter):
+    def __init__(self, x, y, hue, data, order, hue_order,
+                 estimator, ci, n_boot, units,
+                 orient, color, palette, saturation, errcolor,
+                 errwidth, capsize, dodge):
+        """Initialize the plotter."""
+        self.establish_variables(x, y, hue, data, orient,
+                                 order, hue_order, units)
+        self.establish_colors(color, palette, saturation)
+        self.estimate_statistic(estimator, ci, n_boot)
+
+        self.dodge = dodge
+
+        self.errcolor = errcolor
+        self.errwidth = errwidth
+        self.capsize = capsize
+
+    def draw_bars(self, ax, kws):
+        """Draw the bars onto `ax`."""
+        # Get the right matplotlib function depending on the orientation
+        barfunc = ax.bar if self.orient == "v" else ax.barh
+        barpos = np.arange(len(self.statistic))
+
+        if self.plot_hues is None:
+
+            # Draw the bars
+            barfunc(barpos, self.statistic, self.width,
+                    color=self.colors, align="center", **kws)
+
+            # Draw the confidence intervals
+            errcolors = [self.errcolor] * len(barpos)
+            self.draw_confints(ax,
+                               barpos,
+                               self.confint,
+                               errcolors,
+                               self.errwidth,
+                               self.capsize)
+
+        else:
+
+            for j, hue_level in enumerate(self.hue_names):
+
+                # Draw the bars
+                offpos = barpos + self.hue_offsets[j]
+                barfunc(offpos, self.statistic[:, j], self.nested_width,
+                        color=self.colors[j], align="center",
+                        label=hue_level, **kws)
+
+                # Draw the confidence intervals
+                if self.confint.size:
+                    confint = self.confint[:, j]
+                    errcolors = [self.errcolor] * len(offpos)
+                    self.draw_confints(ax,
+                                       offpos,
+                                       confint,
+                                       errcolors,
+                                       self.errwidth,
+                                       self.capsize)
+
+    def plot(self, ax, bar_kws):
+        """Make the plot."""
+        self.draw_bars(ax, bar_kws)
+        self.annotate_axes(ax)
+        if self.orient == "h":
+            ax.invert_yaxis()
+   
 
 class IV2TimeScale(mpl.scale.ScaleBase):
     """For IV curves (IV ramps) this defines the linear function V(t)of the Vm 
@@ -410,4 +622,56 @@ def plotVigraKernel1D(val, fig=None, label=None, xlabel=None, ylabel=None, newPl
     
     return ret
         
+    
+def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
+            estimator=np.mean, ci=95, n_boot=1000, units=None,
+            orient=None, color=None, palette=None, saturation=.75,
+            errcolor=".26", errwidth=None, capsize=None, dodge=True,
+            ax=None, overlay_stripplot=True, **kwargs):
+    """
+    Arguments:
+    ----------
+    ci: in addition to the accepted values for seaborn.barplot, it can also be 
+        the string "se"; in this case the function plots mean +/- standard error 
+        of the mean
+        
+    Additional arguments for overlaid stripplot (defaults in parantheses):
+    -----------
+    strip_jitter (True or float value)
+    strip_dodge (value of the dodge argument, for a nice overlay on the bar plot)
+    strip_size (5)
+    strip_linewidth (0)
+    strip_color (the value of the color argument)
+    strip_palette (the value of the palette argument)
+    """
+    
+    plotter = SB_BarPlotter(x, y, hue, data, order, hue_order,
+                          estimator, ci, n_boot, units,
+                          orient, color, palette, saturation,
+                          errcolor, errwidth, capsize, dodge)
+
+    if ax is None:
+        ax = plt.gca()
+        
+    if overlay_stripplot:
+        strip_jitter = kwargs.pop("strip_jitter", True)
+        strip_size = kwargs.pop("strip_size", 5)
+        strip_dodge = kwargs.pop("strip_dodge", dodge)
+        strip_edgecolor = kwargs.pop("strip_edgecolor", "gray")
+        strip_color = kwargs.pop("strip_color", color)
+        strip_palette = kwargs.pop("strip_palette", palette)
+        strip_linewidth = kwargs.pop("strip_linewidth", 0)
+        
+
+    plotter.plot(ax, kwargs)
+    
+    if overlay_stripplot:
+        sb.stripplot(x=x, y=y, hue=hue, data=data, order=order, hue_order = hue_order,
+                     jitter=strip_jitter, dodge=strip_dodge, orient=orient,
+                     edgecolor=strip_edgecolor, color=strip_color,palette=strip_palette,
+                     size=strip_size, linewidth=strip_linewidth,
+                     ax=ax, **kwargs)
+    
+    return ax
+
     
