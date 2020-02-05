@@ -1,0 +1,64 @@
+# CHANGELOG: (started at 2016-08-15 16:30:22)
+#
+# NOTE: 2016-08-15 16:30:27 -- created xmlutils.py + a new XmlViewerWindow class in 
+# pict.py
+# very basic read-only support for OME XML metadata in image files 
+# based on the out-going QtXml module
+
+
+#NOTE: TODO 2017-03-21 21:52:50 implement drag and drop for opening files:
+#NOTE: this will quite likely require a custom item model subclassing the default 
+#NOTE: QAbstractItemModel that is used by QTreeWidget
+#NOTE:
+#NOTE: 2017-03-21 22:31:07
+#NOTE: until then, I fallback on a half-baked approach: on the drop event I test 
+#NOTE: for the type of the drop event source; if it is the ScipyenWindow's history 
+#NOTE: tree type (i.e. QtWidgets.QTreeWidget) then I just call ScipyenWindow's
+#NOTE: _rerunCommand method asynchronously (by means of Qt signal/slot mechanism)
+#NOTE: whereby I emit a custom signal in EmbedIPython's dropEvent method which
+#NOTE: should be connected to the ScipyenWindow's _rerunCommand slot
+#NOTE:
+#NOTE: 2017-03-21 22:31:16
+#NOTE: this half-baked approach works pretty well in term of excuting the dropped
+#NOTE: command(s) via %rerun line magic; however, it does not allow actually "pasting"
+#NOTE: the command to the console input (and thus prevents the dropped command(s) from
+#NOTE: beign edited by the user before being actually executed)
+#NOTE:
+#NOTE: 2017-03-21 22:57:59 
+#NOTE: finally I decided to just use the signal/slot mechanism such that ScipyenWindow
+#NOTE: code will COPY the string data (the command(s)) on the system's clipboard then use 
+#NOTE: that to paste it into the console's text widget
+
+# NOTE: 2017-06-30 23:44:07
+#implemented a unified file handling mechanism, using python mimetypes module and 
+    #a simple dispatch mechanism
+    
+#started first steps to uniformize the viewers API -- building towards a dispatch paradigm
+
+#implemented linkable cursors in both SignalViewer and ImageViewer logic
+
+#the two viewers still rely on different kits: SignalViewer on matplotlib; ImageViewer
+#almost entirely on pyqt5, except for colormaps which are taken from matplotlib
+
+# NOTE: 2017-06-30 23:48:37 TODO:
+# use quantities as values for AxisInfo objects (can one do this?)
+#   cannot use quantities: AxisInfo.resolution expects a float value, not a numpy array
+#   or a quantity (which is a numpy array subclass) -- Pity!
+
+# NOTE: 2019-09-09 22:06:46
+# DONE: partial implementation of Drag & Drop to load files and change working 
+# directory
+# DONE: using drag & drop to run or load scripts in the console buffer + script manager
+#
+# FIXME SignalViewer switched to pyqtgraph - seems faster, but there are some bugs
+# when reusing plotitems
+#
+# TODO: 2019-09-09 22:13:50
+# streamline the viewing logic; untangle viewing NDarrays e.g. use keyboard mods
+# to determine if numpy arrays plotted in SignalViewer or matplotlib figure, versus
+# displaying their contents in a tableditor.
+# likewise, for neo and datatypes signal objects and vigra Kernel objects, use
+# keyboard mods to determine if theyr are ot be plotted in signal viewer or
+# have their values displayed in a table editor
+# NOTE here extra option to plot vigra Kernel 1D/2D in matplotlib figure
+

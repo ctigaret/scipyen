@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AxesCalibrationDialog</class>
+ <widget class="QDialog" name="AxesCalibrationDialog">
+  <property name="windowModality">
+   <enum>Qt::WindowModal</enum>
+  </property>
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>291</width>
+    <height>404</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Axes Calibration</string>
+  </property>
+  <property name="modal">
+   <bool>true</bool>
+  </property>
+  <layout class="QGridLayout" name="gridLayout_2">
+   <item row="0" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <item>
+      <widget class="QLabel" name="label">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="text">
+        <string>A&amp;xis:</string>
+       </property>
+       <property name="buddy">
+        <cstring>axisIndexSpinBox</cstring>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QSpinBox" name="axisIndexSpinBox">
+       <property name="toolTip">
+        <string>Select axis index</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item row="0" column="1">
+    <widget class="QLabel" name="axisInfoLabel">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+       <horstretch>2</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="toolTip">
+      <string>Axis length (samples)</string>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Plain</enum>
+     </property>
+     <property name="midLineWidth">
+      <number>1</number>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+     <property name="scaledContents">
+      <bool>true</bool>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+     <property name="textInteractionFlags">
+      <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0" colspan="2">
+    <widget class="QGroupBox" name="calibrationGroupBox">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+       <horstretch>1</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="toolTip">
+      <string>Calibrate axis</string>
+     </property>
+     <property name="title">
+      <string>Calibration</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_5">
+        <property name="text">
+         <string>&amp;Units:</string>
+        </property>
+        <property name="buddy">
+         <cstring>unitsLineEdit</cstring>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1" colspan="2">
+       <widget class="QLineEdit" name="unitsLineEdit">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="toolTip">
+         <string>Units of measurement</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_2">
+        <property name="text">
+         <string>Ori&amp;gin:</string>
+        </property>
+        <property name="buddy">
+         <cstring>originSpinBox</cstring>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="2">
+       <widget class="QDoubleSpinBox" name="originSpinBox">
+        <property name="toolTip">
+         <string>Axis origin (in calibrated units)</string>
+        </property>
+        <property name="maximum">
+         <double>1000000.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0" colspan="2">
+       <widget class="QRadioButton" name="resolutionRadioButton">
+        <property name="toolTip">
+         <string>Select to calculate resolution</string>
+        </property>
+        <property name="text">
+         <string>Resolu&amp;tion</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="2">
+       <widget class="QDoubleSpinBox" name="resolutionSpinBox">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+        <property name="toolTip">
+         <string>Axis resolution (size of one pixel in calibrated units)</string>
+        </property>
+        <property name="readOnly">
+         <bool>false</bool>
+        </property>
+        <property name="decimals">
+         <number>4</number>
+        </property>
+        <property name="maximum">
+         <double>1000000.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="0" colspan="2">
+       <widget class="QRadioButton" name="pixelsDistanceRadioButton">
+        <property name="toolTip">
+         <string>Select to calculate distance in pixels</string>
+        </property>
+        <property name="text">
+         <string>Pixe&amp;ls</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="2">
+       <widget class="QSpinBox" name="pixelsDistanceSpinBox">
+        <property name="toolTip">
+         <string>Distance in pixels</string>
+        </property>
+        <property name="maximum">
+         <number>1000000000</number>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="0" colspan="2">
+       <widget class="QRadioButton" name="calibratedDistanceRadioButton">
+        <property name="toolTip">
+         <string>Select to calculate calibrated distance</string>
+        </property>
+        <property name="text">
+         <string>Axial Distance</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="2">
+       <widget class="QDoubleSpinBox" name="calibratedDistanceSpinBox">
+        <property name="toolTip">
+         <string>Distance in calibrated units</string>
+        </property>
+        <property name="maximum">
+         <double>1000000.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <widget class="QLabel" name="label_4">
+     <property name="text">
+      <string>&amp;Description:</string>
+     </property>
+     <property name="buddy">
+      <cstring>axisDescriptionEdit</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="0" colspan="2">
+    <widget class="QPlainTextEdit" name="axisDescriptionEdit">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+       <horstretch>0</horstretch>
+       <verstretch>1</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="toolTip">
+      <string>Axis description</string>
+     </property>
+     <property name="placeholderText">
+      <string>Axis description</string>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="0" colspan="2">
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>accepted()</signal>
+   <receiver>AxesCalibrationDialog</receiver>
+   <slot>accept()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>248</x>
+     <y>254</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>157</x>
+     <y>274</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>rejected()</signal>
+   <receiver>AxesCalibrationDialog</receiver>
+   <slot>reject()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>316</x>
+     <y>260</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>286</x>
+     <y>274</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>

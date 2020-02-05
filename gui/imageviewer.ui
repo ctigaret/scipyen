@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ImageViewerWindow</class>
+ <widget class="QMainWindow" name="ImageViewerWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>691</width>
+    <height>616</height>
+   </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="windowTitle">
+   <string>Image Viewer</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
+   <layout class="QGridLayout" name="gridLayout">
+    <property name="sizeConstraint">
+     <enum>QLayout::SetNoConstraint</enum>
+    </property>
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <item row="0" column="0">
+     <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0">
+      <property name="spacing">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="QWidget" name="viewerWidgetContainer" native="true">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>1</horstretch>
+          <verstretch>1</verstretch>
+         </sizepolicy>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <item>
+         <widget class="QLabel" name="framesLabel">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="text">
+           <string>Frame:</string>
+          </property>
+          <property name="buddy">
+           <cstring>framesQSpinBox</cstring>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSpinBox" name="framesQSpinBox">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="mouseTracking">
+           <bool>true</bool>
+          </property>
+          <property name="toolTip">
+           <string>Select frame</string>
+          </property>
+          <property name="whatsThis">
+           <string>Current frame number</string>
+          </property>
+          <property name="showGroupSeparator" stdset="0">
+           <bool>true</bool>
+          </property>
+          <property name="maximum">
+           <number>999999999</number>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="nFramesLabel">
+          <property name="text">
+           <string>of: 0</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSlider" name="framesQSlider">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="mouseTracking">
+           <bool>true</bool>
+          </property>
+          <property name="toolTip">
+           <string>Select frame</string>
+          </property>
+          <property name="whatsThis">
+           <string>Frame selector slider</string>
+          </property>
+          <property name="autoFillBackground">
+           <bool>false</bool>
+          </property>
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>691</width>
+     <height>28</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>Fi&amp;le</string>
+    </property>
+    <widget class="QMenu" name="menuExport">
+     <property name="title">
+      <string>&amp;Export frame</string>
+     </property>
+     <addaction name="actionExportAsPNG"/>
+     <addaction name="actionExportAsSVG"/>
+     <addaction name="actionExportAsTIFF"/>
+    </widget>
+    <widget class="QMenu" name="menuSave">
+     <property name="title">
+      <string>&amp;Save</string>
+     </property>
+     <addaction name="actionSaveTIFF"/>
+    </widget>
+    <addaction name="separator"/>
+    <addaction name="actionView"/>
+    <addaction name="menuSave"/>
+    <addaction name="menuExport"/>
+    <addaction name="actionClose"/>
+    <addaction name="separator"/>
+    <addaction name="actionRefresh"/>
+   </widget>
+   <addaction name="menuFile"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionClose">
+   <property name="text">
+    <string>&amp;Close</string>
+   </property>
+  </action>
+  <action name="actionColorMap">
+   <property name="text">
+    <string>&amp;Color Map</string>
+   </property>
+  </action>
+  <action name="actionImageScale">
+   <property name="text">
+    <string>&amp;Image Scale</string>
+   </property>
+  </action>
+  <action name="actionImageGamma">
+   <property name="text">
+    <string>Image &amp;Gamma</string>
+   </property>
+  </action>
+  <action name="actionOpen">
+   <property name="text">
+    <string>&amp;Open</string>
+   </property>
+  </action>
+  <action name="actionCrosshair_Cursor">
+   <property name="text">
+    <string>Crosshair</string>
+   </property>
+  </action>
+  <action name="actionVertical_Cursor">
+   <property name="text">
+    <string>Vertical</string>
+   </property>
+  </action>
+  <action name="actionHorizontal_Cursor">
+   <property name="text">
+    <string>Horizontal</string>
+   </property>
+  </action>
+  <action name="actionRemove_Cursor">
+   <property name="text">
+    <string>Remove Cursor...</string>
+   </property>
+  </action>
+  <action name="actionExportAsPNG">
+   <property name="text">
+    <string>&amp;PNG</string>
+   </property>
+  </action>
+  <action name="actionExportAsSVG">
+   <property name="text">
+    <string>&amp;SVG</string>
+   </property>
+  </action>
+  <action name="actionExportAsTIFF">
+   <property name="text">
+    <string>&amp;TIFF</string>
+   </property>
+  </action>
+  <action name="actionSaveTIFF">
+   <property name="text">
+    <string>&amp;TIFF</string>
+   </property>
+  </action>
+  <action name="actionView">
+   <property name="text">
+    <string>&amp;View...</string>
+   </property>
+   <property name="toolTip">
+    <string>View image from workspace</string>
+   </property>
+   <property name="statusTip">
+    <string>View image from workspace</string>
+   </property>
+   <property name="whatsThis">
+    <string>View image from workspace</string>
+   </property>
+  </action>
+  <action name="actionRefresh">
+   <property name="text">
+    <string>&amp;Refresh</string>
+   </property>
+   <property name="toolTip">
+    <string>Refresh image display - only works for images in the workspace</string>
+   </property>
+   <property name="statusTip">
+    <string>Refresh image display - only works for images in the workspace</string>
+   </property>
+   <property name="whatsThis">
+    <string>Refresh image display - only works for images in the workspace</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>actionClose</sender>
+   <signal>triggered()</signal>
+   <receiver>ImageViewerWindow</receiver>
+   <slot>close()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>233</x>
+     <y>176</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>

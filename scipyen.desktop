@@ -1,0 +1,20 @@
+[Desktop Entry]
+Comment[en_GB]=
+Comment=
+Exec=$HOME/scipyen/scipyen_start.py
+GenericName[en_GB]=
+GenericName=
+Icon=pythonbackend
+MimeType=
+Name[en_GB]=Scipyen
+Name=Scipyen
+NoDisplay=false
+Path=
+StartupNotify=true
+Terminal=true
+TerminalOptions=--hold
+Type=Application
+X-DBUS-ServiceName=
+X-DBUS-StartupType=
+X-KDE-SubstituteUID=false
+X-KDE-Username=

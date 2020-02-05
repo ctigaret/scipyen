@@ -1,0 +1,18 @@
+To generate resources for the GUI classes in PICT, using the icons in the 'resources'
+directory:
+
+1) cd to ./resources
+2) run generate_resources_qrc.sh
+3) cd back here
+4) run generate_resources.sh
+5) in QtDesigner import the resources_rc as per the usual means
+6) if needed, import resources_rc.py in your python module (written as part of PICT):
+    import gui.resources_rc as resources_rc
+    
+7) if the python module loads an UI file, make sure that PyQt5.uic.loadUiType function
+is called with the extra arguments 'from_import' and 'import_from', e.g.:
+
+__UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__,"gui","PictWindow.ui"),
+                                                from_imports=True, 
+                                                import_from="gui")
+

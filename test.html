@@ -1,0 +1,80 @@
+<p><strong>Created:</strong> on Sun Oct 6 21:11:29 2019</p>
+
+<p><strong>Author:</strong> Cezar M. Tigaret <em>TigaretC@cardiff.ac.uk</em></p>
+
+<h1>Running scipyan in Spyder 3</h1>
+
+<p>At the moment, scypian can be run in spyder3 as a separate process:</p>
+
+<ol>
+<li>Import scipyan as a project in spyder3:</li>
+</ol>
+
+<p><strong>NOTE</strong> This is equivalent to running pict.py from the scypian directory, in a shell.</p>
+
+<p>This procedure starts a completely python3 process, with its own PyQt5 event loop, embedded
+IPython kernel and namespace (user workspace).</p>
+
+<ul>
+<li>Menu &quot;Projects&quot; -&gt; &quot;New Project&quot;.
+
+<ul>
+<li> In the new project dialog:
+
+<ul>
+<li><p> choose &quot;Existing directory&quot;</p></li>
+<li><p> select the location of scypian, e.g.:</p></li>
+</ul></li>
+</ul></li>
+</ul>
+
+<blockquote>
+<p>/home/cezar/scipyan</p>
+</blockquote>
+
+<pre><code>      * select project type: &quot;Empty project&quot; 
+                from the drop-down combo box
+</code></pre>
+
+<ol>
+<li>Open the project (if project already created) by
+selecting its location, e.g.:</li>
+</ol>
+
+<blockquote>
+<p>/home/cezar/scypian</p>
+</blockquote>
+
+<ol>
+<li><p>Open pict.py in spyder editor</p></li>
+<li><p>Menu &quot;Run&quot; -&gt; &quot;Run&quot;</p></li>
+</ol>
+
+<p><strong>NOTE:</strong> When running for the first time,
+ the &quot;Run configuration per file&quot; dialog shows up:</p>
+
+<ul>
+<li>Choose &quot;Execute in an external system terminal&quot;</li>
+</ul>
+
+<ol>
+<li>On subsequent runs: just select &quot;Run&quot; from the &quot;Run&quot; menu;
+
+<ul>
+<li>for other options, select &quot;Configuration per file&quot; from the &quot;Run&quot; menu.</li>
+</ul></li>
+</ol>
+
+<p>##TODO</p>
+
+<ul>
+<li>Better integration of scipyan with spyder i.e, &quot;Execute in current console&quot; -- contemplate:
+
+<ul>
+<li>find out from pict code whether we're running inside spyder (in the main clause?)</li>
+<li>if run like this, then avoid creating a new PyQt event loop?</li>
+<li>if run from within spyder, then replace pict kernel with spyder kernel (get_ipython())</li>
+<li>use spyder's kernel namespace as pict's workspace</li>
+<li>what about the other imports?</li>
+</ul></li>
+</ul>
