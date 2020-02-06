@@ -14,8 +14,14 @@ mpl.rcParams['backend']='Qt5Agg'
 mpl.rcParams["savefig.format"] = "svg"
 mpl.rcParams["xtick.direction"] = "in"
 mpl.rcParams["ytick.direction"] = "in"
+mpl.rcParams["svg.fonttype"]="none"
 # see NOTE: 2019-07-29 18:25:30 in pict.py
 mpl.use("Qt5Agg") 
+plt.rcParams['backend']='Qt5Agg'
+plt.rcParams["savefig.format"] = "svg"
+plt.rcParams["xtick.direction"] = "in"
+plt.rcParams["ytick.direction"] = "in"
+plt.rcParams["svg.fonttype"]="none"
 
 import numpy as np
 import quantities as pq
@@ -627,7 +633,8 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
             estimator=np.mean, ci=95, n_boot=1000, units=None,
             orient=None, color=None, palette=None, saturation=.75,
             errcolor=".26", errwidth=None, capsize=None, dodge=True,
-            ax=None, overlay_stripplot=True, **kwargs):
+            ax=None, overlay_stripplot=True, axes_offset=0, despine=True,
+            tick_direction="in", **kwargs):
     """
     Keyword arguments (in addition to seaborn.barplot):
     ------------------
@@ -709,6 +716,11 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
                      size=strip_size, linewidth=strip_linewidth,
                      ax=ax, **kwargs)
     
+    if despine:
+        sb.despine(ax = ax, offset=axes_offset)
+        
+    ax.tick_params("y", direction="in")
+        
     return ax, plotter
 
     
