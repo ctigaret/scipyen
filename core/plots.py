@@ -629,13 +629,14 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
             errcolor=".26", errwidth=None, capsize=None, dodge=True,
             ax=None, overlay_stripplot=True, **kwargs):
     """
-    Arguments:
-    ----------
+    Keyword arguments (in addition to seaborn.barplot):
+    ------------------
     ci: in addition to the accepted values for seaborn.barplot, it can also be 
         the string "se"; in this case the function plots mean +/- standard error 
         of the mean
         
-    Additional arguments for overlaid stripplot (defaults in parantheses):
+    Additional keyword arguments controlling the appearance of the 
+    overlaid stripplot (default values in parantheses):
     -----------
     strip_jitter (True or float value)
     strip_dodge (value of the dodge argument, for a nice overlay on the bar plot)
@@ -643,6 +644,32 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
     strip_linewidth (0)
     strip_color (the value of the color argument)
     strip_palette (the value of the palette argument)
+    
+    Additional keywords controlling the appearance of the bars, passed in kwargs - 
+    these are effectively arguments passed directly to pyplot.bar()
+    (default values in parantheses):
+    --------------
+    linewidth (0) - width of the bar edge (0 means no edge)
+    edgecolor
+    tick_label
+    
+    The following pyplot.bar arguments are NOT used/useful:
+    ------------------------------------------------------
+    ecolor, xerr, yerr, capsize, error_kw
+    
+    The following pyplot.bar arguments must NOT be specified in kwargs:
+    ------------------------------------------------------------------
+    color, orientation
+    
+    Returns:
+    -------
+    ax: plot axes -- see ax.bar? doe arguments controlling the appearance of the bars
+    
+    plotter: SB_BarPlotter instance:
+        plotter.statistic: numpy array with the calculated statistics (e.g., mean)
+        plotter.confint: numpy array with either the confidence intervals (float ci)
+            or statistics +/- ci (ci is one of "sd" or "se")
+    
     """
     
     plotter = SB_BarPlotter(x, y, hue, data, order, hue_order,
@@ -652,6 +679,8 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
 
     if ax is None:
         ax = plt.gca()
+        
+        
         
     if overlay_stripplot:
         strip_jitter = kwargs.pop("strip_jitter", True)
@@ -663,7 +692,15 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
         strip_linewidth = kwargs.pop("strip_linewidth", 0)
         
 
+    # NOTE: 2020-02-05 23:59:27
+    # plots the bars
     plotter.plot(ax, kwargs)
+    
+    # NOTE: 2020-02-05 23:59:54
+    # remove edgecolor and linewidth from kwargs if present (used by plotter.plot) otherwise 
+    # it gets specified twice in the call to stripplot
+    kwargs.pop("edgecolor", None)
+    kwargs.pop("linewidth", None)
     
     if overlay_stripplot:
         sb.stripplot(x=x, y=y, hue=hue, data=data, order=order, hue_order = hue_order,
@@ -672,6 +709,6 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
                      size=strip_size, linewidth=strip_linewidth,
                      ax=ax, **kwargs)
     
-    return ax
+    return ax, plotter
 
     
