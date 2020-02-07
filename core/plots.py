@@ -24,6 +24,7 @@ plt.rcParams["ytick.direction"] = "in"
 plt.rcParams["svg.fonttype"]="none"
 
 import numpy as np
+from scipy import stats
 import quantities as pq
 import vigra
 import pandas as pd
@@ -317,7 +318,249 @@ class SB_BarPlotter(SB_CategoricalStatPlotter):
         self.annotate_axes(ax)
         if self.orient == "h":
             ax.invert_yaxis()
-   
+
+class SB_PointPlotter(SB_CategoricalStatPlotter):
+    default_palette = "dark"
+
+    """Show point estimates and confidence intervals with (joined) points."""
+    def __init__(self, x, y, hue, data, order, hue_order,
+                 estimator, ci, n_boot, units,
+                 markers, linestyles, dodge, join, scale,
+                 orient, color, palette, errwidth=None, capsize=None):
+        from seaborn.external.six import string_types
+        """Initialize the plotter."""
+        self.establish_variables(x, y, hue, data, orient,
+                                 order, hue_order, units)
+        self.establish_colors(color, palette, 1)
+        self.estimate_statistic(estimator, ci, n_boot)
+
+        # Override the default palette for single-color plots
+        if hue is None and color is None and palette is None:
+            self.colors = [color_palette()[0]] * len(self.colors)
+
+        # Don't join single-layer plots with different colors
+        if hue is None and palette is not None:
+            join = False
+
+        # Use a good default for `dodge=True`
+        if dodge is True and self.hue_names is not None:
+            dodge = .025 * len(self.hue_names)
+
+        # Make sure we have a marker for each hue level
+        if isinstance(markers, string_types):
+            markers = [markers] * len(self.colors)
+        self.markers = markers
+
+        # Make sure we have a line style for each hue level
+        if isinstance(linestyles, string_types):
+            linestyles = [linestyles] * len(self.colors)
+        self.linestyles = linestyles
+
+        # Set the other plot components
+        self.dodge = dodge
+        self.join = join
+        self.scale = scale
+        self.errwidth = errwidth
+        self.capsize = capsize
+
+    @property
+    def hue_offsets(self):
+        """Offsets relative to the center position for each hue level."""
+        if self.dodge:
+            offset = np.linspace(0, self.dodge, len(self.hue_names))
+            offset -= offset.mean()
+        else:
+            offset = np.zeros(len(self.hue_names))
+        return offset
+
+    def draw_points(self, ax):
+        """Draw the main data components of the plot."""
+        from seaborn.utils import remove_na
+        # Get the center positions on the categorical axis
+        pointpos = np.arange(len(self.statistic))
+
+        # Get the size of the plot elements
+        lw = mpl.rcParams["lines.linewidth"] * 1.8 * self.scale
+        mew = lw * .75
+        markersize = np.pi * np.square(lw) * 2
+
+        if self.plot_hues is None:
+
+            # Draw lines joining each estimate point
+            if self.join:
+                color = self.colors[0]
+                ls = self.linestyles[0]
+                if self.orient == "h":
+                    ax.plot(self.statistic, pointpos,
+                            color=color, ls=ls, lw=lw)
+                else:
+                    ax.plot(pointpos, self.statistic,
+                            color=color, ls=ls, lw=lw)
+
+            # Draw the confidence intervals
+            self.draw_confints(ax, pointpos, self.confint, self.colors,
+                               self.errwidth, self.capsize)
+
+            # Draw the estimate points
+            marker = self.markers[0]
+            hex_colors = [mpl.colors.rgb2hex(c) for c in self.colors]
+            if self.orient == "h":
+                x, y = self.statistic, pointpos
+            else:
+                x, y = pointpos, self.statistic
+            ax.scatter(x, y,
+                       linewidth=mew, marker=marker, s=markersize,
+                       c=hex_colors, edgecolor=hex_colors)
+
+        else:
+
+            offsets = self.hue_offsets
+            for j, hue_level in enumerate(self.hue_names):
+
+                # Determine the values to plot for this level
+                statistic = self.statistic[:, j]
+
+                # Determine the position on the categorical and z axes
+                offpos = pointpos + offsets[j]
+                z = j + 1
+
+                # Draw lines joining each estimate point
+                if self.join:
+                    color = self.colors[j]
+                    ls = self.linestyles[j]
+                    if self.orient == "h":
+                        ax.plot(statistic, offpos, color=color,
+                                zorder=z, ls=ls, lw=lw)
+                    else:
+                        ax.plot(offpos, statistic, color=color,
+                                zorder=z, ls=ls, lw=lw)
+
+                # Draw the confidence intervals
+                if self.confint.size:
+                    confint = self.confint[:, j]
+                    errcolors = [self.colors[j]] * len(offpos)
+                    self.draw_confints(ax, offpos, confint, errcolors,
+                                       self.errwidth, self.capsize,
+                                       zorder=z)
+
+                # Draw the estimate points
+                n_points = len(remove_na(offpos))
+                marker = self.markers[j]
+                hex_color = mpl.colors.rgb2hex(self.colors[j])
+                if n_points:
+                    point_colors = [hex_color for _ in range(n_points)]
+                else:
+                    point_colors = hex_color
+                if self.orient == "h":
+                    x, y = statistic, offpos
+                else:
+                    x, y = offpos, statistic
+                if not len(remove_na(statistic)):
+                    x, y = [], []
+                ax.scatter(x, y, label=hue_level,
+                           c=point_colors, edgecolor=point_colors,
+                           linewidth=mew, marker=marker, s=markersize,
+                           zorder=z)
+
+    def plot(self, ax):
+        """Make the plot."""
+        self.draw_points(ax)
+        self.annotate_axes(ax)
+        if self.orient == "h":
+            ax.invert_yaxis()
+
+class SB_StripPlotter(sb.categorical._CategoricalScatterPlotter):
+    """1-d scatterplot with categorical organization."""
+    def __init__(self, x, y, hue, data, order, hue_order,
+                 jitter, dodge, orient, color, palette):
+        """Initialize the plotter."""
+        self.establish_variables(x, y, hue, data, orient, order, hue_order)
+        self.establish_colors(color, palette, 1)
+
+        # Set object attributes
+        self.dodge = dodge
+        self.width = .8
+
+        if jitter == 1:  # Use a good default for `jitter = True`
+            jlim = 0.1
+        else:
+            jlim = float(jitter)
+            
+        if self.hue_names is not None and dodge:
+            jlim /= len(self.hue_names)
+            
+        self.jitterer = stats.uniform(-jlim, jlim * 2).rvs
+        
+    @property
+    def hue_offsets(self):
+        """A list of center positions for plots when hue nesting is used."""
+        n_levels = len(self.hue_names)
+        if isinstance(self.dodge, bool) and self.dodge:
+            each_width = self.width / n_levels
+            offsets = np.linspace(0, self.width - each_width, n_levels)
+            offsets -= offsets.mean()
+            
+        elif isinstance(self.dodge, float):
+            each_width = (self.width / n_levels) * self.dodge
+            offsets = np.linspace(0, self.width - each_width, n_levels)
+            offsets -= offsets.mean()
+            
+        else:
+            offsets = np.zeros(n_levels)
+
+        return offsets
+
+
+    def draw_stripplot(self, ax, kws):
+        """Draw the points onto `ax`."""
+        # Set the default zorder to 2.1, so that the points
+        # will be drawn on top of line elements (like in a boxplot)
+        for i, group_data in enumerate(self.plot_data):
+            if self.plot_hues is None or not self.dodge:
+
+                if self.hue_names is None:
+                    hue_mask = np.ones(group_data.size, np.bool)
+                else:
+                    hue_mask = np.array([h in self.hue_names
+                                         for h in self.plot_hues[i]], np.bool)
+                    # Broken on older numpys
+                    # hue_mask = np.in1d(self.plot_hues[i], self.hue_names)
+
+                strip_data = group_data[hue_mask]
+
+                # Plot the points in centered positions
+                cat_pos = np.ones(strip_data.size) * i
+                cat_pos += self.jitterer(len(strip_data))
+                kws.update(c=self.point_colors[i][hue_mask])
+                if self.orient == "v":
+                    ax.scatter(cat_pos, strip_data, **kws)
+                else:
+                    ax.scatter(strip_data, cat_pos, **kws)
+
+            else:
+                offsets = self.hue_offsets
+                for j, hue_level in enumerate(self.hue_names):
+                    hue_mask = self.plot_hues[i] == hue_level
+                    strip_data = group_data[hue_mask]
+
+                    # Plot the points in centered positions
+                    center = i + offsets[j]
+                    cat_pos = np.ones(strip_data.size) * center
+                    cat_pos += self.jitterer(len(strip_data))
+                    kws.update(c=self.point_colors[i][hue_mask])
+                    if self.orient == "v":
+                        ax.scatter(cat_pos, strip_data, **kws)
+                    else:
+                        ax.scatter(strip_data, cat_pos, **kws)
+
+    def plot(self, ax, kws):
+        """Make the plot."""
+        self.draw_stripplot(ax, kws)
+        self.add_legend_data(ax)
+        self.annotate_axes(ax)
+        if self.orient == "h":
+            ax.invert_yaxis()
+
 
 class IV2TimeScale(mpl.scale.ScaleBase):
     """For IV curves (IV ramps) this defines the linear function V(t)of the Vm 
@@ -632,18 +875,18 @@ def plotVigraKernel1D(val, fig=None, label=None, xlabel=None, ylabel=None, newPl
 def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
             estimator=np.mean, ci=95, n_boot=1000, units=None,
             orient=None, color=None, palette=None, saturation=.75,
-            errcolor=".26", errwidth=None, capsize=None, dodge=True,
+            errcolor="0", errwidth=None, capsize=None, dodge=True,
             ax=None, overlay_stripplot=True, axes_offset=0, despine=True,
             tick_direction="in", **kwargs):
     """
-    Keyword arguments (in addition to seaborn.barplot):
+    Keyword arguments :
     ------------------
     ci: in addition to the accepted values for seaborn.barplot, it can also be 
         the string "se"; in this case the function plots mean +/- standard error 
         of the mean
         
     Additional keyword arguments controlling the appearance of the 
-    overlaid stripplot (default values in parantheses):
+    overlaid stripplot. These are embedded in kwargs (default values in parantheses):
     -----------
     strip_jitter (True or float value)
     strip_dodge (value of the dodge argument, for a nice overlay on the bar plot)
@@ -651,6 +894,7 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
     strip_linewidth (0)
     strip_color (the value of the color argument)
     strip_palette (the value of the palette argument)
+    strip_alpha
     
     Additional keywords controlling the appearance of the bars, passed in kwargs - 
     these are effectively arguments passed directly to pyplot.bar()
@@ -697,6 +941,7 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
         strip_color = kwargs.pop("strip_color", color)
         strip_palette = kwargs.pop("strip_palette", palette)
         strip_linewidth = kwargs.pop("strip_linewidth", 0)
+        strip_alpha = kwargs.pop("strip_alpha", 1)
         
 
     # NOTE: 2020-02-05 23:59:27
@@ -713,8 +958,14 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
         sb.stripplot(x=x, y=y, hue=hue, data=data, order=order, hue_order = hue_order,
                      jitter=strip_jitter, dodge=strip_dodge, orient=orient,
                      edgecolor=strip_edgecolor, color=strip_color,palette=strip_palette,
-                     size=strip_size, linewidth=strip_linewidth,
+                     size=strip_size, linewidth=strip_linewidth, alpha=strip_alpha,
                      ax=ax, **kwargs)
+    
+        #stripplotsb(x=x, y=y, hue=hue, data=data, order=order, hue_order = hue_order,
+                     #jitter=strip_jitter, dodge=strip_dodge, orient=orient,
+                     #edgecolor=strip_edgecolor, color=strip_color,palette=strip_palette,
+                     #size=strip_size, linewidth=strip_linewidth, alpha=strip_alpha,
+                     #ax=ax, **kwargs)
     
     if despine:
         sb.despine(ax = ax, offset=axes_offset)
@@ -724,3 +975,383 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
     return ax, plotter
 
     
+def catplot_sb(x=None, y=None, hue=None, data=None, row=None, col=None,
+            col_wrap=None, estimator=np.mean, ci=95, n_boot=1000,
+            units=None, order=None, hue_order=None, row_order=None,
+            col_order=None, kind="strip", height=5, aspect=1,
+            orient=None, color=None, palette=None, saturation=.75,
+            errcolor="0", errwidth=None,  capsize=None, dodge=True, 
+            overlay_stripplot=True, axes_offset=0,
+            despine=True, tick_direction="in",
+            legend=True, legend_out=True, sharex=True, sharey=True,
+            margin_titles=False, facet_kws=None, dropna=False, **kwargs):
+    """Seaborn catlpot adapted to accept se as ci and other arguments.
+    
+    Keyword arguments :
+    ------------------
+    ci: in addition to the accepted values for seaborn.barplot, it can also be 
+        the string "se"; in this case the function plots mean +/- standard error 
+        of the mean
+        
+    Additional keyword arguments controlling the appearance of the 
+    overlaid stripplot. These are embedded in kwargs (default values in parantheses):
+    -----------
+    strip_jitter (True or float value)
+    strip_dodge (value of the dodge argument, for a nice overlay on the bar plot)
+    strip_size (5)
+    strip_linewidth (0)
+    strip_color (the value of the color argument)
+    strip_palette (the value of the palette argument)
+    strip_alpha
+    
+    Additional keywords controlling the appearance of the bars, embedded in kwargs - 
+    these are effectively arguments passed directly to pyplot.bar()
+    (default values in parantheses):
+    --------------
+    linewidth (None) - width of the bar edge (None or 0 means no edge)
+    edgecolor (None) - any mpl style color
+    tick_label
+    
+    Additional keywords controllinh the lines and markers for point plot, embedded in
+    kwargs
+    --------------
+    markers ("o")
+    linestyles ("-")
+    scale (1)
+    join  (True)
+    
+    """
+    from seaborn import utils
+    
+    # Handle deprecations
+    if "size" in kwargs:
+        height = kwargs.pop("size")
+        msg = ("The `size` paramter has been renamed to `height`; "
+               "please update your code.")
+        warnings.warn(msg, UserWarning)
+
+    # Determine the plotting function
+    try:
+        plot_func = globals()[kind + "plot" + "_sb"]
+        #print("plot_func: %s" % plot_func)
+    except KeyError:
+        supported_kinds="'bar', 'boxen', 'cat', 'count', 'point', 'strip', 'swarm'"
+        err = "Plot kind '{0}' is not recognized. Supported kinds are: '{1}'".format(kind, supported_kinds)
+        raise ValueError(err)
+
+    # Alias the input variables to determine categorical order and palette
+    # correctly in the case of a count plot
+    if kind == "count":
+        if x is None and y is not None:
+            x_, y_, orient = y, y, "h"
+        elif y is None and x is not None:
+            x_, y_, orient = x, x, "v"
+        else:
+            raise ValueError("Either `x` or `y` must be None for count plots")
+    else:
+        x_, y_ = x, y
+
+    # Determine the order for the whole dataset, which will be used in all
+    # facets to ensure representation of all data in the final plot
+    p = sb.categorical._CategoricalPlotter()
+    p.establish_variables(x_, y_, hue, data, orient, order, hue_order)
+    order = p.group_names
+    hue_order = p.hue_names
+
+    # Determine the palette to use
+    # (FacetGrid will pass a value for ``color`` to the plotting function
+    # so we need to define ``palette`` to get default behavior for the
+    # categorical functions
+    p.establish_colors(color, palette, 1)
+    if kind != "point" or hue is not None:
+        palette = p.colors
+
+    # Determine keyword arguments for the facets
+    facet_kws = {} if facet_kws is None else facet_kws
+    facet_kws.update(
+        data=data, row=row, col=col,
+        row_order=row_order, col_order=col_order,
+        col_wrap=col_wrap, height=height, aspect=aspect,
+        sharex=sharex, sharey=sharey,
+        legend_out=legend_out, margin_titles=margin_titles,
+        dropna=dropna,
+        )
+
+    # Determine keyword arguments for the plotting function
+    plot_kws = dict(
+        order=order, hue_order=hue_order,  orient=orient, 
+        color=color, palette=palette, saturation=saturation,
+        dodge=dodge
+        )
+    plot_kws.update(kwargs)
+
+    if kind in ["bar", "point"]:
+        plot_kws.update(
+            estimator=estimator, ci=ci, n_boot=n_boot, units=units,
+            errcolor = errcolor, errwidth=errwidth, capsize=capsize, dodge=dodge,
+            strip_jitter = kwargs.pop("strip_jitter", True),
+            strip_size = kwargs.pop("strip_size",5),
+            strip_dodge = kwargs.pop("strip_dodge", dodge),
+            strip_edgecolor = kwargs.pop("strip_edgecolor", "gray"),
+            strip_color = kwargs.pop("strip_color", color),
+            strip_palette = kwargs.pop("strip_palette", palette),
+            strip_linewidth = kwargs.pop("strip_linewidth", 0),
+            strip_alpha = kwargs.pop("strip_alpha", 1)
+            )
+        
+        if kind == "point":
+            plot_kws.update(markers=kwargs.pop("markers", "o"), 
+                            linestyles=kwargs.pop("linestyles", "-"),
+                            join=kwargs.pop("join", True),
+                            scale=kwargs.pop("scale", 1)
+                            )
+        
+    elif kind in ["strip"]:
+        plot_kws.update(dodge=dodge,
+            strip_jitter=kwargs.pop("strip_jitter", True),
+            strip_size=kwargs.ppop("strip_size",5),
+            strip_dodge = kwargs.pop("strip_dodge", dodge),
+            strip_edgecolor = kwargs.pop("strip_edgecolor", "gray"),
+            strip_color = kwargs.pop("strip_color", color),
+            strip_palette = kwargs.pop("strip_palette", strip_palette),
+            strip_linewidth = kwargs.pop("strip_linewidth", 0),
+            strip_alpha = kwargs.pop("strip_alpha", 1)
+            )
+
+
+    # Initialize the facets
+    g = sb.axisgrid.FacetGrid(**facet_kws)
+
+    # Draw the plot onto the facets
+    g.map_dataframe(plot_func, x, y, hue, **plot_kws)
+
+    # Special case axis labels for a count type plot
+    if kind == "count":
+        if x is None:
+            g.set_axis_labels(x_var="count")
+        if y is None:
+            g.set_axis_labels(y_var="count")
+
+    if legend and (hue is not None) and (hue not in [x, row, col]):
+        hue_order = list(map(utils.to_utf8, hue_order))
+        g.add_legend(title=hue, label_order=hue_order)
+
+    return g
+   
+def pointplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
+              estimator=np.mean, ci=95, n_boot=1000, units=None,
+              markers="o", linestyles="-", dodge=True, join=True, scale=1,
+              orient=None, color=None, palette=None, saturation=.75,
+              errcolor="0", errwidth=None, overlay_stripplot=True, despine=True,
+              axes_offset=0, capsize=None, ax=None, **kwargs):
+    """
+    Keyword arguments :
+    ------------------
+    ci: in addition to the accepted values for seaborn.barplot, it can also be 
+        the string "se"; in this case the function plots mean +/- standard error 
+        of the mean
+        
+    Additional keyword arguments controlling the appearance of the 
+    overlaid stripplot. These are embedded in kwargs (default values in parantheses):
+    -----------
+    strip_jitter (True or float value)
+    strip_dodge (value of the dodge argument, for a nice overlay on the bar plot)
+    strip_size (5)
+    strip_linewidth (0)
+    strip_color (the value of the color argument)
+    strip_palette (the value of the palette argument)
+    strip_alpha
+    
+    Additional keywords controlling the appearance of the bars, passed in kwargs - 
+    these are effectively arguments passed directly to pyplot.bar()
+    (default values in parantheses):
+    --------------
+    linewidth (0) - width of the bar edge (0 means no edge)
+    edgecolor
+    tick_label
+    
+    The following pyplot.bar arguments are NOT used/useful:
+    ------------------------------------------------------
+    ecolor, xerr, yerr, capsize, error_kw
+    
+    The following pyplot.bar arguments must NOT be specified in kwargs:
+    ------------------------------------------------------------------
+    color, orientation
+    
+    Returns:
+    -------
+    ax: plot axes -- see ax.bar? doe arguments controlling the appearance of the bars
+    
+    plotter: SB_BarPlotter instance:
+        plotter.statistic: numpy array with the calculated statistics (e.g., mean)
+        plotter.confint: numpy array with either the confidence intervals (float ci)
+            or statistics +/- ci (ci is one of "sd" or "se")
+    
+    """
+    plotter = SB_PointPlotter(x, y, hue, data, order, hue_order,
+                            estimator, ci, n_boot, units,
+                            markers, linestyles, dodge, join, scale,
+                            orient, color, palette, errwidth, capsize)
+
+    if ax is None:
+        ax = plt.gca()
+
+    if overlay_stripplot:
+        strip_jitter = kwargs.pop("strip_jitter", True)
+        strip_size = kwargs.pop("strip_size", 5)
+        strip_dodge = kwargs.pop("strip_dodge", dodge)
+        strip_edgecolor = kwargs.pop("strip_edgecolor", "gray")
+        strip_color = kwargs.pop("strip_color", color)
+        strip_palette = kwargs.pop("strip_palette", palette)
+        strip_linewidth = kwargs.pop("strip_linewidth", 0)
+        strip_alpha = kwargs.pop("strip_alpha", 1)
+        
+    plotter.plot(ax)
+
+    # NOTE: 2020-02-05 23:59:54
+    # remove edgecolor and linewidth from kwargs if present (used by plotter.plot) otherwise 
+    # it gets specified twice in the call to stripplot
+    kwargs.pop("edgecolor", None)
+    kwargs.pop("linewidth", None)
+    
+    if overlay_stripplot:
+        sb.stripplot(x=x, y=y, hue=hue, data=data, order=order, hue_order = hue_order,
+                     jitter=strip_jitter, dodge=strip_dodge, orient=orient,
+                     edgecolor=strip_edgecolor, color=strip_color,palette=strip_palette,
+                     size=strip_size, linewidth=strip_linewidth, alpha=strip_alpha,
+                     ax=ax, **kwargs)
+        #stripplot_sb(x=x, y=y, hue=hue, data=data, order=order, hue_order = hue_order,
+                     #jitter=strip_jitter, dodge=strip_dodge, orient=orient,
+                     #edgecolor=strip_edgecolor, color=strip_color,palette=strip_palette,
+                     #size=strip_size, linewidth=strip_linewidth, alpha=strip_alpha,
+                     #ax=ax, **kwargs)
+    
+    if despine:
+        sb.despine(ax = ax, offset=axes_offset)
+        
+    ax.tick_params("y", direction="in")
+        
+    return ax, plotter
+
+def countplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
+              orient=None, color=None, palette=None, saturation=.75,
+              dodge=True, ax=None, **kwargs):
+
+    estimator = len
+    ci = None
+    n_boot = 0
+    units = None
+    errcolor = None
+    errwidth = None
+    capsize = None
+
+    if x is None and y is not None:
+        orient = "h"
+        x = y
+    elif y is None and x is not None:
+        orient = "v"
+        y = x
+    elif x is not None and y is not None:
+        raise TypeError("Cannot pass values for both `x` and `y`")
+    else:
+        raise TypeError("Must pass values for either `x` or `y`")
+
+    plotter = _BarPlotter(x, y, hue, data, order, hue_order,
+                          estimator, ci, n_boot, units,
+                          orient, color, palette, saturation,
+                          errcolor, errwidth, capsize, dodge)
+
+    plotter.value_label = "count"
+
+    if ax is None:
+        ax = plt.gca()
+
+    plotter.plot(ax, kwargs)
+    return ax
+
+def boxenplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
+              orient=None, color=None, palette=None, saturation=.75,
+              width=.8, dodge=True, k_depth='proportion', linewidth=None,
+              scale='exponential', outlier_prop=None, ax=None, **kwargs):
+
+    plotter = sb.categorical._LVPlotter(x, y, hue, data, order, hue_order,
+                         orient, color, palette, saturation,
+                         width, dodge, k_depth, linewidth, scale,
+                         outlier_prop)
+
+    if ax is None:
+        ax = plt.gca()
+
+    plotter.plot(ax, kwargs)
+    return ax
+
+def stripplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
+              jitter=True, dodge=False, orient=None, color=None, palette=None,
+              size=5, edgecolor="gray", linewidth=0, ax=None, alpha=1, **kwargs):
+
+    if "split" in kwargs:
+        dodge = kwargs.pop("split")
+        msg = "The `split` parameter has been renamed to `dodge`."
+        warnings.warn(msg, UserWarning)
+
+    plotter = SB_StripPlotter(x, y, hue, data, order, hue_order,
+                            jitter, dodge, orient, color, palette)
+    if ax is None:
+        ax = plt.gca()
+
+    kwargs.setdefault("zorder", 3)
+    size = kwargs.get("s", size)
+    if linewidth is None:
+        linewidth = size / 10
+    if edgecolor == "gray":
+        edgecolor = plotter.gray
+    kwargs.update(dict(s=size ** 2,
+                       edgecolor=edgecolor,
+                       linewidth=linewidth))
+
+    plotter.plot(ax, kwargs)
+    return ax, plotter
+
+def swarmplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
+              dodge=False, orient=None, color=None, palette=None,
+              size=5, edgecolor="gray", linewidth=0, ax=None, **kwargs):
+
+    if "split" in kwargs:
+        dodge = kwargs.pop("split")
+        msg = "The `split` parameter has been renamed to `dodge`."
+        warnings.warn(msg, UserWarning)
+
+    plotter = sb.categorical._SwarmPlotter(x, y, hue, data, order, hue_order,
+                            dodge, orient, color, palette)
+    if ax is None:
+        ax = plt.gca()
+
+    kwargs.setdefault("zorder", 3)
+    size = kwargs.get("s", size)
+    if linewidth is None:
+        linewidth = size / 10
+    if edgecolor == "gray":
+        edgecolor = plotter.gray
+    kwargs.update(dict(s=size ** 2,
+                       edgecolor=edgecolor,
+                       linewidth=linewidth))
+
+    plotter.plot(ax, kwargs)
+    return ax
+
+#def boxplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
+            #orient=None, color=None, palette=None, saturation=.75,
+            #width=.8, dodge=True, fliersize=5, linewidth=None,
+            #whis=1.5, notch=False, ax=None, **kwargs):
+
+    #plotter = _BoxPlotter(x, y, hue, data, order, hue_order,
+                          #orient, color, palette, saturation,
+                          #width, dodge, fliersize, linewidth)
+
+    #if ax is None:
+        #ax = plt.gca()
+    #kwargs.update(dict(whis=whis, notch=notch))
+
+    #plotter.plot(ax, kwargs)
+    #return ax
+
