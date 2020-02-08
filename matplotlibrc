@@ -538,7 +538,7 @@ savefig.format      : svg
 savefig.transparent : True
 
 #savefig.frameon : True			## enable frame of figure when saving
-savefig.frameon : False
+#savefig.frameon : False        ## NOTE: 2020-02-08 11:20:33 deprecated in Matplotlib 3.1, will be removed in Matplotlib 3.3
 
 #savefig.orientation : portrait	## Orientation of saved figure
 
