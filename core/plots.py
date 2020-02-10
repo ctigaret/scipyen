@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Plot utitilies
 """
 #### BEGIN core python modules
@@ -553,10 +554,11 @@ class SB_StripPlotter(sb.categorical._CategoricalScatterPlotter):
                     else:
                         ax.scatter(strip_data, cat_pos, **kws)
 
-    def plot(self, ax, kws):
+    def plot(self, ax, kws, add_legend=True):
         """Make the plot."""
         self.draw_stripplot(ax, kws)
-        self.add_legend_data(ax)
+        if add_legend:
+            self.add_legend_data(ax)
         self.annotate_axes(ax)
         if self.orient == "h":
             ax.invert_yaxis()
@@ -895,6 +897,7 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
     strip_color (the value of the color argument)
     strip_palette (the value of the palette argument)
     strip_alpha
+    strip_legend (False) When True, strip data will be added to the legend
     
     Additional keywords controlling the appearance of the bars, passed in kwargs - 
     these are effectively arguments passed directly to pyplot.bar()
@@ -933,15 +936,15 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
         
         
         
-    if overlay_stripplot:
-        strip_jitter = kwargs.pop("strip_jitter", True)
-        strip_size = kwargs.pop("strip_size", 5)
-        strip_dodge = kwargs.pop("strip_dodge", dodge)
-        strip_edgecolor = kwargs.pop("strip_edgecolor", "gray")
-        strip_color = kwargs.pop("strip_color", color)
-        strip_palette = kwargs.pop("strip_palette", palette)
-        strip_linewidth = kwargs.pop("strip_linewidth", 0)
-        strip_alpha = kwargs.pop("strip_alpha", 1)
+    strip_jitter = kwargs.pop("strip_jitter", True)
+    strip_size = kwargs.pop("strip_size", 5)
+    strip_dodge = kwargs.pop("strip_dodge", dodge)
+    strip_edgecolor = kwargs.pop("strip_edgecolor", "gray")
+    strip_color = kwargs.pop("strip_color", color)
+    strip_palette = kwargs.pop("strip_palette", palette)
+    strip_linewidth = kwargs.pop("strip_linewidth", 0)
+    strip_alpha = kwargs.pop("strip_alpha", 1)
+    strip_legend = kwargs.pop("strip_legend", False)
         
 
     # NOTE: 2020-02-05 23:59:27
@@ -955,17 +958,18 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
     kwargs.pop("linewidth", None)
     
     if overlay_stripplot:
-        sb.stripplot(x=x, y=y, hue=hue, data=data, order=order, hue_order = hue_order,
-                     jitter=strip_jitter, dodge=strip_dodge, orient=orient,
-                     edgecolor=strip_edgecolor, color=strip_color,palette=strip_palette,
-                     size=strip_size, linewidth=strip_linewidth, alpha=strip_alpha,
-                     ax=ax, **kwargs)
-    
-        #stripplotsb(x=x, y=y, hue=hue, data=data, order=order, hue_order = hue_order,
+        #sb.stripplot(x=x, y=y, hue=hue, data=data, order=order, hue_order = hue_order,
                      #jitter=strip_jitter, dodge=strip_dodge, orient=orient,
                      #edgecolor=strip_edgecolor, color=strip_color,palette=strip_palette,
                      #size=strip_size, linewidth=strip_linewidth, alpha=strip_alpha,
                      #ax=ax, **kwargs)
+    
+        kwargs["add_legend"] = strip_legend
+        stripplot_sb(x=x, y=y, hue=hue, data=data, order=order, hue_order = hue_order,
+                     jitter=strip_jitter, dodge=strip_dodge, orient=orient,
+                     edgecolor=strip_edgecolor, color=strip_color,palette=strip_palette,
+                     size=strip_size, linewidth=strip_linewidth, alpha=strip_alpha,
+                     ax=ax, **kwargs)
     
     if despine:
         sb.despine(ax = ax, offset=axes_offset)
@@ -979,7 +983,7 @@ def catplot_sb(x=None, y=None, hue=None, data=None, row=None, col=None,
             col_wrap=None, estimator=np.mean, ci=95, n_boot=1000,
             units=None, order=None, hue_order=None, row_order=None,
             col_order=None, kind="strip", height=5, aspect=1,
-            orient=None, color=None, palette=None, saturation=.75,
+            orient=None, color=None, palette=None, 
             errcolor="0", errwidth=None,  capsize=None, dodge=True, 
             overlay_stripplot=True, axes_offset=0,
             despine=True, tick_direction="in",
@@ -1080,8 +1084,7 @@ def catplot_sb(x=None, y=None, hue=None, data=None, row=None, col=None,
     # Determine keyword arguments for the plotting function
     plot_kws = dict(
         order=order, hue_order=hue_order,  orient=orient, 
-        color=color, palette=palette, saturation=saturation,
-        dodge=dodge
+        color=color, palette=palette, dodge=dodge
         )
     plot_kws.update(kwargs)
 
@@ -1109,11 +1112,11 @@ def catplot_sb(x=None, y=None, hue=None, data=None, row=None, col=None,
     elif kind in ["strip"]:
         plot_kws.update(dodge=dodge,
             strip_jitter=kwargs.pop("strip_jitter", True),
-            strip_size=kwargs.ppop("strip_size",5),
+            strip_size=kwargs.pop("strip_size",5),
             strip_dodge = kwargs.pop("strip_dodge", dodge),
             strip_edgecolor = kwargs.pop("strip_edgecolor", "gray"),
             strip_color = kwargs.pop("strip_color", color),
-            strip_palette = kwargs.pop("strip_palette", strip_palette),
+            strip_palette = kwargs.pop("strip_palette", palette),
             strip_linewidth = kwargs.pop("strip_linewidth", 0),
             strip_alpha = kwargs.pop("strip_alpha", 1)
             )
@@ -1256,7 +1259,7 @@ def countplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None
     else:
         raise TypeError("Must pass values for either `x` or `y`")
 
-    plotter = _BarPlotter(x, y, hue, data, order, hue_order,
+    plotter = sb.categorical._BarPlotter(x, y, hue, data, order, hue_order,
                           estimator, ci, n_boot, units,
                           orient, color, palette, saturation,
                           errcolor, errwidth, capsize, dodge)
@@ -1287,7 +1290,16 @@ def boxenplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None
 
 def stripplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
               jitter=True, dodge=False, orient=None, color=None, palette=None,
-              size=5, edgecolor="gray", linewidth=0, ax=None, alpha=1, **kwargs):
+              size=5, edgecolor="gray", linewidth=0, ax=None, 
+              alpha=1, **kwargs):
+    """Adapted from seaborn.stripplot
+    
+    Additional keyword arguments:
+    ----------------------------
+    add_legend (True)
+    """
+    
+    add_legend=kwargs.pop("add_legend", True)
 
     if "split" in kwargs:
         dodge = kwargs.pop("split")
@@ -1309,7 +1321,7 @@ def stripplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None
                        edgecolor=edgecolor,
                        linewidth=linewidth))
 
-    plotter.plot(ax, kwargs)
+    plotter.plot(ax, kwargs, add_legend=add_legend)
     return ax, plotter
 
 def swarmplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,

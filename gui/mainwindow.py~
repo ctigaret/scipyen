@@ -1258,8 +1258,16 @@ class EmbedIPython(RichJupyterWidget):
     @safeWrapper
     def dropEvent(self, evt):
         from textwrap import dedent
+        print("EmbedIPython.dropEvent: evt", evt)
         #data = evt.mimeData().data(evt.mimeData().formats()[0])
         src = evt.source()
+        print("EmbedIPython.dropEvent: evt.source:", src)
+        
+        print("EmbedIPython.dropEvent: evt.mimeData()", evt.mimeData())
+        
+        print("EmbedIPython.dropEvent: evt.proposedAction()", evt.proposedAction())
+        
+        print("EmbedIPython.dropEvent: evt.mimeData().hasText()", evt.mimeData().hasText())
         #print(dir(evt.keyboardModifiers()))
         #print("EmbedIPython.dropEvent: event source: %s" % src)
         
@@ -1355,8 +1363,10 @@ class EmbedIPython(RichJupyterWidget):
             elif evt.mimeData().hasText():
                 # NOTE: 2019-08-10 00:33:00
                 # just write at the console whatever text has been dropped
-                if evt.proposedAction() == QtCore.Qt.CopyAction:
+                if evt.proposedAction() in (QtCore.Qt.CopyAction, QtCore.Qt.MoveAction):
                     text = evt.mimeData().text()
+                    print("EmbedIPython.dropEvent: text", text)
+                    print("EmbedIPython.dropEvent: mimeData.formats()", evt.mimeData().formats())
                     echoing = not bool(evt.keyboardModifiers() & QtCore.Qt.ShiftModifier)
                     store = bool(evt.keyboardModifiers() & QtCore.Qt.ControlModifier)
                     
@@ -1381,7 +1391,13 @@ class EmbedIPython(RichJupyterWidget):
                         self.setWindowTitle("%s #executing..." % wintitle)
                         self.ipkernel.shell.run_cell(text, store_history = False, silent=True, shell_futures=True)
                         self.setWindowTitle(wintitle)
+                        
+            else:
+                print("EmbedIPython.dropEvent: evt.mimeData()",evt.mimeData())
+                
         evt.accept()
+        
+        
         
         #NOTE:
         #NOTE: Other considered options:
@@ -1915,7 +1931,7 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
         fileNames, fileFilter = QtWidgets.QFileDialog.getOpenFileNames(self, caption=u"Run python script", filter="Python script (*.py)", directory = targetDir)
         
         for fileName in fileNames:
-        self.signal_pythonFileAdded.emit(fileName)
+            self.signal_pythonFileAdded.emit(fileName)
         
         
     @pyqtSlot()
