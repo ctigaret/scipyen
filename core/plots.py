@@ -125,12 +125,103 @@ mpl_plot_functions["streamplot"]            = Axes.streamplot
 
     #"""
     #return arr[pd.notnull(arr)]
+    
+class SB_CategoricalPlotter(sb.categorical._CategoricalPlotter):
+    def annotate_axes(self, ax, show_legend=True):
+        """Add descriptive labels to an Axes object."""
+        #print("SB_CategoricalPlotter.annotate_axes show_legend", show_legend)
+        if self.orient == "v":
+            xlabel, ylabel = self.group_label, self.value_label
+        else:
+            xlabel, ylabel = self.value_label, self.group_label
 
-class SB_CategoricalStatPlotter(sb.categorical._CategoricalStatPlotter):
+        if xlabel is not None:
+            ax.set_xlabel(xlabel)
+        if ylabel is not None:
+            ax.set_ylabel(ylabel)
+
+        if self.orient == "v":
+            ax.set_xticks(np.arange(len(self.plot_data)))
+            ax.set_xticklabels(self.group_names)
+        else:
+            ax.set_yticks(np.arange(len(self.plot_data)))
+            ax.set_yticklabels(self.group_names)
+
+        if self.orient == "v":
+            ax.xaxis.grid(False)
+            ax.set_xlim(-.5, len(self.plot_data) - .5, auto=None)
+        else:
+            ax.yaxis.grid(False)
+            ax.set_ylim(-.5, len(self.plot_data) - .5, auto=None)
+
+        if show_legend:
+            if self.hue_names is not None:
+                leg = ax.legend(loc="best")
+                if self.hue_title is not None:
+                    leg.set_title(self.hue_title)
+
+                    # Set the title size a roundabout way to maintain
+                    # compatibility with matplotlib 1.1
+                    # TODO no longer needed
+                    try:
+                        #title_size = mpl.rcParams["axes.labelsize"] * .85
+                        title_size = mpl.rcParams["axes.labelsize"]
+                    except TypeError:  # labelsize is something like "large"
+                        title_size = mpl.rcParams["axes.labelsize"]
+                    prop = mpl.font_manager.FontProperties(size=title_size)
+                    leg._legend_title_box._text.set_font_properties(prop)
+    
+    def add_legend_data(self, ax, color, label):
+        """Add a dummy patch object so we can get legend data."""
+        rect = plt.Rectangle([0, 0], 0, 0,
+                             linewidth=self.linewidth / 2,
+                             edgecolor=self.gray,
+                             facecolor=color,
+                             label=label)
+        ax.add_patch(rect)
+
+class SB_CategoricalStatPlotter(SB_CategoricalPlotter):
     """Seaborn's CategoricalPlotter vriant allowing custom statistics.
     For now, accepts ci as "se" in adddition to Seaborn's options
     """
     
+    @property
+    def nested_width(self):
+        """A float with the width of plot elements when hue nesting is used."""
+        if self.dodge:
+            width = self.width / len(self.hue_names)
+        else:
+            width = self.width
+        return width
+
+    def draw_confints(self, ax, at_group, confint, colors,
+                      errwidth=None, capsize=None, **kws):
+
+        if errwidth is not None:
+            kws.setdefault("lw", errwidth)
+        else:
+            kws.setdefault("lw", mpl.rcParams["lines.linewidth"] * 1.8)
+
+        for at, (ci_low, ci_high), color in zip(at_group,
+                                                confint,
+                                                colors):
+            if self.orient == "v":
+                ax.plot([at, at], [ci_low, ci_high], color=color, **kws)
+                if capsize is not None:
+                    ax.plot([at - capsize / 2, at + capsize / 2],
+                            [ci_low, ci_low], color=color, **kws)
+                    ax.plot([at - capsize / 2, at + capsize / 2],
+                            [ci_high, ci_high], color=color, **kws)
+            else:
+                ax.plot([ci_low, ci_high], [at, at], color=color, **kws)
+                if capsize is not None:
+                    ax.plot([ci_low, ci_low],
+                            [at - capsize / 2, at + capsize / 2],
+                            color=color, **kws)
+                    ax.plot([ci_high, ci_high],
+                            [at - capsize / 2, at + capsize / 2],
+                            color=color, **kws)
+
     def estimate_statistic(self, estimator, ci, n_boot):
         """Also accepts ci given as "se"
         """
@@ -315,8 +406,10 @@ class SB_BarPlotter(SB_CategoricalStatPlotter):
 
     def plot(self, ax, bar_kws):
         """Make the plot."""
+        show_legend = bar_kws.pop("show_legend", True)
+        #print("SB_BarPlotter.plot show_legend", show_legend)
         self.draw_bars(ax, bar_kws)
-        self.annotate_axes(ax)
+        self.annotate_axes(ax, show_legend=show_legend)
         if self.orient == "h":
             ax.invert_yaxis()
 
@@ -887,6 +980,10 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
         the string "se"; in this case the function plots mean +/- standard error 
         of the mean
         
+    Additional keyword arguments for barplot:
+    --------------
+    show_legend (True)
+        
     Additional keyword arguments controlling the appearance of the 
     overlaid stripplot. These are embedded in kwargs (default values in parantheses):
     -----------
@@ -945,7 +1042,7 @@ def barplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
     strip_linewidth = kwargs.pop("strip_linewidth", 0)
     strip_alpha = kwargs.pop("strip_alpha", 1)
     strip_legend = kwargs.pop("strip_legend", False)
-        
+    strip_order = kwargs.pop("strip_order", None)  # to allow only for the bar legend
 
     # NOTE: 2020-02-05 23:59:27
     # plots the bars
@@ -1087,8 +1184,13 @@ def catplot_sb(x=None, y=None, hue=None, data=None, row=None, col=None,
         color=color, palette=palette, dodge=dodge
         )
     plot_kws.update(kwargs)
+    
+    #print("plots.catplot_sb kind", kind)
 
     if kind in ["bar", "point"]:
+        # NOTE: 2020-02-11 10:11:05
+        # the strip_* arguments will be renamed within barplot_sb() and pointplot_sb()
+        # then passed with their proper names to stripplot_sb()
         plot_kws.update(
             estimator=estimator, ci=ci, n_boot=n_boot, units=units,
             errcolor = errcolor, errwidth=errwidth, capsize=capsize, dodge=dodge,
@@ -1099,7 +1201,9 @@ def catplot_sb(x=None, y=None, hue=None, data=None, row=None, col=None,
             strip_color = kwargs.pop("strip_color", color),
             strip_palette = kwargs.pop("strip_palette", palette),
             strip_linewidth = kwargs.pop("strip_linewidth", 0),
-            strip_alpha = kwargs.pop("strip_alpha", 1)
+            strip_alpha = kwargs.pop("strip_alpha", 1),
+            strip_order = kwargs.pop("strip_order", None),
+            strip_legend = kwargs.pop("strip_legend", False)
             )
         
         if kind == "point":
@@ -1110,15 +1214,20 @@ def catplot_sb(x=None, y=None, hue=None, data=None, row=None, col=None,
                             )
         
     elif kind in ["strip"]:
-        plot_kws.update(dodge=dodge,
-            strip_jitter=kwargs.pop("strip_jitter", True),
-            strip_size=kwargs.pop("strip_size",5),
-            strip_dodge = kwargs.pop("strip_dodge", dodge),
-            strip_edgecolor = kwargs.pop("strip_edgecolor", "gray"),
-            strip_color = kwargs.pop("strip_color", color),
-            strip_palette = kwargs.pop("strip_palette", palette),
-            strip_linewidth = kwargs.pop("strip_linewidth", 0),
-            strip_alpha = kwargs.pop("strip_alpha", 1)
+        # NOTE: 2020-02-11 10:13:03
+        # unlike the case of barplot_sb and pointplot_sb,
+        # the "strip_*" arguments are directly passed to stripplot_sb
+        # therefore they must appropriately renamed here
+        plot_kws.update(dodge = kwargs.pop("strip_dodge", dodge),
+            jitter=kwargs.pop("strip_jitter", True),
+            size=kwargs.pop("strip_size",5),
+            edgecolor = kwargs.pop("strip_edgecolor", "gray"),
+            color = kwargs.pop("strip_color", color),
+            palette = kwargs.pop("strip_palette", palette),
+            linewidth = kwargs.pop("strip_linewidth", 0),
+            alpha = kwargs.pop("strip_alpha", 1),
+            order = kwargs.pop("strip_order", None),
+            add_legend = kwargs.pop("strip_legend", True)
             )
 
 
@@ -1306,6 +1415,16 @@ def stripplot_sb(x=None, y=None, hue=None, data=None, order=None, hue_order=None
         msg = "The `split` parameter has been renamed to `dodge`."
         warnings.warn(msg, UserWarning)
 
+    #strip_jitter = kwargs.pop("strip_jitter", True)
+    #strip_size = kwargs.pop("strip_size", 5)
+    #strip_dodge = kwargs.pop("strip_dodge", dodge)
+    #strip_edgecolor = kwargs.pop("strip_edgecolor", "gray")
+    #strip_color = kwargs.pop("strip_color", color)
+    #strip_palette = kwargs.pop("strip_palette", palette)
+    #strip_linewidth = kwargs.pop("strip_linewidth", 0)
+    #strip_alpha = kwargs.pop("strip_alpha", 1)
+    #strip_legend = kwargs.pop("strip_legend", False)
+        
     plotter = SB_StripPlotter(x, y, hue, data, order, hue_order,
                             jitter, dodge, orient, color, palette)
     if ax is None:
