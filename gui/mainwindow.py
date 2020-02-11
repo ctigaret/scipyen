@@ -1201,6 +1201,7 @@ class EmbedIPython(RichJupyterWidget):
         self.font_family = desktopFixedFontSpec[0]
         self.font_size = int(desktopFixedFontSpec[1])
         
+        self.drop_cache=None
         
         #self.menubar = QtWidgets.QMenuBar(parent=self)
         #self.setMenuBar(self.menubar)
@@ -1223,37 +1224,18 @@ class EmbedIPython(RichJupyterWidget):
         
         
     def dragEnterEvent(self, evt):
-        mimeData = evt.mimeData()
-        #if evt.mimeData().hasFormat("text/plain"):
-        if evt.mimeData().hasText():
-            evt.acceptProposedAction();
-        #print("dragEnterEvent")
-        #print("Event: ",evt)
-        #print("proposed action: ",evt.proposedAction())
-        #print("mime data: ", evt.mimeData())
-        #print("mime data formats: ", mimeData.formats())
-        
+        #if "text/plain" in evt.mimeData().formats():
+            ##print("mime data text:\n", evt.mimeData().text())
+            #text = evt.mimeData().text()
+            #if len(text):
+                #self.drop_cache = text
+            #else:
+                #self.drop_cache = evt.mimeData().data("text/plain").data().decode()
+
+            #evt.acceptProposedAction();
+            
+        evt.acceptProposedAction();
         evt.accept()
-        
-    @safeWrapper
-    def __write_text_in_console_buffer__(self, text):
-        from textwrap import dedent
-        # NOTE:2019-08-02 13:59:26
-        # code below taken from console_widget module in qtconsole package
-        if isinstance(text, str):
-            self._keep_cursor_in_buffer()
-            cursor = self._control.textCursor()
-            self._insert_plain_text_into_buffer(cursor, dedent(text))
-            
-    @safeWrapper
-    def writeText(self, text):
-        """Writes a text in console buffer
-        """
-        if isinstance(text, str):
-            self.__write_text_in_console_buffer__(text)
-            
-        elif isinstance(text, (tuple, list) and all([isinstance(s, str) for s in text])):
-            self.__write_text_in_console_buffer__("\n".join(text))
         
     @safeWrapper
     def dropEvent(self, evt):
@@ -1360,7 +1342,7 @@ class EmbedIPython(RichJupyterWidget):
                 # directory of the (local) URL, by pressing SHIFT while dropping
                 self.loadUrls.emit(urls, evt.keyboardModifiers() == QtCore.Qt.ShiftModifier, evt.pos())
                 
-            elif evt.mimeData().hasText():
+            elif evt.mimeData().hasText() and len(evt.mimeData().text()):
                 # NOTE: 2019-08-10 00:33:00
                 # just write at the console whatever text has been dropped
                 if evt.proposedAction() in (QtCore.Qt.CopyAction, QtCore.Qt.MoveAction):
@@ -1392,8 +1374,19 @@ class EmbedIPython(RichJupyterWidget):
                         self.ipkernel.shell.run_cell(text, store_history = False, silent=True, shell_futures=True)
                         self.setWindowTitle(wintitle)
                         
-            #else:
-                #print("EmbedIPython.dropEvent: evt.mimeData()",evt.mimeData())
+            else:
+                # mime data formats contains text/plain but data is QByteArray
+                # (which wraps a Python bytes object)
+                if "text/plain" in evt.mimeData().formats():
+                    #print("mime data text:\n", evt.mimeData().text())
+                    text = evt.mimeData().text()
+                    if len(text) == 0:
+                        text = evt.mimeData().data("text/plain").data().decode()
+                        
+                    if len(text):
+                        self.writeText(text)
+
+            self.drop_cache=None
                 
         evt.accept()
         
@@ -1421,6 +1414,26 @@ class EmbedIPython(RichJupyterWidget):
         #print("Event data: ", data, " ", repr(data))
         #print("Event source: ", repr(evt.source()))
 
+    @safeWrapper
+    def __write_text_in_console_buffer__(self, text):
+        from textwrap import dedent
+        # NOTE:2019-08-02 13:59:26
+        # code below taken from console_widget module in qtconsole package
+        if isinstance(text, str):
+            self._keep_cursor_in_buffer()
+            cursor = self._control.textCursor()
+            self._insert_plain_text_into_buffer(cursor, dedent(text))
+            
+    @safeWrapper
+    def writeText(self, text):
+        """Writes a text in console buffer
+        """
+        if isinstance(text, str):
+            self.__write_text_in_console_buffer__(text)
+            
+        elif isinstance(text, (tuple, list) and all([isinstance(s, str) for s in text])):
+            self.__write_text_in_console_buffer__("\n".join(text))
+        
     @safeWrapper
     def slot_clearConsole(self):
         self.ipkernel.shell.run_line_magic("clear", "", 2)
