@@ -169,7 +169,7 @@ def save_LTP_options(val):
         pickle.dump(val, fileDest, pickle.HIGHEST_PROTOCOL)
     
 
-def load_LTP_options():
+def load_LTP_options(LTPOptionsFile=None, field=False):
     if not os.path.isfile(LTPOptionsFile):
         LTPopts = dict()
         LTPopts["Average"] = {'Count': 6, 'Every': 6}
@@ -183,9 +183,9 @@ def load_LTP_options():
         LTPopts["Signals"] = ['Im_prim_1', 'Vm_sec_1']
         print("Now, save the options as %s" % os.path.join(os.path.dirname(__file__), "options", "LTPOptions.pkl"))
         #raise RuntimeError("No options file found. Have you ever run save_LTP_options ?")
-    
-    with open(LTPOptionsFile, "rb") as fileSrc:
-        LTPopts = pickle.load(fileSrc)
+    else:
+        with open(LTPOptionsFile, "rb") as fileSrc:
+            LTPopts = pickle.load(fileSrc)
         
     return LTPopts
 

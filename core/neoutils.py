@@ -1468,14 +1468,16 @@ def concatenate_blocks(*args, **kwargs):
                             can also be a signal name
                                 
             
-    Returns a new neo.Block object
+    Returns:
+    -------
+    a new neo.Block object
     
     NOTE: this is different from Block.merge() and Segment.merge() which basically
     append analog signals to same segments (thus requiring identical time bases)
     
     Example:
     
-    block = concatenate_blocks(getvars("data_name_prefix*", sortkey="rec_datetime"), segment_index=0)
+    block = concatenate_blocks(getvars("data_name_prefix*"), segment_index=0)
     
     # will concatenate first segment from all neo.Block variabels having names beginning with 
     # 'data_name_prefix' in the user workspace and ordered by rec_datetime,
@@ -1489,8 +1491,17 @@ def concatenate_blocks(*args, **kwargs):
     if len(args) == 0:
         return None
     
+    #print(args)
     if len(args) == 1:
-        args = args[0] # unpack the tuple
+        if isinstance(args[0], str):
+            try:
+                args =  workspacefunctions.getvars(args[0])#, sortkey="rec_datetime")
+            except Exception as e:
+                print("String argument did not resolve to a list of neo.Block objects")
+                traceback.print_exc()
+                return
+        else:
+            args = args[0] # unpack the tuple
     
     ret = neo.core.Block()
     

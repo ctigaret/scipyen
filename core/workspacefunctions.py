@@ -77,7 +77,7 @@ def total_size(o, handlers={}, verbose=False):
 
 #"def" lsvars(ws = None, sel = None, sort=False, sortkey=None, reverse=None):
 #"def" lsvars(*args, ws = None, sort=False, sortkey=None, reverse=None):
-def lsvars(*args, glob=True, ws = None):
+def lsvars(*args, glob=True, ws = None, sort = False, sortkey=None, reverse=False):
     """List names of variables in a namespace, according to a selection criterion.
     
     Returns a (possibly sorted) list of variable names if found, or an empty list.
@@ -190,9 +190,8 @@ def lsvars(*args, glob=True, ws = None):
         return ret
     
     
-    #if sort:
-        #return sorted(ret, key=sortkey, reverse=reverse)
-    #else:
+    if sort:
+        return sorted(ret, key=sortkey, reverse=reverse)
     
     
 def getvarsbytype(vartype, ws=None):
@@ -224,7 +223,7 @@ def getvarsbytype(vartype, ws=None):
     
     return dict(lst)
         
-#"def" getvars(*args, types = None, ws=None, sort=True, by_name=False, reverse=None, as_dict=False):
+#"def" getvars(*args, glob=True, ws=None, sort=True, by_name=False, sortkey=None, reverse=None, as_dict=False):
 def getvars(*args, glob=True, ws=None, as_dict=False):
     """Obtain a subset of variabes from a workspace (a dictionary)
 
@@ -328,7 +327,9 @@ def getvars(*args, glob=True, ws=None, as_dict=False):
     
     if as_dict:
         lst = [(n, ws[n]) for n in var_names]
+        
         ret = OrderedDict(lst)
+        
     else:
         ret = [ws[n] for n in var_names]
         #ret = [item[1] for item in lst]
