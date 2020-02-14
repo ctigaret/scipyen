@@ -17,4 +17,4 @@ Usage:
 
 
 """
-__all__ = ["ltp", "ivramp", "membrane"]#, "epsignal"]
+__all__ = ["ivramp", "membrane"]#, "epsignal"]
