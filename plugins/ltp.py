@@ -69,6 +69,63 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,
 
 """
 NOTE: 2020-02-14 16:54:19 LTP options revamp
+NOTATIONS: Im = membrane current; Vm = membrane potential
+
+LTP configurations = dictionary with the following fields:
+
+"mode":str, one of ["VC", "IC", "fEPSP"]
+
+"paired":bool. When True, test stimulation is paired-pulse
+
+"isi":[float, pq.quantity] - interval between stimuli in paired-pulse stimulation
+    when a pq.quantity is must be in time units compatible with the data
+    when a float, the time units of the data are implicit
+    
+"paths":dict with keys "Test" and "Control", or empty
+    paths["Test"]:int
+    paths["Control"]:[int, NoneType]
+    
+    When present and non-empty, indicates that this is a dual pathway experiment
+    where one is the test pathway and the other, the control pathway.
+    
+    The values of the "Test" pathway is the integer index of the sweep corresponding 
+    to the test pathway, in each "Run" stored as an *.abf file
+    
+    Similarly, the value of "Control" is the integer index of the sweep containing
+    data recorded on the control pathway, in each run stored in the *.abf file
+    
+    Although the paths key is used primarily when importing abf files into an
+    experiment, it is also used during analysis, to signal that the experiment is
+    a dual-pathway experiment.
+    
+    An Exception is raised when:
+        a) both "Test" and "Control" have the same value, or
+        b) any of "Test" and "Control" have values < 0 or > max number of sweeps
+        in the run (NOTE: a run is stored internally as a neo.Block; hence the 
+        number of sweeps in the run equals the number of segments in the Block)
+    
+    The experiment is implicitly considered to be singla-pwathway when:
+    a) "paths" is absent
+    b) "paths" is None or an empty dictionary
+    c) "paths" only contains one pathway specification (any name, any value)
+    d) "paths" contains both "Test", and "Control" fields but Control is either
+        None, or has a negative value
+        
+    W
+    
+"dual":bool. Indicated whether this is a dual pathway experiment.
+    When True, recordings are supposed to contain interleaved sweeps, one per
+    pathway, and the two pathways are called "Test" and "Control". The two pathways
+    are assumed to be independent and non-overlapping (i.e., no cross-talk); 
+    in whole-cell patch clamp these pathways are converging onto the patched cell.
+    
+    When False, recordings contain data from a single pathway.
+    
+"xtalk": dictionary with configuration parameters for testing cross-talk between
+    pathways
+    Ignored when "dual" is False.
+    
+
 
 1) allow for one or two pathways experiment
 
@@ -76,10 +133,96 @@ NOTE: 2020-02-14 16:54:19 LTP options revamp
 
 3) allow for the following recording modes:
 3.a) whole-cell patch clamp:
-3.a.1) voltage clamp mode => measures:
-        Rs, 
-        Rin, 
-        peak amplitude of 1st EPSC
+3.a.1) mode="VC": voltage clamp mode => measures series and input resistances,
+    and the peak amplitude of EPSC (one or two, if paire-pulse is True
+    
+    field: "Rm": 
+        defines the baseline region for series and input resistance calculation
+            
+        subfields:
+        
+        "Rbase" either:
+            tuple(position:[float, pq.quantity], window:[float, pq.quantity], name:str)
+            
+            of sequence of two tuples as above
+            
+            each tuple defines a cursor;
+                when a single cursor is defined, its window defines the baseline
+                region
+                
+                when two cursors are defined, their positions delimit the baseline region
+            
+            
+        
+            sets up the cursor Rbase - for Rs and Rin calculations
+            type: vertical, position, window, name = Rbase
+            
+            placed manually before the depolarizing Vm square waveform
+            for the membrane resistance test 
+        
+        field: "Rs":
+        
+        tuple(position:[float, pq.quantity], window:[float, pq.quantity], name:str)
+        
+            sets up the second cursors for the calculation of Rs:
+            this can be
+        
+        * Rs: 
+            required LTP options fields:
+                cursor 1 for resistance test baseline 
+                        
+                cursor 2 for peak of capacitance transient
+                    type: vertical, position, window, name = Rs
+                    
+                    placed manually
+                        either on the peak of the 1st capacitance transient at the
+                        onset of the positive Vm step waveform for the membrane
+                        resistance test
+                        
+                        or after this peak, to use with positive peak detection
+                    
+                value of Vm step (mV)
+                
+                name of the Im signal
+                
+                use peak detection: bool, default False
+            
+            calculation of Rs:
+                Irs = Im_Rs - Im_Rbase where:
+                    Im_Rs = average Im across the window of Rs cursor
+                    Im_Rbase = averae Im across the window of the Rbase cursor
+                
+            Rs = Vm_step/Irs in megaohm
+            
+            
+        * Rin:
+            required LTP options fields:
+                cursor 1 for steady-state Im during the positive (i.e. depolarizing)
+                    VM step waveform
+                    
+                    type: vertical, position, window, name=Rin
+                    
+                    placed manualy towards the end of the Vm step waveform BEFORE repolarization
+                    
+            calculated as :
+                Irin = Im_Rin - Im_Rbase, where:
+                    Im_Rin = average Im acros the window of the Rin cursor
+                    Im_Rbase -- see Rs
+                    
+                Rin = Vm_step/Irin
+                
+        * EPSC0: peak amplitude of 1st EPSC
+            required LTP options fields:
+                cursor for baseline before stimulus artifact
+                type: vertical; position, window, name=EPSC0_base
+                manually placed before stimuus artifact for 1st EPSC
+                
+                cursor for peak of EPSC0
+                type: vertical, position, window, name=EPSC0
+                placed either manually, or use inward peak detection between
+                    two cursors
+                
+                
         if paired-pulse stimulation: 
             peak amplitude of 2nd EPSC
             ratio 2nd EPSC peak amplitude / 1st EPSC peak amplitude
