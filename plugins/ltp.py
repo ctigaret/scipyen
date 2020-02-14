@@ -17,6 +17,11 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import neo
 from scipy import optimize, cluster#, where
+
+from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
+from PyQt5.QtCore import pyqtSignal, pyqtSlot
+from PyQt5.uic import loadUiType as __loadUiType__ 
+
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -34,6 +39,13 @@ from core.utilities import safeWrapper
 
 #### BEGIN pict.gui modules
 import gui.signalviewer as sv
+import gui.textviewer as tv
+import gui.tableeditor as te
+import gui.matrixviewer as matview
+import gui.pictgui as pgui
+import gui.quickdialog as quickdialog
+import gui.scipyenviewer as scipyenviewer
+from gui.scipyenviewer import ScipyenViewer, ScipyenFrameViewer
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules
@@ -43,6 +55,11 @@ import iolib.pictio as pio
 LTPOptionsFile = os.path.join(os.path.dirname(__file__), "options", "LTPOptions.pkl")
 optionsDir     = os.path.join(os.path.dirname(__file__), "options")
 
+__module_path__ = os.path.abspath(os.path.dirname(__file__))
+
+__UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPGUI.ui"), from_imports=True)
+
+
 # NOTE: 2017-05-07 20:18:37
 # overwrite neo's Epoch with our own
 #import neoepoch
@@ -50,8 +67,50 @@ optionsDir     = os.path.join(os.path.dirname(__file__), "options")
 #neo.core.Epoch = neoepoch.Epoch
 #neo.Epoch = neoepoch.Epoch
 
+"""
+NOTE: 2020-02-14 16:54:19 LTP options revamp
+
+1) allow for one or two pathways experiment
+
+2) allow for single or paired-pulse stimulation (must be the same in both pathways)
+
+3) allow for the following recording modes:
+3.a) whole-cell patch clamp:
+3.a.1) voltage clamp mode => measures:
+        Rs, 
+        Rin, 
+        peak amplitude of 1st EPSC
+        if paired-pulse stimulation: 
+            peak amplitude of 2nd EPSC
+            ratio 2nd EPSC peak amplitude / 1st EPSC peak amplitude
+            
+        EPSC amplitudes measurements:
+            - at cursor placed at EPSC peak (manually) or by peak-finding
+            - relative to baseline cursor before stimulus artifact
+            - value = average of data within cursor's WINDOW
+            
+            
+"""
 
 #"def" pairedPulseEPSCs(data_block, Im_signal, Vm_signal, epoch = None):
+
+class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
+        self.settings = QtCore.QSettings()
+        self.threadpool = QtCore.QThreadPool()
+        
+        self._data_ = None
+        self._data_var_name_ = None
+        
+        self._ltpOptions_ = None
+        
+        
+        
+        
+    
+    
     
     
 def generate_LTP_options(cursors, signal_names, path0, path1, baseline_minutes, \
@@ -79,6 +138,10 @@ def generate_LTP_options(cursors, signal_names, path0, path1, baseline_minutes, 
     baseline_minutes = int: number of last baseline minutes before conditioning, to consider for
                     normalizing the EPSCs
                     
+    average: bool. Whether to average individual blocks in order to generage minute-average data.
+        For pClamp:
+            When the acquisition protocol specifies one run/trial, each Axon binary file
+            contains individual sweeps (one per path)
     average_count  = int: number of trials to average per minute
     average_every  = int: number of trials to skip between two consecutive averages
                                         

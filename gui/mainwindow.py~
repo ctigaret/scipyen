@@ -1224,24 +1224,17 @@ class EmbedIPython(RichJupyterWidget):
         
         
     def dragEnterEvent(self, evt):
-        mimeData = evt.mimeData()
-        #if evt.mimeData().hasFormat("text/plain"):
-        #print("EmberIPython.dragEnterEvent(evt)")
-        #print("Event: ",evt)
-        #print("proposed action: ",evt.proposedAction())
-        #print("mime data: ", evt.mimeData())
-        #print("mime data has text: ", evt.mimeData().hasText())
-        #print("mime data formats: ", mimeData.formats())
-        
-        if "text/plain" in evt.mimeData().formats():
-            #print("mime data text:\n", evt.mimeData().text())
-            text = evt.mimeData().text()
-            if len(text):
-                self.drop_cache = text
-            else:
-                self.drop_cache = evt.mimeData().data("text/plain").data().decode()
+        #if "text/plain" in evt.mimeData().formats():
+            ##print("mime data text:\n", evt.mimeData().text())
+            #text = evt.mimeData().text()
+            #if len(text):
+                #self.drop_cache = text
+            #else:
+                #self.drop_cache = evt.mimeData().data("text/plain").data().decode()
 
-            evt.acceptProposedAction();
+            #evt.acceptProposedAction();
+            
+        evt.acceptProposedAction();
         evt.accept()
         
     @safeWrapper
@@ -1382,9 +1375,17 @@ class EmbedIPython(RichJupyterWidget):
                         self.setWindowTitle(wintitle)
                         
             else:
-                if isinstance(self.drop_cache, str) and len(self.drop_cache):
-                    self.writeText(self.drop_cache)
-                    
+                # mime data formats contains text/plain but data is QByteArray
+                # (which wraps a Python bytes object)
+                if "text/plain" in evt.mimeData().formats():
+                    #print("mime data text:\n", evt.mimeData().text())
+                    text = evt.mimeData().text()
+                    if len(text) == 0:
+                        text = evt.mimeData().data("text/plain").data().decode()
+                        
+                    if len(text):
+                        self.writeText(text)
+
             self.drop_cache=None
                 
         evt.accept()

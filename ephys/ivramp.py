@@ -55,7 +55,7 @@ import gui.signalviewer as sv
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-_Ui_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPGUI.ui"))
+#_Ui_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPGUI.ui"))
 
 
 def macroscopic_conductance(v, i, **kwargs):

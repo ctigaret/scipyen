@@ -182,9 +182,10 @@ from systems import *
 #### END pict.systems modules
 
 #### BEGIN other pict modules
-import plugins.CaTanalysis as CaTanalysis # TODO make this a plugin!
+# TODO convert these to plugins!
+import plugins.CaTanalysis as CaTanalysis 
+import plugins.ltp as ltp
 
-#import pictmainwindow as pm
 #### END other pict modules
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
