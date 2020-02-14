@@ -108,7 +108,6 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         
         
         
-        
     
     
     
