@@ -22,8 +22,8 @@ def _new_event(cls, signal, times = None, labels=None, units=None, name=None,
                file_origin=None, description=None,
                annotations=None, segment=None):
     '''
-    A function to map Event.__new__ to function that
-    does not do the unit checking. This is needed for pickle to work. 
+    A function to map Event.__new__ to function that does not do the unit checking.
+    This is needed for pickle to work with older pkl files. 
     '''
     # NOTE: 2017-12-07 23:19:51
     # this avoids pumping signal twice when unpickling events embedded as members

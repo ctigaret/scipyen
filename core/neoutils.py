@@ -3312,7 +3312,8 @@ def auto_detect_trigger_protocols(data,
 def auto_define_trigger_events(src, signal_index, event_type, 
                                times=None, label=None, name=None, 
                                use_lo_hi=True, time_slice=None, 
-                               clearSimilarEvents=True, clearTriggerEvents=True, clearAllEvents=False):
+                               clearSimilarEvents=True, clearTriggerEvents=True, 
+                               clearAllEvents=False):
     """Populates the events lists for the segments in src with dt.TriggerEvent objects.
     
     Searches for trigger waveforms in signals specified by signal_index, to define
@@ -3415,7 +3416,7 @@ def auto_define_trigger_events(src, signal_index, event_type,
         
     Returns:
     ========
-    The src parameter
+    The src parameter (a reference)
     
     Side effects:
         Creates and appends dt.TriggerEvent objects to the segments in src
@@ -3456,33 +3457,40 @@ def auto_define_trigger_events(src, signal_index, event_type,
             # signal specified by name
             signal_index = get_index_of_named_signal(data, signal_index)
             
-        if isinstance(signal_index, list) and all(isinstance(s, int) for s in signal_index):
-            if len(signal_index) != len(data):
-                raise TypeError("When a list of int, signal_index must have as many elements as segments in src (%d); instead it has %d" % (len(data), len(signal_index)))
-            
-            for (s, ndx) in zip(data, signal_index):
-                if ndx in range(len(s.analogsignals)):
-                    if isinstance(time_slice, (tuple, list)) \
-                        and all([isinstance(t, pq.Quantity) and dt.check_time_units(t) for t in time_slice]) \
-                            and len(time_slice) == 2:
-                        event = detect_trigger_events(s.analogsignals[ndx].time_slice(time_slice[0], time_slice[1]), 
-                                                      event_type=event_type, 
-                                                      use_lo_hi=use_lo_hi, 
-                                                      label=label, name=name)
+        if isinstance(signal_index, (tuple, list)):
+            if all(isinstance(s, (int, str)) for s in signal_index):
+                if len(signal_index) != len(data):
+                    raise TypeError("When a list of int, signal_index must have as many elements as segments in src (%d); instead it has %d" % (len(data), len(signal_index)))
+                
+                for (s, ndx) in zip(data, signal_index):
+                    if isinstance(ndx, str):
+                        sndx = get_index_of_named_signal(s, ndx, silent=True)
                         
                     else:
-                        event = detect_trigger_events(s.analogsignals[ndx], 
-                                                      event_type=event_type, 
-                                                      use_lo_hi=use_lo_hi, 
-                                                      label=label, name=name)
+                        sndx = ndx
                         
-                    embed_trigger_event(event, s, 
-                                        clearTriggerEvents = clearTriggerEvents,
-                                        clearSimilarEvents = clearSimilarEvents,
-                                        clearAllEvents = clearAllEvents)
-                    
-                else:
-                    raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (ndx, len(s.analogsignals)))
+                    if sndx in range(len(s.analogsignals)):
+                        if isinstance(time_slice, (tuple, list)) \
+                            and all([isinstance(t, pq.Quantity) and dt.check_time_units(t) for t in time_slice]) \
+                                and len(time_slice) == 2:
+                            event = detect_trigger_events(s.analogsignals[sndx].time_slice(time_slice[0], time_slice[1]), 
+                                                        event_type=event_type, 
+                                                        use_lo_hi=use_lo_hi, 
+                                                        label=label, name=name)
+                            
+                        else:
+                            event = detect_trigger_events(s.analogsignals[sndx], 
+                                                        event_type=event_type, 
+                                                        use_lo_hi=use_lo_hi, 
+                                                        label=label, name=name)
+                            
+                        embed_trigger_event(event, s, 
+                                            clearTriggerEvents = clearTriggerEvents,
+                                            clearSimilarEvents = clearSimilarEvents,
+                                            clearAllEvents = clearAllEvents)
+                        
+                    else:
+                        raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (ndx, len(s.analogsignals)))
 
         elif isinstance(signal_index, int):
             for s in data:
@@ -3510,7 +3518,7 @@ def auto_define_trigger_events(src, signal_index, event_type,
                     raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (signal_index, len(s.analogsignals)))
                 
         else:
-            raise RuntimeError("Invalid signal index %s" % signal_index)
+            raise RuntimeError("Invalid signal index %s" % str(signal_index))
 
     else:
         raise TypeError("times expected to be a python Quantity array with time units, or None")
@@ -4128,7 +4136,7 @@ def embed_trigger_event(event, segment, clearSimilarEvents=True, clearTriggerEve
     """
     from . import datatypes as dt
     
-    if not isinstance(event, neo.Event):
+    if not isinstance(event, (neo.Event, dt.TriggerEvent)):
         raise TypeError("event expected to be a neo.Event; got %s instead" % type(event).__name__)
     
     if not isinstance(segment, neo.Segment):
