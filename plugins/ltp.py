@@ -71,16 +71,146 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,
 NOTE: 2020-02-14 16:54:19 LTP options revamp
 NOTATIONS: Im = membrane current; Vm = membrane potential
 
-LTP configurations = dictionary with the following fields:
+Configurations for synaptic plasticity experiments (ex vivo slice) = dictionary with the following fields:
 
+A synaptic plasticity experiment takes place in three stages:
+        1. pre-conditioning ("baseline") test synaptic responses
+        2. conditioning (plasticity induction protocol)
+        3. post-conditioning ("chase") test synaptic responses
+        
+Test synaptic responses are evoked at low frequency (< 1 Hz) by stimulations of 
+presynaptic axons. Because of normal fluctuations in the synaptic response, the 
+average synaptic response during each minute is usually more relevant: for 0.1 Hz 
+stimulation this is the average of six consecutive responses.
+
+Averaging can be performed "on-line" during the experiment, and the minute-average
+responses are recorded directly (Signal2 from CED, and Clampex from Axon/MolecularDevices
+can do this). Alternatively, the averaging can be performed off-line, using the saved
+data.
+
+The synaptic responses can be recorded as:
+    * evoked post-synaptic currents or potentials, using in whole-cell patch clamp 
+        or with intracellular (sharp) electrodes, in current clamp;
+        
+    * evoked field potentials, using in extracellular field recordings.
+        
+Conditioning consists of a sequence of stimulations delivered to presynaptic axons,
+optionally combined with depolarization of the postsynaptic cell(s). 
+
+Postsynaptic cell depolarization:
+--------------------------------
+Postsynaptic current injections are used to elicit postsynaptic action potentials
+(with intracellular sharp electrodes or whole-cell patch clamp), or tonic 
+depolarization (whole-cell patch clamp with Na+ channel blockers in the intracellular 
+solution). Antidromic stimulation of the efferent axons using extracellulal electrodes
+can also be used to elicit postsynaptic action potentials in extracellular field 
+recordings.
+
+1. Single pathway experiments:
+--------------------------------
+A single stimulation electrode is used to stimulate a single pathway (bundle of 
+presynaptic axons), and the evoked responses are recorded. 
+
+Synaptic plasticity is determined by comparing the magnitude of the average 
+synaptic response some time after conditioning, to that of the average synaptic 
+response during the baseline immediately prior conditioning.
+
+2. Dual-pathway experiments. 
+--------------------------------
+Synaptic responses are recorded, ideally, from two  pathways: 
+* a conditioned ("Test") pathway - the pathway ot which the conditioning protocol
+    is applied
+    
+* a non-conditioned ("Control") pathway which is left unperturbed (not stimulated)
+    during conditioning.
+
+The occurrence of synaptic plasticity is determined by comparing the averaged
+synaptic responses some time after conditioning, to the averaged synaptic responses
+during the baseline immediately before conditioning, in each pathway. 
+
+Homosynaptic plasticity is indicated by a persistent change in synaptic response
+magnitude in the Test pathway, and no change in the Control pathway.
+
+3 Single recording electrode
+--------------------------------
+In dual-pathway experiments, the two pathways converge and make synapses on the 
+same cell (in whole-cell recording) or within the same cell population (in 
+extracellular field recording), and a single electrode is used to record the evoked
+synaptic responses from both pathways. The Control pathway serves as a "reference" 
+(or "internal control") for the stability of synaptic responses in the absence of
+conditioning. 
+
+To distinguish between the pathway source of synaptic responses, the experiment
+records intervealed sweeps, with each pathway stimulated alternatively.
+
+4 Two recording electrodes
+------------------------------
+Two recording electrodes may be used to combine whole-cell recording with 
+extracellular field recording (e.g., Zalutsky & Nicoll, 1990).
+
+This can be used in single- or dual-pathway configurations.
+
+Configuration ("LTP_options") -- dictionary
+
+"paths": dictionary of path specifications, wicth eack key being a path "name"
+
+Must contain at least one key: "Test", mapped to the specification of the "test"
+    pathway
+    
+Members (keys) of a pathway specification dictionary:
+"sweep_index"
+    
+
+
+Configuration fields:
+        
+"paths": collection of one or two path dictionaries
+
+    Test synaptic responses from each path are recorded in interleaved sweeps.
+    
+    For Clampex, this means the experiment is recorded in runs containing 
+        
+    The test responses during (or typically at the end of) the chase are compared
+    to the average baseline test response, on a specific measure, e.g. the amplitude
+    of the EPSC or EPSP, or the slope of the (field) EPSP, to determine whether
+    synaptic plasticity has been induced.
+        
+    There is no prescribed duration of the baseline or chase stages - these
+    depend on the protocol, recording mode and what it is sought by the
+    experiment. 
+    
+    Very short baselines (less than 5 min) are not considered reliable. 
+    Long baselines (15 min or more) while not commonly used in LTP experiments
+    with whole-cell recordings in order to avoid "LTP wash-out", unless the 
+    perforated patch technique is used. On the other hand, long baselines are 
+    recommended for when using field potential recordings and for LTD 
+    experiments with whole-cell recordings (wash-out is thought not to be an
+    issue).
+        
+    When only a path dictionary is present, this is implied to represent the 
+        conditioned (test) pathway.
+    
+    For two pathways, the conditioned pathway is indicated by the name 
+        "Test". The other pathways can have any unique name, but the one that is
+        used as a control should be distinguished by its name (e.g. "Control")
+        
+    Key/value pairs in the path dictionary:
+        name: str, possible vales: "Test", "Control", or any name
+        index: the index of the sweep that contains data recorded from this path
+        
+    
 "mode":str, one of ["VC", "IC", "fEPSP"]
 
-"paired":bool. When True, test stimulation is paired-pulse
+
+
+"paired":bool. When True, test stimulation is paired-pulse; this applies to all 
+    paths in the experiment (see below)
 
 "isi":[float, pq.quantity] - interval between stimuli in paired-pulse stimulation
-    when a pq.quantity is must be in time units compatible with the data
+    when a pq.quantity, it must be in time units compatible with the data
     when a float, the time units of the data are implicit
     
+
 "paths":dict with keys "Test" and "Control", or empty
     paths["Test"]:int
     paths["Control"]:[int, NoneType]
@@ -104,23 +234,13 @@ LTP configurations = dictionary with the following fields:
         in the run (NOTE: a run is stored internally as a neo.Block; hence the 
         number of sweeps in the run equals the number of segments in the Block)
     
-    The experiment is implicitly considered to be singla-pwathway when:
+    The experiment is implicitly considered to be single-pathway when:
     a) "paths" is absent
     b) "paths" is None or an empty dictionary
     c) "paths" only contains one pathway specification (any name, any value)
     d) "paths" contains both "Test", and "Control" fields but Control is either
         None, or has a negative value
         
-    W
-    
-"dual":bool. Indicated whether this is a dual pathway experiment.
-    When True, recordings are supposed to contain interleaved sweeps, one per
-    pathway, and the two pathways are called "Test" and "Control". The two pathways
-    are assumed to be independent and non-overlapping (i.e., no cross-talk); 
-    in whole-cell patch clamp these pathways are converging onto the patched cell.
-    
-    When False, recordings contain data from a single pathway.
-    
 "xtalk": dictionary with configuration parameters for testing cross-talk between
     pathways
     Ignored when "dual" is False.

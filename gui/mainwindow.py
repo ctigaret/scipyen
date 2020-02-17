@@ -3378,6 +3378,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
     @pyqtSlot(QtCore.QItemSelection, QtCore.QItemSelection)
     @safeWrapper
     def slot_selectionChanged(self, selected, deselected):
+        """Selection change in the workspace viewer
+        """
         if not selected.isEmpty():
             modelIndex = selected.indexes()[0]
             
@@ -4805,13 +4807,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
     @pyqtSlot(QtCore.QModelIndex)
     @safeWrapper
     def slot_fileSystemItemActivated(self, ndx):
-        """ Signal activated from self.fileSystemTreeView is connected to this
+        """ Signal activated from self.fileSystemTreeView is connected to this.
+        Triggered by double-click on an item in the file system tree view.
         """
         #print(self.fileSystemModel.filePath(ndx))
         if self.fileSystemModel.isDir(ndx):
+            # if this is a directory then chdir to it
             self.slot_changeDirectory(self.fileSystemModel.filePath(ndx))
             
         else:
+            # if this is a regular file then try to load (open) it
             self.loadFile(self.fileSystemModel.filePath(ndx))
             
     @pyqtSlot(str)
@@ -5186,7 +5191,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
     @safeWrapper
     def loadFile(self, fName):
         """ Entrypoint into the file reading system, for calls from file system tree view
-        
+        Called by: 
+            self.slot_fileSystemItemActivated
+            
+        Delegates to self.loadDiskFile(file_name, fileReader)
         """
         if self.loadDiskFile(fName):
             self.slot_updateWorkspaceTable(False)
@@ -5236,24 +5244,26 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         
         fName -- fully qualified data file name
         
-        fileReader -- (optional, default is None) a str that specifies the image 
-                    reader (currently, only "vigra" or "bioformats"), or a 
-                    boolean, where a value of False chooses the vigra impex 
-                    library, whereas True chooses the bioformats library.
-                    
-                    When None, this functions assumes that an image is to be loaded.
-                    TODO: Guess file type for other data file types as well.
-                    
-                    The file reader is chosen between vigra and bioformats,
-                    according to the file extension. TODO: use other readers as well.
-                    
-                    Other planned readers are hdf5, pickle, matlab, 
-                    
-                    NOTE: For image files, this only reads the image pixels. Currently, image metadata 
-                    is only read through the bioformats library (as OME XML document)
-                    
-                    TODO: Supply other possible image readers?
-        
+        fileReader -- (optional, default is None) a str that specifies a specialized
+            file reader function in the iolib.pictio module
+            
+            reader (currently, only "vigra" or "bioformats"), or a 
+            boolean, where a value of False chooses the vigra impex 
+            library, whereas True chooses the bioformats library.
+            
+            When None, this functions assumes that an image is to be loaded.
+            TODO: Guess file type for other data file types as well.
+            
+            The file reader is chosen between vigra and bioformats,
+            according to the file extension. TODO: use other readers as well.
+            
+            Other planned readers are hdf5, pickle, matlab, 
+            
+            NOTE: For image files, this only reads the image pixels. Currently, image metadata 
+            is only read through the bioformats library (as OME XML document)
+            
+            TODO: Supply other possible image readers?
+    
         
         """
         
@@ -5269,14 +5279,53 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             bName = strutils.string_to_valid_identifier(bName)
             
             if fileReader is None:
-                data = pio.loadFile(fName)
-                #[data, fileReader] = pio.loadFile(fName)
+                fileReader = pio.getLoaderForFile(fName)
+                
+            if fileReader is None:
+                return False
+            
+            #if fileReader is None:
+                ## not file reader is specified
+                ## appropriate reader is resolved in iolib.pictio module
+                ## (aliased as pio)
+                #data = pio.loadFile(fName)
+                
+            #else:
+                #data = fileReader(fName)
+                
+            reader_signature = inspect.signature(fileReader)
+            
+            reader_return = reader_signature.return_annotation
+            
+            data = fileReader(fName)
+            
+            if reader_return is inspect.Signature.empty:
+                self.workspace[bName] = data
                 
             else:
-                data = fileReader(fName)
-            
-            self.workspace[bName] = data
-            
+                if type(reader_return) != type(data):
+                    warnings.warn("Mismatch between return type and its annotation, in %s" % fileReader)
+                    self.workspace[bName] = data
+                    
+                else:
+                    if isinstance(reader_return, (tuple, list)) and isinstance(data, (tuple, list)):
+                        if len(reader_return) != len(data):
+                            warnings.warn("Unexpected number of return values from %s" % fileReader)
+                            self.workspace[bName] = data
+                            
+                        else:
+                            if isinstance(reader_return[0], list):
+                                # several possible return types specified
+                                if type(data[0]) not in (reader_return[0]):
+                                    warnings.warn("Type mismatch between first return value (%s) and signature (%s)" % (type(data[0]), str(reader_return[0])))
+                                    self.workspace[bName] = data
+                                    
+                                else:
+                                    self.workspace[bName] = data[0]
+                                    for k in range(1, len(data)):
+                                        name = "%s_%s" % (bName, type(data[k]).__name__)
+                                        self.workspace[name] = data[k]
+                                    
             self._addRecentFile_(fName, fileReader)
             
             ret = True

@@ -4,7 +4,9 @@ special input/output
 
 NOTE: 2017-05-08 16:15:04
 BYE-BYE bioformats!
-python javabridge really sucks!
+
+NOTE: 2020-02-17 09:52:12
+Add signature annotations to file loaders to help file data handling
 
 '''
 #### BEGIN core python modules
@@ -67,7 +69,7 @@ except Exception as e:
 # openSUSE does not do is_plain_text(), or get_type2()
 # so also use the binding to libmagic here
 # ATTENTION: for Windows you need DLLs for libmagic installed separately
-# for 64 bit python, iinstall libmagicwin64
+# for 64 bit python, install libmagicwin64
 # ATTENTION: on Mac OSX you also needs to install libmagic (homebrew) or file (macports)
 try:
     import magic # file identification using libmagic
@@ -132,114 +134,11 @@ def __ndArray2csv__(data, writer):
     for l in data:
         writer.writerow(l)
         
-#"def" __atomicDictKey2Row(data):
-    #pass
-    
-
-# TODO: check for existence of dependency packages
-# TODO: import CFS data, matlab data (especially as exported from Signal5)
-# TODO: read write pickle neo data etc:
-#e.g.
-#neo.PickleIO(fileName="BaseDataPath0MinuteAvg.pkl").write(BaseDataPath0MinuteAverage)
-#BaseDataPath0 = neo.PickleIO(fileName="BaseDataPath0.pkl").read()[0]
-
-#"def" __getBioFormatsAxisSpecs__(rdr):
-    #if type(rdr) is not bioformats.formatreader.ImageReader:
-        #raise ValueError('bioformats.formatreader.ImageReader expected')
-    
-    #dimsOrder = str(rdr.rdr.getDimensionOrder()).lower()
-    
-    #ret = collections.OrderedDict()
-    
-    #for c in dimsOrder:
-        #if c == 'x':
-            #ret[c] = rdr.rdr.getSizeX()
-        #elif c == 'y':
-            #ret[c] = rdr.rdr.getSizeY()
-        #elif c == 'z':
-            #ret[c] = rdr.rdr.getSizeZ()
-        #elif c == 'c':
-            #ret[c] = rdr.rdr.getSizeC()
-        #elif c == 't':
-            #ret[c] = rdr.rdr.getSizeT()
-
-    ## NOTE: 2016-03-31 22:28:23
-    ##return ret
-    #return AxisSpecs(ret)
-
-#"def" __loadUsingBioformats__(fileName, axisspec=None):
-    #jenv = javabridge.get_env()
-    #if jenv is None:
-        #print("Staring Java VM...")
-        #javabridge.start_vm(class_path=bioformats.JARS)
-        
-    #rdr = bioformats.ImageReader(fileName)
-    
-    #parsedAxisspec = __getBioFormatsAxisSpecs__(rdr)
-    
-    ##print(type(parsedAxisspec))
-    
-    #nPlanes = rdr.rdr.getImageCount()
-    
-    ## NOTE: 2016-03-31 22:27:25
-    #if axisspec is None:
-        #axisspec = parsedAxisspec
-    #elif isinstance(axisspec, datatypes.collections.OrderedDict) or isinstance(axisspec, datatypes.AxisSpecs):
-        #if type(axisspec) is datatypes.collections.OrderedDict:
-            ## NOTE: 2016-03-31 22:29:42
-            ##axisspec = verifyAxisSpecs(axisspec, parsedAxisspec)
-            #axisspec = datatypes.AxisSpecs(axisspec)
-        #axisspec.adaptFrom(parsedAxisspec)
-    #else:
-        #raise ValueError("When not None, axis specs must be an axisutils.AxisSpecs or collections.OrderedDict object")
-    
-    ## first create a 3D vigra array based on x, y, and nPlanes dimensions:
-    ## then reshape it and assign the appropriate axistags
-    
-    ###print('parsedAxisspec.values(): ', type(parsedAxisspec.values()))
-    
-    #ret = datatypes.vigra.VigraArray(tuple(datatypes.np.append(list(parsedAxisspec.values())[0:2], nPlanes)), order='V')#, axistags=vigra.VigraArray.defaultAxistags('xyz'))
-    
-    #mdata = readImageMetadata(fileName)
-        
-    #for k in range(nPlanes):
-        #ret[:,:,k] = rdr.read(index=k, rescale=False).transpose() # needed because this returns a numpy ndarray!
-
-    ## NOTE: 2016-03-31 22:45:26
-    ## even more direct, using AxisSPec API:
-    #axisspec.applyTo(ret)
-    ##ret.shape = axisspec.values();
-    ### NOTE: 2016-03-31 22:44:37
-    ### change to use AxisSpecs API
-    ###ret.axistags = vigra.VigraArray.defaultAxistags(tagKeysAsString(axisspec))
-    ##ret.axistags = vigra.VigraArray.defaultAxistags(axisspec.tagKeysAsString)
-    
-    #rdr.close()
-    
-    #return (ret, mdata)
-    
-#"def" readImageMetadata(fileName):
-    #'''
-    #Reads image meta data from file, using bioformats (for convenience). 
-    #Does NOT read pixel data itself (for that use either Bioformats reader or vigraimpex)
-    #'''
-    #jenv = javabridge.get_env()
-    #if jenv is None:
-        #print("Staring Java VM...")
-        #javabridge.start_vm(class_path=bioformats.JARS)
-        
-    
-    ## 2016-08-12 15:08:52
-    ## NOTE: metadataa is a str with all XML metadata as parsed by bioformats
-    #metadata = bioformats.get_omexml_metadata(fileName)
-    
-    #return metadata
-    
     
 # NOTE: 2017-09-21 16:34:21
 # BioFormats dumped mid 2017 because there are nor good python ports to it
 # (it uses javabridge which is suboptimal)
-def loadImageFile(fileName, asVolume=False, axisspec=None):
+def loadImageFile(fileName:str, asVolume:bool=False, axisspec:[datatypes.collections.OrderedDict, None]=None) -> ([vigra.VigraArray, np.ndarray],):
     ''' Reads pixel data from an image file
     Uses the vigra impex library.
     
@@ -324,7 +223,7 @@ def loadImageFile(fileName, asVolume=False, axisspec=None):
     return ret
         
 # TODO: diverge onto HDF5, and bioformats handling
-def saveImageFile(data, fileName, separateChannels=True):
+def saveImageFile(data, fileName:str, separateChannels:bool=True) -> None:
     """
     Writes a vigra array to one of the image file formats supported by Vigra
     library
@@ -490,7 +389,7 @@ def saveImageFile(data, fileName, separateChannels=True):
 def loadOctave(fileName):
     raise RuntimeError("Loading of Octave binary files is not yet supported; please convert them to matlab files first")
     
-def loadMatlab(fileName):
+def loadMatlab(fileName:str, **kwargs) -> dict:
     """Simple wrapper around scipy.io.loadmat.
     
     Parameters:
@@ -508,14 +407,13 @@ def loadMatlab(fileName):
         raise OSError("File %s not found" % fileName)
         
     try:
-        return sio.loadmat(fileName)
+        return sio.loadmat(fileName) # a dict
         
     except Exception as e:
         traceback.print_exc()
         
-        
     
-def loadCFSmatlab(fileName):
+def loadCFSmatlab(fileName:str) -> neo.Block:
     """Load CFS data exported from Signal5 as matlab
     CAUTION: under development
     Returns an analog signal (?)
@@ -692,14 +590,25 @@ def loadCFSmatlab(fileName):
         
         return ret
         
-def loadAxonTextFile(fileName, with_optional_header=False):
+def loadAxonTextFile(fileName:str) -> (neo.Block, list):#, with_optional_header:bool=False):
+    """Reads the contents of an axon text file.
+    
+    Returns:
+    -------
+    result: neo.Block
+    
+    records: a list of metadata records
+    
+    NOTE: 2020-02-17 09:35:28
+    Also returns the metadata (it used to be optional)
+    """
     if not os.path.isfile(fileName):
         raise OSError("File %s not found" % fileName)
     
     skip_header = 2 # two mandatory header lines in ATF files EXCLUDING column names
     n_data_columns = 0
     
-    optional_records = list()
+    records = list()
     
     data_names = None
     data_units = list()
@@ -722,7 +631,7 @@ def loadAxonTextFile(fileName, with_optional_header=False):
             
             
             for k in range(int(a)):
-                optional_records.append(file_object.readline())
+                records.append(file_object.readline())
                 
             
             # NOTE: 2019-04-22 16:48:36
@@ -885,91 +794,8 @@ def loadAxonTextFile(fileName, with_optional_header=False):
                 
                 
     else:
-        # NOTE: 2019-04-22 17:13:09
-        # allow plain ascii files "masquerading" as ATF files
-        #if data.shape[1] != n_data_columns:
-            #raise RuntimeError("Data has different columns (%d) than indicated by the file (%d)" % (data.shape[1], n_data_columns))
-        
-        #if len(data_col_names) == 0:
         data_col_names = ["Signal_%d" % k for k in range(data.shape[1])]
         
-        #if "Time" in data_col_names:
-            #time_column_index = data_col_names.index("Time")
-            
-            #time_vector = data[:,time_column_index]
-            
-            #channel_names = [name for name in data_col_names if name != "Time"]
-            
-            #chndx = neo.ChannelIndex(index=np.arange(len(channel_names)),
-                                        #channel_ids = range(len(channel_names)),
-                                        #channel_names = channel_names,
-                                        #name = "Channels")
-
-            #if len(data_units):
-                #time_units = data_units[time_column_index]
-                #channel_units = data_units
-                
-            #else: # assume time is in "s"
-                #time_units = pq.s
-                #channel_units = [pq.dimensionless for k in range(data.shape[1])]
-                
-            #dtime = np.ediff1d(time_vector)
-            
-            #analog = np.all(np.isclose(dtime, dtime[0], rtol=1e-5, atol=1e-5))
-            
-            #if analog:
-                #sampling_period = np.mean(time_vector) * time_units
-                
-                #t_start = time_vector[0] * time_units
-                
-                #signals = [neo.AnalogSignal(data[:,k], 
-                                        #units = channel_units[k],
-                                        #t_start = t_start, 
-                                        #sampling_period = sampling_period,
-                                        #name = data_col_names[k]) \
-                        #for k in range(data.shape[1]) if k != time_column_index]
-                    
-            #else:
-                #signals = [neo.IrregularlySampledSignal(time_vector, 
-                                                        #data[:,k],
-                                                        #units = channel_units[k],
-                                                        #time_units = time_units,
-                                                        #name = data_col_names[k]) \
-                        #for k in range(data.shape[1]) if k != time_column_index]
-                    
-            #for k, sig in enumerate(signals):
-                #sig.channel_index = chndx[k]
-                    
-        #else:
-            #time_units = pq.s
-            #t_start = 0 * time_units
-            #sampling_period = 1 * pq.s
-            
-            #chndx = neo.ChannelIndex(index = np.arange(len(data_col_names)),
-                                        #channel_ids = range(len(data_col_names)),
-                                        #channel_names = data_col_names,
-                                        #name = "Channels")
-            
-            #if len(data_units):
-                #signals = [neo.AnalogSignal(data[:,k],
-                                            #units = data_units[k],
-                                            #t_start = t_start,
-                                            #sampling_period = sampling_period,
-                                            #name = data_col_names[k]) \
-                        #for k in range(data.shape[1])]
-                
-            #else:
-                #signals = [neo.AnalogSignal(data[:,k],
-                                            #units = pq.dimensionless,
-                                            #t_start = t_start,
-                                            #sampling_period = sampling_period,
-                                            #name = data_col_names[k]) \
-                        #for k in range(data.shape[1])]
-                
-            #for k, sig in enumerate(signals):
-                #sig.channel_index = chndx[k]
-                
-                
         time_units = pq.s
         t_start = 0 * time_units
         sampling_period = 1 * pq.s
@@ -1001,10 +827,6 @@ def loadAxonTextFile(fileName, with_optional_header=False):
             
     segment = neo.Segment()
 
-    #if data.dtype.names is not None:
-        ## data is a structured array
-    #col_names = [name for name in data.dtype.names]
-    
     analog = True
     
     segment.analogsignals[:] = signals
@@ -1016,12 +838,12 @@ def loadAxonTextFile(fileName, with_optional_header=False):
     
     result.segments.append(segment)
     
-    if with_optional_header:
-        return result, optional_records
+    return result, records
+    #if with_optional_header:
     
-    return result
+    #return result
 
-def loadAxonFile(fileName, readProtocols=False):
+def loadAxonFile(fileName:str) -> ([neo.Block, list], dict, list):
     """Loads a binary ("abf") or text ("atf") Axon file.
     
     Parameters:
@@ -1029,25 +851,19 @@ def loadAxonFile(fileName, readProtocols=False):
     
     fileName : str; a fully qualified path & file name
     
-    Named parameters:
-    -----------------
-    readProtocols : boolean, default is False.
-    
-            When True and fileName is a binary file, also attempt to read the
-            protocols embedded within.
-            
-            Ignored when fileName is an Axon text file
-    
     Returns:
     ---------
     
     data : neo.Block (from Axon Binary Files) or a sequence of neo.AnalogSignal
         of neo.IrregularlySampledSignal (from Axon Text Files)
+        
+    axon_info: dictionary with axon file metadata (see neo.io.AxonIO._axon_info)
     
     protocol : list of neo.Segments (the waveforms defined in the protocol)
     
-        This is returned ONLY when readProtocols is True
-    
+    NOTE: 2020-02-17 09:31:05
+    This now handles only axon binary files, and returns the data AND the metadata
+    in axon file as well.
     """
     
     if not os.path.isfile(fileName):
@@ -1060,30 +876,36 @@ def loadAxonFile(fileName, readProtocols=False):
     
     # finally, if text_file is false we assume it's an Axon binary file (abf)
     
-    text_file=False
+    #text_file=False
     
-    mime_type, file_type = getMimeAndFileType(fileName)
+    #mime_type, file_type = getMimeAndFileType(fileName)
     
-    if file_type is not None:
-        text_file = "text" in file_type
+    #if file_type is not None:
+        #text_file = "text" in file_type
         
-    else:
-        if mime_type is not None:
-            text_file = "text" in mime_type # in case of "application/axon-text-file"
+    #else:
+        #if mime_type is not None:
+            #text_file = "text" in mime_type # in case of "application/axon-text-file"
             
-            # one last attempt, for mime_type may be one of:
-            # "application/x-crossover-atf" (if CrossOver office is installed AND
-            # pClamp is installed in a CrossOver bottle)
-            # "application/axon-text-file" -- the manual fallback
+            ## one last attempt, for mime_type may be one of:
+            ## "application/x-crossover-atf" (if CrossOver office is installed AND
+            ## pClamp is installed in a CrossOver bottle)
+            ## "application/axon-text-file" -- the manual fallback
             
-            if not text_file:
-                text_file = "atf" in mime_type # in case of "application/x-crossover-atf"
+            #if not text_file:
+                #text_file = "atf" in mime_type # in case of "application/x-crossover-atf"
                 
-    if text_file:
-        return loadAxonTextFile(fileName)
+    #if text_file:
+        #return loadAxonTextFile(fileName)
+    
+    data = neo.Block()
+    axon_info = dict()
+    protocol_sweeps = list()
     
     try:
-        data = neo.io.AxonIO(filename=fileName).read_block()
+        axonIO = neo.io.AxonIO(filename=fileName)
+        
+        data = axonIO.read_block()
         
         if isinstance(data, list) and len(data) == 1:
             data = data[0]
@@ -1094,11 +916,16 @@ def loadAxonFile(fileName, readProtocols=False):
             if data.name is None or (isinstance(data.name, str) and len(data.name.strip()) == 0):
                 data.name = os.path.splitext(os.path.basename(fileName))[0]
         
-        if readProtocols:
-            protocol = neo.io.AxonIO(filename=fileName).read_protocol()
-            return (data, protocol)
+        protocol_sweeps = axonIO.read_protocol()
+        axon_info = axonIO._axon_info
+        axon_info["t_starts"] = axonIO._t_starts
+        axon_info["sampling_rate"] = axonIO._sampling_rate
+        return (data, axon_info, protocol_sweeps)
+    
+        #if readProtocols:
+            ##protocol_sweeps = neo.io.AxonIO(filename=fileName).read_protocol()
         
-        return data
+        #return data
     
     except Exception as e:
         traceback.print_exc()
@@ -1757,38 +1584,52 @@ fileLoaders["text/xml"] = loadXMLFile
 fileLoaders["text/plain"] = loadTextFile
 fileLoaders["application/x-matlab"] = loadMatlab
 fileLoaders["application/x-octave"] = loadOctave
+fileLoaders["application/octet-stream"]
 
 def getLoaderForFile(fName):
-    mime_type, file_type = getMimeAndFileType(fName)
+    mime_type, file_type, _ = getMimeAndFileType(fName)
     
     ret = fileLoaders[mime_type] # fileLoaders is a default dict with None the default value
     
     if ret is None: 
-        ret = loadTextFile # default
+        # fileLoaders doesn't have a mapping for this mime_type
+        ret = loadTextFile # fallback
         
-        # plain python mimtype module has failed;
-        # try pyxdg Mime submodule:
-        if Mime is not None:
-            # for unknown stuff Mime returns text/plain?
-            mime = Mime.get_type(fName)
-            mime_type = "/".join([mime.media, mime.subtype]) # e.g. "text/plain"
-            #mime_type = mime.get_comment() # this can be more than just media/subtype !
+        if file_type == "data":
+            with open(fName, mode="rt") as file_object:
+                header = file_object.readline()
+                if "ATF" in header:
+                    ret = loadAxonFile
+                    
+                else:
+                    ret = loadTextFile
+
+        
+        ## plain python mimtype module has failed;
+        ## try pyxdg Mime submodule:
+        #if Mime is not None:
+            ## Mime is a class in pyxdg
+            ## for unknown stuff Mime returns text/plain?
+            #mime = Mime.get_type(fName)
+            #mime_type = "/".join([mime.media, mime.subtype]) # e.g. "text/plain"
+            ##mime_type = mime.get_comment() # this can be more than just media/subtype !
             
-            # if this is recognized as text/plain, make sure it is so:
-            if "text" in mime_type and "plain" in mime_type:
-                # as a last resort use libmagic to find out a bit more about this file
-                if magic is not None:
-                    if os.path.isfile(fName):
-                        file_type = magic.from_file(fName).decode() # from_file returns a bytes object
-                        # most of the times, this just confirms the above?
-                        if "text" in file_type:
-                            with open(fName, mode="rt") as file_object:
-                                header = file_object.readline()
-                                if "ATF" in header:
-                                    ret = loadAxonFile
+            ## if this is recognized as text/plain, make sure it is so:
+            #if "text" in mime_type and "plain" in mime_type:
+                ## as a last resort use libmagic to find out a bit more about this file
+                #if magic is not None:
+                    #if os.path.isfile(fName):
+                        #file_type = magic.from_file(fName).decode() # from_file returns a bytes object
+                        ## most of the times, this just confirms the above?
+                        #if "text" in file_type:
+                            #with open(fName, mode="rt") as file_object:
+                                #header = file_object.readline()
+                                #if "ATF" in header:
+                                    #ret = loadAxonFile
                                     
-                                else:
-                                    ret = loadTextFile
+                                #else:
+                                    #ret = loadTextFile
+                                    
     return ret
 
 def getMimeAndFileType(fileName):
@@ -1819,8 +1660,11 @@ def getMimeAndFileType(fileName):
     mime_type = None
     encoding = None
     
-    # try the python-magic first
+    # NOTE: 2020-02-16 18:15:34
+    # 1) find out the file type
+    # 1.1) try the python-magic first
     if magic is not None:
+        # magic module is loaded
         try:
             if os.path.isfile(fileName):
                 file_type = magic.from_file(fileName)
@@ -1831,7 +1675,7 @@ def getMimeAndFileType(fileName):
         except Exception as e:
             traceback.print_exc()
             
-    # try the system "file" command
+    # 1.2) try the system "file" command
     if file_type is None:
         try:
             if os.path.isfile(fileName):
@@ -1840,7 +1684,8 @@ def getMimeAndFileType(fileName):
         except Exception as e:
             traceback.print_exc()
             
-    # try the pyxdg module
+    # 2) determine the mime type
+    # 2.1) try the pyxdg module
     if Mime is not None:
         try:
             mime = Mime.get_type(fileName)
@@ -1850,11 +1695,11 @@ def getMimeAndFileType(fileName):
         except Exception as e:
             traceback_print_exc()
             
-    # try the mimetypes module
+    # 2.2) try the mimetypes module
     if mime_type is None:
         mime_type, encoding = mimetypes.guess_type(fileName)
         
-    return mime_type, file_type
+    return mime_type, file_type, encoding
         
 def loadFile(fName):
 
