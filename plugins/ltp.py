@@ -57,7 +57,7 @@ optionsDir     = os.path.join(os.path.dirname(__file__), "options")
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-__UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPGUI.ui"), from_imports=True)
+__UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPWindow.ui"), from_imports=True)
 
 
 # NOTE: 2017-05-07 20:18:37
@@ -151,8 +151,9 @@ extracellular field recording (e.g., Zalutsky & Nicoll, 1990).
 This can be used in single- or dual-pathway configurations.
 
 Configuration ("LTP_options") -- dictionary
+-------------------------------------------
 
-"paths": dictionary of path specifications, wicth eack key being a path "name"
+"paths": dictionary of path specifications, with each key being a path "name"
 
 Must contain at least one key: "Test", mapped to the specification of the "test"
     pathway
@@ -369,11 +370,126 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         
         self._ltpOptions_ = None
         
+    def _configureGUI_(self):
+        self.setupUi(self)
+        
+        self.actionOpenExperimentFile.connect(self.slot_openExperimentFile)
         
         
+    def _parsedata_(self, newdata=None, varname=None):
+        # TODO parse options
+        if isinstance(newdata, (dict, type(None))):
+            self._data_ = newdata
+            
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_openExperimentFile(self):
+        import mimetypes, io
+        targetDir = self._scipyenWindow_.currentDir
+        
+        pickleFileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
+                                                                  caption="Open Experiment file",
+                                                                  filter="Pickle Files (*.pkl)",
+                                                                  directory=targetDir)
     
     
-    
+        if len(pickleFileName) == 0:
+            return
+        
+        data = pio.loadPickleFile(pickleFileName)
+        
+        if not self._check_for_linescan_data_(data):
+            QtWidgets.QMessageBox.critical(self, "Open ScanData file", "Chosen file does not contain a valid ScanData object")
+            return
+        
+        _data_var_name_ = os.path.splitext(os.path.basename(pickleFileName))[0]
+        
+        self._parsedata_(data, _data_var_name_)
+        
+        self._scipyenWindow_.assignToWorkspace(_data_var_name_, data)
+        
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_openBaselineFiles(self):
+        import mimetypes, io
+        targetDir = self._scipyenWindow_.currentDir
+        
+        # TODO: 2020-02-17 17:44:55 
+        # 1) write code for CED Signal files (*.cfs)
+        # 2) write code for Axon Text files
+        # 3) write code for pickle files
+        # 4) Allow all files then pick up the appropriate loader for each file.
+        #
+        # Although it may seem convenient for the user, cases 1-4 above complicate 
+        # the code for the following reasons:
+        # case 1: we need to actually write the CFS file reading logic :-)
+        # case 2: the need to make sure that each text file resoves to an appropriate
+        # neo.Block (adapt from the code for binary files?)
+        # case 3: the pickle file may contain already concatenated records, so we 
+        # need a way to distinguish that (adapt from the code for binary files?)
+        # case 4: compounds all of the above PLUS resolve the file loader for each
+        # file in the list
+        # 
+        # To keep it simple, we avoid the "All Files" case (for now)
+        
+        # TODO 2020-02-17 17:49:46
+        # how to process axon text files?
+        # Again, avoid this case also
+        #file_filters = ";; ".join( ["Axon Binary Files (*.abf)",
+                                    #"Axon Text Files (*.atf)",
+                                    #"CED Signal Files (*.cfs)",
+                                    #"Python Pickle Files (*.pkl)",
+                                    #"All Files (*.*)"])
+        
+        file_filters = ";; ".join( ["Axon Binary Files (*.abf)"])
+        
+        
+        
+        
+        # fileNames: list of fully qualified file names
+        # fileFilter: the actual file filter used in the dialog
+        fileNames, fileFilter = QtWidgets.QFileDialog.getOpenFileNames(mainWindow, 
+                                                                       filter=file_filters)
+
+        if len(fileNames) == 0:
+            return
+        
+        if "Axon Binary" in fileFilter:
+            axon_data = [pio.loadAxonFile(f) for f in fileNames]
+            
+        else:
+            raise RuntimeError("%s are not supported" % fileFilter)
+        
+        # NOTE: 2020-02-17 17:51:32
+        #### BEGIN DO NOT DELETE - TO BE REVISITED
+        #elif "Axon Text" in fileFilter:
+            #axon_data = [pio.loadAxonTextFile(f) for f in fileNames]
+            #data = [a[0] for a in axon_data]
+            ## CAUTION 2020-02-17 17:40:17 test this !
+            #metadata = [a[1] for a in axon_data]
+            
+        #elif "Pickle" in fileFilter:
+            ## ATTENTION: 2020-02-17 17:41:58 keep fingers crossed
+            #data = [pio.loadPickleFile(f) for f in fileNames]
+            
+        #elif "CED" in fileFilter:
+            #warnings.warn("CED Signal Files not  yet supported")
+        #### END DO NOT DELETE
+            
+            
+            
+        self._baseline_blocks_ = data
+        self._baseline_blocks_metadata_ = metadata
+        
+    def _parse_axon_data_(self, data, metadata):
+        # NOTE: 2020-02-17 18:27:07
+        # do this in neoutils
+        pass
+        
+        
+            
     
 def generate_LTP_options(cursors, signal_names, path0, path1, baseline_minutes, \
                         average_count, average_every):

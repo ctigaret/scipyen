@@ -590,17 +590,20 @@ def loadCFSmatlab(fileName:str) -> neo.Block:
         
         return ret
         
-def loadAxonTextFile(fileName:str) -> (neo.Block, list):#, with_optional_header:bool=False):
+def loadAxonTextFile(fileName:str) -> neo.Block:
     """Reads the contents of an axon text file.
     
     Returns:
     -------
     result: neo.Block
     
-    records: a list of metadata records
+    NOTE: 2020-02-17 18:14:51
+    The header structure is now embedded in the "annotations" attribute of the
+    return variable
     
     NOTE: 2020-02-17 09:35:28
     Also returns the metadata (it used to be optional)
+    
     """
     if not os.path.isfile(fileName):
         raise OSError("File %s not found" % fileName)
@@ -838,13 +841,17 @@ def loadAxonTextFile(fileName:str) -> (neo.Block, list):#, with_optional_header:
     
     result.segments.append(segment)
     
-    return result, records
+    result.annotate(header=records)
+    
+    return result
+    #return result, records
     #if with_optional_header:
     
     #return result
 
-def loadAxonFile(fileName:str) -> ([neo.Block, list], dict, list):
-    """Loads a binary ("abf") or text ("atf") Axon file.
+#"def" loadAxonFile(fileName:str) -> ([neo.Block, list], dict, list):
+def loadAxonFile(fileName:str) -> neo.Block:
+    """Loads a binary Axon file (*.abf).
     
     Parameters:
     -----------
@@ -854,53 +861,25 @@ def loadAxonFile(fileName:str) -> ([neo.Block, list], dict, list):
     Returns:
     ---------
     
-    data : neo.Block (from Axon Binary Files) or a sequence of neo.AnalogSignal
-        of neo.IrregularlySampledSignal (from Axon Text Files)
+    data : neo.Block; its "annotatins" attribute is updated to include
+        the axon_info "meta data" augumented with t_start and sampling_rate
         
-    axon_info: dictionary with axon file metadata (see neo.io.AxonIO._axon_info)
-    
-    protocol : list of neo.Segments (the waveforms defined in the protocol)
-    
     NOTE: 2020-02-17 09:31:05
     This now handles only axon binary files, and returns the data AND the metadata
     in axon file as well.
+    
+    NOTE: 2020-02-17 18:07:53
+    Reverting back to a single return variable: a neo.Block. The metadata is
+    appended to the annotation block of the variable.
+    The "protocol_sweeps" are not useful: all signals contain zeros!
     """
     
     if not os.path.isfile(fileName):
         raise OSError("File %s not found" % fileName)
     
-    # find out if the file is axon binary or text file
-    
-    # below, we assume that if it's a text file, we'll be able ot guess this
-    # from getMimeAndFileType()
-    
-    # finally, if text_file is false we assume it's an Axon binary file (abf)
-    
-    #text_file=False
-    
-    #mime_type, file_type = getMimeAndFileType(fileName)
-    
-    #if file_type is not None:
-        #text_file = "text" in file_type
-        
-    #else:
-        #if mime_type is not None:
-            #text_file = "text" in mime_type # in case of "application/axon-text-file"
-            
-            ## one last attempt, for mime_type may be one of:
-            ## "application/x-crossover-atf" (if CrossOver office is installed AND
-            ## pClamp is installed in a CrossOver bottle)
-            ## "application/axon-text-file" -- the manual fallback
-            
-            #if not text_file:
-                #text_file = "atf" in mime_type # in case of "application/x-crossover-atf"
-                
-    #if text_file:
-        #return loadAxonTextFile(fileName)
-    
     data = neo.Block()
     axon_info = dict()
-    protocol_sweeps = list()
+    #protocol_sweeps = list()
     
     try:
         axonIO = neo.io.AxonIO(filename=fileName)
@@ -916,11 +895,15 @@ def loadAxonFile(fileName:str) -> ([neo.Block, list], dict, list):
             if data.name is None or (isinstance(data.name, str) and len(data.name.strip()) == 0):
                 data.name = os.path.splitext(os.path.basename(fileName))[0]
         
-        protocol_sweeps = axonIO.read_protocol()
+        #protocol_sweeps = axonIO.read_protocol()
         axon_info = axonIO._axon_info
         axon_info["t_starts"] = axonIO._t_starts
         axon_info["sampling_rate"] = axonIO._sampling_rate
-        return (data, axon_info, protocol_sweeps)
+        
+        data.annotate(**axon_info)
+        
+        return data
+        #return (data, axon_info, protocol_sweeps)
     
         #if readProtocols:
             ##protocol_sweeps = neo.io.AxonIO(filename=fileName).read_protocol()
@@ -959,16 +942,20 @@ def loadPickleFile(fileName):
     except Exception as e:
         exc_info = sys.exc_info()
         frame_summaries = traceback.extract_tb(exc_info[2])
-        #for frame_summary in frame_summaries:
-            #print(frame_summary.name)
+        
+        #for kf, frame_summary in enumerate(frame_summaries):
+            #print("frame %d" % kf, frame_summary.name)
+            
+        frame_names = [f.name for f in frame_summaries]
             
         last_frame = frame_summaries[-1]
         offending_module_filename = last_frame.filename
         offending_function = last_frame.name
         
-        #print(offending_module_filename)
+        #print("offending module:", offending_module_filename)
         
-        if "neo" in offending_module_filename:
+        #if "neo" in offending_module_filename or any(["neo" in frn for frn in frame_names]):
+        if any([any([s in frn for frn in frame_names]) for s in ("neo", "event", "epoch", "analogsignal", "irregularlysampledsignal")]):
             result = unpickleNeoData(fileName)
             
         else:

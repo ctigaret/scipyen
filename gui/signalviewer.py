@@ -75,6 +75,9 @@ numpy (for python 3)
 quantities (for python 3)
 mpldatacursor (for python 3)
 
+CHANGELOG
+2020-02-17 14:01:06
+    Fixed behaviour for plotting a list of neo.Segment objects
 
 '''
 #### BEGIN core python modules
@@ -127,16 +130,9 @@ import core.utilities as utilities
 from core.utilities import safeWrapper
 from core import neoutils as neoutils
 from core import xmlutils, strutils
+from core import neoevent, neoepoch
 #from core.patchneo import *
 from core.workspacefunctions import validateVarName
-
-# NOTE: 2017-05-07 20:20:16
-# overwrite neo's Epoch with our own 
-#import neoepoch
-#neo.core.epoch.Epoch = neoepoch.Epoch
-#neo.core.Epoch = neoepoch.Epoch
-#neo.Epoch = neoepoch.Epoch
-#### END pict.core modules
 
 #### BEGIN pict.gui modules
 #from . import imageviewer as iv
@@ -1951,7 +1947,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if self.annotationsViewer.topLevelItemCount() == 1:
             self.annotationsViewer.topLevelItem(0).setText(0, "Data")
         
-    def _setup_signal_choosers_(self,analog:(tuple, list, type(None)) = None, irregular:(tuple, list, type(None)) = None):
+    def _setup_signal_choosers_(self, analog:(tuple, list, type(None)) = None, irregular:(tuple, list, type(None)) = None):
         """
         """
         sigBlock = [QtCore.QSignalBlocker(widget) for widget in (self.selectSignalComboBox, self.selectIrregularSignalComboBox)]
@@ -1971,6 +1967,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     #if self.frameAxis is None:
             
         else:
+            #print(type(analog))
             current_ndx = self.selectSignalComboBox.currentIndex()
             current_txt = self.selectSignalComboBox.currentText()
             
@@ -3225,13 +3222,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if dlg.exec() == QtWidgets.QDialog.Accepted:
                         newVarName = validateVarName(namePrompt.text(), self._scipyenWindow_.workspace)
                         
-                        self._scipyenWindow_.assignToWorkspace(newVarName, values[0])
+                        self._scipyenWindow_._assignToWorkspace_(newVarName, values[0])
                         
                         
                 else:
                     for name, value in zip(item_paths, values):
                         newVarName = validateVarName(name, self._scipyenWindow_.workspace)
-                        self._scipyenWindow_.assignToWorkspace(newVarName, value)
+                        self._scipyenWindow_._assignToWorkspace_(newVarName, value)
         
         
     @pyqtSlot()
@@ -3845,7 +3842,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if name is None:
                     name="epoch"
                     
-                self._scipyenWindow_.assignToWorkspace(name, epoch)
+                self._scipyenWindow_._assignToWorkspace_(name, epoch)
                 
     @pyqtSlot()
     @safeWrapper
@@ -4053,7 +4050,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if name is not None:
                     name = "epoch"
                 
-                self._scipyenWindow_.assignToWorkspace(name, epoch)
+                self._scipyenWindow_._assignToWorkspace_(name, epoch)
     
     @pyqtSlot()
     @safeWrapper
@@ -4108,7 +4105,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if name is None:
                     name = "epoch"
                     
-                self._scipyenWindow_.assignToWorkspace(name, epoch)
+                self._scipyenWindow_._assignToWorkspace_(name, epoch)
         
     def cursorsToEpoch(self, name=None):
         vertAndCrossCursors = collections.ChainMap(self.crosshairDataCursors, self.verticalDataCursors)
@@ -5462,6 +5459,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             elif all([isinstance(y_, neo.core.Epoch) for y_ in self.y]): # plot an Epoch independently of data
                 self._plotEpochs_(self.y, **self.epoch_plot_options)
+                
+            elif all([isinstance(y_, neo.Segment) for y_ in self.y]):
+                segment = self.y[self.frameIndex[self._current_frame_index_]]
+                self._plotSegment_(segment, *self.plot_args, **self.plot_kwargs)
+                self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
             
             else: # accepts sequence of np.ndarray or VigraKernel1D objects
                 self._setup_signal_choosers_(self.y)
@@ -5581,7 +5583,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 x0 = epoch.times.magnitude.flatten()
                 x1 = (epoch.times.flatten() + epoch.durations.flatten()).magnitude
                 
-                x = [v for v in zip(x0,x1)]
+                x = [v for v in zip(x0,x1)] # sequence of coordinate tuples (x0,x1)
                 
                 brush = next(brushes)
                 
@@ -5597,29 +5599,45 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         brush = next(brushes)
                 
                 if tag in self._shown_epochs_:
+                    # NOTE: 2020-02-17 15:54:03
+                    # _shown_epochs_ maps a tab to a dict, which in turn maps
+                    # a PlotItem ot a collection of LinearRegionItem objects
                     # this epoch had been shown before
                     for ax in self.axes:
                         if ax in self._shown_epochs_[tag]:
-                            # ax has lris
-                            old_lris = self._shown_epochs_[tag][ax]
+                            # ax has LRIs (an LRI is a LinearRangeItem)
+                            old_lris = self._shown_epochs_[tag][ax] # existing LRIs
                             
                             if len(old_lris) < len(x):
+                                # epoch_dict brings new LRIs 
+                                
+                                # may need to modify x0,x1 for the old LRIs
                                 lris_to_modify = old_lris
+                                
+                                # possibly changed x0,x1 on old LRIs
                                 new_x = x[0:len(old_lris)]
                                 
+                                # newly added (x0,x1) for the new LRIs
                                 regions_to_add = x[len(old_lris):]
                                 
+                                # no LRI to remove
                                 lris_to_remove = []
                                 
                             elif len(old_lris) > len(x):
+                                # epoch_dict has fewer LRIs => maybe we need to remove some
+                                
+                                # may need to modify x0,x1 for the old LRIs
                                 lris_to_modify = old_lris[0:len(x)]
                                 new_x = x
                                 
                                 regions_to_add = []
                                 
+                                # old LRIs to remove
                                 lris_to_remove = old_lris[len(x):]
                                 
                             else:
+                                # same number of epochs in epoch_dict
+                                # assume changes to x0,x1 for each of them
                                 lris_to_modify = old_lris
                                 new_x = x
                                 
@@ -5678,9 +5696,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 self._shown_epochs_[tag][ax].append(ax)
                                 
                 else:
-                    # this epoch had not been shown before
+                    # this epoch had not been shown before, no LRIs in the PlotItem
+                    self._shown_epochs_[tag] = dict()
                     for ax in self.axes:
-                        self._shown_epochs_[tag] = dict()
                         self._shown_epochs_[tag][ax] = list()
                         
                         for k in range(x0.size):
@@ -5773,7 +5791,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         epochs_dict = dict()
         
         if isinstance(epochs, (tuple, list)):
-            if all(isinstance(e, neo.Epoch) for e in epochs):
+            if all(isinstance(e, (neo.Epoch, neoepoch.Epoch)) for e in epochs):
                 for k, e in enumerate(epochs):
                     if e.name is None or (isinstance(e.name, str) and len(e.name.strip()) == 0):
                         epoch_tag = k
@@ -5787,7 +5805,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 raise TypeError("All elements in the 'epochs' sequence must be neo.Epoch objects")
             
             
-        elif isinstance(epochs, neo.Epoch):
+        elif isinstance(epochs, (neo.Epoch, neoepoch.Epoch)):
             if epochs.name is None or (isinstance(epochs.name, str) and len(epochs.name.strip()) == 0):
                 e_tag = 0
                 
@@ -6103,7 +6121,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
             kAx +=1
                 
-        if len(events):
+        if isinstance(events, (tuple, list)) and len(events):
             # plot all event arrais in this segment stacked in a single axis
             #print("_plotSegment_ events", kAx)
             event_axis = self.signalsLayout.getItem(kAx, 0)

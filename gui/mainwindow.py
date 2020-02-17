@@ -1,5 +1,29 @@
 # -*- coding: utf-8 -*-
 """Main window for the Scipyen application
+
+CHANGELOG:
+2020-02-17 12:57:24
+    The file loaders in iolib.pictio now return the data and file metadata (where
+    possible) as  distinct variables, by default. 
+    This is reflected in the MainWindow by populating the workspace with more variables
+    than might be expected:
+    1) file data (named after the file name)
+    2) extra variables, named after the file name with the suffix "_var_n", where 
+    "n" is an integral counter (>=1) indicating the order of the variable in the
+    tuple returned by the file loader.
+    
+    In particular:
+        opening an axon binary file with iolib.pictio.loadAxonFile creates three
+        variables in the workspace: 
+            1) the data, named after the file
+            2) a dictionary of axon metadata, named after the file with suffix "_var_1" appended
+            3) a list of neo.Segments representing the protocol waveforms 
+                (as stored inside the file), named after the file with suffix "_var_2" appended
+                
+    It may seem unelegant, but I have taken this decision to create the posibility
+    to inspect the "metadata" stored by 3rd party software as standard.
+        
+
 """
 
 #### BEGIN core python modules
@@ -5304,7 +5328,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                 
             else:
                 if type(reader_return) != type(data):
-                    warnings.warn("Mismatch between return type and its annotation, in %s" % fileReader)
+                    warnings.warn("Mismatch between return type (%s) and its signature (%s), in %s" % (type(data).__name__, type(reader_return).__name__, fileReader))
                     self.workspace[bName] = data
                     
                 else:
@@ -5323,7 +5347,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                                 else:
                                     self.workspace[bName] = data[0]
                                     for k in range(1, len(data)):
-                                        name = "%s_%s" % (bName, type(data[k]).__name__)
+                                        name = "%s_%s_%d" % (bName, "var", k)
                                         self.workspace[name] = data[k]
                                     
             self._addRecentFile_(fName, fileReader)

@@ -24,6 +24,11 @@ def _new_Epoch(cls, times, durations=None, labels=None, units=None, \
     return cls(times=times, durations=durations, labels=labels, units=units, \
                 name=name, file_origin=file_origin, description=description, **annotations)
 
+def _new_epoch(cls, times, durations=None, labels=None, units=None, \
+                name=None, description=None, file_origin=None, annotations=dict()):
+    return cls(times=times, durations=durations, labels=labels, units=units, \
+                name=name, file_origin=file_origin, description=description, **annotations)
+
 
 class Epoch(BaseNeo, pq.Quantity):
     '''
