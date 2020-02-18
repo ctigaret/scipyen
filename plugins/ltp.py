@@ -409,10 +409,24 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         
         self._scipyenWindow_.assignToWorkspace(_data_var_name_, data)
         
-        
     @pyqtSlot()
     @safeWrapper
     def slot_openBaselineFiles(self):
+        data = self.openDataAcquisitionFiles()
+        
+    @safeWrapper
+    def openDataAcquisitionFiles(self):
+        """Opens electrophysiology data acquisition files.
+        
+        Currently supports the following electrphysiology acquisition software:
+        pClamp(Axon binary files version 2 (*.abf) and axon text files, *.atf
+        
+        TODO: support for:
+            CED Signal CED Filing System files (*.cfs)
+            CED Spike2 files (SON library)
+            Ephus (matlab files?)
+        
+        """
         import mimetypes, io
         targetDir = self._scipyenWindow_.currentDir
         
@@ -457,7 +471,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             return
         
         if "Axon Binary" in fileFilter:
-            axon_data = [pio.loadAxonFile(f) for f in fileNames]
+            record_data = [pio.loadAxonFile(f) for f in fileNames]
             
         else:
             raise RuntimeError("%s are not supported" % fileFilter)
@@ -478,10 +492,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             #warnings.warn("CED Signal Files not  yet supported")
         #### END DO NOT DELETE
             
-            
-            
-        self._baseline_blocks_ = data
-        self._baseline_blocks_metadata_ = metadata
+        return record_data
         
     def _parse_axon_data_(self, data, metadata):
         # NOTE: 2020-02-17 18:27:07
