@@ -1,0 +1,30 @@
+2020-02-18 13:01:06
+
+core.mainwindow.MainWindow.loadDiskFile:
+    parse the file reader function return annotations with inspect.Signature
+    
+plugins.ltp.LTPWindow:
+    slot_openBaselineRecords: delegates to openDataAcquisitionFiles (new function)
+    
+    new functions:
+        openDataAcquisitionFiles: Opens electrophysiology data acquisition files.
+        
+    
+neoutils:
+    created ElectrophysiologyDataParser class -- to be completed
+        purpose: encapsulate acquisition parameters and protocols for 
+        electrophysiology data
+        
+        Intended to provide a common denominator for data acquired with various 
+        electrophysiology software vendors. 
+        
+        Planned support: pClamp, CD Signal and Spike, Ephus, generic (i.e., 
+        neo.Block, neo.Segment, and objects from neo signal family but without
+        acquisition software-specific information).
+        
+        Will also implement detection/manual configuration of trigger events
+        and trigger protocols (a.k.a stimulation/acquisition protocols).
+        
+        
+        see pictgui for coding tips
+        

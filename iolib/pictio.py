@@ -889,7 +889,7 @@ def loadAxonFile(fileName:str) -> neo.Block:
         if isinstance(data, list) and len(data) == 1:
             data = data[0]
 
-        if isinstance(data, (neo.Block, neo.Segment, neo.AnalogSignal)):
+        if isinstance(data, (neo.Block, neo.Segment, neo.AnalogSignal, neo.IrregularlySampledSignal)):
             data.annotate(software="Axon")
             
             if data.name is None or (isinstance(data.name, str) and len(data.name.strip()) == 0):
