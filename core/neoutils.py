@@ -10,6 +10,7 @@ import inspect
 import itertools
 import functools
 import warnings
+from enum import Enum, IntEnum
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -5528,5 +5529,21 @@ def inverse_lookup(signal, value, channel=0, rtol=1e-05, atol=1e-08, equal_nan =
     return ret, index, sigvals
 
 class ElectrophysiologyDataParser(object):
+    """Encapsulate acquisition parameters and protocols for electrophysiology data
+    
+    Intended to provide a common denominator for data acquired with various 
+        electrophysiology software vendors. 
+        
+    WARNING API under development (i.e. unstable)
+    """
     def __init__(self):
+        self._data_source_ = "unknown"
+        self._acquisition_protocol_ = dict()
+        self._acquisition_protocol_["trigger_protocol"] = dt.TriggerProtocol()
         pass
+    
+    def parse_data(self, data:neo.Block, metadata:dict=None) -> None:
+        if hasattr(data, "annotations"):
+            self._data_source_ = data.annotations.get("software", "unknown")
+            data_protocol = data.annotations.get("protocol", None)
+        
