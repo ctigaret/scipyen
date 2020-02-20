@@ -5561,3 +5561,4 @@ class ElectrophysiologyDataParser(object):
         
         self._averaged_runs_ = data_protocol.get("lRunsPerTrial",1) > 1
         self._n_sweeps_ = data_protocol.get("lEpisodesPerRun",1)
+        self._stimulation_on_separate_pathways_

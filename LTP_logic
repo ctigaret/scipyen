@@ -1,5 +1,7 @@
 parsing neo.Block form Axon files for LTP experiments
 
+NOTE: these are as parsed by neo.AxonIO file reader!
+
 data.annotations["protocol"]:
     lRunsPerTrial > 1 => averaged runs
     lEpisodesPerRun > 1 => how many sweeps per run
@@ -28,4 +30,30 @@ data.annotations["protocol"]:
         one for each pathway -- hence activate synaptic inputs
         separately (one per sweep)
         
+    nDigitalDACChannel (int) which analog out channel is used to configure digital outputs
+    
         
+        
+data.annotations["dictEpochInfoPerDAC"]:
+    "x" = DAC dictionary (its key is an int)
+    corresponds to the channel #x tab in the "Edit Protocol" dialog, "Waveform" tab
+    In the protocol, for each DAC there are up to 10 epochs (numbered 0 - 9)
+    only the epochs that are activated (i.e. not "Off") are contained here
+    
+    The DACs defined in the protocol are listed in listDACinfo: a list with
+    a DAC dictionary (not explained here)
+    
+    x["y"] = Epoch dictionary 
+        the key ("y") is an int and is mapped to a dict with fields:
+            nEpochNum (int) -- same value as y
+            nDACNum (int) same value as x
+            fEpochInitLevel (float) corresponds to First level (units according to operation mode & telegraph, either pA or mV)
+            fEpochLevelInc (float) corresponds to Delta level (units as above)
+            nEpochType (int) -- 
+                1 = Step; 2 = Ramp; 3 = Pulse train (Pulse); 4 = Biphasic train (Biphsc)
+                5 = Triangle train (Trngl); 6 = Cosine train (Cos)
+        
+            lEpochInitDuration (long int) "First duration" in samples
+            lEpochDurationInc (long int) "Delta duration" in samples
+            lEpochPulsePeriod in samples (corresponds to the displayed train rate xx.xx Hx (xxxx samples))
+            lEpochPulseWidth in samples  (corresponds to the displayed Pulse width x.xx ms => x% (xx samples))
