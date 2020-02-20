@@ -5537,13 +5537,33 @@ class ElectrophysiologyDataParser(object):
     WARNING API under development (i.e. unstable)
     """
     def __init__(self):
-        self._data_source_ = "unknown"
+        # possible values for self._data_source_:
+        # "Axon", "CEDSignal", "CEDSpike", "Ephus", "NA", "unknown"
+        # default: "unknown"
+        self._data_source_ = "unknown"  
         self._acquisition_protocol_ = dict()
         self._acquisition_protocol_["trigger_protocol"] = dt.TriggerProtocol()
-        pass
+        self._averaged_runs_ = False
+        self._alternative_DAC_command_output_ = False
+        self._alternative_digital_outputs_ = False
     
     def parse_data(self, data:neo.Block, metadata:dict=None) -> None:
         if hasattr(data, "annotations"):
             self._data_source_ = data.annotations.get("software", "unknown")
-            data_protocol = data.annotations.get("protocol", None)
+            if self._data_source_ == "Axon":
+                self._parse_axon_data_(data, metadata)
+                
+            else:
+                # TODO 2020-02-20 11:32:16
+                # parse CEDSignal, CEDSpike, EPhus, unknown
+                pass
+            
+    def _parse_axon_data_(self, data:neo.Block, metadata:dict=None) -> None:
+        data_protocol = data.annotations.get("protocol", None)
+        
+        self._averaged_runs_ = data_protocol.get("lRunsPerTrial",1) > 1
+        self._n_sweeps_ = data_protocol.get("lEpisodesPerRun",1)
+        self._alternative_digital_outputs_ = data_protocol.get("nAlternativeDigitalOutputState", 0) == 1
+        self._alternative_DAC_command_output_ = data_protocol.get("nAlternativeDACOutputState", 0) == 1
+        
         
