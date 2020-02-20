@@ -1,0 +1,31 @@
+parsing neo.Block form Axon files for LTP experiments
+
+data.annotations["protocol"]:
+    lRunsPerTrial > 1 => averaged runs
+    lEpisodesPerRun > 1 => how many sweeps per run
+    
+    these can be from a single pathway, or from 
+    separate pathways
+    
+    nAlternateDACOutputState 0 or 1 ?
+        if 1, then there are different waveforms
+        in the protocol for each sweep (does this only
+        applied for two sweeps per run?)
+        
+        else: same waveforms defined in the protocol
+        apply to every sweep
+        
+        
+    nAlternateDigitalOutputState 0 or 1 ?
+        is 1, then digital outputs are different
+        for each sweep does this also apply to more than two
+        sweeps?)
+        
+        else it is the same digital output for all sweeps
+        
+        Typical use case: use alternative digital output
+        to deliver trigger signals to separate stim electrodes,
+        one for each pathway -- hence activate synaptic inputs
+        separately (one per sweep)
+        
+        
