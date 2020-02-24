@@ -77,7 +77,8 @@ def total_size(o, handlers={}, verbose=False):
 
 #"def" lsvars(ws = None, sel = None, sort=False, sortkey=None, reverse=None):
 #"def" lsvars(*args, ws = None, sort=False, sortkey=None, reverse=None):
-def lsvars(*args, glob=True, ws = None, sort = False, sortkey=None, reverse=False):
+def lsvars(*args, glob:bool=True, ws:[dict, type(None)]=None, 
+           sort:bool=False, sortkey:object=None, reverse:bool=False):
     """List names of variables in a namespace, according to a selection criterion.
     
     Returns a (possibly sorted) list of variable names if found, or an empty list.
@@ -224,19 +225,27 @@ def getvarsbytype(vartype, ws=None):
     return dict(lst)
         
 #"def" getvars(*args, glob=True, ws=None, sort=True, by_name=False, sortkey=None, reverse=None, as_dict=False):
-def getvars(*args, glob=True, ws=None, as_dict=False):
-    """Obtain a subset of variabes from a workspace (a dictionary)
+def getvars(*args, glob:bool=True, ws:[dict, type(None)]=None, as_dict:bool=False,
+            sort:bool= False, sortkey:object=None, reverse:bool = False) -> object:
+    """Collects a subset of variabes from a workspace or a dictionary.
 
     Returns a (possibly sorted) list of the variables if found, or an empty list.
     
     Var-positional parameters:
     ==========================
-    *args: the selection criterion which may be: 
-        1) a regular expression string (see docstring for the re python module)
-        
-            This allows to select variables by their name using regular expressions 
-            e.g. '^data* ' will select all ws variables with names beginning with 'data'
+    *args: selection criterion. This may be: 
+        1) a string or a sequence of strings, each containing either a shell-type
+            "glob" expression, or a regular expression (a "regexp", see python's 
+            re module for help about regexps).
             
+            For example, to select variables with names beginning with "data",
+            the selection string may be either
+            
+            "data*" (a shell-type glob) or "^data*" (a regexp string)
+            
+            Whether the sele tion string is interpreted as a glob or a regexp
+            depends on the value of the "glob" parameter (see below).
+        
         2) a type, or an iterable (list, tuple) of types
         
             This allows to select all ws variables of the type(s) specified in 'sel'
@@ -247,40 +256,49 @@ def getvars(*args, glob=True, ws=None, as_dict=False):
     
         When True, the selection strings in args are treated these as UNIX 
             shell-type globs.
+            
         Otherwise, they are treated as regular expression strings.
     
     ws : a dictionary or None (default).
     
-        When a dict, its keys must all be strings.
+        When a dict, its keys must all be strings, and represents the namespace
+        where the variables are searched.
         
-        The search namespace. This can be:
-        a) a global namespace as returned by globals(),
-        b) a local namespace as returned by locals(), or vars()
-        c) an object's namespace as returned by vars([object]) -- technically, 
-            the object.__dict__
+            This can be:
+            a) a global namespace as returned by globals(),
+            b) a local namespace as returned by locals(), or vars()
+            c) an object's namespace as returned by vars([object]);
+                this is technically the __dict__ attribute of the object
+            
+        When None, the function searches inside the user namespace. This is a
+        reference to the console kernel's namespace and is the same as the 
+        "workspace" attribute of Scipyen's main window. In turn, Scipyen
+        main window is referenced as the "mainWindow" variable in the console 
+        namespace.
         
-        When None, the function tries ot find the user namespace (the "workspace")
-        as set up by the PICT Main Window in PICT application.
-    
     as_dict: bool, default False.
     
         When True, returns an ordered dict with objects stored by their names in
-        the search namespace;
-        otherwise, returns a list of objects
+        the search namespace, sorted alphabetically;
+        
+        Whe False (the default) the function return a list of objects.
+        
+    sort:bool, default is False
+        Sort the variables according to their name (by default) or by sortkey
+        
+    sortkey:None or an objetc that is valid as a sort key for list sorting
+        (see list.sorted() or sort() python functions)
+        
+    reverse:bool, default is False.
+        When sort is True, the data is sorted in reverse order. Otherwise, this 
+        is ignored.
     
-    NOTE: The function calls lsvars to select the variables.
-    
-    See also: lsvars(), sorted()
             
-    NOTE: The function was designed to complement the %who, %who_ls and %whos 
-            IPython linemagics, which conspicuously lack the facility to filter
-            their output according to variable names or types. It is NOT thread
-            safe -- if the contents of the ws are concurrently modified by another 
-            thread, it may raise an exception.
-            
-    NOTE: selection of variables works either by variable name (a regexp) or by variable type
-        (single type or tuple of types)
-            
+    Returns:
+    ========
+    a list or a dict.
+        The list is sorted 
+
     Examples:
     =========
     
@@ -313,6 +331,16 @@ def getvars(*args, glob=True, ws=None, as_dict=False):
     #
     # check this: compare lst[0][0] with slst[0][0]
     
+    NOTE: The function calls lsvars(...) to select the variables.
+    
+    See also: lsvars(), sorted()
+            
+    NOTE: The function was designed to complement the %who, %who_ls and %whos 
+            IPython linemagics, which conspicuously lack the facility to filter
+            their output according to variable names or types. It is NOT thread
+            safe -- if the contents of the "ws" workspace are concurrently 
+            modified by another thread, it may raise an exception.
+            
     """
     if ws is None:
         frames_list = inspect.getouterframes(inspect.currentframe())

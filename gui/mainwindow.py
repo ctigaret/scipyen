@@ -1749,8 +1749,8 @@ class WindowManager(__QMainWindow__):
             #obj.show() # steals focus!
             
         else:
-            #obj.activateWindow()
-            #obj.raise_()
+            obj.activateWindow()
+            obj.raise_()
             obj.setVisible(True)
         
     @property
