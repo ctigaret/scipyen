@@ -5544,6 +5544,8 @@ class ElectrophysiologyDataParser(object):
         self._acquisition_protocol_ = dict()
         self._acquisition_protocol_["trigger_protocol"] = dt.TriggerProtocol()
         self._averaged_runs_ = False
+        self._alternative_DAC_command_output_ = False
+        self._alternative_digital_outputs_ = False
     
     def parse_data(self, data:neo.Block, metadata:dict=None) -> None:
         if hasattr(data, "annotations"):
@@ -5561,4 +5563,7 @@ class ElectrophysiologyDataParser(object):
         
         self._averaged_runs_ = data_protocol.get("lRunsPerTrial",1) > 1
         self._n_sweeps_ = data_protocol.get("lEpisodesPerRun",1)
-        self._stimulation_on_separate_pathways_
+        self._alternative_digital_outputs_ = data_protocol.get("nAlternativeDigitalOutputState", 0) == 1
+        self._alternative_DAC_command_output_ = data_protocol.get("nAlternativeDACOutputState", 0) == 1
+        
+        

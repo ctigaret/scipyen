@@ -351,6 +351,10 @@ def cursor2epoch(x, w, name=None, labels=None):
 
 @safeWrapper
 def cursors2epoch(times, windows, labels, name=None):
+    """Generates a neo.Epoch from a sequence of cursors positions (times) and windows.
+    
+    "Cursor" is used loosely here.
+    """
     return neo.Epoch((np.array(times) - np.array(windows)/2) * pq.s, \
                         durations = np.array(windows) * pq.s, \
                         labels = np.array(labels, dtype="S"), name=name)

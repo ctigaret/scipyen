@@ -2,6 +2,10 @@
 	<qresource>
 		<file>images/add_multiple.svg</file>
 		<file>images/add.svg</file>
+		<file>images/adjustlevels.svg</file>
+		<file>images/adjustrgb.svg</file>
+		<file>images/application-menu.svg</file>
+		<file>images/configure.svg</file>
 		<file>images/document-close.svg</file>
 		<file>images/document-export_multiple.svg</file>
 		<file>images/document-export.svg</file>
@@ -37,10 +41,17 @@
 		<file>images/insert.svg</file>
 		<file>images/IPythonConsole.svg</file>
 		<file>images/kr_combine.svg</file>
+		<file>images/list-remove.svg</file>
+		<file>images/menu_new_sep.svg</file>
+		<file>images/overflow-menu-left.svg</file>
+		<file>images/overflow-menu-right.svg</file>
+		<file>images/overflow-menu.svg</file>
+		<file>images/paint-none.svg</file>
 		<file>images/remove_many_specified.svg</file>
 		<file>images/remove_many.svg</file>
 		<file>images/remove_multiple.svg</file>
 		<file>images/remove.svg</file>
+		<file>images/show-menu.svg</file>
 		<file>images/tools-wizard_multiple.svg</file>
 		<file>images/tools-wizard.svg</file>
 		<file>images/user-desktop.svg</file>
