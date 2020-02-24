@@ -42,19 +42,6 @@
       <string>Average</string>
      </property>
     </widget>
-    <widget class="QCheckBox" name="dataIsMinuteAvegaredCheckBox">
-     <property name="geometry">
-      <rect>
-       <x>120</x>
-       <y>40</y>
-       <width>77</width>
-       <height>20</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>Averaged</string>
-     </property>
-    </widget>
     <widget class="QWidget" name="">
      <property name="geometry">
       <rect>
