@@ -57,7 +57,10 @@ optionsDir     = os.path.join(os.path.dirname(__file__), "options")
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-__UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPWindow.ui"), from_imports=True)
+#__UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPWindow.ui"))
+__UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPWindow.ui"), 
+                                                   from_imports=True, 
+                                                   import_from="gui") #  so that resources can be imported too
 
 
 # NOTE: 2017-05-07 20:18:37
@@ -365,21 +368,149 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         self.settings = QtCore.QSettings()
         self.threadpool = QtCore.QThreadPool()
         
-        self._data_ = None
+        self._data_ = dict()
+        self._data_["Baseline"] = dict()
+        self._data_["Baseline"]["Test"] = None
+        self._data_["Baseline"]["Control"] = None
+        self._data_["Chase"] = dict()
+        self._data_["Chase"]["Test"] = None
+        self._data_["Chase"]["Control"] = None
+        
+        # NOTE: 2020-02-23 11:10:20
+        # During conditioning the "Control" synaptic pathway is unperturbed but
+        # it is possible to stimulate additional synaptic pathways for other
+        # purposes: 
+        # for NST+SWR experiments, a separate synmaptic pathway is used to
+        # simulated sharp wave/ripple events
+        # during cooperative LTP experiments, an additional "strong" pathway is 
+        # stimulated concomitently with the "Test" (or "weak") pathway so that
+        # LTP is induced in the weak pathway - without the strong pathway 
+        # stimulation there would be no LTP on the weak ("Test") pathway.
+        self._data_["Conditioning"] = dict()
+        self._data_["Conditioning"]["Test"] = None
+        
+        
+        self._raw_baseline_data_ = None
+        self._raw_chase_data_ = None
+        self._raw_conditioning_data_ = None
+        self._raw_path_xtalk_data_ = None
+        
         self._data_var_name_ = None
         
-        self._ltpOptions_ = None
+        self._ltpOptions_ = dict()
         
     def _configureGUI_(self):
         self.setupUi(self)
         
         self.actionOpenExperimentFile.connect(self.slot_openExperimentFile)
+        self.actionOPenBaselineData.connect(self.slot_openBaselineFiles)
+        self.actionOpenChaseData.connect(self.slot_openChaseFiles)
+        self.actionOpenConditioningData.connect(self.slot_openConditioningFiles)
+        self.actionOpenPathwayCrosstalkData.connect(self.slot_openPathwaysXTalkFiles)
+        
+        #self.dataIsMinuteAvegaredCheckBox.stateChanged[int].connect(self._slot_averaged_checkbox_state_changed_)
+        
+        self.actionOpenOptions.connect(self.slot_openOptionsFile)
+        self.actionImportOptions.connect(self.slot_importOptions)
+        
+        self.actionSaveOptions.connect(self.slot_saveOptionsFile)
+        self.actionExportOptions.connect(self.slot_exportOptions)
         
         
+    @pyqtSlot()
+    @safeWrapper
+    def slot_openOptionsFile(self):
+        pass
+    
+    @pyqtSlot()
+    @safeWrapper
+    def slot_importOptions(self):
+        pass
+    
+    @pyqtSlot()
+    @safeWrapper
+    def slot_saveOptionsFile(self):
+        pass
+    
+    @pyqtSlot()
+    @safeWrapper
+    def slot_exportOptions(self):
+        pass
+        
+    #@pyqtSlot(int)
+    #@safeWrapper
+    #def _slot_averaged_checkbox_state_changed_(self, val):
+        #checked = val == QtCore.Qt.Checked
+        
+        #self.sweepAverageGroupBox.setEnabled(not checked)
+    
+    
     def _parsedata_(self, newdata=None, varname=None):
         # TODO parse options
         if isinstance(newdata, (dict, type(None))):
             self._data_ = newdata
+            
+    @safeWrapper
+    def _parse_clampex_trial_(self, trial:neo.Block):
+        """TODO unfinished business
+        """
+        ret = dict()
+        ret["interleaved_stimulation"] = False
+        ret["averaged_sweeps"] = False
+        ret["averaged_interval"] = 0*pq.s
+        
+        protocol = trial.annotations.get("protocol", None)
+        
+        if not isinstance(protocol, dict):
+            return ret
+        
+        # by now the fields below should always be present
+        nEpisodes = protocol["lEpisodesPerRun"]
+        
+        if nEpisodes != len(trial.segments):
+            raise RuntimeError("Mismatch between protocol Episodes Per Run (%d) and number of sweeps in trial (%d)" % (nEpisodes, len(trial.segments)))
+        
+        runs_per_trial = protocol["lRunsPerTrial"]
+        
+        inter_trial_interval = procotol["fTrialStartToStart"] * pq.s
+        inter_run_interval = protocol["fRunStartToStart"] * pq.s
+        inter_sweep_interval = protocol["fEpisodeStartToStart"] * pq.s
+        
+        trial_duration = inter_run_interval * runs_per_trial
+        if trial_duration == 0 * pq.s:
+            raise RuntimeError("Trial metadata indicates trial duration of %s" % trial_duration )
+        
+        
+        trials_per_minute = int((trial_duration + inter_trial_interval) / (60*pq.s))
+        
+        alternate_pathway_stimulation = protocol["nAlternateDigitalOutputState"] == 1
+        
+        alternate_command_ouptut = protocol["nAlternateDACOutputState"] == 1
+        
+        if alternate_pathway_stimulation:
+            ret["interleaved_stimulation"] = True
+            
+        else:
+            ret["interleaved_stimulation"] = False
+            
+            
+        if runs_per_trial > 1:
+            ret["averaged_sweeps"] = True
+            if trials_per_minute == 1:
+                ret["averaged_interval"] = 60*pq.s
+                    
+        # NOTE: 2020-02-23 14:46:57
+        # find out if there is a protocol epoch for membrane test (whole-cell)
+        
+        protocol_epochs = trial.annotations["EpochInfo"]
+        
+        if len(protocol_epochs):
+            if alternate_command_ouptut:
+                # DAC0 and DAC1 commands are sent alternatively with each sweep
+                # first sweep is DAC0;
+                pass
+        
+        return ret
             
         
     @pyqtSlot()
@@ -412,7 +543,74 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
     @pyqtSlot()
     @safeWrapper
     def slot_openBaselineFiles(self):
-        data = self.openDataAcquisitionFiles()
+        """Opens vendor-specific record files with trials for the baseline responses.
+        
+        Currently only ABF v2 files are supported.
+        
+        TODO add support for CED Signal files, etc.
+        
+        TODO Parse electrophysiology records meta information into a vendor-agnostic
+        data structure -- see core.neoutils module.
+        """
+        # list of neo.Blocks, each with a baseline trial
+        # these may already contain minute-averages
+        self._raw_baseline_data_ = self.openDataAcquisitionFiles()
+        
+        #### BEGIN code to parse the record and interpret the protocol - DO NOT DELETE
+        
+        ## we need to figure out:
+        ##
+        ## 1) if the data contains averaged sweeps and if so, whether these are
+        ##       minute averages
+        ##
+        ## 2) how many stimulation pathways are involved
+        ##
+        ## 3) what is the test stimulus: 
+        ##       single or paired-pulse
+        ##       stimulus onset (in each pathway)
+        ##       if paired-pulse, what is the inter-stimulus interval
+        
+        #trial_infos = [self._parse_clampex_trial_(trial) for trial in self._raw_baseline_data_]
+        
+        #for k, ti in enumerate(trial_infos[1:]):
+            #for key in ti:
+                #if ti[key] != trial_infos[0][key]:
+                    #raise RuntimeError("Mismatch in %s betweenn first and %dth trial" % (key, k+1))
+                
+        
+        
+        
+        #if trial_infos[0]["averaged_sweeps"]:
+            #if trial_infos[0]["averaged_interval"] != 60*pq.s:
+                #raise ValueError("Expecting sweeps averaged over one minute interval; got %s instead" % trial_infos[0]["averaged_interval"])
+            
+            #signalBlockers = [QtCore.QSignalBlocker(w) for w in [self.dataIsMinuteAvegaredCheckBox]]
+            
+            #self.dataIsMinuteAvegaredCheckBox.setCheckState(True)
+            
+            #self.sweepAverageGroupBox.setEnabled(False)
+            
+        #else:
+            #self.dataIsMinuteAvegaredCheckBox.setCheckState(False)
+            
+            #self.sweepAverageGroupBox.setEnabled(True)
+            
+        #### END code to parse the record and interpret the protocol
+            
+    @pyqtSlot()
+    @safeWrapper
+    def slot_openChaseFiles(self):
+        self._raw_chase_data_ = self.openDataAcquisitionFiles()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_openConditioningFiles(self):
+        self._raw_conditioning_data_ = self.openDataAcquisitionFiles()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_openPathwaysXTalkFiles(self):
+        self._raw_path_xtalk_data_ = self.openDataAcquisitionFiles()
         
     @safeWrapper
     def openDataAcquisitionFiles(self):
@@ -494,13 +692,6 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
         return record_data
         
-    def _parse_axon_data_(self, data, metadata):
-        # NOTE: 2020-02-17 18:27:07
-        # do this in neoutils
-        pass
-        
-        
-            
     
 def generate_LTP_options(cursors, signal_names, path0, path1, baseline_minutes, \
                         average_count, average_every):

@@ -1,0 +1,112 @@
+parsing neo.Block form Axon files for LTP experiments
+
+NOTE: these are as parsed by neo.AxonIO file reader!
+
+data.annotations["protocol"]:
+    lRunsPerTrial > 1 => averaged runs
+    lEpisodesPerRun > 1 => how many sweeps per run
+    
+    these can be from a single pathway, or from 
+    separate pathways
+    
+    nAlternateDACOutputState 0 or 1 ?
+        if 1, then there are different waveforms
+        in the protocol for each sweep (does this only
+        applied for two sweeps per run?)
+        
+        else: same waveforms defined in the protocol
+        apply to every sweep
+        
+        
+    nAlternateDigitalOutputState 0 or 1 ?
+        is 1, then digital outputs are different
+        for each sweep does this also apply to more than two
+        sweeps?)
+        
+        else it is the same digital output for all sweeps
+        
+        Typical use case: use alternative digital output
+        to deliver trigger signals to separate stim electrodes,
+        one for each pathway -- hence activate synaptic inputs
+        separately (one per sweep)
+        
+    nDigitalDACChannel (int) which analog out channel is used to configure digital outputs
+    
+        
+data.annotations["EpochInfo"]:
+    list with the active Epochs used in the waveform dialog, irrespective of the 
+    DAC output channel where they are defined
+    
+    Each element if an Epoch dictionary with:
+        nEpochNum: int - the actual epoch number that is active in the protocol
+        (there are up to 10 epochs numbered from 0 to 9)
+        
+        
+        nDigitalValue: int = which of the two 4-bit registries is used?
+        
+            There are two 4-bit registries, labeled as "#3-0" and "#7-4".
+            
+            In every sweep, Clampex can only generate two sets of digital outputs
+            
+            The "#3-0" registry encapsulates the digital outputs 3,2,1, and 0.
+            Registry "#7-0" encapsulates the digital outputs 7,6,5, and 4.
+                        
+            nDigitalValue = 0 signifies that the first 4-bit registry is used?
+        
+        nAlternateDigitalValue: int -- as above, for the alternative (even) sweeps
+        
+        decimal representations of the digital bit patterns
+        
+        nDigitalTrainValue: int = the decimal representation of the bit pattern
+            in the registry:
+            
+            when annotations["protocol"]["nDigitalTrainActiveLogic"] is 1:
+                0000 => 0 (i.e. no digital output is sent)
+                000* => a pulse train (train of TTL triggers) is sent on DIG0
+                0001 => a single transition from low to high is sent to DIG0
+            
+    
+        nAlternateDigitalTrainValue: int = as above, for the alternative (even) 
+            sweeps
+        
+    Epoch parameters that are specific to the DAC output channel are contained in
+    data.annotations["dictEpochInfoPerDAC"] (see next).
+        
+        
+data.annotations["dictEpochInfoPerDAC"]:
+    Contains epochs dictionaries for those DAC output channels where analog waveforms
+    are defined (Analog waveform checkbox is ON). These dictionaries describe the
+    epochs defined for their corresponding DAC channels.
+    
+    data.annotations["dictEpochInfoPerDAC"][x] = DAC epochs dictionary
+        the key (x) is an int representomg the DAC output channel number 
+        (one of the tabs at the bottom of the Waveform dialog)
+    
+    In the protocol, for each DAC there are up to 10 epochs (numbered 0 - 9).
+    
+    The DAC epochs dictionary contains only the epochs that are active (i.e. not "Off")
+    and therefore the keys need not be in a contiguous sequence.
+    
+    The DACs defined in the protocol are listed in listDACinfo: a list with
+    a DAC dictionary (not explained here)
+    
+    x["y"] = Epoch dictionary 
+        the key ("y") is an int and is mapped to a dict with fields:
+            nEpochNum (int) -- same value as y
+            nDACNum (int) same value as x
+            fEpochInitLevel (float) corresponds to First level (units according to operation mode & telegraph, either pA or mV)
+            fEpochLevelInc (float) corresponds to Delta level (units as above)
+            nEpochType (int) -- 
+                1 = Step; 2 = Ramp; 3 = Pulse train (Pulse); 4 = Biphasic train (Biphsc)
+                5 = Triangle train (Trngl); 6 = Cosine train (Cos)
+        
+            lEpochInitDuration (long int) "First duration" in samples
+            lEpochDurationInc (long int) "Delta duration" in samples
+            lEpochPulsePeriod in samples (corresponds to the displayed train rate xx.xx Hx (xxxx samples))
+            lEpochPulseWidth in samples  (corresponds to the displayed Pulse width x.xx ms => x% (xx samples))
+
+To parse a stimulation protocol, one needs to use informaiton in dictEpochInfoPerDAC 
+and in the "EpochInfo" list of epochs defined in the protocol, and with
+annotations["protocol"]["nAlternateDigitalOutputState"]:
+
+    

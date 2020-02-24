@@ -6,36 +6,208 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>700</width>
-    <height>425</height>
+    <width>644</width>
+    <height>372</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QTabWidget" name="tabWidget">
+   <widget class="QGroupBox" name="sweepAverageGroupBox">
+    <property name="enabled">
+     <bool>true</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>8</x>
+      <y>72</y>
+      <width>297</width>
+      <height>121</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>Sweep Averaging</string>
+    </property>
+    <widget class="QPushButton" name="averageSweepsPushButton">
+     <property name="geometry">
+      <rect>
+       <x>120</x>
+       <y>70</y>
+       <width>84</width>
+       <height>32</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Average</string>
+     </property>
+    </widget>
+    <widget class="QWidget" name="">
+     <property name="geometry">
+      <rect>
+       <x>8</x>
+       <y>32</y>
+       <width>103</width>
+       <height>32</height>
+      </rect>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_4">
+      <item>
+       <widget class="QLabel" name="averageSweepsLabel">
+        <property name="text">
+         <string>Average:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSpinBox" name="averageSweepsSpinBox"/>
+      </item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>70</y>
+       <width>86</width>
+       <height>32</height>
+      </rect>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_6">
+      <item>
+       <widget class="QLabel" name="label_2">
+        <property name="text">
+         <string>Every</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSpinBox" name="averageSweepsEverySpinBox"/>
+      </item>
+     </layout>
+    </widget>
+   </widget>
+   <widget class="QGroupBox" name="stimulationPathwaysGroupBox">
+    <property name="geometry">
+     <rect>
+      <x>312</x>
+      <y>45</y>
+      <width>251</width>
+      <height>114</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>Stimulation Pathways</string>
+    </property>
+    <layout class="QGridLayout" name="gridLayout">
+     <item row="0" column="0">
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <item>
+        <widget class="QLabel" name="pathwayIndexLabel">
+         <property name="text">
+          <string>Pathway:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QSpinBox" name="pathwayIndexSpinBox">
+         <property name="wrapping">
+          <bool>true</bool>
+         </property>
+         <property name="maximum">
+          <number>1</number>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item row="0" column="1" rowspan="2">
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <widget class="QRadioButton" name="radioButtonTestPathway">
+         <property name="text">
+          <string>Test</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QRadioButton" name="radioButtonControlPathway">
+         <property name="text">
+          <string>Control</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QRadioButton" name="radioButtonOtherPathway">
+         <property name="text">
+          <string>Other</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item row="1" column="0">
+      <layout class="QHBoxLayout" name="horizontalLayout_3">
+       <item>
+        <widget class="QLabel" name="label">
+         <property name="text">
+          <string>Name:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="lineEdit"/>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </widget>
+   <widget class="QWidget" name="">
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <item>
+      <widget class="QLabel" name="dataNameLabel">
+       <property name="text">
+        <string>Name:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="dataNameLineEdit"/>
+     </item>
+    </layout>
+   </widget>
+   <widget class="QWidget" name="">
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>10</y>
-      <width>671</width>
-      <height>351</height>
+      <y>260</y>
+      <width>284</width>
+      <height>34</height>
      </rect>
     </property>
-    <property name="currentIndex">
-     <number>0</number>
-    </property>
-    <widget class="QWidget" name="dataTab">
-     <attribute name="title">
-      <string>Data</string>
-     </attribute>
-    </widget>
-    <widget class="QWidget" name="optionsTab">
-     <attribute name="title">
-      <string>Options</string>
-     </attribute>
-    </widget>
+    <layout class="QHBoxLayout" name="horizontalLayout_5">
+     <item>
+      <widget class="QPushButton" name="plotRecordingsPushButton">
+       <property name="text">
+        <string>View Recordings</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="analysePushButton">
+       <property name="text">
+        <string>Analyse</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="viewAnalysisDataPushButton">
+       <property name="text">
+        <string>View Analysis</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
@@ -43,7 +215,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>700</width>
+     <width>644</width>
      <height>28</height>
     </rect>
    </property>
@@ -82,7 +254,33 @@
     <addaction name="actionExport"/>
     <addaction name="menuOptions"/>
    </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>View</string>
+    </property>
+    <widget class="QMenu" name="menuRecording">
+     <property name="title">
+      <string>Recording</string>
+     </property>
+     <widget class="QMenu" name="menuRaw">
+      <property name="title">
+       <string>Raw</string>
+      </property>
+      <addaction name="actionViewRawBaselineData"/>
+      <addaction name="actionViewRawChaseData"/>
+      <addaction name="actionViewRawCrossTalkData"/>
+     </widget>
+     <addaction name="actionViewBaselineData"/>
+     <addaction name="actionViewChaseData"/>
+     <addaction name="actionViewConditioningData"/>
+     <addaction name="actionViewCrossTalkData"/>
+     <addaction name="separator"/>
+     <addaction name="menuRaw"/>
+    </widget>
+    <addaction name="menuRecording"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuView"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionBaseline_runs">
@@ -188,7 +386,44 @@
     <string>Pathway Crosstalk Data</string>
    </property>
   </action>
+  <action name="actionViewBaselineData">
+   <property name="text">
+    <string>Baseline</string>
+   </property>
+  </action>
+  <action name="actionViewChaseData">
+   <property name="text">
+    <string>Chase</string>
+   </property>
+  </action>
+  <action name="actionViewConditioningData">
+   <property name="text">
+    <string>Conditioning</string>
+   </property>
+  </action>
+  <action name="actionViewRawBaselineData">
+   <property name="text">
+    <string>Baseline</string>
+   </property>
+  </action>
+  <action name="actionViewRawChaseData">
+   <property name="text">
+    <string>Chase</string>
+   </property>
+  </action>
+  <action name="actionViewRawCrossTalkData">
+   <property name="text">
+    <string>Cross-talk</string>
+   </property>
+  </action>
+  <action name="actionViewCrossTalkData">
+   <property name="text">
+    <string>Cross-talk</string>
+   </property>
+  </action>
  </widget>
- <resources/>
+ <resources>
+  <include location="../gui/resources/resources.qrc"/>
+ </resources>
  <connections/>
 </ui>

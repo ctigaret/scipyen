@@ -5308,15 +5308,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             if fileReader is None:
                 return False
             
-            #if fileReader is None:
-                ## not file reader is specified
-                ## appropriate reader is resolved in iolib.pictio module
-                ## (aliased as pio)
-                #data = pio.loadFile(fName)
-                
-            #else:
-                #data = fileReader(fName)
-                
             reader_signature = inspect.signature(fileReader)
             
             # NOTE: 2020-02-18 12:24:38
