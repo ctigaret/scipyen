@@ -376,6 +376,15 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         self._data_["Chase"]["Test"] = None
         self._data_["Chase"]["Control"] = None
         
+        self._viewers_ = dict()
+        
+        self._viewers_["baseline_source"] = None
+        self._viewers_["conditioning_source"] = None
+        self._viewers_["chase_source"] = None
+        
+        self._viewers_["pathways"] = dict()
+        
+        
         # NOTE: 2020-02-23 11:10:20
         # During conditioning the "Control" synaptic pathway is unperturbed but
         # it is possible to stimulate additional synaptic pathways for other
@@ -390,10 +399,36 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         self._data_["Conditioning"]["Test"] = None
         
         
-        self._raw_baseline_data_ = None
-        self._raw_chase_data_ = None
-        self._raw_conditioning_data_ = None
-        self._raw_path_xtalk_data_ = None
+        # raw data: collections of neo.Blocks, sources from software 
+        # vendor-specific data files. These can be:
+        # a) axon (ABF v2) files (generated with Clampex)
+        # 
+        #    Each block contains data from a single trial.
+        #
+        #    In turn, each trial contains data ither from a single run, 
+        #    or averaged data from several runs per trial (the timgins of 
+        #    sweeps/run and run/trial should bve set so that they result
+        #    in minute-by-minute averages). In the first case (single run per 
+        #    trial) the data shuold be averaged offline, either manually or 
+        #    using LTPWindow API.
+        #
+        # b) CFS files (generated with CED Signal) -- TODO
+        #    there is usually a single file generated for the entire experiment
+        #    but, depending on the script used for the acquisition, it may be
+        #    accompanied by two other cfs files, each with pathway-specific 
+        #    minute-by-minute average signals.
+        #
+        #    Notably, the "pulse" information is NOT saved with the file 
+        #    unless extra ADC inputs are used to piggyback the digital output 
+        #    signals (tee-ed out). Also, the sampling configuration allows
+        #    several "pulse" protocols which can be selected / sequenced
+        #    and do nto necessarily result in separate baseline and chase
+        #    data.
+        #
+        self._baseline_source_data_ = list()
+        self._chase_source_data_ = list()
+        self._conditioning_source_data_ = list()
+        self._path_xtalk_source_data_ = list()
         
         self._data_var_name_ = None
         
@@ -402,19 +437,21 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
     def _configureGUI_(self):
         self.setupUi(self)
         
-        self.actionOpenExperimentFile.connect(self.slot_openExperimentFile)
-        self.actionOPenBaselineData.connect(self.slot_openBaselineFiles)
-        self.actionOpenChaseData.connect(self.slot_openChaseFiles)
-        self.actionOpenConditioningData.connect(self.slot_openConditioningFiles)
-        self.actionOpenPathwayCrosstalkData.connect(self.slot_openPathwaysXTalkFiles)
+        self.actionOpenExperimentFile.triggered.connect(self.slot_openExperimentFile)
+        self.actionOPenBaselineSourceFiles.triggered.connect(self.slot_openBaselineSourceFiles)
+        self.actionOpenChaseSourceFiles.triggered.connect(self.slot_openChaseSourceFiles)
+        self.actionOpenConditioningSourceFiles.triggered.connect(self.slot_openConditioningSourceFiles)
+        self.actionOpenPathwayCrosstalkSourceFiles.triggered.connect(self.slot_openPathwaysXTalkSourceFiles)
         
         #self.dataIsMinuteAvegaredCheckBox.stateChanged[int].connect(self._slot_averaged_checkbox_state_changed_)
         
-        self.actionOpenOptions.connect(self.slot_openOptionsFile)
-        self.actionImportOptions.connect(self.slot_importOptions)
+        self.actionOpenOptions.triggered.connect(self.slot_openOptionsFile)
+        self.actionImportOptions.triggered.connect(self.slot_importOptions)
         
-        self.actionSaveOptions.connect(self.slot_saveOptionsFile)
-        self.actionExportOptions.connect(self.slot_exportOptions)
+        self.actionSaveOptions.triggered.connect(self.slot_saveOptionsFile)
+        self.actionExportOptions.triggered.connect(self.slot_exportOptions)
+        
+        self.pushButtonBaselineSources.clicked.connect(self.slot_viewBaselineSourceData)
         
         
     @pyqtSlot()
@@ -437,6 +474,128 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
     def slot_exportOptions(self):
         pass
         
+    @pyqtSlot()
+    @safeWrapper
+    def slot_viewBaselineSourceData(self):
+        if len(self._baseline_source_data_) == 0:
+            return
+
+        data = None
+        
+        if not isinstance(self._viewers_["baseline_source"], sv.SignalViewer):
+            self._viewers_["baseline_source"] = sv.SignalViewer()
+            
+        viewer = self._viewers_["baseline_source"]
+            
+        if len(self._baseline_source_data_) == 1:
+            data = self._baseline_source_data_[0]
+            
+        else:
+            nameList = [b.name for b in self._baseline_source_data_]
+            choiceDialog = pgui.ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
+            
+            ans = choiceDialog.exec()
+            
+            if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
+                data_index = nameList.index(choiceDialog.selectedItem)
+                data = self._baseline_source_data_[data_index]
+
+
+        if isinstance(data, neo.Block):
+            viewer.view(data)
+            
+    @pyqtSlot()
+    @safeWrapper
+    def slot_viewChaseSourceData(self):
+        if len(self._chase_source_data_) == 0:
+            return
+
+        data = None
+        
+        if not isinstance(self._viewers_["conditioning_source"], sv.SignalViewer):
+            self._viewers_["conditioning_source"] = sv.SignalViewer()
+            
+        viewer = self._viewers_["conditioning_source"]
+            
+        if len(self._chase_source_data_) == 1:
+            data = self._chase_source_data_[0]
+            
+        else:
+            nameList = [b.name for b in self._chase_source_data_]
+            choiceDialog = pgui.ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
+            
+            ans = choiceDialog.exec()
+            
+            if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
+                data_index = nameList.index(choiceDialog.selectedItem)
+                data = self._chase_source_data_[data_index]
+
+
+        if isinstance(data, neo.Block):
+            viewer.view(data)
+            
+            
+    @pyqtSlot()
+    @safeWrapper
+    def slot_viewConditioningSourceData(self):
+        if len(self._conditioning_source_data_) == 0:
+            return
+
+        data = None
+        
+        if not isinstance(self._viewers_["conditioning_source"], sv.SignalViewer):
+            self._viewers_["conditioning_source"] = sv.SignalViewer()
+            
+        viewer = self._viewers_["conditioning_source"]
+            
+        if len(self._conditioning_source_data_) == 1:
+            data = self._conditioning_source_data_[0]
+            
+        else:
+            nameList = [b.name for b in self._conditioning_source_data_]
+            choiceDialog = pgui.ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
+            
+            ans = choiceDialog.exec()
+            
+            if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
+                data_index = nameList.index(choiceDialog.selectedItem)
+                data = self._conditioning_source_data_[data_index]
+
+
+        if isinstance(data, neo.Block):
+            viewer.view(data)
+            
+    @pyqtSlot()
+    @safeWrapper
+    def slot_viewCrossTalkSourceData(self):
+        if len(self._path_xtalk_source_data_) == 0:
+            return
+
+        data = None
+        
+        if not isinstance(self._viewers_["conditioning_source"], sv.SignalViewer):
+            self._viewers_["conditioning_source"] = sv.SignalViewer()
+            
+        viewer = self._viewers_["conditioning_source"]
+            
+        if len(self._path_xtalk_source_data_) == 1:
+            data = self._path_xtalk_source_data_[0]
+            
+        else:
+            nameList = [b.name for b in self._path_xtalk_source_data_]
+            choiceDialog = pgui.ItemsListDialog(parent=self, title="Select Baseline Trial", itemsList = nameList)
+            
+            ans = choiceDialog.exec()
+            
+            if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
+                data_index = nameList.index(choiceDialog.selectedItem)
+                data = self._path_xtalk_source_data_[data_index]
+
+
+        if isinstance(data, neo.Block):
+            viewer.view(data)
+            
+            
     #@pyqtSlot(int)
     #@safeWrapper
     #def _slot_averaged_checkbox_state_changed_(self, val):
@@ -542,7 +701,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         
     @pyqtSlot()
     @safeWrapper
-    def slot_openBaselineFiles(self):
+    def slot_openBaselineSourceFiles(self):
         """Opens vendor-specific record files with trials for the baseline responses.
         
         Currently only ABF v2 files are supported.
@@ -554,7 +713,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         """
         # list of neo.Blocks, each with a baseline trial
         # these may already contain minute-averages
-        self._raw_baseline_data_ = self.openDataAcquisitionFiles()
+        self._baseline_source_data_ = self.openDataAcquisitionFiles()
         
         #### BEGIN code to parse the record and interpret the protocol - DO NOT DELETE
         
@@ -570,7 +729,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         ##       stimulus onset (in each pathway)
         ##       if paired-pulse, what is the inter-stimulus interval
         
-        #trial_infos = [self._parse_clampex_trial_(trial) for trial in self._raw_baseline_data_]
+        #trial_infos = [self._parse_clampex_trial_(trial) for trial in self._baseline_source_data_]
         
         #for k, ti in enumerate(trial_infos[1:]):
             #for key in ti:
@@ -599,18 +758,18 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
     @pyqtSlot()
     @safeWrapper
-    def slot_openChaseFiles(self):
-        self._raw_chase_data_ = self.openDataAcquisitionFiles()
+    def slot_openChaseSourceFiles(self):
+        self._chase_source_data_ = self.openDataAcquisitionFiles()
         
     @pyqtSlot()
     @safeWrapper
-    def slot_openConditioningFiles(self):
-        self._raw_conditioning_data_ = self.openDataAcquisitionFiles()
+    def slot_openConditioningSourceFiles(self):
+        self._conditioning_source_data_ = self.openDataAcquisitionFiles()
         
     @pyqtSlot()
     @safeWrapper
-    def slot_openPathwaysXTalkFiles(self):
-        self._raw_path_xtalk_data_ = self.openDataAcquisitionFiles()
+    def slot_openPathwaysXTalkSourceFiles(self):
+        self._path_xtalk_source_data_ = self.openDataAcquisitionFiles()
         
     @safeWrapper
     def openDataAcquisitionFiles(self):
@@ -812,19 +971,35 @@ def save_LTP_options(val):
         pickle.dump(val, fileDest, pickle.HIGHEST_PROTOCOL)
     
 
-def load_LTP_options(LTPOptionsFile=None, field=False):
-    if not os.path.isfile(LTPOptionsFile):
+def load_LTP_options(LTPOptionsFile=None, field=False, **kwargs):
+    if LTPOptionsFile is None or not os.path.isfile(LTPOptionsFile):
         LTPopts = dict()
         LTPopts["Average"] = {'Count': 6, 'Every': 6}
-        LTPopts["Cursors"] = {'Labels': ['Rbase','Rs','Rin','EPSC0base','EPSC0Peak','EPSC1base','EPSC1peak'],\
-                'Pathway0': [0.06, 0.06579859882206893, 0.16, 0.26, 0.273, 0.31, 0.32334583993039734], \
-                'Pathway1': [5.06, 5.065798598822069,   5.16, 5.26, 5.273, 5.31, 5.323345839930397], \
-                'Windows': [0.01, 0.003, 0.01, 0.01, 0.005, 0.01, 0.005]}
-        LTPopts["Pathway0"] = 0
+        LTPopts["Pathways"] = dict()
+        LTPopts["Pathways"]
+        LTPopts["Pathway0"] = {"Test":True, "Index"}
         LTPopts["Pathway1"] = 1
-        LTPopts["Reference"] =5
-        LTPopts["Signals"] = ['Im_prim_1', 'Vm_sec_1']
+        LTPopts["Reference"] = kwargs.get("Reference", 5)
+        LTPopts["Field"] = True
+        
+        
+        if field:
+            LTPopts["Signals"] = kwargs.get("Signals",['Vm_sec_1'])
+            LTPopts["Cursors"] = {'Labels': ['fEPSP0','fEPSP1'],\
+                    'Pathway0': [0.168, 0.169], \
+                    'Pathway1': [5.168, 5.169], \
+                    'Windows': [0.001, 0.001]} # NOTE: cursor windows are not used here
+            
+            
+        else:
+            LTPopts["Signals"] = kwargs.get("Signals",['Im_prim_1', 'Vm_sec_1'])
+            LTPopts["Cursors"] = {'Labels': ['Rbase','Rs','Rin','EPSC0base','EPSC0Peak','EPSC1base','EPSC1peak'],\
+                    'Pathway0': [0.06, 0.06579859882206893, 0.16, 0.26, 0.273, 0.31, 0.32334583993039734], \
+                    'Pathway1': [5.06, 5.065798598822069,   5.16, 5.26, 5.273, 5.31, 5.323345839930397], \
+                    'Windows': [0.01, 0.003, 0.01, 0.01, 0.005, 0.01, 0.005]}
+            
         print("Now, save the options as %s" % os.path.join(os.path.dirname(__file__), "options", "LTPOptions.pkl"))
+        
         #raise RuntimeError("No options file found. Have you ever run save_LTP_options ?")
     else:
         with open(LTPOptionsFile, "rb") as fileSrc:
@@ -929,11 +1104,70 @@ def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptio
         
 
     return ret
-    
-def calculateRmEPSCsLTP(block, signal_index_Im, signal_index_Vm, Vm = False, epoch = None, out_file=None):
+
+def calculate_fEPSP(block:neo.Block,
+                    signal_index:[int, str],
+                    epoch:[neo.Epoch, type(None)]=None,
+                    out_file:[str, type(None)]=None) -> dict:
     """
-    block: a neo.Block; must have at least one analogsignal for Im and one for Vm; these signals
-        must have the same indices in each segment's list og analogsignals in the block
+    Calculates the slope of field EPSPs.
+    
+    Parameters:
+    ===========
+    block: a neo.Block; must contain the analogsignal for the field potential,
+        found at the same index in each segment's list of analogsignals,
+        throughout the block.
+        
+    signal_index: int or str.
+        When an int: the index of the field potential signal, in the collection
+            of analog signals in each segment (same index throughout)
+            
+        When a str: the name of the analog signal containing the field potential
+            data. It must be present in alll segments of the block.
+        
+            
+    epoch: a neo.Epoch, or None (default).
+        When a neo.Epoch, it must have at least one interval defined:
+        fEPSP0, (optionally, fEPSP1)
+
+     When None, the epoch is supposed to be found embedded in each segment of 
+     the block.
+     
+    
+    Returns
+    =======
+    
+    A dict with the following keys:
+    
+    "fEPSP0" slope of the first field EPSP
+    
+    Optionally (if there are two intervas in the epoch):
+    
+    "fEPSP1" slope of the first field EPSP
+    "PPR" (paired-pulse ratio)
+    
+    """
+    
+    if isinstance(signal_index, str):
+        singal_index = neoutils.get_index(block, signal_index)
+        
+    for k, seg in enumerate(block.segments):
+        pass
+    
+def calculateRmEPSCsLTP(block, 
+                        signal_index_Im, 
+                        signal_index_Vm, 
+                        Vm = False, 
+                        epoch = None, 
+                        out_file=None) -> dict:
+    """
+    Calculates membrane Rin, Rs, and EPSC amplitudes in whole-cell voltage clamp.
+    
+    Parameters:
+    ==========
+    block: a neo.Block; must contain one analogsignal each for Im and Vm;
+        these signals must be found at the same indices in each segment's list
+        of analogsignals, throughout the block.
     
     epoch: a neo.Epoch; must have 5 or 7 intervals defined:
         Rbase, Rs, Rin, EPSC0base, EPSC0peak (optionally, EPSC1base, EPSC1peak)
@@ -944,8 +1178,6 @@ def calculateRmEPSCsLTP(block, signal_index_Im, signal_index_Vm, Vm = False, epo
     Vm: boolean, optional( default it False); when True, then signal_index_Vm is taken to be the actul
         amount of membrane voltage depolarization (in mV) used during the Vm test pulse
         
-    NOTE: NOT ANYMORE: Returns a tuple of np.arrays as follows: NOTE
-    
     NOTE: 2017-04-29 22:41:16 API CHANGE
     Returns a dictionary with keys as follows:
     
@@ -974,7 +1206,7 @@ def calculateRmEPSCsLTP(block, signal_index_Im, signal_index_Vm, Vm = False, epo
         Vm = False
         
     for (k, seg) in enumerate(block.segments):
-        (irbase, rs, rin, epsc0, epsc1) = calculateLTPSegment(seg, signal_index_Im, signal_index_Vm, Vm=Vm, epoch=epoch)
+        (irbase, rs, rin, epsc0, epsc1) = _calculate_LTP_Segment_whole_cell_(seg, signal_index_Im, signal_index_Vm, Vm=Vm, epoch=epoch)
         ui = irbase.units
         ri = rs.units
         
@@ -1041,10 +1273,39 @@ def calculateRmEPSCsLTP(block, signal_index_Im, signal_index_Vm, Vm = False, epo
         
     return ret
 
-def calculateLTPSegment(s, signal_index_Im, signal_index_Vm, Vm=False, epoch=None):
+def _calculate_LTP_Segment_field_EPSP_(s:neo.Segment, signal_index:int, epoch:[neo.Epoch, type(None)]=None) -> np.ndarray:
     if epoch is None:
         if len(s.epochs) == 0:
             raise ValueError("Segment has no epochs and no external epoch has been defined")
+
+        epoch = s.epochs[0]
+        
+        if len(epoch) != 1 and len(epoch) != 2:
+            raise ValueError("Expecting an Epoch with 1 or 2 intervals; got %d instead" % len(epoch))
+        
+        # each epoch interval should cover the signal time slice over which the 
+        # chord slope of the field EPSP is calculated; this time slice should be
+        # between the x coordinates of two adjacent cursors, placed respectively 
+        # on 10% and 90% from base to (negative) peak (10-90 "rise time")
+        
+        t0 = epoch.times
+        dt = epoch.durations
+        t1 = epoch.times + dt
+        
+        signal = s.analogsignals[signal_index]
+        
+        epsp_rises = [signal.time_slice(t_0, t_1) for t_0, t_1 in zip(t0,t1)]
+        
+        chord_slopes = [((sig.max()-sig.min())/d_t).rescale(pq.V/pq.s) for (sig, d_t) in zip(epsp_rises, dt)]
+        
+        return chord_slopes
+        
+        
+def _calculate_LTP_Segment_whole_cell_(s, signal_index_Im, signal_index_Vm, Vm=False, epoch=None):
+    if epoch is None:
+        if len(s.epochs) == 0:
+            raise ValueError("Segment has no epochs and no external epoch has been defined")
+        
         epoch = s.epochs[0]
         
         if len(epoch) != 5 and len(epoch) != 7:
@@ -1093,12 +1354,20 @@ def calculateLTPSegment(s, signal_index_Im, signal_index_Vm, Vm=False, epoch=Non
     return (Irbase, Rs, Rin, EPSC0, EPSC1)
 
                  
-def analyzeLTPPathway(baseline_block, chase_block, signal_index_Im, signal_index_Vm, path_index, \
-                        baseline_epoch=None, chase_epoch = None, \
-                        Vm = False, \
-                        baseline_range=range(-5,-1), \
-                        basename=None, pathType=None, \
-                        normalize=False):
+def analyzeLTPPathway(baseline_block:neo.Block, 
+                      chase_block:neo.Block, 
+                      LTPOptions:dict,
+                      signal_index_Im, 
+                      signal_index_Vm, 
+                      path_index,
+                      baseline_epoch=None, 
+                      chase_epoch = None,
+                      Vm = False,
+                      baseline_range=range(-5,-1),
+                      basename=None, 
+                      pathType=None,
+                      normalize=False,
+                      field=False):
     """
     baseline_block
     chase_block
@@ -1111,9 +1380,12 @@ def analyzeLTPPathway(baseline_block, chase_block, signal_index_Im, signal_index
     baseline_range  = range(-5,-1)
     basename        = None
     """
-    
-    baseline_result     = calculateRmEPSCsLTP(baseline_block, signal_index_Im = signal_index_Im, signal_index_Vm = signal_index_Vm, Vm = Vm, epoch = baseline_epoch)
-    chase_result        = calculateRmEPSCsLTP(chase_block,    signal_index_Im = signal_index_Im, signal_index_Vm = signal_index_Vm, Vm = Vm, epoch = chase_epoch)
+    if field:
+        pass
+        
+    else:
+        baseline_result     = calculateRmEPSCsLTP(baseline_block, signal_index_Im = signal_index_Im, signal_index_Vm = signal_index_Vm, Vm = Vm, epoch = baseline_epoch)
+        chase_result        = calculateRmEPSCsLTP(chase_block,    signal_index_Im = signal_index_Im, signal_index_Vm = signal_index_Vm, Vm = Vm, epoch = chase_epoch)
     
     meanEPSC0baseline   = np.mean(baseline_result["EPSC0"][baseline_range])
     
@@ -1195,7 +1467,7 @@ def analyzeLTPPathway(baseline_block, chase_block, signal_index_Im, signal_index
     return ret
 
     
-def LTP_analysis(mean_average_dict, results_basename=None, LTPOptions=None, normalize=False):
+def LTP_analysis(mean_average_dict, LTPOptions, results_basename=None, normalize=False):
     """
     Arguments:
     ==========
@@ -1217,14 +1489,18 @@ def LTP_analysis(mean_average_dict, results_basename=None, LTPOptions=None, norm
             results_basename = mean_average_dict["name"]
             
         else:
-            warnings.warn("LTP Data dictionary lacks a 'name' field and a result basename has not eenb supllied; results will get a default gneric name")
+            warnings.warn("LTP Data dictionary lacks a 'name' field and a result basename has not been supplied; results will get a default generic name")
             results_basename = "Minute_averaged_LTP_Data"
             
     elif not isinstance(results_basename, str):
         raise TypeError("results_basename parameter must be a str or None; for %s instead" % type(results_basename).__name__)
     
-    ret_test = analyzeLTPPathway(mean_average_dict["Test"]["Baseline"], mean_average_dict["Test"]["Chase"], 0, 1, mean_average_dict["Test"]["Path"], \
-                                basename=results_basename+"_test", pathType="Test", normalize=normalize)
+    ret_test = analyzeLTPPathway(mean_average_dict["Test"]["Baseline"],
+                                 mean_average_dict["Test"]["Chase"], 0, 1, 
+                                 mean_average_dict["Test"]["Path"], 
+                                 basename=results_basename+"_test", 
+                                 pathType="Test", 
+                                 normalize=normalize)
     
     ret_control = analyzeLTPPathway(mean_average_dict["Control"]["Baseline"], mean_average_dict["Control"]["Chase"], 0, 1, mean_average_dict["Control"]["Path"], \
                                 basename=results_basename+"_control", pathType="Control", normalize=normalize)
