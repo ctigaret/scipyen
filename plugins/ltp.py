@@ -971,23 +971,136 @@ def save_LTP_options(val):
         pickle.dump(val, fileDest, pickle.HIGHEST_PROTOCOL)
     
 
-def load_LTP_options(LTPOptionsFile=None, field=False, **kwargs):
+def load_LTP_options(LTPOptionsFile:[str, type(None)]=None, **kwargs):
+    """Loads LTP options from a file or generates one from arguments.
+    
+    The options specify synaptic pathways, aalysis cursors and optional 
+    minute-by-minute averaging of data of synaptic plasticity experiments.
+    
+    Parameters:
+    ===========
+    LTPOptionsFile: str or None (default)
+        If a str, it should resolve to an existing pickle file
+        
+        When None, a dictionary of LTP options is generated using kwargs and
+        "reasonable" defaults.
+        
+    Var-keyword parameters:
+    ======================
+    "offline_average":int = number of consecutive single-run trials to average 
+        off-line (default: 6).
+        
+        A value of 0 indicates no off-line averaging. 
+        
+    "online_average":int = as offline_average; used only in live mode (TODO)
+        
+    "every":int   = number of consecutive single-run trials to skip before next 
+        offline average (default: 6)
+        
+    "reference":int  = number of minute-average responses used to assess 
+        plasticity; this is the number of reponses at the end of the chase
+        stage, and it equals the number of responses at the end of the baseline
+        stage. Therefore it cannot be larger than the duration of the baseline 
+        stage, in minutes.
+        
+        Default is 5 (i.e. compare the average of the last 5 minute-averaged 
+            responses of the chase stage, to the average of the last 5 
+            minute-averaged responses of the baseline stage, in each pathway)
+            
+    "measure":str default is amplitude. 
+        Valid measures are "amplitude", "slope".
+        
+        When "amplitude", the amplitude of the synaptic response will be 
+        measured as the difference between the mean signal value at a vertical 
+        cursor on the synaptic response "peak" (for outward signals, e.g. EPSPs) 
+        or "trough" (for inward signals e.g. EPSCs) and the mean baseline value
+        at a vertical cursor placed ideally just before the stimulus artifact.
+        
+        The mean signal value is calculated as the averfage signal values across
+        the cursor's window.
+        
+        When "slope", the chord slope of the rising phase of the synaptic 
+        response is measured between two vertical cursors, ideally placed at 10% 
+        90% from base to peak (10-90 chord slope).
+        
+        
+    "cursors": dict, each key if the cursor label, mapped to a nested dict with
+        "time": time of vertical cursor, RELATIVE to the start of the sweep 
+            (segment)
+            
+        "window": the cursor window.
+        
+        Both time and window are float or pq.s values. 
+    
+    
+    The following (str = int) pairs are used to configure one or two stimulation 
+    pathways, where the synaptic responses are monitored during the experiment
+    (except perhaps during conditioning).
+    
+    These pathways are specified according to a "name = value" scheme:
+    
+        "name" is a string (curently one of "test" and "control")
+        
+        "value" is an int (currently, 0 or 1) and represents the index of the
+        pathway
+        
+    "test":int , default = 0
+    "control":int, default = 1
+    
+    All synaptic plasticity experiments have at least one stimulation pathway 
+    (the "test" pathway), which is assigned index 0 by default, unless specified
+    here. The "test" pathway receives the conditioning protocol and is monitored 
+    for synaptic responses before and after conditioning.
+    
+    Ideally, synaptic responses are also monitored on a "control" pathway, which 
+    is NOT stimulated during the conditioning, and serves to distinguish changes
+    in synaptic responses induced by the conditioning protocol, from changes by 
+    other causes.
+    
+    """
+    
     if LTPOptionsFile is None or not os.path.isfile(LTPOptionsFile):
+        
+        test_path = kwargs.pop("test", 0)
+        
+        if test_path < 0 or test_path > 1:
+            raise ValueError("Invalid test path index (%d); expecting 0 or 1" % test_path)
+        
+        control_path = kwargs.pop("control", None)
+        
+        if isinstance(control_path, int):
+            if control_path < 0 or control_path > 1:
+                raise ValueError("Invalid control path index (%d) expecting 0 or 1" % control_path)
+            
+            if control_path == test_path:
+                raise ValueError("Control path index must be different from the test path index (%d)" % test_path)
+        
+        online_average = kwargs.pop("online_average", 6)
+        offline_average = kwargs.pop("offline_average", 6)
+        average_every = kwargs.pop("every", 6)
+        
+        reference = keargs.pop("reference", 5)
+        
+        measure = kwargs.pop("measure": "amplitude")
+        
+        
         LTPopts = dict()
-        LTPopts["Average"] = {'Count': 6, 'Every': 6}
+        LTPopts["Average"] = {'Count': offline_average, 'Every': average_every}
+        LTPopts["OnlineAverage"] = {"Count": online_average, "Every": average_every}
         LTPopts["Pathways"] = dict()
-        LTPopts["Pathways"]
-        LTPopts["Pathway0"] = {"Test":True, "Index"}
-        LTPopts["Pathway1"] = 1
+        LTPopts["Pathways"]["Test"] = test_path
+        if isinstance(control_path, int:)
+            LTPopts["Pathways"]["Control"] = control_path
+            
         LTPopts["Reference"] = kwargs.get("Reference", 5)
-        LTPopts["Field"] = True
+        LTPopts["Field"] = kwargs.get("field", False)
         
         
         if field:
             LTPopts["Signals"] = kwargs.get("Signals",['Vm_sec_1'])
-            LTPopts["Cursors"] = {'Labels': ['fEPSP0','fEPSP1'],\
-                    'Pathway0': [0.168, 0.169], \
-                    'Pathway1': [5.168, 5.169], \
+            LTPopts["Cursors"] = {'Labels': ['fEPSP0','fEPSP1'],
+                    'Pathway0': [0.168, 0.169], 
+                    'Pathway1': [5.168, 5.169], 
                     'Windows': [0.001, 0.001]} # NOTE: cursor windows are not used here
             
             
