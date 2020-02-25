@@ -351,6 +351,10 @@ def cursor2epoch(x, w, name=None, labels=None):
 
 @safeWrapper
 def cursors2epoch(times, windows, labels, name=None):
+    """Generates a neo.Epoch from a sequence of cursors positions (times) and windows.
+    
+    "Cursor" is used loosely here.
+    """
     return neo.Epoch((np.array(times) - np.array(windows)/2) * pq.s, \
                         durations = np.array(windows) * pq.s, \
                         labels = np.array(labels, dtype="S"), name=name)
@@ -409,6 +413,142 @@ def signal2epoch(sig, name=None, labels=None):
     
     return ret
 
+@safeWrapper
+def mean_signal_value_at_time(signal:neo.AnalogSignal,
+                              t:[float, pq.Quantity],
+                              w:[float, pq.Quantity]=0.001*pq.s):
+    """Calculates the mean value of signal samples at time t across window w.
+    
+    The value is effectively:
+    
+    signal.time_slice(t-w/2, t+w/2).mean(axis=0)
+    
+    Parameters:
+    ==========
+    signal: neo.AnalogSignal
+    
+    t0: scalar float or python Quantity in units convertible to the signal's 
+        time units
+    
+    w:  a scalar float or python Quantity = a window around the time points, 
+        across which the mean signal value is calculated (useful for noisy 
+        signals).
+        
+        Default is 0.001 * pq.s (i.e. 1 ms)
+    """
+    
+    if isinstance(t, numbers.Real):
+        t *= signal.times.units
+        
+    if isinstance(w, numbers.Real):
+        w *= signal.times.units
+        
+    return signal.time_slice(t-w/2, t+w/2).mean(axis=0)
+
+@safeWrapper
+def amplitude(signal:neo.AnalogSignal, 
+                             t0:[float, pq.Quantity], 
+                             t1:[float, pq.Quantity],
+                             w:[float, pq.Quantity] = 0.001 * pq.s) -> pq.Quantity:
+    """Calculates amplitude as the difference between signal values at t1 and t0.
+    
+                amplitude = y1 - y0
+    
+    The signal values (y0, y1) are taken as the average values of signal samples
+    across a window (w) centered at t0 and t1, respectively:
+    
+    y0 = signal.time_slice(t0-w/2, t0+w/2).mean(axis=0)
+    y1 = signal.time_slice(t1-w/2, t1+w/2).mean(axis=0)
+    
+    Parameters:
+    ==========
+    signal: neo.AnalogSignal
+    
+    t0, t1: scalar float or python Quantity in units convertible to the signal's
+        time units
+    
+    w:  a scalar float or python Quantity = a window around the time points, 
+        across which the mean signal value is calculated (useful for noisy 
+        signals).
+        
+        Default is 0.001 * pq.s (i.e. 1 ms)
+    
+    Returns:
+    ========
+    
+    A python quantity array in signal units, with as many values as there are
+    column vectors (channels) in the signal.
+    
+    """
+    
+    if isinstance(t0, numbers.Real):
+        t0 *= signal.times.units
+        
+    if isinstance(t1, numbers.Real):
+        t1 *= signal.times.units
+        
+    if isinstance(w, numbers.Real):
+        w *= signal.times.units
+        
+    y0 = signal.time_slice(t0-w/2, t0+w/2).mean(axis=0)
+    y1 = signal.time_slice(t1-w/2, t1+w/2).mean(axis=0)
+    
+    return y1-y0
+    
+    
+@safeWrapper
+def chord_slope(signal:neo.AnalogSignal, t0:[float,pq.Quantity], t1:[float,pq.Quantity],
+                w:[float, pq.Quantity] = 0.001 * pq.s) -> pq.Quantity:
+    """Calculates the chord slope of a signal between two time points t0 and t1.
+    
+                    slope = (y1 - y0) / (t1 - t0)
+    
+    The signal values (y0, y1) at time points (t0, t1) are taken as the average 
+    of the sample values in a window (w) around t0 and t1:
+    
+    y0 = signal.time_slice(t0-w/2, t0+w/2).mean(axis=0)
+    y1 = signal.time_slice(t1-w/2, t1+w/2).mean(axis=0)
+    
+    Parameters:
+    ==========
+    signal: neo.AnalogSignal
+    
+    t0, t1: scalar float or python Quantity =  the limits of the interval where
+            the chord slope is calculated, including the half-windows before t0
+            and after t1;
+            Their units must be convertible to the signal's time units
+    
+    w:  a scalar float or python Quantity = a window around the time points, 
+        across which the mean signal value is calculated (useful for noisy 
+        signals).
+        
+        Default is 0.001 * pq.s (i.e. 1 ms)
+        
+    Returns:
+    ========
+    
+    A python quantity array with as many values as there are column vectors
+    (channels) in the signal. The units are derived from the signal units and 
+    signal's time units.
+    
+    """
+    if isinstance(t0, numbers.Real):
+        t0 *= signal.times.units
+        
+    if isinstance(t1, numbers.Real):
+        t1 *= signal.times.units
+        
+    if isinstance(w, numbers.Real):
+        w *= signal.times.units
+        
+    y0 = signal.time_slice(t0-w/2, t0+w/2).mean(axis=0)
+    y1 = signal.time_slice(t1-w/2, t1+w/2).mean(axis=0)
+    
+    ret = (y1-y0) / (t1-t0)
+    
+    return ret
+    
+    
 @safeWrapper
 def interval2epoch(x0, x1):
     """Returns the interval between two cursors (vertical or crosshair)

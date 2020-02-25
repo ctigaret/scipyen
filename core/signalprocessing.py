@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Functions for processing generic 1D signals.
+"""Functions for processing generic 1D signals (numpy array).
 For signal processing on signal types (e.g. neo.AnalogSignals or datatypes.DataSignal)
 please use the "neoutils" module.
 """
@@ -14,7 +14,7 @@ import quantities as pq
 from . import curvefitting as crvf
 #### END pict.core modules
 
-def simplify_2d_shape(xy, max_points = 5, k=3):
+def simplify_2d_shape(xy:np.ndarray, max_points:int = 5, k:int = 3) -> (np.ndarray, list):
     """Creates an simplified version of a 2D shape defined by x,y coordinate array
     
     Parameters:
@@ -186,7 +186,7 @@ def simplify_2d_shape(xy, max_points = 5, k=3):
         
     return ret, splines
     
-def zero_crossings(x):
+def zero_crossings(x:np.ndarray) -> np.ndarray:
     """Returns the zero crossings of x waveform, with grid accuracy.
     
     For good results "x" should be filtered first (e.g. smoothed with a boxcar)
@@ -205,7 +205,7 @@ def zero_crossings(x):
     return np.where(x[:-1] * x[1:] < 0)[0] # because where() returns a tuple which
                                            # for 1D data has only one element
                                         
-def value_crossings(x, value):
+def value_crossings(x:np.ndarray, value:float) -> np.ndarray:
     if isinstance(x, np.ndarray) and len(x.shape) > 1:
         if x.ndim > 2 or x.shape[1] > 1:
             raise TypeError("Expecting a vector")
@@ -216,7 +216,7 @@ def value_crossings(x, value):
     
     return zero_crossings(x_)
                                         
-def generate_bin_width(adcres=15, adcrange=10, adcscale=1):
+def generate_bin_width(adcres:float=15, adcrange:float=10, adcscale:float=1) -> float:
     """Define a histogram bin width according to the ADC used to collect the data.
     
     adcres = integer, optional: 
@@ -239,7 +239,7 @@ def generate_bin_width(adcres=15, adcrange=10, adcscale=1):
     
     return adcscale * adcrange/(2**adcres)
 
-def is_positive_waveform(x):
+def is_positive_waveform(x:np.ndarray) -> bool:
     if not isinstance(x, np.ndarray):
         raise TypeError("Expecting a np.ndarray object or a derived type; got %s instead" % type(x).__name__)
     
@@ -254,16 +254,30 @@ def is_positive_waveform(x):
     
     return len(xPos) > len(xNeg)
 
-def normalise_waveform(x):
+def normalise_waveform(x:np.ndarray) -> np.ndarray:
     """No-frills waveform normalization of a signal
     """
     
     return (x-np.min(x))/(np.max(x)-np.min(x))
 
+def waveform_amplitude(x:np.ndarray, method:str="direct") -> np.ndarray:
+    """Calculates the amplitude of a waveform.
     
+    Parameters:
+    ==========
+    x: numpy array (numeric)
     
-def waveform_amplitude(x, method="direct"):
+    Keyword parameters:
+    ===================
+    method:str, one of "direct", "levels". Default is "direct"
     
+        "direct": amplitude is the absolute value of the range of x
+            (i.e. max - min) excluding NaNs
+            
+        "levels": amplitude if the ansolute difference between two state levels
+            of the signal x (see state_levels() function in this module)
+    
+    """
     if not isinstance(x, np.ndarray):
         raise TypeError("Expecting a np.ndarray object or a derived type; got %s instead" % type(x).__name__)
     
@@ -288,7 +302,7 @@ def waveform_amplitude(x, method="direct"):
         
         return np.abs(np.diff(sl))
         
-def shorth_estimator(x):
+def shorth_estimator(x:np.ndarray):
     """Shorth estimator for step-like waveforms.
     See IEEE Std 181-2011: 
         IEEE Standard for Transitions, Pulses, and Related Waveforms
@@ -297,7 +311,6 @@ def shorth_estimator(x):
     #TODO
     from scipy import cluster
     cbook, dist = cluster.vq.kmeans(x, 2) # get the two state occurrences
-    
     
 def split_histogram(counts, f):
     """ Histogram splitter 
@@ -420,7 +433,7 @@ def split_histogram(counts, f):
         
     return ranges
     
-def state_levels(x, **kwargs):
+def state_levels(x:np.ndarray, **kwargs) -> list:
     """Calculate states from a 1D waveform.
     See IEEE Std 181-2011: 
         IEEE Standard for Transitions, Pulses, and Related Waveforms
@@ -557,38 +570,46 @@ def state_levels(x, **kwargs):
     
     return sLevels#, counts, edges
 
-    
-def nanlen(x):
-    if isinstance(x, (pd.DataFrame, pd.Series)):
-        return sum(~x.isna())
-    
-    elif isinstance(x, np.ndarray):
-        return sum(~np.isnan(x))
-    
-    else:
-        raise TypeError("Expecting a numpy array, a pandas DataFrame or a pandas Series; got %s instead" % type(x).__name__)
-    
-def nansize(x):
+def nansize(x, **kwargs) -> int:
     """
     TODO: allow calculation over specified axis; use np.sum instead of sum
     """
-    if isinstance(x, (pd.DataFrame, pd.Series)):
-        return sum(~x.isna())
+    axis = kwargs.pop("axis", None)
+    keepdims = kwargs.pop("keepdims", True)
     
-    elif isinstance(x, np.ndarray):
-        return sum(~np.isnan(x))
+    ret = np.sum(~np.isnan(x), axis=axis, keepdims=keepdims)
     
+    if len(ret) == 1:
+        return (int(ret))
+    
+    return ret
+    
+def sem(x:np.ndarray, **kwargs) -> np.ndarray:
+    ddof = kwargs.pop("ddof", 1)
+    axis = kwargs.pop("axis", None)
+    keepdims = kwargs.pop("keepdims", True)
+    
+    if axis is None:
+        sz = np.size(x)
+        
     else:
-        raise TypeError("Expecting a numpy array, a pandas DataFrame or a pandas Series; got %s instead" % type(x).__name__)
+        sz = x.shape[axis]
     
-    
+    return np.std(x, ddof=ddof, axis=axis, out=None, keepdims=keepdims) / np.sqrt(sz-ddof)
 
-def sem(x, ddof=0):
-    return np.std(x, ddof=ddof) / np.sqrt(np.size(x)-ddof)
-
-def nansem(x, ddof=0):
-    if nansize(x) <= 1: # because if there is only 1 sample, SD, SEM make no sense
-        return np.nan
+def nansem(x, **kwargs):
+    ddof = kwargs.pop("ddof", 1)
+    axis = kwargs.pop("axis", None)
+    keepdims = kwargs.pop("keepdims", True)
     
-    return np.nanstd(x, ddof=ddof) / np.sqrt(nansize(x)-ddof)
+    sz = nansize(x, axis=axis, keepdims=keepdims)
+    
+    if len(sz) == 1:
+        if sz <= 1:
+            return np.nan
+        
+        else:
+            sz[sz<=1] = np.nan
+    
+    return np.nanstd(x, ddof=ddof, axis=axis, keepdims=keepdims) / np.sqrt(nansize(x)-ddof)
 

@@ -851,6 +851,188 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
         return record_data
         
+def generate_synaptic_plasticity_options(**kwargs) -> dict:
+    """Constructs a dict with options for synaptic plasticity experiments.
+    
+    The options specify synaptic pathways, analysis cursors and optional 
+    minute-by-minute averaging of data from synaptic plasticity experiments.
+    
+    All synaptic plasticity experiments have a stimulation pathway 
+    ("test pathway") where synaptic responses are monitored before and after 
+    a conditioning protocol is applied. Homo-synaptic plasticity is considered
+    to occur when the conditioning protocol induces changes in the magnitude
+    of the synaptic response in the conditioned pathway.
+    
+    The "test" pathway is assigned index 0 by default, unless specified 
+    otherwise.
+    
+    Ideally, synaptic responses are also monitored on a "control" pathway, which 
+    is unperturbed during the conditioning, in order to distinguish the changes
+    in synaptic responses in the conditioned ("test") pathway, from changes 
+    induced by other causes conditioned (test) pathway.
+    
+    When a "control" pathway is present, the data from the two pathways is
+    expected to have been recorded in alternative, interleaved sweeps.
+    
+    NOTE: These options are adapted for off-line analysis of data acquired with
+    custom protocols in Clampex.
+    
+    TODO: 
+    1. Accommodate data acquired in Clampex using the built-in LTP protocol
+    2. Accommodate data acquired with CED Signal (v5 and later).
+    3. Allow for single pathway experiments (i.e. test pathway only)
+    4. Allow for monitoring extra synaptic pathways (e.g., cooperative LTP as in
+       Golding et al, Nature 2002)
+    5. Use in acquisition; on-line analysis.
+    
+    Var-keyword parameters:
+    =======================
+    
+    "field":bool = flag indicating whether the options are for field recordings
+        (when True) or whole-cell and intracellular recordings (False)
+        Default is False.
+    
+    "average":int = number of consecutive single-run trials to average 
+        off-line (default: 6).
+        
+        A value of 0 indicates no off-line averaging. 
+        
+    "every":int   = number of consecutive single-run trials to skip before next 
+        offline average (default: 6)
+        
+    "reference":int  = number of minute-average responses used to assess 
+        plasticity; this is the number of reponses at the end of the chase
+        stage, and it equals the number of responses at the end of the baseline
+        stage. Therefore it cannot be larger than the duration of the baseline 
+        stage, in minutes.
+        
+        Default is 5 (i.e. compare the average of the last 5 minute-averaged 
+            responses of the chase stage, to the average of the last 5 
+            minute-averaged responses of the baseline stage, in each pathway)
+            
+            
+    "measure": dict = Dictionary of measures, 
+            
+    "measure":str default is amplitude. 
+        Valid measures are "amplitude" and "slope".
+        
+        "amplitude" indicates that the synaptic response amplitude will be 
+        monitored. The amplitude is measured as the difference between the 
+        baseline of the synaptic response, and its peak (for outward waveforms)
+        or through (for inward waveforms). 
+        
+        The location of the baseline and the peak (or trough) is set manually
+        using vertical cursors, represented here by their time coordinate
+        relative to the start of the sweep. The signal values are the average 
+        sample values across the cursor "window" (a time interval).
+        
+        "slope" indicates that the chord slope of the rising phase of the 
+        synaptic is monitored. The chord slope is measured between two vertical 
+        cursors (represented by time coordinates relative to the beginning of 
+        the sweep) placed, ideally, 10% and 90% from base to peak (or trough).
+        
+        
+    "cursors": dict = Vertical cursor specification
+        The dictionary maps str keys (cursor label) to a (time, window) tuple
+        where:
+        
+        time = the time coordinate of the cursor cursor (relative to the start
+        of the sweep)
+        
+        window = cursor window 
+        
+        Both time and window are float or python Quantity values with units of
+        "second", and specify a virtual vertical cursor used in the analysis.
+        
+        By default this is empty, and the options will be asssigned a default
+        set of cursors according to the value of the "field" parameter:
+        
+        When field is True:
+        
+        
+    
+    
+    "test":int , default = 0 index of the "test" pathway, for dual pathway
+        interleaved experiments.
+        
+        For data acquired using Clampex with a custom LTP protocol, this 
+        represents the index of the test pathway sweep within each run.
+        The sampling protocol is expected to record data alternatively
+        from the test and control pathway. 
+        
+        Trials with a single run will be saved to disk as files contains two 
+        sweeps, one for each pathway. 
+        
+        When the protocol specifies several runs per trial, the saved file will
+        also contain two sweeps, with data for the corresponding pathway being 
+        averaged acrosss the runs.
+    
+    "control":int, default = 1
+    
+    """
+    field = kwargs.pop("field", False)
+    
+    test_path = kwargs.pop("test", 0)
+    
+    if test_path < 0 or test_path > 1:
+        raise ValueError("Invalid test path index (%d); expecting 0 or 1" % test_path)
+    
+    control_path = kwargs.pop("control", None)
+    
+    if isinstance(control_path, int):
+        if control_path < 0 or control_path > 1:
+            raise ValueError("Invalid control path index (%d) expecting 0 or 1" % control_path)
+        
+        if control_path == test_path:
+            raise ValueError("Control path index must be different from the test path index (%d)" % test_path)
+    
+    average = kwargs.pop("average", 6)
+    average_every = kwargs.pop("every", 6)
+    
+    reference = keargs.pop("reference", 5)
+    
+    measure = kwargs.pop("measure", "amplitude")
+    
+    cursors = kwargs.pop("cursors", dict())
+    
+    LTPopts = dict()
+    
+    LTPopts["Average"] = {'Count': average, 'Every': average_every}
+    LTPopts["Pathways"] = dict()
+    LTPopts["Pathways"]["Test"] = test_path
+    
+    if isinstance(control_path, int):
+        LTPopts["Pathways"]["Control"] = control_path
+        
+    LTPopts["Reference"] = kwargs.get("Reference", 5)
+    #LTPopts["Field"] = kwargs.get("field", False)
+    
+    
+    if field:
+        LTPopts["Signals"] = kwargs.get("Signals",['Vm_sec_1'])
+        
+        if len(cursors):
+            LTPopts["Cursors"] = cursors
+            
+        else:
+            LTPopts["Cursors"] = {"fEPSP0_10": (0.168, 0.001), 
+                                  "fEPSP0_90": (0.169, 0.001)}
+            
+            #LTPopts["Cursors"] = {'Labels': ['fEPSP0','fEPSP1'],
+                                #'time': [0.168, 0.169], 
+                                #'Pathway1': [5.168, 5.169], 
+                                #'Windows': [0.001, 0.001]} # NOTE: cursor windows are not used here
+            
+        
+    else:
+        LTPopts["Signals"] = kwargs.get("Signals",['Im_prim_1', 'Vm_sec_1'])
+        LTPopts["Cursors"] = {'Labels': ['Rbase','Rs','Rin','EPSC0base','EPSC0Peak','EPSC1base','EPSC1peak'],
+                              'Pathway0': [0.06, 0.06579859882206893, 0.16, 0.26, 0.273, 0.31, 0.32334583993039734], 
+                              'Pathway1': [5.06, 5.065798598822069,   5.16, 5.26, 5.273, 5.31, 5.323345839930397], 
+                              'Windows': [0.01, 0.003, 0.01, 0.01, 0.005, 0.01, 0.005]}
+        
+    
+    return LTPopts
     
 def generate_LTP_options(cursors, signal_names, path0, path1, baseline_minutes, \
                         average_count, average_every):
@@ -970,147 +1152,34 @@ def save_LTP_options(val):
     with open(LTPOptionsFile, "wb") as fileDest:
         pickle.dump(val, fileDest, pickle.HIGHEST_PROTOCOL)
     
-
-def load_LTP_options(LTPOptionsFile:[str, type(None)]=None, **kwargs):
+@safeWrapper
+def load_synaptic_plasticity_options(LTPOptionsFile:[str, type(None)]=None, **kwargs):
     """Loads LTP options from a file or generates one from arguments.
-    
-    The options specify synaptic pathways, aalysis cursors and optional 
-    minute-by-minute averaging of data of synaptic plasticity experiments.
     
     Parameters:
     ===========
     LTPOptionsFile: str or None (default)
-        If a str, it should resolve to an existing pickle file
+        If a str, it should resolve to an existing pickle file containing a 
+        dictionary with valid synaptic plasticity options.
         
         When None, a dictionary of LTP options is generated using kwargs and
         "reasonable" defaults.
         
+        WARNING: the contents of the dictionary are not checked for validity as
+        options in synaptic plasticity experiments.
+        
     Var-keyword parameters:
-    ======================
-    "offline_average":int = number of consecutive single-run trials to average 
-        off-line (default: 6).
+    =======================
+    Passed directly to generate_synaptic_plasticity_options(), used when 
+    LTPOptionsFile is None or specifies a non-existent file. 
         
-        A value of 0 indicates no off-line averaging. 
-        
-    "online_average":int = as offline_average; used only in live mode (TODO)
-        
-    "every":int   = number of consecutive single-run trials to skip before next 
-        offline average (default: 6)
-        
-    "reference":int  = number of minute-average responses used to assess 
-        plasticity; this is the number of reponses at the end of the chase
-        stage, and it equals the number of responses at the end of the baseline
-        stage. Therefore it cannot be larger than the duration of the baseline 
-        stage, in minutes.
-        
-        Default is 5 (i.e. compare the average of the last 5 minute-averaged 
-            responses of the chase stage, to the average of the last 5 
-            minute-averaged responses of the baseline stage, in each pathway)
-            
-    "measure":str default is amplitude. 
-        Valid measures are "amplitude", "slope".
-        
-        When "amplitude", the amplitude of the synaptic response will be 
-        measured as the difference between the mean signal value at a vertical 
-        cursor on the synaptic response "peak" (for outward signals, e.g. EPSPs) 
-        or "trough" (for inward signals e.g. EPSCs) and the mean baseline value
-        at a vertical cursor placed ideally just before the stimulus artifact.
-        
-        The mean signal value is calculated as the averfage signal values across
-        the cursor's window.
-        
-        When "slope", the chord slope of the rising phase of the synaptic 
-        response is measured between two vertical cursors, ideally placed at 10% 
-        90% from base to peak (10-90 chord slope).
-        
-        
-    "cursors": dict, each key if the cursor label, mapped to a nested dict with
-        "time": time of vertical cursor, RELATIVE to the start of the sweep 
-            (segment)
-            
-        "window": the cursor window.
-        
-        Both time and window are float or pq.s values. 
-    
-    
-    The following (str = int) pairs are used to configure one or two stimulation 
-    pathways, where the synaptic responses are monitored during the experiment
-    (except perhaps during conditioning).
-    
-    These pathways are specified according to a "name = value" scheme:
-    
-        "name" is a string (curently one of "test" and "control")
-        
-        "value" is an int (currently, 0 or 1) and represents the index of the
-        pathway
-        
-    "test":int , default = 0
-    "control":int, default = 1
-    
-    All synaptic plasticity experiments have at least one stimulation pathway 
-    (the "test" pathway), which is assigned index 0 by default, unless specified
-    here. The "test" pathway receives the conditioning protocol and is monitored 
-    for synaptic responses before and after conditioning.
-    
-    Ideally, synaptic responses are also monitored on a "control" pathway, which 
-    is NOT stimulated during the conditioning, and serves to distinguish changes
-    in synaptic responses induced by the conditioning protocol, from changes by 
-    other causes.
     
     """
     
     if LTPOptionsFile is None or not os.path.isfile(LTPOptionsFile):
         
-        test_path = kwargs.pop("test", 0)
+        LTPopts = generate_synaptic_plasticity_options(**kwargs)
         
-        if test_path < 0 or test_path > 1:
-            raise ValueError("Invalid test path index (%d); expecting 0 or 1" % test_path)
-        
-        control_path = kwargs.pop("control", None)
-        
-        if isinstance(control_path, int):
-            if control_path < 0 or control_path > 1:
-                raise ValueError("Invalid control path index (%d) expecting 0 or 1" % control_path)
-            
-            if control_path == test_path:
-                raise ValueError("Control path index must be different from the test path index (%d)" % test_path)
-        
-        online_average = kwargs.pop("online_average", 6)
-        offline_average = kwargs.pop("offline_average", 6)
-        average_every = kwargs.pop("every", 6)
-        
-        reference = keargs.pop("reference", 5)
-        
-        measure = kwargs.pop("measure": "amplitude")
-        
-        
-        LTPopts = dict()
-        LTPopts["Average"] = {'Count': offline_average, 'Every': average_every}
-        LTPopts["OnlineAverage"] = {"Count": online_average, "Every": average_every}
-        LTPopts["Pathways"] = dict()
-        LTPopts["Pathways"]["Test"] = test_path
-        if isinstance(control_path, int:)
-            LTPopts["Pathways"]["Control"] = control_path
-            
-        LTPopts["Reference"] = kwargs.get("Reference", 5)
-        LTPopts["Field"] = kwargs.get("field", False)
-        
-        
-        if field:
-            LTPopts["Signals"] = kwargs.get("Signals",['Vm_sec_1'])
-            LTPopts["Cursors"] = {'Labels': ['fEPSP0','fEPSP1'],
-                    'Pathway0': [0.168, 0.169], 
-                    'Pathway1': [5.168, 5.169], 
-                    'Windows': [0.001, 0.001]} # NOTE: cursor windows are not used here
-            
-            
-        else:
-            LTPopts["Signals"] = kwargs.get("Signals",['Im_prim_1', 'Vm_sec_1'])
-            LTPopts["Cursors"] = {'Labels': ['Rbase','Rs','Rin','EPSC0base','EPSC0Peak','EPSC1base','EPSC1peak'],\
-                    'Pathway0': [0.06, 0.06579859882206893, 0.16, 0.26, 0.273, 0.31, 0.32334583993039734], \
-                    'Pathway1': [5.06, 5.065798598822069,   5.16, 5.26, 5.273, 5.31, 5.323345839930397], \
-                    'Windows': [0.01, 0.003, 0.01, 0.01, 0.005, 0.01, 0.005]}
-            
         print("Now, save the options as %s" % os.path.join(os.path.dirname(__file__), "options", "LTPOptions.pkl"))
         
         #raise RuntimeError("No options file found. Have you ever run save_LTP_options ?")
