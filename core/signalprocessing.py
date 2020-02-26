@@ -597,7 +597,7 @@ def sem(x:np.ndarray, **kwargs) -> np.ndarray:
     
     return np.std(x, ddof=ddof, axis=axis, out=None, keepdims=keepdims) / np.sqrt(sz-ddof)
 
-def nansem(x, **kwargs):
+def nansem(x:np.ndarray, **kwargs) -> np.ndarray:
     ddof = kwargs.pop("ddof", 1)
     axis = kwargs.pop("axis", None)
     keepdims = kwargs.pop("keepdims", True)

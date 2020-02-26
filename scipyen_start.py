@@ -15,6 +15,7 @@ import sys, os, atexit, re, inspect, gc, sip, io, traceback
 
 # NOTE: 2019-07-29 12:08:47 these are imported indirectly via pict.gui
 from PyQt5 import QtCore, QtGui, QtWidgets
+
 if hasattr(QtCore, "QLoggingCategory"):
     QtCore.QLoggingCategory.setFilterRules("qt.qpa.xcb=false")
     

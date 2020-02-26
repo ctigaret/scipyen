@@ -31,11 +31,9 @@ CHANGELOG:
 from __future__ import print_function
 from __future__ import absolute_import # for python 2.5
 import faulthandler
-import sys, os, types, atexit, re, inspect, gc, sip, io, traceback, keyword, inspect, weakref
+import sys, os, types, atexit, re, inspect, gc, sip, io, warnings, numbers
+import traceback, keyword, inspect, weakref, itertools, typing
 from copy import copy, deepcopy
-import itertools
-
-import warnings
 
 from collections import ChainMap
 
@@ -44,13 +42,49 @@ from importlib import reload # I use this all too often !
 #### END core python modules
 
 #### BEGIN 3rd party modules
+
+#### BEGIN numerics: signal/image , maths, statistics, data visualization
+import numpy as np
+import pywt # wavelets
+import scipy
+from scipy import io as sio
+from scipy import stats
+
+# for statistics
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+import patsy as pt
+import pandas as pd # for DataFrame and Series
+import pingouin as pn # nicer stats
+import mpmath as mpm
+import researchpy as rp # for use with DataFrames & stats
+
+import joblib as jl # to use functions as pipelines: lightweight pipelining in Python
+
+import sklearn as sk # machine learning, also nice plot_* functionality
+
+import seaborn as sb # statistical data visualization
+
+#### BEGIN migration to pyqtgraph -- setup global parameters
+# NOTE: 2019-01-24 21:40:45
+import pyqtgraph as pg # used throughout - based on Qt5 
+pg.Qt.lib = "PyQt5" # pre-empt the use of PyQt5
+# TODO make this peristent  user-modifiable configuration
+pg.setConfigOptions(background="w", foreground="k", editorCommand="kwrite")
+#pg.setConfigOptions(editorCommand="kwrite")
+#### END migration to pyqtgraph -- setup global parameters
+
+
+#### BEGIN matplotlib modules
 import matplotlib as mpl
 mpl.use("Qt5Agg")
 import matplotlib.pyplot as plt
 #import matplotlib.pylab as plb
 import matplotlib.mlab as mlb
+
+#### BEGIN configure matplotlib
+
 #matplotlib.use("QtAgg")
-#### BEGIN setup matplotlib global parameters
 # NOTE: 2019-07-29 18:25:30
 # this does NOT seem to affect matplotlibrc therefore
 # we use a customized matplotlibrc file in pict's directory
@@ -58,14 +92,37 @@ import matplotlib.mlab as mlb
 # NOTE: 2019-08-07 16:34:23 that doesn't seem to work either, hence we 
 # call the matplotlib magic in console, at init, see NOTE: 2019-08-07 16:34:58
 #mpl.rcParams['backend']='Qt5Agg'
+# turn pyplot interactive ON
 mpl.rcParams["savefig.format"] = "svg"
 mpl.rcParams["xtick.direction"] = "in"
 mpl.rcParams["ytick.direction"] = "in"
 # NOTE: 2017-08-24 22:48:45 
-# turn pyplot interactive ON
 plt.ion()
 
-#### END setup matplotlib global parameters
+#### END configure matplotlib
+
+#### END matplotlib modules
+
+# NOTE: 2019-01-24 21:40:45
+#### BEGIN migration to pyqtgraph -- setup global parameters
+pg.Qt.lib = "PyQt5" # pre-empt the use of PyQt5
+# TODO make this peristent  user-modifiable configuration
+pg.setConfigOptions(background="w", foreground="k", editorCommand="kwrite")
+#pg.setConfigOptions(editorCommand="kwrite")
+
+#### END migration to pyqtgraph -- setup global parameters
+
+import quantities as pq
+import xarray as xa
+
+import h5py
+
+import vigra
+#import vigra.pyqt
+
+import neo
+
+#### END numerics: signal/image , maths, statistics, data visualization
 
 #### BEGIN PyQt5 modules
 
@@ -75,7 +132,7 @@ from PyQt5.uic import loadUiType
 
 #### END PyQt5 modules
 
-
+#### BEGIN ipython/jupyter modules
 from qtconsole.rich_jupyter_widget import RichJupyterWidget # DIFFERENT from that in qtconsoleapp module !!!
 #NOTE: 2017-03-21 01:09:05 inheritance chain ("<" means inherits from)
 # RichJupyterWidget < RichIPythonWidget < JupyterWidget < FrontendWidget < (HistoryConsoleWidget, BaseFrontendMixin)
@@ -101,46 +158,6 @@ from IPython.display import set_matplotlib_formats
 
 #### END ipython/jupyter modules
 
-import numpy as np
-import pywt
-import scipy
-from scipy import io as sio
-from scipy import stats
-
-# for statistics
-import statsmodels.api as sm
-import statsmodels.formula.api as smf
-import patsy as pt
-import pandas as pd # for DataFrame and Series
-import pingouin as pn # nicer stats
-import mpmath as mpm
-import researchpy as rp # for use with DataFrames & stats
-
-import joblib as jl # to use functions as pipelines: lightweight pipelining in Python
-
-import sklearn as sk # machine learning, also nice plot_* functionality
-
-import seaborn as sb # statistical data visualization
-import pyqtgraph as pg # used throughout - based on Qt5 
-
-# NOTE: 2019-01-24 21:40:45
-#### BEGIN migration to pyqtgraph -- setup global parameters
-pg.Qt.lib = "PyQt5" # pre-empt the use of PyQt5
-# TODO make this peristent  user-modifiable configuration
-pg.setConfigOptions(background="w", foreground="k", editorCommand="kwrite")
-#pg.setConfigOptions(editorCommand="kwrite")
-
-#### END migration to pyqtgraph -- setup global parameters
-
-import quantities as pq
-import xarray as xa
-
-import h5py
-
-import vigra
-#import vigra.pyqt
-
-import neo
 
 #### END 3rd party modules
 

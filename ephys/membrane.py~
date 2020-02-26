@@ -58,6 +58,7 @@ from core.utilities import safeWrapper
 
 #### BEGIN pict.gui modules
 import gui.signalviewer as sv
+from gui.signalviewer import Cursor as Cursor
 import gui.pictgui as pgui
 
 #### END pict.gui modules
@@ -69,6 +70,17 @@ import iolib.pictio as pio
 #### BEGIN pict.ephys modules
 #from . import epsignal
 #### END pict.ephys modules
+
+@safeWrapper
+def cursor_Rs_Rin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+                  cursor0: typing.Union[tuple, Cursor],
+                  cursor1: typing.Union[tuple, Cursor],
+                  cursor2: typing.Union[tuple, Cursor], 
+                  vstep: typing.Union[float, pq.Quantity]) -> tuple:
+    """Calculates series and input resistance from membrane test voltage step.
+    
+    Applies to voltage-clamp recordings (membran current signal)
+    """
 
 @safeWrapper
 def v_Nernst(x_out, x_in, z, temp):
@@ -2345,7 +2357,6 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
         
     else:
         raise TypeError("'after' has unexpected type: %s" % type(after).__name__)
-    
 
     if before is not None:
         if isinstance(before, numbers.Real):
@@ -2476,7 +2487,10 @@ def extract_pulse_triggered_APs(sig, times, tail = None):
     
     return waves
 
-def detect_fast_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, rtol = 1e-5, atol = 1e-8, return_all=False):
+def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, rtol = 1e-5, atol = 1e-8, return_all=False):
+    # NOTE: 2019-11-29 16:49:14
+    # use a Vm threshold to discard "aberrant" events
+    
     # NOTE: 2019-04-25 09:22:13
     # boolean array; True where dV/dt >= thr and rising (its 2nd derivative) is > 0
     #
@@ -2514,7 +2528,7 @@ def detect_fast_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, rtol = 1e-5, atol = 
     # phase when Im injection has stopped
     #
     
-    # NOTE: 2019-04-25 09:22:13
+    # ### BEGIN NOTE: 2019-04-25 09:22:13 DEPRECATED by NOTE: 2019-11-29 16:40:34
     # select start of the fast (initial) rising phase
     # we're LIKELY to have found a fast rising phase when the Vm satisfies:
     # 
@@ -2529,60 +2543,89 @@ def detect_fast_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, rtol = 1e-5, atol = 
     #
     # b) d2Vm/dt2 > 0 (dVm/dt is MONOTONICALLY INCREASING)
     #
-    fast_rise_starts = (dsdt.magnitude >= dsdt_thr) & (d2sdt2.magnitude > (0 + atol))
+    #fast_rise_starts = (dsdt.magnitude >= dsdt_thr) & (d2sdt2.magnitude > (0 + atol))
+    #fast_rise_start_flags = np.ediff1d(np.asfarray(fast_rise_starts), to_begin = 0) == 1 
+    
+    #fast_rise_start_times = s.times[fast_rise_start_flags]
+    
+    ##print("detect_AP_rises, len(fast_rise_start_times)", len(fast_rise_start_times))
+    
+    #if len(fast_rise_start_times) == 0: # nothing detected
+        #return None, None, None
+    
+    #t0 = fast_rise_start_times[0]
+    
+    ## NOTE: with large injected currents the rise of Vm may be detected as an AP
+    ## however, unlike the 1st deirvative of an AP, the dv/dt of this rising Vm
+    ## curve does NOT cross zero (become negative) until the next detected rise
+    #t1 = fast_rise_start_times[1] if len(fast_rise_start_times) > 1 else s.t_stop
+    
+    #if np.all(dsdt.time_slice(t0, t1).magnitude > 0):
+        ## reject t0 as it is likely to come from a rising Vm without AP
+        
+        #if len(fast_rise_start_times) == 1: # nothing detected
+            #return None, None, None
+        
+        #fast_rise_start_times = fast_rise_start_times[1:]
+        
+    
+    ## NOTE: 2019-04-29 08:40:55
+    ## The problem with the above is that AP waveforms with "hunched" rising phase
+    ## (with a strong kink between the IS and SD spike) will be detected as two
+    ## consecutive rising phases because their rising phase is NOT monotonic.
+    ##
+    ## We therefore have to eliminate the start times that are closer to the 
+    ## previous one by less that minisi.
+    ## 
+    ## NOTE: 2019-04-29 09:16:45
+    ## We cannot simply use ediff1d, because after we found a "bad" start, the
+    ## time point following it must be judged by its delay with respect to
+    ## the last "good" starts one instead of the current one (which is what ediff1d does). 
+    ## Instead, we use the loop below.
+    
+    #fast_rise_start_times_corrected = list()
+    
+    ## this means we always return at least ONE fast rise time !
+    #fast_rise_start_times_corrected.append(fast_rise_start_times[0])
+    
+    #for k, t in enumerate(fast_rise_start_times[1:]):
+        #if t-t0 >= minisi:
+            #fast_rise_start_times_corrected.append(t)
+            #t0 = t
+
+    ## CAUTION: this replaces the initial fast_rise_start_times
+    #fast_rise_start_times = np.array(fast_rise_start_times_corrected) * s.times.units
+            
+    # ### END 
+    
+    # ### BEGIN NOTE: 2019-11-29 16:40:34 New algorithm
+    # slightly modified detection algorithm:
+    # 1) get the logical index where dv/dt >= threshold -- as in NOTE: 2019-04-25 09:22:13
+    # but do not use any condition d2v/dt2 as it is too wobbly
+    fast_rise_starts = (dsdt.magnitude[:,] >= dsdt_thr)
+    # 2) as in NOTE: 2019-04-25 09:22:13 get the loical flags for the starts of
+    # the regions of dv/dt >= threshold
     fast_rise_start_flags = np.ediff1d(np.asfarray(fast_rise_starts), to_begin = 0) == 1 
     
-    fast_rise_start_times = s.times[fast_rise_start_flags]
+    # 3) generate enhanced times array, containing putative start times and 
+    # including the signal's t_stop; np.append dumps the units but the quantity
+    # __array_finalize__ will append its own (dimensionless); hence we correct
+    # this by multiplying the result with the signal's times units
+    fast_rise_start_times = np.append(s.times[fast_rise_start_flags], s.t_stop) * s.times.units
     
-    #print("detect_fast_AP_rises, len(fast_rise_start_times)", len(fast_rise_start_times))
+    # 4)  now use the start times pairwise to slice the original Vm signal;
+    # we retain thse start times which begin a segment of the signal that overshoots
+    # the vm threshold (vm_thr, which is 0 by default)
+    accept_flags = [False] * len(fast_rise_start_times)
+    accept_flags[:-1] = [s.time_slice(t, fast_rise_start_times[k+1]).max().magnitude > vm_thr for k, t in enumerate(fast_rise_start_times[:-1])]
+
+    # the following _DROPS_ signal.t_stop at the end of the array
+    fast_rise_start_times = fast_rise_start_times[accept_flags] 
     
-    if len(fast_rise_start_times) == 0: # nothing detected
-        return None, None, None
+    # this shuould also preclude the use of a minisi condition
+    # ### END NOTE: 2019-11-29 16:40:34 New algorithm
     
-    t0 = fast_rise_start_times[0]
-    
-    # NOTE: with large injected currents the rise of Vm may be detected as an AP
-    # however, unlike the 1st deirvative of an AP, the dv/dt of this rising Vm
-    # curve does NOT cross zero (become negative) until the next detected rise
-    t1 = fast_rise_start_times[1] if len(fast_rise_start_times) > 1 else s.t_stop
-    
-    if np.all(dsdt.time_slice(t0, t1).magnitude > 0):
-        # reject t0 as it is likely to come from a rising Vm without AP
-        
-        if len(fast_rise_start_times) == 1: # nothing detected
-            return None, None, None
-        
-        fast_rise_start_times = fast_rise_start_times[1:]
-        
-    
-    # NOTE: 2019-04-29 08:40:55
-    # The problem with the above is that AP waveforms with "hunched" rising phase
-    # (with a strong kink between the IS and SD spike) will be detected as two
-    # consecutive rising phases because their rising phase is NOT monotonic.
-    #
-    # We therefore have to eliminate the start times that are closer to the 
-    # previous one by less that minisi.
-    # 
-    # NOTE: 2019-04-29 09:16:45
-    # We cannot simply use ediff1d, because after we found a "bad" start, the
-    # time point following it must be judged by its delay with respect to
-    # the last "good" starts one instead of the current one (which is what ediff1d does). 
-    # Instead, we use the loop below.
-    
-    fast_rise_start_times_corrected = list()
-    
-    # this means we always return at least ONE fast rise time !
-    fast_rise_start_times_corrected.append(fast_rise_start_times[0])
-    
-    for k, t in enumerate(fast_rise_start_times[1:]):
-        if t-t0 >= minisi:
-            fast_rise_start_times_corrected.append(t)
-            t0 = t
-            
-    # CAUTION: this replaces the initial fast_rise_start_times
-    fast_rise_start_times = np.array(fast_rise_start_times_corrected) * s.times.units
-            
-    # NOTE: 2019-04-25 09:24:45
+    # ### BEGIN NOTE: 2019-04-25 09:24:45 DEPRECATED
     # select end of the fast (initial) rising phase
     # here, the Vm rising phase "slows down" but nevertheless faster than 10 V/s ("threshold")
     # in other words, the following are satisfied:
@@ -2597,54 +2640,60 @@ def detect_fast_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, rtol = 1e-5, atol = 
     
     #fast_rise_stop_times  = sig.times[fast_rise_stop_flags]
     
-    # NOTE: although mathematically correct, the above code will pick up the
-    # end of the first "hump" in the 2st derivative of the AP waveform,
-    # when the AP is not monotonically rising (see NOTE: 2019-04-29 08:40:55)
-    # This would result in curtailed rise phases.
+    # ### END NOTE: 2019-04-25 09:24:45
+    
+    # ### BEGIN NOTE: 2019-11-29 17:19:01 DEPRECATED 2019-11-29 17:30:40 we don't use 2nd derivative anymore
+    # Although mathematically correct, the code at NOTE: 2019-04-25 09:24:45
+    # might pick up the end of the first "hump" in the 2st derivative of the AP 
+    # waveform, when the AP is not monotonically rising (see below at 
+    # NOTE: 2019-04-29 08:40:55) This would result in curtailed rise phases.
+    # ### END DEPRECATED 2019-11-29 17:30:40 we don't use 2nd derivative anymore
     
     # NOTE: 2019-04-29 09:52:03
-    # a more direct approach is to get the next maximum in the dsdt waveform
-    # as the inflection point marking the true stop of the fast rising phase
-    #
-    # we need to do this on a time slice of the dsdt signal, starting at the
-    # fast_rise_start_times_corrected and ending minisi later
-    
+    # to find out when the fast rising phase of the waveform ends we get the time
+    # of the next local maximum in the dsdt waveform slice following each fast 
+    # rise start time;
     fast_rise_stop_times    = np.full_like(fast_rise_start_times, np.nan)
+    
+    # NOTE: 2019-04-29 11:13:46
+    # also get the peak times by finding argmax on the AP waveform itself
+    # an alternative way is to find where the dvdt waveform crosses zero
+    # while d2vdt2 waveform is negative, but these conditions are likely to be
+    # to met simultaneously met at several time points along the waveforms meaning
+    # we'll have to pick the only first of such occurrence, which involves more CPU work
     peak_times              = np.full_like(fast_rise_start_times, np.nan)
+    
+    # NOTE: 2019-11-29 17:36:23 use of minisi is DEPRECATED
+    # instead we use the signal time slice between two consecutive fast rise 
+    # start times
     
     #waves = list()
     #dwaves = list()
     
-    # NOTE: 2019-04-29 11:13:46
-    # also  get the peak times by finding argmax on the AP waveform itself
-    # an alternative way is to find where the dvdt waveform crosses zero
-    # while d2vdt2 waveform is negative, but these conditions are very likely
-    # to be simultaneously met at several time points along the waveforms so
-    # wew'll have to pick the first such occurrence; yet this is more CPU work
         
-    #print("detect_fast_AP_rises signal t_start=%s, t_stop=%s" % (s.t_start, s.t_stop))
-    #print("detect_fast_AP_rises dsdt t_start=%s, t_stop=%s" % (dsdt.t_start, dsdt.t_stop))
+    #print("detect_AP_rises signal t_start=%s, t_stop=%s" % (s.t_start, s.t_stop))
+    #print("detect_AP_rises dsdt t_start=%s, t_stop=%s" % (dsdt.t_start, dsdt.t_stop))
+    
     for k, t in enumerate(fast_rise_start_times):
-        #print("detect_fast_AP_rises k: %s,  t=%s" % (k,t))
+        #print("detect_AP_rises k: %s,  t=%s" % (k,t))
         if t < s.t_start:
+            # this won't ever happen would it?
             t = s.t_start
         
-        t1 = t + minisi
-        
+        #t1 = t + minisi DEPRECATED use of minisi
         # avoid going past signal t_stop
-        if t1 > s.t_stop:
+        #if t1 > s.t_stop:
+            #t1 = s.t_stop
+            
+        if k < len(fast_rise_start_times)-1:
+            t1 = fast_rise_start_times[k+1]
+            
+        else: # avoid going past the end in fast_rise_start_times
             t1 = s.t_stop
             
         wave = s.time_slice(t, t1)
         dwave = dsdt.time_slice(t, t1)
         
-        #dwave2 = d2sdt2.time_slice(t, t1)
-        
-        #if return_all:
-            #waves.append(wave)
-            #dwaves.append(dwave)
-            #dwaves2.append(dwave2)
-            
         ndx = dwave.argmax()
         fast_rise_stop_times[k] = dwave.times[ndx]
         
@@ -2655,15 +2704,15 @@ def detect_fast_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, rtol = 1e-5, atol = 
     return fast_rise_start_times, fast_rise_stop_times, peak_times#, waves, dwaves
         
 
-def extract_AP_train(vm,im,
-                     tail=0.5*pq.s,
-                     method="state_levels",
-                     box_size=0, 
-                     adcres=15,
-                     adcrange=10,
-                     adcscale=1e3,
-                     resample_with_period = None,
-                     resample_with_rate = None):
+def extract_AP_train(vm:neo.AnalogSignal,im:neo.AnalogSignal,
+                     tail:pq.Quantity=0.5*pq.s,
+                     method:str="state_levels",
+                     box_size:numbers.Number=0, 
+                     adcres:numbers.Number=15,
+                     adcrange:numbers.Number=10,
+                     adcscale:numbers.Number=1e3,
+                     resample_with_period:(pq.Quantity, type(None)) = None,
+                     resample_with_rate:(pq.Quantity, type(None)) = None):
 
     """
     tail: non-negative scalar Quantity (units: "s"); default is 0.5 s
@@ -2902,7 +2951,7 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
     
     #return ap_fast_rise_start_times
     
-    ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_peak_times = detect_fast_AP_rises(sig,
+    ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_peak_times = detect_AP_rises(sig,
                                                                             dv_dt_smooth,
                                                                             d2v_dt2_smooth,
                                                                             thr, min_ap_isi,
@@ -2946,7 +2995,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
                         interpolate_roots = False,
                         decay_intercept_approx = "linear",
                         decay_ref = "hm",
-                        get_duration_at_Vm=-15*pq.mV,
+                        get_duration_at_Vm=None,
                         return_all = False):
     """Detects action potentials in a Vm signal.
     For use with depolarizing step current injection experiments.
@@ -3622,8 +3671,8 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     ap_Vm_hmax_values = neo.IrregularlySampledSignal(time_array_half_max_rise,
                                                      vm_at_half_max,
                                                      time_units = sig.times.units,
-                                                     name = "%s_AP_half_max_Vm" % sig.name,
-                                                     description = "AP half-max Vm for %s signal" % sig.name)
+                                                     name = "%s_AP_half_max_amplitude" % sig.name,
+                                                     description = "AP half-max amplitude for %s signal" % sig.name)
     
     ap_durations_hm = time_array_half_max_decay - time_array_half_max_rise
     
@@ -3636,8 +3685,8 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     ap_Vm_qmax_values = neo.IrregularlySampledSignal(time_array_quart_max_rise,
                                                      vm_at_quart_max,
                                                      time_units = sig.times.units,
-                                                     name = "%s_AP_quart_max_Vm" % sig.name,
-                                                     description = "AP quarter-max Vm for %s signal" % sig.name)
+                                                     name = "%s_AP_quart_max_amplitude" % sig.name,
+                                                     description = "AP quarter-max amplitude for %s signal" % sig.name)
     
     ap_durations_qm = time_array_quart_max_decay - time_array_quart_max_rise
     
@@ -3646,6 +3695,12 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
                                                           time_units = sig.times.units,
                                                           name = "%s_AP_durations_at_quart_max" % sig.name,
                                                           description = "AP durations at quarter-maximum for %s" % sig.name)
+    
+    ap_Vm_tmax_values = neo.IrregularlySampledSignal(time_array_third_max_rise,
+                                                     vm_at_third_max,
+                                                     time_units = sig.times.units,
+                                                     name="%s_AP_third_max_amplitude" % sig.name,
+                                                          description = "AP third-max amplitude for %s" % sig.name)
     
     ap_durations_tm = time_array_third_max_decay - time_array_third_max_rise
     ap_durations_Vthird_max = neo.IrregularlySampledSignal(time_array_third_max_rise,
@@ -3686,16 +3741,8 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
                                                          description = "AP durations at %s Vm for %s" % (reference_Vm, sig.name))
         
     else:
-        ap_durations_Vref = neo.IrregularlySampledSignal(np.full_like(ap_durations_hm),
-                                                         ap_Vm_onset_values.times,
-                                                         units = pq.s,
-                                                         time_units = sig.times.units,
-                                                         name = "%s_AP_durations_at_Reference_Vm" % sig.name,
-                                                         description = "AP durations at %s Vm for %s" % (reference_Vm, sig.name))
+        ap_durations_Vref = None
         
-
-        
-    
     # ### END Calculate AP durations at half-max, 0 mV, and onset Vm
     
     # ### BEGIN Collect dV/dt waveforms for each AP, also get maximum value of dV/dt for the waveform. 
