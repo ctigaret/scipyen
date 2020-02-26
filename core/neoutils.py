@@ -10,6 +10,7 @@ import inspect
 import itertools
 import functools
 import warnings
+import typing
 from enum import Enum, IntEnum
 #### END core python modules
 
@@ -17,15 +18,18 @@ from enum import Enum, IntEnum
 import numpy as np
 import quantities as pq
 import neo
+import matplotlib as mpl
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
 #from . import plots
-#from . import datatypes as dt
+from . import datatypes as dt
 from . import workspacefunctions
 from . import signalprocessing as sigp
 
 #from .patchneo import neo
+
+from gui.signalviewer import Cursor as Cursor
 
 from .utilities import safeWrapper, normalized_index
 #### END pict.core modules
@@ -176,7 +180,8 @@ def correlate(in1, in2, **kwargs):
     
 
 @safeWrapper
-def assign_to_signal(dest, src, channel=None):
+def assign_to_signal(dest:neo.AnalogSignal, src:[neo.AnalogSignal, pq.Quantity], 
+                     channel:[int, type(None)]=None):
     """Assigns values in src to values in dest, for the specified channel, or all channels
     
     Parameters:
@@ -232,7 +237,10 @@ def assign_to_signal(dest, src, channel=None):
     
         
 @safeWrapper
-def assign_to_signal_in_epoch(dest, src, epoch, channel=None):
+def assign_to_signal_in_epoch(dest:neo.AnalogSignal, 
+                              src:[neo.AnalogSignal, pq.Quantity], 
+                              epoch:neo.Epoch, 
+                              channel:[int, type(None)] = None):
     """Assigns values in src to values in dest, within an epoch, for the specified channel, or all channels
     """
     
@@ -299,65 +307,95 @@ def assign_to_signal_in_epoch(dest, src, epoch, channel=None):
     
     
             
+@safeWrapper
+def cursors2epoch(times: typing.Union[numbers.Number, pq.Quantity, np.ndarray, typing.Sequence],
+                  windows: typing.Union[numbers.Number, pq.Quantity, np.ndarray, typing.Sequence],
+                  labels: typing.Optional[typing.Union[str, np.ndarray, typing.Sequence]] = None, 
+                  name: typing.Optional[str] = None) -> neo.Epoch:
+    """Constructs a neo.Epoch from a sequence of times and windows.
     
-
-@safeWrapper
-def cursor2interval(x, w):
-    """Returns a two-element numpy ndarray representing an interval (start, stop, all inclusive).
-    The interval is calculated from a cursor X coordinate (the midpoint) and a symmetric
-    window around it.
-    Useful especially for vertical and crosshair cursors
-    For a more meaningful use, remember to attach a Quantity to it
-    e.g. interval = cursor_window_interval(x,w) * pq.s
-    """
-    return np.array([x-w/2., x+w/.2])
-
-@safeWrapper
-def cursors2interval(x0, x1):
-    """Returns a two-element numpy ndarray representing an interval (start, stop, all inclusive).
-    The interval is calculated from two cursor X coordinates.
-    Useful especially for vertical and crosshair cursors
-    For a more meaningful use, remember to attach a Quantity to it
-    e.g. interval = cursors_interval(x0,x1) * pq.s
-    """
-    return np.array([x0,x1])
-
-@safeWrapper
-def cursor2epoch(x, w, name=None, labels=None):
-    """Returns an interval as a neo.Epoch (time, duration)
-    calculated from the cursor's coordinate and window.
-    Useful especially for vertical and crosshair cursors
+    The times and windows parameters represent a set of notional signal
+    cursors, each located at time t_i and with window w_i (centered at time t_i)
+    for i in 0 ... len(times).
     
-    w must be >0 !
+    The Epoch will contain one interval (time, duration) for each cursor, and 
+    with labels as specified by the "labels" parameter.
+    
+    Parameters:
+    ----------
+    times: numeric scalar, python Quantity, or array-like of scalars or python 
+        Quantity objects
     
     """
     
-    if labels is None:
-        lbl = None
-    elif isinstance(labels, str):
-        lbl = np.array([labels], "S")
-    elif isinstance(labels, np.ndarray) and labels.dtype.kind == "S":
-        if len(labels) != 1:
-            raise ValueError("Only one epoch label was expected")
-
-        lbl = labels.copy()
+    #n_labels = 0 if labels is None else 1 if isinstance(labels, str) else len(labels) if isinstance(labels, typing.Sequence) else labels.size if isinstance(labels, np.ndarray) else 0
+    
+    if isinstance(times, typing.Union[numbers.Number, typing.Sequence]):
+        times = np.array(times)
+        
+    elif isinstance(times, np.ndarray):
+        if not isinstance(times, pq.Quantity):
+            times *= pq.s
+            
+        else:
+            if not dt.units_convertible(times, pq.s):
+                raise TypeError("Unexpected units for times: %s" % times.units)
+            
     else:
-        raise TypeError("Unexpected type for labels argument")
+        raise TypeError("Unexpected type for times: %s" % type(times).__name__)
+        
+    if isinstance(windows, typing.Union[numbers.Number, typing.Sequence]):
+        windows = np.array(windows)
+        
+    elif isinstance(windows, np.ndarray):
+        if not isinstance(windows, pq.Quantity):
+            windows *= pq.s
+            
+        elif not dt.units_convertible(windows, pq.s):
+            raise TypeError("Unexpected units for windows: %s" % windows.units)
+            
+    else:
+        raise TypeError("Unexpected type for windows: %s" % type(windows).__name__)
+        
+    if windows.size != times.size:
+        if windows.size == 1:
+            windows = np.full_like(times, windows[0])
+            
+        else:
+            raise TypeError("Unexpected number of windows specified (%d); expecting 1 or %d" % (windows.size, times.size))
+        
+    if labels is not None:
+        if isinstance(labels, str):
+            labels = np.array([labels])
+            
+        elif isintance(labels, typing.Sequence) and all([isinstance(l, str) for l in labels]):
+            labels = np.array(labels)
+            
+        elif not isinstance(labels, np.ndarray):
+            raise TypeError("labels expected to be a str, sequence of str, numpy array ot None; got %s instead" % type(labels).__name__)
+        
+        else:
+            if np.issubdtype(labels.dtype, np.string_):
+                labels = labels.astype(np.str_)
+                
+            elif not np.issubdtype(labels.dtype, np.str_):
+                raise TypeError("labels expected to contain strings")
+        
+        if labels.size != times.size:
+            if labels.size == 1:
+                labels = np.array(["%s%d" % (labels[0], k) for k in range(times.size)])
+                
+            else:
+                raise TypeError("Unexpected number of labels (%d); expecting 1 or %d" % (labels.size, times.size))
+            
+    else:
+        labels = np.array(["epoch%d" % k for k in range(times.size)])
+        
+    times = times - windows/2.
     
-    if not isinstance(name, str):
-        raise TypeError("Unexpected type for name argument")
-    
-    return neo.Epoch(times=np.array([x-w/2])*pq.s, durations=np.array([w])*pq.s, name=name, labels=lbl)
-
-@safeWrapper
-def cursors2epoch(times, windows, labels, name=None):
-    """Generates a neo.Epoch from a sequence of cursors positions (times) and windows.
-    
-    "Cursor" is used loosely here.
-    """
-    return neo.Epoch((np.array(times) - np.array(windows)/2) * pq.s, \
-                        durations = np.array(windows) * pq.s, \
-                        labels = np.array(labels, dtype="S"), name=name)
+    durations = windows
+        
+    return neo.Epoch(times=times, durations=durations, labels=labels, name=name)
 
 @safeWrapper
 def signal2epoch(sig, name=None, labels=None):
@@ -446,23 +484,25 @@ def mean_value_around_time(signal:neo.AnalogSignal,
     return signal.time_slice(t-w/2, t+w/2).mean(axis=0)
 
 @safeWrapper
-def relative_amplitude(signal:neo.AnalogSignal, 
-                             t0:[float, pq.Quantity], 
-                             t1:[float, pq.Quantity],
-                             w:[float, pq.Quantity] = 0.001 * pq.s) -> pq.Quantity:
-    """Calculates amplitude as the difference between signal values at t1 and t0.
+def slice_amplitude(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+                    t0: typing.Union[float, pq.Quantity], 
+                    t1: typing.Union[float, pq.Quantity],
+                    w:  typing.Union[float, pq.Quantity] = 0.001 * pq.s,
+                    w1: typing.Union[float, pq.Quantity, type(None)] = None) -> pq.Quantity:
+    """Calculates amplitude of a signal slice between domain values t0 and t1.
     
                 amplitude = y1 - y0
+                
+        where y0 and y1 are average signal values across a window (w) centered 
+        respectively, at t0 and t1:
     
-    The signal values (y0, y1) are taken as the average values of signal samples
-    across a window (w) centered at t0 and t1, respectively:
-    
-    y0 = signal.time_slice(t0-w/2, t0+w/2).mean(axis=0)
-    y1 = signal.time_slice(t1-w/2, t1+w/2).mean(axis=0)
+        y0 = signal.time_slice(t0-w/2, t0+w/2).mean(axis=0)
+        
+        y1 = signal.time_slice(t1-w/2, t1+w/2).mean(axis=0)
     
     Parameters:
     ==========
-    signal: neo.AnalogSignal
+    signal: neo.AnalogSignal or datatypes.DataSignal
     
     t0, t1: scalar float or python Quantity in units convertible to the signal's
         time units
@@ -490,15 +530,69 @@ def relative_amplitude(signal:neo.AnalogSignal,
     if isinstance(w, numbers.Real):
         w *= signal.times.units
         
+    if isinstance(w1, numbers.Real):
+        w1 *= signal.times.units
+        
     y0 = signal.time_slice(t0-w/2, t0+w/2).mean(axis=0)
-    y1 = signal.time_slice(t1-w/2, t1+w/2).mean(axis=0)
+    
+    if w1 is not None:
+        y1 = signal.time_slice(t1-w1/2, t1+w1/2).mean(axis=0)
+    else:
+        y1 = signal.time_slice(t1-w/2, t1+w/2).mean(axis=0)
     
     return y1-y0
+
+@safeWrapper
+def cursors_amplitude(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+                      cursor0: typing.Union[tuple, Cursor], 
+                      cursor1: typing_Union[tuple, Cursor]) -> pq.Quantity:
+    """Calculates the signal amplitude between two notional vertical cursors.
     
+    Calls slice_amplitude.
+    
+    Parameters:
+    -----------
+    signal:neo.AnalogSignal, datatypes.DataSignal
+    
+    cursor0, cursor1: (x, window) tuples representing, respectively, the 
+        cursor's x coordinate (time) and window (horizontal extent).
+        
+    """
+    
+    if isinstance(cursor0, Cursor):
+        if cursor0.cursorType not in ("vertical", "crosshair"):
+            raise TypeError("When cursor0 is a signalviewer.Cursor, it must be vertical or crosshair")
+        t0 = cursor0.x
+        w = cursor0.xwindow
+        
+    elif isinstance(cursor0, tuple) and len(cursor0)==2:
+        t0 = cursor0[0]
+        w = cursor0[1]
+        
+    else:
+        raise TypeError("cursor0 expected to be a signalviewer.Cursor or a two-elements tuple; got %s instead" % type(cursor0).__name__)
+    
+    if isinstance(cursor1, Cursor):
+        if cursor1.cursorType not in ("vertical", "crosshair"):
+            raise TypeError("When cursor1 is a signalviewer.Cursor, it must be vertical or crosshair")
+        t1 = cursor1.x
+        w1 = cursor1.xwindow
+        
+    elif isinstance(cursor1, tuple) and len(cursor1)==2:
+        t1 = cursor1[0]
+        w1 = cursor1[1]
+        
+    else:
+        raise TypeError("cursor1 expected to be a signalviewer.Cursor or a two-elements tuple; got %s instead" % type(cursor1).__name__)
+    
+    return slice_amplitude(signal, t0, t1, w, w1)
     
 @safeWrapper
-def chord_slope(signal:neo.AnalogSignal, t0:[float,pq.Quantity], t1:[float,pq.Quantity],
-                w:[float, pq.Quantity] = 0.001 * pq.s) -> pq.Quantity:
+def chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal], 
+                t0: typing.Union[float, pq.Quantity], 
+                t1: typing.Union[float, pq.Quantity],
+                w: typing.Union[float,  pq.Quantity] = 0.001 * pq.s,
+                w1: typing.Union[float, pq.Quantity, type(None)] = None) -> pq.Quantity:
     """Calculates the chord slope of a signal between two time points t0 and t1.
     
                     slope = (y1 - y0) / (t1 - t0)
@@ -511,7 +605,7 @@ def chord_slope(signal:neo.AnalogSignal, t0:[float,pq.Quantity], t1:[float,pq.Qu
     
     Parameters:
     ==========
-    signal: neo.AnalogSignal
+    signal: neo.AnalogSignal, dt.DataSignal
     
     t0, t1: scalar float or python Quantity =  the limits of the interval where
             the chord slope is calculated, including the half-windows before t0
@@ -523,6 +617,9 @@ def chord_slope(signal:neo.AnalogSignal, t0:[float,pq.Quantity], t1:[float,pq.Qu
         signals).
         
         Default is 0.001 * pq.s (i.e. 1 ms)
+        
+    w1: like w (optional default is None). When present, the windows w and w1
+    are used respectively, with the time points t0 and t1.
         
     Returns:
     ========
@@ -541,45 +638,129 @@ def chord_slope(signal:neo.AnalogSignal, t0:[float,pq.Quantity], t1:[float,pq.Qu
     if isinstance(w, numbers.Real):
         w *= signal.times.units
         
+    if isinstance(w1, numbers.Real):
+        w1 *= signal.times.units
+        
     y0 = signal.time_slice(t0-w/2, t0+w/2).mean(axis=0)
-    y1 = signal.time_slice(t1-w/2, t1+w/2).mean(axis=0)
+    
+    if w1 is not None:
+        y1 = signal.time_slice(t1-w1/2, t1+w1/2).mean(axis=0)
+        
+    else:
+        y1 = signal.time_slice(t1-w/2, t1+w/2).mean(axis=0)
+        
+    print(y0, y1, t0, t1)
     
     ret = (y1-y0) / (t1-t0)
     
     return ret
     
+@safeWrapper
+def cursors_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+                  cursor0: typing.Union[tuple, Cursor],
+                  cursor1: typing.Union[tuple, Cursor]) -> pq.Quantity:
+    """Calculates the signal chord slope between two notional vertical cursors.
+    
+    Calls chord_slope() with the cursors' x and xwindow attributes.
+    
+    Parameters:
+    ----------
+    signal
+    
+    cursor0, cursor1: (x, window) tuple representing, respectively, the cursor's
+        x coordinate (time) and (horizontal) window
+        
+        OR gui.signalviewer.Cursor of type "vertical"
+    
+    """
+    if isinstance(cursor0, Cursor):
+        if cursor0.cursorType not in ("vertical", "crosshair"):
+            raise TypeError("When cursor0 is a signalviewer.Cursor, it must be vertical or crosshair")
+        t0 = cursor0.x
+        w = cursor0.xwindow
+        
+    elif isinstance(cursor0, tuple) and len(cursor0)==2:
+        t0 = cursor0[0]
+        w = cursor0[1]
+        
+    else:
+        raise TypeError("cursor0 expected to be a signalviewer.Cursor or a two-elements tuple; got %s instead" % type(cursor0).__name__)
+    
+    if isinstance(cursor1, Cursor):
+        if cursor1.cursorType not in ("vertical", "crosshair"):
+            raise TypeError("When cursor1 is a signalviewer.Cursor, it must be vertical or crosshair")
+        t1 = cursor1.x
+        w1 = cursor1.xwindow
+        
+    elif isinstance(cursor1, tuple) and len(cursor1)==2:
+        t1 = cursor1[0]
+        w1 = cursor1[1]
+        
+    else:
+        raise TypeError("cursor1 expected to be a signalviewer.Cursor or a two-elements tuple; got %s instead" % type(cursor1).__name__)
+    
+    return chord_slope(signal, t0, t1, w, w1)
+    
     
 @safeWrapper
-def interval2epoch(x0, x1):
-    """Returns the interval between two cursors (vertical or crosshair)
-    as a neo.Epoch
+def interval2epoch(t_start: typing.Union[numbers.Number, pq.Quantity],
+                   t_stop: typing.Union[numbers.Number, pq.Quantity]) -> neo.Epoch:
+    """Constructs a neo.Epoch from t_start and t_stop
     """
-    return neo.Epoch(times = np.array([x0])*pq.s, durations=np.array([x1-x0])*pq.s)
+    
+    if isinstance(t_start, numbers.Number):
+        t_start *= pq.s
+        
+    elif isinstance(t_start, pq.Quantity):
+        if t_start.size > 1:
+            raise TypeError("t_start must be a scalar")
+        
+        elif not dt.units_convertible(t_start, pq.s):
+            raise TypeError("Unexpected t_start units %s" % t_start.units)
+        
+    else:
+        raise TypeError("Unexpected type for t_start: %s" % type(t_start).__name__)
+    
+    if isinstance(t_stop, numbers.Number):
+        t_stop *= pq.s
+        
+    elif isinstance(t_stop, pq.Quantity):
+        if t_stop.size > 1:
+            raise TypeError("t_stop must be a scalar")
+        
+        elif not dt.units_convertible(t_stop, pq.s):
+            raise TypeError("Unexpected t_stop units %s" % t_stop.units)
+        
+    else:
+        raise TypeError("Unexpected type for t_stop: %s" % type(t_stop).__name__)
+    
+    return neo.Epoch(times = np.array([t_start])*pq.s, 
+                     durations=np.array([t_stop-t_start])*pq.s)
     
 
 @safeWrapper
-def interval2cursor(t0, t1):
+def interval2cursor(t0: float, t1: float) -> typing.Tuple[float, float]:
     """Returns a cursor time and window from two time points.
-    For use with signal viewer, t0 and t1 must be floats (i.e. any 
-    Quanitities must be dropped beforehand by using the "magnitude" attribute, and 
-    the float value must be extracted from the resulting numpy array)
+    t0, t1: scalar float values
     """
-    w = t1-t0
-    t = t0+w/2
+    w = abs(t1-t0)
+    t = min(t0,t1) + w/2
+    
     return (t, w)
 
 @safeWrapper
-def epoch2cursors(epoch):
-    """Returns the time and window coordinates for a vertical SignalCursor from a neo.Epoch interval.
+def epoch2cursors(epoch: neo.Epoch) -> typing.Sequence:
+    """Creates notional vertical signal cursors from a neo.Epoch.
     Results is a list of tuples of (time, window) where time is epoch.time + epoch.duration/2
     """
     
-    ret = [(t.magnitude + d.magnitude/2, float(d.magnitude)) for (t,d) in zip(epoch.times, epoch.durations)]
+    ret = [(float(t.magnitude + d.magnitude/2.), float(d.magnitude)) for (t,d) in zip(epoch.times, epoch.durations)]
     
     return ret
 
 @safeWrapper
-def plot_signal_vs_signal(x, *args, **kwargs):
+def plot_signal_vs_signal(x: typing.Union[neo.AnalogSignal, neo.Segment, neo.Block],
+                          *args, **kwargs):
     from . import plots
     
     if isinstance(x, neo.Block):
@@ -604,7 +785,10 @@ def plot_signal_vs_signal(x, *args, **kwargs):
 
 
 @safeWrapper
-def plot_spike_waveforms(x, figure=None, new=True, legend=False):
+def plot_spike_waveforms(x: neo.SpikeTrain, 
+                         figure: typing.Union[mpl.figure.Figure, type(None)] = None, 
+                         new: bool = True, 
+                         legend: bool = False):
     import matplotlib.pyplot as plt
     
     if not isinstance(x, neo.SpikeTrain):
@@ -637,7 +821,8 @@ def plot_spike_waveforms(x, figure=None, new=True, legend=False):
     
     return lines
     
-def get_signal_names_indices(data, analog=True):
+def get_signal_names_indices(data: typing.Union[neo.Segment, typing.Sequence],
+                             analog: bool = True) -> typing.List[str]:
     """Returns a list of analog signal names in data.
     
     Produces a list of signal names in the data; for signals that do not have a
@@ -702,7 +887,10 @@ def get_signal_names_indices(data, analog=True):
             
     return [item[1] for item in sig_indices_names]
     
-def normalized_data_index(src:(neo.Segment, neo.ChannelIndex, neo.Unit), index:(int, str, tuple, list, range, slice), stype:type=neo.AnalogSignal, silent:bool=False) -> (range, list):
+def normalized_data_index(src: typing.Union[neo.Segment, neo.ChannelIndex, neo.Unit],
+                          index: typing.Union[int, str, range, slice, typing.Sequence],
+                          stype: type = neo.AnalogSignal, 
+                          silent: bool = False) -> (range, list):
     """Returns the integral index of a signal in its container.
     
     Useful to get the index of data by its name. 
@@ -2646,7 +2834,8 @@ def merge_signal_channels(*args, name=""):
             
     
 @safeWrapper
-def aggregate_signals(*args, name_prefix, collectSD=True, collectSEM=True):
+def aggregate_signals(*args, name_prefix:str, 
+                      collectSD:bool=True, collectSEM:bool=True) -> dict:
     """Returns signal mean, SD, SEM, and number of signals in args
     All signals must be single-channel.
     
@@ -3138,7 +3327,9 @@ def diff(sig, n=1, axis=-1, prepend=False, append=True):
     return ret
 
 @safeWrapper
-def gradient(sig, n=1, axis=0):
+def gradient(sig:[neo.AnalogSignal, dt.DataSignal, np.ndarray], 
+             n:int=1, 
+             axis:int=0) -> neo.AnalogSignal:
     """ First order gradient through central differences.
     
     Parameters:
@@ -3161,7 +3352,7 @@ def gradient(sig, n=1, axis=0):
     Returns:
     -------
     
-    ret: neo.AnalogSignal FIXME/TODO 2019-04-27 10:09:30 Should return same type as sig.
+    ret: neo.AnalogSignal or dt.DataSignal, according to the type of "sig".
     
     
     """
@@ -3180,12 +3371,21 @@ def gradient(sig, n=1, axis=0):
     else:
         raise TypeError("'sig' has too many dimensions (%d); expecting 1 or 2" % diffsig.ndim)
         
-    ret = neo.AnalogSignal(diffsig, 
-                           units = sig.units / sig.times.units, 
-                           t_start = sig.t_start, 
-                           sampling_period = sig.sampling_period, 
-                           name = sig.name,
-                           description = "Gradient of %s over %d samples along axis %d" % (sig.name, n, axis))
+    if isinstance(sig, dt.DataSignal):
+        ret = dt.DataSignal(diffsig, 
+                            units = sig.units / sig.times.units, 
+                            t_start = sig.t_start, 
+                            sampling_period = sig.sampling_period, 
+                            name = sig.name,
+                            description = "Gradient of %s over %d samples along axis %d" % (sig.name, n, axis))
+ 
+    else:
+        ret = neo.AnalogSignal(diffsig, 
+                            units = sig.units / sig.times.units, 
+                            t_start = sig.t_start, 
+                            sampling_period = sig.sampling_period, 
+                            name = sig.name,
+                            description = "Gradient of %s over %d samples along axis %d" % (sig.name, n, axis))
  
     ret.annotations.update(sig.annotations)
     
@@ -3194,7 +3394,9 @@ def gradient(sig, n=1, axis=0):
     
     
 @safeWrapper
-def ediff1d(sig, to_end=0, to_begin=None):
+def ediff1d(sig:[neo.AnalogSignal, dt.DataSignal, np.ndarray],
+            to_end:numbers.Number=0, 
+            to_begin:[numbers.Number, type(None)]=None) -> neo.AnalogSignal:
     """Differentiates each channel of an analogsignal with respect to its time basis.
     
     Parameters:
@@ -3210,6 +3412,10 @@ def ediff1d(sig, to_end=0, to_begin=None):
     to_end: scalar float, or 0 (default) NOTE: for numpy.ediff1d, the default is None
     
     to_begin: scalar float, or None (default)
+    
+    Returns:
+    --------
+    dt.DataSignal or neo.AnalogSignal, according to the type of "sig"
     
     """
     
@@ -3227,18 +3433,30 @@ def ediff1d(sig, to_end=0, to_begin=None):
         
     diffsig /= sig.sampling_period.magnitude
     
-    ret = neo.AnalogSignal(diffsig, units = sig.units / sig.times.units, 
-                           t_start = sig.t_start, 
-                           sampling_period = sig.sampling_period, 
-                           name = sig.name,
-                           description = "First order forward difference of %s" % sig.name)
- 
+    if isinstance(sig, dt.DataSignal):
+        ret = dt.DataSignal(diffsig, units = sig.units / sig.times.units, 
+                            t_start = sig.t_start, 
+                            sampling_period = sig.sampling_period, 
+                            name = sig.name,
+                            description = "First order forward difference of %s" % sig.name)
+    
+        
+    else:
+        ret = neo.AnalogSignal(diffsig, units = sig.units / sig.times.units, 
+                            t_start = sig.t_start, 
+                            sampling_period = sig.sampling_period, 
+                            name = sig.name,
+                            description = "First order forward difference of %s" % sig.name)
+    
     ret.annotations.update(sig.annotations)
     
     return ret
 
 @safeWrapper
-def forward_difference(sig, n=1, to_end=0, to_begin=None):
+def forward_difference(sig:[neo.AnalogSignal, dt.DataSignal, np.ndarray], 
+                       n:int=1, 
+                       to_end:numbers.Number=0,
+                       to_begin:[numbers.Number, type(None)]=None) -> neo.AnalogSignal:
     """Calculates the forward difference along the time axis.
     
     Parameters:
@@ -3269,6 +3487,10 @@ def forward_difference(sig, n=1, to_end=0, to_begin=None):
     to_end: scalar float, or 0 (default) NOTE: for numpy.ediff1d, the default is None
     
     to_begin: scalar float, or None (default)
+    
+    Returns:
+    --------
+    dt.DataSignal or neo.AnalogSignal, according to the type of "sig"
     
     """
     
@@ -3357,22 +3579,30 @@ def forward_difference(sig, n=1, to_end=0, to_begin=None):
         raise TypeError("'sig' has too many dimensions (%d); expecting 1 or 2" % diffsig.ndim)
         
         
-    ret = neo.AnalogSignal(diffsig, units = sig.units / sig.times.units, 
-                           t_start = sig.t_start, 
-                           sampling_period = sig.sampling_period, 
-                           name = "%s_diff(1)" % sig.name,
-                           description = "Forward difference (%dth order) of %s" % (n, sig.name))
+    if isinstance(sig, dt.DataSignal):
+        ret = dt.DataSignal(diffsig, units = sig.units / sig.times.units, 
+                            t_start = sig.t_start, 
+                            sampling_period = sig.sampling_period, 
+                            name = "%s_diff(1)" % sig.name,
+                            description = "Forward difference (%dth order) of %s" % (n, sig.name))
+ 
+    else:
+        ret = neo.AnalogSignal(diffsig, units = sig.units / sig.times.units, 
+                            t_start = sig.t_start, 
+                            sampling_period = sig.sampling_period, 
+                            name = "%s_diff(1)" % sig.name,
+                            description = "Forward difference (%dth order) of %s" % (n, sig.name))
  
     ret.annotations.update(sig.annotations)
     
     return ret
 
-def auto_detect_trigger_protocols(data, 
-                               presynaptic=(), 
-                               postsynaptic=(),
-                               photostimulation=(),
-                               imaging=(),
-                               clear=False):
+def auto_detect_trigger_protocols(data:[dt.ScanData, neo.Block], 
+                               presynaptic:tuple=(), 
+                               postsynaptic:tuple=(),
+                               photostimulation:tuple=(),
+                               imaging:tuple=(),
+                               clear:bool=False):
     
     """Determines the set of trigger protocols in scandata by searching for 
     trigger waveforms in the analogsignals contained in data.

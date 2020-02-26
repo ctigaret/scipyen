@@ -16,9 +16,14 @@ import sys, os, atexit, re, inspect, gc, sip, io, traceback
 # NOTE: 2019-07-29 12:08:47 these are imported indirectly via pict.gui
 from PyQt5 import QtCore, QtGui, QtWidgets
 if hasattr(QtCore, "QLoggingCategory"):
-    QtCore.QLoggingCategory.setFilterRules("qt.qpa.xcb.xcberror=false")
+    QtCore.QLoggingCategory.setFilterRules("qt.qpa.xcb=false")
     
 #### END 3rd party modules
+
+# NOTE: on opensuse pyqtgraph expect PyQt4 first, as qtlib; if not found this
+# raises an exception; setting pq.Qt.lib later does not work.
+os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
+#os.putenv("PYQTGRAPH_QT_LIB", "PyQt5")
 
 
 import gui.mainwindow as mainwindow

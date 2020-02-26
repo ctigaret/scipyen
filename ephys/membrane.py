@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 #### BEGIN core python modules
-import sys, traceback, inspect, numbers
+import sys, traceback, inspect, numbers, typing
 import warnings
 import os, pickle
 import collections
@@ -58,6 +58,7 @@ from core.utilities import safeWrapper
 
 #### BEGIN pict.gui modules
 import gui.signalviewer as sv
+from gui.signalviewer import Cursor as Cursor
 import gui.pictgui as pgui
 
 #### END pict.gui modules
@@ -69,6 +70,17 @@ import iolib.pictio as pio
 #### BEGIN pict.ephys modules
 #from . import epsignal
 #### END pict.ephys modules
+
+@safeWrapper
+def cursor_Rs_Rin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+                  cursor0: typing.Union[tuple, Cursor],
+                  cursor1: typing.Union[tuple, Cursor],
+                  cursor2: typing.Union[tuple, Cursor], 
+                  vstep: typing.Union[float, pq.Quantity]) -> tuple:
+    """Calculates series and input resistance from membrane test voltage step.
+    
+    Applies to voltage-clamp recordings (membran current signal)
+    """
 
 @safeWrapper
 def v_Nernst(x_out, x_in, z, temp):

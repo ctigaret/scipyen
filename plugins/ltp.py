@@ -911,47 +911,28 @@ def generate_synaptic_plasticity_options(**kwargs) -> dict:
             minute-averaged responses of the baseline stage, in each pathway)
             
             
-    "measure": dict = Dictionary of measures, 
+    "measures": dict = details the cursor measurements used in analysis.
+        each key is a str (measurement name) that is mapped to a nested dict 
+            with the following mandatory keys:
+        
+            "function": callable.
             
-    "measure":str default is amplitude. 
-        Valid measures are "amplitude" and "slope".
+                The call syntax must be such that the function accepts a 
+                neo.AnalogSignal or datatypes.DataSignal as first parameter, 
+                followed by any number of notional vertical cursors, each 
+                defined by a tuple (time:float, window:float)
+                
+                Examples: 
+                neoutils.cursors_slope and neoutils.cursors_amplitude
+                ephys.membrane.cursor_Rs_Rin
+            
+            "cursors": the actual vertical cursor specification, with keys (str)
+                representing the cursor name, mapped to a tuple (time, window).
         
-        "amplitude" indicates that the synaptic response amplitude will be 
-        monitored. The amplitude is measured as the difference between the 
-        baseline of the synaptic response, and its peak (for outward waveforms)
-        or through (for inward waveforms). 
-        
-        The location of the baseline and the peak (or trough) is set manually
-        using vertical cursors, represented here by their time coordinate
-        relative to the start of the sweep. The signal values are the average 
-        sample values across the cursor "window" (a time interval).
-        
-        "slope" indicates that the chord slope of the rising phase of the 
-        synaptic is monitored. The chord slope is measured between two vertical 
-        cursors (represented by time coordinates relative to the beginning of 
-        the sweep) placed, ideally, 10% and 90% from base to peak (or trough).
+        The functions must be defined and present in the scope therefore
+        they can be specified as module.function, unless imported directly.
         
         
-    "cursors": dict = Vertical cursor specification
-        The dictionary maps str keys (cursor label) to a (time, window) tuple
-        where:
-        
-        time = the time coordinate of the cursor cursor (relative to the start
-        of the sweep)
-        
-        window = cursor window 
-        
-        Both time and window are float or python Quantity values with units of
-        "second", and specify a virtual vertical cursor used in the analysis.
-        
-        By default this is empty, and the options will be asssigned a default
-        set of cursors according to the value of the "field" parameter:
-        
-        When field is True:
-        
-        
-    
-    
     "test":int , default = 0 index of the "test" pathway, for dual pathway
         interleaved experiments.
         
@@ -1005,7 +986,6 @@ def generate_synaptic_plasticity_options(**kwargs) -> dict:
         LTPopts["Pathways"]["Control"] = control_path
         
     LTPopts["Reference"] = kwargs.get("Reference", 5)
-    #LTPopts["Field"] = kwargs.get("field", False)
     
     
     if field:

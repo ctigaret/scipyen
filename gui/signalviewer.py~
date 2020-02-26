@@ -85,7 +85,7 @@ from __future__ import print_function
 
 import sys, os, traceback, numbers, warnings, weakref, inspect
 
-import collections, itertools
+import collections, itertools, typing
 
 from operator import attrgetter, itemgetter, methodcaller
 
@@ -138,7 +138,7 @@ from core.workspacefunctions import validateVarName
 #from . import imageviewer as iv
 from . import pictgui as pgui
 from . import quickdialog
-from .pictgui import GraphicsObjectType, GraphicsObject, PathElements, Tier2PathElements, Cursor, Path, Start, Move, Line, Cubic, Rect, Ellipse, Quad, Arc, ArcMove
+#from .pictgui import GraphicsObjectType, GraphicsObject, PathElements, Tier2PathElements, Cursor, Path, Start, Move, Line, Cubic, Rect, Ellipse, Quad, Arc, ArcMove
 from .scipyenviewer import ScipyenViewer, ScipyenFrameViewer
 from .dictviewer import InteractiveTreeWidget, DataViewer
 #### END pict.gui modules
@@ -196,13 +196,15 @@ class Cursor(QtCore.QObject):
     #_cursorTypes_ = {(True, True):'crosshair', (True, False):'horizontal', (False,True):'vertical'}
     _cursorTypes_ = {"crosshair":(True, True), "horizontal":(True, False), "vertical":(False,True)}
     
-    def __init__(self, plot_item, x=None, y=None, hWin=0.0, vWin=0.0,
+    def __init__(self, plot_item, x=None, y=None, xwindow=0.0, ywindow=0.0,
                  cursor_type = None, cursorID="c", follower=False, parent=None, 
                  xBounds=None, yBounds=None, 
                  pen=None, hoverPen=None, linkedPen=None,
                  **kwargs):
         
         super(Cursor, self).__init__(parent=parent)
+        
+        #print("Cursor.__init__ cursor_type", cursor_type)
         
         if not isinstance(parent, (SignalViewer, pg.PlotItem)):
             raise TypeError("parent object of a Cursor can only be a pyqtgraph PlotItem or a SignalViewer; got %s instead" % type(parent).__name__)
@@ -288,7 +290,7 @@ class Cursor(QtCore.QObject):
         
         self._current_plot_item_ = None # for multi-axes cursors
         
-        self._setup_cursor_(plot_item, x=x, y=y, hWin=hWin, vWin=vWin, 
+        self._setup_cursor_(plot_item, x=x, y=y, xwindow=xwindow, ywindow=ywindow, 
                          cursor_type=cursor_type, cursorID=cursorID,
                          follower=follower, xBounds = xBounds, yBounds=yBounds,
                          **kwargs)
@@ -738,7 +740,7 @@ class Cursor(QtCore.QObject):
         self._add_lines_to_host_()
         
     def _setup_cursor_(self, host, cursor_type="crosshair", x=None, y=None, 
-                  hWin=None, vWin=None, follower=False, cursorID=None, 
+                  xwindow=None, ywindow=None, follower=False, cursorID=None, 
                   xBounds=None, yBounds=None, **kwargs):
         
         show_lines = (False, False)
@@ -783,29 +785,29 @@ class Cursor(QtCore.QObject):
         else:
             raise TypeError("y expected to be a number, python Quantity or None; got %s instead" % type(y).__name__)
             
-        if isinstance(hWin, numbers.Number):
-            self._hWin_ = hWin
+        if isinstance(xwindow, numbers.Number):
+            self._hWin_ = xwindow
             
-        elif isinstance(hWin, pq.Quantity):
-            self._hWin_ = hWin.magnitude.flatten()[0]
+        elif isinstance(xwindow, pq.Quantity):
+            self._hWin_ = xwindow.magnitude.flatten()[0]
             
-        elif hWin is None:
+        elif xwindow is None:
             self._hWin_ = 0.0
             
         else:
-            raise TypeError("hWin expected to be a number, python Quantity or None; got %s instead" % type(hWin).__name__)
+            raise TypeError("xwindow expected to be a number, python Quantity or None; got %s instead" % type(xwindow).__name__)
             
-        if isinstance(vWin, numbers.Number):
-            self._vWin_ = vWin
+        if isinstance(ywindow, numbers.Number):
+            self._vWin_ = ywindow
             
-        elif isinstance(vWin, pq.Quantity):
-            self._vWin_ = vWin.magnitude.flatten()[0]
+        elif isinstance(ywindow, pq.Quantity):
+            self._vWin_ = ywindow.magnitude.flatten()[0]
             
-        elif vWin is None:
+        elif ywindow is None:
             self._vWin_ = 0.0
             
         else:
-            raise TypeError("vWin expected to be a number, python Quantity or None; got %s instead" % type(vWin).__name__)
+            raise TypeError("ywindow expected to be a number, python Quantity or None; got %s instead" % type(ywindow).__name__)
         
         if follower:
             if cursorID is None:
@@ -2244,85 +2246,124 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.menubar.addMenu(self.docksMenu)
         ##print("_configureGUI_ widget actions menu added to the menu bar")
         
-    def addCursor(self, cursorType="c", where=None, hWin = None, vWin = None, 
-                  label=None, follows_mouse=False):
+    def addCursor(self, cursorType="c", 
+                  x=None, y=None, xwindow = None, ywindow = None, 
+                  xBounds=None, yBounds=None, 
+                  label=None, follows_mouse=False, axis=None, **kwargs):
         """ Add a cursor to the selected axes in the signal viewer window.
         
-        Requires that there is at least one Axis object in the figure, hence some
-        data must have already been plotted.
+        Requires that there is at least one Axis object in the figure, hence
+            some data must have already been plotted.
         
         Arguments:
-        cursorType : str, one of "c", "v" or "h" respectively, for crosshair, vertical or 
-                    horizontal cursors; default is "c"
+        cursorType: str, one of "c", "v" or "h" respectively, for 
+                    crosshair, vertical or horizontal cursors; default is "c"
                     
-        where      : None, float (for vertical or horizontal cursors) or two-element 
-                    sequence of floats for crosshair cursors
-                    when None, the cursor will be placed in the middle of the axes
+        where: None, float (for vertical or horizontal cursors) or 
+                    two-element sequence of floats for crosshair cursors
+                    when None, the cursor will be placed in the middle of the
+                    selected axis
                     
-        hWin    : None or float with the horizontal size of the cursor window
-                    (skipped for horizontal cursors)
+        xwindow: None or float with the horizontal size of the cursor window;
+                    this is ignored for horizontal cursors
                     
-        vWin    : as hWin; skipped for vertical cursors
+        ywindow: as xwindow; ignored for vertical cursors
         
-        label      None, or a str; is None, the cursor will be assigned and ID composed of 
-                    "c", "v", or "h", followed by the current cursor number of the same type
+        label: None, or a str; is None, the cursor will be assigned an ID 
+                    composed of "c", "v", or "h", followed by the current cursor
+                    number of the same type.
+                    
+        axis: None (default), int, the str "all" or "a" (case-insensitive), or
+            a pyqtgraph.PlotItem object.
+            
+            Indicates the axis (or PlotItem) where the cursor will be created.
+            
+            When there are no axes yet the cursor will be created by default in
+            the scene, and wil behave like a multi-axis cursor.
+            WARNING the coordinates wont make much sense unless in this case,
+            unless they are given in the scene coordinates. 
+            
+            None (the default) indicates that the cursor will be created in
+            the selected axis (which by default is the top axis at index 0).
+            
+            Axis "a" or "all" indicates a cursor that spans all axes 
+            (multi-axis cursor). 
+            
+            When "axis" is a pyqtgraph.PlotItem, it must be one of the axes
+            that belong to this instance of SignalViewer.
+                
         
-        It is recommended to pass arguments as keyword arguments for predictable behavior.
+        It is recommended to pass arguments as keyword arguments for predictable
+            behavior.
         
-        cursorType -- char "c" (default), "h" or "v" respectively, for crosshair, 
-                      horizontal or vertical cursor
-                      
-        hWin, vWin = float scalars with the horizontal and vertical window size for the cursor
-        
-        where = float scalar  or two-element (list, tuple, numpy ndarray) with cursor coordinate(s)
         
         """
+        # NOTE: 2020-02-26 14:23:40
+        # creates the cursor DIRECTLY at the specified coordinates
         
-        if hWin is None:
-            hWin=self.defaultCursorWindowSizeX
-            
-        if vWin is None:
-            vWin = self.defaultCursorWindowSizeY
-            
-        crsID = None
+        crsID = self._addCursor_(cursor_type = cursorType,
+                                x = x, y = y, xwindow = xwindow, ywindow = ywindow,
+                                xBounds = xBounds, yBounds = yBounds,
+                                axis = axis, label=label,
+                                follows_mouse=follows_mouse,
+                                **kwargs)
         
-        if cursorType == "c":
-            crsID = self.slot_addCrosshairCursor(label)
-            self.slot_selectCursor(crsID)
-            self.selectedDataCursor.xwindow = hWin
-            self.selectedDataCursor.ywindow = vWin
-            if where is not None and len(where) == 2:
-                if all([isinstance(w, pq.quantity.Quantity) for w in where]):
-                    self.crosshairDataCursors[crsID].x = where[0].magnitude
-                    self.crosshairDataCursors[crsID].y = where[1].magnitude
-                    
-                else:
-                    self.crosshairDataCursors[crsID].x = where[0]
-                    self.crosshairDataCursors[crsID].y = where[1]
-                    
-        elif cursorType == "h":
-            crsID = self.slot_addHorizontalCursor(label)
-            self.slot_selectCursor(crsID)
-            self.selectedDataCursor.ywindow=vWin
-            if where is not None:
-                if isinstance(where, pq.quantity.Quantity):
-                    self.horizontalDataCursors[crsID].y = where.magnitude
-
-                else:
-                    self.horizontalDataCursors[crsID].y = where
-                    
-        elif cursorType == "v":
-            crsID = self.slot_addVerticalCursor(label)
-            self.slot_selectCursor(crsID)
-            self.selectedDataCursor.xwindow = hWin
-            if where is not None:
-                if isinstance(where, pq.quantity.Quantity):
-                    self.horizontalDataCursors[crsID].x = where.magnitude
-                    
-                else:
-                    self.verticalDataCursors[crsID].x = where
-                
+        self.slot_selectCursor(crsID)
+        
         return crsID
+        
+        #if xwindow is None:
+            #xwindow=self.defaultCursorWindowSizeX
+            
+        #if ywindow is None:
+            #ywindow = self.defaultCursorWindowSizeY
+            
+        #crsID = None
+        
+        
+        ## this FIRST creates the cursor (with default coordinates i.e. at the
+        ## CENTRE of the axis or scene), THEN updates its coordinates
+        #if cursorType in ("c", "crosshair"):
+            #crsID = self._addCursor_(cursorType)
+            #crsID = self.slot_addCrosshairCursor(label)
+            #self.slot_selectCursor(crsID)
+            #self.selectedDataCursor.xwindow = xwindow
+            #self.selectedDataCursor.ywindow = ywindow
+            
+            #if where is not None and len(where) == 2:
+                #if all([isinstance(w, pq.quantity.Quantity) for w in where]):
+                    #self.crosshairDataCursors[crsID].x = where[0].magnitude
+                    #self.crosshairDataCursors[crsID].y = where[1].magnitude
+                    
+                #else:
+                    #self.crosshairDataCursors[crsID].x = where[0]
+                    #self.crosshairDataCursors[crsID].y = where[1]
+                    
+        #elif cursorType in ("h", "horizontal"):
+            #crsID = self.slot_addHorizontalCursor(label)
+            #self.slot_selectCursor(crsID)
+            #self.selectedDataCursor.ywindow=ywindow
+            
+            #if where is not None:
+                #if isinstance(where, pq.quantity.Quantity):
+                    #self.horizontalDataCursors[crsID].y = where.magnitude
+
+                #else:
+                    #self.horizontalDataCursors[crsID].y = where
+                    
+        #elif cursorType in ("v", "vertical"):
+            #crsID = self.slot_addVerticalCursor(label)
+            #self.slot_selectCursor(crsID)
+            #self.selectedDataCursor.xwindow = xwindow
+            
+            #if where is not None:
+                #if isinstance(where, pq.quantity.Quantity):
+                    #self.horizontalDataCursors[crsID].x = where.magnitude
+                    
+                #else:
+                    #self.verticalDataCursors[crsID].x = where
+                
+        #return crsID
     
     @safeWrapper
     def keyPressEvent(self, keyevt):
@@ -2353,18 +2394,18 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         * for vertical and horizontal cursors, the coordinates are floats
                     
         keyword arguments ("name=value" pairs):
-                    hWin = 1D sequence of floats with the horizontal extent of the cursor window
+                    xwindow = 1D sequence of floats with the horizontal extent of the cursor window
                         (for crosshair and vertical cursors); must have as many elements as 
                         coordinates supplied in the *where argument
-                    vWin   = as above, for crosshair and horizontal cursors
+                    ywindow   = as above, for crosshair and horizontal cursors
                     labels         = 1D sequence of str for cursor IDs; must have as many
                         elements as supplied through the *where argument
         """
-        hWin = self.defaultCursorWindowSizeX
-        vWin = self.defaultCursorWindowSizeY
+        xwindow = self.defaultCursorWindowSizeX
+        ywindow = self.defaultCursorWindowSizeY
         labels  = None
         
-        allowed_keywords = ["hWin", "vWin", "labels"]
+        allowed_keywords = ["xwindow", "ywindow", "labels"]
         
         if len(kwargs) > 0:
             
@@ -2372,11 +2413,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if key not in allowed_keywords:
                     raise ValueError("Illegal keyword argument %s" % key)
             
-            if "hWin" in kwargs.keys():
-                hWin = kwargs["hWin"]
+            if "xwindow" in kwargs.keys():
+                xwindow = kwargs["xwindow"]
                 
-            if "vWin" in kwargs.keys():
-                vWin = kwargs["vWin"]
+            if "ywindow" in kwargs.keys():
+                ywindow = kwargs["ywindow"]
                 
             if "labels" in kwargs.keys():
                 labels = kwargs["labels"]
@@ -2389,7 +2430,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.slot_removeCursors()
         self.displayFrame()
         #self._plotOverlayFrame_()
-        self.addCursors(cursorType, where, hWin = hWin, vWin = vWin, labels = labels)
+        self.addCursors(cursorType, where, xwindow = xwindow, ywindow = ywindow, labels = labels)
         
     #def setupLTPCursors(self, LTPOptions, pathway, axis=None):
         #""" Convenience function for setting up cursors for LTP experiments:
@@ -2468,19 +2509,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     for vertical and horizontal cursors, the coordinates are floats
                     
         keyword arguments ("name=value" pairs):
-                    hWin = 1D sequence of floats with the horizontal extent of the cursor window
+                    xwindow = 1D sequence of floats with the horizontal extent of the cursor window
                         (for crosshair and vertical cursors); must have as many elements as 
                         coordinates supplied in the *where argument
-                    vWin   = as above, for crosshair and horizontal cursors
+                    ywindow   = as above, for crosshair and horizontal cursors
                     labels         = 1D sequence of str for cursor IDs; must have as many
                         elements as supplied through the *where argument
         """
         
-        hWin = self.defaultCursorWindowSizeX
-        vWin = self.defaultCursorWindowSizeY
+        xwindow = self.defaultCursorWindowSizeX
+        ywindow = self.defaultCursorWindowSizeY
         labels  = None
         
-        allowed_keywords = ["hWin", "vWin", "labels"]
+        allowed_keywords = ["xwindow", "ywindow", "labels"]
         
         if len(kwargs) > 0:
             
@@ -2488,11 +2529,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if key not in allowed_keywords:
                     raise ValueError("Illegal keyword argument %s" % key)
         
-            if "hWin" in kwargs.keys():
-                hWin = kwargs["hWin"]
+            if "xwindow" in kwargs.keys():
+                xwindow = kwargs["xwindow"]
                 
-            if "vWin" in kwargs.keys():
-                vWin = kwargs["vWin"]
+            if "ywindow" in kwargs.keys():
+                ywindow = kwargs["ywindow"]
                 
             if "labels" in kwargs.keys():
                 labels = kwargs["labels"]
@@ -2502,23 +2543,23 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         if isinstance(where, (tuple, list, np.ndarray)):
             for (k, x) in enumerate(where):
-                wx = hWin
-                wy = vWin
+                wx = xwindow
+                wy = ywindow
                 lbl = labels
                 
-                if isinstance(hWin, (tuple, list, np.ndarray)):
-                    wx = hWin[k]
+                if isinstance(xwindow, (tuple, list, np.ndarray)):
+                    wx = xwindow[k]
                         
-                if isinstance(vWin, (tuple, list, np.ndarray)):
-                    wy = vWin[k]
+                if isinstance(ywindow, (tuple, list, np.ndarray)):
+                    wy = ywindow[k]
                     
                 if isinstance(labels,(tuple, list, np.ndarray)):
                     lbl = labels[k]
                     
-                self.addCursor(cursorType=cursorType, where=x, hWin=wx, vWin=wy, label=lbl)
+                self.addCursor(cursorType=cursorType, where=x, xwindow=wx, ywindow=wy, label=lbl)
                 
         else:
-            self.addCursor(cursorType=cursorType, where=where, hWin=hWin, vWin=vWin, label=labels)
+            self.addCursor(cursorType=cursorType, where=where, xwindow=xwindow, ywindow=ywindow, label=labels)
     
     @pyqtSlot(int)
     @safeWrapper
@@ -2724,7 +2765,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         cursor = None
         
         if crsId is not None:
-            cursor = self.getDataCursor(crsId)
+            cursor = self.getCursor(crsId)
         
         if cursor is None:
             cursor = self.sender()
@@ -2942,7 +2983,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if not self._hasCursor_(id1):
             raise ValueError("Cursor %s not found" % id1)
 
-        ct = self.getDataCursor(id1).cursorType()
+        ct = self.getCursor(id1).cursorType()
         
         other = list()
         
@@ -2950,12 +2991,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if not self._hasCursor_(cid):
                 raise ValueError("Cursor %s not found" % cid)
             
-            if self.getDataCursor(cid).cursorType() != ct:
+            if self.getCursor(cid).cursorType() != ct:
                 raise ValueError("Cannot link cursors of different types")
 
-            other.append(self.getDataCursor(cid))
+            other.append(self.getCursor(cid))
         
-        self.getDataCursor(id1).linkTo(*other)
+        self.getCursor(id1).linkTo(*other)
             
     def unlinkCursors(self, id1=None, *ids):
         """Unlinks several linked cursors.
@@ -2972,17 +3013,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if not self._hasCursor_(id1):
             raise ValueError("Cursor %s not found" % id1)
         
-        ct = self.getDataCursor(id1).cursorType()
+        ct = self.getCursor(id1).cursorType()
         
         if len(ids) == 1: 
             if isinstance(ids[0], str): # it is a cursor ID
                 if not self._hasCursor_(ids[0]):
                     raise ValueError("Cursor %s not found" % ids[0])
                 
-                if self.getDataCursor(id1).cursorType() != self.getDataCursor(ids[0]).cursorType():
+                if self.getCursor(id1).cursorType() != self.getCursor(ids[0]).cursorType():
                     raise ValueError("Cursors of different types cannot be linked")
                     
-                self.getDataCursor(id1).unlinkFrom(self.getDataCursor(ids[0]))
+                self.getCursor(id1).unlinkFrom(self.getCursor(ids[0]))
                 
             elif isinstance(ids[0], tuple) or isinstance(ids[0], list):# this is a tuple or list of cursor IDs: we unlink id1 from each one, keep their link state unchanged
                 other = list()
@@ -2990,12 +3031,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if not self._hasCursor_(cid):
                         raise ValueError("Cursor %s not found" % cid)
                     
-                    if self.getDataCursor(cid).cursorType() != ct:
+                    if self.getCursor(cid).cursorType() != ct:
                         raise ValueError("Cursors of different types cannot be linked")
                     
-                    other.append(self.getDataCursor(cid))
+                    other.append(self.getCursor(cid))
                 
-                self.getDataCursor(id1).unlinkFrom(*other)
+                self.getCursor(id1).unlinkFrom(*other)
                 
         elif len(ids) > 1: # a comma-seprated list of cursor IDs: unlink _ALL_ of them
             other = list()
@@ -3004,18 +3045,18 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if not self._hasCursor_(cid):
                     raise ValueError("Cursor %s not found " % cid)
                 
-                if self.getDataCursor(cid).cursorType() != ct:
+                if self.getCursor(cid).cursorType() != ct:
                     raise ValueError("Cursors of different types cannot be linked")
                 
-                other.append(self.getDataCursor(cid))
+                other.append(self.getCursor(cid))
             
-            self.getDataCursor(id1).unlinkFrom(*other)
+            self.getCursor(id1).unlinkFrom(*other)
             
             for c in other:
                 c.unlink()
                 
         else: # unlink ALL
-            self.getDataCursor(id1).unlink()
+            self.getCursor(id1).unlink()
 
     #"def" selectCursor(self, ID):
         #self.slot_selectCursor(ID)
@@ -3036,78 +3077,195 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return crsID in self.allDataCursors
     
     
-    def _addCursor_(self, cursor_type, item=None, label=None, follows_mouse=False,
-                      **kwargs):
-        ax_cx = self.axesWithLayoutPositions
+    def _addCursor_(self, cursor_type: str, 
+                    x: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
+                    y: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
+                    xwindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
+                    ywindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
+                    xBounds: typing.Union[tuple, type(None)] = None,
+                    yBounds: typing.Union[tuple, type(None)] = None,
+                    axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None,
+                    label:typing.Optional[str] = None, 
+                    follows_mouse: bool = False, **kwargs) -> str:
+        """Creates a cursor.
+        kwargs: var-keyword parameters for Cursor constructor (pen, etc)
+        """
         
-        x = None
-        y = None
+        if xwindow is None:
+            xwindow = self.defaultCursorWindowSizeX
+            
+        elif isinstance(xwindow, pq.Quantity):
+            xwindow = float(xwindow.magnitude.flatten()[0])
+            
+        elif not isinstance(xwindow, numbers.Number):
+            raise TypeError("Unexpected type for xwindow: %s" % type(xwindow).__name__)
+            
+        if ywindow is None:
+            ywindow = self.defaultCursorWindowSizeY
+            
+        elif isinstance(ywindow, pq.Quantity):
+            ywindow = float(ywindow.magnitude.flatten()[0])
+            
+        elif not isinstance(ywindow, numbers.Number):
+            raise TypeError("Unexpected type for ywindow: %s" % type(ywindow).__name__)
+            
+        #x = None
+        #y = None
 
-        # NOTE: makes no sense to add a cursors when there are NO plot items (axes) here
-        if len(ax_cx) == 0:
-            item = self.signalsLayout.scene()
+        # NOTE: it seemingly makes no sense to add a cursors when there are no
+        # plot items (axes); nevertheless the cursor can and should be added
+        # to the GraphicsScene
+        if len(self.signalsLayout.items) == 0:
+            axis = self.signalsLayout.scene() # a pg.GraphicsScene
             
-        else:
-            ax, cx = zip(*ax_cx)
-            
-            if item is None:
-                if self._current_plot_item_ is None:
-                    item = ax[0]
-                    
-                else:
-                    item = self._current_plot_item_
-                
-                view_range = item.viewRange() #  [[xmin, xmax], [ymin, ymax]]
-                
-                x = view_range[0][0] + (view_range[0][1] - view_range[0][0])/2
-                
-                y = view_range[1][0] + (view_range[1][1] - view_range[1][0])/2
-                
-            elif isinstance(item, pg.PlotItem):
-                if item not in ax:
-                    return
-                
-                view_range = item.viewRange() #  [[xmin, xmax], [ymin, ymax]]
-                
-                x = view_range[0][0] + (view_range[0][1] - view_range[0][0])/2
-                
-                y = view_range[1][0] + (view_range[1][1] - view_range[1][0])/2
-                
-            elif isinstance(item, pg.GraphicsScene):
-                # for multi-axes cursors = cursors that span several plotitems
-                if item is not self.signalsLayout.scene():
-                    return
+        elif axis is None:
+            if self._current_plot_item_ is None:
+                axis = self.axis[0]
                 
             else:
-                raise TypeError("axes expected to be a pyqtgraph.PlotItem, a pyqtgraph.GraphicsScene or None; got %s instead" % type(axes).__name__)
+                axis = self._current_plot_item_
+            
+        elif isinstance(axis, int):
+            if axis < 0 or axis >= len(self.axes):
+                raise ValueError("Invalid axis index %d for %d axes" % (axis, len(self.axes)))
+            
+            axis = self.axis(axis)
+            
+        elif isinstance(axis, str) and axis.lower().strip() in ("all", "a"):
+            axis = self.signalsLayout.scene()
+            
+        elif not isinstance(axis, (pg.PlotItem, pg.GraphicsScene)):
+            raise TypeError("axes expected to be an int, a str ('all' or 'a'), a pyqtgraph.PlotItem, a pyqtgraph.GraphicsScene, or None; got %s instead" % type(axes).__name__)
+            
+        if isinstance(axis, pg.PlotItem):
+            if axis not in self.signalsLayout.items:
+                return
+            
+            view_range = axis.viewRange() #  [[xmin, xmax], [ymin, ymax]]
+            
+            if x is None:
+                x = view_range[0][0] + (view_range[0][1] - view_range[0][0])/2
+            
+            elif isinstance(x, pq.Quantity):
+                x = float(x.magnitude.flatten()[0])
+                
+            elif not isinstance(x, numbers.Number):
+                raise TypeError("Unexpected type for x coordinate: %s" % type(x).__name__)
+            
+            if xBounds is None:
+                xBounds = view_range[0]
+                
+            if y is None:
+                y = view_range[1][0] + (view_range[1][1] - view_range[1][0])/2
+            
+            elif isinstance(y, pq.Quantity):
+                y = float(y.magnitude.flatten()[0])
+            
+            elif not isinstance(y, numbers.Number):
+                raise TypeError("Unexpected type for y coordinate: %s" % type(y).__name__ )
+            
+            if yBounds is None:
+                yBounds = view_range[1]
+            
+        elif isinstance(axis, pg.GraphicsScene):
+            # generate a multi-axis cursor
+            # when there are several axes the cursor that spans them all
+            if axis is not self.signalsLayout.scene():
+                return
+            
+            if len(self.signalsLayout.items) == 0:
+                # there is no axis (plotitem)
+                warnings.warn("There is no axis in the viewer; have you plotted anything yet?\nThe cursor's coordinates will be reset when plotting")
+                
+                scene_rect = self.signalsLayout.scene().sceneRect()
+                
+                if x is None:
+                    x = scene_rect.width()/2
+                    
+                elif isinstance(x, pq.Quantity):
+                    x = float(x.magnitude.flatten()[0])
+                    
+                elif not isinstance(x, numbers.Number):
+                    raise TypeError("Unexpected type for x coordinate: %s" % type(x).__name__)
+                
+                if xBounds is None:
+                    xBounds = (scene_rect.x(), scene_rect.x() + scene_rect.width())
+                
+                if y is None:
+                    y = scene_rect.height()/2
+                    
+                elif isinstance(y, pq.Quantity):
+                    y = float(y.magnitude.flatten()[0])
+                    
+                elif not isinstance(y, numbers.Number):
+                    raise TypeError("Unexpected type for y coordinate: %s" % type(y).__name__)
+                
+                if yBounds is None:
+                    yBounds = (scene_rect.y(), scene_rect.y() + scene_rect.height())
+                
+            else:
+                min_x_axis = np.min([p.viewRange()[0][0] for p in self.signalsLayout.items])
+                max_x_axis = np.max([p.viewRange()[0][0] for p in self.signalsLayout.items])
+                
+                topAxis_y_max = pIs[0].viewRange()[1][1]
+                bottomAxis_y_min = pIs[-1].viewRange()[1][0]
+            
+                min_point = pIs[0].vb.mapViewToScene(QtCore.QPointF(min_x_axis,topAxis_y_max ))
+                max_point = pIs[-1].vb.mapViewToScene(QtCore.QPointF(max_x_axis, bottomAxis_y_min))
+                
+                if x is None:
+                    x = min_point.x() + (max_point.x() - min_point.x())/2.
+                    
+                elif isinstance(x, pq.Quantity):
+                    x = float(x.magnitude.flatten()[0])
+                    
+                elif not isinstance(x, numbers.Number):
+                    raise TypeError("Unexpected type for x coordinate: %s" % type(x).__name__)
+                
+                if y is None:
+                    y = min_point.y() + (max_point.y() - min_point.y())/2.
+                    
+                elif isinstance(y, pq.Quantity):
+                    y = float(y.magnitude.flatten()[0])
+                    
+                elif not isinstance(y, numbers.Number):
+                    raise TypeError("Unexpected type for y coordinate: %s" % type(y).__name__)
+                    
+                if xBounds is None:
+                    xBounds = [min_point.x(), max_point.x()]
+                
+                if yBounds is None:
+                    yBounds = [min_point.y(), max_point.y()]
                 
         if not isinstance(cursor_type, str):
             raise TypeError("cursor_type expected to be a str; got %s instead" % type(cursor_type).__name__)
         
-        if cursor_type == "vertical":
+        #print("SignalViewer._addCursor_ cursor_type", cursor_type)
+        
+        if cursor_type in ("vertical", "v"):
             cursorDict = self.verticalDataCursors
             crsPrefix = "v"
-            hWin = self.defaultCursorWindowSizeX
-            vWin = 0.0
+            
+            #xwindow = self.defaultCursorWindowSizeX
+            ywindow = 0.0
             pen = pg.mkPen(pg.mkColor(self.cursorColors["vertical"]), style=QtCore.Qt.SolidLine)
             linkedPen = pg.mkPen(pg.mkColor(self.linkedCursorColors["vertical"]), style=QtCore.Qt.SolidLine)
             
-        elif cursor_type == "horizontal":
+        elif cursor_type in ("horizontal", "h"):
             cursorDict = self.horizontalDataCursors
             crsPrefix = "h"
-            hWin = 0.0
-            vWin = self.defaultCursorWindowSizeY
+            xwindow = 0.0
+            #ywindow = self.defaultCursorWindowSizeY
             pen = pg.mkPen(pg.mkColor(self.cursorColors["horizontal"]), style=QtCore.Qt.SolidLine)
             linkedPen = pg.mkPen(pg.mkColor(self.linkedCursorColors["horizontal"]), style=QtCore.Qt.SolidLine)
             
-        elif cursor_type == "crosshair":
+        elif cursor_type in ("crosshair", "c"):
             cursorDict = self.crosshairDataCursors
             crsPrefix = "c"
-            hWin = self.defaultCursorWindowSizeX
-            vWin = self.defaultCursorWindowSizeY
+            xwindow = self.defaultCursorWindowSizeX
+            ywindow = self.defaultCursorWindowSizeY
             pen = pg.mkPen(pg.mkColor(self.cursorColors["crosshair"]), style=QtCore.Qt.SolidLine)
             linkedPen = pg.mkPen(pg.mkColor(self.linkedCursorColors["crosshair"]), style=QtCore.Qt.SolidLine)
-            
             
         else:
             raise ValueError("unsupported cursor type %s" % cursor_type)
@@ -3120,11 +3278,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             crsId = label
             
-        xBounds = kwargs.pop("xBounds", None)
-        yBounds = kwargs.pop("yBounds", None)
-            
-        cursorDict[crsId] = Cursor(item, 
-                                   x = x, y = y, hWin=hWin, vWin=vWin,
+        cursorDict[crsId] = Cursor(axis, 
+                                   x = x, y = y, xwindow=xwindow, ywindow=ywindow,
                                    cursor_type = cursor_type,
                                    cursorID = crsId,
                                    linkedPen = linkedPen, pen = pen, 
@@ -3141,12 +3296,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         return crsId
 
-    @pyqtSlot()
-    @safeWrapper
-    def slot_addVerticalCursor(self, label = None, follows_mouse=False):
-        return self._addCursor_("vertical", item=self._current_plot_item_, 
-                                  label=label, follows_mouse=follows_mouse)
-    
     @pyqtSlot((QtCore.QPoint))
     @safeWrapper
     def slot_annotationsContextMenuRequested(self, point):
@@ -3222,25 +3371,31 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if dlg.exec() == QtWidgets.QDialog.Accepted:
                         newVarName = validateVarName(namePrompt.text(), self._scipyenWindow_.workspace)
                         
-                        self._scipyenWindow_.assignToWorkspace(newVarName, values[0])
+                        self._scipyenWindow_._assignToWorkspace_(newVarName, values[0])
                         
                         
                 else:
                     for name, value in zip(item_paths, values):
                         newVarName = validateVarName(name, self._scipyenWindow_.workspace)
-                        self._scipyenWindow_.assignToWorkspace(newVarName, value)
+                        self._scipyenWindow_._assignToWorkspace_(newVarName, value)
         
         
     @pyqtSlot()
     @safeWrapper
+    def slot_addVerticalCursor(self, label = None, follows_mouse=False):
+        return self._addCursor_("vertical", axis=self._current_plot_item_, 
+                                  label=label, follows_mouse=follows_mouse)
+    
+    @pyqtSlot()
+    @safeWrapper
     def slot_addHorizontalCursor(self, label=None, follows_mouse=False):
-        return self._addCursor_("horizontal", item=self._current_plot_item_, 
+        return self._addCursor_("horizontal", axis=self._current_plot_item_, 
                                   label=label, follows_mouse=follows_mouse)
         
     @pyqtSlot()
     @safeWrapper
     def slot_addCrosshairCursor(self, label=None, follows_mouse=False):
-        return self._addCursor_("crosshair", item=self._current_plot_item_, 
+        return self._addCursor_("crosshair", axis=self._current_plot_item_, 
                                   label=label, follows_mouse=follows_mouse)
     
     @pyqtSlot()
@@ -3337,6 +3492,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                   label=label, follows_mouse=True)
     
     def _construct_multi_axis_vertical_(self, label=None, dynamic=False):
+        # NOTE: 2020-02-26 14:37:50
+        # code being migrated to _addCursor_()
+        # with allowing for cursors to be added to an empty scene (i.e. with no
+        # axes) on the condition that their coordinates must be reset once
+        # something has been plotted
         if self.signalsLayout.scene() is not None:
             ax_cx = self.axesWithLayoutPositions
             
@@ -3353,7 +3513,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             xbounds = [min_point.x(), max_point.x()]
 
-            return self._addCursor_("vertical", item=self.signalsLayout.scene(), 
+            return self._addCursor_("vertical", axis=self.signalsLayout.scene(), 
                                     label=label, follows_mouse=dynamic, xBounds=xbounds)
         
     
@@ -3368,6 +3528,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._construct_multi_axis_vertical_(label=label, dynamic=True)
         
     def _construct_multi_axis_crosshair_(self, label=None, dynamic=False):
+        # NOTE: 2020-02-26 14:39:09
+        # see  NOTE: 2020-02-26 14:37:50
         if self.signalsLayout.scene() is not None:
             ax_cx = self.axesWithLayoutPositions
             if len(ax_cx) == 0:
@@ -3389,9 +3551,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
             ybounds = [min_point.y(), max_point.y()]
             
-            return self._addCursor_("crosshair", item=self.signalsLayout.scene(), 
+            return self._addCursor_("crosshair", axis=self.signalsLayout.scene(), 
                                     label=label, follows_mouse=dynamic, 
-                                    xBounds=xbounds, yBounds = ybounds)
+                                    xBounds = xbounds, yBounds = ybounds)
         
         
     @pyqtSlot()
@@ -3568,7 +3730,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             cursor = self.selectedDataCursor # get the selected cursor if no ID given
                 
         else:
-            cursor = self.getDataCursor(crsId) # otherwise try to get cursor with given ID
+            cursor = self.getCursor(crsId) # otherwise try to get cursor with given ID
             
         # if neither returned a valid cursor, then 
         if cursor is None:
@@ -3684,7 +3846,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if d.exec() == QtWidgets.QDialog.Accepted:
             if choose: # choose cursor as per dialog; otherwise cursor is set above
                 crsId = cursorComboBox.text() 
-                cursor = self.getDataCursor(crsId)
+                cursor = self.getCursor(crsId)
                 initialID = crsId
                 
             if cursor is None: # bail out
@@ -3745,7 +3907,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if len(cid) == 0:
                         cid = d.cursorComboBox.variable.itemText(0)
             
-        c = self.getDataCursor(cid)
+        c = self.getCursor(cid)
             
         #print("_slot_update_cursor_editor_dlg_ cursor", c)
         
@@ -3842,7 +4004,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if name is None:
                     name="epoch"
                     
-                self._scipyenWindow_.assignToWorkspace(name, epoch)
+                self._scipyenWindow_._assignToWorkspace_(name, epoch)
                 
     @pyqtSlot()
     @safeWrapper
@@ -3996,8 +4158,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if c2ID is None or len(c2ID) == 0:
                     return
                 
-                c1 = self.getDataCursor(c1ID)
-                c2 = self.getDataCursor(c2ID)
+                c1 = self.getCursor(c1ID)
+                c2 = self.getCursor(c2ID)
                 
                 if c1 is None or c2 is None:
                     return
@@ -4050,7 +4212,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if name is not None:
                     name = "epoch"
                 
-                self._scipyenWindow_.assignToWorkspace(name, epoch)
+                self._scipyenWindow_._assignToWorkspace_(name, epoch)
     
     @pyqtSlot()
     @safeWrapper
@@ -4092,8 +4254,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if c2ID is None or len(c2ID) == 0:
                 return
             
-            c1 = self.getDataCursor(c1ID)
-            c2 = self.getDataCursor(c2ID)
+            c1 = self.getCursor(c1ID)
+            c2 = self.getCursor(c2ID)
             
             if c1 is None or c2 is None:
                 return
@@ -4105,7 +4267,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if name is None:
                     name = "epoch"
                     
-                self._scipyenWindow_.assignToWorkspace(name, epoch)
+                self._scipyenWindow_._assignToWorkspace_(name, epoch)
         
     def cursorsToEpoch(self, name=None):
         vertAndCrossCursors = collections.ChainMap(self.crosshairDataCursors, self.verticalDataCursors)
@@ -5031,12 +5193,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.displayFrame()
 
     @property
-    def plotItemsWithLayoutPositions(self):
-        """ A zipped list of tuples, each with a PlotItem and a one-element list of grid coordinates.
+    def plotItemsWithLayoutPositions(self) -> typing.List:
+        """ A zipped list of tuples (PlotItem, grid coordinates).
         
-        The structure is as follows:
+        The structure is derived from the dictionary
+        pyqtgraph.graphicsItems.GraphicsLayout.GraphicsLayout.items:
         
-        [ (PlotItem, [(row, col)]), ...]
+        [   (PlotItem, [(row, col)]), 
+            ...
+        ]
         
         The elements in the zipped list are SORTED by the value of row (see above)
         in increasing order
@@ -5044,12 +5209,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         Read-only
         
         """
-        #items = [item for item in self.analogSignalsLayout.items.items()] 
         items = [item for item in self.signalsLayout.items.items()] 
         return sorted(items, key=lambda x: x[1][0])
     
     @property
-    def plotItems(self):
+    def plotItems(self) -> typing.List:
         px = self.plotItemsWithLayoutPositions
         
         if len(px):
@@ -5062,15 +5226,24 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     @property
     def axesWithLayoutPositions(self):
-        """References the plotItemsWithLayoutPositions property -- syntactic sugar
+        """Alias to self.plotItemsWithLayoutPositions property (syntactic sugar)
         """
         return self.plotItemsWithLayoutPositions
     
     @property
-    def axes(self):
+    def axes(self) -> typing.List:
+        """The list of axes (PlotItem objects).
+        
+        Alias to self.plotItems property
+        """
         return self.plotItems
     
-    def getPlotItem(self, index):
+    def axis(self, index: int) -> pg.PlotItem:
+        """The axis (PlotItem) at the specified index.
+        
+        If index is not valid, returns None.
+        
+        """
         try:
             plotitem = self.signalsLayout.getItem(index,0)
             
@@ -5079,23 +5252,35 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         return plotitem
     
-        # alternatively:
-        #axes, coords = zip(*self.axesWithLayoutPositions)
+    @safeWrapper
+    def getPlotItem(self, index: int) -> pg.PlotItem:
+        """Returns the axis (PlotItem) at the specified index.
         
-        #if index <= len(axes):
-            #return axes[index]
-            
+        Does the same thing as self.axis(index) but with the overhead of 
+        iterating over the items in self.signalsLayout (a pg.GraphicsLayout).
+        
+        Raises an exception if index is not valid.
+        """
+        return self.axes[index]
+    
     def getAxis(self, index):
         """Calls self.getPlotItem(index) -- syntactic sugar
         """
         return self.getPlotItem(index)
         
     @property
-    def currentPlotItem(self):
+    def currentPlotItem(self) -> pg.PlotItem:
+        """Reference to the selected (current) axis (PlotItem).
+        
+        The setter counterpart sets the current plot item to be a reference to
+        the PlotItem with the specified index.
+        """
         return self._current_plot_item_
     
     @currentPlotItem.setter
-    def currentPlotItem(self, index):
+    def currentPlotItem(self, index: int):
+        """Sets the current plot item to the one at the specified index.
+        """
         plotitems_coords = self.axesWithLayoutPositions # a reference, so saves computations
         
         if len(plotitems_coords) == 0:
@@ -5116,6 +5301,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.statusBar().showMessage("Selected axes: %d" % index)
         
     @property
+    def currentAxis(self) -> pg.PlotItem:
+        """Alias to currentPlotItem. 
+        The setter counterpart is alaised to that of self.currentPlotItem
+        """
+        return self._current_plot_item_
+    
+    @currentAxis.setter
+    def currentAxis(self, index: int) :
+        self.currentPlotItem = index
+    
+    @property
     def currentAxes(self):
         return self.currentPlotItem
     
@@ -5123,34 +5319,34 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def currentAxes(self, index):
         self.currentPlotItem = index
     
-    def getDataCursor(self, ID):
+    def getCursor(self, ID):
         """Not to be confused with the Qt method self.cursor() !!!
         """
         if len(self.allDataCursors) and ID in self.allDataCursors:
             return self.allDataCursors[ID]
         
-    def getDataCursorWindow(self, crsID):
+    def getCursorWindow(self, crsID):
         if self._hasCursor_(crsID):
             #print(crsID)
             return (self.allDataCursors[crsID].xwindow, self.allDataCursors[crsID].ywindow)
         else:
             raise Exception("Cursor %s not found" % crsID)
         
-    def getDataCursorX(self, crsID):
+    def getCursorX(self, crsID):
         if self._hasCursor_(crsID):
             return self.allDataCursors[crsID].x
         else:
             return None
         
-    def getDataCursorY(self, crsID):
+    def getCursorY(self, crsID):
         if self._hasCursor_(crsID):
             return self.allDataCursors[crsID].y
 
-    def getSelectedDataCursorWindow(self):
+    def getSelectedCursorWindow(self):
         if self.selectedDataCursor is not None:
             return (self.allDataCursors[self.selectedDataCursor.ID].xwindow, self.allDataCursors[self.selectedDataCursor.ID].ywindow)
         
-    def getDataCursorsForItem(self, index=None):
+    def getCursorsForItem(self, index=None):
         """Returns a list of Cursor objects in a PlotItem or spanning all plot items.
         
         List is empty if no cursor exists.
@@ -6478,7 +6674,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if ax["item"].isVisible():
                     pass
         
-        plotItemCursors = self.getDataCursorsForItem(plotItem)
+        plotItemCursors = self.getCursorsForItem(plotItem)
         
         for c in plotItemCursors:
             c.setBounds()
@@ -6644,7 +6840,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         #ndx = self.__plot_items__.index(plotitem)
                         
                         # are there any cursors in this plotitem?
-                        cursors = self.getDataCursorsForItem(plotitem)
+                        cursors = self.getCursorsForItem(plotitem)
                         
                         if len(cursors):
                             for cursor in cursors:
