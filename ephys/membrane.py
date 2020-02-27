@@ -58,7 +58,7 @@ from core.utilities import safeWrapper
 
 #### BEGIN pict.gui modules
 import gui.signalviewer as sv
-from gui.signalviewer import Cursor as Cursor
+from gui.signalviewer import SignalCursor as SignalCursor
 import gui.pictgui as pgui
 
 #### END pict.gui modules
@@ -73,14 +73,59 @@ import iolib.pictio as pio
 
 @safeWrapper
 def cursor_Rs_Rin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
-                  cursor0: typing.Union[tuple, Cursor],
-                  cursor1: typing.Union[tuple, Cursor],
-                  cursor2: typing.Union[tuple, Cursor], 
-                  vstep: typing.Union[float, pq.Quantity]) -> tuple:
+                  baseline: typing.Union[tuple, SignalCursor],
+                  rs: typing.Union[tuple, SignalCursor],
+                  rin: typing.Union[tuple, SignalCursor], 
+                  vstep: typing.Union[float, pq.Quantity],
+                  channel: typing.Optional[int]=None) -> tuple:
     """Calculates series and input resistance from membrane test voltage step.
     
-    Applies to voltage-clamp recordings (membran current signal)
+    Applies to voltage-clamp recordings (membrane current signal)
+    
+    Parameters:
+    ----------
+    
+    signal: neo.AnalogSignal or dt.DataSignal
+    
+    baseline: tuple or signalviewer.SignalCursor of type "vertical".
+        When a tuple (t,w) it represents a niotional vertical signal cursors
+        with window "w" centered at "t". "t" and "w" must be floats or python
+        Quantity objects with the same units as the signal's domain.
+        
+        Sets the signal baseline against which Rs and Rin will be calculated
+        
+    rs, rin: tuple or signalviewer.SignalCursor of type "vertical";
+        Set the signal region where Rs and Rin, respectively, will be calculated.
+        
+    vstep: float or python Quantity: the size of the membrane depolarization 
+        step.
+        
+        When a Quantity it must be in units convertible to mV.
+        
+    Returns:
+    -------
+    
+    (Rs, Rin): tuple of python Quantity objects in vstep.units / signal.units
+    
     """
+    if isinstance(vstep, float):
+        vstep *= pq.mV
+        
+    elif isinstanve(vstep, pq.Quantity):
+        if not dt.units_convertible(vstep, pq.mV):
+            raise TypeError("QWring units for vstep quantity (%s)" % vstep.units)
+        
+    else:
+        raise TypeError("vstep expected to be a float or a python Quantity; got %s instead" % type(vstep).__name__)
+    
+    IRs = neoutils.cursors_amplitude(signal, baseline, rs, channel=channel)
+    IRin= neoutils.cursors_amplitude(signal, baseline, rin, channel=channel)
+    
+    Rs = vstep / IRs
+    Rin = vstep/ IRin
+    
+    return (Rs, Rin)
+    
 
 @safeWrapper
 def v_Nernst(x_out, x_in, z, temp):

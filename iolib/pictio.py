@@ -849,7 +849,6 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
     
     #return result
 
-#"def" loadAxonFile(fileName:str) -> ([neo.Block, list], dict, list):
 def loadAxonFile(fileName:str) -> neo.Block:
     """Loads a binary Axon file (*.abf).
     
@@ -1583,13 +1582,13 @@ def getLoaderForFile(fName):
         ret = loadTextFile # fallback
         
         if file_type == "data":
-            with open(fName, mode="rt") as file_object:
+            with open(fName, mode="rb") as file_object:
                 header = file_object.readline()
-                if "ATF" in header:
+                if b"ABF" in header:
                     ret = loadAxonFile
                     
                 else:
-                    ret = loadTextFile
+                    warnings.warning("Don't know how to open %s" % fName, RuntimeWarning)
 
         
         ## plain python mimtype module has failed;
