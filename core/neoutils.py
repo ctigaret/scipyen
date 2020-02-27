@@ -29,7 +29,7 @@ from . import signalprocessing as sigp
 
 #from .patchneo import neo
 
-from gui.signalviewer import Cursor as Cursor
+from gui.signalviewer import SignalCursor as SignalCursor
 
 from .utilities import safeWrapper, normalized_index
 #### END pict.core modules
@@ -47,6 +47,43 @@ def __indexnone(a, b):
     else:
         return None
     
+def cursor2interval(_cursor_, _units_):
+    if isinstance(_cursor_, tuple):
+        if len(_cursor_) != 2:
+            raise TypeError("When a tuple, cursor must contain two elements; got %d instead" % len(_cursor_))
+        
+        for kc,c in enumerate(_cursor_):
+            if isinstance(c, pq.Quantity):
+                if not dt.units_convertible(c, signal.times):
+                    raise TypeError("Wrong quantity units (%s) for element %d in cursor tuple; expecting %s" % (c.units, kc, signal.times.units))
+                
+            elif not isinstance(c, float):
+                raise TypeError("Wrong type for element %d in cursor tuple %d. Expecting a float or a python Quantity, got a %s" % (kc, _k_, type(c).__name__))
+            
+        t0 = _cursor_[0] - _cursor_[1]/2.
+        t1 = _cursor_[0] + _cursor_[1]/2.
+        
+        if isinstance(t0, float):
+            t0 *= _units_
+            
+        if isinstance(t1, float):
+            t1 *= _units_
+        
+        return (t0, t1)
+            
+    elif isinstance(_cursor_, SignalCursor):
+        if _cursor_.cursorType not in ("vertical", "crosshair"):
+            raise TypeError()
+        
+        t0 = (_cursor_.x - _cursor_.xwindow/2.) * _units_
+        t1 = (_cursor_.x + _cursor_.xwindow/2.) * _units_
+        
+        return (t0, t1)
+            
+    else:
+        raise TypeError("Expecting a tuple or a signalviewer.SignalCursor; got %s instead" % type(_cursor_).__name__)
+                
+
 def correlate(in1, in2, **kwargs):
     """Calls scipy.signal.correlate(in1, in2, **kwargs).
     
@@ -452,103 +489,140 @@ def signal2epoch(sig, name=None, labels=None):
     return ret
 
 @safeWrapper
-def mean_value_around_time(signal:neo.AnalogSignal,
-                           t:[float, pq.Quantity],
-                           w:[float, pq.Quantity]=0.001*pq.s):
-    """Calculates the mean value of signal samples at time t across window w.
+def cursor_max(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+               cursor: typing.Union[tuple, SignalCursor],
+               channel: typing.Optional[int] = None) -> pq.Quantity:
     
-    The value is effectively:
+    (t0,t1) = cursor2interval(cursor, signal.times.units)
     
-    signal.time_slice(t-w/2, t+w/2).mean(axis=0)
+    ret = signal.time_slice(t0,t1).max(axis=0)
     
-    Parameters:
-    ==========
-    signal: neo.AnalogSignal
+    if isinstance(channel, int):
+        return ret[channel].flatten()
     
-    t0: scalar float or python Quantity in units convertible to the signal's 
-        time units
-    
-    w:  a scalar float or python Quantity = a window around the time points, 
-        across which the mean signal value is calculated (useful for noisy 
-        signals).
-        
-        Default is 0.001 * pq.s (i.e. 1 ms)
-    """
-    
-    if isinstance(t, numbers.Real):
-        t *= signal.times.units
-        
-    if isinstance(w, numbers.Real):
-        w *= signal.times.units
-        
-    return signal.time_slice(t-w/2, t+w/2).mean(axis=0)
+    return ret
 
 @safeWrapper
-def slice_amplitude(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
-                    t0: typing.Union[float, pq.Quantity], 
-                    t1: typing.Union[float, pq.Quantity],
-                    w:  typing.Union[float, pq.Quantity] = 0.001 * pq.s,
-                    w1: typing.Union[float, pq.Quantity, type(None)] = None) -> pq.Quantity:
-    """Calculates amplitude of a signal slice between domain values t0 and t1.
+def cursor_min(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+               cursor: typing.Union[tuple, SignalCursor],
+               channel: typing.Optional[int] = None) -> pq.Quantity:
     
-                amplitude = y1 - y0
-                
-        where y0 and y1 are average signal values across a window (w) centered 
-        respectively, at t0 and t1:
+    (t0,t1) = cursor2interval(cursor, signal.times.units)
     
-        y0 = signal.time_slice(t0-w/2, t0+w/2).mean(axis=0)
-        
-        y1 = signal.time_slice(t1-w/2, t1+w/2).mean(axis=0)
+    ret = signal.time_slice(t0,t1).min(axis=0)
+    
+    if isinstance(channel, int):
+        return ret[channel].flatten()
+    
+    return ret
+
+@safeWrapper
+def cursor_average(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+                   cursor: typing.Union[tuple, SignalCursor],
+                   channel: typing.Optional[int]=None) -> pq.Quantity:
+    """Average of signal samples across the window of a vertical cursor.
     
     Parameters:
-    ==========
+    -----------
+    
     signal: neo.AnalogSignal or datatypes.DataSignal
     
-    t0, t1: scalar float or python Quantity in units convertible to the signal's
-        time units
-    
-    w:  a scalar float or python Quantity = a window around the time points, 
-        across which the mean signal value is calculated (useful for noisy 
-        signals).
+    cursor: tuple, or signalviewer.SignalCursor (vertical).
+        When a tuple (t,w), it represents a notional vertical cursor with window
+        "w" centered at time "t". "t" and "w" must be floats or python 
+        Quantity objects with the same units as the signal's domain.
         
-        Default is 0.001 * pq.s (i.e. 1 ms)
-    
+    channel: int or None (default). For multi-channel signals, it specifies the 
+        signal channel to get the average value from.
+        
+        When channel is None, the function returns a python Quantity array
+        (one value for each channel).
+        
+        When channel is an int, the function returns the average at the specifed
+        channel (if it is valid)
+        
     Returns:
-    ========
-    
-    A python quantity array in signal units, with as many values as there are
-    column vectors (channels) in the signal.
+    -------
+    A python Quantity with the same units as the signal.
     
     """
     
-    if isinstance(t0, numbers.Real):
-        t0 *= signal.times.units
+    (t0, t1) = cursor2interval(cursor, signal.times.units)
         
-    if isinstance(t1, numbers.Real):
-        t1 *= signal.times.units
-        
-    if isinstance(w, numbers.Real):
-        w *= signal.times.units
-        
-    if isinstance(w1, numbers.Real):
-        w1 *= signal.times.units
-        
-    y0 = signal.time_slice(t0-w/2, t0+w/2).mean(axis=0)
+    ret = signal.time_slice(t0,t1).mean(axis=0)
     
-    if w1 is not None:
-        y1 = signal.time_slice(t1-w1/2, t1+w1/2).mean(axis=0)
+    if channel is None:
+        return ret
+
+    return ret[channel].flatten() # so that it can accept array indexing
+
+@safeWrapper
+def cursor_value(signal:typing.Union[neo.AnalogSignal, dt.DataSignal],
+                 cursor: typing.Union[float, SignalCursor, pq.Quantity],
+                 channel: typing.Optional[int] = None) -> pq.Quantity:
+    """Value of signal at the vertical cursor's time coordinate.
+    
+    Parameters:
+    -----------
+    signal: neo.AnalogSignal or datatypes.DataSignal
+    
+    cursor: float, python Quantity or vertical SignalCursor
+    
+            When float, it must be a valid value in the signal's domain 
+                (signal domain ubnits are assumed)
+                
+            When a Quantity, its units must be convertible to the units of the
+                signal's domain.
+                
+            When a SignalCursor, it must be a vertical or crosshair cursor.
+            
+    channel: int or None (default). Specifies which signal channel is the value
+        retrieved from.
+        
+            When None (default), the function returns all channel values at 
+                cursor. Otherwise, returns the value in the specified channel
+                (channel must be a valid index >= 0 and < number of channels)
+                
+    Returns:
+    --------
+    
+    python Quantity (units of the signal)
+    
+    """
+    
+    if isinstance(cursor, float):
+        t = cursor * signal.time.units
+        
+    elif isinstance(cursor, SignalCursor):
+        if cursor.cursorType not in ("vertical", "crosshair"):
+            raise TypeError("Expecting a vertical or crosshair cursor; got %s instead" % cursor.cursorType)
+        
+        t = cursor.x * signal.times.units
+        
+    elif isinstance(cursor, pq.Quantity):
+        if not dt.units_convertible(cursor, signal.times.units):
+            raise TypeError("Expecting %s for cursor units; got %s instead" % (signal.times.units, cursor.units))
+        
+        t = cursor
+        
     else:
-        y1 = signal.time_slice(t1-w/2, t1+w/2).mean(axis=0)
+        raise TypeError("Cursor expected to be a float, python Quantity or SignalCursor; got %s instead" % type(cursor).__name__)
     
-    return y1-y0
+    data_index = signal.time_index(t)
+    
+    ret = signal[data_index,:]
+    
+    if channel is None:
+        return ret
+    
+    return ret[channel].flatten() # so that it can be indexed
 
 @safeWrapper
 def cursors_amplitude(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
-                      cursor0: typing.Union[tuple, Cursor], 
-                      cursor1: typing_Union[tuple, Cursor]) -> pq.Quantity:
+                      cursor0: typing.Union[tuple, SignalCursor], 
+                      cursor1: typing.Union[tuple, SignalCursor],
+                      channel: typing.Optional[int] = None) -> pq.Quantity:
     """Calculates the signal amplitude between two notional vertical cursors.
-    
-    Calls slice_amplitude.
     
     Parameters:
     -----------
@@ -559,40 +633,18 @@ def cursors_amplitude(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
         
     """
     
-    if isinstance(cursor0, Cursor):
-        if cursor0.cursorType not in ("vertical", "crosshair"):
-            raise TypeError("When cursor0 is a signalviewer.Cursor, it must be vertical or crosshair")
-        t0 = cursor0.x
-        w = cursor0.xwindow
-        
-    elif isinstance(cursor0, tuple) and len(cursor0)==2:
-        t0 = cursor0[0]
-        w = cursor0[1]
-        
-    else:
-        raise TypeError("cursor0 expected to be a signalviewer.Cursor or a two-elements tuple; got %s instead" % type(cursor0).__name__)
+    y0 = cursor_average(signal, cursor0, channel=channel)
+    y1 = cursor_average(signal, cursor1, channel=channel)
     
-    if isinstance(cursor1, Cursor):
-        if cursor1.cursorType not in ("vertical", "crosshair"):
-            raise TypeError("When cursor1 is a signalviewer.Cursor, it must be vertical or crosshair")
-        t1 = cursor1.x
-        w1 = cursor1.xwindow
-        
-    elif isinstance(cursor1, tuple) and len(cursor1)==2:
-        t1 = cursor1[0]
-        w1 = cursor1[1]
-        
-    else:
-        raise TypeError("cursor1 expected to be a signalviewer.Cursor or a two-elements tuple; got %s instead" % type(cursor1).__name__)
-    
-    return slice_amplitude(signal, t0, t1, w, w1)
+    return y1-y0
     
 @safeWrapper
 def chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal], 
                 t0: typing.Union[float, pq.Quantity], 
                 t1: typing.Union[float, pq.Quantity],
-                w: typing.Union[float,  pq.Quantity] = 0.001 * pq.s,
-                w1: typing.Union[float, pq.Quantity, type(None)] = None) -> pq.Quantity:
+                w0: typing.Optional[typing.Union[float,  pq.Quantity]]=0.001*pq.s,
+                w1: typing.Optional[typing.Union[float, pq.Quantity]] = None,
+                channel: typing.Optional[int] = None) -> pq.Quantity:
     """Calculates the chord slope of a signal between two time points t0 and t1.
     
                     slope = (y1 - y0) / (t1 - t0)
@@ -600,16 +652,17 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     The signal values (y0, y1) at time points (t0, t1) are taken as the average 
     of the sample values in a window (w) around t0 and t1:
     
-    y0 = signal.time_slice(t0-w/2, t0+w/2).mean(axis=0)
-    y1 = signal.time_slice(t1-w/2, t1+w/2).mean(axis=0)
+    y0 = signal.time_slice(t0-w0/2, t0+w0/2).mean(axis=0)
+    y1 = signal.time_slice(t1-w1/2, t1+w1/2).mean(axis=0)
     
     Parameters:
     ==========
     signal: neo.AnalogSignal, dt.DataSignal
     
-    t0, t1: scalar float or python Quantity =  the limits of the interval where
+    t0: scalar float or python Quantity =  the limits of the interval where
             the chord slope is calculated, including the half-windows before t0
             and after t1;
+            
             Their units must be convertible to the signal's time units
     
     w:  a scalar float or python Quantity = a window around the time points, 
@@ -620,6 +673,15 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
         
     w1: like w (optional default is None). When present, the windows w and w1
     are used respectively, with the time points t0 and t1.
+        
+    channel: int or None (default). For multi-channel signals, it specifies the 
+        signal channel to get the average value from.
+        
+        When channel is None, the function returns a python Quantity array
+        (one value for each channel).
+        
+        When channel is an int, the function returns the average at the specifed
+        channel (if it is valid)
         
     Returns:
     ========
@@ -636,32 +698,34 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
         t1 *= signal.times.units
         
     if isinstance(w, numbers.Real):
-        w *= signal.times.units
+        w0 *= signal.times.units
         
     if isinstance(w1, numbers.Real):
         w1 *= signal.times.units
         
-    y0 = signal.time_slice(t0-w/2, t0+w/2).mean(axis=0)
+    y0 = signal.time_slice(t0-w0/2, t0+w0/2).mean(axis=0)
     
     if w1 is not None:
         y1 = signal.time_slice(t1-w1/2, t1+w1/2).mean(axis=0)
         
     else:
-        y1 = signal.time_slice(t1-w/2, t1+w/2).mean(axis=0)
+        y1 = signal.time_slice(t1-w0/2, t1+w0/2).mean(axis=0)
         
-    print(y0, y1, t0, t1)
+    #print(y0, y1, t0, t1)
     
     ret = (y1-y0) / (t1-t0)
     
-    return ret
+    if channel is None:
+        return ret
+    
+    else:
+        return ret[channel].flatten() # so that it can accept array indexing
     
 @safeWrapper
 def cursors_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
-                  cursor0: typing.Union[tuple, Cursor],
-                  cursor1: typing.Union[tuple, Cursor]) -> pq.Quantity:
+                  cursor0: typing.Union[tuple, SignalCursor],
+                  cursor1: typing.Union[tuple, SignalCursor]) -> pq.Quantity:
     """Calculates the signal chord slope between two notional vertical cursors.
-    
-    Calls chord_slope() with the cursors' x and xwindow attributes.
     
     Parameters:
     ----------
@@ -670,37 +734,22 @@ def cursors_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     cursor0, cursor1: (x, window) tuple representing, respectively, the cursor's
         x coordinate (time) and (horizontal) window
         
-        OR gui.signalviewer.Cursor of type "vertical"
+        OR gui.signalviewer.SignalCursor of type "vertical"
     
     """
-    if isinstance(cursor0, Cursor):
-        if cursor0.cursorType not in ("vertical", "crosshair"):
-            raise TypeError("When cursor0 is a signalviewer.Cursor, it must be vertical or crosshair")
-        t0 = cursor0.x
-        w = cursor0.xwindow
-        
-    elif isinstance(cursor0, tuple) and len(cursor0)==2:
-        t0 = cursor0[0]
-        w = cursor0[1]
-        
-    else:
-        raise TypeError("cursor0 expected to be a signalviewer.Cursor or a two-elements tuple; got %s instead" % type(cursor0).__name__)
     
-    if isinstance(cursor1, Cursor):
-        if cursor1.cursorType not in ("vertical", "crosshair"):
-            raise TypeError("When cursor1 is a signalviewer.Cursor, it must be vertical or crosshair")
-        t1 = cursor1.x
-        w1 = cursor1.xwindow
-        
-    elif isinstance(cursor1, tuple) and len(cursor1)==2:
-        t1 = cursor1[0]
-        w1 = cursor1[1]
-        
-    else:
-        raise TypeError("cursor1 expected to be a signalviewer.Cursor or a two-elements tuple; got %s instead" % type(cursor1).__name__)
+    y0 = cursor_average(signal, cursor0, channel=channel)
     
-    return chord_slope(signal, t0, t1, w, w1)
+    t0 = cursor0[0] if isinstance(cursor0, tuple) else cursor0.x
     
+    if isinstance(t0, float):
+        t0 *= signal.times.units
+    
+    y1 = cursor_average(signal, cursor1, channel=channel)
+    
+    t1 = cursor1[0] if isinstance(cursor1, tuple) else cursor1.x
+    
+    return (y1-y0)/(t1-t0)
     
 @safeWrapper
 def interval2epoch(t_start: typing.Union[numbers.Number, pq.Quantity],

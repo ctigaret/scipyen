@@ -10144,9 +10144,14 @@ class ScanData(object):
             self._analysis_unit_._upgrade_API_()
         
         if not hasattr(self, "_scan_region_") or not isinstance(self._scan_region_, (pgui.PlanarGraphics, type(None))):
-            if hasattr(self, "__scan_region__") and isinstance(self.__scan_region__, (pgui.PlanarGraphics, type(None))):
+            if hasattr(self, "__scan_region__"):
+                if isinstance(self.__scan_region__, pgui.PlanarGraphics):
                 #print(type(self.__scan_region__))
-                self._scan_region_ = self.__scan_region__.copy()
+                    self._scan_region_ = self.__scan_region__.copy()
+                    
+                else:
+                    self._scan_region_ = None
+                    
                 delattr(self, "__scan_region__")
                 
             elif "scanline" in self._scenerois_.keys() and isinstance(self._scenerois_["scanline"], (pgui.PlanarGraphics, type(None))):

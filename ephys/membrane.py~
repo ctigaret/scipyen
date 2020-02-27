@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 #### BEGIN core python modules
-import sys, traceback, inspect, numbers
+import sys, traceback, inspect, numbers, typing
 import warnings
 import os, pickle
 import collections
@@ -58,7 +58,7 @@ from core.utilities import safeWrapper
 
 #### BEGIN pict.gui modules
 import gui.signalviewer as sv
-from gui.signalviewer import Cursor as Cursor
+from gui.signalviewer import SignalCursor as SignalCursor
 import gui.pictgui as pgui
 
 #### END pict.gui modules
@@ -73,14 +73,51 @@ import iolib.pictio as pio
 
 @safeWrapper
 def cursor_Rs_Rin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
-                  cursor0: typing.Union[tuple, Cursor],
-                  cursor1: typing.Union[tuple, Cursor],
-                  cursor2: typing.Union[tuple, Cursor], 
+                  baseline: typing.Union[tuple, SignalCursor],
+                  rs: typing.Union[tuple, SignalCursor],
+                  rin: typing.Union[tuple, SignalCursor], 
                   vstep: typing.Union[float, pq.Quantity]) -> tuple:
     """Calculates series and input resistance from membrane test voltage step.
     
-    Applies to voltage-clamp recordings (membran current signal)
+    Applies to voltage-clamp recordings (membrane current signal)
+    
+    Parameters:
+    ----------
+    
+    signal: neo.AnalogSignal or dt.DataSignal
+    
+    baseline: tuple or signalviewer.SignalCursor of type "vertical".
+        When a tuple (t,w) it represents a niotional vertical signal cursors
+        with window "w" centered at "t". "t" and "w" must be floats or python
+        Quantity objects with the same units as the signal's domain.
+        
+        Sets the signal baseline against which Rs and Rin will be calculated
+        
+    rs, rin: tuple or signalviewer.SignalCursor of type "vertical";
+        Set the signal region where Rs and Rin, respectively, will be calculated.
+        
+    vstep: float or python Quantity: the size of the membrane depolarization 
+        step.
+        
+        When a Quantity it must be in units convertible to mV.
+    
     """
+    
+    (base0, base1) = neoutils.cursor2interval(baseline, signal.times.units)
+    
+    if isinstance(baseline, SignalCursor):
+        if baseline.cursorType not in ("vertical", "crosshair"):
+            raise TypeError("When baseline is a signalviewer.SignalCursor, it must be vertical or crosshair")
+        t0 = baseline.x
+        w = baseline.xwindow
+        
+    elif isinstance(baseline, tuple) and len(baseline)==2:
+        t0 = baseline[0]
+        w = baseline[1]
+        
+    else:
+        raise TypeError("baseline expected to be a signalviewer.SignalCursor or a two-elements tuple; got %s instead" % type(baseline).__name__)
+    
 
 @safeWrapper
 def v_Nernst(x_out, x_in, z, temp):
