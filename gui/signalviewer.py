@@ -4407,7 +4407,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 plotStyle:str = "plot",
                 show:bool = True,
                 *args, **kwargs):
-        """ Sets up the plot data.
+        """ Sets up the plot data and updates the plot.
+        
+        Plotting is executed by displayFrame().
+        
                 
         Positional parameters:
         ----------------------
@@ -4580,7 +4583,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                    plotStyle:str = "plot",
                    show:bool = True,
                    *args, **kwargs):
-        """Data management function.
+        """Data management function called by self.setData(...)
+        
         Figures out data layout (channel, frames etc) then calls displayframe().
         """
         self.plot_start = None
@@ -5160,7 +5164,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.framesQSpinBox.setValue(self._current_frame_index_)
             
             self.nFramesLabel.setText("of %d" % self._number_of_frames_)
-            
             
             self.displayFrame()
             

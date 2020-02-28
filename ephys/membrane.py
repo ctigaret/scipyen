@@ -77,7 +77,7 @@ def cursor_Rs_Rin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
                   rs: typing.Union[tuple, SignalCursor],
                   rin: typing.Union[tuple, SignalCursor], 
                   vstep: typing.Union[float, pq.Quantity],
-                  channel: typing.Optional[int]=None) -> tuple:
+                  channel: typing.Optional[int]=None) -> pq.Quantity:
     """Calculates series and input resistance from membrane test voltage step.
     
     Applies to voltage-clamp recordings (membrane current signal)
@@ -88,7 +88,7 @@ def cursor_Rs_Rin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     signal: neo.AnalogSignal or dt.DataSignal
     
     baseline: tuple or signalviewer.SignalCursor of type "vertical".
-        When a tuple (t,w) it represents a niotional vertical signal cursors
+        When a tuple (t,w) it represents a notional vertical signal cursors
         with window "w" centered at "t". "t" and "w" must be floats or python
         Quantity objects with the same units as the signal's domain.
         
@@ -111,9 +111,9 @@ def cursor_Rs_Rin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     if isinstance(vstep, float):
         vstep *= pq.mV
         
-    elif isinstanve(vstep, pq.Quantity):
+    elif isinstance(vstep, pq.Quantity):
         if not dt.units_convertible(vstep, pq.mV):
-            raise TypeError("QWring units for vstep quantity (%s)" % vstep.units)
+            raise TypeError("Wrong units for vstep quantity (%s)" % vstep.units)
         
     else:
         raise TypeError("vstep expected to be a float or a python Quantity; got %s instead" % type(vstep).__name__)
@@ -124,7 +124,7 @@ def cursor_Rs_Rin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     Rs = vstep / IRs
     Rin = vstep/ IRin
     
-    return (Rs, Rin)
+    return np.array([Rs, Rin]) * Rin.units
     
 
 @safeWrapper

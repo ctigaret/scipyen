@@ -6,6 +6,7 @@ import warnings
 import os, pickle
 import collections
 import itertools
+import typing
 
 #### END core python modules
 
@@ -913,24 +914,37 @@ def generate_synaptic_plasticity_options(**kwargs) -> dict:
             
     "measures": dict = details the cursor measurements used in analysis.
         each key is a str (measurement name) that is mapped to a nested dict 
-            with the following mandatory keys:
+            with the following keys:
         
-            "function": callable.
+            "function": callable with the following signature:
             
-                The call syntax must be such that the function accepts a 
-                neo.AnalogSignal or datatypes.DataSignal as first parameter, 
-                followed by any number of notional vertical cursors, each 
-                defined by a tuple (time:float, window:float)
+                function(signal, cursor0, cursor1,...,channel) -> Quantity
+            
+                The function accepts a neo.AnalogSignal or datatypes.DataSignal
+                as first parameter, 
+                followed by any number of tuples (time, window) describing
+                notional vertical SignalCursors, or SignalCursor objects
                 
                 Examples: 
-                neoutils.cursors_slope and neoutils.cursors_amplitude
-                ephys.membrane.cursor_Rs_Rin
+                neoutils.cursors_slope()
+                neoutils.cursors_amplitude()
+                ephys.membrane.cursor_Rs_Rin()
             
             "cursors": the actual vertical cursor specification, with keys (str)
-                representing the cursor name, mapped to a tuple (time, window).
+                representing the cursor name, mapped to a tuple (time, window)
+                that describes the notional vertical SignalCursor.
+                
+            "channel": (optional) if present, it must contain an int
+                
+            "returns": 
         
         The functions must be defined and present in the scope therefore
         they can be specified as module.function, unless imported directly.
+        
+        Using the examples above:
+        
+        measures[""]
+        
         
         
     "test":int , default = 0 index of the "test" pathway, for dual pathway
@@ -1316,7 +1330,7 @@ def calculate_fEPSP(block:neo.Block,
     for k, seg in enumerate(block.segments):
         pass
     
-def calculateRmEPSCsLTP(block, 
+def calculateRmEPSCsLTP(block: neo.Block, 
                         signal_index_Im, 
                         signal_index_Vm, 
                         Vm = False, 
@@ -1368,7 +1382,7 @@ def calculateRmEPSCsLTP(block,
         Vm = False
         
     for (k, seg) in enumerate(block.segments):
-        (irbase, rs, rin, epsc0, epsc1) = _calculate_LTP_Segment_whole_cell_(seg, signal_index_Im, signal_index_Vm, Vm=Vm, epoch=epoch)
+        (irbase, rs, rin, epsc0, epsc1) = _segment_measure_synaptic_plasticity_v_clamp_(seg, signal_index_Im, signal_index_Vm, Vm=Vm, epoch=epoch)
         ui = irbase.units
         ri = rs.units
         
@@ -1435,7 +1449,9 @@ def calculateRmEPSCsLTP(block,
         
     return ret
 
-def _calculate_LTP_Segment_field_EPSP_(s:neo.Segment, signal_index:int, epoch:[neo.Epoch, type(None)]=None) -> np.ndarray:
+def _segment_measure_synaptic_plasticity_i_clamp_(s: neo.Segment, 
+                                       signal_index: int, 
+                                       epoch: typing.Optional[neo.Epoch]=None) -> np.ndarray:
     if epoch is None:
         if len(s.epochs) == 0:
             raise ValueError("Segment has no epochs and no external epoch has been defined")
@@ -1463,7 +1479,11 @@ def _calculate_LTP_Segment_field_EPSP_(s:neo.Segment, signal_index:int, epoch:[n
         return chord_slopes
         
         
-def _calculate_LTP_Segment_whole_cell_(s, signal_index_Im, signal_index_Vm, Vm=False, epoch=None):
+def _segment_measure_synaptic_plasticity_v_clamp_(s: neo.Segment,
+                                       signal_index_Im: int,
+                                       signal_index_Vm: int, 
+                                       Vm: bool=False,
+                                       epoch: typing.Optional[neo.Epoch]=None) -> tuple:
     if epoch is None:
         if len(s.epochs) == 0:
             raise ValueError("Segment has no epochs and no external epoch has been defined")

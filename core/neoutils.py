@@ -547,14 +547,54 @@ def cursor_average(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     
     """
     
-    (t0, t1) = cursor2interval(cursor, signal.times.units)
+    if cursor.xwindow > 0:
+        (t0, t1) = cursor2interval(cursor, signal.times.units)
+        ret = signal.time_slice(t0,t1).mean(axis=0)
         
-    ret = signal.time_slice(t0,t1).mean(axis=0)
+    else:
+        ret = cursor_value(signal, cursor, channel=channel)
+        
     
-    if channel is None:
-        return ret
+    if isinstance(channel, int):
+        return ret[channel].flatten() # so that it can accept array indexing
+    
+    return ret
 
-    return ret[channel].flatten() # so that it can accept array indexing
+
+@safeWrapper
+def epoch_average(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+                  epoch: neo.Epoch,
+                  channel: typing.Optional[int] = None) -> list:
+    """Signal average across an epoch's intervals.
+    
+    Parameters:
+    -----------
+    signal: neo.AnalogSignal or datatypes.DataSignal
+    
+    epoch: neo.Epoch
+    
+    channel: int or None (default)
+    
+    Returns:
+    --------
+    
+    A list of python Quantity objects with as many elements as there
+    are times,durations pairs in the epoch.
+    
+    For multi-channel signals, the Quantity are arrays of size that equals the
+    number of channels.
+    
+    """
+    
+    t0 = epoch.times
+    t1 = epoch.times + epoch.durations
+    
+    ret = [signal.time_slice(t0_, t1_).mean(axis=0) for (t0_, t1_) in zip(t0,t1)]
+    
+    if isinstance(channel, int):
+        ret = [r[channel].flatten() for r in ret]
+        
+    return ret
 
 @safeWrapper
 def cursor_value(signal:typing.Union[neo.AnalogSignal, dt.DataSignal],
@@ -722,32 +762,37 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
         return ret[channel].flatten() # so that it can accept array indexing
     
 @safeWrapper
-def cursors_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
                   cursor0: typing.Union[tuple, SignalCursor],
-                  cursor1: typing.Union[tuple, SignalCursor]) -> pq.Quantity:
-    """Calculates the signal chord slope between two notional vertical cursors.
+                  cursor1: typing.Union[tuple, SignalCursor],
+                  channel: typing.Optional[int] = None) -> pq.Quantity:
+    """Calculates the signal chord slope between two vertical cursors.
+    
+    The singnal value at each cursor is taken as the average of signal samples
+    across the cursor's horizontal window.
     
     Parameters:
     ----------
     signal
     
-    cursor0, cursor1: (x, window) tuple representing, respectively, the cursor's
-        x coordinate (time) and (horizontal) window
-        
-        OR gui.signalviewer.SignalCursor of type "vertical"
+    cursor0, cursor1: tuple (x, window) representing, respectively, the cursor's
+        x coordinate (time) and (horizontal) window, or a
+        gui.signalviewer.SignalCursor of type "vertical"
     
     """
+    t0 = cursor0[0] if isinstance(cursor0, tuple) else cursor0.x
     
     y0 = cursor_average(signal, cursor0, channel=channel)
     
-    t0 = cursor0[0] if isinstance(cursor0, tuple) else cursor0.x
-    
     if isinstance(t0, float):
         t0 *= signal.times.units
-    
-    y1 = cursor_average(signal, cursor1, channel=channel)
-    
+        
     t1 = cursor1[0] if isinstance(cursor1, tuple) else cursor1.x
+
+    if isinstance(t1, float):
+        t1 *= signal.times.units
+        
+    y1 = cursor_average(signal, cursor1, channel=channel)
     
     return (y1-y0)/(t1-t0)
     
@@ -800,7 +845,9 @@ def interval2cursor(t0: float, t1: float) -> typing.Tuple[float, float]:
 @safeWrapper
 def epoch2cursors(epoch: neo.Epoch) -> typing.Sequence:
     """Creates notional vertical signal cursors from a neo.Epoch.
-    Results is a list of tuples of (time, window) where time is epoch.time + epoch.duration/2
+    Results is a list of tuples of (time, window) where 
+    time = epoch.times + epoch.durations/2.
+    window = epoch.durations
     """
     
     ret = [(float(t.magnitude + d.magnitude/2.), float(d.magnitude)) for (t,d) in zip(epoch.times, epoch.durations)]
