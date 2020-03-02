@@ -781,9 +781,9 @@ class SignalCursor(QtCore.QObject):
         
         if isinstance(cursor_type, str):
             if len(cursor_type) == 1:
-                c_type = [SignalCursorTypes[name] for name in SignalCursorTypes.__members__.keys() if name.startswith(cursor_type)]
+                c_type_name = [name for name in SignalCursorTypes.names() if name.startswith(cursor_type)]
                 
-            else:
+            el:
                 c_type = [SignalCursorTypes[name] for name in SignalCursorTypes.__members__.keys() if name == cursor_type]
             
             

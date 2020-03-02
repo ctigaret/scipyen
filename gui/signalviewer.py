@@ -209,25 +209,10 @@ class SignalCursor(QtCore.QObject):
         def values(cls):
             return [c.value for c in cls]
         
-        #@classmethod
-        #def name(cls, value: tuple) -> str:
-            #ret = [v for v in cls.__members__.values() if v is value]
-            
-            #if len(ret):
-                #return ret[0]
-            
         @classmethod
         def default(cls):
             return cls.crosshair
         
-    #_cursorTypes_ = {SignalCursorTypes.crosshair:    (True, True),
-                     #SignalCursorTypes.horizontal:   (True, False), 
-                     #SignalCursorTypes.vertical:     (False, True)}
-    
-    #_cursorTypes_ = {(True, True):  SignalCursorTypes.crosshair.name,
-                     #(True, False): SignalCursorTypes.horizontal.name, 
-                     #(False, True): SignalCursorTypes.vertical.name}
-    
     def __init__(self, plot_item, x=None, y=None, xwindow=0.0, ywindow=0.0,
                  cursor_type = None, cursorID="c", follower=False, parent=None, 
                  xBounds=None, yBounds=None, 
@@ -783,9 +768,8 @@ class SignalCursor(QtCore.QObject):
             if len(cursor_type) == 1:
                 c_type_name = [name for name in SignalCursorTypes.names() if name.startswith(cursor_type)]
                 
-            el:
+            else:
                 c_type = [SignalCursorTypes[name] for name in SignalCursorTypes.__members__.keys() if name == cursor_type]
-            
             
             if len(c_type):
                 cursor_type = SignalCursorTypes[c_type]
