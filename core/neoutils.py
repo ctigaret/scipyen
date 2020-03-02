@@ -763,9 +763,9 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     
 @safeWrapper
 def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
-                  cursor0: typing.Union[tuple, SignalCursor],
-                  cursor1: typing.Union[tuple, SignalCursor],
-                  channel: typing.Optional[int] = None) -> pq.Quantity:
+                        cursor0: typing.Union[SignalCursor, tuple],
+                        cursor1: typing.Union[SignalCursor, tuple],
+                        channel: typing.Optional[int] = None) -> pq.Quantity:
     """Calculates the signal chord slope between two vertical cursors.
     
     The singnal value at each cursor is taken as the average of signal samples

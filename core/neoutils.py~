@@ -763,9 +763,9 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     
 @safeWrapper
 def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
-                  cursor0: typing.Union[tuple, SignalCursor],
-                  cursor1: typing.Union[tuple, SignalCursor],
-                  channel: typing.Optional[int] = None) -> pq.Quantity:
+                        cursor0: typing.Union[tuple, SignalCursor],
+                        cursor1: typing.Union[tuple, SignalCursor],
+                        channel: typing.Optional[int] = None) -> pq.Quantity:
     """Calculates the signal chord slope between two vertical cursors.
     
     The singnal value at each cursor is taken as the average of signal samples
@@ -845,7 +845,9 @@ def interval2cursor(t0: float, t1: float) -> typing.Tuple[float, float]:
 @safeWrapper
 def epoch2cursors(epoch: neo.Epoch) -> typing.Sequence:
     """Creates notional vertical signal cursors from a neo.Epoch.
-    Results is a list of tuples of (time, window) where time is epoch.time + epoch.duration/2
+    Results is a list of tuples of (time, window) where 
+    time = epoch.times + epoch.durations/2.
+    window = epoch.durations
     """
     
     ret = [(float(t.magnitude + d.magnitude/2.), float(d.magnitude)) for (t,d) in zip(epoch.times, epoch.durations)]

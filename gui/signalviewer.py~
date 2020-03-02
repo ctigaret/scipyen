@@ -197,37 +197,73 @@ class SignalCursor(QtCore.QObject):
     #_cursorTypes_ = {(True, True):'crosshair', (True, False):'horizontal', (False,True):'vertical'}
     
     class SignalCursorTypes(Enum):
+        """Enumeration of signal cursor types.
+        """
         vertical    = (False, True)
         horizontal  = (True, False)
         crosshair   = (True, True)
         
         @classmethod
         def names(cls):
+            """List of the signal cursor type names
+            """
             return [c.name for c in cls]
         
         @classmethod
         def values(cls):
+            """List with the values to which the signal cursor types are mapped.
+            """
             return [c.value for c in cls]
         
-        #@classmethod
-        #def name(cls, value: tuple) -> str:
-            #ret = [v for v in cls.__members__.values() if v is value]
-            
-            #if len(ret):
-                #return ret[0]
-            
         @classmethod
         def default(cls):
+            """The default signal cursor type
+            """
             return cls.crosshair
         
-    #_cursorTypes_ = {SignalCursorTypes.crosshair:    (True, True),
-                     #SignalCursorTypes.horizontal:   (True, False), 
-                     #SignalCursorTypes.vertical:     (False, True)}
-    
-    #_cursorTypes_ = {(True, True):  SignalCursorTypes.crosshair.name,
-                     #(True, False): SignalCursorTypes.horizontal.name, 
-                     #(False, True): SignalCursorTypes.vertical.name}
-    
+        @classmethod
+        def types(cls):
+            """List of the defined signal cursor types.
+            """
+            return list(cls)
+        
+        @classmethod
+        def getType(cls, value: tuple):
+            """Inverse-lookup: returns signal cursor type mapped to value.
+            
+            Returns None if no signal cursor type is mapped to this value.
+            """
+            if isinstance(value, (tuple, list)) and len(value) == 2 and all([isinstance(v, bool) for v in value]):
+                value = tuple(value) # force cast to a tuple
+                types = [c for c in cls if c.value == value]
+                if len(types):
+                    return types[0]
+                
+                #types_values = [tv for nv in zip(*[(c, c.value) for c in cls])]
+                #types = types_values[0]
+                #values = types_values[1]
+                #if value in values:
+                    #return types[values.index(value)]
+        
+        @classmethod
+        def getName(cls, value: tuple):
+            """Inverse-lookup for name of a signal cursor type given its value.
+            
+            Returns None if no signal cursor type is mapped to this value.
+            """
+            if isinstance(value, (tuple, list)) and len(value) == 2 and all([isinstance(v, bool) for v in value]):
+                value = tuple(value) # force cast to a tuple
+                types = [c for c in cls if c.value == value]
+                #print(types)
+                if len(types):
+                    return types[0].name
+                
+                #names_values = [nv for nv in zip(*[(c.name, c.value) for c in cls])]
+                #names = names_values[0]
+                #values = names_values[1]
+                #if value in values:
+                    #return names[values.index(value)]
+                
     def __init__(self, plot_item, x=None, y=None, xwindow=0.0, ywindow=0.0,
                  cursor_type = None, cursorID="c", follower=False, parent=None, 
                  xBounds=None, yBounds=None, 
@@ -236,7 +272,7 @@ class SignalCursor(QtCore.QObject):
         
         super(SignalCursor, self).__init__(parent=parent)
         
-        print("SignalCursor.__init__ cursor_type", cursor_type)
+        #print("SignalCursor.__init__ cursor_type", cursor_type)
         
         if not isinstance(parent, (SignalViewer, pg.PlotItem)):
             raise TypeError("parent object of a SignalCursor can only be a pyqtgraph PlotItem or a SignalViewer; got %s instead" % type(parent).__name__)
@@ -775,38 +811,41 @@ class SignalCursor(QtCore.QObject):
                   xwindow=None, ywindow=None, follower=False, cursorID=None, 
                   xBounds=None, yBounds=None, **kwargs):
         
-        print("SignalCursor._setup_ cursor_type %s" % cursor_type)
+        #print("SignalCursor._setup_ cursor_type %s" % cursor_type)
         
         show_lines = (False, False)
         
         if isinstance(cursor_type, str):
             if len(cursor_type) == 1:
                 c_type_name = [name for name in SignalCursorTypes.names() if name.startswith(cursor_type)]
+                if len(c_type_name):
+                    cursor_type = SignalCursor.SignalCursorTypes[c_type_name[0]]
+                    
+                else:
+                    cursor_type = None
                 
-            el:
-                c_type = [SignalCursorTypes[name] for name in SignalCursorTypes.__members__.keys() if name == cursor_type]
-            
-            
-            if len(c_type):
-                cursor_type = SignalCursorTypes[c_type]
+            else:
+                if cursor_type in SignalCursor.SignalCursorTypes.names():
+                    cursor_type = SignalCursor.SignalCursorTypes[cursor_type]
+                    
+                else:
+                    cursor_type = None
                 
         elif isinstance(cursor_type, (tuple, list)) and len(cursor_type) == 2 and all([isinstance(b, bool) for c in cursor_type]):
+            cursor_type = Signalcursor.SignalCursorTypes.getType(cursor_type) # this may return None
             
-            pass
+        elif not isinstance(cursor_type, SignalCursor.SignalCursorTypes):
+            raise TypeError("cursor_type expectec to be a str, a tuple of two booleans or a SignalCursor.SignalCursorTypes; got %s instead" % type(cursor_type).__name__)
             
+        # to avoid doubts, is cursor_type is None then fallback to the default (crosshair)
+        if cursor_type is None:
+            cursor_type = SignalCursor.SignalCursorTypes.crosshair
+            
+        # now we can set which lines are shown
+        show_lines = cursor_type.value
         
-        if isinstance(cursor_type, (tuple, list)) and len(cursor_type) == 2 and all([isinstance(c, bool) for c in cursor_type]):
-            show_lines = cursor_type
-            self._cursor_type_ = _cursorTypes_[cursor_type]
+        self._cursor_type_ = cursor_type
             
-        elif isinstance(cursor_type, str) and cursor_type in ("crosshair", "horizontal", "vertical"):
-            self._cursor_type_ = cursor_type
-            
-            show_lines = SignalCursor._cursorTypes_[cursor_type]
-            
-        else:
-            return
-        
         #print("show_lines", show_lines)
         
         self.setBounds(host, xBounds=xBounds, yBounds=yBounds)
@@ -2357,7 +2396,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # NOTE: 2020-02-26 14:23:40
         # creates the cursor DIRECTLY at the specified coordinates
         
-        print("SignalViewer.addCursor cursorType %s" % cursorType)
+        #print("SignalViewer.addCursor cursorType %s" % cursorType)
         
         crsID = self._addCursor_(cursor_type = cursorType,
                                 x = x, y = y, xwindow = xwindow, ywindow = ywindow,
@@ -2695,7 +2734,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #for cursors_name, cursor in self.cursors.items():
         for cursors_name, cursor in crn:
             #cursor = self.cursors[crn]
-            print("SignalViewer.reportCursors %s %s" % (cursors_name, cursor.cursorType))
+            #print("SignalViewer.reportCursors %s %s" % (cursors_name, cursor.cursorType))
             
             if isinstance(cursor, SignalCursor):
                 cursor_label_text = "%s %s " % ("Dynamic", cursor.ID) if cursor.isDynamic else "%s" % cursor.ID
@@ -3302,7 +3341,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(cursor_type, SignalCursor.SignalCursorTypes):
             cursor_type = cursor_type.name
         
-        print("SignalViewer._addCursor_ cursor_type %s" % cursor_type)
+        #print("SignalViewer._addCursor_ cursor_type %s" % cursor_type)
         
         if cursor_type in ("vertical", "v"):
             cursorDict = self.verticalDataCursors
