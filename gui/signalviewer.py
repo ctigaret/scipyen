@@ -83,9 +83,9 @@ CHANGELOG
 #### BEGIN core python modules
 from __future__ import print_function
 
-import sys, os, traceback, numbers, warnings, weakref, inspect
+import sys, os, traceback, numbers, warnings, weakref, inspect, typing
 
-import collections, itertools, typing
+import collections, itertools
 
 from operator import attrgetter, itemgetter, methodcaller
 from enum import Enum, IntEnum
@@ -196,14 +196,37 @@ class SignalCursor(QtCore.QObject):
 
     #_cursorTypes_ = {(True, True):'crosshair', (True, False):'horizontal', (False,True):'vertical'}
     
-    class SignalCursorType(IntEnum):
-        vertical=1
-        horizontal=2
-        crosshair=3
+    class SignalCursorTypes(Enum):
+        vertical    = (False, True)
+        horizontal  = (True, False)
+        crosshair   = (True, True)
         
-    _cursorTypes_ = {SignalCursorType.crosshair.name:(True, True),
-                     SignalCursorType.horizontal.name:(True, False), 
-                     SignalCursorType.vertical.name:(False,True)}
+        @classmethod
+        def names(cls):
+            return [c.name for c in cls]
+        
+        @classmethod
+        def values(cls):
+            return [c.value for c in cls]
+        
+        #@classmethod
+        #def name(cls, value: tuple) -> str:
+            #ret = [v for v in cls.__members__.values() if v is value]
+            
+            #if len(ret):
+                #return ret[0]
+            
+        @classmethod
+        def default(cls):
+            return cls.crosshair
+        
+    #_cursorTypes_ = {SignalCursorTypes.crosshair:    (True, True),
+                     #SignalCursorTypes.horizontal:   (True, False), 
+                     #SignalCursorTypes.vertical:     (False, True)}
+    
+    #_cursorTypes_ = {(True, True):  SignalCursorTypes.crosshair.name,
+                     #(True, False): SignalCursorTypes.horizontal.name, 
+                     #(False, True): SignalCursorTypes.vertical.name}
     
     def __init__(self, plot_item, x=None, y=None, xwindow=0.0, ywindow=0.0,
                  cursor_type = None, cursorID="c", follower=False, parent=None, 
@@ -213,7 +236,7 @@ class SignalCursor(QtCore.QObject):
         
         super(SignalCursor, self).__init__(parent=parent)
         
-        #print("SignalCursor.__init__ cursor_type", cursor_type)
+        print("SignalCursor.__init__ cursor_type", cursor_type)
         
         if not isinstance(parent, (SignalViewer, pg.PlotItem)):
             raise TypeError("parent object of a SignalCursor can only be a pyqtgraph PlotItem or a SignalViewer; got %s instead" % type(parent).__name__)
@@ -299,7 +322,7 @@ class SignalCursor(QtCore.QObject):
         
         self._current_plot_item_ = None # for multi-axes cursors
         
-        self._setup_cursor_(plot_item, x=x, y=y, xwindow=xwindow, ywindow=ywindow, 
+        self._setup_(plot_item, x=x, y=y, xwindow=xwindow, ywindow=ywindow, 
                          cursor_type=cursor_type, cursorID=cursorID,
                          follower=follower, xBounds = xBounds, yBounds=yBounds,
                          **kwargs)
@@ -748,11 +771,29 @@ class SignalCursor(QtCore.QObject):
             
         self._add_lines_to_host_()
         
-    def _setup_cursor_(self, host, cursor_type="crosshair", x=None, y=None, 
+    def _setup_(self, host, cursor_type="crosshair", x=None, y=None, 
                   xwindow=None, ywindow=None, follower=False, cursorID=None, 
                   xBounds=None, yBounds=None, **kwargs):
         
+        print("SignalCursor._setup_ cursor_type %s" % cursor_type)
+        
         show_lines = (False, False)
+        
+        if isinstance(cursor_type, str):
+            if len(cursor_type) == 1:
+                c_type_name = [name for name in SignalCursorTypes.names() if name.startswith(cursor_type)]
+                
+            el:
+                c_type = [SignalCursorTypes[name] for name in SignalCursorTypes.__members__.keys() if name == cursor_type]
+            
+            
+            if len(c_type):
+                cursor_type = SignalCursorTypes[c_type]
+                
+        elif isinstance(cursor_type, (tuple, list)) and len(cursor_type) == 2 and all([isinstance(b, bool) for c in cursor_type]):
+            
+            pass
+            
         
         if isinstance(cursor_type, (tuple, list)) and len(cursor_type) == 2 and all([isinstance(c, bool) for c in cursor_type]):
             show_lines = cursor_type
@@ -865,10 +906,10 @@ class SignalCursor(QtCore.QObject):
 
         self._setup_lines_(*show_lines, **kwargs)
         
-        #print("_setup_cursor_ after _setup_lines_ xy", (self.x, self.y))
+        #print("_setup_ after _setup_lines_ xy", (self.x, self.y))
         
         self._add_lines_to_host_()
-        #print("_setup_cursor_ after __add_lines_to_host__ xy", (self.x, self.y))
+        #print("_setup_ after __add_lines_to_host__ xy", (self.x, self.y))
         
     def _interpret_scene_mouse_events_(self, scene=None):
         """
@@ -2255,14 +2296,20 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.menubar.addMenu(self.docksMenu)
         ##print("_configureGUI_ widget actions menu added to the menu bar")
         
-    def addCursor(self, cursorType="c", 
-                  x=None, y=None, xwindow = None, ywindow = None, 
-                  xBounds=None, yBounds=None, 
-                  label=None, follows_mouse=False, axis=None, **kwargs):
+    def addCursor(self, cursorType: typing.Union[str, SignalCursor.SignalCursorTypes] = "c", 
+                  x: typing.Optional[numbers.Number] = None,
+                  y: typing.Optional[numbers.Number] = None,
+                  xwindow: typing.Optional[numbers.Number] = None,
+                  ywindow: typing.Optional[numbers.Number] = None, 
+                  xBounds: typing.Optional[numbers.Number] = None,
+                  yBounds: typing.Optional[numbers.Number] = None, 
+                  label: typing.Optional[typing.Union[int, str, pg.PlotItem]] = None,
+                  follows_mouse: bool = False, 
+                  axis: typing.Optional[int] = None, 
+                  **kwargs):
         """ Add a cursor to the selected axes in the signal viewer window.
-        
-        Requires that there is at least one Axis object in the figure, hence
-            some data must have already been plotted.
+
+        When no data has been plotted, the cursor is created in the scene.
         
         Arguments:
         cursorType: str, one of "c", "v" or "h" respectively, for 
@@ -2289,7 +2336,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             When there are no axes yet the cursor will be created by default in
             the scene, and wil behave like a multi-axis cursor.
-            WARNING the coordinates wont make much sense unless in this case,
+            WARNING the coordinates won't make much sense unless in this case,
             unless they are given in the scene coordinates. 
             
             None (the default) indicates that the cursor will be created in
@@ -2309,6 +2356,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         # NOTE: 2020-02-26 14:23:40
         # creates the cursor DIRECTLY at the specified coordinates
+        
+        print("SignalViewer.addCursor cursorType %s" % cursorType)
         
         crsID = self._addCursor_(cursor_type = cursorType,
                                 x = x, y = y, xwindow = xwindow, ywindow = ywindow,
@@ -2646,6 +2695,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #for cursors_name, cursor in self.cursors.items():
         for cursors_name, cursor in crn:
             #cursor = self.cursors[crn]
+            print("SignalViewer.reportCursors %s %s" % (cursors_name, cursor.cursorType))
             
             if isinstance(cursor, SignalCursor):
                 cursor_label_text = "%s %s " % ("Dynamic", cursor.ID) if cursor.isDynamic else "%s" % cursor.ID
@@ -3086,7 +3136,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return crsID in self.allDataCursors
     
     
-    def _addCursor_(self, cursor_type: str, 
+    def _addCursor_(self, cursor_type: typing.Union[str, SignalCursor.SignalCursorTypes], 
                     x: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
                     y: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
                     xwindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
@@ -3249,7 +3299,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if not isinstance(cursor_type, str):
             raise TypeError("cursor_type expected to be a str; got %s instead" % type(cursor_type).__name__)
         
-        #print("SignalViewer._addCursor_ cursor_type", cursor_type)
+        if isinstance(cursor_type, SignalCursor.SignalCursorTypes):
+            cursor_type = cursor_type.name
+        
+        print("SignalViewer._addCursor_ cursor_type %s" % cursor_type)
         
         if cursor_type in ("vertical", "v"):
             cursorDict = self.verticalDataCursors
