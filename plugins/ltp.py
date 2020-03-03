@@ -1449,6 +1449,10 @@ def calculateRmEPSCsLTP(block: neo.Block,
         
     return ret
 
+@safeWrapper
+def calculate_segment_Rs_Rin(segment: neo.Segment):
+    pass
+
 def _segment_measure_synaptic_plasticity_i_clamp_(s: neo.Segment, 
                                        signal_index: int, 
                                        epoch: typing.Optional[neo.Epoch]=None) -> np.ndarray:

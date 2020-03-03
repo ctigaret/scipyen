@@ -3666,6 +3666,20 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @safeWrapper
     def slot_addDynamicMultiAxisCrosshairCursor(self, label=None):
         self._construct_multi_axis_crosshair_(label=label, dynamic=True)
+        
+    @safeWrapper
+    def removeCursors(self):
+        """Remove all signal cursors
+        """
+        self.slot_removeCursors()
+        
+    @safeWrapper
+    def removeActiveCursor(self):
+        self.slot_removeSelectedCursor()
+        
+    @safeWrapper
+    def removeCursor(self, crsID=None):
+        self.slot_removeCursor(crsID)
 
     @pyqtSlot()
     @safeWrapper

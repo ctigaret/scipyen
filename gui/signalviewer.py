@@ -3733,7 +3733,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             crs = self.horizontalDataCursors.pop(crsID, None)
 
         elif crsID in self.verticalDataCursors:
-            crs = self.verticalDataCursors.pop(crsID, None)
+            crs = self.verticalDataCursors.pop(crsID, None) 
             
         # now, also remove its line2D objects from the axes
         if crs is not None:

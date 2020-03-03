@@ -490,8 +490,10 @@ def signal2epoch(sig, name=None, labels=None):
 
 @safeWrapper
 def cursor_max(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
-               cursor: typing.Union[tuple, SignalCursor],
+               cursor: typing.Union[SignalCursor, tuple],
                channel: typing.Optional[int] = None) -> pq.Quantity:
+    """The maximum value of the signal across the cursor's window
+    """
     
     (t0,t1) = cursor2interval(cursor, signal.times.units)
     
@@ -503,9 +505,27 @@ def cursor_max(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     return ret
 
 @safeWrapper
+def cursor_argmax(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+               cursor: typing.Union[SignalCursor, tuple],
+               channel: typing.Optional[int] = None) -> np.ndarray:
+    """The index of maximum value of the signal across the cursor's window.
+    """
+    
+    (t0,t1) = cursor2interval(cursor, signal.times.units)
+    
+    ret = signal.time_slice(t0,t1).argmax(axis=0)
+    
+    if isinstance(channel, int):
+        return ret[channel].flatten()
+    
+    return ret
+
+@safeWrapper
 def cursor_min(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
                cursor: typing.Union[tuple, SignalCursor],
                channel: typing.Optional[int] = None) -> pq.Quantity:
+    """The minimum value of the signal across the cursor's window
+    """
     
     (t0,t1) = cursor2interval(cursor, signal.times.units)
     
@@ -515,6 +535,64 @@ def cursor_min(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
         return ret[channel].flatten()
     
     return ret
+
+@safeWrapper
+def cursor_argmin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+               cursor: typing.Union[tuple, SignalCursor],
+               channel: typing.Optional[int] = None) -> np.ndarray:
+    """The index of minimum value of the signal across the cursor's window.
+    """
+    
+    (t0,t1) = cursor2interval(cursor, signal.times.units)
+    
+    ret = signal.time_slice(t0,t1).argmin(axis=0)
+    
+    if isinstance(channel, int):
+        return ret[channel].flatten()
+    
+    return ret
+
+@safeWrapper
+def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+               cursor: typing.Union[tuple, SignalCursor],
+               channel: typing.Optional[int] = None) -> tuple:
+    """The maximum and minimum value of the signal across the cursor's window.
+    """
+    
+    
+    (t0,t1) = cursor2interval(cursor, signal.times.units)
+    
+    mx = signal.time_slice(t0,t1).min(axis=0)
+    
+    if isinstance(channel, int):
+        mx = mx[channel].flatten()
+    
+    mn = signal.time_slice(t0,t1).min(axis=0)
+    
+    if isinstance(channel, int):
+        mn = mn[channel].flatten()
+    
+    return (mx, mn)
+
+@safeWrapper
+def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+               cursor: typing.Union[tuple, SignalCursor],
+               channel: typing.Optional[int] = None) -> tuple:
+    """The indices of signal maximum and minimum across the cursor's window.
+    """
+    (t0,t1) = cursor2interval(cursor, signal.times.units)
+    
+    mx = signal.time_slice(t0,t1).argmin(axis=0)
+    
+    if isinstance(channel, int):
+        mx = mx[channel].flatten()
+    
+    mn = signal.time_slice(t0,t1).argmin(axis=0)
+    
+    if isinstance(channel, int):
+        mn = mn[channel].flatten()
+    
+    return (mx, mn)
 
 @safeWrapper
 def cursor_average(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
@@ -659,10 +737,15 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, dt.DataSignal],
 
 @safeWrapper
 def cursors_amplitude(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
-                      cursor0: typing.Union[tuple, SignalCursor], 
-                      cursor1: typing.Union[tuple, SignalCursor],
+                      cursor0: typing.Union[SignalCursor, tuple], 
+                      cursor1: typing.Union[SignalCursor, tuple],
                       channel: typing.Optional[int] = None) -> pq.Quantity:
     """Calculates the signal amplitude between two notional vertical cursors.
+    
+    amplitude = y1 - y0
+    
+    where y0, y1 are the average signal values across the windows of cursor0 and
+    cursor1
     
     Parameters:
     -----------
@@ -677,7 +760,7 @@ def cursors_amplitude(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     y1 = cursor_average(signal, cursor1, channel=channel)
     
     return y1-y0
-    
+
 @safeWrapper
 def chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal], 
                 t0: typing.Union[float, pq.Quantity], 
@@ -763,8 +846,8 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     
 @safeWrapper
 def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
-                        cursor0: typing.Union[tuple, SignalCursor],
-                        cursor1: typing.Union[tuple, SignalCursor],
+                        cursor0: typing.Union[SignalCursor, tuple],
+                        cursor1: typing.Union[SignalCursor, tuple],
                         channel: typing.Optional[int] = None) -> pq.Quantity:
     """Calculates the signal chord slope between two vertical cursors.
     
