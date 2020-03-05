@@ -922,21 +922,20 @@ def generate_synaptic_plasticity_options(**kwargs) -> dict:
             
                 The function accepts a neo.AnalogSignal or datatypes.DataSignal
                 as first parameter, 
-                followed by any number of tuples (time, window) describing
-                notional vertical SignalCursors, or SignalCursor objects
+                followed by any number of vertical SignalCursor objects
                 
                 Examples: 
                 neoutils.cursors_slope()
                 neoutils.cursors_amplitude()
                 ephys.membrane.cursor_Rs_Rin()
             
-            "cursors": the actual vertical cursor specification, with keys (str)
-                representing the cursor name, mapped to a tuple (time, window)
-                that describes the notional vertical SignalCursor.
+            "cursors": vertical cursor specification, with keys (str, cursor 
+                name) mapped to a tuple (time, window) with vertical cursor 
+                parameters.
                 
             "channel": (optional) if present, it must contain an int
                 
-            "returns": 
+            
         
         The functions must be defined and present in the scope therefore
         they can be specified as module.function, unless imported directly.
