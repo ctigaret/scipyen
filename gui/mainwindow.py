@@ -1228,22 +1228,24 @@ class EmbedIPython(RichJupyterWidget):
         # see NOTE: 2019-08-07 16:34:23 
         self.ipkernel.shell.run_line_magic("matplotlib", "qt5")
         
-        #self.settings = QtCore.QSettings("PICT", "PICT")
-        self.settings = QtCore.QSettings()
+        self.drop_cache=None
         
-        self._load_settings_()
+        self.defaultFixedFont = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
         
         self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_X), self)
         
         self.clear_shortcut.activated.connect(self.slot_clearConsole)
         
-        desktopFixedFont = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
-        desktopFixedFontSpec = desktopFixedFont.toString().split(",")
+        #self.settings = QtCore.QSettings("PICT", "PICT")
+        self.settings = QtCore.QSettings()
         
-        self.font_family = desktopFixedFontSpec[0]
-        self.font_size = int(desktopFixedFontSpec[1])
+        self._load_settings_()
         
-        self.drop_cache=None
+        #desktopFixedFont = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
+        #desktopFixedFontSpec = desktopFixedFont.toString().split(",")
+        
+        #self.font_family = desktopFixedFontSpec[0]
+        #self.font_size = int(desktopFixedFontSpec[1])
         
         #self.menubar = QtWidgets.QMenuBar(parent=self)
         #self.setMenuBar(self.menubar)
@@ -1253,13 +1255,29 @@ class EmbedIPython(RichJupyterWidget):
         evt.accept()
 
     def _save_settings_(self):
-        self.settings.setValue("PictConsole/Size", self.size())
-        self.settings.setValue("PictConsole/Position", self.pos())
+        self.settings.setValue("Console/Size", self.size())
+        self.settings.setValue("Console/Position", self.pos())
+        self.settings.setValue("Console/FontFamily", self.font.family())
+        self.settings.setValue("Console/FontPointSize", self.font.pointSize())
+        self.settings.setValue("Console/FontStyle", self.font.style())
+        self.settings.setValue("Console/FontWeight", self.font.weight())
 
     def _load_settings_(self):
-        winSize = self.settings.value("PictConsole/Size", QtCore.QSize(600, 350))
-        winPos = self.settings.value("PictConsole/Position", QtCore.QPoint(0,0))
+        winSize = self.settings.value("Console/Size", QtCore.QSize(600, 350))
+        winPos = self.settings.value("Console/Position", QtCore.QPoint(0,0))
+        fontFamily = self.settings.value("Console/FontFamily", self.defaultFixedFont.family())
+        fontSize = int(self.settings.value("Console/FontPointSize", self.defaultFixedFont.pointSize()))
+        fontStyle = int(self.settings.value("Console/FontStyle", self.defaultFixedFont.style()))
+        fontWeight = int(self.settings.value("Console/FontWeight", self.defaultFixedFont.weight()))
         
+        console_font = QtGui.QFont(fontFamily, fontSize, fontWeight, italic = fontStyle > 0)
+        
+        self.setFont(console_font)
+        
+        self._set_font(console_font)
+        
+        self.font = console_font
+
         self.move(winPos)
         self.resize(winSize)
         self.setAcceptDrops(True)
@@ -1723,7 +1741,7 @@ class WindowManager(__QMainWindow__):
                     elif old_viewer_index == 0:
                         viewer_index = 0
                         
-                self.currentViewers[viewer_type] = self.viewers[viewer_type][viewer_index]
+                    self.currentViewers[viewer_type] = self.viewers[viewer_type][viewer_index]
                 
     def _raiseCurrentWindow(self, obj):
         """Sets obj to be the current window and raises it.
@@ -3843,9 +3861,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         self.settings.setValue("Position", self.pos())
         self.settings.setValue("Geometry", self.geometry())
         self.settings.setValue("State", self.saveState())
-        consoleFont = self.console.font
-        self.settings.setValue("ConsoleFont", consoleFont)
-        self.settings.setValue("ConsoleFontSize", consoleFont.pointSizeF())
+        
+        #consoleFont = self.console.font
+        #self.settings.setValue("ConsoleFont", consoleFont)
+        #self.settings.setValue("ConsoleFontSize", consoleFont.pointSizeF())
         #self.settings.setValue("ScipyenWindow/Editor", self.scipyenEditor)
         
         self.settings.setValue("RecentFiles", self.recentFiles)
@@ -3926,12 +3945,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         if self.windowState is not None:
             self.restoreState(self.windowState)
             
-        consoleFontSize = self.settings.value("ConsoleFontSize",8.)
-        consoleFont = self.settings.value("ConsoleFont", QtGui.QFont("Monospace"))
+        #consoleFontSize = self.settings.value("ConsoleFontSize",8.)
+        #consoleFont = self.settings.value("ConsoleFont", QtGui.QFont("Monospace"))
         
-        consoleFont.setPointSizeF(float(consoleFontSize))
+        #consoleFont.setPointSizeF(float(consoleFontSize))
         
-        self.console._set_font(consoleFont)
+        #self.console._set_font(consoleFont)
         
         self.recentVariablesList        = self.settings.value("VariableSearch", datatypes.collections.deque())
         
