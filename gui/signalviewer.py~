@@ -1754,7 +1754,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.crosshairDataCursors = dict() # a dict of SignalCursors mapping str name to cursor object
         self.verticalDataCursors = dict()
         self.horizontalDataCursors = dict()
-        self.allDataCursors = collections.ChainMap(self.crosshairDataCursors, self.horizontalDataCursors, self.verticalDataCursors)
+        self._data_cursors_ = collections.ChainMap(self.crosshairDataCursors, self.horizontalDataCursors, self.verticalDataCursors)
         # NOTE: 2017-05-10 22:57:30
         # these are linked cursors in the same window
         self.linkedCrosshairCursors = []
@@ -1997,7 +1997,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.crosshairDataCursors.clear() # a dict of SignalCursors mapping str name to cursor object
         self.verticalDataCursors.clear()
         self.horizontalDataCursors.clear()
-        self.allDataCursors.clear()
+        self._data_cursors_.clear()
         
         self.y = None
         self.x = None
@@ -2137,14 +2137,22 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.addCursorsMenu.addMenu(self.addMultiAxesCursorMenu)
         
-        self.addVerticalCursorAction = self.addCursorsMenu.addAction("Vertical SignalCursor")
+        self.addVerticalCursorAction = self.addCursorsMenu.addAction("Vertical")
         self.addVerticalCursorAction.triggered.connect(self.slot_addVerticalCursor)
         
-        self.addHorizontalCursorAction = self.addCursorsMenu.addAction("Horizontal SignalCursor")
+        self.addHorizontalCursorAction = self.addCursorsMenu.addAction("Horizontal")
         self.addHorizontalCursorAction.triggered.connect(self.slot_addHorizontalCursor)
         
-        self.addCrosshairCursorAction = self.addCursorsMenu.addAction("Crosshair SignalCursor")
+        self.addCrosshairCursorAction = self.addCursorsMenu.addAction("Crosshair")
         self.addCrosshairCursorAction.triggered.connect(self.slot_addCrosshairCursor)
+        
+        self.addCursorsMenu.addSeparator()
+        
+        self.addDynamicVerticalCursorAction = self.addCursorsMenu.addAction("Dynamic Vertical")
+        self.addDynamicVerticalCursorAction.triggered.connect(self.slot_addDynamicVerticalCursor)
+        
+        self.addDynamicHorizontalCursorAction = self.addCursorsMenu.addAction("Dynamic Horizontal")
+        self.addDynamicHorizontalCursorAction.triggered.connect(self.slot_addDynamicHorizontalCursor)
         
         self.addDynamicCrosshairCursorAction = self.addCursorsMenu.addAction("Dynamic Crosshair")
         self.addDynamicCrosshairCursorAction.triggered.connect(self.slot_addDynamicCrosshairCursor)
@@ -2467,8 +2475,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if keyevt.key() in (QtCore.Qt.Key_Escape, QtCore.Qt.Key_Delete, QtCore.Qt.Key_Backspace):
             # removes dynamic cursor -- practically one can only have at most one 
             # dynamic cursor at any time
-            if len(self.allDataCursors):
-                for c in [c for c in self.allDataCursors.values() if c.isDynamic]:
+            if len(self._data_cursors_):
+                for c in [c for c in self._data_cursors_.values() if c.isDynamic]:
                     self.slot_removeCursor(c.ID)
                     
                 self._cursor_coordinates_text_=""
@@ -2729,13 +2737,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @safeWrapper
     def reportCursors(self):
         text = list()
-        crn = sorted([(c,n) for c,n in self.cursors.items()], key = lambda x: x[0])
+        crn = sorted([(c,n) for c,n in self._data_cursors_.items()], key = lambda x: x[0])
         
-        #for cursors_name, cursor in self.cursors.items():
         for cursors_name, cursor in crn:
-            #cursor = self.cursors[crn]
-            #print("SignalViewer.reportCursors %s %s" % (cursors_name, cursor.cursorType))
-            
             if isinstance(cursor, SignalCursor):
                 cursor_label_text = "%s %s " % ("Dynamic", cursor.ID) if cursor.isDynamic else "%s" % cursor.ID
                 #cursor_label_text = "%s %s " % ("Dynamic", cursor.ID) if cursor.isDynamic else "%s %s" % ("SignalCursor", cursor.ID)
@@ -3103,7 +3107,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         
         if id1 is None: # just unlink ALL linked cursors from any link they may have
-            for c in self.allDataCursors.values():
+            for c in self._data_cursors_.values():
                 c.unlink()
                 
             return
@@ -3169,10 +3173,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.setData(self._scipyenWindow_.workspace[self._data_var_name_], self._data_var_name_)
 
     def _hasCursor_(self, crsID): #  syntactic sugar
-        if len(self.allDataCursors) == 0:
+        if len(self._data_cursors_) == 0:
             return False
         
-        return crsID in self.allDataCursors
+        return crsID in self._data_cursors_
     
     
     def _addCursor_(self, cursor_type: typing.Union[str, SignalCursor.SignalCursorTypes], 
@@ -3592,6 +3596,18 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return self._addCursor_("crosshair", item=self._current_plot_item_, 
                                   label=label, follows_mouse=True)
     
+    @pyqtSlot()
+    @safeWrapper
+    def slot_addDynamicVerticalCursor(self, label=None):
+        return self._addCursor_("vertical", item=self._current_plot_item_, 
+                                  label=label, follows_mouse=True)
+    
+    @pyqtSlot()
+    @safeWrapper
+    def slot_addDynamicHorizontalCursor(self, label=None):
+        return self._addCursor_("horizontal", item=self._current_plot_item_, 
+                                  label=label, follows_mouse=True)
+    
     def _construct_multi_axis_vertical_(self, label=None, dynamic=False):
         # NOTE: 2020-02-26 14:37:50
         # code being migrated to _addCursor_()
@@ -3684,16 +3700,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot()
     @safeWrapper
     def slot_removeCursors(self):
-        #if len(self.allDataCursors) == 0:
+        #if len(self._data_cursors_) == 0:
             #return
         # FIXME 2017-10-09 22:52:28 what do we do with these?!?
         #axes, _ = zip(*self.axesWithLayoutPositions)
         axes = self.plotItems
         
-        for crs in self.allDataCursors.values():
+        for crs in self._data_cursors_.values():
             crs.detach()
         
-        self.allDataCursors.clear()
+        self._data_cursors_.clear()
         self.crosshairDataCursors.clear()
         self.horizontalDataCursors.clear()
         self.verticalDataCursors.clear()
@@ -3705,7 +3721,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot()
     @safeWrapper
     def slot_removeCursor(self, crsID=None):
-        if len(self.allDataCursors) == 0:
+        if len(self._data_cursors_) == 0:
             return
         
         if not isinstance(crsID, str):
@@ -3713,7 +3729,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             #d = vigra.pyqt.quickdialog.QuickDialog(self, "Choose cursor to remove")
         
             cursorComboBox = pgui.QuickDialogComboBox(d, "Select cursor:")
-            cursorComboBox.setItems([c for c in self.allDataCursors])
+            cursorComboBox.setItems([c for c in self._data_cursors_])
             cursorComboBox.setValue(0)
             
             d.cursorComboBox = cursorComboBox
@@ -3721,7 +3737,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if d.exec() == QtWidgets.QDialog.Accepted:
                 crsID = d.cursorComboBox.text()
                 
-        if crsID not in self.allDataCursors:
+        if crsID not in self._data_cursors_:
             return
         
         crs = None
@@ -3733,7 +3749,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             crs = self.horizontalDataCursors.pop(crsID, None)
 
         elif crsID in self.verticalDataCursors:
-            crs = self.verticalDataCursors.pop(crsID, None)
+            crs = self.verticalDataCursors.pop(crsID, None) 
             
         # now, also remove its line2D objects from the axes
         if crs is not None:
@@ -3760,7 +3776,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot()
     @safeWrapper
     def slot_removeSelectedCursor(self):
-        if len(self.allDataCursors) == 0:
+        if len(self._data_cursors_) == 0:
             return
         
         if isinstance(self.selectedDataCursor, SignalCursor):
@@ -3774,7 +3790,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @safeWrapper
     def slot_selectCursor(self, crsID=None):
         #print("SignalViewer.slot_selectCursor", crsID)
-        if len(self.allDataCursors) == 0:
+        if len(self._data_cursors_) == 0:
             return
         
         if crsID is None:
@@ -3784,7 +3800,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             cursor = self.sender()
             crsID = cursor.ID
             
-            if not crsID in self.allDataCursors: # make sure this is a cursor we know about
+            if not crsID in self._data_cursors_: # make sure this is a cursor we know about
                 return
             
             self.selectedDataCursor = cursor
@@ -3792,13 +3808,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             
         else:
-            if crsID in self.allDataCursors and not self.allDataCursors[crsID].isSelected:
-                self.selectedDataCursor = self.allDataCursors[crsID]
-                self.allDataCursors[crsID].slot_setSelected(True)
+            if crsID in self._data_cursors_ and not self._data_cursors_[crsID].isSelected:
+                self.selectedDataCursor = self._data_cursors_[crsID]
+                self._data_cursors_[crsID].slot_setSelected(True)
                 
-        for cid in self.allDataCursors:
+        for cid in self._data_cursors_:
             if cid != crsID:
-                self.allDataCursors[cid].slot_setSelected(False)
+                self._data_cursors_[cid].slot_setSelected(False)
                 
         if isinstance(self.selectedDataCursor, SignalCursor):
             self.slot_reportCursorPosition(self.selectedDataCursor.ID)
@@ -3806,7 +3822,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot(str)
     @safeWrapper
     def slot_deselectCursor(self, crsID=None):
-        if len(self.allDataCursors) == 0:
+        if len(self._data_cursors_) == 0:
             return
         
         if crsID is None:
@@ -3816,15 +3832,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             cursor = self.sender()
             crsID = cursor.ID
             
-            if not crsID in self.allDataCursors: # make sure this is a cursor we know about
+            if not crsID in self._data_cursors_: # make sure this is a cursor we know about
                 return
             
             self.selectedDataCursor = None
             cursor.slot_setSelected(False)
             
         else:
-            if crsID in self.allDataCursors:
-                cursor = self.allDataCursors[crsID]
+            if crsID in self._data_cursors_:
+                cursor = self._data_cursors_[crsID]
                 cursor.slot_setSelected(False)
                 
                 self.selectedDataCursor = None
@@ -3836,7 +3852,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         from functools import partial
         #print("SignalViewer.slot_editCursor", crsId)
         
-        if len(self.allDataCursors) == 0:
+        if len(self._data_cursors_) == 0:
             return
         
         cursor = None
@@ -3866,7 +3882,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             d = quickdialog.QuickDialog(self, "Edit cursor")
             #d = vigra.pyqt.quickdialog.QuickDialog(self, "Edit cursor")
             cursorComboBox = pgui.QuickDialogComboBox(d, "Select cursor:")
-            cursorComboBox.setItems([c for c in self.allDataCursors])
+            cursorComboBox.setItems([c for c in self._data_cursors_])
             
             d.cursorComboBox = cursorComboBox
             
@@ -3954,7 +3970,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             
         if not isinstance(crsId, str): # populate dialog fields w/ data
-            crsId = [c for c in self.allDataCursors.keys()][0]
+            crsId = [c for c in self._data_cursors_.keys()][0]
             
         self._slot_update_cursor_editor_dlg_(crsId, d)
             
@@ -4408,15 +4424,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         cursors = [c for c in vertAndCrossCursors.values()]
         
-        cursors.sort(key=attrgetter('x'))
+        cursors.sort(key=attrgetter('x')) # or key = lambda x: x.x
         
-        x = np.array([c.x for c in cursors]) * pq.s
-        d = np.array([c.xwindow for c in cursors]) * pq.s
-        labels = np.array([c.ID for c in cursors], dtype="S")
+        ret = neoutils.cursor2epoch(*cursors, name=name)
         
-        t = x - d/2
+        #x = np.array([c.x for c in cursors]) * pq.s
+        #d = np.array([c.xwindow for c in cursors]) * pq.s
+        #labels = np.array([c.ID for c in cursors], dtype="S")
         
-        ret = neo.Epoch(times=t, durations=d, labels=labels, units=pq.s, name=name)
+        #t = x - d/2
+        
+        #ret = neo.Epoch(times=t, durations=d, labels=labels, units=pq.s, name=name)
         
         return ret
         
@@ -5440,29 +5458,29 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def getCursor(self, ID):
         """Not to be confused with the Qt method self.cursor() !!!
         """
-        if len(self.allDataCursors) and ID in self.allDataCursors:
-            return self.allDataCursors[ID]
+        if len(self._data_cursors_) and ID in self._data_cursors_:
+            return self._data_cursors_[ID]
         
     def getCursorWindow(self, crsID):
         if self._hasCursor_(crsID):
             #print(crsID)
-            return (self.allDataCursors[crsID].xwindow, self.allDataCursors[crsID].ywindow)
+            return (self._data_cursors_[crsID].xwindow, self._data_cursors_[crsID].ywindow)
         else:
             raise Exception("SignalCursor %s not found" % crsID)
         
     def getCursorX(self, crsID):
         if self._hasCursor_(crsID):
-            return self.allDataCursors[crsID].x
+            return self._data_cursors_[crsID].x
         else:
             return None
         
     def getCursorY(self, crsID):
         if self._hasCursor_(crsID):
-            return self.allDataCursors[crsID].y
+            return self._data_cursors_[crsID].y
 
     def getSelectedCursorWindow(self):
         if self.selectedDataCursor is not None:
-            return (self.allDataCursors[self.selectedDataCursor.ID].xwindow, self.allDataCursors[self.selectedDataCursor.ID].ywindow)
+            return (self._data_cursors_[self.selectedDataCursor.ID].xwindow, self._data_cursors_[self.selectedDataCursor.ID].ywindow)
         
     def getCursorsForItem(self, index=None):
         """Returns a list of SignalCursor objects in a PlotItem or spanning all plot items.
@@ -5499,7 +5517,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 hostitem = self.signalsLayout.scene()
                 
         if hostitem is not None: # may be None if there is no scene, i.e. no plot item
-            ret =  [c for c in self.allDataCursors.values() if c.hostItem is hostitem]
+            ret =  [c for c in self._data_cursors_.values() if c.hostItem is hostitem]
         
         else:
             ret = list()
@@ -5568,7 +5586,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return self.crosshairDataCursors
     
     def getDataCursors(self):
-        return self.allDataCursors
+        return self._data_cursors_
         
     #@safeWrapper
     #def _plotOverlayFrame_(self):
@@ -5848,7 +5866,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if len(axes):
                 self._current_plot_item_ =  axes[0] # by default
                 
-        for cursor in self.allDataCursors.values():
+        for cursor in self._data_cursors_.values():
             cursor.setBounds()
             
         self._update_annotations_()
@@ -7041,7 +7059,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if nAxes == 1:
                 p = self.signalsLayout.getItem(0,0)
                 #reattach multi-axes cursors
-                for c in [c for c in self.allDataCursors.values() if c.isDynamic]:
+                for c in [c for c in self._data_cursors_.values() if c.isDynamic]:
                     c.detach()
                     c.attach(p)
                     
@@ -7258,7 +7276,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
     @property
     def cursors(self):
-        return self.allDataCursors
+        """A list with all defined SignalCursors.
+        ATTENTION: the list is NOT ordered.
+        """
+        return list(self._data_cursors_.values())
         
     # aliases to setData
     plot = setData
