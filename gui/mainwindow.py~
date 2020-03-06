@@ -1002,11 +1002,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def clearTable(self):
         self.removeRows(0,self.rowCount())
         
-    def updateTable(self, from_console=False):
+    def updateTable(self, from_console:bool = False):
         """Updates workspace model table
         """
         try:
             displayed_vars = self.getDisplayedVariableNames(asStrings=True)
+            
             if from_console:
                 # NOTE: 2018-10-07 21:46:03
                 # added/removed/modified variables as a result of code executed
@@ -1070,6 +1071,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 # therefore the cached_vars does not offer us much help here
                 # we rely directly on shell.user_ns instead
                 
+                # NOTE: 2020-03-06 11:02:01
+                # 1. updates self.cached_vars
+                # 2. clears self.new_vars and self.deleted_vars
                 self.pre_execute()
                 
                 #mpl_figs_in_pyplot = [plt.figure(i) for i in plt.get_fignums()]
@@ -1078,7 +1082,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 
                 displayed_vars = self.getDisplayedVariableNames(asStrings=True)
                 
-                #print("displayed vars:", displayed_vars)
+                print("displayed vars:", displayed_vars)
                 
                 # variables deleted from workspace or modified by code executed 
                 # outside the console
@@ -1741,7 +1745,7 @@ class WindowManager(__QMainWindow__):
                     elif old_viewer_index == 0:
                         viewer_index = 0
                         
-                self.currentViewers[viewer_type] = self.viewers[viewer_type][viewer_index]
+                    self.currentViewers[viewer_type] = self.viewers[viewer_type][viewer_index]
                 
     def _raiseCurrentWindow(self, obj):
         """Sets obj to be the current window and raises it.
@@ -3086,7 +3090,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         self.workspace.pop(name, None)
         self.slot_updateWorkspaceTable(from_console)
 
-    def _assignToWorkspace_(self, name:str, val:object, from_console:bool = True):
+    def _assignToWorkspace_(self, name:str, val:object, from_console:bool = False):
+        print("MainWindow._assignToWorkspace_", name, val)
         self.workspace[name] = val
         self.slot_updateWorkspaceTable(from_console)
         
