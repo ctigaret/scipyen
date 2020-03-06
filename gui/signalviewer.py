@@ -1818,7 +1818,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #   "axes"  -> dict:
         #       "plotitem" -> list of LinearRegionItem objects
         # (NOTE: neo.Epoch objects are NOT hashable, but PlotItem objects are)
-        self._shown_epochs_ = dict()
+        self._registered_epochs_ = dict()
         self._shown_spike_trains_ = dict()
         self._plotted_analogsignal_index = list() # which analog signals do we actually plot?
         self._plotted_irregularsignal_index = list() # which irregular signals do we actually plot?
@@ -2779,6 +2779,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         for kdata, dataitem in enumerate(dataitems):
                             data_x, data_y = dataitem.getData()
                             ndx = np.where(data_x >= x)[0]
+                            
                             if len(ndx):
                                 if len(dataitems) > 1:
                                     data_text.append("Y (%d/%d): %f" % (kdata, len(dataitems), data_y[ndx[0]]))
@@ -2786,12 +2787,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 else:
                                     data_text.append("Y: %f" % data_y[ndx[0]])
                                     
-                        if len(data_text) > 1:
+                        if len(data_text) > 0:
                             text.append("\n".join(data_text))
                             
-                        else:
-                            text.append(data_text[0])
-                                    
                 else:
                     text.append(cursor_label_text)
                     
@@ -2846,11 +2844,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     elif len(plot_item_texts) == 1:
                         text.append(plot_item_texts[0])
                     
-        if len(text) > 1:
+        if len(text) > 0:
             self._cursor_coordinates_text_ = "\n".join(text)
-            
-        elif len(text) == 1:
-            self._cursor_coordinates_text_ = text[0]
             
         else:
             self._cursor_coordinates_text_ = ""
@@ -2868,7 +2863,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         cursor = None
         
         if crsId is not None:
-            cursor = self.getCursor(crsId)
+            cursor = self.dataCursor(crsId)
         
         if cursor is None:
             cursor = self.sender()
@@ -3086,7 +3081,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if not self._hasCursor_(id1):
             raise ValueError("SignalCursor %s not found" % id1)
 
-        ct = self.getCursor(id1).cursorType()
+        ct = self.dataCursor(id1).cursorType()
         
         other = list()
         
@@ -3094,12 +3089,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if not self._hasCursor_(cid):
                 raise ValueError("SignalCursor %s not found" % cid)
             
-            if self.getCursor(cid).cursorType() != ct:
+            if self.dataCursor(cid).cursorType() != ct:
                 raise ValueError("Cannot link cursors of different types")
 
-            other.append(self.getCursor(cid))
+            other.append(self.dataCursor(cid))
         
-        self.getCursor(id1).linkTo(*other)
+        self.dataCursor(id1).linkTo(*other)
             
     def unlinkCursors(self, id1=None, *ids):
         """Unlinks several linked cursors.
@@ -3116,17 +3111,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if not self._hasCursor_(id1):
             raise ValueError("SignalCursor %s not found" % id1)
         
-        ct = self.getCursor(id1).cursorType()
+        ct = self.dataCursor(id1).cursorType()
         
         if len(ids) == 1: 
             if isinstance(ids[0], str): # it is a cursor ID
                 if not self._hasCursor_(ids[0]):
                     raise ValueError("SignalCursor %s not found" % ids[0])
                 
-                if self.getCursor(id1).cursorType() != self.getCursor(ids[0]).cursorType():
+                if self.dataCursor(id1).cursorType() != self.dataCursor(ids[0]).cursorType():
                     raise ValueError("Cursors of different types cannot be linked")
                     
-                self.getCursor(id1).unlinkFrom(self.getCursor(ids[0]))
+                self.dataCursor(id1).unlinkFrom(self.dataCursor(ids[0]))
                 
             elif isinstance(ids[0], tuple) or isinstance(ids[0], list):# this is a tuple or list of cursor IDs: we unlink id1 from each one, keep their link state unchanged
                 other = list()
@@ -3134,12 +3129,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if not self._hasCursor_(cid):
                         raise ValueError("SignalCursor %s not found" % cid)
                     
-                    if self.getCursor(cid).cursorType() != ct:
+                    if self.dataCursor(cid).cursorType() != ct:
                         raise ValueError("Cursors of different types cannot be linked")
                     
-                    other.append(self.getCursor(cid))
+                    other.append(self.dataCursor(cid))
                 
-                self.getCursor(id1).unlinkFrom(*other)
+                self.dataCursor(id1).unlinkFrom(*other)
                 
         elif len(ids) > 1: # a comma-seprated list of cursor IDs: unlink _ALL_ of them
             other = list()
@@ -3148,18 +3143,18 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if not self._hasCursor_(cid):
                     raise ValueError("SignalCursor %s not found " % cid)
                 
-                if self.getCursor(cid).cursorType() != ct:
+                if self.dataCursor(cid).cursorType() != ct:
                     raise ValueError("Cursors of different types cannot be linked")
                 
-                other.append(self.getCursor(cid))
+                other.append(self.dataCursor(cid))
             
-            self.getCursor(id1).unlinkFrom(*other)
+            self.dataCursor(id1).unlinkFrom(*other)
             
             for c in other:
                 c.unlink()
                 
         else: # unlink ALL
-            self.getCursor(id1).unlink()
+            self.dataCursor(id1).unlink()
 
     #"def" selectCursor(self, ID):
         #self.slot_selectCursor(ID)
@@ -3862,7 +3857,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             cursor = self.selectedDataCursor # get the selected cursor if no ID given
                 
         else:
-            cursor = self.getCursor(crsId) # otherwise try to get cursor with given ID
+            cursor = self.dataCursor(crsId) # otherwise try to get cursor with given ID
             
         # if neither returned a valid cursor, then 
         if cursor is None:
@@ -3978,7 +3973,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if d.exec() == QtWidgets.QDialog.Accepted:
             if choose: # choose cursor as per dialog; otherwise cursor is set above
                 crsId = cursorComboBox.text() 
-                cursor = self.getCursor(crsId)
+                cursor = self.dataCursor(crsId)
                 initialID = crsId
                 
             if cursor is None: # bail out
@@ -4039,7 +4034,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if len(cid) == 0:
                         cid = d.cursorComboBox.variable.itemText(0)
             
-        c = self.getCursor(cid)
+        c = self.dataCursor(cid)
             
         #print("_slot_update_cursor_editor_dlg_ cursor", c)
         
@@ -4290,8 +4285,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if c2ID is None or len(c2ID) == 0:
                     return
                 
-                c1 = self.getCursor(c1ID)
-                c2 = self.getCursor(c2ID)
+                c1 = self.dataCursor(c1ID)
+                c2 = self.dataCursor(c2ID)
                 
                 if c1 is None or c2 is None:
                     return
@@ -4306,10 +4301,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if name is None:
                         name = "epoch"
                 
-                if isinstance(self.y,neo.Block):
+                if isinstance(self.y, neo.Block):
                     if toCurrentSegment:
                         if overwriteEpoch:
                             self.y.segments[self.frameIndex[self._current_frame_index_]].epochs = [epoch]
+                            
                         else:
                             self.y.segments[self.frameIndex[self._current_frame_index_]].epochs.append(epoch)
                     else:
@@ -4386,8 +4382,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if c2ID is None or len(c2ID) == 0:
                 return
             
-            c1 = self.getCursor(c1ID)
-            c2 = self.getCursor(c2ID)
+            c1 = self.dataCursor(c1ID)
+            c2 = self.dataCursor(c2ID)
             
             if c1 is None or c2 is None:
                 return
@@ -5396,7 +5392,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return plotitem
     
     @safeWrapper
-    def getPlotItem(self, index: int) -> pg.PlotItem:
+    def plotItem(self, index: int) -> pg.PlotItem:
         """Returns the axis (PlotItem) at the specified index.
         
         Does the same thing as self.axis(index) but with the overhead of 
@@ -5406,10 +5402,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         return self.axes[index]
     
-    def getAxis(self, index):
-        """Calls self.getPlotItem(index) -- syntactic sugar
+    def axis(self, index):
+        """Calls self.plotItem(index) -- syntactic sugar
         """
-        return self.getPlotItem(index)
+        return self.plotItem(index)
         
     @property
     def currentPlotItem(self) -> pg.PlotItem:
@@ -5443,16 +5439,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.statusBar().showMessage("Selected axes: %d" % index)
         
-    @property
-    def currentAxis(self) -> pg.PlotItem:
-        """Alias to currentPlotItem. 
-        The setter counterpart is alaised to that of self.currentPlotItem
-        """
-        return self._current_plot_item_
+    #@property
+    #"def" currentAxis(self) -> pg.PlotItem:
+        #"""Alias to currentPlotItem. 
+        #The setter counterpart is alaised to that of self.currentPlotItem
+        #"""
+        #return self._current_plot_item_
     
-    @currentAxis.setter
-    def currentAxis(self, index: int) :
-        self.currentPlotItem = index
+    #@currentAxis.setter
+    #"def" currentAxis(self, index: int) :
+        #self.currentPlotItem = index
     
     @property
     def currentAxes(self):
@@ -5462,34 +5458,34 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def currentAxes(self, index):
         self.currentPlotItem = index
     
-    def getCursor(self, ID):
+    def dataCursor(self, ID):
         """Not to be confused with the Qt method self.cursor() !!!
         """
         if len(self._data_cursors_) and ID in self._data_cursors_:
             return self._data_cursors_[ID]
         
-    def getCursorWindow(self, crsID):
+    def cursorWindow(self, crsID):
         if self._hasCursor_(crsID):
             #print(crsID)
             return (self._data_cursors_[crsID].xwindow, self._data_cursors_[crsID].ywindow)
         else:
             raise Exception("SignalCursor %s not found" % crsID)
         
-    def getCursorX(self, crsID):
+    def cursorX(self, crsID):
         if self._hasCursor_(crsID):
             return self._data_cursors_[crsID].x
         else:
             return None
         
-    def getCursorY(self, crsID):
+    def cursorY(self, crsID):
         if self._hasCursor_(crsID):
             return self._data_cursors_[crsID].y
 
-    def getSelectedCursorWindow(self):
+    def selectedCursorWindow(self):
         if self.selectedDataCursor is not None:
             return (self._data_cursors_[self.selectedDataCursor.ID].xwindow, self._data_cursors_[self.selectedDataCursor.ID].ywindow)
         
-    def getCursorsForItem(self, index=None):
+    def cursorsInAxis(self, index=None):
         """Returns a list of SignalCursor objects in a PlotItem or spanning all plot items.
         
         List is empty if no cursor exists.
@@ -5518,7 +5514,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if index >= len(self.axesWithLayoutPositions):
                     raise ValueError("index must be between -1 and %d; got %d instead" % (len(self.axesWithLayoutPositions), index))
                 
-                hostitem = self.getAxis(index)
+                hostitem = self.axis(index)
                 
             else:
                 hostitem = self.signalsLayout.scene()
@@ -5530,69 +5526,73 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             ret = list()
             
         return ret
-                    
-    def getVerticalCursors(self):
+                   
+    @property
+    def verticalCursors(self):
         return self.verticalDataCursors
     
-    def getVerticalCursorsX(self):
-        return [c.x for c in self.verticalDataCursors]
+    #"def" getVerticalCursorsX(self):
+        #return [c.x for c in self.verticalDataCursors]
     
-    def getVerticalCursorsWindow(self):
-        return [c.window for c in self.verticalDataCursors]
+    #"def" getVerticalCursorsWindow(self):
+        #return [c.window for c in self.verticalDataCursors]
     
-    def setDataCursorWindow(self, crsID, value):
-        if crsID in self.verticalDataCursors:
-            if isinstance(value, float):
-                value = [value]
-            elif isinstance(value, (list, tuple, np.ndarray)): # as in (2.5,) NOTE the comma at the end to define a unary tuple
-                if len(value) == 1:
-                    value = list(value)
-                else:
-                    raise ValueError("Vertical cursor window needs to be a single value (as a scalar or one-element tuple, list, or numpy ndarray)")
-            else:
-                raise ValueError("Vertical cursor window needs to be a single value (as a scalar or one-element tuple, list, or numpy ndarray)")
+    #"def" setDataCursorWindow(self, crsID, value):
+        #if crsID in self.verticalDataCursors:
+            #if isinstance(value, float):
+                #value = [value]
+            #elif isinstance(value, (list, tuple, np.ndarray)): # as in (2.5,) NOTE the comma at the end to define a unary tuple
+                #if len(value) == 1:
+                    #value = list(value)
+                #else:
+                    #raise ValueError("Vertical cursor window needs to be a single value (as a scalar or one-element tuple, list, or numpy ndarray)")
+            #else:
+                #raise ValueError("Vertical cursor window needs to be a single value (as a scalar or one-element tuple, list, or numpy ndarray)")
             
-            self.verticalDataCursors[crsID].xwindow = value
+            #self.verticalDataCursors[crsID].xwindow = value
             
-        elif crsID in self.horizontalDataCursors:
-            if isinstance(value, float):
-                value = [value]
-            elif isinstance(value, (list, tuple, np.ndarray)): # as in (2.5,) NOTE the comma at the end to define a unary tuple
-                if len(value) == 1:
-                    value = list(value)
-                else:
-                    raise ValueError("Horizontal cursor window needs to be a single value (as a scalar or one-element tuple, list, or numpy ndarray)")
-            else:
-                raise ValueError("Horizontal cursor window needs to be a single value (as a scalar or one-element tuple, list, or numpy ndarray)")
+        #elif crsID in self.horizontalDataCursors:
+            #if isinstance(value, float):
+                #value = [value]
+            #elif isinstance(value, (list, tuple, np.ndarray)): # as in (2.5,) NOTE the comma at the end to define a unary tuple
+                #if len(value) == 1:
+                    #value = list(value)
+                #else:
+                    #raise ValueError("Horizontal cursor window needs to be a single value (as a scalar or one-element tuple, list, or numpy ndarray)")
+            #else:
+                #raise ValueError("Horizontal cursor window needs to be a single value (as a scalar or one-element tuple, list, or numpy ndarray)")
     
-            self.horizontalDataCursors[crsID].ywindow = value
+            #self.horizontalDataCursors[crsID].ywindow = value
             
-        elif crsID in self.crosshairDataCursors:
-            if isinstance(value, (tuple, list, np.ndarray)):
-                if len(value) == 2:
-                    value = list(value)
-                else:
-                    raise ValueError("Crosshair cursor window needs to be a two-element tuple, list, or numpy ndarray")
-            else:
-                raise ValueError("Crosshair cursor window needs to be a two-element tuple, list, or numpy ndarray")
+        #elif crsID in self.crosshairDataCursors:
+            #if isinstance(value, (tuple, list, np.ndarray)):
+                #if len(value) == 2:
+                    #value = list(value)
+                #else:
+                    #raise ValueError("Crosshair cursor window needs to be a two-element tuple, list, or numpy ndarray")
+            #else:
+                #raise ValueError("Crosshair cursor window needs to be a two-element tuple, list, or numpy ndarray")
             
-            self.crosshairDataCursors[crsID].xwindow = value[0]
-            self.crosshairDataCursors[crsID].ywindow = value[1]
+            #self.crosshairDataCursors[crsID].xwindow = value[0]
+            #self.crosshairDataCursors[crsID].ywindow = value[1]
             
-        else:
-            raise ValueError("SignalCursor %s not found." % crsID)
+        #else:
+            #raise ValueError("SignalCursor %s not found." % crsID)
         
         
-    def setSelectedDataCursorWindow(self, value):
-        self.setDataCursorWindow(self.selectedDataCursor.ID, value)
+    #"def" setSelectedDataCursorWindow(self, value):
+        #self.setDataCursorWindow(self.selectedDataCursor.ID, value)
     
-    def getHorizontalDataCursors(self):
+    @property
+    def horizontalCursors(self):
         return self.horizontalDataCursors
     
-    def getCrosshairDataCursors(self):
+    @property
+    def crosshairCursors(self):
         return self.crosshairDataCursors
     
-    def getDataCursors(self):
+    @property
+    def cursors(self):
         return self._data_cursors_
         
     #@safeWrapper
@@ -5873,17 +5873,22 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if len(axes):
                 self._current_plot_item_ =  axes[0] # by default
                 
-        for cursor in self._data_cursors_.values():
-            cursor.setBounds()
+        #for cursor in self._data_cursors_.values():
+            #cursor.setBounds()
             
         self._update_annotations_()
                 
     @safeWrapper
-    def _plot_epochs_dict_(self, epoch_dict, **kwargs):
+    def _plot_epochs_dict_(self, epoch_dict:dict, **kwargs):
+        """Unfortunately, neo.Epoch is unhashable.
+        Therefore one can only use its name to collect these in a dict.
+        """
         from itertools import cycle
         
         if len(epoch_dict) == 0:
             return
+        
+        print("SignalViewer._plot_epochs_dict_", epoch_dict)
         
         epoch_pen = kwargs.pop("epoch_pen", self.epoch_plot_options["epoch_pen"])
         epoch_brush = kwargs.pop("epoch_brush", self.epoch_plot_options["epoch_brush"])
@@ -5926,8 +5931,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 brush = next(brushes)
                 
+                # NOTE: "lri" = LinearRegionItem
+                
                 # epochs are plotted in all axes so to query the epoch brush colors
-                # we only need the first axis
+                # we only need the first axis 
                 
                 existing_lris = [i for i in self.axes[0].items if isinstance(i, pg.LinearRegionItem)]
                 
@@ -5937,15 +5944,23 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if c == brush.color():
                         brush = next(brushes)
                 
-                if tag in self._shown_epochs_:
+                if tag in self._registered_epochs_ and epoch is self._registered_epochs_[tag]["epoch"]:
                     # NOTE: 2020-02-17 15:54:03
-                    # _shown_epochs_ maps a tab to a dict, which in turn maps
+                    # _registered_epochs_ maps a tab to a dict, which in turn maps
                     # a PlotItem ot a collection of LinearRegionItem objects
                     # this epoch had been shown before
+                    
+                    # check that axes have any plot data items other than LinearRangeItem objects
+                    # if so, only show the LRIs that fall within the data x range
+                    # otherwise the auto-scaling property of the plotitems will tend to 
+                    # show all the stuff
                     for ax in self.axes:
-                        if ax in self._shown_epochs_[tag]:
+                        if ax in self._registered_epochs_[tag]["axes"]:
+                            # NOTE: 2020-03-06 17:19:07
+                            # maps epoch name (tag) to a dict with "epoch" = reference to the epoch itself
+                            # and "axes": dict mapping a PlotItem (hashable) to a list of LRIs
                             # ax has LRIs (an LRI is a LinearRangeItem)
-                            old_lris = self._shown_epochs_[tag][ax] # existing LRIs
+                            old_lris = self._registered_epochs_[tag]["axes"][ax] # existing LRIs
                             
                             if len(old_lris) < len(x):
                                 # epoch_dict brings new LRIs 
@@ -6012,10 +6027,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             for lri in lris_to_remove:
                                 ax.removeItem(lri)
                                 
-                            self._shown_epochs_[tag][ax][:] = new_or_modified_lris
+                            self._registered_epochs_[tag]["axes"][ax][:] = new_or_modified_lris
                                 
                         else:
-                            self._shown_epochs_[tag][ax] = list()
+                            self._registered_epochs_[tag]["axes"][ax] = list()
                             
                             for region in x:
                                 lri = pg.LinearRegionItem()
@@ -6032,13 +6047,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 lri.update()
                                 
                                 
-                                self._shown_epochs_[tag][ax].append(ax)
+                                self._registered_epochs_[tag][ax].append(ax)
                                 
                 else:
                     # this epoch had not been shown before, no LRIs in the PlotItem
-                    self._shown_epochs_[tag] = dict()
+                    
+                    # NOTE: 2020-03-06 17:19:07
+                    # maps epoch name (tag) to a dict with "epoch" = reference to the epoch itself
+                    # and "axes": dict mapping a PlotItem (hashable) to a list of LRIs
+                    self._registered_epochs_[tag] = dict()
+                    self._registered_epochs_[tag]["epoch"] = epoch
+                    self._registered_epochs_[tag]["axes"] = dict()
                     for ax in self.axes:
-                        self._shown_epochs_[tag][ax] = list()
+                        self._registered_epochs_[tag]["axes"][ax] = list()
                         
                         for k in range(x0.size):
                             x = [x0[k], x1[k]]
@@ -6056,13 +6077,21 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 #penColor.setAlpha(255)
                                 #l.setPen(QtGui.QPen(penColor))
                             
-                            self._shown_epochs_[tag][ax].append(lri)
-                            
+                            self._registered_epochs_[tag]["axes"][ax].append(lri)
+            
+            # NOTE: 2020-03-06 17:45:10
+            # go ahead and HIDE all other registered epochs (which are NOT in epoch_dict)
+            
+            for tag in self._registered_epochs_.keys():
+                for ax in self._registered_epochs_[tag]["axes"].keys():
+                    for lri in self._registered_epochs_[tag]["axes"][ax]:
+                        lri.setVisible(False)
+            
         except Exception as e:
             traceback.print_exc()
             
     @safeWrapper
-    def _plotSpikeTrains_(self, trains=None, clear=False, **kwargs):
+    def _plotSpikeTrains_(self, trains: typing.Optional[neo.SpikeTrain] = None, clear:bool = False, **kwargs):
         """Plots stand-alone spike trains.
         CAUTION: DO NOT use when plotting spike trains associated with a neo.Segment or neo.Unit!
         """
@@ -6111,8 +6140,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
     @safeWrapper
     def _plotEpochs_(self, epochs=None, clear=False, **kwargs):
-        """Plots stand-alone epochs.
-        CAUTION: DO NOT use when plotting epochs associated with a segment
+        """Plots epochs.
         """
         if epochs is None or clear:
             for k, ax in enumerate(self.axes):
@@ -6122,7 +6150,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     for l in lris:
                         ax.removeItem(l)
                         
-            self._shown_epochs_.clear()
+            self._registered_epochs_.clear()
             
             if epochs is None:
                 return
@@ -6206,7 +6234,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
     @safeWrapper
     def _plotSegment_(self, seg, **kwargs):
-        """Plots the signals in a neo.Segment; delegated from displayFrame
+        """Plots a neo.Segment.
+        Plots the signals (optionally the selected ones), and any epochs, events and
+        spike trains associated woth the segment.
         """
         from itertools import cycle
         
@@ -6346,6 +6376,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         kAx = 0
         
+        #### BEGIN plot analog signals 
         for k, signal in enumerate(selected_analogs):
             if isinstance(signal, neo.AnalogSignal):
                 domain_name = "Time"
@@ -6385,7 +6416,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                      **kwargs)
             
             kAx += 1
-            
+         
+        #### END plot analog signals
+        
+        #### BEGIN plot irregularly sampled signals
         for k, signal in enumerate(selected_irregs):
             if isinstance(signal, neo.IrregularlySampledSignal):
                 domain_name = "Time"
@@ -6420,6 +6454,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             kAx += 1
         
+        #### END plot irregularly sampled signals
+        
+        #### BEGIN plot spike trains
         if len(spiketrains):
             # plot all spike trains in this segment stacked in a single axis
             spike_train_axis = self.signalsLayout.getItem(kAx,0)
@@ -6460,6 +6497,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
             kAx +=1
                 
+        #### END plot spike trains
+        
+        #### BEGIN plot events
         if isinstance(events, (tuple, list)) and len(events):
             # plot all event arrais in this segment stacked in a single axis
             #print("_plotSegment_ events", kAx)
@@ -6520,6 +6560,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             kAx +=1
             
+        #### END plot events
+        
+        #### BEGIN plot epochs
+        if len(seg.epochs):
+            self._plotEpochs_(seg.epochs)
+                            
+        #### END plot epochs
+        
         # hide X axis spine in all but the last signal axes only if all signals
         # in the segment share the domain
         
@@ -6534,14 +6582,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             self.plotTitleLabel.setText("", color = "#000000")
             
-        if len(seg.epochs):
-            self._plotEpochs_(seg.epochs)
-                            
         #try: # plot extra bits in the segment (spike trains, epochs, events arrays)
         #except Exception as e:
             #traceback.print_exc()
             
-        self._current_plot_item_ = self.getAxis(0)
+        self._current_plot_item_ = self.axis(0)
         #self._plotOverlayFrame_()
         
     @safeWrapper
@@ -6553,7 +6598,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         if y.ndim == 1:
             self._prepareAxes_(1)
-            self._plot_numeric_data_(self.getPlotItem(0), x, y, name="Analog signal", *args, **kwargs)
+            self._plot_numeric_data_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs)
             
         elif y.ndim == 2:
             #print("SignalViewer _plotArray_ frameAxis", self.frameAxis)
@@ -6564,18 +6609,18 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     # plot each channel in one axis; all axes on the same frame
                     self._prepareAxes_(len(self.signalChannelIndex))
                     for kchn, chNdx in enumerate(self.signalChannelIndex):
-                        self._plot_numeric_data_(self.getPlotItem(kchn),
+                        self._plot_numeric_data_(self.plotItem(kchn),
                                                  x, y[utilities.arraySlice(y, {self.signalChannelAxis:chNdx})],
                                                  *args, **kwargs)
                         
                 else:
                     # plot everything in the same axis
                     self._prepareAxes_(1)
-                    self._plot_numeric_data_(self.getPlotItem(0), x, y, name="Analog signal", *args, **kwargs)
+                    self._plot_numeric_data_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs)
                     
             else:
                 self._prepareAxes_(1) # one axis per frame: one channel per frame
-                self._plot_numeric_data_(self.getPlotItem(0), 
+                self._plot_numeric_data_(self.plotItem(0), 
                                          x, y[utilities.arraySlice(y, {self.frameAxis:self.currentFrame})],
                                          *args, **kwargs)
                 
@@ -6585,13 +6630,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if self.separateChannels:
                 self._prepareAxes_(len(self.signalChannelIndex))
                 for kchn, chNdx in enumerate(self.signalChannelIndex):
-                    self._plot_numeric_data_(self.getPlotItem(kchn),
+                    self._plot_numeric_data_(self.plotItem(kchn),
                                              x, y[utilities.arraySlice(y, {self.signalChannelAxis, chNdx})],
                                              *args, **kwargs)
                 
             else:
                 self._prepareAxes_(1)
-                self._plot_numeric_data_(self.getPlotItem(0), 
+                self._plot_numeric_data_(self.plotItem(0), 
                                          x, y[utilities.arraySlice(y, {self.frameAxis:self.currentFrame})],
                                          *args, **kwargs)
                 
@@ -6661,7 +6706,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._prepareAxes_(len(chNdx), sigNames = ["%s_channel%d" % (signal_name, c) for c in chNdx])
             
             for (k, channel) in enumerate(chNdx):
-                self._plot_numeric_data_(self.getAxis(k), np.array(sig.times),
+                self._plot_numeric_data_(self.axis(k), np.array(sig.times),
                                            np.array(sig[:,channel].magnitude),
                                            xlabel="%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
                                            ylabel="%s (%s)\nchannel %d" % (signal_name, sig.units.dimensionality, channel), 
@@ -6670,7 +6715,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             self._prepareAxes_(1, sigNames = [signal_name])
             
-            self._plot_numeric_data_(self.getAxis(0), np.array(sig.times), 
+            self._plot_numeric_data_(self.axis(0), np.array(sig.times), 
                                        np.array(sig.magnitude), 
                                        ylabel="%s (%s)" % (signal_name, sig.units.dimensionality), 
                                        xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
@@ -6817,7 +6862,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if ax["item"].isVisible():
                     pass
         
-        plotItemCursors = self.getCursorsForItem(plotItem)
+        plotItemCursors = self.cursorsInAxis(plotItem)
         
         for c in plotItemCursors:
             c.setBounds()
@@ -6983,7 +7028,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         #ndx = self.__plot_items__.index(plotitem)
                         
                         # are there any cursors in this plotitem?
-                        cursors = self.getCursorsForItem(plotitem)
+                        cursors = self.cursorsInAxis(plotitem)
                         
                         if len(cursors):
                             for cursor in cursors:
