@@ -1504,22 +1504,28 @@ class SignalCursor(QtCore.QObject):
             self._vl_.setHoverPen(self._hoverPen_)
     
     @property
-    def cursorType(self):
-        if self._vl_ is not None and self._hl_ is not None:
-            if self._cursor_type_ is not "crosshair":
-                self._cursor_type_ = "crosshair"
-                
-        else:
-            if self._vl_ is None:
-                if self._cursor_type_ is not "horizontal":
-                    self._cursor_type_ = "horizontal"
-                    
-            else:
-                if self._cursor_type_ is not "vertical":
-                    self._cursor_type_ = "vertical"
-                    
-        return self._cursor_type_
+    def cursorTypeName(self):
+        return self.cursorType.name
     
+    @property
+    def cursorType(self):
+        lines_tuple = (self._hl_ is not None, self._vl_ is not None)
+        
+        if self._cursor_type_ is None:
+            self._cursor_type_ = SignalCursor.SignalCursorTypes.getType(lines_tuple)
+            
+        elif isinstance(self._cursor_type_, str):
+            if self._cursor_type_ in SignalCursor.SignalCursorTypes.names():
+                self._cursor_type_ = SignalCursor.SignalCursorTypes[self._cursor_type_]
+            
+            else:
+                self._cursor_type_ = SignalCursor.SignalCursorTypes.getType(lines_tuple)
+
+        elif not isinstance(self._cursor_type_, SignalCursor.SignalCursorTypes):
+            self._cursor_type_ = SignalCursor.SignalCursorTypes.getType(lines_tuple)
+            
+        return self._cursor_type_
+                
     @property
     def isSelected(self):
         return self._is_selected_
@@ -3222,7 +3228,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         elif axis is None:
             if self._current_plot_item_ is None:
-                axis = self.axis[0]
+                axis = self.axis(0)
                 
             else:
                 axis = self._current_plot_item_
@@ -4401,6 +4407,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._scipyenWindow_._assignToWorkspace_(name, epoch)
         
     def cursorsToEpoch(self, name=None):
+        """Creates a neo.Epoch from a list of cursors
+        TODO: give the possibilty to select which cursors to use, via GUI
+        """
         vertAndCrossCursors = collections.ChainMap(self.crosshairDataCursors, self.verticalDataCursors)
         
         if len(vertAndCrossCursors) == 0:
@@ -4426,7 +4435,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         cursors.sort(key=attrgetter('x')) # or key = lambda x: x.x
         
-        ret = neoutils.cursor2epoch(*cursors, name=name)
+        ret = neoutils.cursors2epoch(*cursors, name=name)
         
         #x = np.array([c.x for c in cursors]) * pq.s
         #d = np.array([c.xwindow for c in cursors]) * pq.s
@@ -4439,6 +4448,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return ret
         
     def cursorToEpoch(self, crs=None, name=None):
+        """Creates a neo.Epoch from a single cursor
+        TODO: give the possibilty to choose the cursor via GUI
+        """
         if crs is None:
             return
         

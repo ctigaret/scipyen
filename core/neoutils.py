@@ -368,7 +368,7 @@ def cursors2epoch(*args, **kwargs) -> neo.Epoch:
     if len(args) == 0:
         raise ValueError("Expecting at least one argument")
     
-    if len(args == 1):
+    if len(args) == 1:
         if isinstance(args[0], (tuple, list)):
             if not all([isinstance(c, SignalCursor) for c in args[0]]):
                 raise TypeError("Expecting a sequence of SignalCursor objects")
@@ -408,12 +408,12 @@ def cursors2epoch(*args, **kwargs) -> neo.Epoch:
     # this is a list of (time, duration, label) tuples
     t_d_i = [(c.x - c.xwindow/2, c.xwindow, c.ID) for c in cursors]
     # transpose t_d_i and unpack:
-    t, d, i = [v for v in zip(*t_d)]
+    t, d, i = [v for v in zip(*t_d_i)]
     
     return neo.Epoch(times=t, durations=d, labels=i, units=pq.s, name=name)
     
 @safeWrapper
-def cursor_params_2epoch(times: typing.Union[numbers.Number, pq.Quantity, np.ndarray, typing.Sequence],
+def cursor_params_2_epoch(times: typing.Union[numbers.Number, pq.Quantity, np.ndarray, typing.Sequence],
                   windows: typing.Union[numbers.Number, pq.Quantity, np.ndarray, typing.Sequence],
                   labels: typing.Optional[typing.Union[str, np.ndarray, typing.Sequence]] = None, 
                   name: typing.Optional[str] = None) -> neo.Epoch:
@@ -951,18 +951,19 @@ def interval2epoch(t_start: typing.Union[numbers.Number, pq.Quantity],
                      durations=np.array([t_stop-t_start])*pq.s)
     
 
-#@safeWrapper
-#"def" interval2cursor(t0: float, t1: float) -> typing.Tuple[float, float]:
-    #"""Returns a cursor time and window from two time points.
-    #t0, t1: scalar float values
-    #"""
-    #w = abs(t1-t0)
-    #t = min(t0,t1) + w/2
+@safeWrapper
+def interval2cursor(t0: float, t1: float) -> typing.Tuple[float, float]:
+    """Returns a cursor time and window from two time points.
+    t0, t1: scalar float values
+    """
+    w = abs(t1-t0)
+    t = min(t0,t1) + w/2
     
-    #return (t, w)
+    return (t, w)
+    
 
 @safeWrapper
-def epoch2cursors(epoch: neo.Epoch) -> typing.Sequence:
+def epoch_2_cursors_params(epoch: neo.Epoch) -> typing.Sequence:
     """Creates notional vertical signal cursors from a neo.Epoch.
     Results is a list of tuples of (time, window) where 
     time = epoch.times + epoch.durations/2.

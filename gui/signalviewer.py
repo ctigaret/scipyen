@@ -1504,22 +1504,28 @@ class SignalCursor(QtCore.QObject):
             self._vl_.setHoverPen(self._hoverPen_)
     
     @property
-    def cursorType(self):
-        if self._vl_ is not None and self._hl_ is not None:
-            if self._cursor_type_ is not "crosshair":
-                self._cursor_type_ = "crosshair"
-                
-        else:
-            if self._vl_ is None:
-                if self._cursor_type_ is not "horizontal":
-                    self._cursor_type_ = "horizontal"
-                    
-            else:
-                if self._cursor_type_ is not "vertical":
-                    self._cursor_type_ = "vertical"
-                    
-        return self._cursor_type_
+    def cursorTypeName(self):
+        return self.cursorType.name
     
+    @property
+    def cursorType(self):
+        lines_tuple = (self._hl_ is not None, self._vl_ is not None)
+        
+        if self._cursor_type_ is None:
+            self._cursor_type_ = SignalCursor.SignalCursorTypes.getType(lines_tuple)
+            
+        elif isinstance(self._cursor_type_, str):
+            if self._cursor_type_ in SignalCursor.SignalCursorTypes.names():
+                self._cursor_type_ = SignalCursor.SignalCursorTypes[self._cursor_type_]
+            
+            else:
+                self._cursor_type_ = SignalCursor.SignalCursorTypes.getType(lines_tuple)
+
+        elif not isinstance(self._cursor_type_, SignalCursor.SignalCursorTypes):
+            self._cursor_type_ = SignalCursor.SignalCursorTypes.getType(lines_tuple)
+            
+        return self._cursor_type_
+                
     @property
     def isSelected(self):
         return self._is_selected_
@@ -2755,15 +2761,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
                     cursor_pos_text = list()
                     
-                    if cursor.cursorType in ("crosshair", "vertical"):
+                    if cursor.cursorTypeName in ("crosshair", "vertical"):
                         cursor_pos_text.append("X: %f" % x)
                         
-                    if cursor.cursorType in ("crosshair", "horizontal"):
+                    if cursor.cursorTypeName in ("crosshair", "horizontal"):
                         cursor_pos_text.append("Y: %f" % y)
                         
                     text.append("\n".join(cursor_pos_text))
                         
-                    if cursor.cursorType in ("vertical", "crosshair"): 
+                    if cursor.cursorTypeName in ("vertical", "crosshair"): 
                         # data value reporting only makes sense for vertical cursor types
                         data_text = []
                         
@@ -2802,15 +2808,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         x = cursor.getX(plotitem)
                         y = cursor.getY(plotitem)
                         
-                        if cursor.cursorType in ("crosshair", "vertical"):
+                        if cursor.cursorTypeName in ("crosshair", "vertical"):
                             plot_item_cursor_pos_text.append("X: %f" % x)
                             
-                        if cursor.cursorType in ("crosshair", "horizontal"):
+                        if cursor.cursorTypeName in ("crosshair", "horizontal"):
                             plot_item_cursor_pos_text.append("Y: %f" % y)
                             
                         plot_item_text.append("\n".join(plot_item_cursor_pos_text))
                         
-                        if cursor.cursorType in ("vertical", "crosshair"): 
+                        if cursor.cursorTypeName in ("vertical", "crosshair"): 
                             # data value reporting only makes sense for vertical cursor types
                             data_text = []
                             
@@ -2851,11 +2857,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
         self._update_coordinates_viewer_()
         
-    #else:
-        #self._cursor_coordinates_text_ = ""
-            
-            
-        
     @pyqtSlot(str)
     @safeWrapper
     def slot_reportCursorPosition(self, crsId = None):
@@ -2892,15 +2893,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 cursor_pos_text = list()
                 
-                if cursor.cursorType in ("crosshair", "vertical"):
+                if cursor.cursorTypeName in ("crosshair", "vertical"):
                     cursor_pos_text.append("X: %f" % x)
                     
-                if cursor.cursorType in ("crosshair", "horizontal"):
+                if cursor.cursorTypeName in ("crosshair", "horizontal"):
                     cursor_pos_text.append("Y: %f" % y)
                     
                 text.append("\n".join(cursor_pos_text))
                     
-                if cursor.cursorType in ("vertical", "crosshair"): 
+                if cursor.cursorTypeName in ("vertical", "crosshair"): 
                     # data value reporting only makes sense for vertical cursor types
                     data_text = []
                     
@@ -2939,15 +2940,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     x = cursor.getX(plotitem)
                     y = cursor.getY(plotitem)
                     
-                    if cursor.cursorType in ("crosshair", "vertical"):
+                    if cursor.cursorTypeName in ("crosshair", "vertical"):
                         plot_item_cursor_pos_text.append("X: %f" % x)
                         
-                    if cursor.cursorType in ("crosshair", "horizontal"):
+                    if cursor.cursorTypeName in ("crosshair", "horizontal"):
                         plot_item_cursor_pos_text.append("Y: %f" % y)
                         
                     plot_item_text.append("\n".join(plot_item_cursor_pos_text))
                     
-                    if cursor.cursorType in ("vertical", "crosshair"): 
+                    if cursor.cursorTypeName in ("vertical", "crosshair"): 
                         # data value reporting only makes sense for vertical cursor types
                         data_text = []
                         
@@ -3222,7 +3223,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         elif axis is None:
             if self._current_plot_item_ is None:
-                axis = self.axis[0]
+                axis = self.axis(0)
                 
             else:
                 axis = self._current_plot_item_
@@ -4429,7 +4430,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         cursors.sort(key=attrgetter('x')) # or key = lambda x: x.x
         
-        ret = neoutils.cursor2epoch(*cursors, name=name)
+        ret = neoutils.cursors2epoch(*cursors, name=name)
         
         #x = np.array([c.x for c in cursors]) * pq.s
         #d = np.array([c.xwindow for c in cursors]) * pq.s
