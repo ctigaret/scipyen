@@ -410,8 +410,8 @@ class ProgressWorker(QtCore.QRunnable):
 
     @pyqtSlot()
     def run(self):
-        '''
-        Initialise the runner function with passed args, kwargs.
+        '''Initialise the runner function with passed args, kwargs.
+        This is done by calling something like threadpool.start(worker)
         '''
 
         # Retrieve args/kwargs here; and fire processing using them

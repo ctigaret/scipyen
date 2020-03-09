@@ -46,6 +46,7 @@
 #### BEGIN core python modules
 # NOTE: use Python re instead of QRegExp
 import sys, os, re, numbers, itertools, warnings, traceback
+import typing
 import math
 from collections import ChainMap, namedtuple, defaultdict, OrderedDict
 from enum import Enum, IntEnum
@@ -91,6 +92,24 @@ from . import resources_rc
 Ui_ItemsListDialog, QDialog = __loadUiType__(os.path.join(__module_path__,"itemslistdialog.ui"))
 
 Ui_LinearRangeMappingWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "linearrangemappingwidget.ui"))
+
+def generateColorCycle():
+    pass
+
+def generateBrushCycle(color:typing.Optional[QtGui.QColor] = None, 
+                       gradients: typing.Optional[QtGui.QGradient] = None,
+                       images=None,
+                       pixmaps=None,
+                       styles=None):
+    if isinstance(values, (tuple, list)):
+        if all([isinstance(v, int)]) and len(value) == 4:
+            # single value spec (R,G,B,A)
+            brushes = itertools.cycle(QtGui.Brush(QtGui.QColor(*c)))
+            
+    pass
+
+def generatePenCycle():
+    pass
 
 def genColorTable(cmap, ncolors=256):
     if cmap is None:
