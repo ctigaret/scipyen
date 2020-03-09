@@ -5747,16 +5747,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         x_min, x_max = ax.viewRange()[0]
         
-        print("_slot_plot_axis_x_range_changed axis",
-              axis,
-              "viewRange x",
-              x_min, x_max)
+        #print("_slot_plot_axis_x_range_changed axis",
+              #ax,
+              #"viewRange x",
+              #x_min, x_max)
         
         for lri in lris:
             lx0, lx1 = lri.getRegion()
             if lx0>=x_min and lx0<=x_max and lx1 >= x_min and lx1 <= x_max:
                 lri.setVisible(True)
-                print("_slot_plot_axis_x_range_changed lri region", lri.getRegion())
+                #print("_slot_plot_axis_x_range_changed lri region", lri.getRegion())
                 
             else:
                 lri.setVisible(False)
@@ -6061,6 +6061,33 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     warnings.warning("Invalid brush specification %s" % epoch_brush)
                     brushes = cycle([None])
                     
+            #if epoch_pen is None:
+                #if len(args) > 1:
+                    #pens = cycle([QtGui.QPen(QtGui.QColor(*c).darker()) for c in self.epoch_plot_options["epochs_color_set"]])
+                    
+                #else:
+                    #pens = cycle([QtGui.QPen(QtGui.QColor(0,0,255,50).darker())])
+                    
+            #else:
+                #if isinstance(epoch_pen, tying.Sequence):
+                    #if all([isinstance(b, (QtGui.QColor, QtGui.QBrush, tuple, list)) for b in epoch_pen]):
+                        #pens = cycle([QtGui.QPen(QtGui.QColor(c)) if isinstance(c, (QtGui.QColor, QtGui.QBrush)) else QtGui.QPen(QtGui.QColor(*c) for c in epoch_pen)])
+                        
+                    #else:
+                        #pens = cycle([QtGui.QPen(QtGui.QColor(*epoch_pen))])
+                        
+                #elif isinstance(epoch_pen, QtGui.QColor):
+                    #pens = cycle([QtGui.QBrush(QtGui.QColor(epoch_pen))])
+                    
+                #elif isinstance(epoch_pen, QtGui.QBrush):
+                    #pens = cycle([epoch_pen])
+                    
+                #elif isinstance(epoch_pen, QtGui.QPen):
+                    #pens = cycle([epoch_pen])
+                    
+                #else:
+                    #warnings.warning("Invalid pen specification %s" % epoch_pen)
+                    
             # figure out the visible X range
             minX = list()
             maxX = list()
@@ -6070,6 +6097,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             for ax in self.axes:
                 if len(ax.dataItems):
                     [x_min, x_max] = ax.viewRange()[0]
+                    
                     minX.append(x_min)
                     maxX.append(x_max)
                     
@@ -6092,9 +6120,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 #print("x_visible", x_visible)
                 
                 brush = next(brushes)
+                pen = next(pens)
                 
                 for k in range(len(self.axes)):
-                    lris = [pg.LinearRegionItem(values=value, brush=brush, orientation=pg.LinearRegionItem.Vertical, movable=False, bounds = visibleXRange) for value in zip(x0,x1)]
+                    data_x_min = list()
+                    data_x_max = list()
+                    
+                    lris = [pg.LinearRegionItem(values=value, 
+                                                brush=brush, 
+                                                orientation=pg.LinearRegionItem.Vertical, 
+                                                movable=False, 
+                                                bounds = visibleXRange) for value in zip(x0,x1)]
                     
                     for kl, lri in enumerate(lris):
                         self.axes[k].addItem(lri)
