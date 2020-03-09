@@ -912,11 +912,13 @@ def generate_synaptic_plasticity_options(**kwargs) -> dict:
             minute-averaged responses of the baseline stage, in each pathway)
             
             
-    "measures": dict = details the cursor measurements used in analysis.
+    "cursor_measures": dict = cursor-based measurements used in analysis.
+        Can be empty
         each key is a str (measurement name) that is mapped to a nested dict 
             with the following keys:
         
-            "function": callable with the following signature:
+            "function": a cursor-based signal function as defined in the 
+                neoutils module, or membrane module
             
                 function(signal, cursor0, cursor1,...,channel) -> Quantity
             
@@ -924,8 +926,12 @@ def generate_synaptic_plasticity_options(**kwargs) -> dict:
                 as first parameter, 
                 followed by any number of vertical SignalCursor objects
                 
+                The functions must be defined and present in the scope therefore
+                they can be specified as module.function, unless imported 
+                directly in the workspace where ltp analysis is performed.
+            
                 Examples: 
-                neoutils.cursors_slope()
+                neoutils.cursors_chord_slope()
                 neoutils.cursors_amplitude()
                 ephys.membrane.cursor_Rs_Rin()
             
@@ -933,12 +939,34 @@ def generate_synaptic_plasticity_options(**kwargs) -> dict:
                 name) mapped to a tuple (time, window) with vertical cursor 
                 parameters.
                 
-            "channel": (optional) if present, it must contain an int
+                NOTE: SignalCursor objects cannot be serialized. Therefore, in 
+                order for the options to be persistent, the cursors have to be
+                represented by their parameter tuple (time, window) which can be
+                stored on disk, and used to generate a cursor at runtime.
                 
+            "channel": (optional) if present, it must contain an int
+            
+            "pathway": int, the index of the pathway where the measurement is
+                performed, or None (applied to both pathways)
+                
+        "epoch_measures": dict: epoch_based measurements
+            Can be empty.
+            
+            Has a similar structure to cursor_measures, but uses epoch-based
+            measurement functions instead.
+            
+            "function": epoch-based signal function as defined in the neoutils and
+                membrane modules
+                
+            "epoch": a single neo.Epoch (they can be serialized) or the tuple
+                (times, durations, labels, name) with arguments suitable to 
+                construct the Epoch at run time.
+            
+            Examples:
+            neoutils.epoch_average
             
         
-        The functions must be defined and present in the scope therefore
-        they can be specified as module.function, unless imported directly.
+            
         
         Using the examples above:
         

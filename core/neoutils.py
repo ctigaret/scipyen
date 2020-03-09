@@ -1,5 +1,228 @@
 # -*- coding: utf-8 -*-
-""" Various utilities for dealing with neo data structures for electrophysiology
+""" Various utilities for dealing with neo data structures for electrophysiology.
+
+NOTATIONS USED BELOW:
+
+"cursor": signalviewer.SignalCursor object
+
+"cursor time point", "cursor time coordinate", "cursor domain coordinate": 
+the value of a cursor's 'x' attribute (floating point scalar). This is the 
+undimensioned value of the signal's domain at the cursor position.
+
+The module provides a set of utility functions to operate primarily on objects
+in NeuralEnsemble's neo package (http://neuralensemble.org/), 
+documented here: https://neo.readthedocs.io/en/stable/
+
+Some of these function also apply to datatypes.DataSignal in Scipyen package.
+
+
+I. Cursor- and epoch-based functions
+=====================================
+
+These functions measure a signal parameter on closed intervals that are defined
+using, respectively, signalviewer.SignalCursor objects or a neo.Epoch.
+
+The type of SignalCursor objects must be:
+
+SignalCursor.SignalCursorTypes.vertical, 
+or 
+SignalCursor.SignalCursorTypes.horizontal.
+
+The difference between cursor- and epoch-based functions consist in the way the 
+functions calculate the signal values at the interval boundaries, and in the
+number of intervals that a single function can process.
+
+1 Cursor-based functions: named with the prefix "cursor_" or "cursors_".
+
+The function uses the 'x' and 'xwindow' attributes of a vertical or crosshar 
+SignalCursor. These are floating point scalars and are converted internally to
+python Quantity scalars with the units of the signal domain.
+
+'x' is the horizontal coordinate of the cursor.
+'xwindow' is a duration of a horizontal window (or interval) centered on 'x'
+
+1.a "cursor_*" functions use a single cursor:
+    * the signal interval is defined by the cursor's horizontal window 
+        (the 'xwindow' attribute).
+     
+    * the signal values at the interval boundaries, if used, are the actual 
+        signal sample values at the interval's boundary time points 
+        (the interval is closed, i.e. it contains its boundaries)
+        
+    List of functions based on a single cursor:
+    
+    cursor_value: the signal sample value at the time point of the cursor 
+        (i.e., at the cursor's 'x' attribute) regardless of the size of the
+        cursor's 'xwindow'
+        
+    cursor_min, cursor_max: returns the signal minimum (maximum) across the 
+                cursor's horizontal window (or cursor_value if xwindow is zero)
+                
+    cursor_maxmin: return a tuple of signal max and min in the cursor's window
+    
+    cursor_average: average of signal samples across the cursor's window.
+        NOTE: When cursor's xwindow is zero, this calls cursor_value()
+    
+    cursor_argmin, cursor_argmax: the index of the signal minimum (maximum) 
+                in the cursor window
+        
+    cursor_argmaxmin: tuple of indices for signal max and min in the cursor's 
+            window
+            
+    
+    If the cursor's horizontal window is zero, the above functions return
+    the signal sample value at the cursor's coordinate or index 0
+    
+    
+1.b "cursors_*" functions use two cursors to define a signal interval:
+    * the signal interval is bounded by the cursor's 'x' coordinates, and is
+        closed (i.e. the boundaries are part of the interval):
+        
+        left boundary: left_cursor.x
+        
+        right_boundary: right_cursor.x
+        
+    * the signal values at the interval boundaries, if used, are the averages
+        of signal samples across the cursor's horizontal window, if not zero, at
+        the respective boundary.
+        
+        
+    List of functions based on two cursors:
+    
+    cursors_amplitude: the difference between the signal values at two cursors.
+        NOTE: for each cursor, the signal value "at the cursor" is determined by 
+        calling cursor_average(). This means that, if the cursor's xwindow is 
+        zero, the value "at cursor" is the actual sample value at the cursor's
+        time coordinate.
+        
+    cursors_chord_slope
+    
+All cursor-based functions return a python Quantity array of shape(m,1) with
+    m = number of channels.
+        
+2. Epoch-based functions: named with the prefix "epoch_".
+
+These functions use a single neo.Epoch object to define signal intervals. 
+
+An interval is described by time and duration, contained in the 'times' and 
+'durations' attributes of the neo.Epoch object. Since both these attributes
+are numeric arrays with the same length, it follows that a neo.Epoch can define 
+more than one interval. All intervals are considered closed (i.e. they contain
+their boundaries).
+
+    For interval 'k' where 0 <= k < len(epoch) the boundaries are:
+        left boundary: times[k]
+        right boundary: times[k] + durations[k]
+        
+The 'times' and 'durations' are python Quantities in time units ("s" by default)
+as are the units of the signal domain.
+
+Signal values at the interval boundaries, if used, are the sample values at the
+the boundary time points (unlike "cursors_*" functions).
+
+The "epoch_*" functions return a python Quantity array with the shape (m,n) with
+
+    m = number of intervals in the epoch
+    n = number of channels in the signal
+    
+List of neo.Epoch-based functions:
+    epoch_average
+    
+
+As a rule of thumb:
+
+* when several scalar measures, each derived from a signal interval, are needed,
+use neo.Epoch to define the signal intervals where the measures are calculated.
+
+* when a single measure derived from two signal locations is needed, use 
+signalviewer.SignalCursors to define the locations.
+
+II. Statistics across multiple signals
+=======================================
+aggregate_signals: calculates several statistical moments across several
+    single-channel signals with identical shapes; each moment is returned as a
+    new signal with the same shape as the arguments, contained in a dictionary
+    
+average_blocks
+
+average_blocks_by_segments
+
+average_segments
+
+average_segments_in_block
+
+average_signals
+
+III. Signal manipulations: assigning values to signal, signal intervals, or 
+isolated signal samples; signal channels
+=============================================================================
+assign_to_signal
+assign_to_signal_in_epoch
+batch_normalise_signals
+batch_remove_offset
+concatenate_blocks
+concatenate_signals
+copy
+merge_signal_channels
+set_relative_time_start
+
+IV. Management of events, trigger events, trigger protocols
+===========================================================
+auto_define_trigger_events
+auto_detect_trigger_protocols
+clear_events
+detect_trigger_events
+detect_trigger_times
+embed_trigger_event
+embed_trigger_protocol
+modify_trigger_protocol
+parse_trigger_protocols
+remove_events
+remove_trigger_protocol
+
+V. Signal processing
+======================
+convolve
+correlate
+diff
+ediff1d
+forward_difference
+gradient
+peak_normalise_signal
+remove_signal_offset
+parse_step_waveform_signal
+resample_pchip
+resample_poly
+root_mean_square
+sampling_rate_or_period
+signal_to_noise
+
+VI. Synthetic signal and waveforms
+==================================
+generate_ripple_trace
+generate_spike_trace
+
+VII. Lookup functions
+=====================
+get_index_of_named_signal
+get_non_empty_epochs
+get_non_empty_events
+get_non_empty_spike_trains
+get_segments_in_channel_index
+get_signal_names_indices
+get_time_slice
+inverse_lookup
+is_same_as
+lookup
+normalized_data_index
+
+VIII I/O-related
+=================
+parse_acquisition_metadata
+
+
+
+
 """
 #### BEGIN core python modules
 import traceback
@@ -72,7 +295,7 @@ def cursor2interval(_cursor_, _units_):
         return (t0, t1)
             
     elif isinstance(_cursor_, SignalCursor):
-        if _cursor_.cursorType not in ("vertical", "crosshair"):
+        if _cursor_.cursorType not in (SignalCursor.SignalCursorTypes.vertical, SignalCursor.SignalCursorTypes.crosshair):
             raise TypeError()
         
         t0 = (_cursor_.x - _cursor_.xwindow/2.) * _units_
@@ -562,6 +785,20 @@ def cursor_max(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
                channel: typing.Optional[int] = None) -> pq.Quantity:
     """The maximum value of the signal across the cursor's window.
     
+    Parameters:
+    ----------
+    signal: neo.AnalogSignal, dt.DataSignal
+    cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
+    channel: int or None (default)
+        For multi-channel signal, specified which channel is used:
+        0 <= channel < signal.shape[1]
+    
+    Returns:
+    --------
+    Python Quantity array of shape (signal.shape[1], ) with the signal maximum
+    in the interval defined by the cursor's window, or the signal's sample value
+    at the cursor's x coordinate if cursor window is zero.
+    
     NOTE: to get the signal extremes (and their sample indices) between two 
     cursors, just call max(), min(), argmax() argmin() on a signal time slice 
     obtained using the two cursor's x values.
@@ -569,7 +806,11 @@ def cursor_max(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     
     (t0,t1) = cursor2interval(cursor, signal.times.units)
     
-    ret = signal.time_slice(t0,t1).max(axis=0)
+    if t0 == t1:
+        ret = signal[signal.time_index(t0),:]
+        
+    else:
+        ret = signal.time_slice(t0,t1).max(axis=0).flatten()
     
     if isinstance(channel, int):
         return ret[channel].flatten()
@@ -581,27 +822,67 @@ def cursor_argmax(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
                   cursor: typing.Union[SignalCursor, tuple],
                   channel: typing.Optional[int] = None) -> np.ndarray:
     """The index of maximum value of the signal across the cursor's window.
+
+    Parameters:
+    ----------
+    signal: neo.AnalogSignal, dt.DataSignal
+    cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
+    channel: int or None (default)
+        For multi-channel signal, specified which channel is used:
+        0 <= channel < signal.shape[1]
+    
+    Returns:
+    --------
+    Array with the index of the signal maximum, relative to the start of the 
+    interval, with shape (signal.shape[1], ).
+    
+    When cursor's xwindow is zero, returns an array of shape (1,) containing 
+    the sample index of the cursor's x coordinate relative to the beginning of
+    the signal.
     """
     
     (t0,t1) = cursor2interval(cursor, signal.times.units)
     
-    ret = signal.time_slice(t0,t1).argmax(axis=0)
+    if t0 == t1:
+        return np.array(signal.time_index(t0)).flatten()
+        
+    else:
+        ret = signal.time_slice(t0,t1).argmax(axis=0).flatten()
     
-    if isinstance(channel, int):
-        return ret[channel].flatten()
-    
-    return ret
+        if isinstance(channel, int):
+            return ret[channel].flatten()
+        
+        return ret
 
 @safeWrapper
 def cursor_min(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
                cursor: typing.Union[tuple, SignalCursor],
                channel: typing.Optional[int] = None) -> pq.Quantity:
-    """The minimum value of the signal across the cursor's window
+    """The minimum value of the signal across the cursor's window.
+    
+    Parameters:
+    ----------
+    signal: neo.AnalogSignal, dt.DataSignal
+    cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
+    channel: int or None (default)
+        For multi-channel signal, specified which channel is used:
+        0 <= channel < signal.shape[1]
+    
+    Returns:
+    --------
+    Python Quantity array of shape (1, signal.shape[1]) with the signal minimum
+    in the interval defined by the cursor's window, or the signal's sample value
+    at the cursor's x coordinate if cursor window is zero.
+    
     """
     
     (t0,t1) = cursor2interval(cursor, signal.times.units)
     
-    ret = signal.time_slice(t0,t1).min(axis=0)
+    if t0 == t1:
+        ret = signal[signal.time_index(t0),:]
+        
+    else:
+        ret = signal.time_slice(t0,t1).min(axis=0).flatten()
     
     if isinstance(channel, int):
         return ret[channel].flatten()
@@ -613,38 +894,86 @@ def cursor_argmin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
                   cursor: typing.Union[tuple, SignalCursor],
                   channel: typing.Optional[int] = None) -> np.ndarray:
     """The index of minimum value of the signal across the cursor's window.
+
+    Parameters:
+    ----------
+    signal: neo.AnalogSignal, dt.DataSignal
+    cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
+    channel: int or None (default)
+        For multi-channel signal, specified which channel is used:
+        0 <= channel < signal.shape[1]
+    
+    Returns:
+    --------
+    Array with the index of the signal minimum, relative to the start of the 
+    interval, with shape (signal.shape[1], ).
+    
+    When cursor's xwindow is zero, returns an array of shape (1,) containing 
+    the sample index of the cursor's x coordinate relative to the beginning of
+    the signal.
     """
     
     (t0,t1) = cursor2interval(cursor, signal.times.units)
     
-    ret = signal.time_slice(t0,t1).argmin(axis=0)
-    
-    if isinstance(channel, int):
-        return ret[channel].flatten()
-    
-    return ret
+    if t0 == t1:
+        return np.array(signal.time_index(t0)).flatten()
+        
+    else:
+        ret = signal.time_slice(t0,t1).argmin(axis=0).flatten()
+        
+        if isinstance(channel, int):
+            return ret[channel].flatten()
+        
+        return ret
 
 @safeWrapper
 def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
                   cursor: typing.Union[tuple, SignalCursor],
                   channel: typing.Optional[int] = None) -> tuple:
     """The maximum and minimum value of the signal across the cursor's window.
+
+    Parameters:
+    ----------
+    signal: neo.AnalogSignal, dt.DataSignal
+    cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
+    channel: int or None (default)
+        For multi-channel signal, specified which channel is used:
+        0 <= channel < signal.shape[1]
+    
+    Returns:
+    --------
+    Tuple of two Python Quantity arrays each of shape (signal.shape[1], )
+    respectively, with the signal maximum and minimum (respectively) in the 
+    interval defined by the cursor's window.
+    
+    If cursor window is zero, returns a tuple with the signal's sample values 
+    at the cursor's x coordinate (same value is replicated, so that the return
+    object is still a two-element tuple).
+    
     """
-    
-    
     (t0,t1) = cursor2interval(cursor, signal.times.units)
     
-    mx = signal.time_slice(t0,t1).min(axis=0)
+    if t0==t1:
+        ret = signal[signal.time_index(t0),:]
+        
+        if isinstance(channel, int):
+            ret = ret[channel].flatten()
+            
+        return (ret, ret)
+        
+    else:
     
-    if isinstance(channel, int):
-        mx = mx[channel].flatten()
-    
-    mn = signal.time_slice(t0,t1).min(axis=0)
-    
-    if isinstance(channel, int):
-        mn = mn[channel].flatten()
-    
-    return (mx, mn)
+        mx = signal.time_slice(t0,t1).max(axis=0).flatten()
+        
+        if isinstance(channel, int):
+            mx = mx[channel].flatten()
+        
+        mn = signal.time_slice(t0,t1).min(axis=0).flatten()
+        
+        if isinstance(channel, int):
+            mn = mn[channel].flatten()
+        
+        return (mx, mn)
 
 @safeWrapper
 def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
@@ -654,17 +983,24 @@ def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     """
     (t0,t1) = cursor2interval(cursor, signal.times.units)
     
-    mx = signal.time_slice(t0,t1).argmin(axis=0)
+    if t0==t1:
+        ret = np.array(signal.time_index(t0)).flatten()
+        
+        return (ret, ret)
+        
+    else:
     
-    if isinstance(channel, int):
-        mx = mx[channel].flatten()
-    
-    mn = signal.time_slice(t0,t1).argmin(axis=0)
-    
-    if isinstance(channel, int):
-        mn = mn[channel].flatten()
-    
-    return (mx, mn)
+        mx = signal.time_slice(t0,t1).argmax(axis=0).flatten()
+        
+        if isinstance(channel, int):
+            mx = mx[channel].flatten()
+        
+        mn = signal.time_slice(t0,t1).argmin(axis=0).flatten()
+        
+        if isinstance(channel, int):
+            mn = mn[channel].flatten()
+        
+        return (mx, mn)
 
 @safeWrapper
 def cursor_average(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
@@ -716,6 +1052,8 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, dt.DataSignal],
                  channel: typing.Optional[int] = None) -> pq.Quantity:
     """Value of signal at the vertical cursor's time coordinate.
     
+    Signal sample values are NOT averaged across the cursor's window.
+    
     Parameters:
     -----------
     signal: neo.AnalogSignal or datatypes.DataSignal
@@ -740,7 +1078,8 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, dt.DataSignal],
     Returns:
     --------
     
-    python Quantity (units of the signal)
+    python Quantity array with signal's, and shape (signal.shape[1], ) or (1,)
+    when channel is specified.
     
     """
     
@@ -748,7 +1087,7 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, dt.DataSignal],
         t = cursor * signal.time.units
         
     elif isinstance(cursor, SignalCursor):
-        if cursor.cursorType not in ("vertical", "crosshair"):
+        if cursor.cursorType not in (SignalCursor.SignalCursorTypes.vertical, SignalCursor.SignalCursorTypes.crosshair):
             raise TypeError("Expecting a vertical or crosshair cursor; got %s instead" % cursor.cursorType)
         
         t = cursor.x * signal.times.units
@@ -789,6 +1128,12 @@ def cursors_amplitude(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     
     cursor0, cursor1: (x, window) tuples representing, respectively, the 
         cursor's x coordinate (time) and window (horizontal extent).
+        
+    Returns:
+    -------
+    
+    Python Quantity array with signal's units and shape (signal.shape[1], ) or
+    (1, ) when channel is specified.
         
     """
     
@@ -880,15 +1225,26 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     else:
         return ret[channel].flatten() # so that it can accept array indexing
     
+#@safeWrapper
+#"def" epoch_chord_slope(signal,
+                      #epoch: neo.Epoch,
+                      #channel: typing.Optional[int] = None) -> pq.Quantity:
+    #pass
+    
 @safeWrapper
 def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
                         cursor0: typing.Union[SignalCursor, tuple],
                         cursor1: typing.Union[SignalCursor, tuple],
                         channel: typing.Optional[int] = None) -> pq.Quantity:
-    """Calculates the signal chord slope between two vertical cursors.
+    """Signal chord slope between two vertical cursors.
     
-    The singnal value at each cursor is taken as the average of signal samples
-    across the cursor's horizontal window.
+    The function calculates the slope of a straight line connecting the 
+    intersection of the signal with two vertical cursors (of with the vertical
+    lines os two crosshair cursors).
+    
+    The signal value at each cursor is taken as the average of signal samples
+    across the cursor's horizontal window if non-zero, or the sample values at 
+    the cursor's coordinate.
     
     Parameters:
     ----------
@@ -1984,7 +2340,7 @@ def concatenate_signals(*args, axis=1, ignore_domain = False, ignore_units=False
             if not all([np.isclose(sig.sampling_rate.magnitude, signals[0].sampling_rate.magnitude) for sig in signals[1:]]):
                 raise ValueError("To concatenate signals on the 2nd dimension they must all have the same sampling rate")
             
-            if not all([sig.times.unis] == signals[0].times.units for sig in signals[1:]):
+            if not all([sig.times.units] == signals[0].times.units for sig in signals[1:]):
                 raise ValueError("To concatenate signals on 2nd dimension they must have identical domain units ")
             
         if not ignore_units:
@@ -3081,13 +3437,11 @@ def merge_signal_channels(*args, name=""):
         raise ValueError("All signals must have the same sampling period")
     
     return __internal_merge__(*args)
-
-            
     
 @safeWrapper
 def aggregate_signals(*args, name_prefix:str, 
                       collectSD:bool=True, collectSEM:bool=True) -> dict:
-    """Returns signal mean, SD, SEM, and number of signals in args
+    """Returns signal mean, SD, SEM, and number of signals in args.
     All signals must be single-channel.
     
     Keyword parameters:
@@ -3269,7 +3623,6 @@ def parse_acquisition_metadata(data:neo.Block, configuration:[type(None), dict] 
         pass
 
 @safeWrapper
-#def parse_step_waveform_signal(sig, method="state_levels", adcres=15, adcrange=10, adcscale = 1e3, box_size = 0):
 def parse_step_waveform_signal(sig, method="state_levels", **kwargs):
     """Parse a step waveform -- containing two states ("high" and "low").
     

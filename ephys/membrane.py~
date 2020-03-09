@@ -276,7 +276,6 @@ def segment_Rs_Rin(segment: neo.Segment,
     
     Rin = vstep / (Irin - Ibase)
     
-    
     return np.array([Rs, Rin]) * Rin.units
     
 
