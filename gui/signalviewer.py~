@@ -1767,10 +1767,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.linkedCrosshairCursors = []
         self.linkedHorizontalCursors = []
         self.linkedVerticalCursors = []
-        # maps signal name with list of cursors
-        # NOTE: 2019-03-08 13:20:50
-        # map plot item index (int) with list of cursors
-        self._cached_cursors_ = dict()
         
         #### BEGIN data layout attributes
         # see _set_data_ for their use
@@ -1812,14 +1808,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #self.nonSignalAnnotations = None
         #### END metadata for neo and datatypes objects
         
+        # maps signal name with list of cursors
+        # NOTE: 2019-03-08 13:20:50
+        # map plot item index (int) with list of cursors
+        self._cached_cursors_ = dict()
         #### BEGIN selective representation of neo objects components
-        # to avoid over-creating linear region items
-        # map epoch name (str) to a dict with:
-        #   "epoch" -> Epoch 
-        #   "axes"  -> dict:
-        #       "plotitem" -> list of LinearRegionItem objects
-        # (NOTE: neo.Epoch objects are NOT hashable, but PlotItem objects are)
-        self._registered_epochs_ = dict()
+        
+        # NOTE: 2020-03-09 13:56:32
+        # maps frame index to a list of neo.Epochs
+        # frames without epochs are absent from the map
+        self._cached_epochs_ = dict()
         self._shown_spike_trains_ = dict()
         self._plotted_analogsignal_index = list() # which analog signals do we actually plot?
         self._plotted_irregularsignal_index = list() # which irregular signals do we actually plot?
@@ -5735,33 +5733,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         ax = self.sender()
         
-        if len(ax.dataItems) == 0:
-            return
+        #print(x0,x1)
         
-        lris = [item for item in ax.items if isinstance(item, pg.LinearRegionItem)]
-        
-        #print(len(lris))
-        
-        if len(lris) == 0:
-            return
-        
-        x_min, x_max = ax.viewRange()[0]
-        
-        #print("_slot_plot_axis_x_range_changed axis",
-              #ax,
-              #"viewRange x",
-              #x_min, x_max)
-        
-        for lri in lris:
-            lx0, lx1 = lri.getRegion()
-            if lx0>=x_min and lx0<=x_max and lx1 >= x_min and lx1 <= x_max:
-                lri.setVisible(True)
-                #print("_slot_plot_axis_x_range_changed lri region", lri.getRegion())
-                
-            else:
-                lri.setVisible(False)
+        #if len(ax.dataItems) == 0:
+            #return
             
-    
+        if self.currentFrame in self._cached_epochs_:
+            if len(self._cached_epochs_[self.currentFrame]):
+                self._plotEpochs_(from_cache=True)
+                
+                
     @safeWrapper
     def displayFrame(self):
         """ Plots individual frame (data "sweep" or "segment")
@@ -5790,19 +5771,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         Anything else  (?)                 -> _plot_numeric_data_
         
         """
-        
-        #NOTE: 2017-04-09 10:04:40complete revamp of displayFrame (the old one is kept
-        # for backward compatibility)
-        
-        # TODO make cursors redraw themselves after axes clear / canvas redraw
-        
-        # NOTE: 2017-04-09 17:14:08 
-        # determine how many axes we need here !
-        
-        # I should cache this !
-        
-        #print("SignalViewer.displayFrame self._current_frame_index_ ", self._current_frame_index_ )
-        
         if self.y is None:
             return
         
@@ -5842,7 +5810,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._plotSignal_(self.y[self._current_frame_index_], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
                 self.currentFrameAnnotations = {type(self.y[self._current_frame_index_]).__name__: self.y[self._current_frame_index_].annotations}
                 
-            elif all([isinstance(y_, neo.core.Epoch) for y_ in self.y]): # plot an Epoch independently of data
+            elif all([isinstance(y_, neo.core.Epoch) for y_ in self.y]): 
+                # plot an Epoch independently of data; there is a single frame
                 self._plotEpochs_(self.y, **self.epoch_plot_options)
                 
             elif all([isinstance(y_, neo.Segment) for y_ in self.y]):
@@ -5985,7 +5954,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @safeWrapper
     def _plotEpochs_(self, 
                      epochs: typing.Optional[typing.Union[neo.Epoch, typing.Sequence]] = None, 
-                     clear: bool = False,
+                     clear: bool = True,
+                     from_cache: bool = False,
                      **kwargs):
         """Plots epochs.
         A neo.Epoch contains time intervals each defined by time and duration.
@@ -6009,9 +5979,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             function plots the standalone epoch data, is it exists, or clears
             any representations of previous epoch data from all axes.
             
-        clear: bool, default is False.
+        clear: bool, default is True.
             When True, all representations of epochs data are cleared from the
             axes, regardless if there exists standalone epoch data.
+            
+            Otherwise new epochs are added to the plot.
+            
+        from_cache: bool, default is False:
+            When True, plots internally cached epochs
         
         """
         
@@ -6061,6 +6036,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     warnings.warning("Invalid brush specification %s" % epoch_brush)
                     brushes = cycle([None])
                     
+            # NOTE: 2020-03-09 12:09:40
+            # unlike the online documentation, pg.LinearRegionItem constructor 
+            # DOES NOT accept pen as argument
             #if epoch_pen is None:
                 #if len(args) > 1:
                     #pens = cycle([QtGui.QPen(QtGui.QColor(*c).darker()) for c in self.epoch_plot_options["epochs_color_set"]])
@@ -6120,59 +6098,87 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 #print("x_visible", x_visible)
                 
                 brush = next(brushes)
-                pen = next(pens)
+                
+                # see NOTE: 2020-03-09 12:09:40
+                #pen = next(pens)
                 
                 for k in range(len(self.axes)):
                     data_x_min = list()
                     data_x_max = list()
                     
+                    regions = [v for v in zip(x0,x1)]
+                    
                     lris = [pg.LinearRegionItem(values=value, 
                                                 brush=brush, 
                                                 orientation=pg.LinearRegionItem.Vertical, 
                                                 movable=False, 
-                                                bounds = visibleXRange) for value in zip(x0,x1)]
+                                                bounds = visibleXRange) for value in regions]
                     
                     for kl, lri in enumerate(lris):
                         self.axes[k].addItem(lri)
                         lri.setZValue(10)
                         lri.setVisible(x_visible[kl])
+                        lri.setRegion(regions[kl])
             
         # 1. clear existing LinearRegionItem objects.
-        for k, ax in enumerate(self.axes):
-            lris = [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]
-            for l in lris:
-                ax.removeItem(l)
+        
+        if from_cache:
+            epoch_seq = self._cached_epochs_.get(self.currentFrame, None)
+            
+            if epoch_seq is not None:
+                for k, ax in enumerate(self.axes):
+                    lris = [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]
+                    for l in lris:
+                        ax.removeItem(l)
+            
+                _plot_epochs_(*epoch_seq, **kwargs)
+                
+            return
             
         if clear:
-            return # nothing to plot
+            for k, ax in enumerate(self.axes):
+                lris = [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]
+                for l in lris:
+                    ax.removeItem(l)
         
         #print("SignalViewer._plotEpochs_ epochs:", epochs)
         
+        epoch_seq = None
+        
         if epochs is None or len(epochs) == 0:
-            # force plotting "y" epoch data if it exists, when passed epoch is 
             # None, an empty sequence or empty epoch
             if isinstance(self.y, neo.Epoch):
                 self._prepareAxes_(1) # use a brand new single axis
-                _plot_epochs_(self.y, **kwargs)
+                epoch_seq = [self.y]
                 
             elif isinstance(self.y, typing.Sequence) and all([isinstance(y_, neo.Epoch) for y_ in self.y]):
                 self._prepareAxes_(1) # use a brand new single axis
-                _plot_epochs_(*self.y, **kwargs)
+                epoch_seq = self.y
                 
-            #else:
-                #return
-        
         elif isinstance(epochs, neo.Epoch):
-            #print("single epoch")
-            _plot_epochs_(epochs, **kwargs)
+            epoch_seq = [epochs]
             
         elif isinstance(epochs, typing.Sequence) and all([isinstance(e, neo.Epoch) for e in epochs]):
-            #print("sequence of epochs")
-            _plot_epochs_(*epochs, **kwargs)
+            epoch_seq = epochs
             
         else:
             raise TypeError("Expecting a neo.Epoch or a Sequence of neo.Epoch objects; got %s instead" % type(epochs).__name__)
         
+        if epoch_seq is not None:
+            _plot_epochs_(*epoch_seq, **kwargs)
+            
+            if self.currentFrame in self._cached_epochs_:
+                if len(self._cached_epochs_[self.currentFrame]):
+                    if clear:
+                        self._cached_epochs_[self.currentFrame] = epoch_seq
+                        
+                    else:
+                        self._cached_epochs_[self.currentFrame] += epoch_seq
+                        
+        else:
+            if not from_cache:
+                self._cached_epochs_.pop(self.currentFrame, None)
+                    
     @safeWrapper
     def _plot_trains_dict_(self, trains_dict, **kwargs):
         #from itertools import cycle
