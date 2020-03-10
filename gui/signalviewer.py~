@@ -658,8 +658,12 @@ class SignalCursor(QtCore.QObject):
             
         hostBounds = self._get_host_boundaries_(host) # [[xmin, xmax], [ymin, ymax]]
         
-        if isinstance(xBounds, (tuple, list)) and len(xBounds) == 2 and all([isinstance(v, numbers.Number) for v in xBounds]):
-            self._x_range_ = xBounds
+        if isinstance(xBounds, (tuple, list)) and len(xBounds) == 2:
+            if all([isinstance(v, numbers.Number) for v in xBounds]):
+                self._x_range_ = xBounds
+                
+            elif all([isinstance(v, pq.Quantity) and len(v) == 1 for v in xBounds]):
+                self._x_range_  = [v.flatten().magnitude for v in xBounds]
             
         else:
             self._x_range_ = hostBounds[0]
@@ -667,8 +671,12 @@ class SignalCursor(QtCore.QObject):
         if self._vl_ is not None:
             self._vl_.setBounds(self._x_range_)
 
-        if isinstance(yBounds, (tuple, list)) and len(yBounds) == 2 and all([isinstance(v, numbers.Number) for v in yBounds]):
-            self._y_range_ = yBounds
+        if isinstance(yBounds, (tuple, list)) and len(yBounds) == 2:
+            if all([isinstance(v, numbers.Number) for v in yBounds]):
+                self._y_range_ = yBounds
+            
+            elif all([isinstance(v, pq.Quantity) and len(v) == 1 for v in xBounds]):
+                self._x_range_  = [v.flatten().magnitude for v in xBounds]
             
         else:
             self._y_range_ = hostBounds[1]
@@ -5462,7 +5470,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._current_plot_item_ = plotitems[index]
         lbl = "<B>%s</B>" % self._current_plot_item_.axes["left"]["item"].labelText
         self._current_plot_item_.setLabel("left", lbl)
-        self._current_plot_item_.vb.border.setStyle(QtCore.Qt.SolidLine)
+        #self._current_plot_item_.vb.border.setStyle(QtCore.Qt.SolidLine)
         #self._current_plot_item_.vb.border.setColor(system_palette.highlight().color())
         
         for ax in self.axes:
@@ -5473,7 +5481,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     lbl = lbl[3 : lbl.find("</B>")]
                     ax.setLabel("left", lbl)
                     
-                ax.vb.border.setStyle(QtCore.Qt.NoPen)
+                #ax.vb.border.setStyle(QtCore.Qt.NoPen)
                 #ax.vb.border.setColor(default_border_color)
         
         self.statusBar().showMessage("Selected axes: %d (%s)" % index, self._plot_names_.get(index))
@@ -7209,7 +7217,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._current_plot_item_ = focusedPlotItems[0]
                 lbl = "<B>%s</B>" % self._current_plot_item_.axes["left"]["item"].labelText
                 self._current_plot_item_.setLabel("left", lbl)
-                self._current_plot_item_.vb.border.setStyle(QtCore.Qt.SolidLine)
+                #self._current_plot_item_.vb.border.setStyle(QtCore.Qt.SolidLine)
                 #self._current_plot_item_.vb.border.setColor(system_palette.highlight().color())
                 #self._current_plot_item_.vb.border.setWidthF(2.)
                 #self._current_plot_item_.vb.update()
@@ -7236,7 +7244,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             lbl = lbl[3 : lbl.find("</B>")]
                             ax.setLabel("left", lbl)
                             
-                        ax.vb.border.setStyle(QtCore.Qt.NoPen)
+                        #ax.vb.border.setStyle(QtCore.Qt.NoPen)
                         #ax.vb.border.setColor(default_border_color)
                         #ax.vb.border.update()
         

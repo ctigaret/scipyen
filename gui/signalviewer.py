@@ -658,8 +658,21 @@ class SignalCursor(QtCore.QObject):
             
         hostBounds = self._get_host_boundaries_(host) # [[xmin, xmax], [ymin, ymax]]
         
-        if isinstance(xBounds, (tuple, list)) and len(xBounds) == 2 and all([isinstance(v, numbers.Number) for v in xBounds]):
-            self._x_range_ = xBounds
+        if isinstance(xBounds, (tuple, list)) and len(xBounds) == 2:
+            if all([isinstance(v, numbers.Number) for v in xBounds]):
+                self._x_range_ = xBounds
+                
+            elif all([isinstance(v, pq.Quantity) and len(v) == 1 for v in xBounds]):
+                self._x_range_  = [v.flatten().magnitude for v in xBounds]
+                
+        elif isinstance(xBounds, np.ndarray) and xBounds.ndim> 0 and len(xBounds) == 2:
+            if isinstance(xBounds, pq.Quantity):
+                xBounds = xBounds.flatten().magnitude
+                
+            self._x_range_ = [v for v in xBounds]
+            
+        elif xBounds is not None:
+            raise TypeError("xBounds expected to be a sequence of two (possibly Quantity) scalars, or a numpy or Quantity array with two elements")
             
         else:
             self._x_range_ = hostBounds[0]
@@ -667,8 +680,21 @@ class SignalCursor(QtCore.QObject):
         if self._vl_ is not None:
             self._vl_.setBounds(self._x_range_)
 
-        if isinstance(yBounds, (tuple, list)) and len(yBounds) == 2 and all([isinstance(v, numbers.Number) for v in yBounds]):
-            self._y_range_ = yBounds
+        if isinstance(yBounds, (tuple, list)) and len(yBounds) == 2:
+            if all([isinstance(v, numbers.Number) for v in yBounds]):
+                self._y_range_ = yBounds
+            
+            elif all([isinstance(v, pq.Quantity) and len(v) == 1 for v in xBounds]):
+                self._y_range_  = [v.flatten().magnitude for v in xBounds]
+            
+        elif isinstance(yBounds, np.ndarray) and yBounds.ndim> 0 and len(yBounds) == 2:
+            if isinstance(yBounds, pq.Quantity):
+                yBounds = yBounds.flatten().magnitude
+                
+            self._y_range_ = [v for v in yBounds]
+            
+        elif yBounds is not None:
+            raise TypeError("yBounds expected to be a sequence of two (possibly Quantity) scalars, or a numpy or Quantity array with two elements")
             
         else:
             self._y_range_ = hostBounds[1]
