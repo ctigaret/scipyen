@@ -15,6 +15,7 @@ documented here: https://neo.readthedocs.io/en/stable/
 
 Some of these function also apply to datatypes.DataSignal in Scipyen package.
 
+
 I. Cursor- and epoch-based functions
 =====================================
 
@@ -241,6 +242,7 @@ import numpy as np
 import quantities as pq
 import neo
 import matplotlib as mpl
+import pyqtgraph as pg
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -611,14 +613,13 @@ def cursors2epoch(*args, **kwargs) -> neo.Epoch:
         
     name = kwargs.get("name", "Epoch")
     
-    if name is None:
+    if not isinstance(name, str) or len(name.strip()) == 0:
         name="Epoch"
     
     sort = kwargs.get("sort", False)
     
-    if sort is None:
-        soret = False
-    
+    if not isinstance(sort, bool):
+        sort = False
     
     if not all([c.cursorType in (SignalCursor.SignalCursorTypes.vertical, SignalCursor.SignalCursorTypes.crosshair) for c in cursors]):
         raise TypeError("Expecting only vertical and/or crosshair cursors")
@@ -634,95 +635,139 @@ def cursors2epoch(*args, **kwargs) -> neo.Epoch:
     
     return neo.Epoch(times=t, durations=d, labels=i, units=pq.s, name=name)
     
-@safeWrapper
-def cursor_params_2_epoch(times: typing.Union[numbers.Number, pq.Quantity, np.ndarray, typing.Sequence],
-                  windows: typing.Union[numbers.Number, pq.Quantity, np.ndarray, typing.Sequence],
-                  labels: typing.Optional[typing.Union[str, np.ndarray, typing.Sequence]] = None, 
-                  name: typing.Optional[str] = None) -> neo.Epoch:
-    """Constructs a neo.Epoch from a sequence of times and windows.
+#@safeWrapper
+#def cursors2epoch_(cursors: typing.Optional[typing.Sequence] = None,
+                  #times: typing.Optional[typing.Union[numbers.Number, pq.Quantity, np.ndarray, typing.Sequence]] = None,
+                  #windows: typing.Optional[typing.Union[numbers.Number, pq.Quantity, np.ndarray, typing.Sequence]] = None,
+                  #labels: typing.Optional[typing.Union[str, np.ndarray, typing.Sequence]] = None, 
+                  #name: typing.Optional[str] = None) -> neo.Epoch:
+    #"""Constructs a neo.Epoch from a sequence of times and windows.
     
-    The times and windows parameters represent a set of notional signal
-    cursors, each located at time t_i and with window w_i (centered at time t_i)
-    for i in 0 ... len(times).
+    #The times and windows parameters represent a set of notional signal
+    #cursors, each located at time t_i and with window w_i (centered at time t_i)
+    #for i in 0 ... len(times).
     
-    The Epoch will contain one interval (time, duration) for each cursor, and 
-    with labels as specified by the "labels" parameter.
+    #The Epoch will contain one interval (time, duration) for each cursor, and 
+    #with labels as specified by the "labels" parameter.
     
-    Parameters:
-    ----------
-    times: numeric scalar, python Quantity, or array-like of scalars or python 
-        Quantity objects
+    #Parameters:
+    #----------
+    #cursors: sequence of vertical or crosshair signalviewer.SignalCursor objects
+        #(optional)
     
-    """
+    #times: numeric scalar, python Quantity, or array-like of scalars or python 
+        #Quantity objects (optional)
+        
+    #windows: numeric scalar, python Quantity, or array-like of scalars or python 
+        #Quantity objects (optional)
+        
+    #labels: str, iterable of strings (optional)
     
-    #n_labels = 0 if labels is None else 1 if isinstance(labels, str) else len(labels) if isinstance(labels, typing.Sequence) else labels.size if isinstance(labels, np.ndarray) else 0
+    #name: str (optional)
     
-    if isinstance(times, typing.Union[numbers.Number, typing.Sequence]):
-        times = np.array(times)
+    #NOTE: at least cursors must be specified. If cursors is None, then both
+    #times and windows must be specified and they must result in arrays of 
+    #identical sizes.
+    
+    #For clarity, parameters should be passed uusing "keyword=value" syntax
+    
+    #"""
+    #if isinstance(cursors, typing.Sequence) and all([isinstance(c, SignalCursor) for c in cursors]):
+        #if any([c.cursorType is not in (SignalCursor.SignalCursorTypes.vertical, SignalCursor.SignalCursorTypes.crosshair)]):
+            #raise TypeError("Expecting only vertical and crosshair cursors")
         
-    elif isinstance(times, np.ndarray):
-        if not isinstance(times, pq.Quantity):
-            times *= pq.s
-            
-        else:
-            if not dt.units_convertible(times, pq.s):
-                raise TypeError("Unexpected units for times: %s" % times.units)
-            
-    else:
-        raise TypeError("Unexpected type for times: %s" % type(times).__name__)
+        #times = np.array([c.x. for c in cursors]) * pq.s # will subtract windows/2. below
+        #durations = np.array([c.xwindow for c in cursors]) * pq.s
+        #labels = np.array([c.ID for c in cursors])
         
-    if isinstance(windows, typing.Union[numbers.Number, typing.Sequence]):
-        windows = np.array(windows)
+    #elif isinstance(cursors, SignalCursor):
+        #if cursors.cursorType not in (SignalCursor.SignalCursorTypes.vertical, SignalCursor.SignalCursorTypes.crosshair):
+            #raise TypeError("Expecting a vertical or crosshair cursor")
         
-    elif isinstance(windows, np.ndarray):
-        if not isinstance(windows, pq.Quantity):
-            windows *= pq.s
-            
-        elif not dt.units_convertible(windows, pq.s):
-            raise TypeError("Unexpected units for windows: %s" % windows.units)
-            
-    else:
-        raise TypeError("Unexpected type for windows: %s" % type(windows).__name__)
+        #times = np.array([cursors.x]) * pq.s # will subtract windows/2. below
+        #durations = np.array([cursors.xwindow]) * pq.s
+        #labels = np.array([cursors.ID])
         
-    if windows.size != times.size:
-        if windows.size == 1:
-            windows = np.full_like(times, windows[0])
+    #elif cursors is None:
+        #if isinstance(times, typing.Union[numbers.Number, typing.Sequence]):
+            #times = np.array(times)
             
-        else:
-            raise TypeError("Unexpected number of windows specified (%d); expecting 1 or %d" % (windows.size, times.size))
-        
-    if labels is not None:
-        if isinstance(labels, str):
-            labels = np.array([labels])
-            
-        elif isintance(labels, typing.Sequence) and all([isinstance(l, str) for l in labels]):
-            labels = np.array(labels)
-            
-        elif not isinstance(labels, np.ndarray):
-            raise TypeError("labels expected to be a str, sequence of str, numpy array ot None; got %s instead" % type(labels).__name__)
-        
-        else:
-            if np.issubdtype(labels.dtype, np.string_):
-                labels = labels.astype(np.str_)
+        #elif isinstance(times, np.ndarray):
+            #if not isinstance(times, pq.Quantity):
+                #times *= pq.s
                 
-            elif not np.issubdtype(labels.dtype, np.str_):
-                raise TypeError("labels expected to contain strings")
-        
-        if labels.size != times.size:
-            if labels.size == 1:
-                labels = np.array(["%s%d" % (labels[0], k) for k in range(times.size)])
+            #else:
+                #if not dt.units_convertible(times, pq.s):
+                    #raise TypeError("Unexpected units for times: %s" % times.units)
                 
-            else:
-                raise TypeError("Unexpected number of labels (%d); expecting 1 or %d" % (labels.size, times.size))
+        #elif times is None:
+            #raise TypeError("When cursors is None, times must be specified")
+                
+        #else:
+            #raise TypeError("Unexpected type for times: %s" % type(times).__name__)
+        
+        #if isinstance(windows, typing.Union[numbers.Number, typing.Sequence]):
+            #windows = np.array(windows)
             
-    else:
-        labels = np.array(["epoch%d" % k for k in range(times.size)])
+        #elif isinstance(windows, np.ndarray):
+            #if not isinstance(windows, pq.Quantity):
+                #windows *= pq.s
+                
+            #elif not dt.units_convertible(windows, pq.s):
+                #raise TypeError("Unexpected units for windows: %s" % windows.units)
+            
+        #elif windows is None:
+            #raise TypeError("When cursors is None, windows must be specified")
+                
+        #else:
+            #raise TypeError("Unexpected type for windows: %s" % type(windows).__name__)
         
-    times = times - windows/2.
+        
+        #if windows.size != times.size:
+            #if windows.size == 1:
+                #windows = np.full_like(times, windows[0])
+                
+            #else:
+                #raise TypeError("Unexpected number of windows specified (%d); expecting 1 or %d" % (windows.size, times.size))
+            
+        #if labels is None:
+            #labels = np.array(["interval_%d" % k for k in range(times.size)])
+        #else:
+            #if isinstance(labels, str):
+                #labels = np.array([labels])
+                
+            #elif isintance(labels, typing.Sequence) and all([isinstance(l, str) for l in labels]):
+                #labels = np.array(labels)
+                
+            #elif not isinstance(labels, np.ndarray):
+                #raise TypeError("labels expected to be a str, sequence of str, numpy array ot None; got %s instead" % type(labels).__name__)
+            
+            #else:
+                #if np.issubdtype(labels.dtype, np.string_):
+                    #labels = labels.astype(np.str_)
+                    
+                #elif not np.issubdtype(labels.dtype, np.str_):
+                    #raise TypeError("labels expected to contain strings")
+            
+            #if labels.size != times.size:
+                #if labels.size == 1:
+                    #labels = np.array(["%s%d" % (labels[0], k) for k in range(times.size)])
+                    
+                #else:
+                    #raise TypeError("Unexpected number of labels (%d); expecting 1 or %d" % (labels.size, times.size))
+                
+    #else:
+        #raise TypeError("cursors expected to be a sequence of SignalCursor objects or None; got %s instead" % type(cursors).__name__)
     
-    durations = windows
         
-    return neo.Epoch(times=times, durations=durations, labels=labels, name=name)
+    #times = times - windows/2.
+    
+    #durations = windows
+    
+    #if not isinstance(name, str) or len(name.strip()) == 0:
+        #name="Epoch"
+        
+    #return neo.Epoch(times=times, durations=durations, labels=labels, name=name)
 
 @safeWrapper
 def signal2epoch(sig, name=None, labels=None):
@@ -1318,14 +1363,38 @@ def interval2cursor(t0: float, t1: float) -> typing.Tuple[float, float]:
     
 
 @safeWrapper
-def epoch_2_cursors_params(epoch: neo.Epoch) -> typing.Sequence:
+def epoch2cursors(epoch: neo.Epoch, 
+                  axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]], None) -> typing.Sequence:
     """Creates notional vertical signal cursors from a neo.Epoch.
-    Results is a list of tuples of (time, window) where 
-    time = epoch.times + epoch.durations/2.
-    window = epoch.durations
+    
+    axis: pyqtgraph.PlotItem, pyqtgraph.GraphicsScene, or None (default).
+    
+        When not None, the function also populates axis with a sequence of 
+        vertical SignalCursor objects constructed using the returned values.
+    
+    Returns:
+    --------
+    When axis is None, returns a list of tuples of (time, window, labels) where:
+        time = epoch.times + epoch.durations/2.
+        window = epoch.durations
+        labels = epoch.labels -- the labels of the epoch's intervals
+        
+    When axis is a pyqtgraph.PlotItem or a pyqtgraph.GraphicsScene, a list of
+    vertical SignalCursor objects.
+    
+    Side effects:
+    -------------
+    The cursors are added to the PlotItem or GraphicsScene specified by the
+    'axis' parameter.
     """
     
-    ret = [(float(t.magnitude + d.magnitude/2.), float(d.magnitude)) for (t,d) in zip(epoch.times, epoch.durations)]
+    ret = [(t + d/2., d, l) for (t, d, l) in zip(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels)]
+    
+    if isinstance(axis, (pg.PlotItem, pg.GraphicsScene)):
+        cursors = [SignalCursor(axis, x=t, xwindow=d,
+                                cursor_type=SignalCursor.SignalCursorTypes.vertical,
+                                cursorID=l) for (t,d,l) in ret]
+        return cursors
     
     return ret
 

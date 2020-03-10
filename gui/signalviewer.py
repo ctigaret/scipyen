@@ -3342,7 +3342,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         #print("SignalViewer._addCursor_ cursor_type %s" % cursor_type)
         
-        if cursor_type in ("vertical", "v"):
+        if cursor_type in ("vertical", "v", SignalCursor.SignalCursorTypes.vertical):
             cursorDict = self.verticalDataCursors
             crsPrefix = "v"
             
@@ -3351,7 +3351,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             pen = pg.mkPen(pg.mkColor(self.cursorColors["vertical"]), style=QtCore.Qt.SolidLine)
             linkedPen = pg.mkPen(pg.mkColor(self.linkedCursorColors["vertical"]), style=QtCore.Qt.SolidLine)
             
-        elif cursor_type in ("horizontal", "h"):
+        elif cursor_type in ("horizontal", "h", SignalCursor.SignalCursorTypes.horizontal):
             cursorDict = self.horizontalDataCursors
             crsPrefix = "h"
             xwindow = 0.0
@@ -3359,7 +3359,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             pen = pg.mkPen(pg.mkColor(self.cursorColors["horizontal"]), style=QtCore.Qt.SolidLine)
             linkedPen = pg.mkPen(pg.mkColor(self.linkedCursorColors["horizontal"]), style=QtCore.Qt.SolidLine)
             
-        elif cursor_type in ("crosshair", "c"):
+        elif cursor_type in ("crosshair", "c", SignalCursor.SignalCursorTypes.crosshair):
             cursorDict = self.crosshairDataCursors
             crsPrefix = "c"
             xwindow = self.defaultCursorWindowSizeX
@@ -3382,7 +3382,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                    x = x, y = y, xwindow=xwindow, ywindow=ywindow,
                                    cursor_type = cursor_type,
                                    cursorID = crsId,
-                                   linkedPen = linkedPen, pen = pen, 
+                                   linkedPen = linkedPen,
+                                   pen = pen, 
                                    parent = self, 
                                    follower = follows_mouse, 
                                    xBounds = xBounds,
@@ -4425,15 +4426,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         cursors.sort(key=attrgetter('x')) # or key = lambda x: x.x
         
-        ret = neoutils.cursors2epoch(*cursors, name=name)
-        
-        #x = np.array([c.x for c in cursors]) * pq.s
-        #d = np.array([c.xwindow for c in cursors]) * pq.s
-        #labels = np.array([c.ID for c in cursors], dtype="S")
-        
-        #t = x - d/2
-        
-        #ret = neo.Epoch(times=t, durations=d, labels=labels, units=pq.s, name=name)
+        ret = neoutils.cursors2epoch(*cursors, name=name, sort=True)
         
         return ret
         
@@ -4462,14 +4455,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
             else:
                 return
+            
+        return neoutils.cursors2epoch(crs, name=name)
         
-        return neo.Epoch(times = np.array([crs.x-crs.xwindow/2]) * pq.s, \
-                         durations = np.array([crs.xwindow]) * pq.s, \
-                         units = pq.s, label = np.ndarray([crs.ID], dtype="S"), name=name)
+        #return neo.Epoch(times = np.array([crs.x-crs.xwindow/2]) * pq.s, \
+                         #durations = np.array([crs.xwindow]) * pq.s, \
+                         #units = pq.s, label = np.ndarray([crs.ID], dtype="S"), name=name)
     
     
     def epochBetweenCursors(self, c0, c1, name=None):
-        
         if c0.isHorizontal or c1.isHorizontal:
             return
         
@@ -4491,8 +4485,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 return
         
-        return neo.Epoch(times = np.array([clist[0].x])*pq.s, \
-                         durations = np.array([clist[1].x - clist[0].x]) * pq.s, \
+        return neo.Epoch(times = np.array([clist[0].x])*pq.s,
+                         durations = np.array([clist[1].x - clist[0].x]) * pq.s,
                          units = pq.s, labels=np.array(["From %s to %s" % (clist[0].ID, clist[1].ID)], dtype="S"), \
                          name=name)
     
