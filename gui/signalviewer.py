@@ -1205,6 +1205,26 @@ class SignalCursor(QtCore.QObject):
         elif isinstance(val, (tuple, list)) and len(val) == 2 and all([isinstance(v, (number.Number, type(None))) for v in val]):
             self.x = val[0]
             self.y = val[1]
+            
+    @property
+    def parameters(self):
+        """A tuple with cursor parameters.
+        
+        Vertical cursors: (x, xwindow, ID)
+        
+        Horizontal cursors: (y, ywindow, ID)
+        
+        Crosshair cursors: (x, xwindow, y, ywindow, ID)
+        
+        """
+        if self.cursorType == SignalCursor.SignalCursorTypes.vertical:
+            return (self.x, self.xwindow, self.ID)
+        
+        elif self.cursorType == SignalCursor.SignalCursorTypes.horizontal:
+            return (self.y, self.ywindow, self.ID)
+        
+        else:
+            return (self.x, self.xwindow, self.y, self.ywindow, self.ID)
         
     @property
     def x(self):
@@ -2597,7 +2617,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 #if axis < 0 or axis >= len(self.axesWithLayoutPositions):
                     #raise ValueError("When specified, axis must be an integer between 0 and %d" % len(self.axesWithLayoutPositions))
                 
-                #self.currentAxes = axis
+                #self.currentAxis = axis
                 
             #else:
                 #raise ValueError("When specified, axis must be an integer between 0 and %d" % len(self.axesWithLayoutPositions))
@@ -5436,9 +5456,27 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if index < 0 or index >= len(plotitems):
             raise ValueError("Expecting an int between 0 and %d inclusive; got %d" % (len(plotitems)-1, index))
         
-        self._current_plot_item_ = plotitems[index]
+        #system_palette = QtGui.QGuiApplication.palette()
+        #default_border_color = self.axis(0).vb.border.color()
         
-        self.statusBar().showMessage("Selected axes: %d" % index)
+        self._current_plot_item_ = plotitems[index]
+        lbl = "<B>%s</B>" % self._current_plot_item_.axes["left"]["item"].labelText
+        self._current_plot_item_.setLabel("left", lbl)
+        #self._current_plot_item_.vb.border.setStyle(QtCore.Qt.SolidLine)
+        #self._current_plot_item_.vb.border.setColor(system_palette.highlight().color())
+        
+        for ax in self.axes:
+            if ax is not self._current_plot_item_:
+                lbl = ax.axes["left"]["item"].labelText
+                
+                if lbl.startswith("<B>") and lbl.endswith("</B>"):
+                    lbl = lbl[3 : lbl.find("</B>")]
+                    ax.setLabel("left", lbl)
+                    
+                #ax.vb.border.setStyle(QtCore.Qt.NoPen)
+                #ax.vb.border.setColor(default_border_color)
+        
+        self.statusBar().showMessage("Selected axes: %d (%s)" % index, self._plot_names_.get(index))
         
     #@property
     #"def" currentAxis(self) -> pg.PlotItem:
@@ -5452,11 +5490,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #self.currentPlotItem = index
     
     @property
-    def currentAxes(self):
+    def currentAxis(self):
         return self.currentPlotItem
     
-    @currentAxes.setter
-    def currentAxes(self, index):
+    @currentAxis.setter
+    def currentAxis(self, index):
         self.currentPlotItem = index
     
     def dataCursor(self, ID):
@@ -5532,58 +5570,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def verticalCursors(self):
         return self.verticalDataCursors
     
-    #"def" getVerticalCursorsX(self):
-        #return [c.x for c in self.verticalDataCursors]
-    
-    #"def" getVerticalCursorsWindow(self):
-        #return [c.window for c in self.verticalDataCursors]
-    
-    #"def" setDataCursorWindow(self, crsID, value):
-        #if crsID in self.verticalDataCursors:
-            #if isinstance(value, float):
-                #value = [value]
-            #elif isinstance(value, (list, tuple, np.ndarray)): # as in (2.5,) NOTE the comma at the end to define a unary tuple
-                #if len(value) == 1:
-                    #value = list(value)
-                #else:
-                    #raise ValueError("Vertical cursor window needs to be a single value (as a scalar or one-element tuple, list, or numpy ndarray)")
-            #else:
-                #raise ValueError("Vertical cursor window needs to be a single value (as a scalar or one-element tuple, list, or numpy ndarray)")
-            
-            #self.verticalDataCursors[crsID].xwindow = value
-            
-        #elif crsID in self.horizontalDataCursors:
-            #if isinstance(value, float):
-                #value = [value]
-            #elif isinstance(value, (list, tuple, np.ndarray)): # as in (2.5,) NOTE the comma at the end to define a unary tuple
-                #if len(value) == 1:
-                    #value = list(value)
-                #else:
-                    #raise ValueError("Horizontal cursor window needs to be a single value (as a scalar or one-element tuple, list, or numpy ndarray)")
-            #else:
-                #raise ValueError("Horizontal cursor window needs to be a single value (as a scalar or one-element tuple, list, or numpy ndarray)")
-    
-            #self.horizontalDataCursors[crsID].ywindow = value
-            
-        #elif crsID in self.crosshairDataCursors:
-            #if isinstance(value, (tuple, list, np.ndarray)):
-                #if len(value) == 2:
-                    #value = list(value)
-                #else:
-                    #raise ValueError("Crosshair cursor window needs to be a two-element tuple, list, or numpy ndarray")
-            #else:
-                #raise ValueError("Crosshair cursor window needs to be a two-element tuple, list, or numpy ndarray")
-            
-            #self.crosshairDataCursors[crsID].xwindow = value[0]
-            #self.crosshairDataCursors[crsID].ywindow = value[1]
-            
-        #else:
-            #raise ValueError("SignalCursor %s not found." % crsID)
-        
-        
-    #"def" setSelectedDataCursorWindow(self, value):
-        #self.setDataCursorWindow(self.selectedDataCursor.ID, value)
-    
     @property
     def horizontalCursors(self):
         return self.horizontalDataCursors
@@ -5592,10 +5578,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def crosshairCursors(self):
         return self.crosshairDataCursors
     
-    @property
-    def cursors(self):
-        return self._data_cursors_
-        
     #@safeWrapper
     #def _plotOverlayFrame_(self):
         ##print("_plotOverlayFrame_ %d" % self._current_frame_index_)
@@ -6715,7 +6697,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             x:np.ndarray, 
                             y:np.ndarray,
                             xlabel:(str, type(None))=None, 
+                            xunits: (str, pq.Quantity, type(None))=None,
                             ylabel:(str, type(None))=None, 
+                            yunits:(str, pq.Quantity, type(None))=None,
                             title:(str, type(None))=None, 
                             name:(str, type(None))=None,
                             symbolcolorcycle:(itertools.cycle, type(None))=None,
@@ -6729,12 +6713,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         x and y must be 2D numpy arrays with compatible dimensions
         
         """
-        #from itertools import cycle
-        
         # ATTENTION: x, y are both numpy arrays here !
         
         # NOTE: 2019-04-06 09:37:51 
-        # there are issues with SVg export of curves containing np.nan
+        # there are issues with SVG export of curves containing np.nan
         
         if x.shape[0] != y.shape[0]:
             raise ValueError("x and y have different sizes on their first axes")
@@ -6838,6 +6820,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     plotItem.plot(x = xx, y = yy, **kwargs)
 
+        
         plotItem.setLabels(bottom = [xlabel], left=[ylabel])
         
         plotItem.setTitle(title)
@@ -7136,11 +7119,23 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         #print("mouse hover in", obj)
         
+        if len(self.axes) == 0:
+            return
+        
+        #system_palette = QtGui.QGuiApplication.palette()
+        #default_border_color = self.axis(0).vb.border.color()
+        
         if len(obj) and isinstance(obj[0], pg.PlotItem):
             self._focussed_plot_item_ = obj[0]
+            #self._focussed_plot_item_.vb.border.setStyle(QtCore.Qt.SolidLine)
+            #self._focussed_plot_item_.vb.border.setColor(system_palette.highlight().color())
             
         else:
             self._focussed_plot_item_ = None
+            
+        #for ax in self.axes:
+            #if ax is not self._focussed_plot_item_ and ax is not self._current_plot_item_:
+                #ax.vb.border.setColor(default_border_color)
         
     @pyqtSlot(object)
     @safeWrapper
@@ -7198,8 +7193,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def slot_mouseClickSelectPlotItem(self, evt):
         focusItem = self.sender().focusItem()
         
-        #print("slot_mouseClickSelectPlotItem event:", evt)
-
+        if len(self.axes) == 0:
+            return
+        
+        #system_palette = QtGui.QGuiApplication.palette()
+        #default_border_color = self.axis(0).vb.border.color()
+        
         if isinstance(focusItem, pg.ViewBox):
             plotitems, rc = zip(*self.axesWithLayoutPositions)
             #plotitems = self.plotItems
@@ -7208,7 +7207,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             if len(focusedPlotItems):
                 self._current_plot_item_ = focusedPlotItems[0]
-                self._focussed_plot_item_ = self._current_plot_item_
+                lbl = "<B>%s</B>" % self._current_plot_item_.axes["left"]["item"].labelText
+                self._current_plot_item_.setLabel("left", lbl)
+                #self._current_plot_item_.vb.border.setStyle(QtCore.Qt.SolidLine)
+                #self._current_plot_item_.vb.border.setColor(system_palette.highlight().color())
+                #self._current_plot_item_.vb.border.setWidthF(2.)
+                #self._current_plot_item_.vb.update()
+                
+                #self._focussed_plot_item_ = self._current_plot_item_
                 
                 plot_index = plotitems.index(self._current_plot_item_)
                 
@@ -7218,16 +7224,49 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 if isinstance(plot_name, str) and len(plot_name.strip()):
                     self.statusBar().showMessage("Selected axes: %d (%s)" % (plotitems.index(self._current_plot_item_), plot_name))
+                    
                 else:
                     self.statusBar().showMessage("Selected axes: %d" % plotitems.index(self._current_plot_item_))
                     
+                for ax in self.axes:
+                    if ax is not self._current_plot_item_:
+                        lbl = ax.axes["left"]["item"].labelText
+                        
+                        if lbl.startswith("<B>") and lbl.endswith("</B>"):
+                            lbl = lbl[3 : lbl.find("</B>")]
+                            ax.setLabel("left", lbl)
+                            
+                        #ax.vb.border.setStyle(QtCore.Qt.NoPen)
+                        #ax.vb.border.setColor(default_border_color)
+                        #ax.vb.border.update()
+        
             else:
                 self._current_plot_item_ = None
-                self._focussed_plot_item_ = None
+                #self._focussed_plot_item_ = None
                 
+                for ax in self.axes:
+                    lbl = ax.axes["left"]["item"].labelText
+                    
+                    if lbl.startswith("<B>") and lbl.endswith("</B>"):
+                        lbl = lbl[3 : lbl.find("</B>")]
+                        ax.setLabel("left", lbl)
+                        
+                    ax.vb.border.setStyle(QtCore.Qt.NoPen)
+                    #ax.vb.border.setColor(default_border_color)
+
         else:
             self._current_plot_item_ = None
-            self._focussed_plot_item_ = None
+            #self._focussed_plot_item_ = None
+
+            for ax in self.axes:
+                lbl = ax.axes["left"]["item"].labelText
+                
+                if lbl.startswith("<B>") and lbl.endswith("</B>"):
+                    lbl = lbl[3 : lbl.find("</B>")]
+                    ax.setLabel("left", lbl)
+                    
+                ax.vb.border.setStyle(QtCore.Qt.NoPen)
+                #ax.vb.border.setColor(default_border_color)
             
     #@pyqtSlot(int)
     #@safeWrapper
@@ -7334,8 +7373,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         ATTENTION: the list is NOT ordered.
         """
         return list(self._data_cursors_.values())
-        
+    
+    @property
+    def dataCursors(self):
+        """Alias to cursors property
+        """
+        return self.cursors
     # aliases to setData
     plot = setData
     view = setData
+    
         

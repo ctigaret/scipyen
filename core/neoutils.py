@@ -271,41 +271,159 @@ def __indexnone(a, b):
     else:
         return None
     
-def cursor2interval(_cursor_, _units_):
-    if isinstance(_cursor_, tuple):
-        if len(_cursor_) != 2:
-            raise TypeError("When a tuple, cursor must contain two elements; got %d instead" % len(_cursor_))
+def cursors2intervals(*args, **kwargs) -> typing.Union[typing.Sequence, np.ndarray]:
+    #cursor: typing.Union[typing.Sequence, np.ndarray, SignalCursor],
+                    #units: typing.Optional[pq.Quantity] = None, 
+                    #as_array:bool = False) -> typing.Union[tuple, np.ndarray]:
+    """Converts a cursor's parameters to the boundaries of a closed interval.
+    
+    Parameters:
+    ----------
+    
+    Variadic parameters (*args):
+    ---------------------------
+    
+    SignalCursor objects, or sequence (tuple, list) of SignalCursors
+    
+    cursor: tuple of two floating point or python Quantity scalars, 
+            a numpy array or a python Quantity array, or a vertical SignalCursor
+            object (from signalviewer module).
+            
+            When a tuple of Quantity scalars, their units must be compatible 
+            with each other (i.e. convertible). If their units are different
+            (but convertible) the second element will be rescaled to the units
+            of the first element.
+            
+    units: (optional, default is None) python Quantity scalar or dimensionality 
+            (e.g., "pq.s" assuming the "quantities" package has been importes as
+            "pq")
+            
+            Ignored when cursor is a tuple of python Quantity scalars or a 
+            Quantity array.
+            
+    as_array: bool, default is False
+    
+        When True the result is a numpy array (or python Quantity array)
+            
+    Returns:
+    -------
+    Tuple of python Quantity scalars representing the boundaries of the interval
+    (from left to right).
+    
+    NOTE: Units are NOT checked for compatibility with a given signal. 
+    
+    Appropriate units would be pq.s (mandatory for neo.AnalogSignal objects). 
+    datatypes.DataSignal objects accept any physical domain (e.g., space with
+    units of distance such as pq.um, etc.)
+    
+    """
+    
+    if units is not None:
+        # do this now, although we may ignore them if cursor is a quantity itself, see below
+        if isinstance(units, pq.Quantity):
+            if not isinstance(units, pq.UnitQuantity):
+                units = units.units # avoid the mistake of passing a quantity 
+                                    # array when instead we're only interested
+                                    # in its units
+        else:
+            raise TypeError("units expected to be a python Quantity or None; got %s instead" % type(units).__name__)
+    
+    if isinstance(cursor, (tuple, list)):
+        if len(cursor) != 2:
+            raise TypeError("When a tuple, cursor must contain two elements; got %d instead" % len(cursor))
         
-        for kc,c in enumerate(_cursor_):
-            if isinstance(c, pq.Quantity):
-                if not dt.units_convertible(c, signal.times):
-                    raise TypeError("Wrong quantity units (%s) for element %d in cursor tuple; expecting %s" % (c.units, kc, signal.times.units))
+        if all([isinstance(c, pq.Quantity) for c in cursor]):
+            if not dt.units_convertible(cursor[0], cursor[1]):
+                raise TypeError("Cursor elements must all have the same units")
+            
+            elif cursor[1].units != cursor[0].units:
+                cursor = list(cursor) # convert to a list so that we are able to
+                                      # scale the 2nd to the units of 1st
+                                      
+                cursor[1] = cursor[1].rescale(cursor[0].units) # scale to same units
+            
+        elif not all([isinstance(c, flooat) for c in cursor]):
+            raise TypeError("Cursor tuple must have either floats or quantities")
+            
+        
+        t0 = cursor[0] - cursor[1]/2.
+        t1 = cursor[0] + cursor[1]/2.
+        
+        if as_array:
+            ret = np.array([t0,t1])
+            
+            if all([isinstance(t, float) for t in (t0,t1)]):
+                if isinstance(units, pq.Quantity): # this includes UnitQuantity
+                    ret *= units
+                    
+            elif all([isinstance(t. pq.Quantity) for t in (t0,t1)]):
+                ret *= t0.units
+            
+        else:
+            if all([isinstance(t, float) for t in (t0,t1)]):
+                if isinstance(units, pq.Quantity):
+                    ret = (t0*units, t1*units) #=> tuple of quantities
+                    
+                else:
+                    ret = (t0,t1) # tuple of whatever t0, t1 are
+            
+        return ret
+    
+    elif isinstance(cursor, np.ndarray):
+        # pq.Quantity inherits from np.ndarray, which guarantees that both 
+        # elements have the same unit, if the array is a pq.Quantity array
+        if cursor.size != 2:
+            raise TypeError("When a numpy array cursor must have exactly two elements")
+        
+        if cursor.ndim == 0: # for a 2-element array this will NEVER happen!
+            cursor = cursor.flatten()
+        
+        t0 = float(cursor[0] - cursor[1]/2.)
+        t1 = float(cursor[0] + cursor[1]/2.)
+        
+        if as_array:
+            ret = np.array([t0,t1])
+            
+            if isinstance(cursor, pq.Quantity):
+                ret *= cursor.units
+    
+            elif isinstance(units, pq.Quantity):
+                ret *= units
+            
+        else:
+            if isinstance(cursor, pq.Quantity):
+                ret = (t0*cursor.units, t1*cursor.units)
                 
-            elif not isinstance(c, float):
-                raise TypeError("Wrong type for element %d in cursor tuple %d. Expecting a float or a python Quantity, got a %s" % (kc, _k_, type(c).__name__))
+            elif isinstance(units, pq.Quantity):
+                ret = (t0*units, t1*units)
+                
+            else:
+                ret = (t0, t1)
             
-        t0 = _cursor_[0] - _cursor_[1]/2.
-        t1 = _cursor_[0] + _cursor_[1]/2.
+    elif isinstance(cursor, SignalCursor):
+        if cursor.cursorType not in (SignalCursor.SignalCursorTypes.vertical, SignalCursor.SignalCursorTypes.crosshair):
+            raise TypeError("Cursor expected ot be vertical or crosshair; got %s instead" % cursor.cursorType.name)
         
-        if isinstance(t0, float):
-            t0 *= _units_
+        t0 = cursor.x - cursor.xwindow/2.
+        t1 = cursor.x + cursor.xwindow/2.
+        
             
-        if isinstance(t1, float):
-            t1 *= _units_
-        
-        return (t0, t1)
+        if as_array:
+            ret = np.array([t0,t1])
+            if isinstance(units, pq.Quantity):
+                ret *= units
+                
+        else:
+            if isinstance(units, pq.Quantity):
+                ret = (t0*units, t1*units)
             
-    elif isinstance(_cursor_, SignalCursor):
-        if _cursor_.cursorType not in (SignalCursor.SignalCursorTypes.vertical, SignalCursor.SignalCursorTypes.crosshair):
-            raise TypeError()
-        
-        t0 = (_cursor_.x - _cursor_.xwindow/2.) * _units_
-        t1 = (_cursor_.x + _cursor_.xwindow/2.) * _units_
-        
-        return (t0, t1)
+            else:
+                ret = (t0,t1)
             
     else:
-        raise TypeError("Expecting a tuple or a signalviewer.SignalCursor; got %s instead" % type(_cursor_).__name__)
+        raise TypeError("Expecting a tuple or a signalviewer.SignalCursor; got %s instead" % type(cursor).__name__)
+    
+    return ret
                 
 
 def correlate(in1, in2, **kwargs):
@@ -569,47 +687,84 @@ def assign_to_signal_in_epoch(dest:neo.AnalogSignal,
     
 @safeWrapper
 def cursors2epoch(*args, **kwargs) -> neo.Epoch:
-    """Constructs a neo.Epoch from vertical or crosshair SignalCursors.
+    """Constructs a neo.Epoch from a sequence of SignalCursor objects.
     
-    SignalCursors are defined in the signalviewer module.
+    Each cursor contributes to an interval in the Epoch.
+    
+    SignalCursor objects are defined in the signalviewer module; this function
+    expects vertical and crosshair cursors (i.e., with cursorType one of
+    SignalCursor.SignalCursorTypes.vertical, 
+    SignalCursor.SignalCursorTypes.horizontal)
     
     Variadic parameters:
     --------------------
     
-    SignalCursor object(s) or a sequence (tuple, list) of SignalCursor objects.
-        NOTE: All must be of type vertical or crosshair
+    SignalCursor object(s), a sequence (tuple, list) of SignalCursor objects,
+    or a sequence of tuples (x, xwindow, label) of vertical cursor parameters.
+    
+        SignalCursor obejcts must all be of type vertical or crosshair.
+        
+        When a sequence of tuples, these can have 2, 3 or 5 elements.
+        
+        a) 2-tuples are interpreted as (time, window) pairs of notional vertical
+            cursor coordinates
+            
+        b) 3-tuples are interpreted as (time, window, label) triples of notional
+            vertical cursors
+            
+        c) 5-tuples are interpreted as (x, xwindow, y, ywindow, label) tuples of
+            notional crosshair cursors. In this case only the x, xwindow and
+            label elements are used.
+            
+        NOTE: the cases (a) and (b) are the value of the 'parameters' property
+        of a vertical and crosshair cursor, respectively. This means that such
+        a tuple can be obtained by referencing cursor.parameters property.
         
     Var-keyword parameters:
     ----------------------
+    
+    units: python Quantity or None (default)
+        By default, the epoch's units are seconds (pq.s) but in a neo.Epoch can
+        support any units
+    
     name: str, default is" Epoch"
     
     sort: bool, default if False
         When True, the cursors are sorted by their x coordinate
+        
+    as_intervals: bool, default is False.
+    
+        When True, the function returns triplets of (start, stop, label)
+        
+        Otherwise returns a neo.Epoch
+        
+    Returns:
+    -------
+    
+    When as_intervals is False (default), returns a neo.Epoch with intervals 
+        generated from the cursor x coordinates and horizontal windows:
+        
+            times = cursor.x - cursor.xwindow/2
+            durations = cursor.xwindow
+            
+            By design, the epoch's units are time units (pq.s by default)
+            
+    When as_intervals is True, returns a list of triplets:
+            (start, stop, label)
+            
+            If units are provided, start and stop are python Quantity scalars,
+            otherwise they are floating point scalars.
     
     """
-    cursors = None
+    as_intervals = kwargs.get("as_intervals", False)
     
-    if len(args) == 0:
-        raise ValueError("Expecting at least one argument")
+    units = kwargs.get("units", pq.s)
     
-    if len(args) == 1:
-        if isinstance(args[0], (tuple, list)):
-            if not all([isinstance(c, SignalCursor) for c in args[0]]):
-                raise TypeError("Expecting a sequence of SignalCursor objects")
-            
-            cursors = list(args[0])
-            
-        elif isinstance(args[0], SignalCursor):
-            cursors = list(args)
-            
-        else:
-            raise TypeError("Expecting a SignalCursor or a sequence of SignalCutsor objects; got %s instead" % type(args[0]).__name__)
+    if not isinstance(units, pq.UnitQuantity):
+        units = units.units
         
-    else:
-        if not all([isinstance(c, SignalCursor) for c in args]):
-            raise TypeError("Expecting SignalCursor objects")
-        
-        cursors = list(args)
+    elif not isinstance(units, pq.Quantity):
+        raise TypeError("Units expected to be a python Quantity; got %s instead" % type(units).__name__)
         
     name = kwargs.get("name", "Epoch")
     
@@ -621,19 +776,80 @@ def cursors2epoch(*args, **kwargs) -> neo.Epoch:
     if not isinstance(sort, bool):
         sort = False
     
-    if not all([c.cursorType in (SignalCursor.SignalCursorTypes.vertical, SignalCursor.SignalCursorTypes.crosshair) for c in cursors]):
-        raise TypeError("Expecting only vertical and/or crosshair cursors")
+    def __parse_cursors_tuples__(*values):
+        print("values:", values)
+        
+        if as_intervals:
+            return [(v[0]-v[1]/2., v[0]+v[1]/2., "%d"%k) if len(v) == 2 else (v[0]-v[1]/2., v[0]+v[1]/2., v[2]) if len(v) == 3 else (v[0]-v[1]/2., v[0]+v[1]/2., v[4]) for k,v in enumerate(values)]
+        else:
+            return [(v[0]-v[1]/2., v[1],         "%d"%k) if len(v) == 2 else (v[0]-v[1]/2., v[1],         v[2]) if len(v) == 3 else (v[0]-v[1]/2., v[1],         v[4]) for k,v in enumerate(values)]
+        
+    #cursors = None
+    
+    if len(args) == 0:
+        raise ValueError("Expecting at least one argument")
+    
+    if len(args) == 1:
+        if isinstance(args[0], (tuple, list)):
+            if all ([isinstance(c, SignalCursor) for c in args[0]]):
+                if all([c.cursorTypeName in ("vertical", "crosshair")  for c in args[0]]):
+                    t_d_i = __parse_cursors_tuples__(*[c.parameters for c in args[0]])                    
+                else:
+                    raise TypeError("Expecting only vertical or crosshair cursors")
+                #t_d_i = [(c.x - c.xwindow/2., c.xwindow, c.ID) for c in args[0]]
+                
+            elif all([isinstance(c, (tuple, list)) for c in args[0]]):
+                if all([len(c) in (2,3,5) for c in args[0]]):
+                    t_d_i = __parse_cursors_tuples__(args[0])
+                    
+                else:
+                    raise TypeError("All cursor parameter tuples must have two or three elements")
+                         
+        elif isinstance(args[0], SignalCursor):
+            if args[0].cursorType is SignalCursor.SignalCursorTypes.horizontal:
+                raise TypeError("Expecting a vertical or crosshair cursor")
+            
+            t_d_i = __parse_cursors_tuples__([args[0].parameters])
+            
+        elif len(args[0] == 3):
+            t_d_i = __parse_cursors_tuples__([args[0]])
+            
+        else:
+            raise TypeError("Unexpected argument type %s" % type(args[0]).__name__)
+        
+    else:
+        if all([isinstance(c, SignalCursor) for c in args]):
+            if all ([c.cursorTypeName in ("vertical", "crosshair") for c in args]):
+                t_d_i = __parse_cursors_tuples__([c.parameters for c in args])
+                
+            else:
+                raise TypeError("Expecting only vertical or crosshair cursors")
+            
+        elif all([isinstance(c, (tuple, list)) and len(c) in (2,3,5) for c in args]):
+            t_d_i = __parse_cursors_tuples__(args)
+            
+        else:
+            raise TypeError("Unexpected argument types")
+        
+    #if not all([c.cursorType in (SignalCursor.SignalCursorTypes.vertical, SignalCursor.SignalCursorTypes.crosshair) for c in cursors]):
+        #raise TypeError("Expecting only vertical and/or crosshair cursors")
 
     if sort:
-        cursors = sorted(cursors, key=lambda x: x.x)
+        t_d_i = sorted(t_d_i, key=lambda x: x[0])
+        #cursors = sorted(cursors, key=lambda x: x.x)
         
     # get the times and durations from cursors list ordered by their x coordinate
     # this is a list of (time, duration, label) tuples
-    t_d_i = [(c.x - c.xwindow/2, c.xwindow, c.ID) for c in cursors]
+    #t_d_i = [(c.x - c.xwindow/2, c.xwindow, c.ID) for c in cursors]
     # transpose t_d_i and unpack:
-    t, d, i = [v for v in zip(*t_d_i)]
     
-    return neo.Epoch(times=t, durations=d, labels=i, units=pq.s, name=name)
+    
+    if as_intervals:
+        return t_d_i
+    
+    else:
+        t, d, i = [v for v in zip(*t_d_i)]
+        return neo.Epoch(times=t, durations=d, labels=i, units=units, name=name)
     
 #@safeWrapper
 #def cursors2epoch_(cursors: typing.Optional[typing.Sequence] = None,
@@ -1364,9 +1580,9 @@ def interval2cursor(t0: float, t1: float) -> typing.Tuple[float, float]:
 
 @safeWrapper
 def epoch2cursors(epoch: neo.Epoch, 
-                  axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]], None,
+                  axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None,
                   **kwargs) -> typing.Sequence:
-    """Creates notional vertical signal cursors from a neo.Epoch.
+    """Creates vertical signal cursors from a neo.Epoch.
     
     axis: pyqtgraph.PlotItem, pyqtgraph.GraphicsScene, or None (default).
     
