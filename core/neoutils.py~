@@ -271,13 +271,6 @@ def __indexnone(a, b):
     else:
         return None
     
-def cursors2intervals(*args, **kwargs) -> typing.Union[typing.Sequence, np.ndarray]:
-    """Calls cursors2epochs with intervals set to True
-    """
-    kwargs.pop("intervals", True) # avoid double parameter specification
-    
-    return cursors2epoch(*args, **kwargs, intervals=True)
-
 def correlate(in1, in2, **kwargs):
     """Calls scipy.signal.correlate(in1, in2, **kwargs).
     
@@ -780,6 +773,13 @@ def cursors2epoch(*args, **kwargs) -> typing.Union[neo.Epoch, typing.Sequence]:
         
         return neo.Epoch(times=t, durations=d, labels=i, units=units, name=name)
     
+def cursors2intervals(*args, **kwargs) -> typing.Union[typing.Sequence, np.ndarray]:
+    """Calls cursors2epochs with intervals set to True
+    """
+    kwargs.pop("intervals", True) # avoid double parameter specification
+    
+    return cursors2epoch(*args, **kwargs, intervals=True)
+
 @safeWrapper
 def signal2epoch(sig, name=None, labels=None):
     """Constructs a neo.Epochs from the times and durations in a neo.IrregularlySampledSignal
@@ -1385,10 +1385,10 @@ def epoch2cursors(epoch: neo.Epoch,
     
     axis: (optional) pyqtgraph.PlotItem, pyqtgraph.GraphicsScene, or None.
     
-        Default is None.
+        Default is None, in which case the function returns cursor parameters.
     
-        When not None, the function also populates 'axis' with a sequence of 
-        vertical SignalCursor objects constructed using the returned values.
+        When not None, the function populates 'axis' with a sequence of 
+        vertical SignalCursor objects and returns their references in a list.
         
     Var-keyword parameters:
     ----------------------
@@ -1403,23 +1403,36 @@ def epoch2cursors(epoch: neo.Epoch,
     
     Returns:
     --------
-    When axis is None, returns a list of tuples of (time, window, labels) where:
+    When axis is None, returns a list of tuples of vertical cursor parameters
+        (time, window, labels) where:
+        
         time = epoch.times + epoch.durations/2.
         window = epoch.durations
         labels = epoch.labels -- the labels of the epoch's intervals
         
-    When axis is a pyqtgraph.PlotItem or a pyqtgraph.GraphicsScene, a list of
-    vertical SignalCursor objects.
+    When axis is a pyqtgraph.PlotItem or a pyqtgraph.GraphicsScene, the function
+    adds vertical SignalCursors to the axis and returns a list with references
+    to them.
     
     Side effects:
     -------------
-    The cursors are added to the PlotItem or GraphicsScene specified by the
-    'axis' parameter.
+    When axis is not None, the cursors are added to the PlotItem or GraphicsScene
+    specified by the 'axis' parameter.
     """
-    
-    ret = [(t + d/2., d, l) for (t, d, l) in zip(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels)]
+    keep_units = kwargs.pop("keep_units", False)
+    if not isinstance(keep_units, bool):
+        keep_units = False
+        
+    if keep_units:
+        ret = [(t + d/2., d, l) for (t, d, l) in zip(epoch.times, epoch.durations, epoch.labels)]
+        
+    else:
+        ret = [(t + d/2., d, l) for (t, d, l) in zip(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels)]
     
     if isinstance(axis, (pg.PlotItem, pg.GraphicsScene)):
+        # NOTE: 2020-03-10 18:23:03
+        # cursor constructor accepts python Quantity objects for its numeric
+        # parameters x, y, xwindow, ywindow, xBounds and yBounds
         cursors = [SignalCursor(axis, x=t, xwindow=d,
                                 cursor_type=SignalCursor.SignalCursorTypes.vertical,
                                 cursorID=l) for (t,d,l) in ret]
@@ -1427,8 +1440,28 @@ def epoch2cursors(epoch: neo.Epoch,
     
     return ret
 
-def epoch2intervals(epoch: neo.Epoch) -> typing.Sequence:
-    ret = [(t, t+d, l) for (t,d,l) in zip(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels)]
+@safeWrapper
+def epoch2intervals(epoch: neo.Epoch, keep_units:bool = False) -> typing.Sequence:
+    """Generates a sequence of intervals as triplets (t_start, t_stop, label).
+    
+    Each interval coresponds to the epoch's interval.
+    
+    Parameters:
+    ----------
+    epoch: neo.Epoch
+    
+    keep_units: bool (default False)
+        When True, the t_start and t_stop in each interval are scalar python 
+        Quantity objects (units borrowed from the epoch)
+    
+    """
+    if keep_units:
+        return [(t, t+d, l) for (t,d,l) in zip(epoch.times, epoch.durations, epoch.labels)]
+        
+    else:
+        return [(t, t+d, l) for (t,d,l) in zip(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels)]
+    
+@safeWrapper
     
 
 @safeWrapper

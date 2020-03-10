@@ -664,6 +664,15 @@ class SignalCursor(QtCore.QObject):
                 
             elif all([isinstance(v, pq.Quantity) and len(v) == 1 for v in xBounds]):
                 self._x_range_  = [v.flatten().magnitude for v in xBounds]
+                
+        elif isinstance(xBounds, np.ndarray) and xBounds.ndim> 0 and len(xBounds) == 2:
+            if isinstance(xBounds, pq.Quantity):
+                xBounds = xBounds.flatten().magnitude
+                
+            self._x_range_ = [v for v in xBounds]
+            
+        elif xBounds is not None:
+            raise TypeError("xBounds expected to be a sequence of two (possibly Quantity) scalars, or a numpy or Quantity array with two elements")
             
         else:
             self._x_range_ = hostBounds[0]
@@ -676,7 +685,16 @@ class SignalCursor(QtCore.QObject):
                 self._y_range_ = yBounds
             
             elif all([isinstance(v, pq.Quantity) and len(v) == 1 for v in xBounds]):
-                self._x_range_  = [v.flatten().magnitude for v in xBounds]
+                self._y_range_  = [v.flatten().magnitude for v in xBounds]
+            
+        elif isinstance(yBounds, np.ndarray) and yBounds.ndim> 0 and len(yBounds) == 2:
+            if isinstance(yBounds, pq.Quantity):
+                yBounds = yBounds.flatten().magnitude
+                
+            self._y_range_ = [v for v in yBounds]
+            
+        elif yBounds is not None:
+            raise TypeError("yBounds expected to be a sequence of two (possibly Quantity) scalars, or a numpy or Quantity array with two elements")
             
         else:
             self._y_range_ = hostBounds[1]
@@ -1786,10 +1804,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self._plot_names_ = dict() # maps item row position to name
         
-        self.crosshairDataCursors = dict() # a dict of SignalCursors mapping str name to cursor object
-        self.verticalDataCursors = dict()
-        self.horizontalDataCursors = dict()
-        self._data_cursors_ = collections.ChainMap(self.crosshairDataCursors, self.horizontalDataCursors, self.verticalDataCursors)
+        self.crosshairSignalCursors = dict() # a dict of SignalCursors mapping str name to cursor object
+        self.verticalSignalCursors = dict()
+        self.horizontalSignalCursors = dict()
+        self._data_cursors_ = collections.ChainMap(self.crosshairSignalCursors, self.horizontalSignalCursors, self.verticalSignalCursors)
         # NOTE: 2017-05-10 22:57:30
         # these are linked cursors in the same window
         self.linkedCrosshairCursors = []
@@ -1933,6 +1951,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #### BEGIN plot items management
         self._focussed_plot_item_ = None
         self._current_plot_item_ = None
+        self._current_plot_item_index_ = -1
         #### END plot items management
         
         self._mouse_coordinates_text_ = ""
@@ -2027,9 +2046,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.linkedCrosshairCursors.clear()
         self.linkedHorizontalCursors.clear()
         self.linkedVerticalCursors.clear()
-        self.crosshairDataCursors.clear() # a dict of SignalCursors mapping str name to cursor object
-        self.verticalDataCursors.clear()
-        self.horizontalDataCursors.clear()
+        self.crosshairSignalCursors.clear() # a dict of SignalCursors mapping str name to cursor object
+        self.verticalSignalCursors.clear()
+        self.horizontalSignalCursors.clear()
         self._data_cursors_.clear()
         
         self.y = None
@@ -2448,61 +2467,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.slot_selectCursor(crsID)
         
-        return crsID
-        
-        #if xwindow is None:
-            #xwindow=self.defaultCursorWindowSizeX
-            
-        #if ywindow is None:
-            #ywindow = self.defaultCursorWindowSizeY
-            
-        #crsID = None
-        
-        
-        ## this FIRST creates the cursor (with default coordinates i.e. at the
-        ## CENTRE of the axis or scene), THEN updates its coordinates
-        #if cursorType in ("c", "crosshair"):
-            #crsID = self._addCursor_(cursorType)
-            #crsID = self.slot_addCrosshairCursor(label)
-            #self.slot_selectCursor(crsID)
-            #self.selectedDataCursor.xwindow = xwindow
-            #self.selectedDataCursor.ywindow = ywindow
-            
-            #if where is not None and len(where) == 2:
-                #if all([isinstance(w, pq.quantity.Quantity) for w in where]):
-                    #self.crosshairDataCursors[crsID].x = where[0].magnitude
-                    #self.crosshairDataCursors[crsID].y = where[1].magnitude
-                    
-                #else:
-                    #self.crosshairDataCursors[crsID].x = where[0]
-                    #self.crosshairDataCursors[crsID].y = where[1]
-                    
-        #elif cursorType in ("h", "horizontal"):
-            #crsID = self.slot_addHorizontalCursor(label)
-            #self.slot_selectCursor(crsID)
-            #self.selectedDataCursor.ywindow=ywindow
-            
-            #if where is not None:
-                #if isinstance(where, pq.quantity.Quantity):
-                    #self.horizontalDataCursors[crsID].y = where.magnitude
-
-                #else:
-                    #self.horizontalDataCursors[crsID].y = where
-                    
-        #elif cursorType in ("v", "vertical"):
-            #crsID = self.slot_addVerticalCursor(label)
-            #self.slot_selectCursor(crsID)
-            #self.selectedDataCursor.xwindow = xwindow
-            
-            #if where is not None:
-                #if isinstance(where, pq.quantity.Quantity):
-                    #self.horizontalDataCursors[crsID].x = where.magnitude
-                    
-                #else:
-                    #self.verticalDataCursors[crsID].x = where
-                
         #return crsID
-    
+        
     @safeWrapper
     def keyPressEvent(self, keyevt):
         if keyevt.key() in (QtCore.Qt.Key_Escape, QtCore.Qt.Key_Delete, QtCore.Qt.Key_Backspace):
@@ -3371,7 +3337,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #print("SignalViewer._addCursor_ cursor_type %s" % cursor_type)
         
         if cursor_type in ("vertical", "v", SignalCursor.SignalCursorTypes.vertical):
-            cursorDict = self.verticalDataCursors
+            cursorDict = self.verticalSignalCursors
             crsPrefix = "v"
             
             #xwindow = self.defaultCursorWindowSizeX
@@ -3380,7 +3346,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             linkedPen = pg.mkPen(pg.mkColor(self.linkedCursorColors["vertical"]), style=QtCore.Qt.SolidLine)
             
         elif cursor_type in ("horizontal", "h", SignalCursor.SignalCursorTypes.horizontal):
-            cursorDict = self.horizontalDataCursors
+            cursorDict = self.horizontalSignalCursors
             crsPrefix = "h"
             xwindow = 0.0
             #ywindow = self.defaultCursorWindowSizeY
@@ -3388,7 +3354,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             linkedPen = pg.mkPen(pg.mkColor(self.linkedCursorColors["horizontal"]), style=QtCore.Qt.SolidLine)
             
         elif cursor_type in ("crosshair", "c", SignalCursor.SignalCursorTypes.crosshair):
-            cursorDict = self.crosshairDataCursors
+            cursorDict = self.crosshairSignalCursors
             crsPrefix = "c"
             xwindow = self.defaultCursorWindowSizeX
             ywindow = self.defaultCursorWindowSizeY
@@ -3734,9 +3700,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             crs.detach()
         
         self._data_cursors_.clear()
-        self.crosshairDataCursors.clear()
-        self.horizontalDataCursors.clear()
-        self.verticalDataCursors.clear()
+        self.crosshairSignalCursors.clear()
+        self.horizontalSignalCursors.clear()
+        self.verticalSignalCursors.clear()
         
         self.selectedDataCursor = None
         self._cursor_coordinates_text_ = ""
@@ -3766,14 +3732,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         crs = None
         
-        if crsID in self.crosshairDataCursors:
-            crs = self.crosshairDataCursors.pop(crsID, None)
+        if crsID in self.crosshairSignalCursors:
+            crs = self.crosshairSignalCursors.pop(crsID, None)
 
-        elif crsID in self.horizontalDataCursors:
-            crs = self.horizontalDataCursors.pop(crsID, None)
+        elif crsID in self.horizontalSignalCursors:
+            crs = self.horizontalSignalCursors.pop(crsID, None)
 
-        elif crsID in self.verticalDataCursors:
-            crs = self.verticalDataCursors.pop(crsID, None) 
+        elif crsID in self.verticalSignalCursors:
+            crs = self.verticalSignalCursors.pop(crsID, None) 
             
         # now, also remove its line2D objects from the axes
         if crs is not None:
@@ -4014,16 +3980,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     cursor.ID = name
                     
                     if cursor.isVertical:
-                        self.verticalDataCursors.pop(initialID)
-                        self.verticalDataCursors[cursor.ID] = cursor
+                        self.verticalSignalCursors.pop(initialID)
+                        self.verticalSignalCursors[cursor.ID] = cursor
                         
                     elif cursor.isHorizontal:
-                        self.horizontalDataCursors.pop(initialID)
-                        self.horizontalDataCursors[cursor.ID] = cursor
+                        self.horizontalSignalCursors.pop(initialID)
+                        self.horizontalSignalCursors[cursor.ID] = cursor
                         
                     else:
-                        self.crosshairDataCursors.pop(initialID)
-                        self.crosshairDataCursors[cursor.ID] = cursor
+                        self.crosshairSignalCursors.pop(initialID)
+                        self.crosshairSignalCursors[cursor.ID] = cursor
                         
             if cursor.isVertical:
                 #print(d.promptX.value(), d.promptXWindow.value())
@@ -4164,7 +4130,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot()
     @safeWrapper
     def slot_cursorsToEpochInData(self):
-        vertAndCrossCursors = collections.ChainMap(self.crosshairDataCursors, self.verticalDataCursors)
+        vertAndCrossCursors = collections.ChainMap(self.crosshairSignalCursors, self.verticalSignalCursors)
         
         if len(vertAndCrossCursors) == 0:
             return
@@ -4245,7 +4211,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot()
     @safeWrapper
     def slot_cursorToEpochInData(self):
-        vertAndCrossCursors = collections.ChainMap(self.crosshairDataCursors, self.verticalDataCursors)
+        vertAndCrossCursors = collections.ChainMap(self.crosshairSignalCursors, self.verticalSignalCursors)
         
         if len(vertAndCrossCursors) == 0:
             return
@@ -4261,7 +4227,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot()
     @safeWrapper
     def slot_epochInDataBetweenCursors(self):
-        vertAndCrossCursors = collections.ChainMap(self.crosshairDataCursors, self.verticalDataCursors)
+        vertAndCrossCursors = collections.ChainMap(self.crosshairSignalCursors, self.verticalSignalCursors)
         
         if len(vertAndCrossCursors) == 0:
             return
@@ -4356,7 +4322,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot()
     @safeWrapper
     def slot_cursorToEpoch(self):
-        vertAndCrossCursors = collections.ChainMap(self.crosshairDataCursors, self.verticalDataCursors)
+        vertAndCrossCursors = collections.ChainMap(self.crosshairSignalCursors, self.verticalSignalCursors)
         
         if len(vertAndCrossCursors) == 0:
             return
@@ -4376,7 +4342,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if self._scipyenWindow_ is None:
             return
         
-        vertAndCrossCursors = collections.ChainMap(self.crosshairDataCursors, self.verticalDataCursors)
+        vertAndCrossCursors = collections.ChainMap(self.crosshairSignalCursors, self.verticalSignalCursors)
         
         if len(vertAndCrossCursors) == 0:
             return
@@ -4429,7 +4395,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """Creates a neo.Epoch from a list of cursors
         TODO: give the possibilty to select which cursors to use, via GUI
         """
-        vertAndCrossCursors = collections.ChainMap(self.crosshairDataCursors, self.verticalDataCursors)
+        vertAndCrossCursors = collections.ChainMap(self.crosshairSignalCursors, self.verticalSignalCursors)
         
         if len(vertAndCrossCursors) == 0:
             return None
@@ -5454,6 +5420,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if len(plotitems_coords) == 0:
             #QtWidgets.QMessageBox.critical(self, "Set current axes:", "Must plot something first!")
             self._current_plot_item_ = None
+            self._current_plot_item_index_ = -1
             return False
         
         plotitems, _ = zip(*plotitems_coords)
@@ -5468,6 +5435,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #default_border_color = self.axis(0).vb.border.color()
         
         self._current_plot_item_ = plotitems[index]
+        self._current_plot_item_index_ = index
         lbl = "<B>%s</B>" % self._current_plot_item_.axes["left"]["item"].labelText
         self._current_plot_item_.setLabel("left", lbl)
         #self._current_plot_item_.vb.border.setStyle(QtCore.Qt.SolidLine)
@@ -5486,17 +5454,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.statusBar().showMessage("Selected axes: %d (%s)" % index, self._plot_names_.get(index))
         
-    #@property
-    #"def" currentAxis(self) -> pg.PlotItem:
-        #"""Alias to currentPlotItem. 
-        #The setter counterpart is alaised to that of self.currentPlotItem
-        #"""
-        #return self._current_plot_item_
-    
-    #@currentAxis.setter
-    #"def" currentAxis(self, index: int) :
-        #self.currentPlotItem = index
-    
     @property
     def currentAxis(self):
         return self.currentPlotItem
@@ -5576,15 +5533,21 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                    
     @property
     def verticalCursors(self):
-        return self.verticalDataCursors
+        """List of vertical signal cursors
+        """
+        return [c for c in self.verticalSignalCursors.values()]
     
     @property
     def horizontalCursors(self):
-        return self.horizontalDataCursors
+        """List of horizontal signal cursors
+        """
+        return [c for c in self.horizontalSignalCursors.values()]
     
     @property
     def crosshairCursors(self):
-        return self.crosshairDataCursors
+        """List of croshair signal cursors
+        """
+        return [c for c in self.crosshairSignalCursors.values()]
     
     #@safeWrapper
     #def _plotOverlayFrame_(self):
@@ -5789,8 +5752,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                     neo.core.AnalogSignal, 
                                     neo.core.IrregularlySampledSignal,
                                     dt.IrregularlySampledDataSignal)) for y_ in self.y]):
-                #print("displayFrame %d type %s" % (self._current_frame_index_, type(self.y[self._current_frame_index_]).__name__))
-                
                 self._plotSignal_(self.y[self._current_frame_index_], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
                 self.currentFrameAnnotations = {type(self.y[self._current_frame_index_]).__name__: self.y[self._current_frame_index_].annotations}
                 
@@ -5828,14 +5789,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if segmentNdx >= len(self.y.segments):
                     return
                 
-                #print("SignalViewer.displayFrame for neo.Block: segment index", 
-                      #segmentNdx,
-                      #"for %d segments" % len(self.y.segments))
-                
                 segment = self.y.segments[segmentNdx]
-                
-                #print("SignalViewer.displayFrame for neo.Block: segment.epochs",
-                      #segment.epochs)
                 
                 self._plotSegment_(segment, *self.plot_args, **self.plot_kwargs) # calls _setup_signal_choosers_() and _prepareAxes_()
                 
@@ -5858,12 +5812,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 try:
                     if self.y.ndim > 3:
                         raise TypeError("Numpy arrays with more than three dimensions are not supported")
-                        
-                    #self._setup_signal_choosers_(self.y)
-                    
-                    #print("SignalViewer displayFrame y.ndim", self.y.ndim)
-                    #print("SignalViewer displayFrame frameAxis", self.frameAxis)
-                    #print("SignalViewer displayFrame signalChannelAxis", self.signalChannelAxis)
                     
                     self._plotArray_(self.x, self.y, *self.plot_args, **self.plot_kwargs)
                     
@@ -5876,15 +5824,65 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 raise TypeError("Plotting of data of type %s not yet implemented" % str(type(self.y)))
             
-        if self._current_plot_item_ is None:
-            axes = self.plotItems
-
-            if len(axes):
-                self._current_plot_item_ =  axes[0] # by default
+        # NOTE: 2020-03-10 22:09:51
+        # reselect an axis according to its index (if one had been selected before)
+        # CAUTION: this may NOT be the same PlotItem object!
+        # also makes sure we always have an axis selected
+        print("start currentFrame", self.currentFrame)
+        print("start current plot item", self._current_plot_item_)
+        print("start current plot item index", self._current_plot_item_index_)
+        print("number of axes: ", len(self.plotItems))
+        
+        if len(self.plotItems):
+            if self._current_plot_item_ is None:
+                print("no prev selected axis")
+                self._current_plot_item_index_ = 0 # by default
+                self._current_plot_item_ =  self.plotItems[self._current_plot_item_index_] 
+                print("new current plot item", self._current_plot_item_)
+                print("new current plot item index", self._current_plot_item_index_)
                 
-        #for cursor in self._data_cursors_.values():
-            #cursor.setBounds()
+            elif self._current_plot_item_ not in self.plotItems:
+                print("prev selected index", self._current_plot_item_index_)
+                
+                if self._current_plot_item_index_ < 0: # this is prev index
+                    self._current_plot_item_index_ = 0
+                    
+                elif self._current_plot_item_index_ >= len(self.plotItems):
+                        self._current_plot_item_index_ = len(self.plotItems) -1
+                    
+                self._current_plot_item_ = self.plotItems[self._current_plot_item_index_]
+                
+                print("reset current plot item", self._current_plot_item_)
+                print("reset current plot item index", self._current_plot_item_index_)
+                
+            else:
+                self._current_plot_item_index_ = self.plotItems.index(self._current_plot_item_)
+                print("test index", self._current_plot_item_index_, "item", self._current_plot_item_)
+                
+            lbl = self._current_plot_item_.axes["left"]["item"].labelText
             
+            if any([s not in lbl for s in ("<B>", "</B>")]):
+                lbl = "<B>%s</B>" % lbl
+                self._current_plot_item_.setLabel("left", lbl)
+
+            for plotItem in self.plotItems:
+                if plotItem is not self._current_plot_item_:
+                    lbl = plotItem.axes["left"]["item"].labelText
+                    
+                    if lbl.startswith("<B>") and lbl.endswith("</B>"):
+                        lbl = lbl[3 : lbl.find("</B>")]
+                        plotItem.setLabel("left", lbl)
+                    
+        else:
+            # have no axis selected as current, only when there are no axes
+            # (pg.PlotItem objects)
+            self._current_plot_item_ = None
+            self._current_plot_item_index_ = -1
+                    
+        print("end current plot item", self._current_plot_item_)
+        print("end current plot item index", self._current_plot_item_index_)
+        print("***")
+        
         self._update_annotations_()
         
     @safeWrapper
@@ -6844,6 +6842,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         for c in plotItemCursors:
             c.setBounds()
+            
+        if plotItem is self._current_plot_item_:
+            lbl = "<B>%s</B>" % self._current_plot_item_.axes["left"]["item"].labelText
+            self._current_plot_item_.setLabel("left", lbl)
+            
+        else:
+            lbl = plotItem.axes["left"]["item"].labelText
+            
+            if lbl.startswith("<B>") and lbl.endswith("</B>"):
+                lbl = lbl[3 : lbl.find("</B>")]
+                plotItem.setLabel("left", lbl)
         
         return plotItem
            
@@ -6852,8 +6861,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """sigNames: a sequence of str or None objects - either empty, or with as many elements as nAxes
         """
         plotitems = self.plotItems
-        
-        #print("_prepareAxes_ nAxes", nAxes, "sigNames", sigNames)
         
         if not isinstance(sigNames, (tuple, list)):
             raise TypeError("Expecting sigNames to be a sequence; got %s instead" % type(sigNames).__name__)
@@ -6881,9 +6888,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     for plotdataitem in plotDataItems:
                         plotdataitem.clear()
                         
-                    #print(plotitem.vb.name)
-                    #print(sigNames[k])
-                    
                     self._plot_names_[k] = sigNames[k]
                     
                     try:
@@ -6904,9 +6908,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if nAxes == 0:
             # no axes required => clear all plots
             if len(plotitems):
-                cursors = [c for c in self.crosshairDataCursors.values()] + \
-                          [c for c in self.verticalDataCursors.values()] + \
-                          [c for c in self.horizontalDataCursors.values()]
+                cursors = [c for c in self.crosshairSignalCursors.values()] + \
+                          [c for c in self.verticalSignalCursors.values()] + \
+                          [c for c in self.horizontalSignalCursors.values()]
                       
                 for plotitem in plotitems:
                     for c in cursors:
@@ -6924,12 +6928,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.signalsLayout.removeItem(plotitem)
                 
             self._plot_names_.clear()
-            
-            #self.__plot_items__.clear()
                 
-            self.crosshairDataCursors.clear()
-            self.verticalDataCursors.clear()
-            self.horizontalDataCursors.clear()
+            self.crosshairSignalCursors.clear()
+            self.verticalSignalCursors.clear()
+            self.horizontalSignalCursors.clear()
             
             self._cached_cursors_.clear()
             
@@ -7008,26 +7010,22 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     plotitem = self.signalsLayout.getItem(k, 0)
                     
                     if isinstance(plotitem, pg.PlotItem):# and plotitem in self.__plot_items__:
-                        #ndx = self.__plot_items__.index(plotitem)
-                        
                         # are there any cursors in this plotitem?
                         cursors = self.cursorsInAxis(plotitem)
                         
                         if len(cursors):
                             for cursor in cursors:
                                 cursor.detach() # option (b)
-                            #self._cached_cursors_[plotitem.vb.name] = cursors
+
                             # see NOTE: 2019-03-08 13:20:50
                             self._cached_cursors_[k] = cursors
                                 
-                        #del self.__plot_items__[ndx]
-                        
                         self.signalsLayout.removeItem(plotitem)
                         self._plot_names_.pop(k, None)
                 #### END remove extra plot items
                 
             elif nAxes > len(plotitems):
-                #### requires more axes that there actually are:
+                # requires more axes that there actually are:
                 # adapt existing plotitems then add new axes
                 
                 #### BEGIN adapt existing plot items
@@ -7082,13 +7080,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             plotitems = sorted([i for i in self.signalsLayout.items.items()], key = lambda x: x[1][0])
             
             if len(plotitems):
-                # restore cached cursors if any
-                #if len(self._cached_cursors_):
-                    #for k,p in enumerate(plotitems):
-                        #if p.vb.name in self._cached_cursors_:
-                            #for c in self._cached_cursors_[p.vb.name]:
-                                #c.attach(p)
-                                
                 p0 = self.signalsLayout.getItem(0,0)
                 
                 if isinstance(p0, pg.PlotItem):
@@ -7113,7 +7104,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if p.scene():
                 p.scene().sigMouseMoved[object].connect(self.slot_mouseMovedInPlotItem)
                 p.scene().sigMouseHover[object].connect(self.slot_mouseHoverInPlotItem)
-                
+            
                 
     @pyqtSlot(object)
     @safeWrapper
@@ -7215,16 +7206,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             if len(focusedPlotItems):
                 self._current_plot_item_ = focusedPlotItems[0]
-                lbl = "<B>%s</B>" % self._current_plot_item_.axes["left"]["item"].labelText
-                self._current_plot_item_.setLabel("left", lbl)
-                #self._current_plot_item_.vb.border.setStyle(QtCore.Qt.SolidLine)
-                #self._current_plot_item_.vb.border.setColor(system_palette.highlight().color())
-                #self._current_plot_item_.vb.border.setWidthF(2.)
-                #self._current_plot_item_.vb.update()
-                
-                #self._focussed_plot_item_ = self._current_plot_item_
-                
+                lbl = self._current_plot_item_.axes["left"]["item"].labelText
+                if any([s not in lbl for s in ("<B>", "</B>")]):
+                    lbl = "<B>%s</B>" % lbl
+                    self._current_plot_item_.setLabel("left", lbl)
+
                 plot_index = plotitems.index(self._current_plot_item_)
+                self._current_plot_item_index_ = plot_index
                 
                 plot_row = rc[plot_index][0][0]
                 
@@ -7244,13 +7232,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             lbl = lbl[3 : lbl.find("</B>")]
                             ax.setLabel("left", lbl)
                             
-                        #ax.vb.border.setStyle(QtCore.Qt.NoPen)
-                        #ax.vb.border.setColor(default_border_color)
-                        #ax.vb.border.update()
-        
             else:
                 self._current_plot_item_ = None
-                #self._focussed_plot_item_ = None
+                self._current_plot_item_index_ = -1
                 
                 for ax in self.axes:
                     lbl = ax.axes["left"]["item"].labelText
@@ -7260,11 +7244,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         ax.setLabel("left", lbl)
                         
                     ax.vb.border.setStyle(QtCore.Qt.NoPen)
-                    #ax.vb.border.setColor(default_border_color)
 
         else:
             self._current_plot_item_ = None
-            #self._focussed_plot_item_ = None
+            self._current_plot_item_index_ = -1
 
             for ax in self.axes:
                 lbl = ax.axes["left"]["item"].labelText
@@ -7274,20 +7257,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     ax.setLabel("left", lbl)
                     
                 ax.vb.border.setStyle(QtCore.Qt.NoPen)
-                #ax.vb.border.setColor(default_border_color)
-            
-    #@pyqtSlot(int)
-    #@safeWrapper
-    #def slot_setFrameNumber(self, val):
-        #if val >= self._number_of_frames_ or val < 0: 
-            #return
-        
-        #self.currentFrame = val
-
-        #if len(self._linkedViewers_) > 0:
-            #for viewer in self._linkedViewers_: 
-                #viewer.currentFrame = val
                 
+        print("click curent item", self._current_plot_item_)
+        print("click curent item index", self._current_plot_item_index_)
+            
     @safeWrapper
     def clearEpochs(self):
         self._plotEpochs_()
@@ -7302,6 +7275,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #self.fig.clear() # both mpl.Figure and pg.GraphicsLayoutWidget have this method
         #print("SignalViewer.clear() %s" % self.windowTitle())
         self._current_plot_item_ = None
+        self._current_plot_item_index_ = -1
         self._focussed_plot_item_ = None
         
         for p in self.plotItems:
@@ -7309,22 +7283,22 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         self.plotTitleLabel.setText("")
         
-        for c in self.crosshairDataCursors.values():
+        for c in self.crosshairSignalCursors.values():
             c.detach()
             
-        for c in self.verticalDataCursors.values():
+        for c in self.verticalSignalCursors.values():
             c.detach()
             
-        for c in self.horizontalDataCursors.values():
+        for c in self.horizontalSignalCursors.values():
             c.detach()
             
         for c in self._cached_cursors_.values():
             c.detach()
             
         if not keepCursors:
-            self.crosshairDataCursors.clear() # a dict of SignalCursors mapping str name to cursor object
-            self.verticalDataCursors.clear()
-            self.horizontalDataCursors.clear()
+            self.crosshairSignalCursors.clear() # a dict of SignalCursors mapping str name to cursor object
+            self.verticalSignalCursors.clear()
+            self.horizontalSignalCursors.clear()
             self._cached_cursors_.clear()
             
             self.linkedCrosshairCursors = []
