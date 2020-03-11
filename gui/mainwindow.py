@@ -32,7 +32,7 @@ from __future__ import print_function
 from __future__ import absolute_import # for python 2.5
 import faulthandler
 import sys, os, types, atexit, re, inspect, gc, sip, io, warnings, numbers
-import traceback, keyword, inspect, weakref, itertools, typing
+import traceback, keyword, inspect, weakref, itertools, typing, functools
 from copy import copy, deepcopy
 
 from collections import ChainMap
@@ -179,6 +179,7 @@ import core.simulations as sim
 import core.data_analysis as anl
 from core.workspacefunctions import * # NOTE: 2017-04-16 09:48:15 imported into the console in slot_initQtConsole
 from core.utilities import safeWrapper, safe_identity_test, warn_with_traceback
+from core.utilities import timefunc, timeblock, processtimefunc, processtimeblock, Timer
 
 # FIXME: 2016-04-03 00:11:22
 # do I need this as a separate module? the advantage is it would unclutter the 
@@ -2596,6 +2597,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         
         return sw_f
 
+    #@processtimefunc
     def __init__(self, app, parent=None):
         #super(ScipyenWindow, self).__init__(parent)
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: python3 way
@@ -3932,7 +3934,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             self.settings.endGroup()
             
         self.settings.endGroup()
-                    
+          
+    #@processtimefunc
     def _load_settings_(self):
         self.settings                   = QtCore.QSettings("Scipyen", "Scipyen")
         
@@ -4073,7 +4076,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             #if 
         
         self.settings.endGroup()
-
+    
+    #@processtimefunc
     def _configureGUI_(self):
         ''' Collect file menu actions & submenus that are built in the UI file. This should be 
             done before loading the plugins.

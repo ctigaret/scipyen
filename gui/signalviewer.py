@@ -844,7 +844,7 @@ class SignalCursor(QtCore.QObject):
         
         if isinstance(cursor_type, str):
             if len(cursor_type) == 1:
-                c_type_name = [name for name in SignalCursorTypes.names() if name.startswith(cursor_type)]
+                c_type_name = [name for name in SignalCursor.SignalCursorTypes.names() if name.startswith(cursor_type)]
                 if len(c_type_name):
                     cursor_type = SignalCursor.SignalCursorTypes[c_type_name[0]]
                     
@@ -5436,8 +5436,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self._current_plot_item_ = plotitems[index]
         self._current_plot_item_index_ = index
-        lbl = "<B>%s</B>" % self._current_plot_item_.axes["left"]["item"].labelText
-        self._current_plot_item_.setLabel("left", lbl)
+        lbl = self._current_plot_item_.axes["left"]["item"].labelText
+        if any([s not in lbl for s in ("<B>", "</B>")]):
+            lbl = "<B>%s</B>" % lbl
+            self._current_plot_item_.setLabel("left", lbl)
+            
         #self._current_plot_item_.vb.border.setStyle(QtCore.Qt.SolidLine)
         #self._current_plot_item_.vb.border.setColor(system_palette.highlight().color())
         
@@ -5828,22 +5831,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # reselect an axis according to its index (if one had been selected before)
         # CAUTION: this may NOT be the same PlotItem object!
         # also makes sure we always have an axis selected
-        print("start currentFrame", self.currentFrame)
-        print("start current plot item", self._current_plot_item_)
-        print("start current plot item index", self._current_plot_item_index_)
-        print("number of axes: ", len(self.plotItems))
-        
         if len(self.plotItems):
             if self._current_plot_item_ is None:
-                print("no prev selected axis")
                 self._current_plot_item_index_ = 0 # by default
                 self._current_plot_item_ =  self.plotItems[self._current_plot_item_index_] 
-                print("new current plot item", self._current_plot_item_)
-                print("new current plot item index", self._current_plot_item_index_)
                 
             elif self._current_plot_item_ not in self.plotItems:
-                print("prev selected index", self._current_plot_item_index_)
-                
                 if self._current_plot_item_index_ < 0: # this is prev index
                     self._current_plot_item_index_ = 0
                     
@@ -5852,12 +5845,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
                 self._current_plot_item_ = self.plotItems[self._current_plot_item_index_]
                 
-                print("reset current plot item", self._current_plot_item_)
-                print("reset current plot item index", self._current_plot_item_index_)
-                
             else:
                 self._current_plot_item_index_ = self.plotItems.index(self._current_plot_item_)
-                print("test index", self._current_plot_item_index_, "item", self._current_plot_item_)
                 
             lbl = self._current_plot_item_.axes["left"]["item"].labelText
             
@@ -5879,10 +5868,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._current_plot_item_ = None
             self._current_plot_item_index_ = -1
                     
-        print("end current plot item", self._current_plot_item_)
-        print("end current plot item index", self._current_plot_item_index_)
-        print("***")
-        
         self._update_annotations_()
         
     @safeWrapper
@@ -6561,7 +6546,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #except Exception as e:
             #traceback.print_exc()
             
-        self._current_plot_item_ = self.axis(0)
         #self._plotOverlayFrame_()
         
     @safeWrapper
@@ -7127,15 +7111,18 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if len(obj) and isinstance(obj[0], pg.PlotItem):
             self._focussed_plot_item_ = obj[0]
             #self._focussed_plot_item_.vb.border.setStyle(QtCore.Qt.SolidLine)
-            #self._focussed_plot_item_.vb.border.setColor(system_palette.highlight().color())
+            #self._focussed_plot_item_.vb.border.setColor(QtGui.QGuiApplication.palette().highlight().color())
+            #for ax in self.axes:
+                #if ax is not self._focussed_plot_item_:
+                    #ax.vb.border.setStyle(QtCore.Qt.NoPen)
+                    #ax.vb.border.setColor(QtGui.QGuiApplication.palette().color(QtGui.QPalette.Base))
             
         else:
             self._focussed_plot_item_ = None
+            #for ax in self.axes:
+                #ax.vb.border.setStyle(QtCore.Qt.NoPen)
+                #ax.vb.border.setColor(QtGui.QGuiApplication.palette().color(QtGui.QPalette.Base))
             
-        #for ax in self.axes:
-            #if ax is not self._focussed_plot_item_ and ax is not self._current_plot_item_:
-                #ax.vb.border.setColor(default_border_color)
-        
     @pyqtSlot(object)
     @safeWrapper
     def slot_mouseMovedInPlotItem(self, pos): # pos is a QPointF
@@ -7257,10 +7244,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     ax.setLabel("left", lbl)
                     
                 ax.vb.border.setStyle(QtCore.Qt.NoPen)
-                
-        print("click curent item", self._current_plot_item_)
-        print("click curent item index", self._current_plot_item_index_)
-        print("***")
             
     @safeWrapper
     def clearEpochs(self):

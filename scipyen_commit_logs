@@ -1,3 +1,148 @@
+2020-03-11 13:42:34
+ltp module:
+===========
+    work started on parsing ltp options
+
+
+neoutils module:
+===============
+cursor functions for signal analysis (all based on vertical cursors, although
+    crosshair cursors are accepted, as only their x and xwindow parameters are
+    used)
+    
+    NOTE 1 the "time" is used in the loose sense of signal's domain. For 
+    neo.AnalogSignal, "time" refers to the time domain of the signal, whereas
+    the domain of datatypes.DataSignal may be some other physical measure (e.g.
+    space, or frequency, etc)
+    
+    NOTE 2: all signals are column vectors; a multi-channel signal is a matrix
+    with one channel per column, hence all channels share the signal's domain,
+    have the same number of samples, and have the same python Quantity units.
+    
+    Thus they are NOT to be confused with neo.ChannelIndex.
+    
+    Functions based on a single cursor:
+    ====================================
+        * all take a neo.AnalogSignal or datatypes.DataSignal as first parameter
+        
+        * second parameter conveys the cursor's coordinate in the signal's 
+            domain, and can be one of:
+                    
+                a SignalCursor (the coordinate is the cursor's x attribute)
+                
+                a tuple of 2 or 3 scalars (either floating point or Quantity)
+                    interpreted as cursor parameters (x, xwindow, label) 
+                    in THIS ORDER 
+                    
+                NOTE: for cursor_index and cursor_value functions only, this 
+                parameter can also be:
+                    a float scalar (signal's domain units are assumed)
+                        
+                    a scalar python Quantity having units compatible with those
+                        of the signal's domain
+                
+                
+        * third parameter (optional) is the channel index (an int, or None).
+                
+     List of single-cursor functions:
+     -------------------------------
+        cursor_index -> int, signal sample index at cursor x coordinate
+        
+        cursor_value -> pyqthon Quantity,  signal value at cursor x coordinate
+        
+        cursor_average -> Quantity array, the average of signal samples 
+            across the cursor's xwindow (one array element per channel), or the 
+            cursor_value(...) if cursors' xwindow is zero
+        
+        cursor_max, cursor_min -> python Quantity array; signal max (min) in the
+            cursor's xwindow, or cursor_value if xwindow is 0
+                                
+        cursor_argmax, cursor_argmin -> numpy array, index of the signal sample
+            with the max (min) value within the cursor's window, from the start
+            of the signal, or cursor_index if cursor's xwindow is 0.
+            
+            Unlike cursor_index, these functions return a numpy array due to the
+            fact that the maximum of a signal channel need not be at the same
+            sample index for all the channels!
+                                
+        cursor_maxmin -> tuple of Quantity arrays in THIS order: 
+                    signal maximum and minimum
+                    
+        cursor_argmaxmin -> tuple of numpy arrays with the indices of signal
+            maximum and minimum (in THIS order)
+            
+            
+    Functions based on two cursors
+    ==============================
+        * first parameter is a neo.AnalogSignal or datatypes.DataSignal
+        
+        * second and third parameters are SignalCursor objects, or SignalCursor
+            parameter tuples
+    
+        * third parameter (optional) is the channel index (an int, or None).
+        
+    List fo functions based on cursor pairs:
+    ---------------------------------------
+        cursors_distance: -> int, the distance (in signal samples) between 
+            cursors
+            
+        cursors_difference -> python Quantity, the signed difference between
+            cursor_average at each of the cursors
+            
+        cursors_chord_slope -> python Quantity, slope of a straight line through
+            the signal values at the cursors; signal value is obtained from
+            cursor_average(...)
+                    
+2020-03-11 13:16:30
+neoutils:
+    new functions to convert between cursors, epoch, intervals:
+    
+    cursors2epoch: sequence of cursors => neo.Epoch
+    cursors2intervals: sequence of cursors => sequence of intervals
+    intervals2cursors: sequence of intervals => sequence of cursors or cursor parameters
+    intervals2epoch: sequence of intervals => neo.Epoch
+    epoch2cursors: neo.Epoch => sequence of cursors
+    epoch2intervals: neo.Epoch => sequence of intervals
+
+    removed: 
+        interval2cursor (intervals2cursors does the same thing)
+        interval2epoch (intervals2epoch does the same thing)
+        
+    NOTE: cursor refers to a SignalCursor object of vertical type, or a
+    parameter triplet (x, xwindow, label) describing a notional vertical 
+    cursor.
+    
+    Converison functions accepting these cursors can also accept
+    crosshair SignalCursors (as they to have x and xwindow parameters).
+    
+    NOTE: interval refers to a tuple (t0, t1) or a triplet (t0, t1, label)
+    representing an interval of a signal.
+    
+    t0 and t1 are numeric scalars, or python Quantity objects (also scalars
+    i.e. their size attribute is one)
+    
+    When present, label must be a non-emty string.
+    
+        
+signalviewer:
+    SignalCursor has gained the parameters property
+        
+utilities: 
+    new timing functions, see 
+        Recipe 14.13 "Profiling and Timing Your Programs" 
+        From Python Cookbook 3rd Ed. 2013:
+        
+    timefunc, processtimefunc: function wrappers that time function
+        execution using, respectively, time.perf_counter() or 
+        time.process_time()
+        
+    timeblock, processtimeblock: context managers for timing statement
+        blocks using repectively, time.perf_counter() or time.process_time()
+        
+    new class Timer: high-level interface stopwatch,
+        see Recipe 13.13 "Making a Stopwatch Timer"
+        in Python Cookbook 3rd Ed. 2013
+
 2020-02-19 14:35:22
 
 
