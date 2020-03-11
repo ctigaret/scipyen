@@ -89,7 +89,7 @@ python Quantity scalars with the units of the signal domain.
         
     List of functions based on two cursors:
     
-    cursors_amplitude: the difference between the signal values at two cursors.
+    cursors_difference: the signed difference between the signal values at two cursors.
         NOTE: for each cursor, the signal value "at the cursor" is determined by 
         calling cursor_average(). This means that, if the cursor's xwindow is 
         zero, the value "at cursor" is the actual sample value at the cursor's
@@ -577,7 +577,7 @@ def cursors2epoch(*args, **kwargs) -> typing.Union[neo.Epoch, typing.Sequence]:
         By default, the epoch's units are seconds (pq.s) but in a neo.Epoch can
         support any units
     
-    name: str, default is" Epoch"
+    name: str, default is" Epoch"; not used when intervals is True (see below)
     
     sort: bool, default if True
         When True, the cursors are sorted by their x coordinate
@@ -776,10 +776,26 @@ def cursors2epoch(*args, **kwargs) -> typing.Union[neo.Epoch, typing.Sequence]:
     
 def cursors2intervals(*args, **kwargs) -> typing.Union[typing.Sequence, np.ndarray]:
     """Calls cursors2epochs with intervals set to True
+    
+    Additional var-keyword parameters:
+    --------------------------------
+    unwrap: bool default True
+        When False, calling the function with a single cursor (or cursor parameter
+            tuple) will return a single interval tuple (t0, t1, label) wrapped in
+            a list.
+            
+        When True, the function returns the single interval tuple directly
     """
     kwargs.pop("intervals", True) # avoid double parameter specification
     
-    return cursors2epoch(*args, **kwargs, intervals=True)
+    unwrap = kwargs.pop("unwrap", True)
+    
+    ret = cursors2epoch(*args, **kwargs, intervals=True)
+    
+    if unwrap and len(ret) == 1:
+        return ret[0]
+    
+    
 
 @safeWrapper
 def signal2epoch(sig, name=None, labels=None):
@@ -823,7 +839,7 @@ def signal2epoch(sig, name=None, labels=None):
         raise TypeError("'labels' expected to be a str, numpy array of string dtype, or None; got %s instead" % type(labels).__name__)
     
     if not isinstance(name, (str, type(None))):
-        raise TypeError("'name' expected ot be None or a string; got %s instead" % type(name).__name__)
+        raise TypeError("'name' expected to be None or a string; got %s instead" % type(name).__name__)
     
     if isinstance(name, str) and len(name) == 0:
         name = sig.name # this may be None
@@ -860,7 +876,7 @@ def cursor_max(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     obtained using the two cursor's x values.
     """
     
-    (t0,t1) = cursor2interval(cursor, signal.times.units)
+    t0,t1, _ = cursors2intervals(cursor, signal.times.units)
     
     if t0 == t1:
         ret = signal[signal.time_index(t0),:]
@@ -897,13 +913,15 @@ def cursor_argmax(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     the signal.
     """
     
-    (t0,t1) = cursor2interval(cursor, signal.times.units)
+    t0,t1,_ = cursors2intervals(cursor, units=signal.times.units)
+    
+    t0_ndx = np.array(signal.time_index(t0)).flatten()
     
     if t0 == t1:
-        return np.array(signal.time_index(t0)).flatten()
+        return t0_ndx
         
     else:
-        ret = signal.time_slice(t0,t1).argmax(axis=0).flatten()
+        ret = signal.time_slice(t0,t1).argmax(axis=0).flatten() + t0_ndx
     
         if isinstance(channel, int):
             return ret[channel].flatten()
@@ -932,7 +950,7 @@ def cursor_min(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     
     """
     
-    (t0,t1) = cursor2interval(cursor, signal.times.units)
+    t0,t1,_ = cursors2intervals(cursor, units=signal.times.units)
     
     if t0 == t1:
         ret = signal[signal.time_index(t0),:]
@@ -969,13 +987,15 @@ def cursor_argmin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     the signal.
     """
     
-    (t0,t1) = cursor2interval(cursor, signal.times.units)
+    t0,t1, _ = cursors2intervals(cursor, units=signal.times.units)
+    
+    t0_ndx = np.array(signal.time_index(t0)).flatten()
     
     if t0 == t1:
-        return np.array(signal.time_index(t0)).flatten()
+        return t0_ndx
         
     else:
-        ret = signal.time_slice(t0,t1).argmin(axis=0).flatten()
+        ret = signal.time_slice(t0,t1).argmin(axis=0).flatten() + t0_ndx
         
         if isinstance(channel, int):
             return ret[channel].flatten()
@@ -1007,7 +1027,7 @@ def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     object is still a two-element tuple).
     
     """
-    (t0,t1) = cursor2interval(cursor, signal.times.units)
+    t0,t1, _ = cursors2intervals(cursor, units = signal.times.units)
     
     if t0==t1:
         ret = signal[signal.time_index(t0),:]
@@ -1037,21 +1057,21 @@ def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
                      channel: typing.Optional[int] = None) -> tuple:
     """The indices of signal maximum and minimum across the cursor's window.
     """
-    (t0,t1) = cursor2interval(cursor, signal.times.units)
+    t0,t1,_ = cursors2intervals(cursor, units=signal.times.units)
+    
+    t0_ndx = np.array(signal.time_index(t0)).flatten()
     
     if t0==t1:
-        ret = np.array(signal.time_index(t0)).flatten()
-        
-        return (ret, ret)
+        return (t0_ndx, t0_ndx)
         
     else:
     
-        mx = signal.time_slice(t0,t1).argmax(axis=0).flatten()
+        mx = signal.time_slice(t0,t1).argmax(axis=0).flatten() + t0_ndx
         
         if isinstance(channel, int):
             mx = mx[channel].flatten()
         
-        mn = signal.time_slice(t0,t1).argmin(axis=0).flatten()
+        mn = signal.time_slice(t0,t1).argmin(axis=0).flatten() + t0_ndx
         
         if isinstance(channel, int):
             mn = mn[channel].flatten()
@@ -1089,12 +1109,12 @@ def cursor_average(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     
     """
     
-    if cursor.xwindow > 0:
-        (t0, t1) = cursor2interval(cursor, signal.times.units)
-        ret = signal.time_slice(t0,t1).mean(axis=0)
+    t0, t1, _ = cursors2intervals(cursor, units=signal.times.units)
+    if t0 == t1:
+        ret = cursor_value(signal, cursor, channel=channel)
         
     else:
-        ret = cursor_value(signal, cursor, channel=channel)
+        ret = signal.time_slice(t0,t1).mean(axis=0)
         
     
     if isinstance(channel, int):
@@ -1104,7 +1124,7 @@ def cursor_average(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
 
 @safeWrapper
 def cursor_value(signal:typing.Union[neo.AnalogSignal, dt.DataSignal],
-                 cursor: typing.Union[float, SignalCursor, pq.Quantity],
+                 cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple],
                  channel: typing.Optional[int] = None) -> pq.Quantity:
     """Value of signal at the vertical cursor's time coordinate.
     
@@ -1139,6 +1159,44 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, dt.DataSignal],
     
     """
     
+    data_index = cursor_index(signal, cursor)
+    
+    ret = signal[data_index,:]
+    
+    if channel is None:
+        return ret
+    
+    return ret[channel].flatten() # so that it can be indexed
+
+@safeWrapper
+def cursor_index(signal:typing.Union[neo.AnalogSignal, dt.DataSignal],
+                 cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple]) -> int:
+    """Index of signal sample at the vertical cursor's time coordinate.
+    
+    Parameters:
+    -----------
+    signal: neo.AnalogSignal or datatypes.DataSignal
+    
+    cursor: float, python Quantity, vertical SignalCursor or cursor parameters
+            tuple
+    
+            When float, it must be a valid value in the signal's domain 
+                (signal domain ubnits are assumed)
+                
+            When a Quantity, its units must be convertible to the units of the
+                signal's domain.
+                
+            When a SignalCursor, it must be a vertical or crosshair cursor.
+            
+                
+    Returns:
+    --------
+    An int: index of the sample
+    
+    """
+    # NOTE: specifying a channel doesn't make sense here because all
+    # channels in the signal sharethe domain and have the same number of
+    # samples
     if isinstance(cursor, float):
         t = cursor * signal.time.units
         
@@ -1154,23 +1212,32 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, dt.DataSignal],
         
         t = cursor
         
+    elif isinstance(cursor, (tuple, list)) and len(cursor) in (2,3) and all([isinstance(c, (numbers.Number, pq.Quantity)) for v in cursor[0:2] ]):
+        # cursor parameter sequence
+        t = cursor[0]
+        
+        if isinstace(t, numbers.Number):
+            t *= signal.times.units
+            
+        else:
+            if t.units != signal.times.units:
+                if not dt.units_convertible(t, signal.times):
+                    raise TypeError("Incompatible units for cursor time")
+            
+            t = t.rescale(signal.times.units)
+        
     else:
         raise TypeError("Cursor expected to be a float, python Quantity or SignalCursor; got %s instead" % type(cursor).__name__)
     
     data_index = signal.time_index(t)
     
-    ret = signal[data_index,:]
+    return data_index
     
-    if channel is None:
-        return ret
-    
-    return ret[channel].flatten() # so that it can be indexed
-
 @safeWrapper
-def cursors_amplitude(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
-                      cursor0: typing.Union[SignalCursor, tuple], 
-                      cursor1: typing.Union[SignalCursor, tuple],
-                      channel: typing.Optional[int] = None) -> pq.Quantity:
+def cursors_difference(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+                       cursor0: typing.Union[SignalCursor, tuple], 
+                       cursor1: typing.Union[SignalCursor, tuple],
+                       channel: typing.Optional[int] = None) -> pq.Quantity:
     """Calculates the signal amplitude between two notional vertical cursors.
     
     amplitude = y1 - y0
@@ -1197,6 +1264,21 @@ def cursors_amplitude(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     y1 = cursor_average(signal, cursor1, channel=channel)
     
     return y1-y0
+
+@safeWrapper
+def cursors_distance(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+                     cursor0: typing.Union[SignalCursor, tuple], 
+                     cursor1: typing.Union[SignalCursor, tuple],
+                     channel: typing.Optional[int] = None) -> pq.Quantity:
+    """Distance between two cursors, in signal samples.
+    
+    NOTE: The distance between two cursors in the signal domain can be
+    calculated directly as the difference between the cursors' x coordinates
+    
+    """
+    ret = [cursor_index(signal, c) for c in (cursor0, cursor1)]
+    
+    return abs(ret[1]-ret[0])
 
 @safeWrapper
 def chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal], 
@@ -1427,7 +1509,7 @@ def intervals2epoch(*args, **kwargs) -> neo.Epoch:
     """
     units = kwargs.pop("units", pq.s)
     if not isinstance(units, pq.Quantity) or units.size > 1:
-        raise TypeError("units expected ot be a scalar python Quantity")
+        raise TypeError("units expected to be a scalar python Quantity")
 
     name = kwargs.pop("name", "Epoch")
     if not isinstance(name, str):

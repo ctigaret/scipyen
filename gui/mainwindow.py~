@@ -2597,7 +2597,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         
         return sw_f
 
-    @processtimefunc
+    #@processtimefunc
     def __init__(self, app, parent=None):
         #super(ScipyenWindow, self).__init__(parent)
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: python3 way
@@ -3935,7 +3935,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             
         self.settings.endGroup()
           
-    @processtimefunc
+    #@processtimefunc
     def _load_settings_(self):
         self.settings                   = QtCore.QSettings("Scipyen", "Scipyen")
         
@@ -4077,7 +4077,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         
         self.settings.endGroup()
     
-    @processtimefunc
+    #@processtimefunc
     def _configureGUI_(self):
         ''' Collect file menu actions & submenus that are built in the UI file. This should be 
             done before loading the plugins.

@@ -32,7 +32,7 @@ from __future__ import print_function
 from __future__ import absolute_import # for python 2.5
 import faulthandler
 import sys, os, types, atexit, re, inspect, gc, sip, io, warnings, numbers
-import traceback, keyword, inspect, weakref, itertools, typing
+import traceback, keyword, inspect, weakref, itertools, typing, functools
 from copy import copy, deepcopy
 
 from collections import ChainMap
