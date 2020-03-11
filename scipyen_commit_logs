@@ -1,3 +1,52 @@
+2020-03-11 13:16:30
+neoutils:
+    new functions to convert between cursors, epoch, intervals
+    cursors2epoch: sequence of cursors => neo.Epoch
+    cursors2intervals: sequence of cursors => sequence of intervals
+    intervals2cursors: sequence of intervals => sequence of cursors or cursor parameters
+    intervals2epoch: sequence of intervals => neo.Epoch
+    epoch2cursors: neo.Epoch => sequence of cursors
+    epoch2intervals: neo.Epoch => sequence of intervals
+
+    removed: 
+        interval2cursor (intervals2cursors does the same thing)
+        interval2epoch (intervals2epoch does the same thing)
+        
+    NOTE: cursor refers to a SignalCursor object of vertical type, or a
+    parameter triplet (x, xwindow, label) describing a notional vertical 
+    cursor.
+    
+    Converison functions accepting these cursors can also accept
+    crosshair SignalCursors (as they to have x and xwindow parameters).
+    
+    NOTE: interval refers to a tuple (t0, t1) or a triplet (t0, t1, label)
+    representing an interval of a signal.
+    
+    t0 and t1 are numeric scalars, or python Quantity objects (also scalars
+    i.e. their size attribute is one)
+    
+    When present, label must be a non-emty string.
+    
+        
+signalviewer:
+    SignalCursor has gained the parameters property
+        
+utilities: 
+    new timing functions, see 
+        Recipe 14.13 "Profiling and Timing Your Programs" 
+        From Python Cookbook 3rd Ed. 2013:
+        
+    timefunc, processtimefunc: function wrappers that time function
+        execution using, respectively, time.perf_counter() or 
+        time.process_time()
+        
+    timeblock, processtimeblock: context managers for timing statement
+        blocks using repectively, time.perf_counter() or time.process_time()
+        
+    new class Timer: high-level interface stopwatch,
+        see Recipe 13.13 "Making a Stopwatch Timer"
+        in Python Cookbook 3rd Ed. 2013
+
 2020-02-19 14:35:22
 
 

@@ -3,8 +3,9 @@
 Programming helper functions & decorators
 '''
 #### BEGIN core python modules
-import traceback, re, io, sys, enum, itertools
+import traceback, re, io, sys, enum, itertools, time
 from functools import singledispatch, update_wrapper, wraps
+from contextlib import contextmanager
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -67,7 +68,55 @@ def instanceMethodSingleDispatch(func):
     
     #return __slot_manager_wrapper__
             
+def timefunc(func):
+    """Recipe 14.13 "Profiling and Timing Your Programs" 
+        From Python Cookbook 3rd Ed. 2013
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        r = func(*args, **kwargs)
+        end = time.perf_counter()
+        print("{}.{} : {}".format(func.__module__, func.__name__, end-start))
+        return r
+    return wrapper
 
+def processtimefunc(func):
+    """Recipe 14.13 "Profiling and Timing Your Programs" 
+        From Python Cookbook 3rd Ed. 2013
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.process_time()
+        r = func(*args, **kwargs)
+        end = time.process_time()
+        print("{}.{} : {}".format(func.__module__, func.__name__, end-start))
+        return r
+    return wrapper
+
+@contextmanager
+def timeblock(label):
+    """Recipe 14.13 "Profiling and Timing Your Programs" 
+        From Python Cookbook 3rd Ed. 2013
+    """
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        end = time.perf_counter()
+        print("{} : {}".format(label, end-start))
+
+@contextmanager
+def processtimeblock(label):
+    """Recipe 14.13 "Profiling and Timing Your Programs" 
+        From Python Cookbook 3rd Ed. 2013
+    """
+    start = time.process_time()
+    try:
+        yield
+    finally:
+        end = time.process_time()
+        print("{} : {}".format(label, end-start))
 
 
 #NOTE: 2017-11-22 22:00:40 FIXME TODO
@@ -101,7 +150,6 @@ def safeGUIWrapper(f, *args, **kwargs):
             msgbox.exec()
             
     return wrapper
-            
 
 def makeFileFilterString(extList, genericName):
     extensionList = [''.join(i) for i in zip('*' * len(extList), '.' * len(extList), extList)]
@@ -125,8 +173,6 @@ def counterSuffix(x, strings):
     x = str: string to check for existence
     
     strings = sequence of str to check for existence of x
-    
-    
     
     """
     
@@ -273,7 +319,6 @@ def isVector(x):
     else:
         return False
         
-
 def isColumnVector(x):
     """Returns True if x is a numpy arrtay encapsulating a column vector.
     
@@ -653,51 +698,9 @@ def safe_identity_test(x, y):
         # unless an object could have shape attribte but not ndim
         if hasattr(x, "ndim"):
             ret &= x.ndim == y.ndim
-            #print("safe_identity_test same dims", ret)
         
-        #if not ret:
-            #return ret
-        
-        # NOTE: 2019-08-04 23:35:48
-        # code below is too expensive
-        # TODO/FIXME contemplate something similar (pyqtgraph.eq?)
-        
-        # NOTE: 2019-08-04 23:41:51
-        # still too slow!
         ret &= eq(x,y)
         
-        #if ret:
-            ## NOTE: 2018-11-09 21:50:38
-            ## do further checks only if all went OK so far
-            #if isinstance(x, (pd.DataFrame, pd.Series)):
-                #if any([v.isna().all() for v in (x,y)]):
-                    #ret &= all([v.isna().all() for v in (x,y)])
-                        
-                #else:
-                    #ret &= (x==y).all().all()
-                    
-            #elif isinstance(x, np.ndarray):
-                #if any([np.isnan(v).all() for v in (x,y)]):
-                    #ret &= all([v.isna().all() for v in (x,y)])
-                    
-                #else:
-                    #ret &= (x==y).all().all()
-            
-            #if np.dtype(type(x)).isbuiltin == 1:
-                #if np.dtype(type(x)) == np.dtype("O"):
-                    #ret &= x is y
-                    
-                #else:
-                    #ret &= np.all(x == y)
-        
-        # FIXME TODO 2018-10-09 22:51:18
-        # be more specific/atomic, for pandas types, modules, and our own custom types e.g. dt.ScanData
-        #return True
-        #if isinstance(x, (dt.pd.DataFrame, dt.pd.Series, dt.pd.Categorical)):
-        #if "type" in type(x).__name__.lower() or "module" in type(x).__name__.lower():
-            #return True # for now
-            ##return (x==y).all()
-        #return False ## good fallback, though potentially expensive
         return ret ## good fallback, though potentially expensive
     
     except Exception as e:
@@ -711,3 +714,41 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
     traceback.print_stack(file=log)
     log.write(warnings.formatwarning(message, category, filename, lineno, line))
     
+class Timer(object):
+    """Recipe 13.13 "Making a Stopwatch Timer" in Python Cookbook 3rd Ed. 2013
+    """
+    def __init__(self, func = time.perf_counter):
+        self.elapsed = 0.0
+        self._func = func
+        self._start = None
+        
+    def start(self):
+        if self._start is not None:
+            raise RuntimeError("Already started")
+        
+        self._start = self._func()
+        
+    def stop(self):
+        if self._start is None:
+            raise RuntimeError("Not started")
+        
+        end = self._func()
+        
+        self.elapsed += end - self._start
+        self._start = None
+        
+    def reset(self):
+        self.elapsed = 0.0
+        
+    @property
+    def running(self):
+        return self._start is not None
+    
+    def __enter__(self):
+        # for use as context manager
+        self.start()
+        return self
+    
+    def __exit__(self):
+        # for use as context manager
+        self.stop()

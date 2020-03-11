@@ -935,9 +935,9 @@ def generate_synaptic_plasticity_options(**kwargs) -> dict:
                 neoutils.cursors_amplitude()
                 ephys.membrane.cursor_Rs_Rin()
             
-            "cursors": vertical cursor specification, with keys (str, cursor 
-                name) mapped to a tuple (time, window) with vertical cursor 
-                parameters.
+            "cursors": vertical cursor specification, with keys (str, containing
+                the cursor name) mapped to a tuple (time, window) or triplet
+                (time, window, label) with vertical cursor parameters.
                 
                 NOTE: SignalCursor objects cannot be serialized. Therefore, in 
                 order for the options to be persistent, the cursors have to be

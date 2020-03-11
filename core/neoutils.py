@@ -660,18 +660,19 @@ def cursors2epoch(*args, **kwargs) -> typing.Union[neo.Epoch, typing.Sequence]:
     if not isinstance(units, pq.UnitQuantity):
         units = units.units
         
-    elif not isinstance(units, pq.Quantity):
+    elif not isinstance(units, pq.Quantity) or units.size > 1:
         raise TypeError("Units expected to be a python Quantity; got %s instead" % type(units).__name__)
         
     name = kwargs.get("name", "Epoch")
+    if not isinstance(name, str):
+        raise TypeError("name expected to be a string")
     
-    if not isinstance(name, str) or len(name.strip()) == 0:
-        name="Epoch"
+    if len(name.strip())==0:
+        raise ValueError("name must not be empty")
     
     sort = kwargs.get("sort", True)
-    
     if not isinstance(sort, bool):
-        sort = True
+        raise TypeError("sort must be a boolean")
     
     def __parse_cursors_tuples__(*values):
         # check for dimensionality consistency
@@ -1327,53 +1328,6 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     return (y1-y0)/(t1-t0)
     
 @safeWrapper
-def interval2epoch(t_start: typing.Union[numbers.Number, pq.Quantity],
-                   t_stop: typing.Union[numbers.Number, pq.Quantity]) -> neo.Epoch:
-    """Constructs a neo.Epoch from t_start and t_stop
-    """
-    
-    if isinstance(t_start, numbers.Number):
-        t_start *= pq.s
-        
-    elif isinstance(t_start, pq.Quantity):
-        if t_start.size > 1:
-            raise TypeError("t_start must be a scalar")
-        
-        elif not dt.units_convertible(t_start, pq.s):
-            raise TypeError("Unexpected t_start units %s" % t_start.units)
-        
-    else:
-        raise TypeError("Unexpected type for t_start: %s" % type(t_start).__name__)
-    
-    if isinstance(t_stop, numbers.Number):
-        t_stop *= pq.s
-        
-    elif isinstance(t_stop, pq.Quantity):
-        if t_stop.size > 1:
-            raise TypeError("t_stop must be a scalar")
-        
-        elif not dt.units_convertible(t_stop, pq.s):
-            raise TypeError("Unexpected t_stop units %s" % t_stop.units)
-        
-    else:
-        raise TypeError("Unexpected type for t_stop: %s" % type(t_stop).__name__)
-    
-    return neo.Epoch(times = np.array([t_start])*pq.s, 
-                     durations=np.array([t_stop-t_start])*pq.s)
-    
-
-@safeWrapper
-def interval2cursor(t0: float, t1: float) -> typing.Tuple[float, float]:
-    """Returns a cursor time and window from two time points.
-    t0, t1: scalar float values
-    """
-    w = abs(t1-t0)
-    t = min(t0,t1) + w/2
-    
-    return (t, w)
-    
-
-@safeWrapper
 def epoch2cursors(epoch: neo.Epoch, 
                   axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None,
                   **kwargs) -> typing.Sequence:
@@ -1462,7 +1416,7 @@ def epoch2intervals(epoch: neo.Epoch, keep_units:bool = False) -> typing.Sequenc
         return [(t, t+d, l) for (t,d,l) in zip(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels)]
     
 @safeWrapper
-def intervals2epoch(*args, name:str = None) -> neo.Epoch:
+def intervals2epoch(*args, **kwargs) -> neo.Epoch:
     """Construct a neo.Epoch from a sequence of interval tuples or triplets.
     
     Variadic parameters:
@@ -1470,13 +1424,221 @@ def intervals2epoch(*args, name:str = None) -> neo.Epoch:
     tuples (t0,t1) or triplets (t0,t1,label), or a sequence of tuples or triplets
     each specifying an interval
     
-    
     """
-    pass
+    units = kwargs.pop("units", pq.s)
+    if not isinstance(units, pq.Quantity) or units.size > 1:
+        raise TypeError("units expected ot be a scalar python Quantity")
+
+    name = kwargs.pop("name", "Epoch")
+    if not isinstance(name, str):
+        raise TypeError("name expected to be a string")
+    
+    if len(name.strip())==0:
+        raise ValueError("name must not be empty")
+    
+    sort = kwargs.pop("sort", True)
+    if not isinstance(sort, bool):
+        raise TypeError("sort must be a boolean")
+    
+    def __generate_epoch_interval__(value):
+        if not isinstance(value, (tuple, list)) or len(value) not in (2,3):
+            raise TypeError("expecting a tuple of 2 or 3 elements")
+        
+        if len(value) == 3:
+            if not isinstance(value[2], str) or len(value[2].strip()) == 0:
+                raise ValueError("expecting a non-empty string as thirs element in the tuple")
+            
+            l = value[2]
+                
+        else:
+            l = None
+            
+        u = units # by default if boundaries are scalars
+        
+        if not all([isinstance(v, (pq.Quantity, numbers.Number)) for v in value[0:2]]):
+            raise TypeError("interval boundaries must be scalar numbers or quantities")
+        
+        if all([isinstance(v, pq.Quantity) for v in value[0:2]]):
+            if any([v.size != 1 for v in value[0:2]]):
+                raise TypeError("interval boundaries must be scalar quantities")
+            
+            u = value[0].units #store the units
+            
+            if value[0].units != value[1].units:
+                if not dt.units_convertible(value[0], value[1]):
+                    raise TypeError("interval boundaries must have compatible units")
+                
+                else:
+                    value = [float(value[0]), float(value[1].rescale(value[0].units))]
+                    
+            else:
+                value = [float(v) for v in value[0:2]]
+            
+        t, d = (value[0], value[1] - value[0])
+        
+        if d < 0:
+            raise ValueError("interval cannot have negative duration")
+
+        return (t, d, u) if l is None else (t, d, u, l)
+     
+    tdl = None
+    
+    if len(args) == 1:
+        if isinstance(args[0], (tuple, list)):
+            if len(args[0]) in (2,3): # a sequence with one tuple of 2-3 elements
+                if all([isinstance(v, (numbers.Number, pq.Quantity)) for v in args[0][0:2]]):
+                    # this can be an interval tuple
+                    tdl = [__generate_epoch_interval__(args[0])]
+                    
+                elif all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
+                    # or a sequence of tuples -- feed this into __generate_epoch_interval__
+                    # and hope for the best
+                    if sort:
+                        tdl = [__generate_epoch_interval__(v) for v in sorted(args[0], key=lambda x: x[0])]
+                        
+                    else:
+                        tdl = [__generate_epoch_interval__(v) for v in args[0]]
+                    
+                else:
+                    raise TypeError("incorrect syntax")
+                
+            else:
+                if all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
+                    if sort:
+                        tdl = [__generate_epoch_interval__(v) for v in sorted(args[0], key=lambda x: x[0])]
+                    else:
+                        tdl = [__generate_epoch_interval__(v) for v in args[0]]
+
+        else:
+            raise TypeError("expecting a sequence of tuples, or a 2- or 3- tuple")
+        
+    else:
+        # sequence of 2- or 3- tuples
+        if all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args]):
+            if sort:
+                tdl = [__generate_epoch_interval__(v) for v in sorted(args, key=lambda x: x[0])]
+                
+            else:
+                tdl = [__generate_epoch_interval__(v) for v in args]
+        
+        else:
+            raise TypeError("expecting 2- or 3- tuples")
+        
+    if tdl is not None:
+        # all numeric elements in tdl are python quantities
+        if all([len(v) == 4 for v in tdl]):
+            times, durations, units, labels = [x_ for x_ in zip(*tdl)]
+            ret = neo.Epoch(times = times, durations = durations, units = units[0], labels=labels)
+        else:
+            times, durations, units = [x_ for x_ in zip(*tdl)]
+            ret = neo.Epoch(times = times, durations = durations, units=units[0])
+                
+        return ret
 
 @safeWrapper
-def intervals2cursors():
-    pass
+def intervals2cursors(*args, **kwargs) -> typing.Sequence:
+    """Construct a neo.Epoch from a sequence of interval tuples or triplets.
+    
+    Variadic parameters:
+    --------------------
+    triplets (t0,t1,label), or a sequence of tuples or triplets
+    each specifying an interval
+    
+    """
+    axis = kwargs.pop("axis", None)
+    if not isinstance(axis, (int, pg.PlotItem, type(None))):
+        raise TypeError("axis expected to be an int, a PlotItem or None; got %s instead" % type(axis).__name__)
+
+    sort = kwargs.pop("sort", True)
+    
+    if not isinstance(sort, bool):
+        raise TypeError("sort must be a boolean")
+    
+    def __generate_cursor_params__(value):
+        # start, stop, label
+        if not isinstance(value, (tuple, list)) or len(value) != 3:
+            raise TypeError("expecting a tuple of 3 elements")
+        
+        if not isinstance(value[2], str) or len(value[2].strip()) == 0:
+            raise ValueError("expecting a non-empty string as thirs element in the tuple")
+        
+        l = value[2]
+        
+        if not all([isinstance(v, (pq.Quantity, numbers.Number)) for v in value[0:2]]):
+            raise TypeError("interval boundaries must be scalar numbers or quantities")
+        
+        if all([isinstance(v, pq.Quantity) for v in value[0:2]]):
+            if any([v.size != 1 for v in value[0:2]]):
+                raise TypeError("interval boundaries must be scalar quantities")
+            
+            if value[0].units != value[1].units:
+                if not dt.units_convertible(value[0], value[1]):
+                    raise TypeError("interval boundaries must have compatible units")
+                
+                else:
+                    value = [float(value[0]), float(value[1].rescale(value[0].units)), value[2]]
+                    
+            else:
+                value = [float(v) for v in value[0:2]] + [value[2]]
+            
+        x, xwindow = (value[0], value[1]-value[0])
+        
+        if xwindow < 0:
+            raise ValueError("interval cannot have negative duration")
+        
+        x += xwindow/2. 
+        
+        return (x, xwindow, l)
+     
+    xwl = None
+    
+    if len(args) == 1:
+        if isinstance(args[0], (tuple, list)):
+            if len(args[0]) in (2,3): # a sequence with one tuple of 2-3 elements
+                if all([isinstance(v, (numbers.Number, pq.Quantity)) for v in args[0][0:2]]):
+                    # this can be an interval tuple
+                    xwl = [__generate_cursor_params__(args[0])]
+                    
+                elif all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
+                    # or a sequence of tuples -- feed this into __generate_cursor_params__
+                    # and hope for the best
+                    if sort:
+                        xwl = [__generate_cursor_params__(v) for v in sorted(args[0], key=lambda x: x[0])]
+                    
+                    else:
+                        xwl = [__generate_cursor_params__(v) for v in args[0]]
+                    
+                else:
+                    raise TypeError("incorrect syntax")
+                
+            else:
+                if all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
+                    if sort:
+                        xwl = [__generate_cursor_params__(v) for v in sorted(args[0], key=lambda x: x[0])]
+
+        else:
+            raise TypeError("expecting a sequence of tuples, or a 2- or 3- tuple")
+        
+    else:
+        # sequence of 2- or 3- tuples
+        if all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args]):
+            if sort:
+                xwl = [__generate_cursor_params__(v) for v in sorted(args, key=lambda x: x[0])]
+            
+            else:
+                xwl = [__generate_cursor_params__(v) for v in args]
+        
+        else:
+            raise TypeError("expecting 2- or 3- tuples")
+        
+    if xwl is not None:
+        if axis is not None:
+            cursors = [SignalCursor(axis, x=p[0], xwindow=p[1], cursorID=p[2], 
+                                    cursor_type=SignalCursor.SignalCursorTypes.vertical) for p in xwl]
+                
+            return cursors
+        
+        return xwl
 
 @safeWrapper
 def epoch_average(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
