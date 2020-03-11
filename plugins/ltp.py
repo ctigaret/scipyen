@@ -852,41 +852,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
         return record_data
     
-def signal_cursor_measure(func, data, *cursors, segment_index=None, signal_index=None) -> pq.Quantity:
-    """
-    data: a neo.Analogsignal or datatypes.DataSignal
-    """
-    if not isinstance(func, types.FunctionType):
-        raise TypeError("first parameter expected to be a function; got %s instead")
-    
-    #signature = inspect.signature(func)
-    #parameter_names = [n for n in signature.parameters]
-    
-    ## check the function expects a signal as first parameter
-    
-    #ann = signature.parameters[parameter_names[0]].annotation
-    
-    #if isinstance(ann, (tuple, list)):
-        #param0_types = tuple(ann)
-        
-    #elif isinstance(ann, type):
-        #param0_types = (ann,)
-        
-    #elif isinstance(ann, typing._TypingBase):
-        #param0_types = typing._subs_tree(ann)
-    
-    #else:
-        #raise TypeError("cannot parse a parameter's annotation %s" % ann)
-    
-    if not isinstance(data, (neo.AnalogSignal, dt.DataSignal)):
-        raise TypeError(" data expected to be a neo.Block, neo.Segment or one of %s" % param0_types)
-        
-    
-    
             
-        
-    
-        
 def generate_synaptic_plasticity_options(**kwargs) -> dict:
     """Constructs a dict with options for synaptic plasticity experiments.
     
