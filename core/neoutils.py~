@@ -839,7 +839,7 @@ def signal2epoch(sig, name=None, labels=None):
         raise TypeError("'labels' expected to be a str, numpy array of string dtype, or None; got %s instead" % type(labels).__name__)
     
     if not isinstance(name, (str, type(None))):
-        raise TypeError("'name' expected ot be None or a string; got %s instead" % type(name).__name__)
+        raise TypeError("'name' expected to be None or a string; got %s instead" % type(name).__name__)
     
     if isinstance(name, str) and len(name) == 0:
         name = sig.name # this may be None
@@ -1232,6 +1232,50 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, dt.DataSignal],
     data_index = signal.time_index(t)
     
     return data_index
+
+@safeWrapper
+def cursors_measure(func, data, *cursors, 
+                    segment_index: int = None, 
+                    analog: typing.Optional[typing.Union[int, str]] = None, 
+                    irregular: typing.Optional[typing.Union[int, str]] = None,
+                    **kwargs) -> pq.Quantity:
+    """
+    data: a neo.Analogsignal or datatypes.DataSignal
+    """
+    
+    def __signal_measure__(f, x, *cursors, **kwargs):
+        return f(x, *cursors, **kwargs)
+    
+    def __parse_signal_index__(x, ndx, stype):
+        if isinstance(ndx, int):
+            if ndx < 0 or ndx >= len(x):
+                raise ValueError("Invalid signal index %d for %d signals" % (ndx, len(x)))
+            
+            return ndx
+        
+        elif isinstance(ndx, str):
+            ndx = get_index_of_named_signal(x, ndx, stype=stype)
+            
+        else:
+            raise TypeError("invalid indexing type")
+            
+    
+    if not isinstance(func, types.FunctionType):
+        raise TypeError("first parameter expected to be a function; got %s instead")
+    
+    if isinstance(data, (neo.AnalogSignal, dt.DataSignal)):
+        return __signal_measure__(func, data, *cursors, **kwargs)
+    
+    elif isinstance(data, neo.Segment):
+        if analog is not None:
+            analog = __parse_signal_index__(data, analog, stype=neo.AnalogSignal)
+            
+            return __signal_measure__(func, data.analogsignals[analog], *cursors, **kwargs)
+            
+        elif irregular is not None
+        
+    return func(data, *cursors, **kwargs)
+
     
 @safeWrapper
 def cursors_difference(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
@@ -1509,7 +1553,7 @@ def intervals2epoch(*args, **kwargs) -> neo.Epoch:
     """
     units = kwargs.pop("units", pq.s)
     if not isinstance(units, pq.Quantity) or units.size > 1:
-        raise TypeError("units expected ot be a scalar python Quantity")
+        raise TypeError("units expected to be a scalar python Quantity")
 
     name = kwargs.pop("name", "Epoch")
     if not isinstance(name, str):
@@ -2069,7 +2113,8 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
     Positional parameters:
     ----------------------
     
-    Src: a neo.Block or a neo.Segment, or a list of neo.Segment objects
+    Src: a neo.Block or a neo.Segment, or a list of signal-like objects
+    
     
     names: a string, or a list or tuple of strings
     
@@ -2132,6 +2177,11 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
     """
     from . import datatypes as dt
     
+    signal_collection = "%ss" % stype.__name__.lower()
+    
+    if signal_collection == "datasignals":
+        signal_collection = "analogsignals"
+    
     if isinstance(src, neo.core.Block) or (isinstance(src, (tuple, list)) and all([isinstance(s, neo.Segment) for s in src])):
         # construct a list of indices (or list of lists of indices) of the named
         # signal(s) in each of the Block's segments
@@ -2147,102 +2197,113 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
             # I don't think this is really necessary because DataSignal objects
             # can be very well contained in the analogsignals list of a segment
             # alongside neo.AnalogSignal objects ( guess ... TODO check this)
+            
+            if silent:
+                return [__indexnone([i.name for i in getattr(j, signal_collection)], names) for j in data]
+            
+            return [[i.name for i in getattr(j, signal_collection)].index(names) for j in data]
              
-            if stype in (neo.AnalogSignal, dt.DataSignal) or \
-                (isinstance(stype, (tuple, list)) and all([s.__name__ in ("AnalogSignal", "DataSignal") for s in stype])):
-                if silent:
-                    return [__indexnone([i.name for i in j.analogsignals], names) for j in data]
+            #if stype in (neo.AnalogSignal, dt.DataSignal) or \
+                #(isinstance(stype, (tuple, list)) and all([s.__name__ in ("AnalogSignal", "DataSignal") for s in stype])):
+                #if silent:
+                    #return [__indexnone([i.name for i in j.analogsignals], names) for j in data]
                 
-                return [[i.name for i in j.analogsignals].index(names) for j in data]
+                #return [[i.name for i in j.analogsignals].index(names) for j in data]
             
-            elif stype is neo.IrregularlySampledSignal:
-                if silent:
-                    return [__indexnone([i.name for i in j.irregularlysampledsignals], names) for j in data]
+            #elif stype is neo.IrregularlySampledSignal:
+                #if silent:
+                    #return [__indexnone([i.name for i in j.irregularlysampledsignals], names) for j in data]
                 
-                return [[i.name for i in j.irregularlysampledsignals].index(names) for j in data]
-            
-                
-            elif stype is neo.SpikeTrain:
-                if silent:
-                    return [__indexnone([i.name for i in j.spiketrains], names) for j in data]
-                
-                return [[i.name for i in j.spiketrains].index(names) for j in data]
+                #return [[i.name for i in j.irregularlysampledsignals].index(names) for j in data]
             
                 
-            elif stype is neo.Event:
-                if silent:
-                    return [__indexnone([i.name for i in j.events], names) for j in data]
+            #elif stype is neo.SpikeTrain:
+                #if silent:
+                    #return [__indexnone([i.name for i in j.spiketrains], names) for j in data]
                 
-                return [[i.name for i in j.events].index(names) for j in data]
+                #return [[i.name for i in j.spiketrains].index(names) for j in data]
             
                 
-            elif stype is neo.Epoch:
-                if silent:
-                    return [__indexnone([i.name for i in j.epochs], names) for j in data]
+            #elif stype is neo.Event:
+                #if silent:
+                    #return [__indexnone([i.name for i in j.events], names) for j in data]
                 
-                return [[i.name for i in j.epochs].index(names) for j in data]
+                #return [[i.name for i in j.events].index(names) for j in data]
             
-            else:
-                raise TypeError("Invalid stype")
+                
+            #elif stype is neo.Epoch:
+                #if silent:
+                    #return [__indexnone([i.name for i in j.epochs], names) for j in data]
+                
+                #return [[i.name for i in j.epochs].index(names) for j in data]
+            
+            #else:
+                #raise TypeError("Invalid stype")
 
         elif isinstance(names, (list, tuple)):
             if np.all([isinstance(i,str) for i in names]):
                 # proceed only if all elements in names are strings and return a 
                 # list of lists, where each list element has the indices for a given
                 # signal name
-                if stype in (neo.AnalogSignal, dt.DataSignal) or \
-                    (isinstance(stype, (tuple, list)) and all([s.__name__ in ("AnalogSignal", "DataSignal") for s in stype])):
-                    if silent:
-                        return [[__indexnone([i.name for i in j.analogsignals], k) for k in names] for j in data]
+                if silent:
+                    return [[__indexnone([i.name for i in getattr(j, signal_collection)], k) for k in names] for j in data]
+                
+                return [[[i.name for i in getattr(j, signal_collection)].index(k) for k in names ] for j in data]
+                
+                #if stype in (neo.AnalogSignal, dt.DataSignal) or \
+                    #(isinstance(stype, (tuple, list)) and all([s.__name__ in ("AnalogSignal", "DataSignal") for s in stype])):
+                    #if silent:
+                        #return [[__indexnone([i.name for i in j.analogsignals], k) for k in names] for j in data]
                     
-                    return [[[i.name for i in j.analogsignals].index(k) for k in names ] for j in data]
+                    #return [[[i.name for i in j.analogsignals].index(k) for k in names ] for j in data]
                     
-                elif stype in (neo.IrregularlySampledSignal, dt.IrregularlySampledDataSignal):
-                    if silent:
-                        return [[__indexnone([i.name for i in j.irregularlysampledsignals], k) for k in names] for j in data]
+                #elif stype in (neo.IrregularlySampledSignal, dt.IrregularlySampledDataSignal):
+                    #if silent:
+                        #return [[__indexnone([i.name for i in j.irregularlysampledsignals], k) for k in names] for j in data]
                     
-                    return [[[i.name for i in j.irregularlysampledsignals].index(k) for k in names ] for j in data]
+                    #return [[[i.name for i in j.irregularlysampledsignals].index(k) for k in names ] for j in data]
                     
-                elif stype is neo.SpikeTrain:
-                    if silent:
-                        return [[__indexnone([i.name for i in j.spiketrains], k) for k in names] for j in data]
+                #elif stype is neo.SpikeTrain:
+                    #if silent:
+                        #return [[__indexnone([i.name for i in j.spiketrains], k) for k in names] for j in data]
                     
-                    return [[[i.name for i in j.spiketrains].index(k) for k in names ] for j in data]
+                    #return [[[i.name for i in j.spiketrains].index(k) for k in names ] for j in data]
                     
-                elif stype is neo.Event:
-                    if silent:
-                        return [[__indexnone([i.name for i in j.events], k) for k in names] for j in data]
+                #elif stype is neo.Event:
+                    #if silent:
+                        #return [[__indexnone([i.name for i in j.events], k) for k in names] for j in data]
                     
-                    return [[[i.name for i in j.events].index(k) for k in names ] for j in data]
+                    #return [[[i.name for i in j.events].index(k) for k in names ] for j in data]
                     
-                elif stype is neo.Epoch:
-                    if silent:
-                        return [[__indexnone([i.name for i in j.epochs], k) for k in names] for j in data]
+                #elif stype is neo.Epoch:
+                    #if silent:
+                        #return [[__indexnone([i.name for i in j.epochs], k) for k in names] for j in data]
                     
-                    return [[[i.name for i in j.epochs].index(k) for k in names ] for j in data]
+                    #return [[[i.name for i in j.epochs].index(k) for k in names ] for j in data]
                     
-                else:
-                    raise TypeError("Invalid stype")
+                #else:
+                    #raise TypeError("Invalid stype")
 
     elif isinstance(src, neo.core.Segment):
-        if stype in (neo.AnalogSignal, dt.DataSignal) or \
-            (isinstance(stype, (tuple, list)) and all([s.__name__ in ("AnalogSignal", "DataSignal") for s in stype])):
-            objectList = src.analogsignals
+        objectList = getattr(src, signal_collection)
+        #if stype in (neo.AnalogSignal, dt.DataSignal) or \
+            #(isinstance(stype, (tuple, list)) and all([s.__name__ in ("AnalogSignal", "DataSignal") for s in stype])):
+            #objectList = src.analogsignals
             
-        elif stype is neo.IrregularlySampledSignal:
-            objectList = src.irregularlysampledsignals
+        #elif stype is neo.IrregularlySampledSignal:
+            #objectList = src.irregularlysampledsignals
             
-        elif stype is neo.SpikeTrain:
-            objectList = src.spiketrains
+        #elif stype is neo.SpikeTrain:
+            #objectList = src.spiketrains
             
-        elif stype is neo.Event:
-            objectList = src.events
+        #elif stype is neo.Event:
+            #objectList = src.events
             
-        elif stype is neo.Epoch:
-            objectList = src.epochs
+        #elif stype is neo.Epoch:
+            #objectList = src.epochs
             
-        else:
-            raise TypeError("Invalid stype")
+        #else:
+            #raise TypeError("Invalid stype")
         
         if isinstance(names, str):
             if silent:

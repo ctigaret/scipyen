@@ -1,3 +1,8 @@
+2020-03-11 23:09:48
+
+neoutils:
+    function cursors_measure: applies a cursor-based function to a signal, segment or block
+
 2020-03-11 13:42:34
 ltp module:
 ===========
