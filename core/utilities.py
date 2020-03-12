@@ -3,7 +3,7 @@
 Programming helper functions & decorators
 '''
 #### BEGIN core python modules
-import traceback, re, io, sys, enum, itertools, time, typing
+import traceback, re, io, sys, enum, itertools, time, typing, types
 from functools import singledispatch, update_wrapper, wraps
 from contextlib import contextmanager
 #### END core python modules
@@ -513,7 +513,7 @@ def unique(seq):
     return [x for x in seq if x not in seen and not seen.add(x) ]
 
 def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)) -> int:
-    """Returns an integer index for the axis
+    """Returns an integer index for a specific array axis
     """
     if not isinstance(data, np.ndarray):
         raise TypeError("Expecting a numpy array or a derivative; got %s instead" % type(data).__name__)
@@ -541,8 +541,10 @@ def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)) -> i
     return axis
 
 def normalized_index(data_len:(int),
-                     index:(int, tuple, list, np.ndarray, range, slice, type(None)) = None) -> (range, list):
-    """Checks index validity along an iterable; returns a generic indexing form.
+                     index:(int, tuple, list, np.ndarray, range, slice, type(None)) = None) -> typing.Union[range, tuple]:
+    """Returns a generic indexing in the form of an iterable of indices.
+    
+    Also checks the validity of the index for an iterable of data_len samples.
     
     Parameters:
     -----------
@@ -556,17 +558,21 @@ def normalized_index(data_len:(int),
     
     Returns:
     --------
-    ret - an iterable (range or list) of integer indices
+    ret - an iterable index (range or list of integer indices) that can be
+        used with list comprehension
     
     """
     if index is None:
         return range(data_len)
     
     elif isinstance(index, int):
+        # NOTE: 2020-03-12 22:40:31
+        # negative ints ARE supported: they simply go backwards from the end of
+        # the sequence
         if index >= data_len:
             raise ValueError("Index %s is invalid for %d elements" % (index, data_len))
         
-        return [index]
+        return tuple([index]) # -> (index,)
     
     elif isinstance(index, (tuple,  list)):
         if not all([isinstance(v, int) for v in index]):
@@ -575,7 +581,7 @@ def normalized_index(data_len:(int),
         if not all([v < data_len for v in index]):
             raise ValueError("Index sequence %s contains invalid values for %d elements" % (index, data_len))
         
-        return index
+        return tuple(index) # -> index as a tuple
     
     elif isinstance(index, range):
         if index.start < 0 or index.stop < 0:
@@ -584,8 +590,7 @@ def normalized_index(data_len:(int),
         if max(index) >= data_len:
             raise ValueError("Index %s out of range for %d elements" % (index, data_len))
         
-        return index
-        
+        return index # -> index IS a range
     
     elif isinstance(index, slice):
         if index.start < 0 or index.stop < 0:
@@ -605,31 +610,29 @@ def normalized_index(data_len:(int),
         if any(ndx) < 0:
             warnings.warn("Index %s will produce reverse indexing" % index)
             
-        return ndx
+        return ndx # -> ndx IS a tuple
     
     elif isinstance(index, np.ndarray):
         if not isVector(index):
-            raise TypeError("Indexing array must be a vector; instead its shape is" % index.shape)
+            raise TypeError("Indexing array must be a vector; instead its shape is %s" % index.shape)
             
-
-        if index.dtype.kind == "i":
-            return [k for k in index]
+        if index.dtype.kind == "i": # index is an array of int
+            return tuple([k for k in index])
         
-        elif index.dtype.kind == "b":
+        elif index.dtype.kind == "b": # index is an array of bool
             if len(index) != data_len:
                 raise TypeError("Boolean indexing vector must have the same length as the iterable against it will be normalized (%d); got %d instead" % (data_len, len(index)))
             
-            ndx = [k for k in range(data_len) if index[k]]
+            return tuple([k for k in range(data_len) if index[k]])
             
-            return ndx
-        
     else:
         raise TypeError("Unsupported data type for index: %s" % type(index).__name__)
     
 def normalized_sample_index(data:np.ndarray, 
                             axis: typing.Union[int, str, vigra.AxisInfo], 
                             index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None) -> typing.Union[range, list]:
-    """Checks index validity along a numpy array axis; returns a generic indexing form.
+    """Calls normalized_index on a specific array axis.
+    Also checks index validity along a numpy array axis.
     
     Parameters:
     ----------

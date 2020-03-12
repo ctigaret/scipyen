@@ -2007,31 +2007,62 @@ def normalized_segment_index(src: neo.Block,
     #"""
     
 def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]],
-                  index: typing.Union[int, str, range, slice, typing.Sequence],
-                  stype: type = neo.AnalogSignal,
-                  silent: bool = False) -> typing.Union[int, list, slice]:
+                     index: typing.Union[int, str, range, slice, typing.Sequence],
+                     stype: type = neo.AnalogSignal,
+                     silent: bool = False) -> list:
     """Provisional - work in progress
+    The idea is to get an iterable of indices (i.e. a tuple of int or a range)
+    for the contained objects in a container, given either:
+    the "name" of a contained (a str), an int, a slice, a range, or a list of int.
+    
+    WARNING: the function only iterates through the first level of children
+    in src. If any of these are containers, there are not searched.
+    
+    Positional parameters:
+    ----------------------
+    src: neo.core.container.Container or a sequence of these
+        (neo.core.container.Container is the ancestor of all container objects 
+        in the neo package)
+        
+    index: int, str, range, slice, or sequence of int or str.
+        CAUTION: The sequence can contain a mixture of int and str.
+        
+        Indexing by str works for children types with attribute "name" - all
+        all data objects in the neo package. It is implemented to allows 
+        retrieving the int index of the data objects children in src according 
+        to the value of their "name" attribute.
+        WARNING This assumes that all data object children have unique names.
+        If this is not the case, the index of the last child with the same 
+        "name" is returned, and all the others are silenty ignored.
+        
+    slient: bool, default is True
+        Only used when index is, or contains, str.
+        
+        When True (the default) returns empty tuples when a child with the 
+        "name" specified by str does not exist.
+        
+        When false, it will raise an exception.
+    
     """
     def __container_lookup__(container, contained_type, index_obj) -> typing.Union[list, range]:
-        """the idea is to get an iterable of indices (i.e. a tuple of int or a range)
-        for the contained objects in a container, given either:
-        given the "name" of a contained, an int, a slice, a range, or a list of ints.
-        """
         seq_contained = [c for c in container.children if isinstance(c, contained_type)]
         
         if len(seq_contained) == 0:
-            return range(0)
+            warnings.warn("%s does not contain %s children" % (type(src).__name__, stype.__name__))
+            return tuple()
         
         else:
-            names = [c.name for c in seq_contained]
             
             if isinstance(index_obj, str):
                 if "name" not in dict(inspect.getmembers(contained_type)):
                     if "name" not in dict(contained_type._recommended_attrs):
                         raise TypeError("name cannot be used to get the index of %s in %s" % (contained_type.__name__, type(container).__name__))
                 
+                names = [c.name for c in seq_contained]
+                
                 if silent:
                     ndx = __indexnone(names, index_obj)
+                    
                     if ndx is None:
                         return tuple()
                     
@@ -2040,18 +2071,21 @@ def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequ
                 else:
                     return tuple([names.index(index_obj)]) # -> (the_index, )
                 
-            elif isinstance(index_obj, int):
-                return tuple([index_obj]) # -> (the_index, )
-            
-            elif isinstance(index_obj, range):
-                return index_obj
-            
-            elif isinstance(index_obj, slice):
-                return range(index_obj.indices(len(seq_contained)))
-            
             elif isinstance(index_obj, (tuple, list)):
-                if all([isinstance(i, (int, str)) for i in index_obj]):
-                    return [i if isinstance(i, int) else __indexnone(names, i) if silent else names.index(i)]
+                if all([isinstance(i, int) for i in index_obj]):
+                    return normalized_index(len(seq_contained), index_obj)
+                
+                elif all([isinstance(i, (str, int)) for i in index_obj]):
+                    if "name" not in dict(inspect.getmembers(contained_type)):
+                        if "name" not in dict(contained_type._recommended_attrs):
+                            raise TypeError("name cannot be used to get the index of %s in %s" % (contained_type.__name__, type(container).__name__))
+                    
+                    names = [c.name for c in seq_contained]
+                    
+                    return tuple([normalized_index(len(seq_contained), i)[0] if isinstance(i, int) else __indexnone(names, i) if silent else names.index(i)])
+            
+            else:
+                return normalized_index(len(seq_contained, index_obj))
         
     major, minor, dot = get_neo_version()
     
@@ -2062,11 +2096,9 @@ def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequ
     
     if not all([isinstance(s, neo.core.container.Container) for s in src]):
         raise TypeError("src must be a neo Containter or a sequence of neo Container objects")
+    
+    return [__container_lookup__(s, stype, index) for s in src]
         
-    
-    
-    
-    
 def normalized_signal_index(src: neo.core.container.Container,
                             index: typing.Union[int, str, range, slice, typing.Sequence],
                             stype: type = neo.AnalogSignal, 
