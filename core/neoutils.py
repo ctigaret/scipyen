@@ -214,7 +214,8 @@ get_time_slice
 inverse_lookup
 is_same_as
 lookup
-normalized_data_index
+normalized_signal_index
+normalized_segment_index
 
 VIII I/O-related
 =================
@@ -1948,10 +1949,56 @@ def get_signal_names_indices(data: typing.Union[neo.Segment, typing.Sequence],
             
     return [item[1] for item in sig_indices_names]
     
-def normalized_data_index(src: typing.Union[neo.Segment, neo.ChannelIndex, neo.Unit],
-                          index: typing.Union[int, str, range, slice, typing.Sequence],
-                          stype: type = neo.AnalogSignal, 
-                          silent: bool = False) -> (range, list):
+def normalized_segment_index(src: neo.Block,
+                             index: typing.Union[int, str, range, slice, typing.Sequence]):
+    """Returns integral indices of a Segment in a neo.Block or list of Segments.
+    """
+    
+    if isinstance(src, neo.Block):
+        src = src.segments
+        
+    elif isinstance(src, neo.Segment):
+        src = [src]
+        
+    elif not isinstance(src, (tuple, list)) or not all([isinstance(s, neo.Segment) for s in src]):
+        raise TypeError("src expected to be a neo.Block, a sequence of neo.Segments, or a neo.Segment; got %s instead" % type(src).__name__)
+    
+    data_len = len(src)
+    
+    if isinstance(index, (int, range, slice, np.ndarray, type(None))):
+        return normalized_index(data_len, index)
+    
+    elif isinstance(index, str):
+        if slient:
+            return __indexnone([i.name for i in src], index)
+
+        return [i.name for i in src].index(index)
+    
+    elif isinstance(index, (tuple, list)):
+        indices = list()
+        
+        for ndx in index:
+            if isinstance(ndx, int):
+                indices.append(normalized_index(data_len, ndx))
+                
+            elif isinstance(ndx, str):
+                if silent:
+                    indices.append(__indexnone([i.name for i in src], ndx))
+                    
+                else:
+                    indics.append([i.name for i in src].index(ndx))
+                    
+            else:
+                raise TypeError("Invalid index element type %s" % type(ndx).__name__)
+        return indices
+    
+    else:
+        raise TypeError("Invalid indexing: %s" % index)
+    
+def normalized_signal_index(src: typing.Union[neo.Segment, neo.ChannelIndex, neo.Unit],
+                            index: typing.Union[int, str, range, slice, typing.Sequence],
+                            stype: type = neo.AnalogSignal, 
+                            silent: bool = False) -> typing.Union[range, list]:
     """Returns the integral index of a signal in its container.
     
     Useful to get the index of data by its name. 
@@ -1962,10 +2009,10 @@ def normalized_data_index(src: typing.Union[neo.Segment, neo.ChannelIndex, neo.U
     
     src: neo.Segment, neo.ChannelIndex, or neo.Unit.
     
-    index: int, str, tuple, list, range, or slice - any valid form of indexing
+    index: int, str, tuple, list, range, or slice; any valid form of indexing
         including by the value of the signal's "name " attribute.
     
-    stype: type = the type of signal to index; valid sugnal types are 
+    stype: type object; the type of signal to index; valid signal types are 
         neo.AnalogSignal, neo.IrregularlySampledSignal, 
         neo.Event, neo.Epoch, neo.SpikeTrain, neo.ImageSequence, neo.Unit,
         datatypes.DataSignal and datatypes.IrregularlySampledDataSignal
@@ -1985,8 +2032,6 @@ def normalized_data_index(src: typing.Union[neo.Segment, neo.ChannelIndex, neo.U
     a range or list of integer indices
     
     """
-    from . import datatypes as dt
-    
     major, minor, dot = get_neo_version()
     
     data_len = None
@@ -1996,6 +2041,7 @@ def normalized_data_index(src: typing.Union[neo.Segment, neo.ChannelIndex, neo.U
     if not isinstance(src, (neo.Segment, neo.ChannelIndex, neo.Unit)):
         raise TypeError("Expecting a neo.Segment or neo.ChannelIndex; got %s instead" % type(src).__name__)
     
+    #### BEGIN figure out what signal collection we're after'
     if stype in (neo.AnalogSignal, dt.DataSignal):
         if not isinstance(src, (neo.Segment, neo.ChannelIndex)):
             raise TypeError("%s does not contain %s" % (type(src).__name__, stype.__name__))
@@ -2061,6 +2107,8 @@ def normalized_data_index(src: typing.Union[neo.Segment, neo.ChannelIndex, neo.U
     else:
         raise TypeError("Cannot handle %s" % stype.__name__)
     
+    #### END figure out what signal collection we're after'
+
     if signal_collection is None or len(signal_collection) == 0:
         return range(0)
     
@@ -2085,7 +2133,7 @@ def normalized_data_index(src: typing.Union[neo.Segment, neo.ChannelIndex, neo.U
             if isinstance(ndx, int):
                 indices.append(normalized_index(data_len, ndx))
                 
-            if isinstance(ndx, str):
+            elif isinstance(ndx, str):
                 if silent:
                     indices.append(__indexnone([i.name for i in signal_collection], ndx))
                     
