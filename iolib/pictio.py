@@ -893,6 +893,11 @@ def loadAxonFile(fileName:str) -> neo.Block:
             
             if data.name is None or (isinstance(data.name, str) and len(data.name.strip()) == 0):
                 data.name = os.path.splitext(os.path.basename(fileName))[0]
+                
+            if isinstance(data, neo.Block):
+                for k, s in enumerate(data.segments):
+                    if s.name is None or (isinstance(s.name, str) and len(s.name.strip()) == 0):
+                        s.name = "segment_%d" % k
         
         #protocol_sweeps = axonIO.read_protocol()
         axon_info = axonIO._axon_info
