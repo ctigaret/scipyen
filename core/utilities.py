@@ -3,7 +3,7 @@
 Programming helper functions & decorators
 '''
 #### BEGIN core python modules
-import traceback, re, io, sys, enum, itertools, time
+import traceback, re, io, sys, enum, itertools, time, typing
 from functools import singledispatch, update_wrapper, wraps
 from contextlib import contextmanager
 #### END core python modules
