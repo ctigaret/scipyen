@@ -1,7 +1,9 @@
-2020-03-11 23:09:48
+2020-03-12 09:31:52
 
 neoutils:
-    function cursors_measure: applies a cursor-based function to a signal, segment or block
+    new function cursors_measure: applies a cursor-based function to a signal, segment or block
+    function normalized_data_index renamed to normalized_signal_index
+    new function normalized_segment_index
 
 2020-03-11 13:42:34
 ltp module:

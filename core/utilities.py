@@ -627,8 +627,8 @@ def normalized_index(data_len:(int),
         raise TypeError("Unsupported data type for index: %s" % type(index).__name__)
     
 def normalized_sample_index(data:np.ndarray, 
-                            axis:(int, str, vigra.AxisInfo), 
-                            index:(int, tuple, list, np.ndarray, range, slice, type(None))=None) -> (range, list):
+                            axis: typing.Union[int, str, vigra.AxisInfo], 
+                            index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None) -> typing.Union[range, list]:
     """Checks index validity along a numpy array axis; returns a generic indexing form.
     
     Parameters:
