@@ -162,7 +162,7 @@ batch_normalise_signals
 batch_remove_offset
 concatenate_blocks
 concatenate_signals
-copy
+neo_copy
 merge_signal_channels
 set_relative_time_start
 
@@ -1241,7 +1241,7 @@ def cursors_measure(func, data, *cursors,
                     irregular: typing.Optional[typing.Union[int, str]] = None,
                     **kwargs) -> pq.Quantity:
     """
-    data: a neo.Analogsignal or datatypes.DataSignal
+    data: a neo.AnalogSignal or datatypes.DataSignal
     """
     
     def __signal_measure__(f, x, *cursors, **kwargs):
@@ -3014,6 +3014,12 @@ def concatenate_blocks(*args, **kwargs):
     Copies of neo.Segment objects in the source data (*args) are appended in the
     order they are encountered.
     
+    Optionally a subset of the signals contained in the source data are retained
+    in the concatenated Block.
+    
+    Events, spike trains and epochs contained in the selected segments will be
+    copied to the concatenated Block.
+    
     Var-positional parameters:
     --------------------------
     args : a comma-separated list of neo.core.Block or neo.core.Segment objects
@@ -3022,18 +3028,35 @@ def concatenate_blocks(*args, **kwargs):
     -----------------------
     
     name            see neo.Block docstring
-    annotation      see neo.Block docstring
+    description     see neo.Block docstring
     rec_datetime    see neo.Block docstring
     file_origin     see neo.Block docstring
     file_datetime   see neo.Block docstring
+    annotation      see neo.Block docstring
+    
     segment_index   int or None; 
                     when None, all segments in each block will be used
                     when int then only segments with given index will be used
+                    (i.e. only one segment from each block will be retained in 
+                    the concatenated data)
                     
-    signal_index    index of signal into each of the segments to be used;
-                    can also be a signal name
-                                
-            
+    analog_index: int, str, range, slice, typing.Sequence
+                    Indexing of analog signal(s) into each of the segments, that
+                    will be retained in the concatenated data. These include
+                    neo.AnalogSignal and datatypes.DataSignal
+                    
+                    This index can be (see neo_index_lookup):
+                    int, str (signal name), sequence of int or str, a range, a
+                    slice, or a numpy array of int or booleans.
+                    
+    irregular_index: as analog_index, for irregularly sampled signals. These 
+                    include neo.IrregularlySampledSignal and 
+                    datatypes.IrregularlySampledDataSignal
+    
+    image_index: as analog_index, for neo.ImageSequence objects (for neo version
+                    from 0.8.0 onwards)
+                    
+                    
     Returns:
     -------
     a new neo.Block object
@@ -3045,11 +3068,15 @@ def concatenate_blocks(*args, **kwargs):
     
     block = concatenate_blocks(getvars("data_name_prefix*"), segment_index=0)
     
-    # will concatenate first segment from all neo.Block variabels having names beginning with 
-    # 'data_name_prefix' in the user workspace and ordered by rec_datetime,
+    will concatenate the first segment (segment_index = 0) from all neo.Block 
+    variables having names beginning with 'data_name_prefix' in the user 
+    workspace.
 
     
     """
+    major, minor, dot = get_neo_version()
+    
+    neo_ge_8 = any([major >=0, minor >= 8])
     
     #if not isinstance(arg0, (neo.core.Block, neo.core.Segment)):
         #raise TypeError("First argument must be a Block or a Segment")
@@ -3057,11 +3084,11 @@ def concatenate_blocks(*args, **kwargs):
     if len(args) == 0:
         return None
     
-    #print(args)
     if len(args) == 1:
         if isinstance(args[0], str):
             try:
-                args =  workspacefunctions.getvars(args[0])#, sortkey="rec_datetime")
+                args =  workspacefunctions.getvars(args[0], sort=True, sortkey=lambda x: x.rec_datetime)
+                
             except Exception as e:
                 print("String argument did not resolve to a list of neo.Block objects")
                 traceback.print_exc()
@@ -3069,61 +3096,49 @@ def concatenate_blocks(*args, **kwargs):
         else:
             args = args[0] # unpack the tuple
     
-    ret = neo.core.Block()
+    name = kwargs.get("name", "Concatenated block")
+    description = kwargs.get("description", "Concatenated block")
+    file_origin = kwargs.get("file_origin", "")
+    file_datetime = kwargs.get("file_datetime", None)
+    rec_datetime = kwargs.get("datetime", datetime.datetime.now())
+    annotations = kwargs.get("annotations", dict())
     
-    ret.rec_datetime = datetime.datetime.now()
-    ret.annotation = "Concatenated block"
-    ret.name = "Concatenated block"
-    ret.file_origin = None
-    ret.file_datetime = None
+    segment_index = kwargs.get("segment", None)
+    analog_index = kwargs.get("analog", None)
+    irregular_index = kwargs.get("irregular", None)
+    image_index = kwargs.get("image", None)
+    channel_index = kwargs.get("channel", None)
     
-    segment_index = None
-    signal_index = None
+     # the returned data:
+    ret = neo.core.Block(name=name, description=description, file_origin=file_origin,
+                         file_datetime=file_datetime, rec_datetime=rec_datetime, 
+                         **annotations)
     
-    if len(kwargs) > 0 :
-        if "name" in kwargs.keys():
-            ret.name = kwargs["name"]
-            
-        if "annotation" in kwargs.keys():
-            ret.annotation = kwargs["annotation"]
-
-        if "rec_datetime" in kwargs.keys():
-            ret.rec_datetime = kwargs["datetime"]
-            
-        if "file_origin" in kwargs.keys():
-            ret.file_origin = kwargs["file_origin"]
-            
-        if "file_datetime" in kwargs.keys():
-            ret.file_datetime = kwargs["file_datetime"]
-            
-        if "segment_index" in kwargs.keys():
-            segment_index = kwargs["segment_index"]
-            
-        if "signal_index" in kwargs.keys():
-            signal_index = kwargs["signal_index"]
-            
     if isinstance(args, neo.core.Block):
         if segment_index is None:
             for (l,seg) in enumerate(args.segments):
-                if signal_index is None:
+                if analog_index is None:
                     seg_ = copy(seg)
                     seg_.name = "%s_%s" % (args.name, seg.name)
                     seg_.annotate(origin=args.file_origin, original_segment=segment_index)
                     ret.segments.append(seg_)
                     
                 else:
-                    seg_ = neo.Segment(rec_datetime = seg.rec_datetime)
+                    # NOTE: 2020-03-13 08:48:10 
+                    # we do NOT copy; instead we create a new segment, that we
+                    # then populate with selected signals
+                    seg_ = neo.Segment(rec_datetime = seg.rec_datetime, name="%s_%s" % (args.name, seg.name))
                     seg_.merge_annotations(seg)
                     seg_.annotate(origin=args.file_origin, original_segment=segment_index)
                     
-                    if isinstance(signal_index, str):
-                        seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, signal_index)].copy())
+                    if isinstance(analog_index, str):
+                        seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, analog_index)].copy())
                         
-                    elif isinstance(signal_index, int):
-                        seg_.analogsignals.append(seg.analogsignals[signal_index].copy())
+                    elif isinstance(analog_index, int):
+                        seg_.analogsignals.append(seg.analogsignals[analog_index].copy())
                         
-                    elif isinstance(signal_index, (tuple, list)):
-                        for sigNdx in signal_index:
+                    elif isinstance(analog_index, (tuple, list)):
+                        for sigNdx in analog_index:
                             if isinstance(sigNdx, str):
                                 sigNdx = get_index_of_named_signal(seg, sigNdx)
                                 
@@ -3133,29 +3148,39 @@ def concatenate_blocks(*args, **kwargs):
                             seg_.analogsignals.append(seg.analogsignals[sigNdx].copy())
                             
                     else:
-                        raise TypeError("signal_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(signal_index).__name__)
+                        raise TypeError("analog_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(analog_index).__name__)
                         
                     ret.segments.append(seg_)
         else:
             if segment_index < len(args.segments):
-                if signal_index is None:
-                    ret.segments.append(args.segments[segment_index])
-                    ret.segments[-1].annotate(origin=args.file_origin, original_segment=segment_index)
+                # NOTE: 2020-03-13 08:51:32
+                # get a reference to the segment with index "index"
+                # then either:
+                # a) copy it, if all signals are to be retained
+                # b) create a new segment populated only with the selected signals
+                seg = args.segments[segment_index] # a reference
+                
+                if analog_index is None:
+                    seg_ = copy(seg)
+                    seg_.name = "%s_%s" % (args.name, seg.name)
+                    seg_.annotate(origin=args.file_origin, original_segment=segment_index)
+                    ret.segments.append(seg_) # copy of original seg
                     
                 else:
-                    seg = args.segments[segment_index]
-                    
-                    seg_ = neo.Segment(rec_datetime = seg.rec_datetime)
+                    seg_ = neo.Segment(rec_datetime = seg.rec_datetime, name="%s_%s" % (args.name, seg.name)) # new seg
+                    seg_.merge_annotations(seg)
                     seg_.annotate(origin=args.file_origin, original_segment=segment_index)
                     
-                    if isinstance(signal_index, str):
-                        seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, signal_index)].copy())
+                    analog_index = neo_index_lookup(seg, analog_index, )
+                    
+                    if isinstance(analog_index, str):
+                        seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, analog_index)].copy())
                         
-                    elif isinstance(signal_index, int):
-                        seg_.analogsignals.append(seg.analogsignals[signal_index].copy())
+                    elif isinstance(analog_index, int):
+                        seg_.analogsignals.append(seg.analogsignals[analog_index].copy())
                         
-                    elif isinstance(signal_index, (tuple, list)):
-                        for sigNdx in signal_index:
+                    elif isinstance(analog_index, (tuple, list)):
+                        for sigNdx in analog_index:
                             if isinstance(sigNdx, str):
                                 sigNdx = get_index_of_named_signal(seg, sigNdx)
                                 
@@ -3165,7 +3190,7 @@ def concatenate_blocks(*args, **kwargs):
                             seg_.analogsignals.append(seg.analogsignals[sigNdx].copy())
                             
                     else:
-                        raise TypeError("signal_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(signal_index).__name__)
+                        raise TypeError("analog_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(analog_index).__name__)
                         
                     ret.segments.append(seg_)
         
@@ -3174,7 +3199,7 @@ def concatenate_blocks(*args, **kwargs):
             if isinstance(arg, neo.core.Block):
                 if segment_index is None:
                     for (l,seg) in enumerate(arg.segments):
-                        if signal_index is None:
+                        if analog_index is None:
                             ret.segments.append(seg)
                             ret.segments[-1].annotate(origin=arg.file_origin, original_segment=segment_index)
                             
@@ -3182,14 +3207,14 @@ def concatenate_blocks(*args, **kwargs):
                             seg_ = neo.Segment(rec_datetime = seg.rec_datetime)
                             seg_.annotate(origin=arg.file_origin, original_segment=segment_index)
                             
-                            if isinstance(signal_index, str):
-                                seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, signal_index)].copy())
+                            if isinstance(analog_index, str):
+                                seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, analog_index)].copy())
                                 
-                            elif isinstance(signal_index, int):
-                                seg_.analogsignals.append(seg.analogsignals[signal_index].copy())
+                            elif isinstance(analog_index, int):
+                                seg_.analogsignals.append(seg.analogsignals[analog_index].copy())
                                 
-                            elif isinstance(signal_index, (tuple, list)):
-                                for sigNdx in signal_index:
+                            elif isinstance(analog_index, (tuple, list)):
+                                for sigNdx in analog_index:
                                     if isinstance(sigNdx, str):
                                         sigNdx = get_index_of_named_signal(seg, sigNdx)
                                         
@@ -3199,14 +3224,14 @@ def concatenate_blocks(*args, **kwargs):
                                     seg_.analogsignals.append(seg.analogsignals[sigNdx].copy())
                                     
                             else:
-                                raise TypeError("signal_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(signal_index).__name__)
+                                raise TypeError("analog_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(analog_index).__name__)
                                 
                             ret.segments.append(seg_)
         
                             
                 else:
                     if segment_index < len(arg.segments):
-                        if signal_index is None:
+                        if analog_index is None:
                             ret.segments.append(arg.segments[segment_index])
                             ret.segments[-1].annotate(origin=arg.file_origin, original_segment=segment_index)
                             
@@ -3216,14 +3241,14 @@ def concatenate_blocks(*args, **kwargs):
                             seg_ = neo.Segment(rec_datetime = seg.rec_datetime)
                             seg_.annotate(origin=arg.file_origin, original_segment=segment_index)
                             
-                            if isinstance(signal_index, str):
-                                seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, signal_index)].copy())
+                            if isinstance(analog_index, str):
+                                seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, analog_index)].copy())
                                 
-                            elif isinstance(signal_index, int):
-                                seg_.analogsignals.append(seg.analogsignals[signal_index].copy())
+                            elif isinstance(analog_index, int):
+                                seg_.analogsignals.append(seg.analogsignals[analog_index].copy())
                                 
-                            elif isinstance(signal_index, (tuple, list)):
-                                for sigNdx in signal_index:
+                            elif isinstance(analog_index, (tuple, list)):
+                                for sigNdx in analog_index:
                                     if isinstance(sigNdx, str):
                                         sigNdx = get_index_of_named_signal(seg, sigNdx)
                                         
@@ -3233,26 +3258,26 @@ def concatenate_blocks(*args, **kwargs):
                                     seg_.analogsignals.append(seg.analogsignals[sigNdx].copy())
                                     
                             else:
-                                raise TypeError("signal_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(signal_index).__name__)
+                                raise TypeError("analog_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(analog_index).__name__)
                                 
                             ret.segments.append(seg_)
         
             elif isinstance(arg, neo.core.Segment):
-                if signal_index is None:
+                if analog_index is None:
                     ret.segments.append(arg)
                     
                 else:
                     seg_ = neo.Segment(rec_datetime = arg.rec_datetime)
                     seg_.annotate(origin=arg.file_origin, original_segment=segment_index)
                     
-                    if isinstance(signal_index, str):
-                        seg_.analogsignals.append(arg.analogsignals[get_index_of_named_signal(arg, signal_index)].copy())
+                    if isinstance(analog_index, str):
+                        seg_.analogsignals.append(arg.analogsignals[get_index_of_named_signal(arg, analog_index)].copy())
                         
-                    elif isinstance(signal_index, int):
-                        seg_.analogsignals.append(arg.analogsignals[signal_index].copy())
+                    elif isinstance(analog_index, int):
+                        seg_.analogsignals.append(arg.analogsignals[analog_index].copy())
                         
-                    elif isinstance(signal_index, (tuple, list)):
-                        for sigNdx in signal_index:
+                    elif isinstance(analog_index, (tuple, list)):
+                        for sigNdx in analog_index:
                             if isinstance(sigNdx, str):
                                 sigNdx = get_index_of_named_signal(arg, sigNdx)
                                 
@@ -3262,7 +3287,7 @@ def concatenate_blocks(*args, **kwargs):
                             seg_.analogsignals.append(arg.analogsignals[sigNdx].copy())
                             
                     else:
-                        raise TypeError("signal_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(signal_index).__name__)
+                        raise TypeError("analog_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(analog_index).__name__)
                         
                     ret.segments.append(seg_)
         
@@ -3289,7 +3314,7 @@ def average_blocks(*args, **kwargs):
         
         segment_index       which segment index into the block argument(s) to consider
         
-        signal_index        index of signal into each of the segments to be used;
+        analog_index        index of signal into each of the segments to be used;
                             can also be a signal name
         
         name                see neo.Block docstring
@@ -3327,7 +3352,7 @@ def average_blocks(*args, **kwargs):
     averaging multiple electrophysiology record sweeps acquired with the same
     protocol (sampling, duration, etc).
     
-    For this reason only signal_index can be specified, to select from the
+    For this reason only analog_index can be specified, to select from the
     analogsignals list in the segments.
     
     Examples of usage:
@@ -3354,7 +3379,7 @@ def average_blocks(*args, **kwargs):
     n = None
     m = None
     segment_index = None
-    signal_index = None
+    analog_index = None
     
 # we do something like this:
     #BaseDataPath0MinuteAverage = neo.Block()
@@ -3367,7 +3392,7 @@ def average_blocks(*args, **kwargs):
     if len(kwargs) > 0 :
         for key in kwargs.keys():
             if key not in ["count", "every", "name", "segment_index", 
-                           "signal_index", "annotation", "rec_datetime", 
+                           "analog_index", "annotation", "rec_datetime", 
                            "file_origin", "file_datetime"]:
                 raise RuntimeError("Unexpected named parameter %s" % key)
             
@@ -3383,8 +3408,8 @@ def average_blocks(*args, **kwargs):
         if "segment_index" in kwargs.keys():
             segment_index = kwargs["segment_index"]
             
-        if "signal_index" in kwargs.keys():
-            signal_index = kwargs["signal_index"]
+        if "analog_index" in kwargs.keys():
+            analog_index = kwargs["analog_index"]
             
         if "annotation" in kwargs.keys():
             ret.annotation = kwargs["annotation"]
@@ -3423,8 +3448,8 @@ def average_blocks(*args, **kwargs):
     else:
         segment_str = "all"
         
-    if signal_index is not None:
-        signal_str = str(signal_index)
+    if analog_index is not None:
+        signal_str = str(analog_index)
     else:
         signal_str = "all"
         
@@ -3452,7 +3477,7 @@ def average_blocks(*args, **kwargs):
     finally:
         del(cframe)
         
-    ret.segments = average_segments(segments, count=n, every=m, signal_index=signal_index)
+    ret.segments = average_segments(segments, count=n, every=m, analog_index=analog_index)
     
     ret.annotations["Averaged"] = dict()
     ret.annotations["Averaged"]["Count"] = n
@@ -3484,7 +3509,7 @@ def average_blocks_by_segments(*args, **kwargs):
     
     **kwargs:
     ========
-    signal_index: which signal into each of the segments to consider
+    analog_index: which signal into each of the segments to consider
                   can also be a signal name; optional default is None 
                   (thus taking all signals)
                   
@@ -3503,13 +3528,13 @@ def average_blocks_by_segments(*args, **kwargs):
     if len(args) == 1:
         args = args[0] # unpack the tuple
     
-    signal_index = None
+    analog_index = None
     
     name = None
     
     if len(kwargs) > 0:
-        if "signal_index" in kwargs.keys():
-            signal_index = kwargs["signal_index"]
+        if "analog_index" in kwargs.keys():
+            analog_index = kwargs["analog_index"]
             
         if "name" in kwargs.keys():
             name = kwargs["name"]
@@ -3534,7 +3559,7 @@ def average_blocks_by_segments(*args, **kwargs):
         if min(nSigs) != max(nSigs):
             raise ValueError("Corresponding segments must have the same number of signals")
         
-        segment = average_segments([block.segments[k] for block in args], signal_index = signal_index)
+        segment = average_segments([block.segments[k] for block in args], analog_index = analog_index)
         ret.segments.append(segment[0])
     
     ret.name="Segment by segment average %s" % name
@@ -3619,7 +3644,7 @@ def average_segments_in_block(data, **kwargs):
         e.g. from a block with 5 segments, one may choose to calculate the
         average between segments 1, 3 and 5: segment_index = [1,3,5]
         
-    "signal_index" = integer or string, or sequence of integers or strings
+    "analog_index" = integer or string, or sequence of integers or strings
         that indicate which channels need to be included in the averaged
         segment. This argument is pased directly to neoutils.average_segments
         function.
@@ -3648,7 +3673,7 @@ def average_segments_in_block(data, **kwargs):
     "data" (either all segments, or of those selected by "segment_index").
     
     The new (average) segment contains averages of all signals, or of the signals
-    selected by "signal_index".
+    selected by "analog_index".
     
     """
 
@@ -3657,11 +3682,11 @@ def average_segments_in_block(data, **kwargs):
     
             
     segment_index = None
-    signal_index = None
+    analog_index = None
     
     if len(kwargs) > 0:
         for key in kwargs.keys():
-            if key not in ["segment_index", "signal_index", 
+            if key not in ["segment_index", "analog_index", 
                            "annotation", "rec_datetime", 
                            "file_origin", "file_datetime"]:
                 raise RuntimeError("Unexpected named parameter %s" % key)
@@ -3669,8 +3694,8 @@ def average_segments_in_block(data, **kwargs):
         if "segment_index" in kwargs.keys():
             segment_index = kwargs["segment_index"]
             
-        if "signal_index" in kwargs.keys():
-            signal_index = kwargs["signal_index"]
+        if "analog_index" in kwargs.keys():
+            analog_index = kwargs["analog_index"]
             
     
     if segment_index is not None:
@@ -3690,7 +3715,7 @@ def average_segments_in_block(data, **kwargs):
         sgm = data.segments
 
     ret = neo.Block()
-    ret.segments = average_segments(sgm, signal_index = signal_index)
+    ret.segments = average_segments(sgm, analog_index = analog_index)
     
     ret.annotations = data.annotations
     ret.file_origin = data.file_origin
@@ -3722,47 +3747,96 @@ def average_segments_in_block(data, **kwargs):
     else:
         ret.annotations["averaged_segments"] = segment_index
         
-    if signal_index is None:
+    if analog_index is None:
         ret.annotations["averaged_signals"] = "all signals"
     else:
-        ret.annotations["averaged_signals"] = signal_index
+        ret.annotations["averaged_signals"] = analog_index
         
     return ret
         
-def copy(src):
+def neo_copy(src):
     """Copies a neo.Block or a neo.Segment
     
-    CAUTION    The following properties are NOT copied:
-    file_origin, file_datetime, units
+    CAUTION: neo data objects' copy() function creates shallow copies
+    
+    WARNING: units are not copied across blocks
     
     """
     if isinstance(src, neo.Block):
-        ret = neo.Block()
-        ret.annotations.update(src.annotations)
-        ret.name = src.name
-        ret.description = src.description
-        ret.index = src.index
-        ret.rec_datetime = src.rec_datetime
+        ret = neo.Block(name=src.name, 
+                        description=src.description,
+                        file_origin=src.file_origin, 
+                        file_datetime=src.file_datetime,
+                        rec_datetime=src.datetime,
+                        index=src.index,
+                        **src.annotations)
         
-        for s in src.segments:
-            ret.segments.append(copy(s))
-            
+        # NOTE: 2020-03-13 18:33:19
+        # see NOTE: 2020-03-13 18:33:01
+        
         for c in src.channel_indexes:
-            chn = neo.ChannelIndex(c.index, channel_names = c.channel_names, 
-                                   channel_ids = c.channel_ids, name = c.name,
-                                   description = c.description, 
-                                   coordinates = c.coordinates)
+            c_ = neo.ChannelIndex(index=c.index, name=c.name, 
+                                  channel_ids=c.channel_ids,
+                                  channel_names=c.channel_names,
+                                  description=c.description,
+                                  file_origin=c.file_origin,
+                                  coordinates=c.coordinates,
+                                  **c.annotations)
             
-            chn.annotations.update(c.annotations)
+            c_.block = ret
             
-            ret.channel_indexes.append(chn)
+            for u_ in c.units:
+                u_ = neo.Unit(name=u.name, description=u.description,
+                              fle_origin=u.file_origin,
+                              **u.annotations)
+                u_.channel_index = u.c_
+                c_.units.append(u_)
+                
+        for s in src.segments:
+            s_ = neo.Segment(name=s.name, description=s.description,
+                             file_origin=s.file_origin,
+                             file_datetime=s.file_datetime,
+                             rec_datetime=s.rec_datetime,
+                             index = s.index,
+                             **s.annotations)
             
+            for asig in s.analogsignals:
+                asig_ = asig.copy()
+                
+                for c in src.channel_indexes:
+                    if asig in c.analogsignals:
+                        pass #TODO
+                        
+                
+                
+            s_.irregularlysampledsignals += [sig.copy() for sig in s.irregularlysampledsignals]
+                
+            s_.epochs += [e.copy() for e in s.epochs]
+            
+            s_.events += [e.copy() for e in s.events]
+            
+            s_.imagesequences == [i.copy() for i in s.imagesequences]
+            for st in s.spiketrains:
+                st_ = st.copy()
+            
+                
+                
+        
+        #ret.segments += [neo_copy(s) for s in src.segments]
         
             
+        # also a shallow copy
+        #ret.channel_indexes += [neo_copy(c) for c in src.channel_indexes]
+        
     elif isinstance(src, neo.Segment):
+        # will break links with ChannelIndex & Units from the parent Block (if any)
         ret = neo.Segment(name = src.name, 
                           description = src.description,
-                          index = src.index)
+                          file_origin = src.file_origin,
+                          file_datetime = src.file_datetime,
+                          rec_datetime = src.rec_datetime,
+                          index = src.index,
+                          **src.annotations)
         
         ret.analogsignals += [s.copy() for s in src.analogsignals]
         
@@ -3770,21 +3844,48 @@ def copy(src):
 
         ret.spiketrains += [s.copy() for s in src.spiketrains]
         
-        #for t in src.spiketrains:
-            #ret.spiketrains.append(t.copy())
+        
+    elif isinstance(src, neo.ChannelIndex):
+        ret = neo.ChannelIndex(index=src.index, name=src.name, 
+                               channel_ids=src.channel_ids,
+                               channel_names=src.channel_names,
+                               description=src.description,
+                               file_origin=src.file_origin,
+                               coordinates=src.coordinates,
+                               **src.annotations)
+        
+        # NOTE: 2020-03-13 18:33:01
+        # need to do this carefully, as the units will have references to any
+        # existing spike trains; we don't want to end up actually duplicating 
+        # this data
+        #ret.units += [neo_copy(u) for u in src.units]
+        
+        for u in src.units:
+            u_ = neo.Unit(name=u.name, description=u.description,
+                          fle_origin=u.file_origin,
+                          **u.annotations)
+            
+            u_.channel_index = u.channel_index
+            
+            ret.units.append(u_)
+        
+        
+    elif isinstance(src, neo.Unit):
+        # the only apparent way a unit get into a Block is via a ChannelIndex
+        ret = neo.Unit(name=src.name, description=src.description,
+                       file_origin=src.file_origin,
+                       **src.annotations)
+        
+        # references, NOT copies, to the src spiketrains
+        # I guess in real life, these spiketrains are also contained in a Block's
+        # segments, and hence referenced in the unit spiketrain collection
+        #
+        ret.channel_index = src.channel_index
+        ret.spiketrains += [st for st in src.spiketrains]
+        
 
-        ret.epochs += [e.copy() for e in src.epochs]
-        
-        #for e in src.epochs:
-            #ret.epochs.append(e.copy())
-        
-        ret.events += [e.copy() for e in src.events]
-        #for v in src.events:
-            #ret.events.append(v.copy())
-    
     else:
         raise TypeError("Expecting a neo.Block or a neo.Segment; got %s instead" % type(src).__name__)
-        
 
     return ret
 
@@ -3796,7 +3897,7 @@ def average_segments(*args, **kwargs):
     kwargs  keyword/value pairs
         count
         every
-        signal_index
+        analog_index
         
     
     """
@@ -3864,7 +3965,7 @@ def average_segments(*args, **kwargs):
         
     n = None
     m = None
-    signal_index = None
+    analog_index = None
     
     
     if len(kwargs) > 0:
@@ -3874,8 +3975,8 @@ def average_segments(*args, **kwargs):
         if "every" in kwargs.keys():
             m = kwargs["every"]
             
-        if "signal_index" in kwargs.keys():
-            signal_index = kwargs["signal_index"]
+        if "analog_index" in kwargs.keys():
+            analog_index = kwargs["analog_index"]
             
     if n is None:
         n = len(args)
@@ -3897,7 +3998,7 @@ def average_segments(*args, **kwargs):
     
     ret_seg = list() #  a LIST of segments, each containing averaged analogsignals!
     
-    if signal_index is None: #we want an average across the Block list for all signals in the segments
+    if analog_index is None: #we want an average across the Block list for all signals in the segments
         if not all([len(arg.analogsignals) == len(args[0].analogsignals) for arg in args[1:]]):
             raise ValueError("All segments must have the same number of analogsignals")
         
@@ -3924,7 +4025,7 @@ def average_segments(*args, **kwargs):
 
             ret_seg.append(seg)
             
-    elif isinstance(signal_index, str): # only one signal indexed by name
+    elif isinstance(analog_index, str): # only one signal indexed by name
         for range_avg in ranges_avg:
             seg = neo.core.segment.Segment()
             for k in range_avg:
@@ -3932,10 +4033,10 @@ def average_segments(*args, **kwargs):
                     if args[k].rec_datetime is not None:
                         seg.rec_datetime = args[k].rec_datetime
                         
-                    seg.analogsignals.append(args[k].analogsignals[get_index_of_named_signal(args[k], signal_index)].copy())
+                    seg.analogsignals.append(args[k].analogsignals[get_index_of_named_signal(args[k], analog_index)].copy())
                     
                 else:
-                    s = args[k].analogsignals[get_index_of_named_signal(args[k], signal_index)].copy()
+                    s = args[k].analogsignals[get_index_of_named_signal(args[k], analog_index)].copy()
 
                     seg.analogsignals[0] += __resample_add__(seg.analogsignals[0], s)
                     
@@ -3943,8 +4044,8 @@ def average_segments(*args, **kwargs):
             
             ret_seg.append(seg)
             
-    elif isinstance(signal_index, int):
-        #print("signal_index ", signal_index)
+    elif isinstance(analog_index, int):
+        #print("analog_index ", analog_index)
         for range_avg in ranges_avg:
             seg = neo.core.segment.Segment()
             for k in range_avg:
@@ -3952,10 +4053,10 @@ def average_segments(*args, **kwargs):
                     seg.rec_datetime = args[k].rec_datetime
                     
                 if k == range_avg.start:
-                    seg.analogsignals.append(args[k].analogsignals[signal_index].copy())
+                    seg.analogsignals.append(args[k].analogsignals[analog_index].copy())
                     
                 else:
-                    s = args[k].analogsignals[signal_index].copy()
+                    s = args[k].analogsignals[analog_index].copy()
                     
                     seg.analogsignals[0] += __resample_add__(seg.analogsignals[0], s)
                     
@@ -3963,7 +4064,7 @@ def average_segments(*args, **kwargs):
             
             ret_seg.append(seg)
             
-    elif isinstance(signal_index, (list, tuple)):
+    elif isinstance(analog_index, (list, tuple)):
         for range_avg in ranges_avg:
             seg = neo.core.segment.Segment()
             for k in range_avg:
@@ -3971,15 +4072,15 @@ def average_segments(*args, **kwargs):
                     if args[k].rec_datetime is not None:
                         seg.rec_datetime = args[k].rec_datetime
 
-                    for sigNdx in signal_index:
+                    for sigNdx in analog_index:
                         if isinstance(sigNdx, str):
                             sigNdx = get_index_of_named_signal(args[k], sigNdx)
                             
                         seg.analogsignals.append(args[k].analogsignals[sigNdx].copy()) # will raise an error if sigNdx is of unexpected type
                         
                 else:
-                    for ds in range(len(signal_index)):
-                        sigNdx = signal_index[ds]
+                    for ds in range(len(analog_index)):
+                        sigNdx = analog_index[ds]
                         
                         if isinstance(sigNdx, str):
                             sigNdx = get_index_of_named_signal(args[k], sigNdx)
@@ -4950,14 +5051,14 @@ def auto_detect_trigger_protocols(data:[dt.ScanData, neo.Block],
     return tp
 
 @safeWrapper
-def auto_define_trigger_events(src, signal_index, event_type, 
+def auto_define_trigger_events(src, analog_index, event_type, 
                                times=None, label=None, name=None, 
                                use_lo_hi=True, time_slice=None, 
                                clearSimilarEvents=True, clearTriggerEvents=True, 
                                clearAllEvents=False):
     """Populates the events lists for the segments in src with dt.TriggerEvent objects.
     
-    Searches for trigger waveforms in signals specified by signal_index, to define
+    Searches for trigger waveforms in signals specified by analog_index, to define
     TriggerEvent objects.
     
     A TriggerEvent is an array of time values and will be added to the events list
@@ -4970,7 +5071,7 @@ def auto_define_trigger_events(src, signal_index, event_type,
     
     src: a neo.Block, a neo.Segment, or a list of neo.Segment objects
     
-    signal_index:   specified which signal to use for event detection; can be one of:
+    analog_index:   specified which signal to use for event detection; can be one of:
     
                     int (index of the signal array in the data analogsignals)
                         assumes that _ALL_ segments in "src" have the desired analogsignal
@@ -5004,7 +5105,7 @@ def auto_define_trigger_events(src, signal_index, event_type,
     times: either None, or a python quantity array with time units
     
         When "times" is None (the default) the function calls detect_trigger_events() 
-        on the analogsignal specified by signal_index in src, to detect trigger 
+        on the analogsignal specified by analog_index in src, to detect trigger 
         events. The specified analogsignal must therefore contain trigger waveforms 
         (typically, rectangular pulses).
         
@@ -5093,17 +5194,17 @@ def auto_define_trigger_events(src, signal_index, event_type,
                                 clearAllEvents = clearAllEvents)
             
     elif times is None: #  no event times specified =>
-        # auto-detect trigger events from signal given by signal_index
-        if isinstance(signal_index, str):
+        # auto-detect trigger events from signal given by analog_index
+        if isinstance(analog_index, str):
             # signal specified by name
-            signal_index = get_index_of_named_signal(data, signal_index)
+            analog_index = get_index_of_named_signal(data, analog_index)
             
-        if isinstance(signal_index, (tuple, list)):
-            if all(isinstance(s, (int, str)) for s in signal_index):
-                if len(signal_index) != len(data):
-                    raise TypeError("When a list of int, signal_index must have as many elements as segments in src (%d); instead it has %d" % (len(data), len(signal_index)))
+        if isinstance(analog_index, (tuple, list)):
+            if all(isinstance(s, (int, str)) for s in analog_index):
+                if len(analog_index) != len(data):
+                    raise TypeError("When a list of int, analog_index must have as many elements as segments in src (%d); instead it has %d" % (len(data), len(analog_index)))
                 
-                for (s, ndx) in zip(data, signal_index):
+                for (s, ndx) in zip(data, analog_index):
                     if isinstance(ndx, str):
                         sndx = get_index_of_named_signal(s, ndx, silent=True)
                         
@@ -5133,19 +5234,19 @@ def auto_define_trigger_events(src, signal_index, event_type,
                     else:
                         raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (ndx, len(s.analogsignals)))
 
-        elif isinstance(signal_index, int):
+        elif isinstance(analog_index, int):
             for s in data:
-                if signal_index in range(len(s.analogsignals)):
+                if analog_index in range(len(s.analogsignals)):
                     if isinstance(time_slice, (tuple, list)) \
                         and all([isinstance(t, pq.Quantity) and dt.check_time_units(t) for t in time_slice]) \
                             and len(time_slice) == 2:
-                        event = detect_trigger_events(s.analogsignals[signal_index].time_slice(time_slice[0], time_slice[1]), 
+                        event = detect_trigger_events(s.analogsignals[analog_index].time_slice(time_slice[0], time_slice[1]), 
                                                       event_type=event_type, 
                                                       use_lo_hi=use_lo_hi, 
                                                       label=label, name=name)
                         
                     else:
-                        event = detect_trigger_events(s.analogsignals[signal_index], 
+                        event = detect_trigger_events(s.analogsignals[analog_index], 
                                                       event_type=event_type, 
                                                       use_lo_hi=use_lo_hi, 
                                                       label=label, name=name)
@@ -5156,10 +5257,10 @@ def auto_define_trigger_events(src, signal_index, event_type,
                                         clearAllEvents = clearAllEvents)
                     
                 else:
-                    raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (signal_index, len(s.analogsignals)))
+                    raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (analog_index, len(s.analogsignals)))
                 
         else:
-            raise RuntimeError("Invalid signal index %s" % str(signal_index))
+            raise RuntimeError("Invalid signal index %s" % str(analog_index))
 
     else:
         raise TypeError("times expected to be a python Quantity array with time units, or None")
@@ -5372,7 +5473,7 @@ def root_mean_square(x, axis = None):
     from . import datatypes as dt
     
     if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, dt.DataSignal)):
-        raise TypeError("Expecting a neo.Analogsignal, neo.IrregularlySampledSignal, or a datatypes.DataSignal; got %s instead" % type(x).__name__)
+        raise TypeError("Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datatypes.DataSignal; got %s instead" % type(x).__name__)
     
     if not isinstance(axis, (int, tuple, list, type(None))):
         raise TypeError("axis expected to be an int or None; got %s instead" % type(axis).__name__)
@@ -5423,7 +5524,7 @@ def signal_to_noise(x, axis=None, ddof=None, db=True):
     from . import datatypes as dt
 
     if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, dt.DataSignal)):
-        raise TypeError("Expecting a neo.Analogsignal, neo.IrregularlySampledSignal, or a datatypes.DataSignal; got %s instead" % type(x).__name__)
+        raise TypeError("Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datatypes.DataSignal; got %s instead" % type(x).__name__)
     
     if not isinstance(axis, (int, tuple, list, type(None))):
         raise TypeError("axis expected to be an int or None; got %s instead" % type(axis).__name__)

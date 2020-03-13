@@ -282,11 +282,11 @@ def segment_Rs_Rin(segment: neo.Segment,
 
 @safeWrapper
 def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
-           vstep: typing.Union[float, pq.Quantity],
-           baseline: typing.Union[SignalCursor, tuple],
-           rs: typing.Union[SignalCursor, tuple],
-           rin: typing.Union[SignalCursor, tuple], 
-           channel: typing.Optional[int] = None) -> pq.Quantity:
+                   baseline: typing.Union[SignalCursor, tuple],
+                   rs: typing.Union[SignalCursor, tuple],
+                   rin: typing.Union[SignalCursor, tuple], 
+                   vstep: typing.Union[float, pq.Quantity],
+                   channel: typing.Optional[int] = None) -> pq.Quantity:
     """Calculates series and input resistance from voltage-clamp recording.
     
     Applies to voltage-clamp recordings (membrane current signal)

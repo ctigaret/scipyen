@@ -10995,7 +10995,7 @@ class ScanData(object):
         # deepcopy "slices" the events into quantities
         # if it is a reference, any modifications in the copy will also touch the
         # original !
-        ephys = neoutils.copy(self.electrophysiology)
+        ephys = neoutils.neo_copy(self.electrophysiology)
         
         analysisoptions = copy.deepcopy(self.analysisoptions)
         
@@ -11016,11 +11016,11 @@ class ScanData(object):
         result._scans_filters_ = copy.deepcopy(self._scans_filters_)
         
         # neo.Block does not have a copy() method so we need to use our own
-        result._scene_block_ = neoutils.copy(self._scene_block_)
-        result._scans_block_ = neoutils.copy(self._scans_block_)
+        result._scene_block_ = neoutils.neo_copy(self._scene_block_)
+        result._scans_block_ = neoutils.neo_copy(self._scans_block_)
         
-        result._scan_region_scans_profiles_ = neoutils.copy(self._scan_region_scans_profiles_)
-        result._scan_region_scene_profiles_ = neoutils.copy(self._scan_region_scene_profiles_)
+        result._scan_region_scans_profiles_ = neoutils.neo_copy(self._scan_region_scans_profiles_)
+        result._scan_region_scene_profiles_ = neoutils.neo_copy(self._scan_region_scene_profiles_)
         
         #result._scan_region_scans_profiles_ = copy.deepcopy(self._scan_region_scans_profiles_)
         #result._scan_region_scene_profiles_ = copy.deepcopy(self._scan_region_scene_profiles_)
@@ -12424,10 +12424,10 @@ class ScanData(object):
                 result._scans_block_.segments.append(neo.Segment())
         else:
             if len(source._scans_block_.segments) > source.scansFrames:
-                result._scans_block_.segments += [neoutils.copy(s) for s in source._scans_block_.segments[0:source.scansFrames]]
+                result._scans_block_.segments += [neoutils.neo_copy(s) for s in source._scans_block_.segments[0:source.scansFrames]]
                 
             else:
-                result._scans_block_.segments += [neoutils.copy(s) for s in source._scans_block_.segments]
+                result._scans_block_.segments += [neoutils.neo_copy(s) for s in source._scans_block_.segments]
                 
                 new_scans_frames = original_scans_frames + source.scansFrames
                 #print("ScanData.concatenate: current scans frames %d" % result.scansFrames)
@@ -12453,10 +12453,10 @@ class ScanData(object):
                 
         else:
             if len(source._scene_block_.segments) > source.sceneFrames:
-                result._scene_block_.segments += [neoutils.copy(s) for s in source._scene_block_.segments[0:source.sceneFrames]]
+                result._scene_block_.segments += [neoutils.neo_copy(s) for s in source._scene_block_.segments[0:source.sceneFrames]]
                 
             else:
-                result._scene_block_.segments += [neoutils.copy(s) for s in source._scene_block_.segments]
+                result._scene_block_.segments += [neoutils.neo_copy(s) for s in source._scene_block_.segments]
                 
                 new_scene_frames = original_scene_frames + source.sceneFrames
                 
@@ -12473,7 +12473,7 @@ class ScanData(object):
         
         #### BEGIN 7) concatenate electrophysiology
         if len(source._electrophysiology_.segments):
-            result._electrophysiology_.segments += [neoutils.copy(s) for s in source._electrophysiology_.segments]
+            result._electrophysiology_.segments += [neoutils.neo_copy(s) for s in source._electrophysiology_.segments]
             
         else:
             # fill up with empty segments
@@ -13765,7 +13765,7 @@ class ScanData(object):
                 if average:
                     # NOTE: 2018-06-15 09:59:21
                     # "segments" here is a list even if it has only one segment!
-                    segments = neoutils.average_segments([neoutils.copy(self.electrophysiology.segments[f]) for f in kprotocol_frames])
+                    segments = neoutils.average_segments([neoutils.neo_copy(self.electrophysiology.segments[f]) for f in kprotocol_frames])
                     
                     if len(segments) > 1:
                         raise RuntimeError("averaging segments for protocol %s yielded in electrophysiology block more than one segment!" % current_protocol.name)
@@ -13780,7 +13780,7 @@ class ScanData(object):
                         
                         
                 else:
-                    segments = [neoutils.copy(self.electrophysiology.segments[f]) for f in kprotocol_frames]
+                    segments = [neoutils.neo_copy(self.electrophysiology.segments[f]) for f in kprotocol_frames]
                     
                     for kseg, seg in enumerate(segments):
                         seg.name = current_protocol.name
@@ -13806,12 +13806,12 @@ class ScanData(object):
                 # we therefore should FIRST extract the analogsignal (if found)
                 # into a new set of segments and average these if necessary
                 
-                segments = [neoutils.copy(self.scansBlock.segments[f]) for f in kprotocol_frames]
+                segments = [neoutils.neo_copy(self.scansBlock.segments[f]) for f in kprotocol_frames]
                 
                 segments = list()
                 
                 for f in kprotocol_frames:
-                    seg = neoutils.copy(self.scansBlock.segments[f])
+                    seg = neoutils.neo_copy(self.scansBlock.segments[f])
                     
                     signals = seg.analogsignals
                     
@@ -13872,7 +13872,7 @@ class ScanData(object):
                 
             if len(self.sceneBlock.segments):
                 if average:
-                    segments = neoutils.average_segments([neoutils.copy(self.sceneBlock.segments[f]) for f in kprotocol_frames])
+                    segments = neoutils.average_segments([neoutils.neo_copy(self.sceneBlock.segments[f]) for f in kprotocol_frames])
                     
                     if len(segments) > 1:
                         raise RuntimeError("averaging segments for protocol %s in scene block yielded more than one segment!" % current_protocol.name)
@@ -13897,7 +13897,7 @@ class ScanData(object):
                         seg.index = kprotocol
                     
                 else:
-                    segments = [neoutils.copy(self.sceneBlock.segments[f]) for f in kprotocol_frames]
+                    segments = [neoutils.neo_copy(self.sceneBlock.segments[f]) for f in kprotocol_frames]
                     
                     for kseg, seg in enumerate(segments):
                         if analysis_unit.landmark is not None:
@@ -13940,7 +13940,7 @@ class ScanData(object):
             if len(self.scanRegionScansProfiles.segments) > 0:
                 if average:
                     try:
-                        segments = neoutils.average_segments([neoutils.copy(self.scanRegionScansProfiles.segments[f]) for f in kprotocol_frames])
+                        segments = neoutils.average_segments([neoutils.neo_copy(self.scanRegionScansProfiles.segments[f]) for f in kprotocol_frames])
                         
                     except:
                         segments = []
@@ -13957,7 +13957,7 @@ class ScanData(object):
                         seg.index = kprotocol
                     
                 else:
-                    segments = [neoutils.copy(self.scanRegionScansProfiles.segments[f]) for f in kprotocol_frames]
+                    segments = [neoutils.neo_copy(self.scanRegionScansProfiles.segments[f]) for f in kprotocol_frames]
                     
                     for kseg, seg in enumerate(segments):
                         seg.name  = current_protocol.name
@@ -13974,7 +13974,7 @@ class ScanData(object):
             #### BEGIN copy scan region profile in scene data
             if len(self.scanRegionSceneProfiles.segments) > 0:
                 if average:
-                    segments = neoutils.average_segments([neoutils.copy(self.scanRegionSceneProfiles.segments[f]) for f in kprotocol_frames])
+                    segments = neoutils.average_segments([neoutils.neo_copy(self.scanRegionSceneProfiles.segments[f]) for f in kprotocol_frames])
                     
                     if len(segments) > 1:
                         raise RuntimeError("averaging segments for protocol %s in scene block yielded more than one segment!" % current_protocol.name)
@@ -13988,7 +13988,7 @@ class ScanData(object):
                         seg.index = kprotocol
                     
                 else:
-                    segments = [neoutils.copy(self.scanRegionSceneProfiles.segments[f]) for f in kprotocol_frames]
+                    segments = [neoutils.neo_copy(self.scanRegionSceneProfiles.segments[f]) for f in kprotocol_frames]
                     
                     for kseg, seg in enumerate(segments):
                         seg.name  = current_protocol.name

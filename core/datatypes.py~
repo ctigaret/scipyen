@@ -9458,7 +9458,7 @@ class ScanData(object):
     class ScanDataType(IntEnum):
         linescan    = 1
         timeseries  = 2
-        zseries     = 4
+        zseries     = 3
         
     class ScanDataAnalysisMode(IntEnum):
         frame       = 1

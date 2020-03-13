@@ -224,7 +224,6 @@ def getvarsbytype(vartype, ws=None):
     
     return dict(lst)
         
-#"def" getvars(*args, glob=True, ws=None, sort=True, by_name=False, sortkey=None, reverse=None, as_dict=False):
 def getvars(*args, glob:bool=True, ws:[dict, type(None)]=None, as_dict:bool=False,
             sort:bool= False, sortkey:object=None, reverse:bool = False) -> object:
     """Collects a subset of variabes from a workspace or a dictionary.
@@ -297,7 +296,7 @@ def getvars(*args, glob:bool=True, ws:[dict, type(None)]=None, as_dict:bool=Fals
     Returns:
     ========
     a list or a dict.
-        The list is sorted 
+        The list is sorted by the variable name.
 
     Examples:
     =========
@@ -356,12 +355,17 @@ def getvars(*args, glob:bool=True, ws:[dict, type(None)]=None, as_dict:bool=Fals
     if as_dict:
         lst = [(n, ws[n]) for n in var_names]
         
+        if sort and sortkey is not None:
+            lst.sort(key=sortkey)
+        
         ret = OrderedDict(lst)
         
     else:
         ret = [ws[n] for n in var_names]
-        #ret = [item[1] for item in lst]
-
+        
+        if sort and sortkey is not None:
+            ret.sort(key=sortkey)
+        
     return ret
 
     
