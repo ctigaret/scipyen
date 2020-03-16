@@ -2045,10 +2045,12 @@ def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequ
     
     """
     def __container_lookup__(container, contained_type, index_obj) -> typing.Union[list, range]:
+        print("__container_lookup__: container type: %s; contained type: %s" % (type(container).__name__, contained_type.__name__))
+        
         seq_contained = [c for c in container.children if isinstance(c, contained_type)]
         
         if len(seq_contained) == 0:
-            warnings.warn("%s does not contain %s children" % (type(src).__name__, stype.__name__))
+            warnings.warn("%s does not contain %s children" % (type(container).__name__, contained_type.__name__))
             return tuple()
         
         else:
@@ -4075,6 +4077,22 @@ def neo_copy(src: typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Uni
                         index=src.index)
         ret.annotations.update(src.annotations)
         
+        for r in src.regionsofinterest:
+            r_ = None
+            
+            if isinstance(r, neo.PolygonRegionOfInterest):
+                r_ = neo.PolygonRegionOfInterest(*r.vertices)
+                
+            elif isinstance(r, neo.RectangularRegionOfInterest):
+                r_ = neo.RectangularRegionOfInterest(r.x, r.y, r.width, r.height)
+                
+            elif isinstance(r, neo.CircularRegionOfInterest):
+                r_ = neo.CircularRegionOfInterest(r.x, r.y r.radius)
+            
+            if r_ is not None:
+                ret.regionsofinterest.append(r_)
+            
+        
         # NOTE: 2020-03-13 18:33:19
         # original channel: {"copy": copied channel, "units": {original unit: copied unit}}
         channels = dict() 
@@ -4140,6 +4158,8 @@ def neo_copy(src: typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Uni
             
             ret.segments.append(s_)
             
+        ret.create_many_to_one_relationship()
+        
     elif isinstance(src, neo.Segment):
         # NOTE: 2020-03-14 00:56:12
         # bare-bones copy; the channel_index and units are NOT copied
@@ -4159,6 +4179,8 @@ def neo_copy(src: typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Uni
         ret.irregularlysampledsignals += [s.copy() for s in src.irregularlysampledsignals]
 
         ret.spiketrains += [s.copy() for s in src.spiketrains]
+        
+        ret.create_many_to_one_relationship()
         
     elif isinstance(src, neo.ChannelIndex):
         # NOTE: 2020-03-14 00:42:29

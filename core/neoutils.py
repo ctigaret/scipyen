@@ -2018,7 +2018,23 @@ def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequ
     WARNING: the function only iterates through the first level of children
     in src. If any of these are containers, there are not searched.
     
-    Positional parameters:
+    In neo there are two nested containment levels:
+        
+        Top level:
+            Block - contains segments, regions of interest, channel_indexes
+        
+        Inner level:
+            Channel_Index - contains units and references to signals contained
+                in segments
+        
+            Segment - contains signals, events, epochs, spiketrains and 
+                imagesequences
+                
+        So if you need to locate a signal in a block, using the signal's name,
+        in theory there are two ways to go about this:
+            a) iterate through the block's segments 
+            b) iterate through the block's channel_indexes
+            Positional parameters:
     ----------------------
     src: neo.core.container.Container or a sequence of these
         (neo.core.container.Container is the ancestor of all container objects 
@@ -2045,11 +2061,55 @@ def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequ
     
     """
     def __container_lookup__(container, contained_type, index_obj) -> typing.Union[list, range]:
+        """In neo there are two nested containment levels:
+        
+        Top level:
+            Block - contains segments, regions of interest, channel_indexes
+        
+        Inner level:
+            Channel_Index - contains units and  references to signals contained
+                in segments
+        
+            Segment - contains signals, events, epochs, spiketrains and 
+                imagesequences
+                
+        So if you look for a signal in a block:
+            you may get to the signal via block.segments, or via block.channel_indexes
+            
+        
+        """
+        #print("__container_lookup__: container type: %s; contained type: %s" % (type(container).__name__, contained_type.__name__))
+        
+        
+        # 1) check if the container's type is aming the contained_type._parent_objects
+        
+        contained_collection_name = neo.baseneo._container_name(contained_type.__name__)
+        
+        if not hasattr(container, contained_collection_name):
+            # contained type is not a direct child of container
+            # => check if the child containers of container do actually contain contained_type
+            contained_subcollections = [getattr(container, c) for c in container._child_containers if len(getattr(container, c)) and hasattr(getattr(container, c)[0], contained_collection_name)]
+            
+            if len(contained_subcollections) > 0:
+                pass
+            
+            for child_container in container._child_containers:
+                pass
+                
+            return tuple()
+        
+        
+        
         seq_contained = [c for c in container.children if isinstance(c, contained_type)]
         
         if len(seq_contained) == 0:
-            warnings.warn("%s does not contain %s children" % (type(src).__name__, stype.__name__))
-            return tuple()
+            seq_contained =[c for c in container.children_recur if isinstance(c, contained_type)]
+            
+            if len(seq_contained) == 0:
+                warnings.warn("%s does not contain %s children" % (type(container).__name__, contained_type.__name__))
+                return tuple()
+            
+            
         
         else:
             
@@ -4074,6 +4134,22 @@ def neo_copy(src: typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Uni
                         rec_datetime=src.rec_datetime,
                         index=src.index)
         ret.annotations.update(src.annotations)
+        
+        for r in src.regionsofinterest:
+            r_ = None
+            
+            if isinstance(r, neo.PolygonRegionOfInterest):
+                r_ = neo.PolygonRegionOfInterest(*r.vertices)
+                
+            elif isinstance(r, neo.RectangularRegionOfInterest):
+                r_ = neo.RectangularRegionOfInterest(r.x, r.y, r.width, r.height)
+                
+            elif isinstance(r, neo.CircularRegionOfInterest):
+                r_ = neo.CircularRegionOfInterest(r.x, r.y r.radius)
+            
+            if r_ is not None:
+                ret.regionsofinterest.append(r_)
+            
         
         # NOTE: 2020-03-13 18:33:19
         # original channel: {"copy": copied channel, "units": {original unit: copied unit}}
