@@ -6216,8 +6216,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             irregs = [s for s in seg.irregularlysampledsignals if s in channelIndex.irregularlysampledsignals]
             
         else:
-            self.signalIndex = neoutils.normalized_signal_index(seg, self.signalIndex, stype = neo.AnalogSignal)
-            self.irregularSignalIndex = neoutils.normalized_signal_index(seg, self.irregularSignalIndex, stype = neo.IrregularlySampledSignal)
+            self.signalIndex = neoutils.normalized_signal_index(seg, self.signalIndex, ctype = neo.AnalogSignal)
+            self.irregularSignalIndex = neoutils.normalized_signal_index(seg, self.irregularSignalIndex, ctype = neo.IrregularlySampledSignal)
             analog = [seg.analogsignals[k] for k in self.signalIndex]
             irregs = [seg.irregularlysampledsignals[k] for k in self.irregularSignalIndex]
         

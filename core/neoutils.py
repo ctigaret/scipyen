@@ -251,6 +251,7 @@ import pyqtgraph as pg
 from . import datatypes as dt
 from . import workspacefunctions
 from . import signalprocessing as sigp
+from . import utilities
 
 #from .patchneo import neo
 
@@ -263,14 +264,14 @@ def get_neo_version() -> tuple:
     major, minor, dot = neo.version.version.split(".")
     return eval(major), eval(minor), eval(dot)
 
-def __indexnone(a, b):
-    """ Call this instead of list.index, such that a missing value returns None instead
-    of raising an Exception
-    """
-    if b in a:
-        return a.index(b)
-    else:
-        return None
+#"def" __indexnone(a, b):
+    #""" Call this instead of list.index, such that a missing value returns None instead
+    #of raising an Exception
+    #"""
+    #if b in a:
+        #return a.index(b)
+    #else:
+        #return None
     
 def correlate(in1, in2, **kwargs):
     """Calls scipy.signal.correlate(in1, in2, **kwargs).
@@ -449,7 +450,7 @@ def assign_to_signal(dest:neo.AnalogSignal, src:[neo.AnalogSignal, pq.Quantity],
         else:
             dest[:,channel] = src
             
-    elif isinstance(src, np.ndarray) and utilties.isVector(src):
+    elif isinstance(src, np.ndarray) and utilities.isVector(src):
         # TODO
         if channel is None:
             pass
@@ -1970,7 +1971,7 @@ def normalized_segment_index(src: neo.Block,
     
     elif isinstance(index, str):
         if slient:
-            return __indexnone([i.name for i in src], index)
+            return utilities.__indexnone([i.name for i in src], index)
 
         return [i.name for i in src].index(index)
     
@@ -1983,7 +1984,7 @@ def normalized_segment_index(src: neo.Block,
                 
             elif isinstance(ndx, str):
                 if silent:
-                    indices.append(__indexnone([i.name for i in src], ndx))
+                    indices.append(utilities.__indexnone([i.name for i in src], ndx))
                     
                 else:
                     indics.append([i.name for i in src].index(ndx))
@@ -2008,33 +2009,16 @@ def normalized_segment_index(src: neo.Block,
     
 def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]],
                      index: typing.Union[int, str, range, slice, typing.Sequence],
-                     stype: type = neo.AnalogSignal,
-                     silent: bool = False) -> list:
+                     ctype: type = neo.AnalogSignal,
+                     silent: bool = False,
+                     flat:bool = True,
+                     multiple:bool=True) -> list:
     """Provisional - work in progress
     The idea is to get an iterable of indices (i.e. a tuple of int or a range)
     for the contained objects in a container, given either:
     the "name" of a contained (a str), an int, a slice, a range, or a list of int.
     
-    WARNING: the function only iterates through the first level of children
-    in src. If any of these are containers, there are not searched.
-    
-    In neo there are two nested containment levels:
-        
-        Top level:
-            Block - contains segments, regions of interest, channel_indexes
-        
-        Inner level:
-            Channel_Index - contains units and references to signals contained
-                in segments
-        
-            Segment - contains signals, events, epochs, spiketrains and 
-                imagesequences
-                
-        So if you need to locate a signal in a block, using the signal's name,
-        in theory there are two ways to go about this:
-            a) iterate through the block's segments 
-            b) iterate through the block's channel_indexes
-            Positional parameters:
+    Positional parameters:
     ----------------------
     src: neo.core.container.Container or a sequence of these
         (neo.core.container.Container is the ancestor of all container objects 
@@ -2051,6 +2035,8 @@ def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequ
         If this is not the case, the index of the last child with the same 
         "name" is returned, and all the others are silenty ignored.
         
+    ctype: type, default is neo.AnalogSignal; the type of the contained object
+        
     slient: bool, default is True
         Only used when index is, or contains, str.
         
@@ -2058,10 +2044,10 @@ def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequ
         "name" specified by str does not exist.
         
         When false, it will raise an exception.
-    
-    """
-    def __container_lookup__(container, contained_type, index_obj) -> typing.Union[list, range]:
-        """In neo there are two nested containment levels:
+        
+    flat: bool, default is True
+        
+    In neo there are two nested containment levels:
         
         Top level:
             Block - contains segments, regions of interest, channel_indexes
@@ -2076,92 +2062,190 @@ def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequ
         So if you look for a signal in a block:
             you may get to the signal via block.segments, or via block.channel_indexes
             
+    NOTATION:
+    ========
+    container: a neo.Container
+    
+    contained type: a type that is an element of a member collection
+    
+    member: an attribute of a type instance (gettable by calling getattr)
+    
+    member collection  = sequence (list or tuple) of objects, that is
+    a member of a neo.Container
+    
+    COMPOSITION HIERARCHIES
+    =======================
+    Data object containers are specialized on the types of data object they
+    may contain. The neo library allows for a data object type to be
+    simultaneously contained in different types of container objects.
+    
+    The top-level container in neo library is a Block. However, data
+    objects are never direcly contained in a block. Instead, a Block
+    instance is composed of iterable collections of container objects. In 
+    turn, each container object in the collection is composed of collections
+    of data objects.
+    
+    In short, objects in the neo library are never directly contained. Instead,
+    tey are stored in appropriate collection of objects with the same type.
+    
+    For example, neo.AnalogSignal objects are contained in a list which can
+    be a member of a neo.Container instance, either a Segment, or a
+    ChannelIndex (or both).
+    
+    Therefore, analog signals have two types of parents: Segment and 
+    ChannelIndex, and both of these are in turn contained in collection members
+    of a Block instance. The composition hierarchy looks like a diamond:
+    
+                     AnalogSignal    
+                     dt.DataSignal    
+                    /             \ 
+                   /               \ 
+                  /                 \ 
+                 /                   \
+                /                     \
+      Segment.analogsignals   ChannelIndex.analogsignals
+                \                      /
+                 \                    /
+                  \                  /
+                   \                /
+                    \              /
+            Block.segments      Block.channel_indexes
+                       \         /
+                        \       /
+                          Block
         
+    
+    Likewise, neo.SpikeTrain obejcts can only be found in th member list of
+    of a Segment (Segment.spiketrains) or a Unit. Unit is a Container which 
+    is only contained in a ChannelIndex (although it can be also accessed in
+    read-only mode from a Block). The composition hierarchy looks like this:
+        
+                      SpikeTrain    
+                    /            \ 
+                   /              \ 
+                  /                \ 
+                 /                  \
+                /                    \
+        Segment.spiketrains         Unit.spiketrains
+                \                     |            \
+                 \                    |             \   
+                  \            ChannelIndex.units    \
+                   \                 /                \
+                    \               /                 |
+              Block.segments  Block.channel_indexes   |
+                      \           /                   |
+                       \         /                    |
+                          Block  - - - - - Block.list_units
+                          
+        
+    For all other BaseSignal types there a direct (linear) composition 
+    hierarchy:
+        
+                IrregularlySampledSignal,
+            dt.IrregularlySampledDataSignal,    
+              ImageSequence, Epoch, Event
+                            |
+                            |
+                            |
+                Segment member colection: 
+                irregularlysampledsignals
+              imagesequences, epochs, events
+                            |
+                            |
+                            |
+                          Block
+        
+    And also for other neo object types:
+        
+                     RegionOfInterest
+                            |
+                            |
+                            |
+                  Block.regonsofinterest
+                            |
+                            |
+                            |
+                          Block
+        
+        
+    As a design decision, when the container is a Block and we lookup a
+    neo.AnalogSignal, we traverse the container's Segments.
+    When the container if another container (which for a signal can 
+    only be a ChannelIndex) when then get directly to its analogsignals
+    member collection
+        
+    """
+    def __container_lookup__(container, contained_type, index_obj) -> typing.Union[list, range]:
+        """        
         """
-        #print("__container_lookup__: container type: %s; contained type: %s" % (type(container).__name__, contained_type.__name__))
+        # 1) check if the container's type is among the contained_type._parent_objects
         
-        
-        # 1) check if the container's type is aming the contained_type._parent_objects
-        
+        contained_mro = inspect.getmro(contained_type)
         contained_collection_name = neo.baseneo._container_name(contained_type.__name__)
         
-        if not hasattr(container, contained_collection_name):
-            # contained type is not a direct child of container
-            # => check if the child containers of container do actually contain contained_type
-            contained_subcollections = [getattr(container, c) for c in container._child_containers if len(getattr(container, c)) and hasattr(getattr(container, c)[0], contained_collection_name)]
-            
-            if len(contained_subcollections) > 0:
-                pass
-            
-            for child_container in container._child_containers:
-                pass
+        if neo.basesignal.BaseSignal in contained_mro:
+            # lookup the index of a base signal or derived type i.e., one of 
+            # analog or irregular signal, spike train, epoch, event, 
+            # and image sequence; these include datatypes.DataSignal and
+            # datatypes.IrregularlySampledDataSignal
+            if isinstance(container, neo.Block):
+                ret_ = [__container_lookup__(s, contained_type, index_obj) for s in container.segments]
                 
-            return tuple()
-        
-        
-        
-        seq_contained = [c for c in container.children if isinstance(c, contained_type)]
-        
-        if len(seq_contained) == 0:
-            seq_contained =[c for c in container.children_recur if isinstance(c, contained_type)]
-            
-            if len(seq_contained) == 0:
-                warnings.warn("%s does not contain %s children" % (type(container).__name__, contained_type.__name__))
-                return tuple()
-            
-            
-        
-        else:
-            
-            if isinstance(index_obj, str):
-                if "name" not in dict(inspect.getmembers(contained_type)):
-                    if "name" not in dict(contained_type._recommended_attrs):
-                        raise TypeError("name cannot be used to get the index of %s in %s" % (contained_type.__name__, type(container).__name__))
-                
-                names = [c.name for c in seq_contained]
-                
-                if silent:
-                    ndx = __indexnone(names, index_obj)
-                    
-                    if ndx is None:
-                        return tuple()
-                    
-                    return tuple([ndx]) # => (the_index, )
+                if len(ret_) > 1:
+                    return tuple(ret_)
                 
                 else:
-                    return tuple([names.index(index_obj)]) # -> (the_index, )
+                    return ret_[0]
                 
-            elif isinstance(index_obj, (tuple, list)):
-                if all([isinstance(i, int) for i in index_obj]):
-                    return normalized_index(len(seq_contained), index_obj)
-                
-                elif all([isinstance(i, (str, int)) for i in index_obj]):
-                    if "name" not in dict(inspect.getmembers(contained_type)):
-                        if "name" not in dict(contained_type._recommended_attrs):
-                            raise TypeError("name cannot be used to get the index of %s in %s" % (contained_type.__name__, type(container).__name__))
+            elif isinstance(container, (neo.Segment, neo.ChannelIndex, neo.Unit)):
+                if not hasattr(container, contained_collection_name):
+                    warnings.warn("%s does not contain %s" % (type(container).__name__, contained_collection_name))
+                    return tuple() 
                     
-                    names = [c.name for c in seq_contained]
-                    
-                    return tuple([normalized_index(len(seq_contained), i)[0] if isinstance(i, int) else __indexnone(names, i) if silent else names.index(i)])
+                ret_ = normalized_index(getattr(container, contained_collection_name),
+                                        index_obj, multiple=multiple)
+                return ret_
             
             else:
-                return normalized_index(len(seq_contained, index_obj))
+                raise TypeError("Wrong container type %s for %s objects" % (type(container).__name__), contained_type.__name__)
+            
+        elif neo.container.Container in contained_mro:
+            # lookup the index of a container
+            # (Block, Segment, Unit, ChannelIndex)
+            if not hasattr(container, contained_collection_name):
+                warnings.warn("%s does not contain %s" % (type(container).__name__, contained_collection_name))
+                return tuple() 
+                
+            return normalized_index(getattr(container, contained_collection_name), index_obj)
         
-    major, minor, dot = get_neo_version()
-    
-    data_len = None
+        elif neo.regionofinterest.RegionOfInterest in contained_mro:
+            # NOTE: 
+            # lookup the index of a region of interest
+            if not hasattr(container, contained_collection_name):
+                warnings.warn("%s does not contain %s" % (type(container).__name__, contained_collection_name))
+                return tuple() 
+                
+            return normalized_index(getattr(container, contained_collection_name), index_obj)
+        
+        else:
+            raise TypeError("Cannot lookup %s objects" % contained_type.__name__)
+        
+    #major, minor, dot = get_neo_version()
     
     if not isinstance(src, (tuple, list)):
         src = [src]
     
-    if not all([isinstance(s, neo.core.container.Container) for s in src]):
-        raise TypeError("src must be a neo Containter or a sequence of neo Container objects")
+    ret = [__container_lookup__(s, ctype, index) for s in src]
     
-    return [__container_lookup__(s, stype, index) for s in src]
+    if len(ret) > 1:
+        return tuple(ret)
+    
+    return ret[0]
+    #return tuple([__container_lookup__(s, ctype, index) for s in src])
         
 def normalized_signal_index(src: neo.core.container.Container,
                             index: typing.Union[int, str, range, slice, typing.Sequence],
-                            stype: type = neo.AnalogSignal, 
+                            ctype: type = neo.AnalogSignal, 
                             silent: bool = False) -> typing.Union[range, list]:
     """Returns the integral index of a signal in its container.
     
@@ -2176,7 +2260,7 @@ def normalized_signal_index(src: neo.core.container.Container,
     index: int, str, tuple, list, range, or slice; any valid form of indexing
         including by the value of the signal's "name " attribute.
     
-    stype: type object; the type of signal to index; valid signal types are 
+    ctype: type object; the type of signal to index; valid signal types are 
         neo.AnalogSignal, neo.IrregularlySampledSignal, 
         neo.Event, neo.Epoch, neo.SpikeTrain, neo.ImageSequence, neo.Unit,
         datatypes.DataSignal and datatypes.IrregularlySampledDataSignal
@@ -2200,49 +2284,49 @@ def normalized_signal_index(src: neo.core.container.Container,
     
     data_len = None
     
-    #signal_collection = [s for s in src.children if isinstance(s, stype)]
+    #signal_collection = [s for s in src.children if isinstance(s, ctype)]
     
     #if isinstance(src, neo.core.baseneo.BaseNeo):
         #if not hasattr(src, collection_name):
-            #raise TypeError("%s data does not contain a collection of %s" % (type(src_.__name__), stype.__name__))
+            #raise TypeError("%s data does not contain a collection of %s" % (type(src_.__name__), ctype.__name__))
     
     if not isinstance(src, (neo.Segment, neo.ChannelIndex, neo.Unit)):
         raise TypeError("Expecting a neo.Segment or neo.ChannelIndex; got %s instead" % type(src).__name__)
     
     #### BEGIN figure out what signal collection we're after'
-    if stype in (neo.AnalogSignal, dt.DataSignal):
+    if ctype in (neo.AnalogSignal, dt.DataSignal):
         if not isinstance(src, (neo.Segment, neo.ChannelIndex)):
-            raise TypeError("%s does not contain %s" % (type(src).__name__, stype.__name__))
+            raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
         
         signal_collection = src.analogsignals
         
-    elif stype in (neo.IrregularlySampledSignal, dt.IrregularlySampledDataSignal):
+    elif ctype in (neo.IrregularlySampledSignal, dt.IrregularlySampledDataSignal):
         if not isinstance(src, (neo.Segment, neo.ChannelIndex)):
-            raise TypeError("%s does not contain %s" % (type(src).__name__, stype.__name__))
+            raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
         
         signal_collection = src.irregularlysampledsignals
         
-    elif stype is neo.SpikeTrain:
+    elif ctype is neo.SpikeTrain:
         if not isinstance(src, (neo.Segment, neo.Unit)):
-            raise TypeError("%s does not contain %s" % (type(src).__name__, stype.__name__))
+            raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
         
         signal_collection = src.spiketrains
         
-    elif stype is neo.Event:
+    elif ctype is neo.Event:
         if not isinstance(src, neo.Segment):
-            raise TypeError("%s does not contain %s" % (type(src).__name__, stype.__name__))
+            raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
             
         signal_collection = src.events
         
-    elif stype is neo.Epoch:
+    elif ctype is neo.Epoch:
         if not isinstance(src, neo.Segment):
-            raise TypeError("%s does not contain %s" % (type(src).__name__, stype.__name__))
+            raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
             
         signal_collection = src.epochs
         
-    elif any([major >= 0, minor >= 8]) and stype is neo.core.ImageSequence:
+    elif any([major >= 0, minor >= 8]) and ctype is neo.core.ImageSequence:
         if not isinstance(src, neo.Segment):
-            raise TypeError("%s does not contain %s" % (type(src).__name__, stype.__name__))
+            raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
             
         # ImageSequence: either a 3D numpy array [frame][row][column] OR
         # a sequence (list) of 2D numpy arrays [row][column]
@@ -2266,14 +2350,14 @@ def normalized_signal_index(src: neo.core.container.Container,
             
             data_len = len(signal_collection)
             
-    elif stype is neo.Unit:
+    elif ctype is neo.Unit:
         if not isinstance(src, neo.ChannelIndex):
-            raise TypeError("%s does not contain %s" % (type(src).__name__, stype.__name__))
+            raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
         
         signal_collection = src.units
         
     else:
-        raise TypeError("Cannot handle %s" % stype.__name__)
+        raise TypeError("Cannot handle %s" % ctype.__name__)
     
     #### END figure out what signal collection we're after'
 
@@ -2290,7 +2374,7 @@ def normalized_signal_index(src: neo.core.container.Container,
         
     elif isinstance(index, str):
         if silent:
-            return __indexnone([i.name for i in signal_collection], index)
+            return utilities.__indexnone([i.name for i in signal_collection], index)
         
         return [i.name for i in signal_collection].index(index)
     
@@ -2303,7 +2387,7 @@ def normalized_signal_index(src: neo.core.container.Container,
                 
             elif isinstance(ndx, str):
                 if silent:
-                    indices.append(__indexnone([i.name for i in signal_collection], ndx))
+                    indices.append(utilities.__indexnone([i.name for i in signal_collection], ndx))
                     
                 else:
                     indices.append([i.name for i in signal_collection].index(ndx) )
@@ -2433,91 +2517,20 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
             # alongside neo.AnalogSignal objects ( guess ... TODO check this)
             
             if silent:
-                return [__indexnone([i.name for i in getattr(j, signal_collection)], names) for j in data]
+                return [utilities.__indexnone([i.name for i in getattr(j, signal_collection)], names) for j in data]
             
             return [[i.name for i in getattr(j, signal_collection)].index(names) for j in data]
              
-            #if stype in (neo.AnalogSignal, dt.DataSignal) or \
-                #(isinstance(stype, (tuple, list)) and all([s.__name__ in ("AnalogSignal", "DataSignal") for s in stype])):
-                #if silent:
-                    #return [__indexnone([i.name for i in j.analogsignals], names) for j in data]
-                
-                #return [[i.name for i in j.analogsignals].index(names) for j in data]
-            
-            #elif stype is neo.IrregularlySampledSignal:
-                #if silent:
-                    #return [__indexnone([i.name for i in j.irregularlysampledsignals], names) for j in data]
-                
-                #return [[i.name for i in j.irregularlysampledsignals].index(names) for j in data]
-            
-                
-            #elif stype is neo.SpikeTrain:
-                #if silent:
-                    #return [__indexnone([i.name for i in j.spiketrains], names) for j in data]
-                
-                #return [[i.name for i in j.spiketrains].index(names) for j in data]
-            
-                
-            #elif stype is neo.Event:
-                #if silent:
-                    #return [__indexnone([i.name for i in j.events], names) for j in data]
-                
-                #return [[i.name for i in j.events].index(names) for j in data]
-            
-                
-            #elif stype is neo.Epoch:
-                #if silent:
-                    #return [__indexnone([i.name for i in j.epochs], names) for j in data]
-                
-                #return [[i.name for i in j.epochs].index(names) for j in data]
-            
-            #else:
-                #raise TypeError("Invalid stype")
-
         elif isinstance(names, (list, tuple)):
             if np.all([isinstance(i,str) for i in names]):
                 # proceed only if all elements in names are strings and return a 
                 # list of lists, where each list element has the indices for a given
                 # signal name
                 if silent:
-                    return [[__indexnone([i.name for i in getattr(j, signal_collection)], k) for k in names] for j in data]
+                    return [[utilities.__indexnone([i.name for i in getattr(j, signal_collection)], k) for k in names] for j in data]
                 
                 return [[[i.name for i in getattr(j, signal_collection)].index(k) for k in names ] for j in data]
                 
-                #if stype in (neo.AnalogSignal, dt.DataSignal) or \
-                    #(isinstance(stype, (tuple, list)) and all([s.__name__ in ("AnalogSignal", "DataSignal") for s in stype])):
-                    #if silent:
-                        #return [[__indexnone([i.name for i in j.analogsignals], k) for k in names] for j in data]
-                    
-                    #return [[[i.name for i in j.analogsignals].index(k) for k in names ] for j in data]
-                    
-                #elif stype in (neo.IrregularlySampledSignal, dt.IrregularlySampledDataSignal):
-                    #if silent:
-                        #return [[__indexnone([i.name for i in j.irregularlysampledsignals], k) for k in names] for j in data]
-                    
-                    #return [[[i.name for i in j.irregularlysampledsignals].index(k) for k in names ] for j in data]
-                    
-                #elif stype is neo.SpikeTrain:
-                    #if silent:
-                        #return [[__indexnone([i.name for i in j.spiketrains], k) for k in names] for j in data]
-                    
-                    #return [[[i.name for i in j.spiketrains].index(k) for k in names ] for j in data]
-                    
-                #elif stype is neo.Event:
-                    #if silent:
-                        #return [[__indexnone([i.name for i in j.events], k) for k in names] for j in data]
-                    
-                    #return [[[i.name for i in j.events].index(k) for k in names ] for j in data]
-                    
-                #elif stype is neo.Epoch:
-                    #if silent:
-                        #return [[__indexnone([i.name for i in j.epochs], k) for k in names] for j in data]
-                    
-                    #return [[[i.name for i in j.epochs].index(k) for k in names ] for j in data]
-                    
-                #else:
-                    #raise TypeError("Invalid stype")
-
     elif isinstance(src, neo.core.Segment):
         objectList = getattr(src, signal_collection)
         #if stype in (neo.AnalogSignal, dt.DataSignal) or \
@@ -2541,14 +2554,14 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
         
         if isinstance(names, str):
             if silent:
-                return __indexnone([i.name for i in objectList], names)
+                return utilities.__indexnone([i.name for i in objectList], names)
             
             return [i.name for i in objectList].index(names)
             
         elif isinstance(names, (list, tuple)):
             if np.all([isinstance(i,str) for i in names]):
                 if silent:
-                    return [__indexnone([i.name for i in objectList], j) for j in names]
+                    return [utilities.__indexnone([i.name for i in objectList], j) for j in names]
                 
                 return [[i.name for i in objectList].index(j) for j in names]
             
@@ -3488,27 +3501,33 @@ def concatenate_blocks2(*args, **kwargs):
                     # we do NOT copy; instead we create a new segment, that we
                     # then populate with selected signals
                     seg_ = neo.Segment(rec_datetime = seg.rec_datetime, name="%s_%s" % (args.name, seg.name))
+                    
                     seg_.merge_annotations(seg)
+                    
                     seg_.annotate(origin=args.file_origin, original_segment=segment_index)
                     
-                    if isinstance(analog_index, str):
-                        seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, analog_index)].copy())
+                    signal_index = neo_index_lookup(seg, analog_index)
+                    
+                    sig_ = seg.analogsignals[signal_index]
+                    
+                    #if isinstance(analog_index, str):
+                        #seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, analog_index)].copy())
                         
-                    elif isinstance(analog_index, int):
-                        seg_.analogsignals.append(seg.analogsignals[analog_index].copy())
+                    #elif isinstance(analog_index, int):
+                        #seg_.analogsignals.append(seg.analogsignals[analog_index].copy())
                         
-                    elif isinstance(analog_index, (tuple, list)):
-                        for sigNdx in analog_index:
-                            if isinstance(sigNdx, str):
-                                sigNdx = get_index_of_named_signal(seg, sigNdx)
+                    #elif isinstance(analog_index, (tuple, list)):
+                        #for sigNdx in analog_index:
+                            #if isinstance(sigNdx, str):
+                                #sigNdx = get_index_of_named_signal(seg, sigNdx)
                                 
-                            elif not isinstance(sigNdx, int):
-                                raise TypeError("Signal index expected to be a str or an int; got %s instead" % type(sigNdx).__name__)
+                            #elif not isinstance(sigNdx, int):
+                                #raise TypeError("Signal index expected to be a str or an int; got %s instead" % type(sigNdx).__name__)
                                 
-                            seg_.analogsignals.append(seg.analogsignals[sigNdx].copy())
+                            #seg_.analogsignals.append(seg.analogsignals[sigNdx].copy())
                             
-                    else:
-                        raise TypeError("analog_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(analog_index).__name__)
+                    #else:
+                        #raise TypeError("analog_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(analog_index).__name__)
                         
                     ret.segments.append(seg_)
         else:

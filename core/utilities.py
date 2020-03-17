@@ -3,7 +3,7 @@
 Programming helper functions & decorators
 '''
 #### BEGIN core python modules
-import traceback, re, io, sys, enum, itertools, time, typing, types
+import traceback, re, io, sys, enum, itertools, time, typing, types, warnings
 from functools import singledispatch, update_wrapper, wraps
 from contextlib import contextmanager
 #### END core python modules
@@ -21,6 +21,18 @@ import vigra
 from . import strutils
 #### END pict.core modules
 
+def __indexnone(a, b, multiple:bool = True):
+    """ Call this instead of list.index, such that a missing value returns None instead
+    of raising an Exception
+    """
+    if b in a:
+        if multiple:
+            return [k for k, v in enumerate(a) if v is b]
+        
+        return a.index(b) # returns the index of first occurrence of b in a
+    else:
+        return None
+    
 def yyMdd(now=None):
     import string, time
     if not isinstance(now, time.struct_time):
@@ -540,15 +552,19 @@ def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)) -> i
     
     return axis
 
-def normalized_index(data_len:(int),
-                     index:(int, tuple, list, np.ndarray, range, slice, type(None)) = None) -> typing.Union[range, tuple]:
+def normalized_index(data: typing.Union[typing.Sequence, int],
+                     index:(int, tuple, list, np.ndarray, range, slice, type(None)) = None,
+                     silent:bool=False, 
+                     flat:bool = True,
+                     multiple:bool = True) -> typing.Union[range, tuple]:
     """Returns a generic indexing in the form of an iterable of indices.
     
     Also checks the validity of the index for an iterable of data_len samples.
     
     Parameters:
     -----------
-    data_len: length of the iterable for which indexing will be normalized
+    data: a sequence, or an int; the index will be normalized against its length
+        When an int, data is the length of a putative sequence
     
     index: int, tuple, list, np.ndarray, range, slice, None (default).
         When not None, it is the index to be normalized
@@ -562,26 +578,70 @@ def normalized_index(data_len:(int),
         used with list comprehension
     
     """
+    def __name_lookup__(container, name):
+        names = [getattr(x, "name", None) for x in container]
+        
+        if silent:
+            return __indexnone(names, name, multiple=multiple)
+        
+        if len(names) == 0 or name not in names:
+            warnings.warn("No element with a valid 'name' attribute or with name '%s' was found in the sequence" % name)
+            return None
+        
+        if multiple:
+            ret = [k for k, v in enumerate(names) if v == name]
+            
+            if len(ret) == 1:
+                return ret[0]
+        
+        return names.index(name)
+            
+    if not isinstance(data, (int, tuple, list)):
+        raise TypeError("Expecting an int or a sequence (tuple, or list)")
+    
+    data_len = data if isinstance(data, int) else len(data)
+    
     if index is None:
         return range(data_len)
     
     elif isinstance(index, int):
         # NOTE: 2020-03-12 22:40:31
-        # negative ints ARE supported: they simply go backwards from the end of
+        # negative values ARE supported: they simply go backwards from the end of
         # the sequence
-        if index >= data_len:
-            raise ValueError("Index %s is invalid for %d elements" % (index, data_len))
+        if index >= len(data):
+            raise ValueError("Index %s is invalid for %d elements" % (index, len(data)))
+        
+        if flat:
+            return index
         
         return tuple([index]) # -> (index,)
     
+    elif isinstance(index, str):
+        if not isinstance(data, (tuple, list)):
+            raise TypeError("Name lookup requires a sequence")
+        
+        ret = __name_lookup__(data, index)
+        
+        if flat:
+            return ret
+        
+        return tuple([ret])
+        
     elif isinstance(index, (tuple,  list)):
-        if not all([isinstance(v, int) for v in index]):
+        if not all([isinstance(v, (int, str)) for v in index]):
             raise TypeError("Index sequence %s is expected to contain int only" % index)
         
-        if not all([v < data_len for v in index]):
-            raise ValueError("Index sequence %s contains invalid values for %d elements" % (index, data_len))
-        
-        return tuple(index) # -> index as a tuple
+        if any([isinstance(v, str) for v in index]):
+            if not isinstance(data, (tuple, list)):
+                raise TypeError("Name lookup requires a sequence")
+            
+            return tuple([v if isinstance(v, int) and v < data_len else __name_lookup__(data, v) for v in index])
+            
+        else:
+            if not all([v < data_len for v in index]):
+                raise ValueError("Index sequence %s contains invalid values for %d elements" % (index, data_len))
+            
+            return tuple(index) # -> index as a tuple
     
     elif isinstance(index, range):
         if index.start < 0 or index.stop < 0:
