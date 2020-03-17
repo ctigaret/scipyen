@@ -4145,7 +4145,7 @@ def neo_copy(src: typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Uni
                 r_ = neo.RectangularRegionOfInterest(r.x, r.y, r.width, r.height)
                 
             elif isinstance(r, neo.CircularRegionOfInterest):
-                r_ = neo.CircularRegionOfInterest(r.x, r.y r.radius)
+                r_ = neo.CircularRegionOfInterest(r.x, r.y, r.radius)
             
             if r_ is not None:
                 ret.regionsofinterest.append(r_)
