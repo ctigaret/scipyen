@@ -21,7 +21,7 @@ import vigra
 from . import strutils
 #### END pict.core modules
 
-def __indexnone(a, b, multiple:bool = True):
+def silentindex(a, b, multiple:bool = True):
     """ Call this instead of list.index, such that a missing value returns None instead
     of raising an Exception
     """
@@ -582,7 +582,7 @@ def normalized_index(data: typing.Union[typing.Sequence, int],
         names = [getattr(x, "name", None) for x in container]
         
         if silent:
-            return __indexnone(names, name, multiple=multiple)
+            return silentindex(names, name, multiple=multiple)
         
         if len(names) == 0 or name not in names:
             warnings.warn("No element with a valid 'name' attribute or with name '%s' was found in the sequence" % name)
@@ -593,7 +593,9 @@ def normalized_index(data: typing.Union[typing.Sequence, int],
             
             if len(ret) == 1:
                 return ret[0]
-        
+            
+            return ret
+            
         return names.index(name)
             
     if not isinstance(data, (int, tuple, list)):
@@ -622,10 +624,14 @@ def normalized_index(data: typing.Union[typing.Sequence, int],
         
         ret = __name_lookup__(data, index)
         
-        if flat:
-            return ret
+        return tuple(ret)
+        #if flat:
         
-        return tuple([ret])
+        
+        #else:
+            #return {}
+        
+        #return tuple([ret])
         
     elif isinstance(index, (tuple,  list)):
         if not all([isinstance(v, (int, str)) for v in index]):

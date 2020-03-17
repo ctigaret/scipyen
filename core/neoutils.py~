@@ -264,7 +264,7 @@ def get_neo_version() -> tuple:
     major, minor, dot = neo.version.version.split(".")
     return eval(major), eval(minor), eval(dot)
 
-#"def" __indexnone(a, b):
+#"def" silentindex(a, b):
     #""" Call this instead of list.index, such that a missing value returns None instead
     #of raising an Exception
     #"""
@@ -1971,7 +1971,7 @@ def normalized_segment_index(src: neo.Block,
     
     elif isinstance(index, str):
         if slient:
-            return utilities.__indexnone([i.name for i in src], index)
+            return utilities.silentindex([i.name for i in src], index)
 
         return [i.name for i in src].index(index)
     
@@ -1984,7 +1984,7 @@ def normalized_segment_index(src: neo.Block,
                 
             elif isinstance(ndx, str):
                 if silent:
-                    indices.append(utilities.__indexnone([i.name for i in src], ndx))
+                    indices.append(utilities.silentindex([i.name for i in src], ndx))
                     
                 else:
                     indics.append([i.name for i in src].index(ndx))
@@ -2006,6 +2006,34 @@ def normalized_segment_index(src: neo.Block,
     #attribute name: "analogsignals"
     
     #"""
+    
+def neo_container_name(type_or_object):
+    """Provisional: name of member collection.
+    May become obsolete in neo versions newer than 0.8.0
+    """
+    if inspect.isclass(type_or_object):
+        if neo.regionofinterest.RegionOfInterest in inspect.getmro(type_or_object):
+            return "regionsofinterest"
+        
+        else:
+            return neo.baseneo._container_name(type_or_object.__name__)
+        
+    elif isinstance(type_or_object, str):
+        if s in dir(neo.regionofinterest):
+            return "regionsofinterest"
+        
+        else:
+            return neo.baseneo._container_name(type_or_object)
+        
+    else:
+        if isinstance(type_or_object, neo.regionofinterest.RegionOfInterest):
+            return "regionsofinterest"
+        
+        else:
+            return neo.baseneo._container_name(type(type_or_object).__name__)
+            
+        
+    
     
 def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]],
                      index: typing.Union[int, str, range, slice, typing.Sequence],
@@ -2161,7 +2189,7 @@ def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequ
                             |
                             |
                             |
-                  Block.regonsofinterest
+                  Block.regionsofinterest
                             |
                             |
                             |
@@ -2181,7 +2209,12 @@ def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequ
         # 1) check if the container's type is among the contained_type._parent_objects
         
         contained_mro = inspect.getmro(contained_type)
-        contained_collection_name = neo.baseneo._container_name(contained_type.__name__)
+        contained_collection_name = neo_container_name(contained_type)
+        
+        member_collections_names = container._child_containers
+        
+        if contained_type.__name__ in container._child_objects:
+            return normalized_index(getattr(container, neo_container_name(contained_type)), index_obj)
         
         if neo.basesignal.BaseSignal in contained_mro:
             # lookup the index of a base signal or derived type i.e., one of 
@@ -2374,7 +2407,7 @@ def normalized_signal_index(src: neo.core.container.Container,
         
     elif isinstance(index, str):
         if silent:
-            return utilities.__indexnone([i.name for i in signal_collection], index)
+            return utilities.silentindex([i.name for i in signal_collection], index)
         
         return [i.name for i in signal_collection].index(index)
     
@@ -2387,7 +2420,7 @@ def normalized_signal_index(src: neo.core.container.Container,
                 
             elif isinstance(ndx, str):
                 if silent:
-                    indices.append(utilities.__indexnone([i.name for i in signal_collection], ndx))
+                    indices.append(utilities.silentindex([i.name for i in signal_collection], ndx))
                     
                 else:
                     indices.append([i.name for i in signal_collection].index(ndx) )
@@ -2517,7 +2550,7 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
             # alongside neo.AnalogSignal objects ( guess ... TODO check this)
             
             if silent:
-                return [utilities.__indexnone([i.name for i in getattr(j, signal_collection)], names) for j in data]
+                return [utilities.silentindex([i.name for i in getattr(j, signal_collection)], names) for j in data]
             
             return [[i.name for i in getattr(j, signal_collection)].index(names) for j in data]
              
@@ -2527,7 +2560,7 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
                 # list of lists, where each list element has the indices for a given
                 # signal name
                 if silent:
-                    return [[utilities.__indexnone([i.name for i in getattr(j, signal_collection)], k) for k in names] for j in data]
+                    return [[utilities.silentindex([i.name for i in getattr(j, signal_collection)], k) for k in names] for j in data]
                 
                 return [[[i.name for i in getattr(j, signal_collection)].index(k) for k in names ] for j in data]
                 
@@ -2554,14 +2587,14 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
         
         if isinstance(names, str):
             if silent:
-                return utilities.__indexnone([i.name for i in objectList], names)
+                return utilities.silentindex([i.name for i in objectList], names)
             
             return [i.name for i in objectList].index(names)
             
         elif isinstance(names, (list, tuple)):
             if np.all([isinstance(i,str) for i in names]):
                 if silent:
-                    return [utilities.__indexnone([i.name for i in objectList], j) for j in names]
+                    return [utilities.silentindex([i.name for i in objectList], j) for j in names]
                 
                 return [[i.name for i in objectList].index(j) for j in names]
             
@@ -3526,8 +3559,8 @@ def concatenate_blocks2(*args, **kwargs):
                                 
                             #seg_.analogsignals.append(seg.analogsignals[sigNdx].copy())
                             
-                    else:
-                        raise TypeError("analog_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(analog_index).__name__)
+                    #else:
+                        #raise TypeError("analog_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(analog_index).__name__)
                         
                     ret.segments.append(seg_)
         else:
