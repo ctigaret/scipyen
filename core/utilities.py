@@ -624,6 +624,9 @@ def normalized_index(data: typing.Union[typing.Sequence, int],
         
         ret = __name_lookup__(data, index)
         
+        if isinstance(ret, int) or (isinstance(ret, (tuple, list)) and len(ret) > 1):
+            return tuple([ret])
+        
         return tuple(ret)
         #if flat:
         

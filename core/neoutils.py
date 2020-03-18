@@ -2007,33 +2007,57 @@ def normalized_segment_index(src: neo.Block,
     
     #"""
     
-def neo_container_name(type_or_object):
+def neo_container_name(type_or_obj):
     """Provisional: name of member collection.
     May become obsolete in neo versions newer than 0.8.0
     """
-    if inspect.isclass(type_or_object):
-        if neo.regionofinterest.RegionOfInterest in inspect.getmro(type_or_object):
+    if inspect.isclass(type_or_obj):
+        if neo.regionofinterest.RegionOfInterest in inspect.getmro(type_or_obj):
             return "regionsofinterest"
         
         else:
-            return neo.baseneo._container_name(type_or_object.__name__)
+            return neo.baseneo._container_name(type_or_obj.__name__)
         
-    elif isinstance(type_or_object, str):
+    elif isinstance(type_or_obj, str):
         if s in dir(neo.regionofinterest):
             return "regionsofinterest"
         
         else:
-            return neo.baseneo._container_name(type_or_object)
+            return neo.baseneo._container_name(type_or_obj)
         
     else:
-        if isinstance(type_or_object, neo.regionofinterest.RegionOfInterest):
+        if isinstance(type_or_obj, neo.regionofinterest.RegionOfInterest):
             return "regionsofinterest"
         
         else:
-            return neo.baseneo._container_name(type(type_or_object).__name__)
+            return neo.baseneo._container_name(type(type_or_obj).__name__)
             
         
+def neo_reference_name(type_or_obj):
+    """Provisional: name of attribute name ot reference instance of type_or_obj
+    """
     
+    if inspect.isclass(type_or_obj):
+        if neo.regionofinterest.RegionOfInterest in inspect.getmro(type_or_obj):
+            return "regionofinterest"
+        
+        else:
+            return neo.baseneo._reference_name(type_or_obj.__name__)
+        
+    elif isinstance(type_or_obj, str):
+        if s in dir(neo.regionofinterest):
+            return "regionofinterest"
+        
+        else:
+            return neo.baseneo._reference_name(type_or_obj)
+        
+    else:
+        if isinstance(type_or_obj, neo.regionofinterest.RegionOfInterest):
+            return "regionofinterest"
+        
+        else:
+            return neo.baseneo._reference_name(type(type_or_obj).__name__)
+            
     
 def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]],
                      index: typing.Union[int, str, range, slice, typing.Sequence],
@@ -2042,6 +2066,83 @@ def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequ
                      flat:bool = True,
                      multiple:bool=True) -> list:
     """Provisional - work in progress
+    
+    Structured indices:
+    
+    a) search for a signal in a Container => signal's address should be:
+    
+    for neo.container.Container:
+    
+    Example 1: generic uniform indexing of signals in a block
+    =========================================================
+    
+    block.segments[k].analgosignals[l] <=>
+    
+    child_container_name = "segments"
+    
+    child_container_index = [k]
+    
+    child_subcontainer_name = "analogsignals"
+    
+    child_subcontainer_index = [l] 
+    
+    => 
+    
+    getattr(getattr(block, child_container_name)[child_container_index], child_subcontainer_name)[child_subcontainer_index]
+    
+    wrapped in a recursive call:
+    
+    access(container, child_container_name, child_container_index):
+        return getattr(container, child_container_name)[child_container_index]
+    
+    would be:
+    
+    access(access(block, "segments", 0), "analogsignals", 0)
+    
+    ========================
+    
+    the structured index would then be:
+        
+        {Segment: [{index: int, AnalogSignal: int, tuple, list}]}
+        
+        
+    find signals named "sig_a" and "sig_b" in all the segments of a block:
+    
+    neo_index_lookup should return:
+    
+    {Segment: [{index: int, AnalogSignal: tuple_of_ints}]} where
+        index = int index of segment that contains the named analogsignals
+        tuple_of_ints = tuple of named signal indices in each segment that has it
+        
+    if none of the named signals is found in any of the segments, return:
+    {Segment: []}
+    
+    Example 2: a tuple or list of blocks:
+    =====================================
+    {Block: [{index: int, Segment: [{index: int, AnalogSignal: tuple of ints}]}]}
+        
+        
+    Example 3: a Segment:
+    =====================
+    {AnalogSignal: tuple_of_ints, IrregularlySampledSignal: tuple_of_ints}
+    
+    Looking up for a neo.object:
+    
+    {object_type: tuple if data object else dict}
+    
+    
+    
+    
+    container type => child container collection name => signal type => signal index in child container
+    
+    container type => channel index => child container name => signal type => signal index in child container
+    
+    for generic container (e.g. a python sequence, i.e. tuple or list):
+        if signal directly contained in the sequence: signal type => signal index in container
+        
+        if sequence itself has containers:
+            if a neo.container.Container
+    
     The idea is to get an iterable of indices (i.e. a tuple of int or a range)
     for the contained objects in a container, given either:
     the "name" of a contained (a str), an int, a slice, a range, or a list of int.
@@ -2203,80 +2304,107 @@ def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequ
     member collection
         
     """
-    def __container_lookup__(container, contained_type, index_obj) -> typing.Union[list, range]:
+    def __container_lookup__(container, contained_type, index_obj, flat_) -> typing.Union[list, range]:
         """        
         """
         # 1) check if the container's type is among the contained_type._parent_objects
+        
+        if not isinstance(container, neo.container.Container):
+            return
         
         contained_mro = inspect.getmro(contained_type)
         contained_collection_name = neo_container_name(contained_type)
         
         member_collections_names = container._child_containers
+        member_object_types = container._child_objects
         
         if contained_type.__name__ in container._child_objects:
             ret = normalized_index(getattr(container, neo_container_name(contained_type)), index_obj)
-            if flat:
+            
+            if flat_:
                 return ret
             
             else:
-                return {type(container).__name__ : {contained_type.__name__ : ret}}
+                return {type(container) : {contained_type : ret}}
         
         else:
-            pass # TODO
-        
-        if neo.basesignal.BaseSignal in contained_mro:
-            # lookup the index of a base signal or derived type i.e., one of 
-            # analog or irregular signal, spike train, epoch, event, 
-            # and image sequence; these include datatypes.DataSignal and
-            # datatypes.IrregularlySampledDataSignal
-            if isinstance(container, neo.Block):
-                ret_ = [__container_lookup__(s, contained_type, index_obj) for s in container.segments]
+            if flat_: 
+                all_indices = list()
                 
-                if len(ret_) > 1:
-                    return tuple(ret_)
-                
-                else:
-                    return ret_[0]
-                
-            elif isinstance(container, (neo.Segment, neo.ChannelIndex, neo.Unit)):
-                if not hasattr(container, contained_collection_name):
-                    warnings.warn("%s does not contain %s" % (type(container).__name__, contained_collection_name))
-                    return tuple() 
-                    
-                ret_ = normalized_index(getattr(container, contained_collection_name),
-                                        index_obj, multiple=multiple)
-                return ret_
-            
             else:
-                raise TypeError("Wrong container type %s for %s objects" % (type(container).__name__), contained_type.__name__)
+                all_indices = {type(container): dict()}
             
-        elif neo.container.Container in contained_mro:
-            # lookup the index of a container
-            # (Block, Segment, Unit, ChannelIndex)
-            if not hasattr(container, contained_collection_name):
-                warnings.warn("%s does not contain %s" % (type(container).__name__, contained_collection_name))
-                return tuple() 
+            for sub_container_name, sub_contained_type in zip(member_collections_names, member_object_types):
+                member_collection = getattr(container, sub_container_name)
                 
-            return normalized_index(getattr(container, contained_collection_name), index_obj)
+                if flat_:
+                    all_indices.append([(k, __container_lookup__(sub_container, contained_type, index_obj, flat_=flat_)) for k,sub_container in enumerate(member_collection)])
+                    
+                else:
+                    all_indices[type(container)][sub_contained_type] = list()
+                    
+                    for k, sub_container in enumerate(member_collection):
+                        all_indices[type(container)][sub_contained_type].append({k: __container_lookup__(sub_container, contained_type, index_obj, flat_ = not flat_)})
+                    
+            return all_indices
+                    
+            #pass # TODO
         
-        elif neo.regionofinterest.RegionOfInterest in contained_mro:
-            # NOTE: 
-            # lookup the index of a region of interest
-            if not hasattr(container, contained_collection_name):
-                warnings.warn("%s does not contain %s" % (type(container).__name__, contained_collection_name))
-                return tuple() 
+        #### BEGIN do not delete
+        #if neo.basesignal.BaseSignal in contained_mro:
+            ## lookup the index of a base signal or derived type i.e., one of 
+            ## analog or irregular signal, spike train, epoch, event, 
+            ## and image sequence; these include datatypes.DataSignal and
+            ## datatypes.IrregularlySampledDataSignal
+            #if isinstance(container, neo.Block):
+                #ret_ = [__container_lookup__(s, contained_type, index_obj) for s in container.segments]
                 
-            return normalized_index(getattr(container, contained_collection_name), index_obj)
+                #if len(ret_) > 1:
+                    #return tuple(ret_)
+                
+                #else:
+                    #return ret_[0]
+                
+            #elif isinstance(container, (neo.Segment, neo.ChannelIndex, neo.Unit)):
+                #if not hasattr(container, contained_collection_name):
+                    #warnings.warn("%s does not contain %s" % (type(container).__name__, contained_collection_name))
+                    #return tuple() 
+                    
+                #ret_ = normalized_index(getattr(container, contained_collection_name),
+                                        #index_obj, multiple=multiple)
+                #return ret_
+            
+            #else:
+                #raise TypeError("Wrong container type %s for %s objects" % (type(container).__name__), contained_type.__name__)
+            
+        #elif neo.container.Container in contained_mro:
+            ## lookup the index of a container
+            ## (Block, Segment, Unit, ChannelIndex)
+            #if not hasattr(container, contained_collection_name):
+                #warnings.warn("%s does not contain %s" % (type(container).__name__, contained_collection_name))
+                #return tuple() 
+                
+            #return normalized_index(getattr(container, contained_collection_name), index_obj)
         
-        else:
-            raise TypeError("Cannot lookup %s objects" % contained_type.__name__)
+        #elif neo.regionofinterest.RegionOfInterest in contained_mro:
+            ## NOTE: 
+            ## lookup the index of a region of interest
+            #if not hasattr(container, contained_collection_name):
+                #warnings.warn("%s does not contain %s" % (type(container).__name__, contained_collection_name))
+                #return tuple() 
+                
+            #return normalized_index(getattr(container, contained_collection_name), index_obj)
+        
+        #else:
+            #raise TypeError("Cannot lookup %s objects" % contained_type.__name__)
+        #### END do not delete
         
     #major, minor, dot = get_neo_version()
     
     if not isinstance(src, (tuple, list)):
         src = [src]
     
-    ret = [__container_lookup__(s, ctype, index) for s in src]
+    ret = [__container_lookup__(s, ctype, index, flat_=flat) for s in src]
     
     if len(ret) > 1:
         return tuple(ret)
