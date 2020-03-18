@@ -2019,7 +2019,7 @@ def neo_container_name(type_or_obj):
             return neo.baseneo._container_name(type_or_obj.__name__)
         
     elif isinstance(type_or_obj, str):
-        if s in dir(neo.regionofinterest):
+        if type_or_obj in dir(neo.regionofinterest):
             return "regionsofinterest"
         
         else:
@@ -2069,10 +2069,111 @@ def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequ
     
     Structured indices:
     
-    a) search for a signal in a Container => signal's address should be:
+    child_container_name is obtained by calling neo_container_name(...)
+    
+        it can be a 
+        
+        data_child_container_name (sequence of data objects), 
+        
+        or a
+        
+        container_child_container_name (sequence of container obejcts)
+        
+        In both cases these are prescribed attribute names of 
+        neo.container.Container objects.
+    
+    indices = an iterable of int (i.e., tuple, list or range), NOT a slice
+    
+    
+    Example 1: index of signals in a python sequence:
+    =================================================
+    indices
+    
+    
+    Example 2: index of data objects in a Segment or ChannelIndex:
+    ============================================================================
+    {data_child_container_name: indices, ...}
+    
+    data_child_container_name is one of the following:
+    
+    "analogsignals", "irregularlysampledsignals", "imagesequences", 
+    "spiketrains", "epochs", "events",
+    
+    
+    Example 3: index of container objects (Segment or ChannelIndex in Block, or
+    Units in a ChannelIndex)
+    ============================================================================
+    {container_child_container_name: indices, ...}
+    
+    container_child_container_name is one of the following:
+    
+    "segments", "channel_indexes", "list_units" - for Block
+    "units" for ChannelIndex
+    
+    
+    Example 4: index of signal in a sequence of Segment, ChannelIndex, or Unit
+    ==========================================================================
+    {index0: {data_child_container_name: indices}, 
+     index1: {...},
+     etc...}
+     
+    index0, index1, etc: indices of the container in the sequence. 
+     
+    These indices are not necessarily the same as Segment.index or ChannelIndex
+    value! Instead they are the indices of said objects in the collection where
+    the lookup takes place.
+    
+    For spike trains in a sequence of ChannelIndex, one may also select the units:
+    
+    {index0: {container_child_container_name: {nested_index0:{data_child_container_name: indices}}},
+     index1: {...},
+     etc...}
+     
+     Here index0/1/etc: indices of the channel index in the sequence
+          nested_index0/1/etc: indices of the Units
+
+        
+    Example 5: nested index of signal in a Block
+    =============================================
+    {container_child_container_name: {index0: {data_child_container_name: indices},
+                                      index1: {...},
+                                      etc... },
+                                        
+    for analog signals, should indicate preference between "segments" and "channel_indexes"
+        default is "segments"
+    
+    for spike trains, should indicate preference between "segments" and "units"
+        default is "segments"
+        if "units", this implies traversing "channel_indexes" if looking up in
+        a Block
+    
+
+    Example 6: nested index of signal in a sequence of blocks
+    =========================================================
+    {index1:    {"segments": {index1: {child_container_name: indices},
+                              index2: {...},
+                              etc... },
+                 "channel_indexes": {index: {child_container_name: indices}, 
+                                     etc... }},
+     index2:    {"segments": {index1: {child_container_name: indices},
+                              index2: {...},
+                              etc... },
+                 "channel_indexes": {index: {child_container_name: indices}, 
+                                     etc... }},
+     etc...}
+    
+        
+    
+    
+    
+    
+    
+    
+    
     
     for neo.container.Container:
     
+        
     Example 1: generic uniform indexing of signals in a block
     =========================================================
     
@@ -2121,10 +2222,6 @@ def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequ
     =====================================
     {Block: [{index: int, Segment: [{index: int, AnalogSignal: tuple of ints}]}]}
         
-        
-    Example 3: a Segment:
-    =====================
-    {AnalogSignal: tuple_of_ints, IrregularlySampledSignal: tuple_of_ints}
     
     Looking up for a neo.object:
     
@@ -2657,7 +2754,7 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
     where the 'analogsignals' attribute a list) is not empty. Likewise, when 
     'src' is a Segment, its attribute 'analogsignals' (a list) is not empty.
     
-    2) iT IS ASSUMED THAT ALL SIGNALS HAVE A NAME ATTRIBUTE THATG IS NOT None
+    2) iT IS ASSUMED THAT ALL SIGNALS HAVE A NAME ATTRIBUTE THAT IS NOT None
     (None is technically acceptable value for the name attribute)
     
     Such signals will be skipped / missed!
