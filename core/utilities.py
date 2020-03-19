@@ -627,7 +627,7 @@ def normalized_index(data: typing.Union[typing.Sequence, int],
         if isinstance(ret, int) or (isinstance(ret, (tuple, list)) and len(ret) > 1):
             return tuple([ret])
         
-        return tuple(ret)
+        return tuple()
         #if flat:
         
         

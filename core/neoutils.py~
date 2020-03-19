@@ -2496,30 +2496,27 @@ def __container_lookup__(container, contained_type, index_obj) -> dict:
     """
     # 1) check if the container's type is among the contained_type._parent_objects
     
-    if not isinstance(container, neo.container.Container):
-        return dict()
-
-    child_collection_name = neo_child_container_name(contained_type)
-    
-    collection = getattr(container, child_collection_name, None)
-    
-    if collection is not None:
-        return {child_collection_name: normalized_index(collection, index_obj)}
+    if isinstance(container, neo.container.Container):
+        child_collection_name = neo_child_container_name(contained_type)
+        
+        collection = getattr(container, child_collection_name, None)
+        
+        if collection is not None:
+            ndx = normalized_index(collection, index_obj)
+            return {child_collection_name: ndx} if len(ndx) else dict()
     
     return dict()
 
 def __collection_lookup__(seq, contained_type, index_obj) -> typing.Union[tuple, range]:
     """ Case 3
     """
-    ret = dict()
+    pfun = functools.partial(__container_lookup__, 
+                             contained_type = contained_type, 
+                             index_obj = index_obj)
     
-    for k, s in enumerate(seq):
-        indices = __container_lookup__(s, contained_type, index_obj)
-        
-        if len(indices):
-            ret[k] = indices
-            
-    return ret
+    #return dict((k, pfun(s)) for k, s in enumerate(seq))
+    return dict((k, d) for k, d in enumerate(map(pfun, seq)) if len(d))
+    
         
 def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]],
                      index: typing.Union[int, str, range, slice, typing.Sequence],

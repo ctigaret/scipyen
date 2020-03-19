@@ -2492,38 +2492,48 @@ def neo_child_reference_name(type_or_obj):
             return neo.baseneo._reference_name(type(type_or_obj).__name__)
             
 def __container_lookup__(container, contained_type, index_obj) -> dict:
-    """ Case 2        
+    """ Cases 2 & 4      
     """
     # 1) check if the container's type is among the contained_type._parent_objects
     
-    if not isinstance(container, neo.container.Container):
-        return dict()
-
-    child_collection_name = neo_child_container_name(contained_type)
-    
-    collection = getattr(container, child_collection_name, None)
-    
-    if collection is not None:
-        return {child_collection_name: normalized_index(collection, index_obj)}
+    if isinstance(container, neo.container.Container):
+        child_collection_name = neo_child_container_name(contained_type)
+        child_property_name = neo_child_property_name(contained_type)
+        
+        collection = getattr(container, child_collection_name, None)
+        
+        childprop = getattr(container, child_property_name, None)
+        
+        if collection is not None:
+            ndx = normalized_index(collection, index_obj)
+            return {child_collection_name: ndx} if len(ndx) else dict()
+        
+        elif childprop is not None:
+            ndx = normalized_index(childprop, index_obj)
+            return {child_property_name: ndx} if len(ndx) else dict()
+            
+        else:
+            # might by indirectly contained
+            direct_containers = contained_type._single_parent_objects
+            child_container_names = [neo_child_container_name(c) for c in direct_containers]
+            
+            
+            
+            return {}
+            
     
     return dict()
 
 def __collection_lookup__(seq, contained_type, index_obj) -> typing.Union[tuple, range]:
     """ Case 3
     """
-    # TODO: contemplate dict(map()]) and use partial(__container_lookup__)
-    # for speed
-    # ret = dict([(k, __container_lookup__(s, contained_type, index_obj)) for s in seq if ])
+    pfun = functools.partial(__container_lookup__, 
+                             contained_type = contained_type, 
+                             index_obj = index_obj)
     
-    ret = dict()
+    #return dict((k, pfun(s)) for k, s in enumerate(seq))
+    return dict((k, d) for k, d in enumerate(map(pfun, seq)) if len(d))
     
-    for k, s in enumerate(seq):
-        indices = __container_lookup__(s, contained_type, index_obj)
-        
-        if len(indices):
-            ret[k] = indices
-            
-    return ret
         
 def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]],
                      index: typing.Union[int, str, range, slice, typing.Sequence],
