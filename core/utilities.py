@@ -553,7 +553,7 @@ def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)) -> i
     return axis
 
 def normalized_index(data: typing.Union[typing.Sequence, int],
-                     index:(int, tuple, list, np.ndarray, range, slice, type(None)) = None,
+                     index:(str, int, tuple, list, np.ndarray, range, slice, type(None)) = None,
                      silent:bool=False, 
                      flat:bool = True,
                      multiple:bool = True) -> typing.Union[range, tuple]:
