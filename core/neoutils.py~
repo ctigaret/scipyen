@@ -2492,157 +2492,83 @@ def neo_child_reference_name(type_or_obj):
             return neo.baseneo._reference_name(type(type_or_obj).__name__)
             
 def __container_lookup__(container, contained_type, index_obj) -> dict:
-    """ Case 2        
+    """ Cases 2 & 4      
     """
     # 1) check if the container's type is among the contained_type._parent_objects
     
     if isinstance(container, neo.container.Container):
-        child_collection_name = neo_child_container_name(contained_type)
+        member_collection_names = [neo_child_container_name(contained_type), neo_child_property_name(contained_type)]
         
-        collection = getattr(container, child_collection_name, None)
+        ret = dict((cname, normalized_index(getattr(container, cname), index_obj)) for cname in member_collection_names if hasattr(container, cname))
         
-        if collection is not None:
-            ndx = normalized_index(collection, index_obj)
-            return {child_collection_name: ndx} if len(ndx) else dict()
-    
+        if len(ret):
+            return ret
+        
+        # might by indirectly contained
+        direct_containers = contained_type._single_parent_objects
+        
+        child_container_names = [neo_child_container_name(c) for c in direct_containers]
+        
+        pfun = functools.partial(__collection_lookup__, 
+                                contained_type=contained_type,
+                                index_obj = index_obj)
+        
+        return dict((cname, pfun(getattr(container, cname))) for cname in child_container_names if hasattr(container, cname))
+        
     return dict()
 
-def __collection_lookup__(seq, contained_type, index_obj) -> typing.Union[tuple, range]:
+def __collection_lookup__(seq, contained_type, index_obj) -> dict:
     """ Case 3
     """
     pfun = functools.partial(__container_lookup__, 
                              contained_type = contained_type, 
                              index_obj = index_obj)
     
-    #return dict((k, pfun(s)) for k, s in enumerate(seq))
     return dict((k, d) for k, d in enumerate(map(pfun, seq)) if len(d))
     
         
-def neo_index_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]],
-                     index: typing.Union[int, str, range, slice, typing.Sequence],
-                     ctype: type = neo.AnalogSignal) -> list:
+def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]],
+               index: typing.Union[int, str, range, slice, typing.Sequence],
+               ctype: type = neo.AnalogSignal,
+               multiple: bool = True) -> list:
     """Provisional - work in progress
-    
     
     Positional parameters:
     ----------------------
-    src: neo.core.container.Container or a sequence of these
+    src: neo.core.container.Container or a sequence of Container objects
         (neo.core.container.Container is the ancestor of all container objects 
         in the neo package)
         
     index: int, str, range, slice, or sequence of int or str.
         CAUTION: The sequence can contain a mixture of int and str.
         
-        Indexing by str works for children types with attribute "name" - all
-        all data objects in the neo package. It is implemented to allows 
-        retrieving the int index of the data objects children in src according 
-        to the value of their "name" attribute.
-        WARNING This assumes that all data object children have unique names.
-        If this is not the case, the index of the last child with the same 
-        "name" is returned, and all the others are silenty ignored.
+        When index is a string, the function looks up objects by the value of 
+        their "name" attribute - all data objects in the neo package except for 
+        neo.regionofinterest.RegionOfInterest. 
+        
+        WARNING This name lookup assumes that all data object children have 
+            unique values for their "name" attribute.
+            
+        If this is not the case, the behaviour of the function depends on the
+            value of the "multiple" parameter (see below).
         
     ctype: type, default is neo.AnalogSignal; the type of the contained object
+    
+    multiple: bool, default is True; controls the behaviour when looking up
+        objects by their "name" attribute.
+        
+        When True, the function will return  the index of all objects for which
+        the "name" attribute equals the value in index.
+        
+        When False, the function returns the index of the first object for which
+        the "name" attribute has equals the value in index
         
     """
-        
-        #contained_mro = inspect.getmro(contained_type)
-        
-        #member_collections_names = container._child_containers
-        #member_object_types = container._child_objects
-        
-        #if contained_type.__name__ in container._child_objects:
-            #ret = normalized_index(getattr(container, neo_child_container_name(contained_type)), index_obj)
-            
-            #if flat_:
-                #return ret
-            
-            #else:
-                #return {type(container) : {contained_type : ret}}
-        
-        #else:
-            #if flat_: 
-                #all_indices = list()
-                
-            #else:
-                #all_indices = {type(container): dict()}
-            
-            #for sub_container_name, sub_contained_type in zip(member_collections_names, member_object_types):
-                #member_collection = getattr(container, sub_container_name)
-                
-                #if flat_:
-                    #all_indices.append([(k, __container_lookup__(sub_container, contained_type, index_obj, flat_=flat_)) for k,sub_container in enumerate(member_collection)])
-                    
-                #else:
-                    #all_indices[type(container)][sub_contained_type] = list()
-                    
-                    #for k, sub_container in enumerate(member_collection):
-                        #all_indices[type(container)][sub_contained_type].append({k: __container_lookup__(sub_container, contained_type, index_obj, flat_ = not flat_)})
-                    
-            #return all_indices
-                    
-            #pass # TODO
-        
-        #### BEGIN do not delete
-        #if neo.basesignal.BaseSignal in contained_mro:
-            ## lookup the index of a base signal or derived type i.e., one of 
-            ## analog or irregular signal, spike train, epoch, event, 
-            ## and image sequence; these include datatypes.DataSignal and
-            ## datatypes.IrregularlySampledDataSignal
-            #if isinstance(container, neo.Block):
-                #ret_ = [__container_lookup__(s, contained_type, index_obj) for s in container.segments]
-                
-                #if len(ret_) > 1:
-                    #return tuple(ret_)
-                
-                #else:
-                    #return ret_[0]
-                
-            #elif isinstance(container, (neo.Segment, neo.ChannelIndex, neo.Unit)):
-                #if not hasattr(container, contained_collection_name):
-                    #warnings.warn("%s does not contain %s" % (type(container).__name__, contained_collection_name))
-                    #return tuple() 
-                    
-                #ret_ = normalized_index(getattr(container, contained_collection_name),
-                                        #index_obj, multiple=multiple)
-                #return ret_
-            
-            #else:
-                #raise TypeError("Wrong container type %s for %s objects" % (type(container).__name__), contained_type.__name__)
-            
-        #elif neo.container.Container in contained_mro:
-            ## lookup the index of a container
-            ## (Block, Segment, Unit, ChannelIndex)
-            #if not hasattr(container, contained_collection_name):
-                #warnings.warn("%s does not contain %s" % (type(container).__name__, contained_collection_name))
-                #return tuple() 
-                
-            #return normalized_index(getattr(container, contained_collection_name), index_obj)
-        
-        #elif neo.regionofinterest.RegionOfInterest in contained_mro:
-            ## NOTE: 
-            ## lookup the index of a region of interest
-            #if not hasattr(container, contained_collection_name):
-                #warnings.warn("%s does not contain %s" % (type(container).__name__, contained_collection_name))
-                #return tuple() 
-                
-            #return normalized_index(getattr(container, contained_collection_name), index_obj)
-        
-        #else:
-            #raise TypeError("Cannot lookup %s objects" % contained_type.__name__)
-        #### END do not delete
-        
-    #major, minor, dot = get_neo_version()
+    if isinstance(src, (tuple, list)):
+        return tuple([__container_lookup__(s, ctype, index) for s in src])
     
-    if not isinstance(src, (tuple, list)):
-        src = [src]
-    
-    ret = [__container_lookup__(s, ctype, index) for s in src]
-    
-    if len(ret) > 1:
-        return tuple(ret)
-    
-    return ret[0]
-    #return tuple([__container_lookup__(s, ctype, index) for s in src])
+    else:
+        return __container_lookup__(src, ctype, index)
         
 def normalized_signal_index(src: neo.core.container.Container,
                             index: typing.Union[int, str, range, slice, typing.Sequence],
