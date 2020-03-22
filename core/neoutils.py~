@@ -2491,40 +2491,56 @@ def neo_child_reference_name(type_or_obj):
         else:
             return neo.baseneo._reference_name(type(type_or_obj).__name__)
             
-def __container_lookup__(container, contained_type, index_obj) -> dict:
+def __container_lookup__(container, contained_type, index_obj, multiple = True) -> dict:
     """ Cases 2 & 4      
     """
     # 1) check if the container's type is among the contained_type._parent_objects
     
     if isinstance(container, neo.container.Container):
         member_collection_names = [neo_child_container_name(contained_type), neo_child_property_name(contained_type)]
+        member_collections = [getattr(container, cname, None) for cname in member_collection_names]
         
-        ret = dict((cname, normalized_index(getattr(container, cname), index_obj)) for cname in member_collection_names if hasattr(container, cname))
-        
-        if len(ret):
-            return ret
-        
-        # might by indirectly contained
-        direct_containers = contained_type._single_parent_objects
-        
-        child_container_names = [neo_child_container_name(c) for c in direct_containers]
-        
-        pfun = functools.partial(__collection_lookup__, 
-                                contained_type=contained_type,
-                                index_obj = index_obj)
-        
-        return dict((cname, pfun(getattr(container, cname))) for cname in child_container_names if hasattr(container, cname))
-        
-    return dict()
+        #ret = dict((cname, normalized_index(getattr(container, cname), index_obj, multiple=multiple)) for cname in member_collection_names if hasattr(container, cname))
 
-def __collection_lookup__(seq, contained_type, index_obj) -> dict:
+        pfun0 = functools.partial(normalized_index, index=index_obj, multiple=multiple)
+        
+        ret = dict((cname, t) for cname, t in zip(member_collection_names, map(pfun0, member_collections)) if len(t) > 0)
+        
+        
+        if len(ret) == 0:
+            # might by indirectly contained
+            direct_containers = contained_type._single_parent_objects
+            child_container_names = [neo_child_container_name(c) for c in direct_containers]
+            child_container_collections = [getattr(container, cname, None) for cname in child_container_names]
+            
+            pfun = functools.partial(__collection_lookup__, 
+                                    contained_type=contained_type,
+                                    index_obj = index_obj,
+                                    multiple = multiple)
+            
+            #ret = dict((cname, pfun(getattr(container, cname))) for cname in child_container_names if hasattr(container, cname))
+            
+            ret = dict((cname, d) for cname, d in zip(child_container_names, map(pfun, child_container_collections)) if len(d) > 0)
+
+    else:
+        ret = dict()
+        
+    # TODO cleanup empty nested dictionaries
+        
+    return ret
+
+def __collection_lookup__(seq, contained_type, index_obj, multiple=True) -> dict:
     """ Case 3
     """
+    if seq is None:
+        return dict()
+    
     pfun = functools.partial(__container_lookup__, 
                              contained_type = contained_type, 
-                             index_obj = index_obj)
+                             index_obj = index_obj,
+                             multiple=multiple)
     
-    return dict((k, d) for k, d in enumerate(map(pfun, seq)) if len(d))
+    return dict((k, d) for k, d in enumerate(map(pfun, seq)) if len(d) > 0 and any([len(val) > 0 for key, val in d.items()]))
     
         
 def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]],
@@ -2565,10 +2581,10 @@ def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[n
         
     """
     if isinstance(src, (tuple, list)):
-        return tuple([__container_lookup__(s, ctype, index) for s in src])
+        return tuple([__container_lookup__(s, ctype, index, multiple=True) for s in src])
     
     else:
-        return __container_lookup__(src, ctype, index)
+        return __container_lookup__(src, ctype, index, multiple=True)
         
 def normalized_signal_index(src: neo.core.container.Container,
                             index: typing.Union[int, str, range, slice, typing.Sequence],

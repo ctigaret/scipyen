@@ -556,18 +556,20 @@ def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)) -> i
     
     return axis
 
+#def __name_lookup__(container: typing.Sequence, name:str, 
+                    #silent: bool = True, 
+                    #multiple: bool = True) -> typing.Union[tuple, int]:
 def __name_lookup__(container: typing.Sequence, name:str, 
-                    silent: bool = True, 
                     multiple: bool = True) -> typing.Union[tuple, int]:
     names = [getattr(x, "name") for x in container if (hasattr(x, "name") and isinstance(x.name, str) and len(x.name.strip())>0)]
     #names = [getattr(x, "name") for x in container if hasattr(x, "name")]
     #names = [getattr(x, "name", None) for x in container]
     
-    if silent:
-        return silentindex(names, name, multiple=multiple)
+    #if silent:
+        #return silentindex(names, name, multiple=multiple)
     
     if len(names) == 0 or name not in names:
-        warnings.warn("No element with 'name' == '%s' was found in the sequence" % name)
+        #warnings.warn("No element with 'name' == '%s' was found in the sequence" % name)
         return None
     
     if multiple:
@@ -580,9 +582,8 @@ def __name_lookup__(container: typing.Sequence, name:str,
         
     return names.index(name)
 
-def normalized_index(data: typing.Union[typing.Sequence, int],
+def normalized_index(data: typing.Union[typing.Sequence, int, type(None)],
                      index:(str, int, tuple, list, np.ndarray, range, slice, type(None)) = None,
-                     silent:bool=False, 
                      multiple:bool = True) -> typing.Union[range, tuple]:
     """Returns a generic indexing in the form of an iterable of indices.
     
@@ -605,8 +606,13 @@ def normalized_index(data: typing.Union[typing.Sequence, int],
         used with list comprehension
     
     """
+    if data is None:
+        return tuple()
+    
     if not isinstance(data, (int, tuple, list)):
-        raise TypeError("Expecting an int or a sequence (tuple, or list)")
+        raise TypeError("Expecting an int or a sequence (tuple, or list) or None; got %s instead" % type(data).__name__)
+    
+    
     
     data_len = data if isinstance(data, int) else len(data)
     
@@ -629,7 +635,8 @@ def normalized_index(data: typing.Union[typing.Sequence, int],
         if not isinstance(data, (tuple, list)):
             raise TypeError("Name lookup requires a sequence")
         
-        ret = __name_lookup__(data, index, silent=silent, multiple=multiple)
+        ret = __name_lookup__(data, index, multiple=multiple)
+        #ret = __name_lookup__(data, index, silent=silent, multiple=multiple)
         
         if isinstance(ret, numbers.Number):
             return tuple([ret])
@@ -652,7 +659,7 @@ def normalized_index(data: typing.Union[typing.Sequence, int],
             if not isinstance(data, (tuple, list)):
                 raise TypeError("Name lookup requires a sequence")
             
-            return tuple([v if isinstance(v, int) and v < data_len else __name_lookup__(data, v) for v in index])
+            return tuple([v if isinstance(v, int) and v < data_len else __name_lookup__(data, v, multiple=multiple) for v in index])
             
         else:
             if not all([v < data_len for v in index]):
