@@ -686,6 +686,11 @@ from gui.signalviewer import SignalCursor as SignalCursor
 from .utilities import safeWrapper, normalized_index
 #### END pict.core modules
 
+if __debug__:
+    global __debug_count__
+
+    __debug_count__ = 0
+
 def get_neo_version() -> tuple:
     major, minor, dot = neo.version.version.split(".")
     return eval(major), eval(minor), eval(dot)
@@ -2422,17 +2427,6 @@ def normalized_segment_index(src: neo.Block,
     else:
         raise TypeError("Invalid indexing: %s" % index)
     
-#def generic_accessor(container_type, contained_type):
-    #"""Generic accessor for neo data in neo collections.
-    #Given a container & a contained type returns the name of the containter's
-    #attribute that collects the contained data types. E.g.
-    
-    #container_type: neo.Segment
-    #contained_type: neo.AnalogSignal
-    #attribute name: "analogsignals"
-    
-    #"""
-
 def neo_child_property_name(type_or_obj):
     """Provisional.
     As of neo 0.8.0 this only works for neo.Unit, in neo.Block
@@ -2490,63 +2484,105 @@ def neo_child_reference_name(type_or_obj):
         
         else:
             return neo.baseneo._reference_name(type(type_or_obj).__name__)
+        
+def __get_container_collection_attribute__(container, attrname,
+                                           container_index=None,
+                                           multiple=True):
+    
+    ret = getattr(container, attrname, None)
+    
+    if container_index is None:
+        return [(k, c) for k, c in enumerate(ret)]
+    
+    else:
+        return [(k, ret[k]) for k in normalized_index(len(ret), container_index, multiple=multiple)]
             
-def __container_lookup__(container, contained_type, index_obj, multiple = True) -> dict:
-    """ Cases 2 & 4      
+def __container_lookup__(container: neo.container.Container, 
+                         index_obj: typing.Union[str, int, tuple, list, np.ndarray, range, slice],
+                         contained_type: neo.baseneo.BaseNeo,
+                         multiple:bool = True, 
+                         return_objects:bool = False,
+                         **kwargs) -> dict:
+    """ Cases 2 & 4       
     """
     # 1) check if the container's type is among the contained_type._parent_objects
     
     if isinstance(container, neo.container.Container):
-        member_collection_names = [neo_child_container_name(contained_type), neo_child_property_name(contained_type)]
-        member_collections = [getattr(container, cname, None) for cname in member_collection_names]
-        
-        #ret = dict((cname, normalized_index(getattr(container, cname), index_obj, multiple=multiple)) for cname in member_collection_names if hasattr(container, cname))
-
         pfun0 = functools.partial(normalized_index, index=index_obj, multiple=multiple)
         
-        ret = dict((cname, t) for cname, t in zip(member_collection_names, map(pfun0, member_collections)) if len(t) > 0)
+        member_collection_names = [neo_child_container_name(contained_type), neo_child_property_name(contained_type)]
         
+        member_collections = [getattr(container, cname, None) for cname in member_collection_names]
+            
+        ret = dict((cname, t) for cname, t in zip(member_collection_names, map(pfun0, member_collections)) if len(t) > 0)
         
         if len(ret) == 0:
             # might by indirectly contained
+            # this is where additional index objects for collection of data that may be in kwargs should be applied
+            
             direct_containers = contained_type._single_parent_objects
+            
             child_container_names = [neo_child_container_name(c) for c in direct_containers]
+            
             child_container_collections = [getattr(container, cname, None) for cname in child_container_names]
             
-            pfun = functools.partial(__collection_lookup__, 
-                                    contained_type=contained_type,
-                                    index_obj = index_obj,
-                                    multiple = multiple)
+            child_container_collections2 = [__get_container_collection_attribute__(container, cname, kwargs.get(cname, None) for cname in child_container_names]
             
-            #ret = dict((cname, pfun(getattr(container, cname))) for cname in child_container_names if hasattr(container, cname))
+            pfun = functools.partial(__collection_lookup__, 
+                                    index_obj = index_obj,
+                                    contained_type = contained_type,
+                                    multiple = multiple,
+                                    return_objects = return_objects)
             
             ret = dict((cname, d) for cname, d in zip(child_container_names, map(pfun, child_container_collections)) if len(d) > 0)
 
     else:
         ret = dict()
         
-    # TODO cleanup empty nested dictionaries
-        
     return ret
 
-def __collection_lookup__(seq, contained_type, index_obj, multiple=True) -> dict:
+def __collection_lookup__(seq: typing.Sequence, 
+                          index_obj: typing.Union[str, int, tuple, list, np.ndarray, range, slice],
+                          contained_type: neo.baseneo.BaseNeo,
+                          seq_index: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None,
+                          multiple:bool = True, 
+                          return_objects:bool = False,
+                          **kwargs) -> dict:
     """ Case 3
     """
     if seq is None:
         return dict()
     
     pfun = functools.partial(__container_lookup__, 
-                             contained_type = contained_type, 
                              index_obj = index_obj,
-                             multiple=multiple)
+                             contained_type = contained_type, 
+                             multiple = multiple,
+                             return_objects = return_objects)
     
-    return dict((k, d) for k, d in enumerate(map(pfun, seq)) if len(d) > 0 and any([len(val) > 0 for key, val in d.items()]))
+    if seq_index is None:
+        return dict((k, d) for k, d in enumerate(map(pfun, seq)) if len(d) > 0 and any([len(val) > 0 for key, val in d.items()]))
+    
+    elif isinstance(seq_index, (tuple, list, range)) and all([isinstance(v, int) for v in seq]):
+        k_ = [k for k in seq_index]
+        seq_ = [seq[k] for k in k_]
+        
+        return dict((k, d) for k, d in zip(map(pfun, seq), k_) if len(d) > 0 and any([len(val) > 0 for key, val in d.items()]))
+    
+    elif isinstance(seq_index, slice):
+        k_ = [k for k in seq_index.indices(len(seq))]
+        seq_ = seq[seq_index]
+        
+        return dict((k, d) for k, d in zip(map(pfun, seq), k_) if len(d) > 0 and any([len(val) > 0 for key, val in d.items()]))
+    
+    else:
+        return dict()
     
         
 def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]],
                index: typing.Union[int, str, range, slice, typing.Sequence],
                ctype: type = neo.AnalogSignal,
-               multiple: bool = True) -> list:
+               multiple: bool = True,
+               return_objects:bool = False) -> typing.Union[dict, tuple]:
     """Provisional - work in progress
     
     Positional parameters:
@@ -2577,15 +2613,178 @@ def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[n
         the "name" attribute equals the value in index.
         
         When False, the function returns the index of the first object for which
-        the "name" attribute has equals the value in index
+        the "name" attribute equals the value in index (python's default)
+        
+        This parameters is passed to, and control the bbehaviour of, the 
+        utilities.normalized_index(...) function.
+        
+    See also:
+        utilities.normalized_index
         
     """
     if isinstance(src, (tuple, list)):
-        return tuple([__container_lookup__(s, ctype, index, multiple=True) for s in src])
+        return tuple([__container_lookup__(s, index, ctype, multiple=True, return_objects=return_objects) for s in src])
     
     else:
-        return __container_lookup__(src, ctype, index, multiple=True)
+        return __container_lookup__(src, index, ctype, multiple=True, return_objects=return_objects)
+    
+def neo_index(src: typing.Union[neo.container.Container, typing.Sequence],
+                    ndx: typing.Union[typing.Mapping, typing.Sequence]) -> tuple:
+    """Provisional. Applies dictionary ndx created by neo_lookup.
+    """
+    if __debug__:
+        global __debug_count__
+        __debug_count__ += 1
         
+        __debug_indent__ = "   " * (__debug_count__ -1)
+        
+    ret = list()
+    
+    if isinstance(src, (tuple, list)): # NOTE: 2020-03-23 23:41:16 sequence of containers or data objects
+        if isinstance(ndx, (tuple, list)) and all([isinstance(k, int) for k in ndx]): # sequence of ints
+            ret += [src[k] for k in ndx] # simply return the kth element, k in ndx
+            
+        elif isinstance(ndx, int):# and all([isinstance(s, neo.container.Container) for s in src]):
+            ret += [src[ndx]] # return the ndxth element
+            
+        elif isinstance(ndx, dict):
+            for key, index in ndx.items():
+                if isinstance(key, int):
+                    ret_ = neo_index(src[key], index)
+                    ret += [v for v in ret_ if all([not is_same_as(v, v_) for v_ in ret])]
+                              
+                else:
+                    raise IndexError("Unexpected index:%s at key:%s = %s, for src:%s" % (type(index).__name__, type(key).__name__, key, type(src).__name__))
+            
+        else:
+            raise TypeError("Unexpected indexing type %s for %s object" % (type(ndx).__name__, type(src).__name__))
+        
+    elif isinstance(src, neo.container.Container): # typical entry point
+        if isinstance(ndx, dict):
+            for key, index in ndx.items(): # iterate through the ndx dict's key/value pairs
+                if isinstance(key, str): # works on Container's attribute in 'key'
+                    collection = getattr(src, key, None) # sequence of containers or data objects
+                    
+                    if collection is None:
+                        raise AttributeError("%s is an invalid attribute of %s" % (key, type(src).__name__))
+                    
+                    if isinstance(index, (dict, tuple, list)):
+                        ret += [v for v in neo_index(collection, index) if v not in ret] # enters at NOTE: 2020-03-23 23:41:16 
+                        
+                    else:
+                        raise KeyError("Unexpected indexing structure type %s for %s object" % (type(index).__name__, type(collection).__name__))
+                    
+                #elif isinstance(key, int): # an int key in a dict ndx - cannot work
+                    
+                    #if isinstance(src, (tuple, list)):
+                        #ret += [v for v in neo_index(src[key], index) if v not in ret]
+                        
+                    #else:
+                        #raise TypeError("Invalid object of indexing: %s" % type(src).__name__)
+    else:
+        raise IndexError("Invalid indexing structure type: %s" % type(ndx).__name__)
+    
+
+    
+    #if isinstance(ndx, dict):
+        #for key, index in ndx.items():
+            #if isinstance(key, str):
+                #if isinstance(src, neo.container.Container):
+                    #collection = getattr(src, key, None)
+                    
+                    #if collection is None:
+                        #raise AttributeError("%s is an invalid attribute of %s" % (key, type(src).__name__))
+                    
+                    #if isinstance(index, (dict, tuple, list)):
+                        #try:
+                            #ret += [v for v in neo_index(collection, index) if v not in ret]
+                                #if __debug__:
+                                #print("%sCall %d" % (__debug_indent__, __debug_count__))
+                                #print("%ssrc: %s" % (__debug_indent__, type(src).__name__))
+                                #print("%sndx: %s" % (__debug_indent__, type(ndx).__name__))
+                                #print("%sndx key: %s = %s " % (__debug_indent__, type(key).__name__, key))
+                                #print("%sndx index: %s " % (__debug_indent__, type(index).__name__))
+                                #print("%scollection: %s" % (__debug_indent__, type(collection).__name__))
+                            
+                        #except Exception as e:
+                            #if __debug__:
+                                #print("%sException in call %d" % (__debug_indent__, __debug_count__))
+                                #print("%ssrc: %s" % (__debug_indent__, type(src).__name__))
+                                #print("%sndx: %s" % (__debug_indent__, type(ndx).__name__))
+                                #print("%sndx key: %s = %s " % (__debug_indent__, type(key).__name__, key))
+                                #print("%sndx index: %s " % (__debug_indent__, type(index).__name__))
+                                #print("%scollection: %s" % (__debug_indent__, type(collection).__name__))
+                                
+                                #__debug_count__ -= 1
+                            
+                            #raise e
+                        
+                    #else:
+                        #raise KeyError("Unexpected indexing structure type: %s" % type(index).__name__)
+                    
+                #else:
+                    #raise TypeError("Invalid object of indexing: %s" % type(src).__name__)
+                
+            #elif isinstance(key, int):
+                #if isinstance(src, (tuple, list)):
+                    #try:
+                        ##ret += [v for v in neo_index(src[key], index) if v not in ret]
+                        #ret += [v for v in neo_index(src[key], index)]
+                        #if __debug__:
+                            #print("%sCall %d: " % (__debug_indent__, __debug_count__))
+                            #print("%ssrc: %s" % (__debug_indent__, type(src).__name__))
+                            #print("%sndx: %s" % (__debug_indent__, type(ndx).__name__))
+                            #print("%sndx key: %s = %s " % (__debug_indent__, type(key).__name__, key))
+                            #print("%sndx index: %s " % (__debug_indent__, type(index).__name__))
+                            #print("%ssrc[key]: %s" % (__debug_indent__, type(src[key]).__name__))
+                            
+                    #except Exception as e:
+                        #if __debug__:
+                            #print("%sException in call %d: " % (__debug_indent__, __debug_count__))
+                            #print("%ssrc: %s" % (__debug_indent__, type(src).__name__))
+                            #print("%sndx: %s" % (__debug_indent__, type(ndx).__name__))
+                            #print("%sndx key: %s = %s " % (__debug_indent__, type(key).__name__, key))
+                            #print("%sndx index: %s " % (__debug_indent__, type(index).__name__))
+                            #print("%ssrc[key]: %s" % (__debug_indent__, type(src[key]).__name__))
+                            
+                            #__debug_count__ -= 1
+                        
+                        #raise e
+                        
+                    
+                #else:
+                    #raise TypeError("Invalid object of indexing: %s" % type(src).__name__)
+                
+    #elif isinstance(ndx, tuple):
+        #if isinstance(src, (tuple, list)):
+            #try:
+                #ret += [src[k] for k in ndx if src[k] not in ret]
+                #if __debug__:
+                    #print("%sCall %d: " % (__debug_indent__, __debug_count__))
+                    #print("%ssrc: %s" % (__debug_indent__, type(src).__name__))
+                    #print("%sndx: %s" % (__debug_indent__, type(ndx).__name__))
+            #except Exception as e:
+                #if __debug__:
+                    #print("%sException in call %d: " % (__debug_indent__, __debug_count__))
+                    #print("%ssrc: %s" % (__debug_indent__, type(src).__name__))
+                    #print("%sndx: %s" % (__debug_indent__, type(ndx).__name__))
+                    
+                    #__debug_count__ -= 1
+                
+                #raise e
+                
+    
+        #else:
+            #raise TypeError("Invalid object of indexing: %s" % type(src).__name__)
+        
+    #else:
+        #raise TypeError("Invalid indexing structure type: %s" % type(ndx).__name__)
+    
+    if __debug__:
+        __debug_count__ -= 1
+        
+    return tuple(ret)
+            
 def normalized_signal_index(src: neo.core.container.Container,
                             index: typing.Union[int, str, range, slice, typing.Sequence],
                             ctype: type = neo.AnalogSignal, 
@@ -2626,12 +2825,6 @@ def normalized_signal_index(src: neo.core.container.Container,
     major, minor, dot = get_neo_version()
     
     data_len = None
-    
-    #signal_collection = [s for s in src.children if isinstance(s, ctype)]
-    
-    #if isinstance(src, neo.core.baseneo.BaseNeo):
-        #if not hasattr(src, collection_name):
-            #raise TypeError("%s data does not contain a collection of %s" % (type(src_.__name__), ctype.__name__))
     
     if not isinstance(src, (neo.Segment, neo.ChannelIndex, neo.Unit)):
         raise TypeError("Expecting a neo.Segment or neo.ChannelIndex; got %s instead" % type(src).__name__)
