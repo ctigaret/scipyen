@@ -5607,12 +5607,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                                                     imaging=imaging,
                                                     clear=True)
                         
-                        lsdata.electrophysiology = neoutils.copy(ephysData)
+                        lsdata.electrophysiology = neoutils.neo_copy(ephysData)
                         lsdata.electrophysiology.name = ephysNamePrompt.text()
                 
                 else: # we still need to call dlg.exec()
                     if dlg.exec() == QtWidgets.QDialog.Accepted: # if rejected, do create lsdata w/o ephys
-                        lsdata.electrophysiology = neoutils.copy(ephysData) # just accept ephys data
+                        lsdata.electrophysiology = neoutils.neo_copy(ephysData) # just accept ephys data
                         lsdata.electrophysiology.name = ephysNamePrompt.text()
                         
                 if isinstance(tp, (tuple, list)) and len(tp) and len(lsdata.electrophysiology.segments):
@@ -6073,7 +6073,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                                                      defaultButton = QtWidgets.QMessageBox.Yes)
                 
                 if btn == QtWidgets.QMessageBox.Yes:
-                    ephysData = neoutils.set_relative_time_start(neoutils.copy(ephysData), start_times[0])
+                    ephysData = neoutils.set_relative_time_start(neoutils.neo_copy(ephysData), start_times[0])
                     
                 else:
                     return
@@ -6097,7 +6097,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     
                     self._data_.analysisoptions["TriggerEventDetection"] = default_options["TriggerEventDetection"]
                 
-                self._data_.electrophysiology = neoutils.copy(ephysData)
+                self._data_.electrophysiology = neoutils.neo_copy(ephysData)
                 
                 tp, _ = neoutils.parse_trigger_protocols(self._data_.electrophysiology)
                 
@@ -6361,7 +6361,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                                                      defaultButton = QtWidgets.QMessageBox.Yes)
                 
                 if btn == QtWidgets.QMessageBox.Yes:
-                    ephysData = neoutils.set_relative_time_start(neoutils.copy(ephysData), start_times[0])
+                    ephysData = neoutils.set_relative_time_start(neoutils.neo_copy(ephysData), start_times[0])
                     
                 else:
                     ephysData = None

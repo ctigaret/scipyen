@@ -5500,7 +5500,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 if all([mimetypes.guess_type(f)[0] == "application/axon-data" for f in ephysFileNames]):
                     axon_data = [pio.loadAxonFile(f) for f in ephysFileNames]
                     # NOTE: 2020-02-17 13:34:19
-                    # axon file loader now return a triplet of variables
+                    # axon file loader in iolib.pictio now return a triplet of variables
                     blocks = [d[0] for d in axon_data]
                     
                 else:

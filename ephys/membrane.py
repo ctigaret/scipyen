@@ -7505,7 +7505,7 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
     Ioff = list()
     
     for b in data_blocks:
-        bb = neoutils.copy(b)
+        bb = neoutils.neo_copy(b)
         
         neoutils.set_relative_time_start(bb)
         

@@ -3,7 +3,8 @@
 Programming helper functions & decorators
 '''
 #### BEGIN core python modules
-import traceback, re, io, sys, enum, itertools, time, typing
+import traceback, re, io, sys, enum, itertools, time, typing, types, warnings
+import numbers
 from functools import singledispatch, update_wrapper, wraps
 from contextlib import contextmanager
 #### END core python modules
@@ -21,6 +22,19 @@ import vigra
 from . import strutils
 #### END pict.core modules
 
+def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True) -> typing.Union[tuple, int]:
+    """Alternative to list.index(), such that a missing value returns None
+    of raising an Exception
+    """
+    if b in a:
+        if multiple:
+            return tuple([k for k, v in enumerate(a) if v is b])
+        
+        return a.index(b) # returns the index of first occurrence of b in a
+    
+    else:
+        return None
+    
 def yyMdd(now=None):
     import string, time
     if not isinstance(now, time.struct_time):
@@ -32,23 +46,25 @@ def yyMdd(now=None):
     
     return "%s%s%s" % (time.strftime("%y", tuple(now)), string.ascii_lowercase[now.tm_mon-1], time.strftime("%d", tuple(now)))
 
-# NOTE: 2017-08-11 08:56:01
-# a little trick to use singledispatch as an instancemethod decorator
-# I picked up from below:
-# https://stackoverflow.com/questions/24601722/how-can-i-use-functools-singledispatch-with-instance-methods
 
-def instanceMethodSingleDispatch(func):
-    dispatcher = singledispatch(func)
-    def wrapper(*args, **kw):
-        return dispatcher.dispatch(args[1].__class__)(*args, **kw)
-    wrapper.register = dispatcher.register
-    # update_wrapper(wrapper, func)
-    # or better, for the full interface of singledispatch:
-    update_wrapper(wrapper, dispatcher)
-    return wrapper
+#"def" instanceMethodSingleDispatch(func):
+    #"""
+        #NOTE: 2017-08-11 08:56:01
+        #a little trick to use singledispatch as an instancemethod decorator
+        #I picked up from below:
+        #https://stackoverflow.com/questions/24601722/how-can-i-use-functools-singledispatch-with-instance-methods
+    #"""
+    #dispatcher = singledispatch(func)
+    #def wrapper(*args, **kw):
+        #return dispatcher.dispatch(args[1].__class__)(*args, **kw)
+    #wrapper.register = dispatcher.register
+    ## update_wrapper(wrapper, func)
+    ## or better, for the full interface of singledispatch:
+    #update_wrapper(wrapper, dispatcher)
+    #return wrapper
 
 
-#def manage_ui_slot_connections(src, signals, dest, slots):
+#"def" manage_ui_slot_connections(src, signals, dest, slots):
     #def __slot_manager_wrapper__(f,*args, **kwargs):
         #@wraps(f)
         #def __func_wrapper__(*args, **kwargs):
@@ -513,7 +529,7 @@ def unique(seq):
     return [x for x in seq if x not in seen and not seen.add(x) ]
 
 def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)) -> int:
-    """Returns an integer index for the axis
+    """Returns an integer index for a specific array axis
     """
     if not isinstance(data, np.ndarray):
         raise TypeError("Expecting a numpy array or a derivative; got %s instead" % type(data).__name__)
@@ -540,13 +556,43 @@ def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)) -> i
     
     return axis
 
-def normalized_index(data_len:(int),
-                     index:(int, tuple, list, np.ndarray, range, slice, type(None)) = None) -> (range, list):
-    """Checks index validity along an iterable; returns a generic indexing form.
+#def __name_lookup__(container: typing.Sequence, name:str, 
+                    #silent: bool = True, 
+                    #multiple: bool = True) -> typing.Union[tuple, int]:
+def __name_lookup__(container: typing.Sequence, name:str, 
+                    multiple: bool = True) -> typing.Union[tuple, int]:
+    names = [getattr(x, "name") for x in container if (hasattr(x, "name") and isinstance(x.name, str) and len(x.name.strip())>0)]
+    #names = [getattr(x, "name") for x in container if hasattr(x, "name")]
+    #names = [getattr(x, "name", None) for x in container]
+    
+    #if silent:
+        #return silentindex(names, name, multiple=multiple)
+    
+    if len(names) == 0 or name not in names:
+        #warnings.warn("No element with 'name' == '%s' was found in the sequence" % name)
+        return None
+    
+    if multiple:
+        ret = tuple([k for k, v in enumerate(names) if v == name])
+        
+        if len(ret) == 1:
+            return ret[0]
+        
+        return ret
+        
+    return names.index(name)
+
+def normalized_index(data: typing.Union[typing.Sequence, int, type(None)],
+                     index:(str, int, tuple, list, np.ndarray, range, slice, type(None)) = None,
+                     multiple:bool = True) -> typing.Union[range, tuple]:
+    """Returns a generic indexing in the form of an iterable of indices.
+    
+    Also checks the validity of the index for an iterable of data_len samples.
     
     Parameters:
     -----------
-    data_len: length of the iterable for which indexing will be normalized
+    data: a sequence, or an int; the index will be normalized against its length
+        When an int, data is the length of a putative sequence
     
     index: int, tuple, list, np.ndarray, range, slice, None (default).
         When not None, it is the index to be normalized
@@ -556,26 +602,70 @@ def normalized_index(data_len:(int),
     
     Returns:
     --------
-    ret - an iterable (range or list) of integer indices
+    ret - an iterable index (range or list of integer indices) that can be
+        used with list comprehension
     
     """
+    if data is None:
+        return tuple()
+    
+    if not isinstance(data, (int, tuple, list)):
+        raise TypeError("Expecting an int or a sequence (tuple, or list) or None; got %s instead" % type(data).__name__)
+    
+    
+    
+    data_len = data if isinstance(data, int) else len(data)
+    
     if index is None:
         return range(data_len)
     
     elif isinstance(index, int):
-        if index >= data_len:
-            raise ValueError("Index %s is invalid for %d elements" % (index, data_len))
+        # NOTE: 2020-03-12 22:40:31
+        # negative values ARE supported: they simply go backwards from the end of
+        # the sequence
+        if index >= len(data):
+            raise ValueError("Index %s is invalid for %d elements" % (index, len(data)))
         
-        return [index]
+        if flat:
+            return index
+        
+        return tuple([index]) # -> (index,)
     
+    elif isinstance(index, str):
+        if not isinstance(data, (tuple, list)):
+            raise TypeError("Name lookup requires a sequence")
+        
+        ret = __name_lookup__(data, index, multiple=multiple)
+        #ret = __name_lookup__(data, index, silent=silent, multiple=multiple)
+        
+        if isinstance(ret, numbers.Number):
+            return tuple([ret])
+        
+        elif isinstance(ret, (tuple, list)):
+            if len(ret) > 1:
+                return tuple(ret)
+            
+            else:
+                return tuple([ret[0]])
+            
+        else:
+            return tuple()
+            
     elif isinstance(index, (tuple,  list)):
-        if not all([isinstance(v, int) for v in index]):
+        if not all([isinstance(v, (int, str)) for v in index]):
             raise TypeError("Index sequence %s is expected to contain int only" % index)
         
-        if not all([v < data_len for v in index]):
-            raise ValueError("Index sequence %s contains invalid values for %d elements" % (index, data_len))
-        
-        return index
+        if any([isinstance(v, str) for v in index]):
+            if not isinstance(data, (tuple, list)):
+                raise TypeError("Name lookup requires a sequence")
+            
+            return tuple([v if isinstance(v, int) and v < data_len else __name_lookup__(data, v, multiple=multiple) for v in index])
+            
+        else:
+            if not all([v < data_len for v in index]):
+                raise ValueError("Index sequence %s contains invalid values for %d elements" % (index, data_len))
+            
+            return tuple(index) # -> index as a tuple
     
     elif isinstance(index, range):
         if index.start < 0 or index.stop < 0:
@@ -584,8 +674,7 @@ def normalized_index(data_len:(int),
         if max(index) >= data_len:
             raise ValueError("Index %s out of range for %d elements" % (index, data_len))
         
-        return index
-        
+        return index # -> index IS a range
     
     elif isinstance(index, slice):
         if index.start < 0 or index.stop < 0:
@@ -605,31 +694,29 @@ def normalized_index(data_len:(int),
         if any(ndx) < 0:
             warnings.warn("Index %s will produce reverse indexing" % index)
             
-        return ndx
+        return ndx # -> ndx IS a tuple
     
     elif isinstance(index, np.ndarray):
         if not isVector(index):
-            raise TypeError("Indexing array must be a vector; instead its shape is" % index.shape)
+            raise TypeError("Indexing array must be a vector; instead its shape is %s" % index.shape)
             
-
-        if index.dtype.kind == "i":
-            return [k for k in index]
+        if index.dtype.kind == "i": # index is an array of int
+            return tuple([k for k in index])
         
-        elif index.dtype.kind == "b":
+        elif index.dtype.kind == "b": # index is an array of bool
             if len(index) != data_len:
                 raise TypeError("Boolean indexing vector must have the same length as the iterable against it will be normalized (%d); got %d instead" % (data_len, len(index)))
             
-            ndx = [k for k in range(data_len) if index[k]]
+            return tuple([k for k in range(data_len) if index[k]])
             
-            return ndx
-        
     else:
         raise TypeError("Unsupported data type for index: %s" % type(index).__name__)
     
 def normalized_sample_index(data:np.ndarray, 
                             axis: typing.Union[int, str, vigra.AxisInfo], 
                             index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None) -> typing.Union[range, list]:
-    """Checks index validity along a numpy array axis; returns a generic indexing form.
+    """Calls normalized_index on a specific array axis.
+    Also checks index validity along a numpy array axis.
     
     Parameters:
     ----------
