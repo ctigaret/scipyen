@@ -582,8 +582,8 @@ def __name_lookup__(container: typing.Sequence, name:str,
         
     return names.index(name)
 
-def normalized_index(data: typing.Union[typing.Sequence, int, type(None)],
-                     index:(str, int, tuple, list, np.ndarray, range, slice, type(None)) = None,
+def normalized_index(data: typing.Optional[typing.Union[typing.Sequence, int]],
+                     index: typing.Optional[typing.Union[str, int, tuple, list, np.ndarray, range, slice]] = None,
                      multiple:bool = True) -> typing.Union[range, tuple]:
     """Returns a generic indexing in the form of an iterable of indices.
     
@@ -611,8 +611,6 @@ def normalized_index(data: typing.Union[typing.Sequence, int, type(None)],
     
     if not isinstance(data, (int, tuple, list)):
         raise TypeError("Expecting an int or a sequence (tuple, or list) or None; got %s instead" % type(data).__name__)
-    
-    
     
     data_len = data if isinstance(data, int) else len(data)
     

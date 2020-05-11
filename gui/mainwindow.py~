@@ -32,7 +32,7 @@ from __future__ import print_function
 from __future__ import absolute_import # for python 2.5
 import faulthandler
 import sys, os, types, atexit, re, inspect, gc, sip, io, warnings, numbers
-import traceback, keyword, inspect, weakref, itertools, typing
+import traceback, keyword, inspect, weakref, itertools, typing, functools
 from copy import copy, deepcopy
 
 from collections import ChainMap
@@ -138,7 +138,10 @@ from qtconsole.rich_jupyter_widget import RichJupyterWidget # DIFFERENT from tha
 # RichJupyterWidget < RichIPythonWidget < JupyterWidget < FrontendWidget < (HistoryConsoleWidget, BaseFrontendMixin)
 #in turn, FrontendWidget < ... < ConsoleWidget which implements underlying 
 # Qt logic, including drag'n drop
-from qtconsole.mainwindow import MainWindow as ConsoleMainWindow
+#from qtconsole.mainwindow import MainWindow as ConsoleMainWindow
+
+
+import jupyter_client
 
 from qtconsole.inprocess import QtInProcessKernelManager
 
@@ -148,7 +151,7 @@ from IPython.core.history import HistoryAccessor
 
 from IPython.lib.deepreload import reload as dreload
 
-from ipykernel.inprocess.ipkernel import InProcessInteractiveShell
+#from ipykernel.inprocess.ipkernel import InProcessInteractiveShell
 
 from IPython.core.magic import (Magics, magics_class, line_magic,
                                 cell_magic, line_cell_magic,
@@ -331,6 +334,51 @@ class PictMagics(Magics):
             #return 1000000
         
         #return super().styleHint(hint, *args, **kwargs)
+        
+class InternalIPKernel(object):
+    """Modified from ipykernel/examples/embedding/internal_ipkernel.py
+    Use for embedding a kernel as a separate process (hence accepting command 
+    line options) -- NOTE this is NOT an in-process kernel.
+    """
+    from ipykernel.kernelapp import IPKernelApp
+    
+    def init_ipkernel(self, backend="qt5", *args):
+        """ Start IPython kernel with GUI event loop and mpl support for python3.
+        backend: gui backend specification for matplotlib
+        *args further command line arguments 
+        NOTE: "python3" and "--matplotlib=%s" % backend are already passed
+        """
+        self.ipkernel = IPKernelApp.instance()
+        self.ipkernel.initialize(["python3", "--gui=%s"% backend, "--matplotlib=%s" % backend] + [a for a in args])
+        #self.ipkernel = mpl_kernel(backend)
+        # To create and track active qt consoles
+        self.consoles = []
+        
+        # This application will also act on the shell user namespace
+        self.namespace = self.ipkernel.shell.user_ns
+
+        # Example: a variable that will be seen by the user in the shell, and
+        # that the GUI modifies (the 'Counter++' button increments it):
+        self.namespace['app_counter'] = 0
+        #self.namespace['ipkernel'] = self.ipkernel  # dbg
+
+    def print_namespace(self, evt=None):
+        print("\n***Variables in User namespace***")
+        for k, v in self.namespace.items():
+            if not k.startswith('_'):
+                print('%s -> %r' % (k, v))
+        sys.stdout.flush()
+
+    def new_qt_console(self, evt=None):
+        """start a new qtconsole connected to our kernel"""
+        return connect_qtconsole(self.ipkernel.abs_connection_file, profile=self.ipkernel.profile)
+
+    def count(self, evt=None):
+        self.namespace['app_counter'] += 1
+
+    def cleanup_consoles(self, evt=None):
+        for c in self.consoles:
+            c.kill()
 
 class FileSystemModel(QtWidgets.QFileSystemModel):
     def __init__(self, parent=None):
@@ -543,6 +591,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     #self.windows.pop(wid, None)
             
             self.cached_vars.clear()
+            #self.deleted_vars.clear()
             
         except Exception as e:
             #pass
@@ -1063,7 +1112,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                                 self.removeRowForVariable(item[0])
                         
                 self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.hidden_vars and not item[0].startswith("_")])
-                    
+                self.deleted_vars.clear()
+                
             else:
                 # NOTE:; 2018-10-07 21:54:45
                 # for variables added/modified/deleted from code executed outside
@@ -1183,17 +1233,27 @@ class WorkspaceViewer(QtWidgets.QTableView):
                     dropAction = drag.exec(QtCore.Qt.CopyAction)
                     
         
+#class FlexiConsole(RichJupyterWidget):
+    #def __init__(self, mainWindow=None):
+        #super(RichJupyterWidget, self).__init__()
+        
+        #if isinstance(mainWindow, (ScipyenWindow, type(None))):
+            #self.mainWindow = mainWindow
+            
 
 # NOTE: use Jupyter (IPython >= 4.x and qtconsole / qt5 by default)
-class EmbedIPython(RichJupyterWidget):
+class ScipyenConsole(RichJupyterWidget):
+    """Console with in-process kernel manager for pythonic command interface.
+    Uses an in-process kernel generated and managed by QtInProcessKernelManager.
+    """
     historyItemsDropped = pyqtSignal()
     workspaceItemsDropped = pyqtSignal()
     #workspaceItemsDropped = pyqtSignal(bool)
     loadUrls = pyqtSignal(object, bool, QtCore.QPoint)
     pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
     
-    def __init__(self, mainWindow=None):
-        ''' EmbedIPython constructor
+    def __init__(self, kernel_manager=None, mainWindow=None):
+        ''' ScipyenConsole constructor
         
         Using Qt5 gui by default
         NOTE:
@@ -1208,13 +1268,15 @@ class EmbedIPython(RichJupyterWidget):
 #        super(RichIPythonWidget, self).__init__()
         # NOTE: 2016-03-08 15:38:19
         #super(IPythonWidget, self).__init__()
-        self.kernel_manager = QtInProcessKernelManager() # what if gui is NOT Qt?
+        if not isinstance(kernel_manager, jupyter_client.KernelManager):
+            self.kernel_manager = QtInProcessKernelManager() # what if gui is NOT Qt?
+            
         self.kernel_manager.start_kernel()
         self.ipkernel = self.kernel_manager.kernel
         
         ## NOTE: 2016-03-20 14:37:37
         ## this must be set BEFORE start_channels is called
-        ##self.ipkernel.shell.banner2 = "\n".join(EmbedIPython.banner)
+        ##self.ipkernel.shell.banner2 = "\n".join(ScipyenConsole.banner)
         #self.ipkernel.shell.banner2 = u'\n*** NOTE: ***\n\nUser variables created here in console be visible in the User variables tab of the PICT main window.\n' +\
         #u'\n\nThe Pict main window GUI object is accessible from the console as `mainWindow` or `mainWindow` (an alias of mainWindow)' +\
         #u'\n\nExcept for user variables, if any of `mainWindow`, `mainWindow`, or loaded modules are deleted from the console workspace by calling del(...), they can be restored using the `Console/Restore Namespace` menu item.' +\
@@ -1245,15 +1307,6 @@ class EmbedIPython(RichJupyterWidget):
         self.settings = QtCore.QSettings()
         
         self._load_settings_()
-        
-        #desktopFixedFont = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
-        #desktopFixedFontSpec = desktopFixedFont.toString().split(",")
-        
-        #self.font_family = desktopFixedFontSpec[0]
-        #self.font_size = int(desktopFixedFontSpec[1])
-        
-        #self.menubar = QtWidgets.QMenuBar(parent=self)
-        #self.setMenuBar(self.menubar)
         
     def closeEvent(self, evt):
         self._save_settings_()
@@ -1305,21 +1358,21 @@ class EmbedIPython(RichJupyterWidget):
     @safeWrapper
     def dropEvent(self, evt):
         from textwrap import dedent
-        #print("EmbedIPython.dropEvent: evt", evt)
+        #print("ScipyenConsole.dropEvent: evt", evt)
         #data = evt.mimeData().data(evt.mimeData().formats()[0])
         src = evt.source()
-        #print("EmbedIPython.dropEvent: evt.source:", src)
+        #print("ScipyenConsole.dropEvent: evt.source:", src)
         
-        #print("EmbedIPython.dropEvent: evt.mimeData()", evt.mimeData())
+        #print("ScipyenConsole.dropEvent: evt.mimeData()", evt.mimeData())
         
-        #print("EmbedIPython.dropEvent: evt.proposedAction()", evt.proposedAction())
+        #print("ScipyenConsole.dropEvent: evt.proposedAction()", evt.proposedAction())
         
-        #print("EmbedIPython.dropEvent: evt.mimeData().hasText()", evt.mimeData().hasText())
+        #print("ScipyenConsole.dropEvent: evt.mimeData().hasText()", evt.mimeData().hasText())
         #print(dir(evt.keyboardModifiers()))
-        #print("EmbedIPython.dropEvent: event source: %s" % src)
+        #print("ScipyenConsole.dropEvent: event source: %s" % src)
         
-        #print("EmbedIPython.dropEvent: \nevt mimeData %s" % evt.mimeData())
-        #print("EmbedIPython.dropEvent: \ndata: %s \nsrc: %s" % (text, src))
+        #print("ScipyenConsole.dropEvent: \nevt mimeData %s" % evt.mimeData())
+        #print("ScipyenConsole.dropEvent: \ndata: %s \nsrc: %s" % (text, src))
         
         # NOTE: 2019-08-10 00:23:42
         # for drop events issued by mainWindow's workspace viewer and command
@@ -1335,13 +1388,13 @@ class EmbedIPython(RichJupyterWidget):
         # editor
         #if isinstance(self.mainWindow, ScipyenWindow):
         if isinstance(self.mainWindow, ScipyenWindow) and src is self.mainWindow.workspaceView:
-            #print("EmbedIPython.dropEvent mime data has text:",  evt.mimeData().hasText())
+            #print("ScipyenConsole.dropEvent mime data has text:",  evt.mimeData().hasText())
             #if evt.mimeData().hasText():
                 #print(evt.mimeData().text())
-            #print("EmbedIPython.dropEvent mime data has urls:", evt.mimeData().hasUrls())
-            #print("EmbedIPython.dropEvent possible actions:", evt.possibleActions())
-            #print("EmbedIPython.dropEvent proposed action:", evt.proposedAction())
-            #print("EmbedIPython.dropEvent actual drop action:",  evt.dropAction())
+            #print("ScipyenConsole.dropEvent mime data has urls:", evt.mimeData().hasUrls())
+            #print("ScipyenConsole.dropEvent possible actions:", evt.possibleActions())
+            #print("ScipyenConsole.dropEvent proposed action:", evt.proposedAction())
+            #print("ScipyenConsole.dropEvent actual drop action:",  evt.dropAction())
             
             #print(evt.keyboardModifiers() & QtCore.Qt.ShiftModifier)
             
@@ -1381,14 +1434,14 @@ class EmbedIPython(RichJupyterWidget):
             # useful for drag&drop python code directly from a python source file
             # opened in a text editor (that also supports drag&drop)
             # event source is from outside the Pict application (i.e. it is None)
-            #print("EmbedIPython.dropEvent: \nproposed action: %s" % evt.proposedAction())
+            #print("ScipyenConsole.dropEvent: \nproposed action: %s" % evt.proposedAction())
             
-            #print("EmbedIPython.dropEvent source:",  src)
-            #print("EmbedIPython.dropEvent mime data has text:",  evt.mimeData().hasText())
-            #print("EmbedIPython.dropEvent mime data has urls:",  evt.mimeData().hasUrls())
-            #print("EmbedIPython.dropEvent possible actions:",  evt.possibleActions())
-            #print("EmbedIPython.dropEvent proposed action:",  evt.proposedAction())
-            #print("EmbedIPython.dropEvent actual drop action:",  evt.dropAction())
+            #print("ScipyenConsole.dropEvent source:",  src)
+            #print("ScipyenConsole.dropEvent mime data has text:",  evt.mimeData().hasText())
+            #print("ScipyenConsole.dropEvent mime data has urls:",  evt.mimeData().hasUrls())
+            #print("ScipyenConsole.dropEvent possible actions:",  evt.possibleActions())
+            #print("ScipyenConsole.dropEvent proposed action:",  evt.proposedAction())
+            #print("ScipyenConsole.dropEvent actual drop action:",  evt.dropAction())
             
             if evt.mimeData().hasUrls():
                 urls = evt.mimeData().urls()
@@ -1412,8 +1465,8 @@ class EmbedIPython(RichJupyterWidget):
                 # just write at the console whatever text has been dropped
                 if evt.proposedAction() in (QtCore.Qt.CopyAction, QtCore.Qt.MoveAction):
                     text = evt.mimeData().text()
-                    #print("EmbedIPython.dropEvent: text", text)
-                    #print("EmbedIPython.dropEvent: mimeData.formats()", evt.mimeData().formats())
+                    #print("ScipyenConsole.dropEvent: text", text)
+                    #print("ScipyenConsole.dropEvent: mimeData.formats()", evt.mimeData().formats())
                     echoing = not bool(evt.keyboardModifiers() & QtCore.Qt.ShiftModifier)
                     store = bool(evt.keyboardModifiers() & QtCore.Qt.ControlModifier)
                     
@@ -1745,6 +1798,9 @@ class WindowManager(__QMainWindow__):
                         
                     elif old_viewer_index == 0:
                         viewer_index = 0
+                        
+                    else:
+                        viewer_index = old_viewer_index
                         
                     self.currentViewers[viewer_type] = self.viewers[viewer_type][viewer_index]
                 
@@ -2723,6 +2779,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         self.shell.events.register("post_execute", self.workspaceModel.post_execute)
         
         self.slot_changeDirectory(self.recentDirectories[0])
+        
+    #@pyqtSlot()
+    @safeWrapper
+    def newConsole(self, kernel_manager=None):
+        
+        console = ScipyenConsole(self, kernel_manager=kernel_manager, mainWindow=self)
+        
+        return console
 
         
     @safeWrapper
@@ -2784,7 +2848,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         
         #from core import custom_magics
         
-        self.console = EmbedIPython(self) 
+        self.console = ScipyenConsole(self) 
         
         self.console.executed.connect(self.slot_updateHistory)
         self.console.executed.connect(self.slot_updateCwd)
