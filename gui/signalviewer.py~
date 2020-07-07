@@ -128,8 +128,15 @@ from iolib import pictio as pio
 
 #### BEGIN pict.core modules
 from core import datatypes as dt
-import core.utilities as utilities
+import core.utilities
 from core.utilities import safeWrapper
+
+import core.datasignal
+from core.datasignal import DataSignal, IrregularlySampledDataSignal
+
+import core.triggerprotocols
+from core.triggerprotocols import TriggerEvent, TriggerProtocol
+
 from core import neoutils as neoutils
 from core import xmlutils, strutils
 from core import neoevent, neoepoch
@@ -1748,8 +1755,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     supported_types = (neo.Block, neo.Segment, neo.AnalogSignal, 
                        neo.IrregularlySampledSignal, neo.SpikeTrain, neo.Event,
                        neo.Epoch, neo.core.baseneo.BaseNeo,
-                        dt.DataSignal, dt.IrregularlySampledDataSignal,
-                        dt.TriggerEvent,dt.TriggerProtocol,
+                       DataSignal, IrregularlySampledDataSignal,
+                       TriggerEvent,TriggerProtocol,
                         vigra.filters.Kernel1D, np.ndarray,
                         tuple, list)
     
@@ -1767,8 +1774,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     defaultEpochColor    = mpl.colors.to_rgba("xkcd:coral")
 
     def __init__(self, 
-                 x: (neo.core.baseneo.BaseNeo, dt.DataSignal, dt.IrregularlySampledDataSignal, dt.TriggerEvent,dt.TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
-                 y: (neo.core.baseneo.BaseNeo, dt.DataSignal, dt.IrregularlySampledDataSignal, dt.TriggerEvent,dt.TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
+                 x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
+                 y: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
                  parent: (QtWidgets.QMainWindow, type(None)) = None, 
                  pWin: (QtWidgets.QMainWindow, type(None))= None, 
                  ID:(int, type(None)) = None,
@@ -4503,8 +4510,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     @safeWrapper
     def setData(self,  
-                x:(neo.core.baseneo.BaseNeo, dt.DataSignal, dt.IrregularlySampledDataSignal, dt.TriggerEvent,dt.TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
-                y:(neo.core.baseneo.BaseNeo, dt.DataSignal, dt.IrregularlySampledDataSignal, dt.TriggerEvent,dt.TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
+                x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
+                y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
                 doc_title:(str, type(None)) = None, 
                 frameAxis:(int, str, vigra.AxisInfo, type(None)) = None,
                 signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None,
@@ -6216,8 +6223,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             irregs = [s for s in seg.irregularlysampledsignals if s in channelIndex.irregularlysampledsignals]
             
         else:
-            self.signalIndex = neoutils.normalized_signal_index(seg, self.signalIndex, stype = neo.AnalogSignal)
-            self.irregularSignalIndex = neoutils.normalized_signal_index(seg, self.irregularSignalIndex, stype = neo.IrregularlySampledSignal)
+            self.signalIndex = neoutils.normalized_signal_index(seg, self.signalIndex, ctype = neo.AnalogSignal)
+            self.irregularSignalIndex = neoutils.normalized_signal_index(seg, self.irregularSignalIndex, ctype = neo.IrregularlySampledSignal)
             analog = [seg.analogsignals[k] for k in self.signalIndex]
             irregs = [seg.irregularlysampledsignals[k] for k in self.irregularSignalIndex]
         

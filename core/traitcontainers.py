@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
 """traitlets-aware containers
 """
-#from traitlets import HasTraits, Int, Bool, observe
 from inspect import getcallargs
-#import collections # maybe not
-from traitlets.utils.bunch import Bunch
-from traitutils import (gen_trait_from_type, transform_link, 
-                        TraitsObserver, ContainerTraitsObserver,
-                        HasTraits, TraitType, Int, Bool, All, is_trait, observe)
 
-from prog import safeWrapper
-from strutils import string_to_valid_identifier
+from traitlets import (HasTraits, TraitType, Int, Bool, All, is_trait, observe,
+                       )
+
+from traitlets.utils.bunch import Bunch
+
+from .traitutils import (gen_trait_from_type, transform_link, 
+                        TraitsObserver, ContainerTraitsObserver,
+                        )
+
+from .prog import safeWrapper
+from .strutils import string_to_valid_identifier
 
 #class DataList(list):
     #"""A list which dynamically generates a TraitType for its elements

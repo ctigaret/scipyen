@@ -30,9 +30,17 @@ import matplotlib.mlab as mlb
 #### BEGIN pict.core modules
 #from core.patchneo import *
 import core.datatypes as dt
+
 import core.strutils as strutils
-from core.utilities import safeWrapper, unique
 from core.strutils import string_to_float
+
+from core.utilities import safeWrapper, unique
+
+import core.triggerprotocols
+from core.triggerprotocols import TriggerEvent, TriggerProtocol
+
+import core.datasignal
+from core.datasignal import DataSignal, IrregularlySampledDataSignal
 
 #### END pict.core modules
 
@@ -296,7 +304,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 #self._modelDataRowHeaders = data.index
                 #self._modelDataColumnHeaders = data.name
                 
-            elif isinstance(data, (neo.AnalogSignal, neo.IrregularlySampledSignal, dt.DataSignal, dt.IrregularlySampledDataSignal)):
+            elif isinstance(data, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
                 if data.ndim:
                     self._modelRows_ = data.shape[0]
                     
@@ -556,11 +564,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     else:
                         return QtCore.QVariant()
                     
-            elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, dt.DataSignal, dt.IrregularlySampledDataSignal)):
+            elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
                 if orientation == QtCore.Qt.Horizontal: # horizontal (columns) header
                     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
                         if section == 0:
-                            if isinstance(self._modelData_, (neo.IrregularlySampledSignal, dt.IrregularlySampledDataSignal)):
+                            if isinstance(self._modelData_, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
                                 return QtCore.QVariant("%s (%s)" % (self._modelData_.domain_name, self._modelData_.domain.dimensionality))
                                                        
                             else:
@@ -629,7 +637,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 if isinstance(ret, datetime.datetime):
                     ret = ret.isoformat(" ")
 
-            elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, dt.DataSignal, dt.IrregularlySampledDataSignal)):
+            elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
                 if col == 0:
                     ret = self._modelData_.times[row]
                     ret_type = type(ret).__name__
@@ -813,8 +821,8 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
     supported_types = (pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
                        neo.AnalogSignal, neo.IrregularlySampledSignal,
                        neo.Epoch, neo.Event, neo.SpikeTrain,
-                       dt.DataSignal, dt.IrregularlySampledDataSignal,
-                       dt.TriggerEvent, dt.TriggerProtocol,
+                       DataSignal, IrregularlySampledDataSignal,
+                       TriggerEvent, TriggerProtocol,
                        np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D)
     
     view_action_name = "Table"
@@ -968,8 +976,8 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
     def _set_data_(self, data:(pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
                        neo.AnalogSignal, neo.IrregularlySampledSignal,
                        neo.Epoch, neo.Event, neo.SpikeTrain,
-                       dt.DataSignal, dt.IrregularlySampledDataSignal,
-                       dt.TriggerEvent, dt.TriggerProtocol,
+                       DataSignal, IrregularlySampledDataSignal,
+                       TriggerEvent, TriggerProtocol,
                        np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D), *args, **kwargs):
         
         if type(data) not in self.supported_types or not any([t in type(data).mro() for t in self.supported_types]):

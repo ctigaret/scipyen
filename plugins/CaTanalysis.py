@@ -164,7 +164,19 @@ import core.imageprocessing as imgp
 from core.imageprocessing import *
 import core.signalprocessing as sgp
 from core.workspacefunctions import validateVarName
-from core.utilities import safeWrapper, safeGUIWrapper, get_nested_value, set_nested_value, counterSuffix
+from core.utilities import (get_nested_value, set_nested_value, counterSuffix, )
+from core.prog import (safeWrapper, safeGUIWrapper, )
+import core.datasignal as datasignal
+from core.datasignal import DataSignal, IrregularlySampledDataSignal
+import core.triggerprotocols
+from core.triggerprotocols import TriggerEvent, TriggerEventType, TriggerProtocol
+import core.scandata
+from core.scandata import ScanData
+import core.axisutils
+from core.axisutils import calibration
+import core.traitcontainers
+from core.traitcontainers import DataBag
+
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
@@ -960,7 +972,7 @@ def epscatDiscriminator(base, peak, func, pred, predValue, predFunc):#, accFcnBa
 def getTimeSlice(scandata, t0, t1):
     """Returns a time slice of the linescans
     """
-    cal = dt.calibration(scandata.scans[0].axistags["t"])
+    cal = calibration(scandata.scans[0].axistags["t"])
     
     start = int(t0.magnitude / cal[2] + cal[1])
     
@@ -972,7 +984,7 @@ def getTimeSlice(scandata, t0, t1):
     
     ephys = neoutils.get_time_slice(scandata.electrophysiology, t0, t1)
     
-    ret = dt.ScanData(scene, scans, 
+    ret = ScanData(scene, scans, 
                       electrophysiology=ephys, 
                       sceneFrameAxis = scandata.sceneFrameAxis,
                       scansFrameAxis = scandata.scansFrameAxis,
@@ -1017,7 +1029,7 @@ def getProfile(scandata, roi, scene=True):
     
     """
     
-    if not isinstance(scandata, dt.ScanData):
+    if not isinstance(scandata, ScanData):
         raise TypeError("First parameter was expected to be a datatypes.ScanData; got %s instead" % type(scandata).__name__)
     
     
@@ -1029,14 +1041,14 @@ def getProfile(scandata, roi, scene=True):
     
     
     
-    if scandata.analysismode != dt.ScanData.ScanDataAnalysisMode.frame:
+    if scandata.analysismode != ScanData.ScanDataAnalysisMode.frame:
         raise NotImplementedError("%s analysis not yet supported" % self.analysismode)
     
-    if scandata.scantype != dt.ScanData.ScanDataType.linescan:
+    if scandata.scantype != ScanData.ScanDataType.linescan:
         raise NotImplementedError("%s not yet supported" % self.scantype)
     
 def averageEPSCaTs(scandata, epscatname, frame_index = None):
-    if not isinstance(scandata, dt.ScanData):
+    if not isinstance(scandata, ScanData):
         raise TypeError("Expecting a datatypes.ScanData object as the first parameter; got %s instead" % type(scandata).__name__)
     
     if len(scandata.scansBlock.segments) == 0:
@@ -1070,7 +1082,7 @@ def analyseLSData(*args, **kwargs):
     """
     
     for data in args:
-        if not isinstance(data, dt.ScanData):
+        if not isinstance(data, ScanData):
             raise TypeError("Expecting a datatypes.ScanData; got %s instead" % type(data).__name__)
         
         for frame in range(data.scansFrames):
@@ -1114,16 +1126,16 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
     
     protocol = None
     
-    if not isinstance(lsdata, dt.ScanData):
+    if not isinstance(lsdata, ScanData):
         raise TypeError("First parameters was expected to be a datatypes.ScanData; got %s instead" % type(lsdata).__name__)
     
     if len(lsdata.scans) == 0:
         raise ValueError("no linescan data was found in %s" % lsdata.name)
     
-    if lsdata.scantype != dt.ScanData.ScanDataType.linescan:
+    if lsdata.scantype != ScanData.ScanDataType.linescan:
         raise ValueError("%s was expected to be a ScanData.ScanDataType.linescan experiment; it has %s instead" % (lsdata.name,lsdata.scantype))
         
-    if lsdata.analysismode != dt.ScanData.ScanDataAnalysisMode.frame:
+    if lsdata.analysismode != ScanData.ScanDataAnalysisMode.frame:
         raise ValueError("%s was expected to have a ScanData.ScanDataAnalysisMode.frame analysis mode; it has %s instead" % (lsdata.name, lsdata.analysismode))
         
     if len(lsdata.analysisoptions) == 0:
@@ -1766,16 +1778,16 @@ def analyseFrame(lsdata, frame, unit=None,
     indicator_channel_ndx, reference_channel_ndx, indices of the indicator and reference channels for EPSCaT calculation
     
     """
-    if not isinstance(lsdata, dt.ScanData):
+    if not isinstance(lsdata, ScanData):
         raise TypeError("First parameters was expected to be a datatypes.ScanData; got %s instead" % type(lsdata).__name__)
     
     if len(lsdata.scans) == 0:
         raise ValueError("no linescan data was found in %s" % lsdata.name)
     
-    if lsdata.scantype != dt.ScanData.ScanDataType.linescan:
+    if lsdata.scantype != ScanData.ScanDataType.linescan:
         raise ValueError("%s was expected to be a ScanData.ScanDataType.linescan experiment; it has %s instead" % (lsdata.name, lsdata.scantype))
         
-    if lsdata.analysismode != dt.ScanData.ScanDataAnalysisMode.frame:
+    if lsdata.analysismode != ScanData.ScanDataAnalysisMode.frame:
         raise ValueError("%s was expected to have a ScanData.ScanDataAnalysisMode.frame analysis mode; it has %s instead" % (lsdata.name, lsdata.analysismode))
         
     if len(lsdata.analysisoptions) == 0:
@@ -2720,7 +2732,7 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
     result = list()
     
     # parse the call parameters
-    if not isinstance(scandata, dt.ScanData):
+    if not isinstance(scandata, ScanData):
         raise TypeError("first parameter should be a datatypes.ScanData object; got %s instead" % type(scandata).__name__)
     
     if analysis_unit is None: # when analysis unit is None, take the whole data as an analysis unit
@@ -3581,7 +3593,7 @@ def addMirrorCursor(data, vc):
     d) the vc cursor does not belong to this data
     
     """
-    if not isinstance(data, dt.ScanData):
+    if not isinstance(data, ScanData):
         raise TypeError("Expecting a ScanData object; got %s instead" % type(data).__name__)
 
     if len(data.scene) == 0:
@@ -3666,7 +3678,7 @@ def generateMirrorCursors(data):
     that have names identical to those of the vertical cursors in linescans.
     
     """
-    if not isinstance(data, dt.ScanData):
+    if not isinstance(data, ScanData):
         raise TypeError("Expecting a ScanData object; got %s instead" % type(data).__name__)
 
     if len(data.scene) == 0:
@@ -3748,7 +3760,7 @@ def removeMirrorCursors(data):
     WARNING: the scene cursors are nto checked that theyare point_cursors!!!
     
     """
-    if not isinstance(data, dt.ScanData):
+    if not isinstance(data, ScanData):
         raise TypeError("Expecting a ScanData object; got %s instead" % type(data).__name__)
 
     if len(data.scene) == 0:
@@ -3785,7 +3797,7 @@ def removeMirrorCursor(data, vc):
     
     """
     
-    if not isinstance(data, dt.ScanData):
+    if not isinstance(data, ScanData):
         raise TypeError("Expecting a ScanData object; got %s instead" % type(data).__name__)
 
     if len(data.scene) == 0:
@@ -3813,80 +3825,82 @@ def removeMirrorCursor(data, vc):
     
             
 class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
-    supported_types = (dt.ScanData,)
+    supported_types = (ScanData,)
     
     view_action_name = "Launch LSCaT"
     
     default_scanline_spline_order = 3
     
-    defaultPureletFilterOptions = dt.DataBag()
+    defaultPureletFilterOptions = DataBag()
     
-    defaultPureletFilterOptions.scene = dt.DataBag()
+    print(type(defaultPureletFilterOptions))
     
-    defaultPureletFilterOptions.scene.ref = dt.DataBag()
+    defaultPureletFilterOptions.scene = DataBag()
+    
+    defaultPureletFilterOptions.scene.ref = DataBag()
     defaultPureletFilterOptions.scene.ref.alpha = 1
     defaultPureletFilterOptions.scene.ref.beta = 0
     defaultPureletFilterOptions.scene.ref.sigma = 0
     defaultPureletFilterOptions.scene.ref.j = 4
     defaultPureletFilterOptions.scene.ref.t = 3
     
-    defaultPureletFilterOptions.scene.ind = dt.DataBag()
+    defaultPureletFilterOptions.scene.ind = DataBag()
     defaultPureletFilterOptions.scene.ind.alpha = 1
     defaultPureletFilterOptions.scene.ind.beta = 0
     defaultPureletFilterOptions.scene.ind.sigma = 0
     defaultPureletFilterOptions.scene.ind.j = 4
     defaultPureletFilterOptions.scene.ind.t = 3
     
-    defaultPureletFilterOptions.scans = dt.DataBag()
+    defaultPureletFilterOptions.scans = DataBag()
     
-    defaultPureletFilterOptions.scans.ref = dt.DataBag()
+    defaultPureletFilterOptions.scans.ref = DataBag()
     defaultPureletFilterOptions.scans.ref.alpha = 1
     defaultPureletFilterOptions.scans.ref.beta = 0
     defaultPureletFilterOptions.scans.ref.sigma = 0
     defaultPureletFilterOptions.scans.ref.j = 4
     defaultPureletFilterOptions.scans.ref.t = 3
     
-    defaultPureletFilterOptions.scans.ind = dt.DataBag()
+    defaultPureletFilterOptions.scans.ind = DataBag()
     defaultPureletFilterOptions.scans.ind.alpha = 1
     defaultPureletFilterOptions.scans.ind.beta = 0
     defaultPureletFilterOptions.scans.ind.sigma = 0
     defaultPureletFilterOptions.scans.ind.j = 4
     defaultPureletFilterOptions.scans.ind.t = 3
     
-    defaultGaussianFilterOptions = dt.DataBag()
+    defaultGaussianFilterOptions = DataBag()
     
-    defaultGaussianFilterOptions.scene = dt.DataBag()
+    defaultGaussianFilterOptions.scene = DataBag()
     
-    defaultGaussianFilterOptions.scene.ref = dt.DataBag()
+    defaultGaussianFilterOptions.scene.ref = DataBag()
     defaultGaussianFilterOptions.scene.ref.size = 0
     defaultGaussianFilterOptions.scene.ref.sigma = 5
     
-    defaultGaussianFilterOptions.scene.ind = dt.DataBag()
+    defaultGaussianFilterOptions.scene.ind = DataBag()
     defaultGaussianFilterOptions.scene.ind.size = 0
     defaultGaussianFilterOptions.scene.ind.sigma = 5
     
-    defaultGaussianFilterOptions.scans = dt.DataBag()
+    defaultGaussianFilterOptions.scans = DataBag()
     
-    defaultGaussianFilterOptions.scans.ref = dt.DataBag()
+    defaultGaussianFilterOptions.scans.ref = DataBag()
     defaultGaussianFilterOptions.scans.ref.size = 0
     defaultGaussianFilterOptions.scans.ref.sigma = 5
     
-    defaultGaussianFilterOptions.scans.ind = dt.DataBag()
+    defaultGaussianFilterOptions.scans.ind = DataBag()
     defaultGaussianFilterOptions.scans.ind.size = 0
     defaultGaussianFilterOptions.scans.ind.sigma = 5
     
-    defaultBinomialFilterOptions = dt.DataBag()
+    defaultBinomialFilterOptions = DataBag()
     
-    defaultBinomialFilterOptions.scene = dt.DataBag()
-    defaultBinomialFilterOptions.scene.ref = dt.DataBag()
+    defaultBinomialFilterOptions.scene = DataBag()
+    defaultBinomialFilterOptions.scene.ref = DataBag()
     defaultBinomialFilterOptions.scene.ref.radius = 10
-    defaultBinomialFilterOptions.scene.ind = dt.DataBag()
+    defaultBinomialFilterOptions.scene.ind = DataBag()
     defaultBinomialFilterOptions.scene.ind.radius = 10
     
-    defaultBinomialFilterOptions.scans = dt.DataBag()
-    defaultBinomialFilterOptions.scans.ref = dt.DataBag()
+    defaultBinomialFilterOptions.scans = DataBag()
+    defaultBinomialFilterOptions.scans.ref = DataBag()
     defaultBinomialFilterOptions.scans.ref.radius = 10
-    defaultBinomialFilterOptions.scans.ind = dt.DataBag()
+    defaultBinomialFilterOptions.scans.ind = DataBag()
     defaultBinomialFilterOptions.scans.ind.radius = 10
 
     def __init__(self, **kwargs):
@@ -4005,74 +4019,74 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         #self.scanline_spline_order = 3
         
-        #self.defaultPureletFilterOptions = dt.DataBag()
+        #self.defaultPureletFilterOptions = DataBag()
         
-        #self.defaultPureletFilterOptions.scene = dt.DataBag()
+        #self.defaultPureletFilterOptions.scene = DataBag()
         
-        #self.defaultPureletFilterOptions.scene.ref = dt.DataBag()
+        #self.defaultPureletFilterOptions.scene.ref = DataBag()
         #self.defaultPureletFilterOptions.scene.ref.alpha = 1
         #self.defaultPureletFilterOptions.scene.ref.beta = 0
         #self.defaultPureletFilterOptions.scene.ref.sigma = 0
         #self.defaultPureletFilterOptions.scene.ref.j = 4
         #self.defaultPureletFilterOptions.scene.ref.t = 3
         
-        #self.defaultPureletFilterOptions.scene.ind = dt.DataBag()
+        #self.defaultPureletFilterOptions.scene.ind = DataBag()
         #self.defaultPureletFilterOptions.scene.ind.alpha = 1
         #self.defaultPureletFilterOptions.scene.ind.beta = 0
         #self.defaultPureletFilterOptions.scene.ind.sigma = 0
         #self.defaultPureletFilterOptions.scene.ind.j = 4
         #self.defaultPureletFilterOptions.scene.ind.t = 3
         
-        #self.defaultPureletFilterOptions.scans = dt.DataBag()
+        #self.defaultPureletFilterOptions.scans = DataBag()
         
-        #self.defaultPureletFilterOptions.scans.ref = dt.DataBag()
+        #self.defaultPureletFilterOptions.scans.ref = DataBag()
         #self.defaultPureletFilterOptions.scans.ref.alpha = 1
         #self.defaultPureletFilterOptions.scans.ref.beta = 0
         #self.defaultPureletFilterOptions.scans.ref.sigma = 0
         #self.defaultPureletFilterOptions.scans.ref.j = 4
         #self.defaultPureletFilterOptions.scans.ref.t = 3
         
-        #self.defaultPureletFilterOptions.scans.ind = dt.DataBag()
+        #self.defaultPureletFilterOptions.scans.ind = DataBag()
         #self.defaultPureletFilterOptions.scans.ind.alpha = 1
         #self.defaultPureletFilterOptions.scans.ind.beta = 0
         #self.defaultPureletFilterOptions.scans.ind.sigma = 0
         #self.defaultPureletFilterOptions.scans.ind.j = 4
         #self.defaultPureletFilterOptions.scans.ind.t = 3
         
-        #self.defaultGaussianFilterOptions = dt.DataBag()
+        #self.defaultGaussianFilterOptions = DataBag()
         
-        #self.defaultGaussianFilterOptions.scene = dt.DataBag()
+        #self.defaultGaussianFilterOptions.scene = DataBag()
         
-        #self.defaultGaussianFilterOptions.scene.ref = dt.DataBag()
+        #self.defaultGaussianFilterOptions.scene.ref = DataBag()
         #self.defaultGaussianFilterOptions.scene.ref.size = 0
         #self.defaultGaussianFilterOptions.scene.ref.sigma = 5
         
-        #self.defaultGaussianFilterOptions.scene.ind = dt.DataBag()
+        #self.defaultGaussianFilterOptions.scene.ind = DataBag()
         #self.defaultGaussianFilterOptions.scene.ind.size = 0
         #self.defaultGaussianFilterOptions.scene.ind.sigma = 5
         
-        #self.defaultGaussianFilterOptions.scans = dt.DataBag()
+        #self.defaultGaussianFilterOptions.scans = DataBag()
         
-        #self.defaultGaussianFilterOptions.scans.ref = dt.DataBag()
+        #self.defaultGaussianFilterOptions.scans.ref = DataBag()
         #self.defaultGaussianFilterOptions.scans.ref.size = 0
         #self.defaultGaussianFilterOptions.scans.ref.sigma = 5
         
-        #self.defaultGaussianFilterOptions.scans.ind = dt.DataBag()
+        #self.defaultGaussianFilterOptions.scans.ind = DataBag()
         #self.defaultGaussianFilterOptions.scans.ind.size = 0
         #self.defaultGaussianFilterOptions.scans.ind.sigma = 5
         
-        #self.defaultBinomialFilterOptions = dt.DataBag()
+        #self.defaultBinomialFilterOptions = DataBag()
         
-        #self.defaultBinomialFilterOptions.scene = dt.DataBag()
-        #self.defaultBinomialFilterOptions.scene.ref = dt.DataBag()
+        #self.defaultBinomialFilterOptions.scene = DataBag()
+        #self.defaultBinomialFilterOptions.scene.ref = DataBag()
         #self.defaultBinomialFilterOptions.scene.ref.radius = 10
-        #self.defaultBinomialFilterOptions.scene.ind = dt.DataBag()
+        #self.defaultBinomialFilterOptions.scene.ind = DataBag()
         #self.defaultBinomialFilterOptions.scene.ind.radius = 10
         
-        #self.defaultBinomialFilterOptions.scans = dt.DataBag()
-        #self.defaultBinomialFilterOptions.scans.ref = dt.DataBag()
+        #self.defaultBinomialFilterOptions.scans = DataBag()
+        #self.defaultBinomialFilterOptions.scans.ref = DataBag()
         #self.defaultBinomialFilterOptions.scans.ref.radius = 10
-        #self.defaultBinomialFilterOptions.scans.ind = dt.DataBag()
+        #self.defaultBinomialFilterOptions.scans.ind = DataBag()
         #self.defaultBinomialFilterOptions.scans.ind.radius = 10
         
         # ###
@@ -4957,7 +4971,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         TODO ###
         
         """
-        if not isinstance(self._data_, dt.ScanData):
+        if not isinstance(self._data_, ScanData):
             return
         
         if len(self._data_.analysisoptions) == 0:
@@ -5349,7 +5363,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if self._data_ is None:
             return
 
-        scandata_name_vars = dict(getvarsbytype(dt.ScanData, ws = self._scipyenWindow_.workspace))
+        scandata_name_vars = dict(getvarsbytype(ScanData, ws = self._scipyenWindow_.workspace))
         
         if len(scandata_name_vars) == 0:
             return
@@ -5729,7 +5743,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             #msgbox.setDetailedText(obj[2])
             #msgbox.exec()
             
-        elif isinstance(obj, dt.ScanData):
+        elif isinstance(obj, ScanData):
             
             dlg = quickdialog.QuickDialog(self, "Store concatenated LSData as:")
             
@@ -5764,7 +5778,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if self._data_ is None:
             return
         
-        scandata_name_vars = dict(getvarsbytype(dt.ScanData, ws = self._scipyenWindow_.workspace))
+        scandata_name_vars = dict(getvarsbytype(ScanData, ws = self._scipyenWindow_.workspace))
         
         if len(scandata_name_vars) == 0:
             return
@@ -5805,7 +5819,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     def slot_concatenateLSData(self):
         from core.workspacefunctions import getvarsbytype
         
-        scandata_name_vars = dict(getvarsbytype(dt.ScanData, ws = self._scipyenWindow_.workspace))
+        scandata_name_vars = dict(getvarsbytype(ScanData, ws = self._scipyenWindow_.workspace))
         
         if len(scandata_name_vars) == 0:
             return
@@ -5844,7 +5858,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if self._data_ is None:
             return
         
-        scandata_name_vars = dict(getvarsbytype(dt.ScanData, ws = self._scipyenWindow_.workspace))
+        scandata_name_vars = dict(getvarsbytype(ScanData, ws = self._scipyenWindow_.workspace))
         
         if len(scandata_name_vars) == 0:
             return
@@ -5885,7 +5899,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if self._data_ is None:
             return
         try:
-            scandata_name_vars = dict(getvarsbytype(dt.ScanData, ws = self._scipyenWindow_.workspace))
+            scandata_name_vars = dict(getvarsbytype(ScanData, ws = self._scipyenWindow_.workspace))
             
             if len(scandata_name_vars) == 0:
                 return
@@ -5933,7 +5947,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             return
         
         try:
-            scandata_name_vars = dict(getvarsbytype(dt.ScanData, ws = self._scipyenWindow_.workspace))
+            scandata_name_vars = dict(getvarsbytype(ScanData, ws = self._scipyenWindow_.workspace))
             
             if len(scandata_name_vars) == 0:
                 return
@@ -5982,7 +5996,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             return
         
         try:
-            scandata_name_vars = dict(getvarsbytype(dt.ScanData, ws = self._scipyenWindow_.workspace))
+            scandata_name_vars = dict(getvarsbytype(ScanData, ws = self._scipyenWindow_.workspace))
             
             if len(scandata_name_vars) == 0:
                 return
@@ -7767,7 +7781,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 else:
                     r.name = "%s_%s" % (self._data_.name, r.name)
                     
-        elif isinstance(result, dt.ScanData):
+        elif isinstance(result, ScanData):
             # this hapens when a data-wide analysis unit is extracted
             for frame in range(result.scansFrames):
                 analyseFrame(result, frame, 
@@ -7839,7 +7853,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                                                              exclude_failures=excludeFailures,
                                                              test_component=testComponent)
             
-            if isinstance(result, dt.ScanData):
+            if isinstance(result, ScanData):
                 if self._selected_analysis_unit_ is not None:
                     for frame in range(result.scansFrames):
                         analyseFrame(result, frame, 
@@ -7868,7 +7882,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         from core.workspacefunctions import getvarsbytype
         
-        scandata_name_vars = dict(getvarsbytype(dt.ScanData, ws = self._scipyenWindow_.workspace))
+        scandata_name_vars = dict(getvarsbytype(ScanData, ws = self._scipyenWindow_.workspace))
         
         if len(scandata_name_vars) == 0:
             return
@@ -8191,7 +8205,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     def slot_collectAnalysisUnits(self):
         from core.workspacefunctions import getvarsbytype
 
-        scandata_name_vars = dict(getvarsbytype(dt.ScanData, ws = self._scipyenWindow_.workspace))
+        scandata_name_vars = dict(getvarsbytype(ScanData, ws = self._scipyenWindow_.workspace))
         
         if len(scandata_name_vars) == 0:
             return
@@ -8351,7 +8365,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
                 self.statusBar().showMessage("Done!")
                 
-            elif isinstance(result, dt.ScanData):
+            elif isinstance(result, ScanData):
                 self._scipyenWindow_.workspace[strutils.string_to_valid_identifier(result.name)] = result
                 
                 self._scipyenWindow_.slot_updateWorkspaceTable(False)
@@ -10192,7 +10206,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     def slot_loadWorkspaceScanData(self):
         from core.workspacefunctions import getvarsbytype
 
-        scandata_name_vars = getvarsbytype(dt.ScanData, ws = self._scipyenWindow_.workspace)
+        scandata_name_vars = getvarsbytype(ScanData, ws = self._scipyenWindow_.workspace)
         
         if len(scandata_name_vars) == 0:
             return
@@ -10260,7 +10274,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if not dt.check_apiversion(data):
                 data._upgrade_API_()
                 
-            return data._scandatatype_ == dt.ScanData.ScanDataType.linescan and data._analysismode_ == dt.ScanData.ScanDataAnalysisMode.frame
+            return data._scandatatype_ == ScanData.ScanDataType.linescan and data._analysismode_ == ScanData.ScanDataAnalysisMode.frame
         
         except Exception as e:
             return False
@@ -10295,7 +10309,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
          NOTE: this does NOT link frame navigation across viewers, although when
         a viewer window is removed, its navigation links are also removed.
         """
-        if not isinstance(self._data_, dt.ScanData):
+        if not isinstance(self._data_, ScanData):
             return
         
         # NOTE: 2019-10-12 10:18:41
@@ -10600,7 +10614,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         # TODO/FIXME: combine viewing of scanRegionScansProfiles and 
         # scanRegionSceneProfiles;
         # currently only using scanRegionSceneProfiles
-        if not isinstance(self._data_, dt.ScanData):
+        if not isinstance(self._data_, ScanData):
             return
         
         if self.showScanlineCheckBox.checkState() != QtCore.Qt.Checked:
@@ -10861,7 +10875,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
     @safeWrapper
     def _data_modifed_(self, value=False):
-        if not isinstance(self._data_, dt.ScanData):
+        if not isinstance(self._data_, ScanData):
             return
         
         if not isinstance(value, bool):
@@ -11663,7 +11677,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         pass
         
     def _update_report_(self):
-        if not isinstance(self._data_, dt.ScanData):
+        if not isinstance(self._data_, ScanData):
             return
         
         if self._selected_analysis_unit_ is not None:
@@ -12334,7 +12348,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
     @safeWrapper
     def _parsedata_(self, newdata=None, varname=None):
-        if isinstance(newdata, dt.ScanData):
+        if isinstance(newdata, ScanData):
             newdata._upgrade_API_()
             #print("LSCaTWindow _parsedata_ %s" % newdata.name)
             default_options = epscatOptions()
@@ -12485,7 +12499,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 function (default is an empty dict)
         
         """
-        if not isinstance(self._data_, dt.ScanData):
+        if not isinstance(self._data_, ScanData):
             return
         
         if not isinstance(channel, str):
@@ -12520,7 +12534,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     def getSceneFilterFunction(self, channel):
         """Returns the function object for filtering the specified scene channel
         """
-        if not isinstance(self._data_, dt.ScanData):
+        if not isinstance(self._data_, ScanData):
             return
         
         if not isinstance(channel, str):
@@ -12558,7 +12572,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 function (default is an empty dict)
         
         """
-        if not isinstance(self._data_, dt.ScanData):
+        if not isinstance(self._data_, ScanData):
             return
         
         if not isinstance(channel, str):
@@ -12591,7 +12605,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     def getScansFilterFunction(self, channel):
         """Returns the function object for filtering the specified scans channel
         """
-        if not isinstance(self._data_, dt.ScanData):
+        if not isinstance(self._data_, ScanData):
             return
         
         if not isinstance(channel, str):
@@ -12638,7 +12652,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         # 2) scene indicator channel filter
         # 3) scans reference channel filter
         # 4) scans indicator channel filter
-        if not isinstance(self._data_, dt.ScanData):
+        if not isinstance(self._data_, ScanData):
             return
         
         if len(self._data_.analysisoptions) == 0:
@@ -12726,13 +12740,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         multi-channel VigraArray
         
         """
-        if not isinstance(self._data_, dt.ScanData):
+        if not isinstance(self._data_, ScanData):
             return
         
-        if self._data_.analysismode != dt.ScanData.ScanDataAnalysisMode.frame:
+        if self._data_.analysismode != ScanData.ScanDataAnalysisMode.frame:
             raise NotImplementedError("%s analysis not yet supported" % self._data_.analysismode)
         
-        if self._data_.scantype != dt.ScanData.ScanDataType.linescan:
+        if self._data_.scantype != ScanData.ScanDataType.linescan:
             raise NotImplementedError("%s not yet supported" % self._data_.scantype)
 
         self.generateScanRregionProfilesFromScans() 
@@ -12751,13 +12765,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         filtered data for generating the profiles.
         
         """
-        if not isinstance(self._data_, dt.ScanData):
+        if not isinstance(self._data_, ScanData):
             return
         
-        if self._data_.analysismode != dt.ScanData.ScanDataAnalysisMode.frame:
+        if self._data_.analysismode != ScanData.ScanDataAnalysisMode.frame:
             raise NotImplementedError("%s analysis not yet supported" % self._data_.analysismode)
         
-        if self._data_.scantype != dt.ScanData.ScanDataType.linescan:
+        if self._data_.scantype != ScanData.ScanDataType.linescan:
             raise NotImplementedError("%s not yet supported" % self._data_.scantype)
         
         data = self._data_.scene
@@ -12838,13 +12852,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         filtered data for generating the profiles.
         
         """
-        if not isinstance(self._data_, dt.ScanData):
+        if not isinstance(self._data_, ScanData):
             return
         
-        if self._data_.analysismode != dt.ScanData.ScanDataAnalysisMode.frame:
+        if self._data_.analysismode != ScanData.ScanDataAnalysisMode.frame:
             raise NotImplementedError("%s analysis not yet supported" % self._data_.analysismode)
         
-        if self._data_.scantype != dt.ScanData.ScanDataType.linescan:
+        if self._data_.scantype != ScanData.ScanDataType.linescan:
             raise NotImplementedError("%s not yet supported" % self._data_.scantype)
 
         data = self._data_.scans
@@ -12948,7 +12962,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         progressSignal: a callable pyqtSignal emitting an int, or None (default)
         
         """
-        if not isinstance(self._data_, dt.ScanData):
+        if not isinstance(self._data_, ScanData):
             return
         
         # choose what to process: data.scene or data.scans
@@ -13215,7 +13229,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     def setData(self, newdata = None, varname=None):
         """When newdata is None this resets everything to their defaults"""
         
-        if isinstance(newdata, dt.ScanData):
+        if isinstance(newdata, ScanData):
             #print(newdata.name, varname)
             if isinstance(varname, str):
                 self._parsedata_(newdata, varname)

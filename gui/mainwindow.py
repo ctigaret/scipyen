@@ -141,21 +141,21 @@ from core import *
 #from core.patchneo import neo
 
 
-import core.plots as plots
-import core.datatypes as dt
-from core.datatypes import * # also imports datetime & time
-import core.xmlutils as xmlutils
-import core.neoutils as neoutils
-import core.tiwt as tiwt
-import core.signalprocessing as sigp
-import core.imageprocessing as imgp
-import core.curvefitting as crvf
-import core.strutils
-import core.simulations as sim
-import core.data_analysis as anl
-from core.workspacefunctions import * # NOTE: 2017-04-16 09:48:15 imported into the console in slot_initQtConsole
-from core.utilities import safeWrapper, safe_identity_test, warn_with_traceback
-from core.utilities import timefunc, timeblock, processtimefunc, processtimeblock, Timer
+#import core.plots as plots
+#import core.datatypes as dt
+#from core.datatypes import * # also imports datetime & time
+#import core.xmlutils as xmlutils
+#import core.neoutils as neoutils
+#import core.tiwt as tiwt
+#import core.signalprocessing as sigp
+#import core.imageprocessing as imgp
+#import core.curvefitting as crvf
+#import core.strutils
+#import core.simulations as sim
+#import core.data_analysis as anl
+#from core.workspacefunctions import * # NOTE: 2017-04-16 09:48:15 imported into the console in slot_initQtConsole
+#from core.utilities import safeWrapper, safe_identity_test, warn_with_traceback
+#from core.utilities import timefunc, timeblock, processtimefunc, processtimeblock, Timer
 
 # FIXME: 2016-04-03 00:11:22
 # do I need this as a separate module? the advantage is it would unclutter the 
@@ -164,12 +164,14 @@ from core.utilities import timefunc, timeblock, processtimefunc, processtimebloc
 # NOTE: 2016-04-03 00:04:43
 # proof of principle works in search_plugins.py
 # TODO -- do I need this at global namescope, or just inside the pict main window class?
-from core import pict_plugin_loader as pict_plugin_loader
+#from core import pict_plugin_loader as pict_plugin_loader
 
 #### END pict.core modules
 
 #### BEGIN pict.iolib modules
-import iolib.pictio as pio
+#import iolib.pictio as pio
+from iolib import pictio as pio
+#import iolib.pictio as pio
 
 #### END pict.iolib modules
 

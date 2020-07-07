@@ -128,8 +128,15 @@ from iolib import pictio as pio
 
 #### BEGIN pict.core modules
 from core import datatypes as dt
-import core.utilities as utilities
+import core.utilities
 from core.utilities import safeWrapper
+
+import core.datasignal
+from core.datasignal import DataSignal, IrregularlySampledDataSignal
+
+import core.triggerprotocols
+from core.triggerprotocols import TriggerEvent, TriggerProtocol
+
 from core import neoutils as neoutils
 from core import xmlutils, strutils
 from core import neoevent, neoepoch
@@ -1748,8 +1755,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     supported_types = (neo.Block, neo.Segment, neo.AnalogSignal, 
                        neo.IrregularlySampledSignal, neo.SpikeTrain, neo.Event,
                        neo.Epoch, neo.core.baseneo.BaseNeo,
-                        dt.DataSignal, dt.IrregularlySampledDataSignal,
-                        dt.TriggerEvent,dt.TriggerProtocol,
+                       DataSignal, IrregularlySampledDataSignal,
+                       TriggerEvent,TriggerProtocol,
                         vigra.filters.Kernel1D, np.ndarray,
                         tuple, list)
     
@@ -1767,8 +1774,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     defaultEpochColor    = mpl.colors.to_rgba("xkcd:coral")
 
     def __init__(self, 
-                 x: (neo.core.baseneo.BaseNeo, dt.DataSignal, dt.IrregularlySampledDataSignal, dt.TriggerEvent,dt.TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
-                 y: (neo.core.baseneo.BaseNeo, dt.DataSignal, dt.IrregularlySampledDataSignal, dt.TriggerEvent,dt.TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
+                 x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
+                 y: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
                  parent: (QtWidgets.QMainWindow, type(None)) = None, 
                  pWin: (QtWidgets.QMainWindow, type(None))= None, 
                  ID:(int, type(None)) = None,
@@ -4503,8 +4510,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     @safeWrapper
     def setData(self,  
-                x:(neo.core.baseneo.BaseNeo, dt.DataSignal, dt.IrregularlySampledDataSignal, dt.TriggerEvent,dt.TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
-                y:(neo.core.baseneo.BaseNeo, dt.DataSignal, dt.IrregularlySampledDataSignal, dt.TriggerEvent,dt.TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
+                x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
+                y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
                 doc_title:(str, type(None)) = None, 
                 frameAxis:(int, str, vigra.AxisInfo, type(None)) = None,
                 signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None,
@@ -4679,8 +4686,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     @safeWrapper
     def _set_data_(self, 
-                   x:(neo.core.baseneo.BaseNeo, dt.DataSignal, dt.IrregularlySampledDataSignal, dt.TriggerEvent,dt.TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
-                   y:(neo.core.baseneo.BaseNeo, dt.DataSignal, dt.IrregularlySampledDataSignal, dt.TriggerEvent,dt.TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
+                   x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
+                   y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
                    doc_title:(str, type(None)) = None, 
                    frameIndex:(int, tuple, list, range, slice, type(None)) = None, 
                    frameAxis:(int, type(None)) = None,
@@ -4853,7 +4860,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 #self.frameIndex = range(1)
                 #self._plotEpochs_(clear=True)
             
-            elif isinstance(y, (neo.core.AnalogSignal,dt.DataSignal)):
+            elif isinstance(y, (neo.core.AnalogSignal, DataSignal)):
                 self.y = y
                 
                 # NOTE: no need for these as there is only one signal
@@ -4892,7 +4899,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self.frameIndex = utilities.normalized_sample_index(self.y.as_array(), self.frameAxis, frameIndex)
                     self._number_of_frames_ = len(self.frameIndex)
                     
-            elif isinstance(y, (neo.core.IrregularlySampledSignal, dt.IrregularlySampledDataSignal)):
+            elif isinstance(y, (neo.core.IrregularlySampledSignal,  IrregularlySampledDataSignal)):
                 self.y = y
                 self.frameIndex = range(1)
                 #self.signalIndex = range(1)
@@ -5175,7 +5182,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self.signalIndex                    = signalIndex
                     self.irregularSignalIndex           = irregularSignalIndex
                     
-                elif all([isinstance(i, (neo.core.AnalogSignal, neo.core.IrregularlySampledSignal, dt.DataSignal)) for i in y]):
+                elif all([isinstance(i, (neo.core.AnalogSignal, neo.core.IrregularlySampledSignal,  DataSignal)) for i in y]):
                     # NOTE: 2019-11-30 09:42:27
                     # Treat this as a segment, EXCEPT that each signal is plotted
                     # in its own frame. This is because in a generic container
@@ -5239,7 +5246,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._docTitle_ = doc_title
                 
             else:
-                if isinstance(self.y, (neo.Block, neo.AnalogSignal, neo.IrregularlySampledSignal, neo.Segment, dt.DataSignal)) and (self.y.name is not None and len(self.y.name) > 0):
+                if isinstance(self.y, (neo.Block, neo.AnalogSignal, neo.IrregularlySampledSignal, neo.Segment,  DataSignal)) and (self.y.name is not None and len(self.y.name) > 0):
                     self._doctTitle_ = self.y.name
                     
                 elif isinstance(self.y, (neo.Epoch, neo.SpikeTrain, neo.Event)):
@@ -5586,7 +5593,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             #ox = self.ox
 
         #if type(oy).__name__ == "weakref":
-            #if isinstance(oy(), dt.DataSignal):
+            #if isinstance(oy(),  DataSignal):
                 #self._plotOverlaySignal_(oy().domain, oy(), *self.overlay_args, **self.overlay_kwargs)
             
             #elif isinstance(oy(), (neo.core.AnalogSignal, neo.core.IrregularlySampledSignal)):
@@ -5599,7 +5606,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 #self._plotOverlaySignal_(ox(), oy(), *self.overlay_args, **self.overlay_kwargs)
                 
         #else:
-            #if isinstance(oy, dt.DataSignal):
+            #if isinstance(oy,  DataSignal):
                 #self._plotOverlaySignal_(oy.domain, oy, *self.overlay_args, **self.overlay_kwargs)
                 
             #elif isinstance(oy, (neo.core.AnalogSignal, neo.core.IrregularlySampledSignal)):
@@ -5751,10 +5758,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # see setData() for list of kernel1D, datatypes.DataSignal, and np.ndarrays
             #print("displayFrame: self.x: ", self.x)
             
-            if all([isinstance(y_, (dt.DataSignal, 
+            if all([isinstance(y_, (DataSignal, 
                                     neo.core.AnalogSignal, 
                                     neo.core.IrregularlySampledSignal,
-                                    dt.IrregularlySampledDataSignal)) for y_ in self.y]):
+                                    IrregularlySampledDataSignal)) for y_ in self.y]):
                 self._plotSignal_(self.y[self._current_frame_index_], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
                 self.currentFrameAnnotations = {type(self.y[self._current_frame_index_]).__name__: self.y[self._current_frame_index_].annotations}
                 
@@ -5803,9 +5810,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._plotSegment_(self.y, *self.plot_args, **self.plot_kwargs) # calls _setup_signal_choosers_() and _prepareAxes_()
                 
             elif isinstance(self.y, (neo.core.AnalogSignal, 
-                                     dt.DataSignal, 
+                                     DataSignal, 
                                      neo.core.IrregularlySampledSignal,
-                                     dt.IrregularlySampledDataSignal)):
+                                     IrregularlySampledDataSignal)):
                 self._plotSignal_(self.y, *self.plot_args, **self.plot_kwargs)
 
             elif isinstance(self.y, neo.core.Epoch): # plot an Epoch independently of data
@@ -6341,7 +6348,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 domain_name = "Time"
                 
             else:
-                domain_name = signal.domain_name # alternative is a dt.DataSignal
+                domain_name = signal.domain_name # alternative is a DataSignal
                 
             # apply whatever time slicing was required by arguments to setData()
             if self.plot_start is not None:
@@ -6384,7 +6391,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 domain_name = "Time"
                 
             else:
-                domain_name = signal.domain_name # alternative is a dt.IrregularlySampledDataSignal
+                domain_name = signal.domain_name # alternative is a IrregularlySampledDataSignal
         
             #print("_plotSegment_ irregular signal", signal.name, kAx)
             
@@ -6621,7 +6628,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if signal is None:
             return
 
-        #if not isinstance(signal, (neo.core.baseneo.BaseNeo, dt.DataSignal)):
+        #if not isinstance(signal, (neo.core.baseneo.BaseNeo, DataSignal)):
         if not isinstance(signal, neo.core.baseneo.BaseNeo):
             raise TypeError("_plotSignal_ expects an object from neo framework, or a datatypes.DataSignal or datatypes.IrregularlySampledDataSignal; got %s instead" % (type(signal).__name__))
             

@@ -28,7 +28,8 @@ from IPython.display import set_matplotlib_formats
 
 #### END ipython/jupyter modules
 
-from prog import safeWrapper
+from core import prog
+from core.prog import safeWrapper
 
 
 # NOTE: use Jupyter (IPython >= 4.x and qtconsole / qt5 by default)

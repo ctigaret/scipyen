@@ -36,8 +36,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 #### BEGIN pict.core modules
 #from core import neo
 #from core import patchneo
-from core import xmlutils, strutils, axisutils
-from core import datatypes
+from core import (xmlutils, strutils, axisutils, datatypes, datasignal,
+                  scandata, analysisunit, axiscalibration, triggerprotocols,
+                  neoutils)
 
 from core.axisutils import *
 
@@ -83,7 +84,7 @@ except Exception as e:
 
 # NOTE: 2016-04-01 10:58:32
 # let's have this done once and for all
-__vigra_formats__ = datatypes.vigra.impex.listExtensions()
+__vigra_formats__ = vigra.impex.listExtensions()
 __ephys_formats__ = ["abf"]
 __generic_formats__ = ["pkl", "h5", "csv"]
 
@@ -91,8 +92,10 @@ __generic_formats__ = ["pkl", "h5", "csv"]
 SUPPORTED_IMAGE_TYPES = __vigra_formats__.split() # + [i for i in bioformats.READABLE_FORMATS if i not in __vigra_formats__]
 #del(i)
 SUPPORTED_IMAGE_TYPES.sort()
+
 SUPPORTED_EPHYS_FILES = __ephys_formats__
 SUPPORTED_EPHYS_FILES.sort()
+
 SUPPORTED_GENERIC_FILES = __generic_formats__
 SUPPORTED_GENERIC_FILES.sort()
 
@@ -138,14 +141,10 @@ def __ndArray2csv__(data, writer):
 # NOTE: 2017-09-21 16:34:21
 # BioFormats dumped mid 2017 because there are nor good python ports to it
 # (it uses javabridge which is suboptimal)
-def loadImageFile(fileName:str, asVolume:bool=False, axisspec:[datatypes.collections.OrderedDict, None]=None) -> ([vigra.VigraArray, np.ndarray],):
+def loadImageFile(fileName:str, asVolume:bool=False, axisspec:[collections.OrderedDict, None]=None) -> ([vigra.VigraArray, np.ndarray],):
     ''' Reads pixel data from an image file
     Uses the vigra impex library.
     
-    TODO: should it return a datatypes.CaTData ???
-    TODO: perhaps is better to return a VigraArray, optionally a (VigraArray, metadata) tuple
-    
-    TODO: check validity of fileName
     
     asVolume: boolean, optional (default is False):
         
@@ -197,16 +196,16 @@ def loadImageFile(fileName:str, asVolume:bool=False, axisspec:[datatypes.collect
         asVolume = True
     
     if asVolume:
-        ret = datatypes.vigra.readVolume(fileName)
+        ret = vigra.readVolume(fileName)
         
     else:
-        ret = datatypes.vigra.readImage(fileName)
+        ret = vigra.readImage(fileName)
         
     #mdata = readImageMetadata(fileName)
     
     if axisspec is not None:# TODO FIXME we're not using this kind of axisspec anymore, are we?
-        if type(axisspec) is datatypes.collections.OrderedDict:
-            parsedAxisspec = datatypes.collections.OrderedDict(zip(ret.axistags.keys(), ret.shape))
+        if type(axisspec) is collections.OrderedDict:
+            parsedAxisspec = collections.OrderedDict(zip(ret.axistags.keys(), ret.shape))
             
             axisspec = verifyAxisSpecs(axisspec, parsedAxisspec)
             
@@ -214,7 +213,7 @@ def loadImageFile(fileName:str, asVolume:bool=False, axisspec:[datatypes.collect
             #print("axisspec: ", axisspec)
             
             ret.shape = axisspec.values()
-            ret.axistags = datatypes.vigra.VigraArray.defaultAxistags(tagKeysAsString(axisspec))
+            ret.axistags = vigra.VigraArray.defaultAxistags(tagKeysAsString(axisspec))
                     
         else:
             raise ValueError('axisspec must be a collections.OrderedDict, or None')
@@ -921,7 +920,9 @@ def loadPickleFile(fileName):
     #from core import neoepoch, neoevent
     from core import neoepoch as neoepoch
     from core import neoevent as neoevent
-    from core import datatypes
+    #from core import scandata, analysisunit, axiscalibration, triggerprotocols
+    #from core import 
+    #from core import datatypes
     from core.workspacefunctions import assignin
     from gui import pictgui
     from plugins import CaTanalysis
@@ -935,7 +936,7 @@ def loadPickleFile(fileName):
     # the following attempts to fix this
     sys.modules["neoevent"] = neoevent
     sys.modules["neoepoch"] = neoepoch
-    sys.modules["datatypes"] = datatypes
+    #sys.modules["datatypes"] = datatypes
     sys.modules["pictgui"] = pictgui
     sys.modules["CaTanalysis"] = CaTanalysis
     
@@ -965,7 +966,7 @@ def loadPickleFile(fileName):
         else:
             raise e
         
-    if isinstance(result, (datatypes.ScanData, datatypes.AnalysisUnit, datatypes.AxisCalibration, pictgui.PlanarGraphics)):
+    if isinstance(result, (scandata.ScanData, analysisunit.AnalysisUnit, axiscalibration.AxisCalibration, pictgui.PlanarGraphics)):
         result._upgrade_API_()
     
     if "neoevent" in sys.modules:
@@ -974,8 +975,8 @@ def loadPickleFile(fileName):
     if "neoepoch" in sys.modules:
         del sys.modules["neoepoch"]
         
-    if "datatypes" in sys.modules:
-        del sys.modules["datatypes"]
+    #if "datatypes" in sys.modules:
+        #del sys.modules["datatypes"]
         
     if "pictgui" in sys.modules:
         del sys.modules["pictgui"]
@@ -1394,7 +1395,7 @@ def writeCsv(data, fileName=None, header=None):
                     
     ## TODO for neo & datatypes signals must export the domain values too (e.g. time, etc)
     ## in column 0 of the csv
-    elif isinstance(data, (neo.IrregularlySampledSignal, datatypes.IrregularlySampledDataSignal)):
+    elif isinstance(data, (neo.IrregularlySampledSignal, datasignal.IrregularlySampledDataSignal)):
         if header is not None:
             if isinstance(header, (tuple, list)):
                 if data.ndim != 2:
