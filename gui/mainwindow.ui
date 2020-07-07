@@ -48,7 +48,7 @@
      <x>0</x>
      <y>0</y>
      <width>1115</width>
-     <height>28</height>
+     <height>29</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -57,10 +57,9 @@
     </property>
     <widget class="QMenu" name="menuPrint_IPython_Namespace">
      <property name="title">
-      <string>Co&amp;nsole</string>
+      <string>Co&amp;nsoles</string>
      </property>
      <addaction name="actionOpen_Console"/>
-     <addaction name="actionRestore_Workspace"/>
     </widget>
     <widget class="QMenu" name="menuImport">
      <property name="title">
