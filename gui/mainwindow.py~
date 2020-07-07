@@ -27,15 +27,13 @@ CHANGELOG:
 """
 
 #### BEGIN core python modules
-
-from __future__ import print_function
-from __future__ import absolute_import # for python 2.5
 import faulthandler
 import sys, os, types, atexit, re, inspect, gc, sip, io, warnings, numbers
 import traceback, keyword, inspect, weakref, itertools, typing, functools
+from pprint import pprint
 from copy import copy, deepcopy
-
-from collections import ChainMap
+import collections
+#from collections import ChainMap
 
 from importlib import reload # I use this all too often !
 
@@ -132,44 +130,44 @@ from PyQt5.uic import loadUiType
 
 #### END PyQt5 modules
 
+from IPython.core.magic import (Magics, magics_class, line_magic,
+                                cell_magic, line_cell_magic,
+                                needs_local_scope)
 
+from IPython.core.history import HistoryAccessor
 
 #### END 3rd party modules
 
+#print("sys.path in %s named %s:\n" % (__file__, __name__),  sys.path)
 #### BEGIN pict.core modules
-from core import *
-#from core.patchneo import neo
 
+#import core.prog as prog
+from core.prog import (timefunc, timeblock, processtimefunc, processtimeblock, Timer, 
+                       safeWrapper, warn_with_traceback,)
 
-#import core.plots as plots
-#import core.datatypes as dt
+from core.utilities import safe_identity_test
+from core.workspacefunctions import * # NOTE: 2017-04-16 09:48:15 imported into the console in slot_initQtConsole
+
+from core import plots as plots
+from core import datatypes as dt
+from core.datatypes import * # also imports datetime & time
 #from core.datatypes import * # also imports datetime & time
-#import core.xmlutils as xmlutils
-#import core.neoutils as neoutils
-#import core.tiwt as tiwt
-#import core.signalprocessing as sigp
-#import core.imageprocessing as imgp
-#import core.curvefitting as crvf
-#import core.strutils
-#import core.simulations as sim
-#import core.data_analysis as anl
-#from core.workspacefunctions import * # NOTE: 2017-04-16 09:48:15 imported into the console in slot_initQtConsole
-#from core.utilities import safeWrapper, safe_identity_test, warn_with_traceback
-#from core.utilities import timefunc, timeblock, processtimefunc, processtimeblock, Timer
-
-# FIXME: 2016-04-03 00:11:22
-# do I need this as a separate module? the advantage is it would unclutter the 
-# pict main window code; however, i need access to the gui api for creating menus
-# and actions, so it is probbly better to keep it inide the pict main window code
-# NOTE: 2016-04-03 00:04:43
-# proof of principle works in search_plugins.py
-# TODO -- do I need this at global namescope, or just inside the pict main window class?
-from core import pict_plugin_loader as pict_plugin_loader
+import core.xmlutils as xmlutils
+import core.neoutils as neoutils
+import core.tiwt as tiwt
+import core.signalprocessing as sigp
+import core.imageprocessing as imgp
+import core.curvefitting as crvf
+import core.strutils
+import core.simulations as sim
+import core.data_analysis as anl
 
 #### END pict.core modules
 
 #### BEGIN pict.iolib modules
-import iolib.pictio as pio
+#import iolib.pictio as pio
+from iolib import pictio as pio
+#import iolib.pictio as pio
 
 #### END pict.iolib modules
 
@@ -188,7 +186,7 @@ from . import quickdialog
 from . import scipyenviewer
 from . import consoles
 
-from . import *
+from . import gui_viewers
 
 #### END pict.gui modules
 
@@ -2588,18 +2586,18 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: python3 way
         #print("ScipyenWindow __init__")
         self.app                        = app
-        self.recentFiles                = datatypes.collections.OrderedDict()
-        self.recentDirectories          = datatypes.collections.deque()
-        self.fileSystemFilterHistory    = datatypes.collections.deque()
-        self.commandHistoryFinderList   = datatypes.collections.deque()
-        self.recentVariablesList        = datatypes.collections.deque()
-        self.recentlyRunScripts         = datatypes.collections.deque()
+        self.recentFiles                = collections.OrderedDict()
+        self.recentDirectories          = collections.deque()
+        self.fileSystemFilterHistory    = collections.deque()
+        self.commandHistoryFinderList   = collections.deque()
+        self.recentVariablesList        = collections.deque()
+        self.recentlyRunScripts         = collections.deque()
         self._recent_scripts_dict_      = dict()
         self.lastFileSystemFilter       = str()
         self.lastVariableFind           = str()
         self.lastCommandFind            = str()
-        self.navPrevDir                 = datatypes.collections.deque()
-        self.navNextDir                 = datatypes.collections.deque()
+        self.navPrevDir                 = collections.deque()
+        self.navNextDir                 = collections.deque()
         self.currentDir                 = None
         self.workspace                  = dict()
         self._nonInteractiveVars        = dict()
@@ -2710,12 +2708,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         self.slot_changeDirectory(self.recentDirectories[0])
         
     #@pyqtSlot()
-    @safeWrapper
-    def newConsole(self, kernel_manager=None):
+    #@safeWrapper
+    #def newConsole(self, kernel_manager=None):
         
-        console = ScipyenConsole(self, kernel_manager=kernel_manager, mainWindow=self)
+        #console = ScipyenConsole(self, kernel_manager=kernel_manager, mainWindow=self)
         
-        return console
+        #return console
 
         
     @safeWrapper
@@ -2777,7 +2775,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         
         #from core import custom_magics
         
-        self.console = ScipyenConsole(self) 
+        self.console = consoles.ScipyenConsole(self) 
         
         self.console.executed.connect(self.slot_updateHistory)
         self.console.executed.connect(self.slot_updateCwd)
@@ -3953,7 +3951,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         
         #self.console._set_font(consoleFont)
         
-        self.recentVariablesList        = self.settings.value("VariableSearch", datatypes.collections.deque())
+        self.recentVariablesList        = self.settings.value("VariableSearch", collections.deque())
         
         if len(self.recentVariablesList) > 0:
             for item in self.recentVariablesList:
@@ -3961,21 +3959,21 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                 
         self.lastVariableFind           = self.settings.value("LastVariableSearch", str())
         
-        self.commandHistoryFinderList   = self.settings.value("CommandSearch", datatypes.collections.deque())
+        self.commandHistoryFinderList   = self.settings.value("CommandSearch", collections.deque())
         
         self.lastCommandFind            = self.settings.value("LastCommandSearch", str())
         
-        used_file_filters = [s for s in self.settings.value("RecentFileSystemFilters", datatypes.collections.deque()) if isinstance(s, str)]
+        used_file_filters = [s for s in self.settings.value("RecentFileSystemFilters", collections.deque()) if isinstance(s, str)]
         
-        self.fileSystemFilterHistory    = datatypes.collections.deque(sorted(used_file_filters))
+        self.fileSystemFilterHistory    = collections.deque(sorted(used_file_filters))
         
         self.lastFileSystemFilter       = self.settings.value("LastFileSystemFilter", str())
         
         self.recentFiles = self.settings.value("RecentFiles", list())
         
-        self.recentDirectories = self.settings.value("RecentDirectories", datatypes.collections.deque())
+        self.recentDirectories = self.settings.value("RecentDirectories", collections.deque())
         
-        recentScripts = self.settings.value("RecentScripts", datatypes.collections.deque())
+        recentScripts = self.settings.value("RecentScripts", collections.deque())
         
         for script_file in recentScripts:
             if os.path.isfile(script_file):
@@ -4005,10 +4003,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         self.fileSystemModel.setNameFilters(self.lastFileSystemFilter.split())
 
         if isinstance(self.recentFiles, (tuple, list)) and len(self.recentFiles):
-            self.recentFiles = datatypes.collections.OrderedDict(zip(self.recentFiles, ["vigra"] * len(self.recentFiles)))
+            self.recentFiles = collections.OrderedDict(zip(self.recentFiles, ["vigra"] * len(self.recentFiles)))
 
         if self.recentFiles is None:
-            self.recentFiles = datatypes.collections.OrderedDict()
+            self.recentFiles = collections.OrderedDict()
 
         if len(self.recentDirectories) == 0:
             self.recentDirectories.appendleft(os.getcwd()) # this ensures recentDirectories is never empty
@@ -5538,7 +5536,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         #If you want multiple filters, separate them with ';;', for example:
         #"Images (*.png *.xpm *.jpgui);;Text files (*.txt);;XML files (*.xml)"
         
-        from utilities import makeFileFilterString
+        from core.utilities import makeFileFilterString
         
         if self.slot_openSelectedFileItems():
             return
@@ -5612,7 +5610,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
     def slot_openFiles(self):
         """Allows the opening of several files, as opposed to openFile.
         """
-        from utilities import makeFileFilterString
+        from core.utilities import makeFileFilterString
         
         if self.slot_openSelectedFileItems():
             return
@@ -6316,7 +6314,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         
         if len(pict_plugin_loader.loaded_plugins) > 0:
             for p in pict_plugin_loader.loaded_plugins.values():
-                menudict = datatypes.collections.OrderedDict([(p.__name__, (p.__file__, p.init_pict_plugin()) )])
+                menudict = collections.OrderedDict([(p.__name__, (p.__file__, p.init_pict_plugin()) )])
                 #menudict = p.init_pict_plugin()
                 if len(menudict) > 0:
                     for (k,v) in menudict.items():
@@ -6608,7 +6606,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                                         self._installPluginFunction_(ff[0], item, parentMenu)
 
                                 elif isinstance(ff, dict):
-                                    self._parsePluginFunctionDict_(datatypes.collections.OrderedDict(ff), item, parentMenu)
+                                    self._parsePluginFunctionDict_(collections.OrderedDict(ff), item, parentMenu)
 
                                 else:
                                     raise TypeError(" a function object or a list of function objects was expected")
@@ -6641,7 +6639,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                                 else:
                                     raise TypeError("function object expected")
                     elif isinstance(ff, dict):
-                        self._parsePluginFunctionDict_(datatypes.collections.OrderedDict(ff), pname, pluginsMenu)
+                        self._parsePluginFunctionDict_(collections.OrderedDict(ff), pname, pluginsMenu)
         else:
             raise ValueError("empty nested dict in plugin info")
     

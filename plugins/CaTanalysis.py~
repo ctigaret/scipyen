@@ -3833,6 +3833,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     
     defaultPureletFilterOptions = DataBag()
     
+    print(type(defaultPureletFilterOptions))
+    
     defaultPureletFilterOptions.scene = DataBag()
     
     defaultPureletFilterOptions.scene.ref = DataBag()

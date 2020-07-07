@@ -674,14 +674,13 @@ import pyqtgraph as pg
 
 #### BEGIN pict.core modules
 #from . import plots
-import core.datasignal
-from core.datasignal import DataSignal, IrregularlySampledDataSignal
+from .datasignal import DataSignal, IrregularlySampledDataSignal
 
-import core.triggerprotocols
-from core.triggerprotocols import TriggerEvent, TriggerProtocol
+from .triggerprotocols import TriggerEvent, TriggerProtocol
 
-import core.scandata
-from core.scandata import ScanData
+from .scandata import ScanData
+
+from .prog import safeWrapper
 
 from . import datatypes as dt
 from . import workspacefunctions
@@ -692,7 +691,7 @@ from . import utilities
 
 from gui.signalviewer import SignalCursor as SignalCursor
 
-from .utilities import safeWrapper, normalized_index
+from .datatypes import  normalized_index
 #### END pict.core modules
 
 if __debug__:
