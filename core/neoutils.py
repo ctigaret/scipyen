@@ -674,24 +674,22 @@ import pyqtgraph as pg
 
 #### BEGIN pict.core modules
 #from . import plots
-from .datasignal import DataSignal, IrregularlySampledDataSignal
-
-from .triggerprotocols import TriggerEvent, TriggerProtocol
-
-from .scandata import ScanData
-
 from .prog import safeWrapper
+from .datatypes import  normalized_index
+from .datasignal import DataSignal, IrregularlySampledDataSignal
+from .triggerprotocols import TriggerEvent, TriggerProtocol
+from .scandata import ScanData
 
 from . import datatypes as dt
 from . import workspacefunctions
 from . import signalprocessing as sigp
 from . import utilities
 
+
 #from .patchneo import neo
 
 from gui.signalviewer import SignalCursor as SignalCursor
 
-from .utilities import  normalized_index
 #### END pict.core modules
 
 if __debug__:

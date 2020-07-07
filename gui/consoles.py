@@ -43,7 +43,6 @@ class ScipyenConsole(RichJupyterWidget):
     loadUrls = pyqtSignal(object, bool, QtCore.QPoint)
     pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
     
-    #def __init__(self, kernel_manager=None, mainWindow=None):
     def __init__(self, mainWindow=None):
         ''' ScipyenConsole constructor
         
@@ -55,7 +54,7 @@ class ScipyenConsole(RichJupyterWidget):
         super(RichJupyterWidget, self).__init__()
         
         #if isinstance(mainWindow, (ScipyenWindow, type(None))):
-        if type(mainWindow).__name__ ==  "Scipyenwindow":
+        if type(mainWindow).__name__ ==  "ScipyenWindow":
             self.mainWindow = mainWindow
             
         else:
@@ -181,7 +180,8 @@ class ScipyenConsole(RichJupyterWidget):
         # are also available on the system clipboard to paste onto some text 
         # editor
         #if isinstance(self.mainWindow, ScipyenWindow):
-        if isinstance(self.mainWindow, ScipyenWindow) and src is self.mainWindow.workspaceView:
+        #if isinstance(self.mainWindow, ScipyenWindow) and src is self.mainWindow.workspaceView:
+        if type(self.mainWindow).__name__ == "ScipyenWindow" and src is self.mainWindow.workspaceView:
             #print("ScipyenConsole.dropEvent mime data has text:",  evt.mimeData().hasText())
             #if evt.mimeData().hasText():
                 #print(evt.mimeData().text())
@@ -202,7 +202,8 @@ class ScipyenConsole(RichJupyterWidget):
             #self.workspaceItemsDropped.emit(bool(quoted))
             self.workspaceItemsDropped.emit()
             
-        elif isinstance(self.mainWindow, ScipyenWindow) and src is self.mainWindow.historyTreeWidget:
+        #elif isinstance(self.mainWindow, ScipyenWindow) and src is self.mainWindow.historyTreeWidget:
+        elif type(self.mainWindow).__name__ == "ScipyenWindow" and src is self.mainWindow.historyTreeWidget:
             #print(evt.mimeData().hasText())
             #print(evt.mimeData().hasUrls())
             #print(evt.possibleActions())
@@ -214,7 +215,8 @@ class ScipyenConsole(RichJupyterWidget):
             # do the above asynchronously
             self.historyItemsDropped.emit()
             
-        elif isinstance(self.mainWindow, ScipyenWindow) and src is self.mainWindow.fileSystemTreeView:
+        #elif isinstance(self.mainWindow, ScipyenWindow) and src is self.mainWindow.fileSystemTreeView:
+        elif type(self.mainWindow).__name__ == "ScipyenWindow" and src is self.mainWindow.fileSystemTreeView:
             # NOTE: 2019-08-10 00:54:40
             # TODO: load data from disk
             pass

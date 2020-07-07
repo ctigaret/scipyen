@@ -38,11 +38,11 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 #from core import patchneo
 from core import (xmlutils, strutils, axisutils, datatypes, datasignal,
                   scandata, analysisunit, axiscalibration, triggerprotocols,
-                  neoutils)
+                  neoutils,)
 
 from core.axisutils import *
 
-from core.utilities import safeWrapper
+from core.prog import safeWrapper
 
 #import datatypes
 #### END pict.core modules

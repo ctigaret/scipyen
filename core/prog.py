@@ -134,6 +134,27 @@ def processtimeblock(label):
 
 #### END Context managers
 
+def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
+    log = file if hasattr(file, "write") else sys.stderr
+    traceback.print_stack(file=log)
+    log.write(warnings.formatwarning(message, category, filename, lineno, line))
+    
+#"def" instanceMethodSingleDispatch(func):
+    #"""
+        #NOTE: 2017-08-11 08:56:01
+        #a little trick to use singledispatch as an instancemethod decorator
+        #I picked up from below:
+        #https://stackoverflow.com/questions/24601722/how-can-i-use-functools-singledispatch-with-instance-methods
+    #"""
+    #dispatcher = singledispatch(func)
+    #def wrapper(*args, **kw):
+        #return dispatcher.dispatch(args[1].__class__)(*args, **kw)
+    #wrapper.register = dispatcher.register
+    ## update_wrapper(wrapper, func)
+    ## or better, for the full interface of singledispatch:
+    #update_wrapper(wrapper, dispatcher)
+    #return wrapper
+
 class Timer(object):
     """Recipe 13.13 "Making a Stopwatch Timer" in Python Cookbook 3rd Ed. 2013
     """
@@ -172,3 +193,4 @@ class Timer(object):
     def __exit__(self):
         # for use as context manager
         self.stop()
+

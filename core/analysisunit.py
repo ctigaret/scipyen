@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from core import prog
 from core.prog import safeWrapper
 

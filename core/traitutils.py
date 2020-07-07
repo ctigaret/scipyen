@@ -22,47 +22,103 @@ from traitlets.utils.bunch import Bunch as Bunch
 
 #from prog import safeWrapper
 
-def gen_trait_from_type(x):
+def gen_trait_from_type(x, *args, **kwargs):
+    """Generates a TraitType for object x.
+    
+    Prerequisites: Except for enum types (enum.Enum and enumIntEnum)
+    x.__class__ should define a "copy constructor", e.g.:
+    
+    x = SomeClass()
+    
+    y = SomeClass(x)
+    
+    For types derived from builtin types, this is taken care of by the python 
+    library. Anything else needs 
+    
+    """
+    immclass = getmro(x.__class__)[0]
+    # NOTE 2020-07-07 14:42:22
+    # to prevent "slicing" of derived classes, 
+    
+    arg = [x] + [a for a in args]
+    
+    args = tuple(arg)
+    
+    kw = kwargs
+    
     if isinstance(x, bool):
+        if immclass != bool:
+            # preserve its immediate :class:, otherwise this will slice subclasses
+            return Instance(klass = x.__class__, args=args, kw=kw)
+        
         return Bool(default_value=x)
     
     elif isinstance(x, int):
+        if immclass != int:
+            return Instance(klass = x.__class__, args=args, kw=kw)
+        
         return Int(default_value=x)
     
     elif isinstance(x, float):
+        if immclass != float:
+            return Instance(klass = x.__class__, args=args, kw=kw)
+        
         return Float(default_value=x)
     
     elif isinstance(x, complex):
+        if immclass != complex:
+            return Instance(klass = x.__class__, args=args, kw=kw)
+        
         return Complex(default_value=x)
     
     elif isinstance(x, bytes):
+        if immclass != bytes:
+            return Instance(klass = x.__class__, args=args, kw=kw)
+        
         return Bytes(default_value=x)
     
     elif isinstance(x, str):
+        if immclass != str:
+            return Instance(klass = x.__class__, args=args, kw=kw)
+        
         return Unicode(default_value=x)
     
     elif isinstance(x, list):
+        if immclass != list:
+            return Instance(klass = x.__class__, args=args, kw=kw)
+        
         return List(default_value=x)
     
     elif isinstance(x, set):
+        if immclass != set:
+            return Instance(klass = x.__class__, args=args, kw=kw)
+        
         return Set(default_value = x)
     
     elif isinstance(x, tuple):
+        if immclass != tuple:
+            return Instance(klass = x.__class__, args=args, kw=kw)
+        
         return Tuple(default_value=x)
     
     elif isinstance(x, dict):
+        if immclass != dict:
+            # preserve its immediate :class:, otherwise this will slice subclasses
+            return Instance(klass = x.__class__, args=args, kw=kw)
+        
         return Dict(default_value=x)
+
     
     elif isinstance(x, enum.EnumMeta):
         return UseEnum(x)
     
     else:
-        immclass = getmro(x.__class__)[0]
+        #immclass = getmro(x.__class__)[0]
         if immclass.__name__ == "type":
             return Type(klass=x, default_value = immclass)
         
         else:
-            return Instance(klass = x.__class__, args=(x,))
+            return Instance(klass = x.__class__, args=args, kw=kw)
     
             
 class TraitsObserver(HasTraits):

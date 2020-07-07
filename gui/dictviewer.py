@@ -41,7 +41,9 @@ from core import xmlutils, strutils
 
 from core.workspacefunctions import validateVarName
 
-from core.utilities import safeWrapper, safeGUIWrapper, get_nested_value, set_nested_value, counterSuffix
+from core.utilities import (get_nested_value, set_nested_value, counterSuffix, )
+
+from core.prog import (safeWrapper, safeGUIWrapper, )
 
 #### END pict.core modules
 

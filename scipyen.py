@@ -14,7 +14,7 @@ import sys, os, atexit, re, inspect, gc, sip, io, traceback
 
 
 # NOTE: 2019-07-29 12:08:47 these are imported indirectly via pict.gui
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 
 if hasattr(QtCore, "QLoggingCategory"):
     QtCore.QLoggingCategory.setFilterRules("qt.qpa.xcb=false")
@@ -26,12 +26,8 @@ if hasattr(QtCore, "QLoggingCategory"):
 os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
 #os.putenv("PYQTGRAPH_QT_LIB", "PyQt5")
 
+#sys.path.insert(2, os.path.dirname(os.path.dirname(__file__)))
 
-import gui.mainwindow as mainwindow
-
-
-
-#app = None
 
 class MyProxyStyle(QtWidgets.QProxyStyle):
     """To prevent repeats of valueChanged in QSpinBox controls for frame navigation.
@@ -55,6 +51,7 @@ class MyProxyStyle(QtWidgets.QProxyStyle):
         return super().styleHint(hint, *args, **kwargs)
 
 def main():
+    import gui.mainwindow as mainwindow
     faulthandler.enable()
 
     sip.setdestroyonexit(True)

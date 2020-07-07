@@ -27,15 +27,16 @@
 
 
 
-#from .dictviewer import DataViewer
-#from .matrixviewer import MatrixViewer
-#from .imageviewer import ImageViewer
-#from .signalviewer import SignalViewer
-#from .tableeditor import TableEditor
-#from .textviewer import TextViewer
-#from .xmlviewer import XMLViewer
+from .dictviewer import DataViewer
+from .matrixviewer import MatrixViewer
+from .imageviewer import ImageViewer
+from .signalviewer import SignalViewer
+from .tableeditor import TableEditor
+from .textviewer import TextViewer
+from .xmlviewer import XMLViewer
 
-#gui_viewers = [DataViewer, MatrixViewer, ImageViewer, SignalViewer, TableEditor, TextViewer, XMLViewer]
+gui_viewers = [DataViewer, MatrixViewer, ImageViewer, SignalViewer, 
+               TableEditor, TextViewer, XMLViewer]
 ##gui_viewers = [DataViewer, MatrixViewer, ImageViewer, SignalViewer, TableEditor, TextViewer, XMLViewer, Figure]
 
 #__all__ = ["QtCore", "QtGui", "QtWidgets", "QtXmlPatterns", "QtXml", "QtSvg", 
