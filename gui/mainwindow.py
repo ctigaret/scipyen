@@ -130,11 +130,15 @@ from PyQt5.uic import loadUiType
 
 #### END PyQt5 modules
 
+from IPython.lib.deepreload import reload as dreload
+
 from IPython.core.magic import (Magics, magics_class, line_magic,
                                 cell_magic, line_cell_magic,
                                 needs_local_scope)
 
 from IPython.core.history import HistoryAccessor
+
+from IPython.display import set_matplotlib_formats
 
 #### END 3rd party modules
 
@@ -283,6 +287,17 @@ class PictMagics(Magics):
         """
         if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
             local_ns["mainWindow"].slot_pictQuit()
+            
+        return line
+    
+    @line_magic
+    @needs_local_scope
+    def external_ipython(self, line, local_ns):
+        """%external_ipython magic launches a separate Jupyter Qt Console process
+        """
+        
+        if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
+            local_ns["mainWindow"]._init_ExternalIPython_()
             
         return line
     
@@ -2607,6 +2622,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         self.historyAccessor            = None
         #self.scipyenEditor              = "kwrite"
         
+        self.external_console           = None
+        
         #pg.setConfigOptions(editorCommand=self.scipyenEditor)
         
         self._temp_python_filename_   = None # cached file name for python source (for loading or running)
@@ -2695,6 +2712,22 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         #self.app.focusWindowChanged[]
             
         self.threadpool = QtCore.QThreadPool()
+        
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_launchExternalIPython(self):
+        self._init_ExternalIPython_()
+        
+    @safeWrapper
+    def _init_ExternalIPython_(self):
+        if not isinstance(self.external_console, consoles.ExternalIPython):
+            self.external_console = consoles.ExternalIPython.launch()
+            self.workspace["external_console"] = self.external_console
+            self.workspaceModel.hidden_vars.update({"external_console":self.external_console})
+            
+        else:
+            self.external_console.window.setVisible(True)
 
         
     @pyqtSlot()
@@ -2775,135 +2808,137 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         
         #from core import custom_magics
         
-        self.console = consoles.ScipyenConsole(mainWindow=self) 
-        
-        self.console.executed.connect(self.slot_updateHistory)
-        self.console.executed.connect(self.slot_updateCwd)
+        if not isinstance(self.console, consoles.ScipyenConsole):
+            
+            self.console = consoles.ScipyenConsole(mainWindow=self) 
+            
+            self.console.executed.connect(self.slot_updateHistory)
+            self.console.executed.connect(self.slot_updateCwd)
 
-        self.ipkernel = self.console.ipkernel
-        
-        #NOTE: 2017-03-19 16:21:51 FYI:
-        #NOTE: The actual shell is an instance of 
-        #NOTE: ipykernel.inprocess.ipkernel.InProcessInteractiveShell
-        #NOTE: 
-        #NOTE: The shell is accessible as self.ipkernel.shell and is the SAME 
-        #NOTE: object at the one returned by manually calling get_ipython()
-        #NOTE: at the console
-        #NOTE:
-        #NOTE: This inherits from ZMQInteractiveShell which inherits from InteractiveShell
-        #NOTE:
-        #NOTE:
-        #NOTE: Some important & useful function (bound methods) of the shell instance:
-        #NOTE:
-        #NOTE: show_banner(banner=None)
-        #NOTE: to directly execute code inside the shell we can use one of its bound 
-        #NOTE: methods, inherited all the way from IPython.core.InteractiveShell:
-        #NOTE:
-        #NOTE: run_cell (overridden by ipkernel.zmqshell.ZMQInteractiveShell but syntax and functionality are the same)
-        #NOTE: run_cell_magic 
-        #NOTE: run_code
-        #NOTE: runcode, 
-        #NOTE: run_line_magic
-        #NOTE:
+            self.ipkernel = self.console.ipkernel
+            
+            #NOTE: 2017-03-19 16:21:51 FYI:
+            #NOTE: The actual shell is an instance of 
+            #NOTE: ipykernel.inprocess.ipkernel.InProcessInteractiveShell
+            #NOTE: 
+            #NOTE: The shell is accessible as self.ipkernel.shell and is the SAME 
+            #NOTE: object at the one returned by manually calling get_ipython()
+            #NOTE: at the console
+            #NOTE:
+            #NOTE: This inherits from ZMQInteractiveShell which inherits from InteractiveShell
+            #NOTE:
+            #NOTE:
+            #NOTE: Some important & useful function (bound methods) of the shell instance:
+            #NOTE:
+            #NOTE: show_banner(banner=None)
+            #NOTE: to directly execute code inside the shell we can use one of its bound 
+            #NOTE: methods, inherited all the way from IPython.core.InteractiveShell:
+            #NOTE:
+            #NOTE: run_cell (overridden by ipkernel.zmqshell.ZMQInteractiveShell but syntax and functionality are the same)
+            #NOTE: run_cell_magic 
+            #NOTE: run_code
+            #NOTE: runcode, 
+            #NOTE: run_line_magic
+            #NOTE:
 
-        #self.ipkernel.shell.push(self.a, self.testing) # fooling around
-        
-        self.shell = self.ipkernel.shell
+            #self.ipkernel.shell.push(self.a, self.testing) # fooling around
+            
+            self.shell = self.ipkernel.shell
 
-        self.executionCount = self.ipkernel.shell.execution_count # this is always 1 immediately after initialization
+            self.executionCount = self.ipkernel.shell.execution_count # this is always 1 immediately after initialization
 
-        self.historyAccessor = HistoryAccessor() # access history database independently of the shell
-                                                 # should not interfere with the history 
+            self.historyAccessor = HistoryAccessor() # access history database independently of the shell
+                                                    # should not interfere with the history 
 
 
-        # NOTE: 2019-08-03 17:03:03
-        # populate the command history widget
-        hist = self.historyAccessor.search('*')
+            # NOTE: 2019-08-03 17:03:03
+            # populate the command history widget
+            hist = self.historyAccessor.search('*')
 
-        sessionNo = None
-        
-        items = list()
+            sessionNo = None
+            
+            items = list()
 
-        for session, line, inline in hist:
-            if sessionNo is None or sessionNo != session:
-                sessionNo = session  #cache the session
-                sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [repr(sessionNo)])
-                items.append(sessionItem)
+            for session, line, inline in hist:
+                if sessionNo is None or sessionNo != session:
+                    sessionNo = session  #cache the session
+                    sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [repr(sessionNo)])
+                    items.append(sessionItem)
 
-            #lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [inline])
-            lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [repr(line), inline])
-            #lineItem.setText(0,repr(line))
-            #lineItem.setText(1,inline)
-            items.append(lineItem)
+                #lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [inline])
+                lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [repr(line), inline])
+                #lineItem.setText(0,repr(line))
+                #lineItem.setText(1,inline)
+                items.append(lineItem)
 
-        self.currentSessionTreeWidgetItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, ["Current"])
-        
-        items.append(self.currentSessionTreeWidgetItem)
-        
-        #self.console.historyItemsDropped.connect(self._rerunCommand)
-        #NOTE: 2017-03-21 22:55:57 much better!
-        # connect signals emitted by the console when processing a drop event
-        self.console.historyItemsDropped.connect(self.slot_pasteHistorySelection) 
-        self.console.workspaceItemsDropped.connect(self.slot_pasteWorkspaceSelection)
-        #self.console.workspaceItemsDropped[bool].connect(self.slot_pasteWorkspaceSelection)
-        self.console.loadUrls[object, bool, QtCore.QPoint].connect(self.slot_loadDroppedURLs)
-        self.console.pythonFileReceived[str, QtCore.QPoint].connect(self.slot_handlePythonTextFile)
+            self.currentSessionTreeWidgetItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, ["Current"])
+            
+            items.append(self.currentSessionTreeWidgetItem)
+            
+            #self.console.historyItemsDropped.connect(self._rerunCommand)
+            #NOTE: 2017-03-21 22:55:57 much better!
+            # connect signals emitted by the console when processing a drop event
+            self.console.historyItemsDropped.connect(self.slot_pasteHistorySelection) 
+            self.console.workspaceItemsDropped.connect(self.slot_pasteWorkspaceSelection)
+            #self.console.workspaceItemsDropped[bool].connect(self.slot_pasteWorkspaceSelection)
+            self.console.loadUrls[object, bool, QtCore.QPoint].connect(self.slot_loadDroppedURLs)
+            self.console.pythonFileReceived[str, QtCore.QPoint].connect(self.slot_handlePythonTextFile)
 
-        self.historyTreeWidget.insertTopLevelItems(0, items)
-        self.historyTreeWidget.scrollToItem(self.currentSessionTreeWidgetItem)
-        self.historyTreeWidget.setCurrentItem(self.currentSessionTreeWidgetItem)
+            self.historyTreeWidget.insertTopLevelItems(0, items)
+            self.historyTreeWidget.scrollToItem(self.currentSessionTreeWidgetItem)
+            self.historyTreeWidget.setCurrentItem(self.currentSessionTreeWidgetItem)
 
-        #NOTE: until input has been enetered at the console, this is the LAST session on record NOT the current one!
-        self.currentSessionID = self.historyAccessor.get_last_session_id()
-        
-        self.selectedSessionID = None
+            #NOTE: until input has been enetered at the console, this is the LAST session on record NOT the current one!
+            self.currentSessionID = self.historyAccessor.get_last_session_id()
+            
+            self.selectedSessionID = None
 
-        # ------------------------------
-        # set up a` COMMON workspace
-        # ------------------------------
-        #
-        # NOTE: 2016-03-20 14:29:16
-        # populate kernel namespace with the imports from this current module 
-        #
-        # this effectively is the second time they're being imported, but this time
-        # in the ipkernel environment
-        # __module_name__ is "pict" so we take all its contents into the kernel
-        # namespace (they're just references to those objects)
-        self.workspace = self.ipkernel.shell.user_ns
-        #self.workspace['mainWindow'] = self
-        self.workspace['mainWindow'] = self
+            # ------------------------------
+            # set up a` COMMON workspace
+            # ------------------------------
+            #
+            # NOTE: 2016-03-20 14:29:16
+            # populate kernel namespace with the imports from this current module 
+            #
+            # this effectively is the second time they're being imported, but this time
+            # in the ipkernel environment
+            # __module_name__ is "pict" so we take all its contents into the kernel
+            # namespace (they're just references to those objects)
+            self.workspace = self.ipkernel.shell.user_ns
+            #self.workspace['mainWindow'] = self
+            self.workspace['mainWindow'] = self
 
-        # NOTE: 2016-03-20 20:50:42 -- WRONG!
-        # get_ipython() returns an instance of the interactive shell, NOT the kernel
-        self.workspace['ipkernel'] = self.ipkernel
-        self.workspace['console'] = self.console # useful for testing functionality; remove upon release
-        self.workspace["shell"] = self.shell # alias to self.ipkernel.shell
-        
-        # NOTE: 2018-05-08 10:49:37
-        # console exit() is broken as of ipykernel 4.8.2/ipython 6.3.1/jupyter 1.0.0/jupyter-client 5.2.3/jupyter-console 5.2.0/jupyter-core 4.4.0
-        # override with our custom exit instead
-        # NOTE 2019-08-04 11:05:59
-        # directly call this slot
-        self.workspace["exit"] = self.slot_pictQuit
-        
-        # TODO/FIXME 2019-08-04 11:06:16
-        # this does not override ipython's exit: 
-        # this will have to be called as %exit line magic (i.e. automagic doesn't work)
-        self.ipkernel.shell.register_magics(PictMagics) 
-        
-        impcmd = ' '.join(['from', "".join(["gui.", __module_name__]), 'import *'])
-        
-        self.ipkernel.shell.run_cell(impcmd)
-        
-        # hide the variables added ot the workspace so far
-        # (ipkernel, console, shell)
-        
-        self._nonInteractiveVars.update([i for i in self.workspace.items()])
+            # NOTE: 2016-03-20 20:50:42 -- WRONG!
+            # get_ipython() returns an instance of the interactive shell, NOT the kernel
+            self.workspace['ipkernel'] = self.ipkernel
+            self.workspace['console'] = self.console # useful for testing functionality; remove upon release
+            self.workspace["shell"] = self.shell # alias to self.ipkernel.shell
+            
+            # NOTE: 2018-05-08 10:49:37
+            # console exit() is broken as of ipykernel 4.8.2/ipython 6.3.1/jupyter 1.0.0/jupyter-client 5.2.3/jupyter-console 5.2.0/jupyter-core 4.4.0
+            # override with our custom exit instead
+            # NOTE 2019-08-04 11:05:59
+            # directly call this slot
+            self.workspace["exit"] = self.slot_pictQuit
+            
+            # TODO/FIXME 2019-08-04 11:06:16
+            # this does not override ipython's exit: 
+            # this will have to be called as %exit line magic (i.e. automagic doesn't work)
+            self.ipkernel.shell.register_magics(PictMagics) 
+            
+            impcmd = ' '.join(['from', "".join(["gui.", __module_name__]), 'import *'])
+            
+            self.ipkernel.shell.run_cell(impcmd)
+            
+            # hide the variables added ot the workspace so far
+            # (ipkernel, console, shell)
+            
+            self._nonInteractiveVars.update([i for i in self.workspace.items()])
 
-        # --------------------------
-        # finally, customize console window title and show it
-        # -------------------------
-        self.console.setWindowTitle(u'Scipyen Console')
+            # --------------------------
+            # finally, customize console window title and show it
+            # -------------------------
+            self.console.setWindowTitle(u'Scipyen Console')
         
         self.console.show()
         
@@ -3821,36 +3856,53 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         #NOTE: I guess I can live with this for now...
 
     def slot_pictQuit(self):
-        if not self._save_settings_guard_:
-            self._save_settings_()
-            self._save_settings_guard_ = True
+        evt = QtGui.QCloseEvent()
+        self.closeEvent(evt)
         
-        self.workspaceModel.clear()
+        #if not self._save_settings_guard_:
+            #self._save_settings_()
+            #self._save_settings_guard_ = True
+        
+        #self.workspaceModel.clear()
 
+        #if self.console is not None:
+            #self.console.kernel_manager.shutdown_kernel()
+            #self.console.close()
+            ##del self.console
+            #self.console = None
+            
+        #if self.external_console:
+            #self.external_console.window.closeEvent(evt)
+            #if not evt.isAccepted():
+                #return
+            #self.external_console = None
+            
+        #self.app.closeAllWindows()
+            
+    def closeEvent(self, evt):
+        if self.external_console is not None:
+            self.external_console.window.closeEvent(evt)
+            if not evt.isAccepted():
+                return
+            self.external_console = None
+            self.workspace["external_console"] = None
+            self.workspaceModel.hidden_vars["external_console"] = None
+            #self.slot_updateWorkspaceTable(False)
+            
         if self.console is not None:
             self.console.kernel_manager.shutdown_kernel()
             self.console.close()
             #del self.console
             self.console = None
             
-        self.app.closeAllWindows()
-            
-        #self.close()
+        self.lscatWindow.slot_Quit()
         
-    #"def" consoleExit(self):
-        #self.slot_pictQuit()
-        ##if self.console is not None:
-            ##self.console.kernel_manager.shutdown_kernel()
-            ##self.console.close()
-            ##self.console = None
-        
-    def closeEvent(self, evt):
         if not self._save_settings_guard_:
             self._save_settings_()
             self._save_settings_guard_ = True
             
-        self.lscatWindow.slot_Quit()
         self.app.closeAllWindows()
+        
         evt.accept()
         
     def _save_settings_(self):
@@ -4113,9 +4165,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         
         self.actionQuit.triggered.connect(self.slot_pictQuit)
         
-        self.actionOpen_Console.triggered.connect(self.slot_initQtConsole)
+        self.actionConsole.triggered.connect(self.slot_initQtConsole)
         #self.actionRestore_Workspace.triggered.connect(self.slot_restoreWorkspace)
         self.actionHelp_On_Console.triggered.connect(self._helpOnConsole_)
+        
+        self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
+        
         self.actionOpen.triggered.connect(self.slot_openFiles)
         #self.actionOpen.triggered.connect(self.openFile)
         #self.actionOpen_Files.triggered.connect(self.slot_openFiles)

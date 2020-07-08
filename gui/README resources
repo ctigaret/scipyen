@@ -16,3 +16,5 @@ __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__,"gu
                                                 from_imports=True, 
                                                 import_from="gui")
 
+# NOTE 2020-07-08 10:45:46
+Alternatively, run generate_resources2.sh in THIS directory

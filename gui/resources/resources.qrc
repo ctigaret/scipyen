@@ -40,6 +40,9 @@
 		<file>images/go-up.svg</file>
 		<file>images/insert.svg</file>
 		<file>images/IPythonConsole.svg</file>
+		<file>images/ipython.svg</file>
+		<file>images/JupyterConsole.svg</file>
+		<file>images/JupyterQtConsole.svg</file>
 		<file>images/kr_combine.svg</file>
 		<file>images/list-remove.svg</file>
 		<file>images/menu_new_sep.svg</file>

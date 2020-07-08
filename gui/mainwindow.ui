@@ -55,12 +55,6 @@
     <property name="title">
      <string>Fi&amp;le</string>
     </property>
-    <widget class="QMenu" name="menuPrint_IPython_Namespace">
-     <property name="title">
-      <string>Co&amp;nsoles</string>
-     </property>
-     <addaction name="actionOpen_Console"/>
-    </widget>
     <widget class="QMenu" name="menuImport">
      <property name="title">
       <string>&amp;Import</string>
@@ -77,7 +71,6 @@
     <addaction name="actionChange_Working_Directory"/>
     <addaction name="separator"/>
     <addaction name="separator"/>
-    <addaction name="menuPrint_IPython_Namespace"/>
     <addaction name="actionReload_Plugins"/>
     <addaction name="separator"/>
     <addaction name="actionQuit"/>
@@ -112,10 +105,19 @@
     </property>
     <addaction name="actionConsole_font"/>
    </widget>
+   <widget class="QMenu" name="menuConsoles">
+    <property name="title">
+     <string>Consoles</string>
+    </property>
+    <addaction name="actionConsole"/>
+    <addaction name="actionExternalIPython"/>
+    <addaction name="actionExternalNrnIPython"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuView"/>
    <addaction name="menuSettings"/>
    <addaction name="menuViewers"/>
+   <addaction name="menuConsoles"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -696,7 +698,7 @@ NOTE: you can click anywhere in the row to select</string>
     <string>&amp;Quit</string>
    </property>
   </action>
-  <action name="actionOpen_Console">
+  <action name="action_Console">
    <property name="text">
     <string>&amp;Console</string>
    </property>
@@ -814,6 +816,26 @@ NOTE: you can click anywhere in the row to select</string>
   <action name="actionNewViewer">
    <property name="text">
     <string>New...</string>
+   </property>
+  </action>
+  <action name="actionExternal_IPython">
+   <property name="text">
+    <string>External IPython</string>
+   </property>
+  </action>
+  <action name="actionConsole">
+   <property name="text">
+    <string>Console</string>
+   </property>
+  </action>
+  <action name="actionExternalIPython">
+   <property name="text">
+    <string>External IPython</string>
+   </property>
+  </action>
+  <action name="actionExternalNrnIPython">
+   <property name="text">
+    <string>External IPython for Neuron</string>
    </property>
   </action>
  </widget>

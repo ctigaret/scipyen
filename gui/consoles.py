@@ -1,36 +1,675 @@
-from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
+import os
+import signal
+import sys
+from warnings import warn
+
+from PyQt5 import (QtCore, QtGui, QtWidgets, )
+from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
 
 #### BEGIN ipython/jupyter modules
-from qtconsole.rich_jupyter_widget import RichJupyterWidget # DIFFERENT from that in qtconsoleapp module !!!
+from traitlets.config.application import boolean_flag
+from traitlets.config.application import catch_config_error
+from traitlets import (
+    Dict, Unicode, CBool, Any
+)
+
+from qtconsole import styles, __version__
+
 #NOTE: 2017-03-21 01:09:05 inheritance chain ("<" means inherits from)
 # RichJupyterWidget < RichIPythonWidget < JupyterWidget < FrontendWidget < (HistoryConsoleWidget, BaseFrontendMixin)
 #in turn, FrontendWidget < ... < ConsoleWidget which implements underlying 
 # Qt logic, including drag'n drop
-#from qtconsole.mainwindow import MainWindow as ConsoleMainWindow
-
-
-import jupyter_client
+from qtconsole.rich_jupyter_widget import RichJupyterWidget # DIFFERENT from that in qtconsoleapp module !!!
+from qtconsole.jupyter_widget import JupyterWidget # for use in the External Console
 
 from qtconsole.inprocess import QtInProcessKernelManager
+from qtconsole.jupyter_widget import JupyterWidget
+#from qtconsole.mainwindow import MainWindow as ConsoleMainWindow
+from qtconsole.mainwindow import MainWindow, background
+from qtconsole.client import QtKernelClient
+from qtconsole.manager import QtKernelManager
 
-from IPython.utils.ipstruct import Struct as IPStruct
 
-from IPython.core.history import HistoryAccessor
+#import jupyter_client
 
-from IPython.lib.deepreload import reload as dreload
+
+#from IPython.utils.ipstruct import Struct as IPStruct
+
+#from IPython.core.history import HistoryAccessor
+
+#from IPython.lib.deepreload import reload as dreload
 
 from IPython.core.magic import (Magics, magics_class, line_magic,
                                 cell_magic, line_cell_magic,
                                 needs_local_scope)
 
-from IPython.display import set_matplotlib_formats
+from jupyter_core.application import JupyterApp, base_flags, base_aliases
+from jupyter_client.consoleapp import (
+        JupyterConsoleApp, app_aliases, app_flags,
+    )
+
+
+from jupyter_client.localinterfaces import is_local_ip
+
+#from IPython.display import set_matplotlib_formats
 
 #### END ipython/jupyter modules
 
-from core import prog
+#from core import prog
 from core.prog import safeWrapper
 
+flags = dict(base_flags)
+qt_flags = {
+    'plain' : ({'JupyterQtConsoleApp' : {'plain' : True}},
+            "Disable rich text support."),
+}
+qt_flags.update(boolean_flag(
+    'banner', 'JupyterQtConsoleApp.display_banner',
+    "Display a banner upon starting the QtConsole.",
+    "Don't display a banner upon starting the QtConsole."
+))
+
+# and app_flags from the Console Mixin
+qt_flags.update(app_flags)
+# add frontend flags to the full set
+flags.update(qt_flags)
+
+# start with copy of base jupyter aliases
+aliases = dict(base_aliases)
+qt_aliases = dict(
+    style = 'JupyterWidget.syntax_style',
+    stylesheet = 'JupyterQtConsoleApp.stylesheet',
+
+    editor = 'JupyterWidget.editor',
+    paging = 'ConsoleWidget.paging',
+)
+# and app_aliases from the Console Mixin
+qt_aliases.update(app_aliases)
+qt_aliases.update({'gui-completion':'ConsoleWidget.gui_completion'})
+# add frontend aliases to the full set
+aliases.update(qt_aliases)
+
+# get flags&aliases into sets, and remove a couple that
+# shouldn't be scrubbed from backend flags:
+qt_aliases = set(qt_aliases.keys())
+qt_flags = set(qt_flags.keys())
+
+class ExternalConsoleWindow(MainWindow):
+    def __init__(self, app,
+                    confirm_exit=True,
+                    new_frontend_factory=None, slave_frontend_factory=None,
+                    connection_frontend_factory=None,
+                ):
+        super().__init__(app, confirm_exit = confirm_exit,
+                         new_frontend_factory = new_frontend_factory,
+                         slave_frontend_factory = slave_frontend_factory,
+                         connection_frontend_factory=connection_frontend_factory)
+        
+        self.defaultFixedFont = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
+        self.settings = QtCore.QSettings()
+        self._console_font_ = None
+        self._load_settings_()
+        
+        
+    def _load_settings_(self):
+        # located in $HOME/.config/Scipyen/Scipyen.conf
+        winSize = self.settings.value("ExternalConsole/Size", QtCore.QSize(600, 350))
+        winPos = self.settings.value("ExternalConsole/Position", QtCore.QPoint(0,0))
+        fontFamily = self.settings.value("ExternalConsole/FontFamily", self.defaultFixedFont.family())
+        fontSize = int(self.settings.value("ExternalConsole/FontPointSize", self.defaultFixedFont.pointSize()))
+        fontStyle = int(self.settings.value("ExternalConsole/FontStyle", self.defaultFixedFont.style()))
+        fontWeight = int(self.settings.value("ExternalConsole/FontWeight", self.defaultFixedFont.weight()))
+        
+        self._console_font_ = QtGui.QFont(fontFamily, fontSize, fontWeight, italic = fontStyle > 0)
+        
+        #self.setFont(console_font)
+        
+        #self._set_font(console_font)
+        
+        #self.font = console_font
+
+        self.move(winPos)
+        self.resize(winSize)
+        self.setAcceptDrops(True)
+        
+    @safeWrapper
+    def _save_settings_(self):
+        self.settings.setValue("ExternalConsole/Size", self.size())
+        self.settings.setValue("ExternalConsole/Position", self.pos())
+        if self.active_frontend:
+            font = self.active_frontend.font
+            self.settings.setValue("ExternalConsole/FontFamily", font.family())
+            self.settings.setValue("ExternalConsole/FontPointSize", font.pointSize())
+            self.settings.setValue("ExternalConsole/FontStyle", font.style())
+            self.settings.setValue("ExternalConsole/FontWeight", font.weight())
+
+    @safeWrapper
+    def _save_tab_settings_(self, widget):
+        font = widget.font
+        self.settings.setValue("ExternalConsole/FontFamily", font.family())
+        self.settings.setValue("ExternalConsole/FontPointSize", font.pointSize())
+        self.settings.setValue("ExternalConsole/FontStyle", font.style())
+        self.settings.setValue("ExternalConsole/FontWeight", font.weight())
+        
+        
+    def add_tab_with_frontend(self,frontend,name=None):
+        """ insert a tab with a given frontend in the tab bar, and give it a name
+
+        """
+        if not name:
+            name = 'kernel %i' % self.next_kernel_id
+        self.tab_widget.addTab(frontend,name)
+        self.update_tab_bar_visibility()
+        self.make_frontend_visible(frontend)
+        frontend.font = self._console_font_
+        frontend.exit_requested.connect(self.close_tab)
+
+    def closeEvent(self, event):
+        """ Forward the close event to every tabs contained by the windows
+        """
+        if self.tab_widget.count() == 0:
+            # no tabs, just close
+            self._save_settings_()
+            event.accept()
+            return
+        
+        # Do Not loop on the widget count as it change while closing
+        title = self.window().windowTitle()
+        cancel = QtWidgets.QMessageBox.Cancel
+        okay = QtWidgets.QMessageBox.Ok
+        accept_role = QtWidgets.QMessageBox.AcceptRole
+
+        if self.confirm_exit:
+            if self.tab_widget.count() > 1:
+                msg = "Close all tabs, stop all kernels, and Quit?"
+            else:
+                msg = "Close console, stop kernel, and Quit?"
+            info = "Kernels not started here (e.g. notebooks) will be left alone."
+            closeall = QtWidgets.QPushButton("&Quit", self)
+            closeall.setShortcut('Q')
+            box = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Question,
+                                    title, msg)
+            box.setInformativeText(info)
+            box.addButton(cancel)
+            box.addButton(closeall, QtWidgets.QMessageBox.YesRole)
+            box.setDefaultButton(closeall)
+            box.setEscapeButton(cancel)
+            pixmap = QtGui.QPixmap(self._app.icon.pixmap(QtCore.QSize(64,64)))
+            box.setIconPixmap(pixmap)
+            reply = box.exec_()
+        else:
+            reply = okay
+
+        if reply == cancel:
+            event.ignore()
+            return
+        
+        if reply == okay or reply == accept_role:
+            while self.tab_widget.count() >= 1:
+                # prevent further confirmations:
+                widget = self.active_frontend
+                widget._confirm_exit = False
+                if self.tab_widget.count() == 1:
+                    self._save_tab_settings_()
+                self.close_tab(widget)
+            event.accept()
+        
+    def close_tab(self,current_tab):
+        """ Called when you need to try to close a tab.
+
+        It takes the number of the tab to be closed as argument, or a reference
+        to the widget inside this tab
+        """
+
+        # let's be sure "tab" and "closing widget" are respectively the index
+        # of the tab to close and a reference to the frontend to close
+        if type(current_tab) is not int :
+            current_tab = self.tab_widget.indexOf(current_tab)
+        closing_widget=self.tab_widget.widget(current_tab)
+
+
+        # when trying to be closed, widget might re-send a request to be
+        # closed again, but will be deleted when event will be processed. So
+        # need to check that widget still exists and skip if not. One example
+        # of this is when 'exit' is sent in a slave tab. 'exit' will be
+        # re-sent by this function on the master widget, which ask all slave
+        # widgets to exit
+        if closing_widget is None:
+            return
+
+        #get a list of all slave widgets on the same kernel.
+        slave_tabs = self.find_slave_widgets(closing_widget)
+
+        keepkernel = None #Use the prompt by default
+        if hasattr(closing_widget,'_keep_kernel_on_exit'): #set by exit magic
+            keepkernel = closing_widget._keep_kernel_on_exit
+            # If signal sent by exit magic (_keep_kernel_on_exit, exist and not None)
+            # we set local slave tabs._hidden to True to avoid prompting for kernel
+            # restart when they get the signal. and then "forward" the 'exit'
+            # to the main window
+            if keepkernel is not None:
+                for tab in slave_tabs:
+                    tab._hidden = True
+                if closing_widget in slave_tabs:
+                    try :
+                        self.find_master_tab(closing_widget).execute('exit')
+                    except AttributeError:
+                        self.log.info("Master already closed or not local, closing only current tab")
+                        self.tab_widget.removeTab(current_tab)
+                    self.update_tab_bar_visibility()
+                    return
+
+        kernel_client = closing_widget.kernel_client
+        kernel_manager = closing_widget.kernel_manager
+
+        if keepkernel is None and not closing_widget._confirm_exit:
+            # don't prompt, just terminate the kernel if we own it
+            # or leave it alone if we don't
+            keepkernel = closing_widget._existing
+        if keepkernel is None: #show prompt
+            if kernel_client and kernel_client.channels_running:
+                title = self.window().windowTitle()
+                cancel = QtWidgets.QMessageBox.Cancel
+                okay = QtWidgets.QMessageBox.Ok
+                if closing_widget._may_close:
+                    msg = "You are closing the tab : "+'"'+self.tab_widget.tabText(current_tab)+'"'
+                    info = "Would you like to quit the Kernel and close all attached Consoles as well?"
+                    justthis = QtWidgets.QPushButton("&No, just this Tab", self)
+                    justthis.setShortcut('N')
+                    closeall = QtWidgets.QPushButton("&Yes, close all", self)
+                    closeall.setShortcut('Y')
+                    # allow ctrl-d ctrl-d exit, like in terminal
+                    closeall.setShortcut('Ctrl+D')
+                    box = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Question,
+                                            title, msg)
+                    box.setInformativeText(info)
+                    box.addButton(cancel)
+                    box.addButton(justthis, QtWidgets.QMessageBox.NoRole)
+                    box.addButton(closeall, QtWidgets.QMessageBox.YesRole)
+                    box.setDefaultButton(closeall)
+                    box.setEscapeButton(cancel)
+                    pixmap = QtGui.QPixmap(self._app.icon.pixmap(QtCore.QSize(64,64)))
+                    box.setIconPixmap(pixmap)
+                    reply = box.exec_()
+                    if reply == 1: # close All
+                        for slave in slave_tabs:
+                            background(slave.kernel_client.stop_channels)
+                            self.tab_widget.removeTab(self.tab_widget.indexOf(slave))
+                        kernel_manager.shutdown_kernel()
+                        self.tab_widget.removeTab(current_tab)
+                        background(kernel_client.stop_channels)
+                    elif reply == 0: # close Console
+                        if not closing_widget._existing:
+                            # Have kernel: don't quit, just close the tab
+                            closing_widget.execute("exit True")
+                        self.tab_widget.removeTab(current_tab)
+                        background(kernel_client.stop_channels)
+                else:
+                    reply = QtWidgets.QMessageBox.question(self, title,
+                        "Are you sure you want to close this Console?"+
+                        "\nThe Kernel and other Consoles will remain active.",
+                        okay|cancel,
+                        defaultButton=okay
+                        )
+                    if reply == okay:
+                        self.tab_widget.removeTab(current_tab)
+        elif keepkernel: #close console but leave kernel running (no prompt)
+            self.tab_widget.removeTab(current_tab)
+            background(kernel_client.stop_channels)
+        else: #close console and kernel (no prompt)
+            self.tab_widget.removeTab(current_tab)
+            if kernel_client and kernel_client.channels_running:
+                for slave in slave_tabs:
+                    background(slave.kernel_client.stop_channels)
+                    self.tab_widget.removeTab(self.tab_widget.indexOf(slave))
+                if kernel_manager:
+                    kernel_manager.shutdown_kernel()
+                background(kernel_client.stop_channels)
+
+        self.update_tab_bar_visibility()
+
+
+class ExternalIPython(JupyterApp, JupyterConsoleApp):
+    """Modifed version of qtconsole.qtconsoleapp.JupyterQtConsoleApp
+    """
+    #  NOTE 2020-07-08 08:23:39
+    #
+    # uses the exising app (Scipyen) so no more init_qt_app()
+    #
+    # there is one python app and one PyQt GUI app (in the original, started by
+    # the qtconsole)
+    #
+    # in the original start mechanism is:
+    # 
+    # * call class method launch_instance - which calls (by MRO) Application.launch_instance()
+    # (from traitlets.config.application) to launch a global instance
+    #   in turn, Application.launch_instance creates an instance of the python app
+    #   initializes (app.initialize()) and starts (app.start())
+    #
+    name = 'Scypien External IPython Console'
+    version = __version__
+    description = """
+        The Jupyter QtConsole.
+
+        This launches a Console-style application using Qt.  It is not a full
+        console, in that launched terminal subprocesses will not be able to accept
+        input.
+
+    """
+    classes = [JupyterWidget] + JupyterConsoleApp.classes
+    flags = Dict(flags)
+    aliases = Dict(aliases)
+    frontend_flags = Any(qt_flags)
+    frontend_aliases = Any(qt_aliases)
+    kernel_client_class = QtKernelClient
+    kernel_manager_class = QtKernelManager
+
+    stylesheet = Unicode('', config=True,
+        help="path to a custom CSS stylesheet")
+
+    hide_menubar = CBool(False, config=True,
+        help="Start the console window with the menu bar hidden.")
+
+    maximize = CBool(False, config=True,
+        help="Start the console window maximized.")
+
+    plain = CBool(False, config=True,
+        help="Use a plaintext widget instead of rich text (plain can't print/save).")
+
+    display_banner = CBool(True, config=True,
+        help="Whether to display a banner upon starting the QtConsole."
+    )
+
+    def _plain_changed(self, name, old, new):
+        kind = 'plain' if new else 'rich'
+        self.config.ConsoleWidget.kind = kind
+        if new:
+            self.widget_factory = JupyterWidget
+        else:
+            self.widget_factory = RichJupyterWidget
+
+    # the factory for creating a widget
+    widget_factory = Any(RichJupyterWidget)
+
+    def parse_command_line(self, argv=None):
+        super().parse_command_line(argv)
+        self.build_kernel_argv(self.extra_args)
+
+
+    def new_frontend_master(self):
+        """ Create and return new frontend attached to new kernel, launched on localhost.
+        """
+        kernel_manager = self.kernel_manager_class(
+                                connection_file=self._new_connection_file(),
+                                parent=self,
+                                autorestart=True,
+        )
+        # start the kernel
+        kwargs = {}
+        # FIXME: remove special treatment of IPython kernels
+        if self.kernel_manager.ipykernel:
+            kwargs['extra_arguments'] = self.kernel_argv
+        kernel_manager.start_kernel(**kwargs)
+        kernel_manager.client_factory = self.kernel_client_class
+        kernel_client = kernel_manager.client()
+        kernel_client.start_channels(shell=True, iopub=True)
+        widget = self.widget_factory(config=self.config,
+                                     local_kernel=True)
+        self.init_colors(widget)
+        widget.kernel_manager = kernel_manager
+        widget.kernel_client = kernel_client
+        widget._existing = False
+        widget._may_close = True
+        widget._confirm_exit = self.confirm_exit
+        widget._display_banner = self.display_banner
+        return widget
+
+    def new_frontend_connection(self, connection_file):
+        """Create and return a new frontend attached to an existing kernel.
+
+        Parameters
+        ----------
+        connection_file : str
+            The connection_file path this frontend is to connect to
+        """
+        kernel_client = self.kernel_client_class(
+            connection_file=connection_file,
+            config=self.config,
+        )
+        kernel_client.load_connection_file()
+        kernel_client.start_channels()
+        widget = self.widget_factory(config=self.config,
+                                     local_kernel=False)
+        self.init_colors(widget)
+        widget._existing = True
+        widget._may_close = False
+        widget._confirm_exit = False
+        widget._display_banner = self.display_banner
+        widget.kernel_client = kernel_client
+        widget.kernel_manager = None
+        return widget
+
+    def new_frontend_slave(self, current_widget):
+        """Create and return a new frontend attached to an existing kernel.
+
+        Parameters
+        ----------
+        current_widget : JupyterWidget
+            The JupyterWidget whose kernel this frontend is to share
+        """
+        kernel_client = self.kernel_client_class(
+                                connection_file=current_widget.kernel_client.connection_file,
+                                config = self.config,
+        )
+        kernel_client.load_connection_file()
+        kernel_client.start_channels()
+        widget = self.widget_factory(config=self.config,
+                                local_kernel=False)
+        self.init_colors(widget)
+        widget._existing = True
+        widget._may_close = False
+        widget._confirm_exit = False
+        widget._display_banner = self.display_banner
+        widget.kernel_client = kernel_client
+        widget.kernel_manager = current_widget.kernel_manager
+        return widget
+    
+    def init_qt_elements(self):
+        # Create the widget.
+
+        base_path = os.path.abspath(os.path.dirname(__file__))
+        #icon_path = os.path.join(base_path, 'resources', 'icon', 'JupyterConsole.svg')
+        icon_path = os.path.join(base_path, 'resources', 'images', 'ipython.svg')
+        self.app.icon = QtGui.QIcon(icon_path)
+        QtWidgets.QApplication.setWindowIcon(self.app.icon)
+
+        ip = self.ip
+        local_kernel = (not self.existing) or is_local_ip(ip)
+        self.widget = self.widget_factory(config=self.config,
+                                        local_kernel=local_kernel)
+        self.init_colors(self.widget)
+        self.widget._existing = self.existing
+        self.widget._may_close = not self.existing
+        self.widget._confirm_exit = self.confirm_exit
+        self.widget._display_banner = self.display_banner
+
+        self.widget.kernel_manager = self.kernel_manager
+        self.widget.kernel_client = self.kernel_client
+        
+        self.window = ExternalConsoleWindow(self.app,
+                                confirm_exit=self.confirm_exit,
+                                new_frontend_factory=self.new_frontend_master,
+                                slave_frontend_factory=self.new_frontend_slave,
+                                connection_frontend_factory=self.new_frontend_connection,
+                                )
+        
+        self.window.log = self.log
+        self.window.add_tab_with_frontend(self.widget)
+        self.window.init_menu_bar()
+
+        # Ignore on OSX, where there is always a menu bar
+        if sys.platform != 'darwin' and self.hide_menubar:
+            self.window.menuBar().setVisible(False)
+
+        self.window.setWindowTitle('External Scipyen Console')
+
+    def init_colors(self, widget):
+        """Configure the coloring of the widget"""
+        # Note: This will be dramatically simplified when colors
+        # are removed from the backend.
+
+        # parse the colors arg down to current known labels
+        cfg = self.config
+        colors = cfg.ZMQInteractiveShell.colors if 'ZMQInteractiveShell.colors' in cfg else None
+        style = cfg.JupyterWidget.syntax_style if 'JupyterWidget.syntax_style' in cfg else None
+        sheet = cfg.JupyterWidget.style_sheet if 'JupyterWidget.style_sheet' in cfg else None
+
+        # find the value for colors:
+        if colors:
+            colors=colors.lower()
+            if colors in ('lightbg', 'light'):
+                colors='lightbg'
+            elif colors in ('dark', 'linux'):
+                colors='linux'
+            else:
+                colors='nocolor'
+        elif style:
+            if style=='bw':
+                colors='nocolor'
+            elif styles.dark_style(style):
+                colors='linux'
+            else:
+                colors='lightbg'
+        else:
+            colors=None
+
+        # Configure the style
+        if style:
+            widget.style_sheet = styles.sheet_from_template(style, colors)
+            widget.syntax_style = style
+            widget._syntax_style_changed()
+            widget._style_sheet_changed()
+        elif colors:
+            # use a default dark/light/bw style
+            widget.set_default_style(colors=colors)
+
+        if self.stylesheet:
+            # we got an explicit stylesheet
+            if os.path.isfile(self.stylesheet):
+                with open(self.stylesheet) as f:
+                    sheet = f.read()
+            else:
+                raise IOError("Stylesheet %r not found." % self.stylesheet)
+        if sheet:
+            widget.style_sheet = sheet
+            widget._style_sheet_changed()
+
+
+    def init_signal(self):
+        """allow clean shutdown on sigint"""
+        signal.signal(signal.SIGINT, lambda sig, frame: self.exit(-2))
+        # need a timer, so that QApplication doesn't block until a real
+        # Qt event fires (can require mouse movement)
+        # timer trick from http://stackoverflow.com/q/4938723/938949
+        timer = QtCore.QTimer()
+         # Let the interpreter run each 200 ms:
+        timer.timeout.connect(lambda: None)
+        timer.start(200)
+        # hold onto ref, so the timer doesn't get cleaned up
+        self._sigint_timer = timer
+
+    def _deprecate_config(self, cfg, old_name, new_name):
+        """Warn about deprecated config."""
+        if old_name in cfg:
+            self.log.warning(
+                "Use %s in config, not %s. Outdated config:\n    %s",
+                new_name, old_name,
+                '\n    '.join(
+                    '{name}.{key} = {value!r}'.format(key=key, value=value,
+                                                      name=old_name)
+                    for key, value in self.config[old_name].items()
+                )
+            )
+            cfg = cfg.copy()
+            cfg[new_name].merge(cfg[old_name])
+            return cfg
+
+    def _init_asyncio_patch(self):
+        """
+        Same workaround fix as https://github.com/ipython/ipykernel/pull/456
+
+        Set default asyncio policy to be compatible with tornado
+        Tornado 6 (at least) is not compatible with the default
+        asyncio implementation on Windows
+        Pick the older SelectorEventLoopPolicy on Windows
+        if the known-incompatible default policy is in use.
+        do this as early as possible to make it a low priority and overrideable
+        ref: https://github.com/tornadoweb/tornado/issues/2608
+        FIXME: if/when tornado supports the defaults in asyncio,
+               remove and bump tornado requirement for py38
+        """
+        if sys.platform.startswith("win") and sys.version_info >= (3, 8):
+            import asyncio
+            try:
+                from asyncio import (
+                    WindowsProactorEventLoopPolicy,
+                    WindowsSelectorEventLoopPolicy,
+                )
+            except ImportError:
+                pass
+                # not affected
+            else:
+                if type(asyncio.get_event_loop_policy()) is WindowsProactorEventLoopPolicy:
+                    # WindowsProactorEventLoopPolicy is not compatible with tornado 6
+                    # fallback to the pre-3.8 default of Selector
+                    asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
+
+    @catch_config_error
+    def initialize(self, argv=None):
+        self._init_asyncio_patch()
+        
+        # NOTE 2020-07-08 09:17:44
+        # this is the GUI Pyqt app (providing a GUI event loop etc)
+        #self.init_qt_app()
+        self.app = QtWidgets.QApplication.instance()
+        super().initialize(argv)
+        if self._dispatching:
+            return
+        # handle deprecated renames
+        for old_name, new_name in [
+            ('IPythonQtConsoleApp', 'JupyterQtConsole'),
+            ('IPythonWidget', 'JupyterWidget'),
+            ('RichIPythonWidget', 'RichJupyterWidget'),
+        ]:
+            cfg = self._deprecate_config(self.config, old_name, new_name)
+            if cfg:
+                self.update_config(cfg)
+        JupyterConsoleApp.initialize(self,argv)
+        self.init_qt_elements()
+        self.init_signal()
+
+    def start(self):
+        super().start()
+
+        # draw the window
+        if self.maximize:
+            self.window.showMaximized()
+        else:
+            self.window.show()
+        self.window.raise_()
+
+        # Start the application main loop.
+        #self.app.exec_() # already happening
+
+    @classmethod
+    def launch(cls, argv=None, **kwargs):
+        # the launch_instance mechanism in jupyter and qtconsole does not return
+        # an instance of this python "app"
+        app = cls.instance(**kwargs)
+        app.initialize(argv)
+        app.start()
+        
+        return app
 
 # NOTE: use Jupyter (IPython >= 4.x and qtconsole / qt5 by default)
 class ScipyenConsole(RichJupyterWidget):
@@ -114,6 +753,7 @@ class ScipyenConsole(RichJupyterWidget):
         self.settings.setValue("Console/FontWeight", self.font.weight())
 
     def _load_settings_(self):
+        # located in $HOME/.config/Scipyen/Scipyen.conf
         winSize = self.settings.value("Console/Size", QtCore.QSize(600, 350))
         winPos = self.settings.value("Console/Position", QtCore.QPoint(0,0))
         fontFamily = self.settings.value("Console/FontFamily", self.defaultFixedFont.family())
@@ -123,9 +763,9 @@ class ScipyenConsole(RichJupyterWidget):
         
         console_font = QtGui.QFont(fontFamily, fontSize, fontWeight, italic = fontStyle > 0)
         
-        self.setFont(console_font)
+        #self.setFont(console_font)
         
-        self._set_font(console_font)
+        #self._set_font(console_font)
         
         self.font = console_font
 
