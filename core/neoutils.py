@@ -314,8 +314,8 @@ IX Generic indexing for the neo framework (provisional)
     
                          AnalogSignal                                    
                     IrregularlySampledSignal                                    
-                         dt.DataSignal                                    
-                  dt.IrregularlySampledDataSignal                                    
+                         DataSignal                                    
+                  IrregularlySampledDataSignal                                    
                         /               \                                     
                        /                 \                                     
                       /                   \                                     
@@ -674,16 +674,22 @@ import pyqtgraph as pg
 
 #### BEGIN pict.core modules
 #from . import plots
+from .prog import safeWrapper
+from .datatypes import  normalized_index
+from .datasignal import DataSignal, IrregularlySampledDataSignal
+from .triggerprotocols import TriggerEvent, TriggerProtocol
+from .scandata import ScanData
+
 from . import datatypes as dt
 from . import workspacefunctions
 from . import signalprocessing as sigp
 from . import utilities
 
+
 #from .patchneo import neo
 
 from gui.signalviewer import SignalCursor as SignalCursor
 
-from .utilities import safeWrapper, normalized_index
 #### END pict.core modules
 
 if __debug__:
@@ -788,13 +794,13 @@ def correlate(in1, in2, **kwargs):
     if in2.ndim > 1 and in2.shape[1] > 1:
         raise TypeError("in2 expected to be a 1D signal")
     
-    if isinstance(in1, (neo.AnalogSignal, neo.IrregularlySampledSignal, dt.DataSignal)):
+    if isinstance(in1, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
         in1_ = in1.magnitude.flatten()
         
     else:
         in1_ = in1.flatten()
 
-    if isinstance(in2, (neo.AnalogSignal, neo.IrregularlySampledSignal, dt.DataSignal)):
+    if isinstance(in2, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
         in2_ = in2.magnitude.flatten()
         
     else:
@@ -804,13 +810,13 @@ def correlate(in1, in2, **kwargs):
         
     corr = correlate(in1_, in2_, mode=mode, **kwargs)
     
-    if isinstance(in1, (neo.AnalogSignal, dt.DataSignal)):
+    if isinstance(in1, (neo.AnalogSignal, DataSignal)):
         ret = neo.AnalogSignal(corr, t_start = in1.t_start,
                                 units = units, 
                                 sampling_period = in1.sampling_period,
                                 name = name)
     
-        if isinstance(in2, (neo.AnalogSignal, neo.IrregularlySampledSignal, dt.DataSignal)):
+        if isinstance(in2, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
             ret.description = "Correlation of %s with %s" % (in1.name, in2.name)
             
         else:
@@ -824,7 +830,7 @@ def correlate(in1, in2, **kwargs):
                                             times = in1.times,
                                             name = name)
     
-        if isinstance(in2, (neo.AnalogSignal, neo.IrregularlySampledSignal, dt.DataSignal)):
+        if isinstance(in2, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
             ret.description = "Correlation of %s with %s" % (in1.name, in2.name)
             
         else:
@@ -1285,14 +1291,14 @@ def signal2epoch(sig, name=None, labels=None):
     return ret
 
 @safeWrapper
-def cursor_max(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal],
                cursor: typing.Union[SignalCursor, tuple],
                channel: typing.Optional[int] = None) -> pq.Quantity:
     """The maximum value of the signal across the cursor's window.
     
     Parameters:
     ----------
-    signal: neo.AnalogSignal, dt.DataSignal
+    signal: neo.AnalogSignal, DataSignal
     cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
     channel: int or None (default)
         For multi-channel signal, specified which channel is used:
@@ -1323,14 +1329,14 @@ def cursor_max(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     return ret
 
 @safeWrapper
-def cursor_argmax(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
                   cursor: typing.Union[SignalCursor, tuple],
                   channel: typing.Optional[int] = None) -> np.ndarray:
     """The index of maximum value of the signal across the cursor's window.
 
     Parameters:
     ----------
-    signal: neo.AnalogSignal, dt.DataSignal
+    signal: neo.AnalogSignal, DataSignal
     cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
     channel: int or None (default)
         For multi-channel signal, specified which channel is used:
@@ -1362,14 +1368,14 @@ def cursor_argmax(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
         return ret
 
 @safeWrapper
-def cursor_min(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+def cursor_min(signal: typing.Union[neo.AnalogSignal, DataSignal],
                cursor: typing.Union[tuple, SignalCursor],
                channel: typing.Optional[int] = None) -> pq.Quantity:
     """The minimum value of the signal across the cursor's window.
     
     Parameters:
     ----------
-    signal: neo.AnalogSignal, dt.DataSignal
+    signal: neo.AnalogSignal, DataSignal
     cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
     channel: int or None (default)
         For multi-channel signal, specified which channel is used:
@@ -1397,14 +1403,14 @@ def cursor_min(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     return ret
 
 @safeWrapper
-def cursor_argmin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
                   cursor: typing.Union[tuple, SignalCursor],
                   channel: typing.Optional[int] = None) -> np.ndarray:
     """The index of minimum value of the signal across the cursor's window.
 
     Parameters:
     ----------
-    signal: neo.AnalogSignal, dt.DataSignal
+    signal: neo.AnalogSignal, DataSignal
     cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
     channel: int or None (default)
         For multi-channel signal, specified which channel is used:
@@ -1436,14 +1442,14 @@ def cursor_argmin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
         return ret
 
 @safeWrapper
-def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
                   cursor: typing.Union[tuple, SignalCursor],
                   channel: typing.Optional[int] = None) -> tuple:
     """The maximum and minimum value of the signal across the cursor's window.
 
     Parameters:
     ----------
-    signal: neo.AnalogSignal, dt.DataSignal
+    signal: neo.AnalogSignal, DataSignal
     cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
     channel: int or None (default)
         For multi-channel signal, specified which channel is used:
@@ -1485,7 +1491,7 @@ def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
         return (mx, mn)
 
 @safeWrapper
-def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
                      cursor: typing.Union[tuple, SignalCursor],
                      channel: typing.Optional[int] = None) -> tuple:
     """The indices of signal maximum and minimum across the cursor's window.
@@ -1512,7 +1518,7 @@ def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
         return (mx, mn)
 
 @safeWrapper
-def cursor_average(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
                    cursor: typing.Union[tuple, SignalCursor],
                    channel: typing.Optional[int]=None) -> pq.Quantity:
     """Average of signal samples across the window of a vertical cursor.
@@ -1556,7 +1562,7 @@ def cursor_average(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     return ret
 
 @safeWrapper
-def cursor_value(signal:typing.Union[neo.AnalogSignal, dt.DataSignal],
+def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal],
                  cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple],
                  channel: typing.Optional[int] = None) -> pq.Quantity:
     """Value of signal at the vertical cursor's time coordinate.
@@ -1602,7 +1608,7 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, dt.DataSignal],
     return ret[channel].flatten() # so that it can be indexed
 
 @safeWrapper
-def cursor_index(signal:typing.Union[neo.AnalogSignal, dt.DataSignal],
+def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
                  cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple]) -> int:
     """Index of signal sample at the vertical cursor's time coordinate.
     
@@ -1696,7 +1702,7 @@ def cursors_measure(func, data, *cursors,
     if not isinstance(func, types.FunctionType):
         raise TypeError("first parameter expected to be a function; got %s instead")
     
-    if isinstance(data, (neo.AnalogSignal, dt.DataSignal)):
+    if isinstance(data, (neo.AnalogSignal, DataSignal)):
         return __signal_measure__(func, data, *cursors, **kwargs)
     
     elif isinstance(data, neo.Segment):
@@ -1716,7 +1722,7 @@ def cursors_measure(func, data, *cursors,
         pass
     
     elif isinstance(data, (tuple, list)):
-        if all([isinstance(s, (neo.AnalogSignal, dt.DataSignal)) for s in data]):
+        if all([isinstance(s, (neo.AnalogSignal, DataSignal)) for s in data]):
             # treat as a segment's signal collection
             pass
         
@@ -1729,7 +1735,7 @@ def cursors_measure(func, data, *cursors,
 
     
 @safeWrapper
-def cursors_difference(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
                        cursor0: typing.Union[SignalCursor, tuple], 
                        cursor1: typing.Union[SignalCursor, tuple],
                        channel: typing.Optional[int] = None) -> pq.Quantity:
@@ -1761,7 +1767,7 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     return y1-y0
 
 @safeWrapper
-def cursors_distance(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+def cursors_distance(signal: typing.Union[neo.AnalogSignal, DataSignal],
                      cursor0: typing.Union[SignalCursor, tuple], 
                      cursor1: typing.Union[SignalCursor, tuple],
                      channel: typing.Optional[int] = None) -> pq.Quantity:
@@ -1776,7 +1782,7 @@ def cursors_distance(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     return abs(ret[1]-ret[0])
 
 @safeWrapper
-def chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal], 
+def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], 
                 t0: typing.Union[float, pq.Quantity], 
                 t1: typing.Union[float, pq.Quantity],
                 w0: typing.Optional[typing.Union[float,  pq.Quantity]]=0.001*pq.s,
@@ -1794,7 +1800,7 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     
     Parameters:
     ==========
-    signal: neo.AnalogSignal, dt.DataSignal
+    signal: neo.AnalogSignal, DataSignal
     
     t0: scalar float or python Quantity =  the limits of the interval where
             the chord slope is calculated, including the half-windows before t0
@@ -1865,7 +1871,7 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
     #pass
     
 @safeWrapper
-def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
                         cursor0: typing.Union[SignalCursor, tuple],
                         cursor1: typing.Union[SignalCursor, tuple],
                         channel: typing.Optional[int] = None) -> pq.Quantity:
@@ -2218,7 +2224,7 @@ def intervals2cursors(*args, **kwargs) -> typing.Sequence:
         return xwl
 
 @safeWrapper
-def epoch_average(signal: typing.Union[neo.AnalogSignal, dt.DataSignal],
+def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
                   epoch: neo.Epoch,
                   channel: typing.Optional[int] = None) -> list:
     """Signal average across an epoch's intervals.
@@ -2362,7 +2368,7 @@ def get_signal_names_indices(data: typing.Union[neo.Segment, typing.Sequence],
             signals = data.irregularlysampledsignals
         
     elif isinstance(data, (tuple, list)):
-        if all([isinstance(s, (neo.AnalogSignal, dt.DataSignal, neo.IrregularlySampledSignal)) for s in data]):
+        if all([isinstance(s, (neo.AnalogSignal, DataSignal, neo.IrregularlySampledSignal)) for s in data]):
             signals = data
             
         else:
@@ -2830,13 +2836,13 @@ def normalized_signal_index(src: neo.core.container.Container,
         raise TypeError("Expecting a neo.Segment or neo.ChannelIndex; got %s instead" % type(src).__name__)
     
     #### BEGIN figure out what signal collection we're after'
-    if ctype in (neo.AnalogSignal, dt.DataSignal):
+    if ctype in (neo.AnalogSignal, DataSignal):
         if not isinstance(src, (neo.Segment, neo.ChannelIndex)):
             raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
         
         signal_collection = src.analogsignals
         
-    elif ctype in (neo.IrregularlySampledSignal, dt.IrregularlySampledDataSignal):
+    elif ctype in (neo.IrregularlySampledSignal, IrregularlySampledDataSignal):
         if not isinstance(src, (neo.Segment, neo.ChannelIndex)):
             raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
         
@@ -2977,7 +2983,7 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
     
     stype:  a type (python class ) of signal; optional, default is neo.AnalogSignal
                 other valid types are:
-                dt.DataSignal
+                DataSignal
                 neo.IrregularlySampledSignal
                 neo.SpikeTrain
                 neo.Event
@@ -3069,7 +3075,7 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
                 
     elif isinstance(src, neo.core.Segment):
         objectList = getattr(src, signal_collection)
-        #if stype in (neo.AnalogSignal, dt.DataSignal) or \
+        #if stype in (neo.AnalogSignal, DataSignal) or \
             #(isinstance(stype, (tuple, list)) and all([s.__name__ in ("AnalogSignal", "DataSignal") for s in stype])):
             #objectList = src.analogsignals
             
@@ -3490,7 +3496,7 @@ def get_time_slice(data, t0, t1=None, window=0, \
             else:
                 raise TypeError("Unexpected epoch index type")
         
-    elif isinstance(data, (neo.AnalogSignal, dt.DataSignal)):
+    elif isinstance(data, (neo.AnalogSignal, DataSignal)):
         return data.time_slice(t0,t1)
     
     else:
@@ -3556,7 +3562,7 @@ def concatenate_signals(*args, axis=1, ignore_domain = False, ignore_units=False
     # instead of either one of the two types -- i.e. do NOT accept sequences of
     # mixed types !!!
     if all([isinstance(sig, neo.AnalogSignal) for sig in signals]) or \
-        all([isinstance(sig, dt.DataSignal) for sig in signals]):
+        all([isinstance(sig, DataSignal) for sig in signals]):
         sig_shapes = [[s for s in sig.shape] for sig in signals]
         
         for s in sig_shapes:
@@ -4842,7 +4848,7 @@ def average_segments(*args, **kwargs):
         else:
             ss = new_signal
             
-        # neo.AnalogSignal and dt.DataSignal always have ndim == 2
+        # neo.AnalogSignal and DataSignal always have ndim == 2
         
         if ss.shape != signal.shape:
             ss_ = neo.AnalogSignal(np.full_like(signal, np.nan),
@@ -5087,7 +5093,7 @@ def merge_signal_channels(*args, name=""):
         
     
     if not all([isinstance(s, neo.AnalogSignal) for s in args]) and \
-        not all([isinstance(s, dt.DataSignal) for s in args]):
+        not all([isinstance(s, DataSignal) for s in args]):
         raise TypeError("All data in the parameter sequence must be either AnalogSignal objects or DataSignal objects")
         
     if not all([s.shape[0] == args[0].shape[0] for s in args]):
@@ -5116,7 +5122,7 @@ def aggregate_signals(*args, name_prefix:str,
     if len(args) == 0:
         return
     
-    if len(args) == 1 and isinstance(args[0], (list, tuple)) and all([isinstance(a, (neo.AnalogSignal, dt.Datasignal)) for a in args[0]]):
+    if len(args) == 1 and isinstance(args[0], (list, tuple)) and all([isinstance(a, (neo.AnalogSignal, Datasignal)) for a in args[0]]):
         args = args[0]
 
     if any([s.shape != args[0].shape for s in args]):
@@ -5423,7 +5429,7 @@ def resample_pchip(sig, new_sampling_period, old_sampling_period = 1):
     
     from . import datatypes as dt
     
-    if isinstance(sig, (neo.AnalogSignal, dt.DataSignal)):
+    if isinstance(sig, (neo.AnalogSignal, DataSignal)):
         if isinstance(new_sampling_period, pq.Quantity):
             if not dt.units_convertible(new_sampling_period, sig.sampling_period):
                 raise TypeError("new sampling period units (%s) are incompatible with those of the signal's sampling period (%s)" % (new_sampling_period.units, sig.sampling_period.units))
@@ -5591,7 +5597,7 @@ def diff(sig, n=1, axis=-1, prepend=False, append=True):
     return ret
 
 @safeWrapper
-def gradient(sig:[neo.AnalogSignal, dt.DataSignal, np.ndarray], 
+def gradient(sig:[neo.AnalogSignal, DataSignal, np.ndarray], 
              n:int=1, 
              axis:int=0) -> neo.AnalogSignal:
     """ First order gradient through central differences.
@@ -5616,7 +5622,7 @@ def gradient(sig:[neo.AnalogSignal, dt.DataSignal, np.ndarray],
     Returns:
     -------
     
-    ret: neo.AnalogSignal or dt.DataSignal, according to the type of "sig".
+    ret: neo.AnalogSignal or DataSignal, according to the type of "sig".
     
     
     """
@@ -5635,8 +5641,8 @@ def gradient(sig:[neo.AnalogSignal, dt.DataSignal, np.ndarray],
     else:
         raise TypeError("'sig' has too many dimensions (%d); expecting 1 or 2" % diffsig.ndim)
         
-    if isinstance(sig, dt.DataSignal):
-        ret = dt.DataSignal(diffsig, 
+    if isinstance(sig, DataSignal):
+        ret = DataSignal(diffsig, 
                             units = sig.units / sig.times.units, 
                             t_start = sig.t_start, 
                             sampling_period = sig.sampling_period, 
@@ -5658,7 +5664,7 @@ def gradient(sig:[neo.AnalogSignal, dt.DataSignal, np.ndarray],
     
     
 @safeWrapper
-def ediff1d(sig:[neo.AnalogSignal, dt.DataSignal, np.ndarray],
+def ediff1d(sig:[neo.AnalogSignal, DataSignal, np.ndarray],
             to_end:numbers.Number=0, 
             to_begin:[numbers.Number, type(None)]=None) -> neo.AnalogSignal:
     """Differentiates each channel of an analogsignal with respect to its time basis.
@@ -5679,7 +5685,7 @@ def ediff1d(sig:[neo.AnalogSignal, dt.DataSignal, np.ndarray],
     
     Returns:
     --------
-    dt.DataSignal or neo.AnalogSignal, according to the type of "sig"
+    DataSignal or neo.AnalogSignal, according to the type of "sig"
     
     """
     
@@ -5697,8 +5703,8 @@ def ediff1d(sig:[neo.AnalogSignal, dt.DataSignal, np.ndarray],
         
     diffsig /= sig.sampling_period.magnitude
     
-    if isinstance(sig, dt.DataSignal):
-        ret = dt.DataSignal(diffsig, units = sig.units / sig.times.units, 
+    if isinstance(sig, DataSignal):
+        ret = DataSignal(diffsig, units = sig.units / sig.times.units, 
                             t_start = sig.t_start, 
                             sampling_period = sig.sampling_period, 
                             name = sig.name,
@@ -5717,7 +5723,7 @@ def ediff1d(sig:[neo.AnalogSignal, dt.DataSignal, np.ndarray],
     return ret
 
 @safeWrapper
-def forward_difference(sig:[neo.AnalogSignal, dt.DataSignal, np.ndarray], 
+def forward_difference(sig:[neo.AnalogSignal, DataSignal, np.ndarray], 
                        n:int=1, 
                        to_end:numbers.Number=0,
                        to_begin:[numbers.Number, type(None)]=None) -> neo.AnalogSignal:
@@ -5754,7 +5760,7 @@ def forward_difference(sig:[neo.AnalogSignal, dt.DataSignal, np.ndarray],
     
     Returns:
     --------
-    dt.DataSignal or neo.AnalogSignal, according to the type of "sig"
+    DataSignal or neo.AnalogSignal, according to the type of "sig"
     
     """
     
@@ -5843,8 +5849,8 @@ def forward_difference(sig:[neo.AnalogSignal, dt.DataSignal, np.ndarray],
         raise TypeError("'sig' has too many dimensions (%d); expecting 1 or 2" % diffsig.ndim)
         
         
-    if isinstance(sig, dt.DataSignal):
-        ret = dt.DataSignal(diffsig, units = sig.units / sig.times.units, 
+    if isinstance(sig, DataSignal):
+        ret = DataSignal(diffsig, units = sig.units / sig.times.units, 
                             t_start = sig.t_start, 
                             sampling_period = sig.sampling_period, 
                             name = "%s_diff(1)" % sig.name,
@@ -5861,7 +5867,7 @@ def forward_difference(sig:[neo.AnalogSignal, dt.DataSignal, np.ndarray],
     
     return ret
 
-def auto_detect_trigger_protocols(data:[dt.ScanData, neo.Block], 
+def auto_detect_trigger_protocols(data:[ScanData, neo.Block], 
                                presynaptic:tuple=(), 
                                postsynaptic:tuple=(),
                                photostimulation:tuple=(),
@@ -5920,7 +5926,7 @@ def auto_detect_trigger_protocols(data:[dt.ScanData, neo.Block],
     """
     from . import datatypes as dt
 
-    if isinstance(data, dt.ScanData):
+    if isinstance(data, ScanData):
         target = data.electrophysiology
         
     elif isinstance(data, neo.Block):
@@ -5987,7 +5993,7 @@ def auto_define_trigger_events(src, analog_index, event_type,
                                use_lo_hi=True, time_slice=None, 
                                clearSimilarEvents=True, clearTriggerEvents=True, 
                                clearAllEvents=False):
-    """Populates the events lists for the segments in src with dt.TriggerEvent objects.
+    """Populates the events lists for the segments in src with TriggerEvent objects.
     
     Searches for trigger waveforms in signals specified by analog_index, to define
     TriggerEvent objects.
@@ -6092,7 +6098,7 @@ def auto_define_trigger_events(src, analog_index, event_type,
     The src parameter (a reference)
     
     Side effects:
-        Creates and appends dt.TriggerEvent objects to the segments in src
+        Creates and appends TriggerEvent objects to the segments in src
     """
     from . import datatypes as dt
     
@@ -6115,7 +6121,7 @@ def auto_define_trigger_events(src, analog_index, event_type,
             raise TypeError("times expected to have time units; it has %s instead" % times.units)
 
         for segment in data: # construct eventss, store them in segments
-            event = dt.TriggerEvent(times=times, units=times.units,
+            event = TriggerEvent(times=times, units=times.units,
                                     event_type=event_type, labels=label, 
                                     name=name)
             
@@ -6246,11 +6252,11 @@ def clear_events(src, triggersOnly=False, triggerType=None):
         
         trigs = []
         
-        if isinstance(triggerType, dt.TriggerEventType):
-            trigs = [(endx, e) for (endx, e) in enumerate(s.events) if isinstance(e, dt.TriggerEvent) and e.type & triggerType]
+        if isinstance(triggerType, TriggerEventType):
+            trigs = [(endx, e) for (endx, e) in enumerate(s.events) if isinstance(e, TriggerEvent) and e.type & triggerType]
             
         elif triggersOnly:
-            trigs = [(endx, e) for (endx, e) in enumerate(s.events) if isinstance(e, dt.TriggerEvent)]
+            trigs = [(endx, e) for (endx, e) in enumerate(s.events) if isinstance(e, TriggerEvent)]
 
         if len(trigs):
             (endx, evs) = zip(*trigs)
@@ -6269,7 +6275,7 @@ def get_non_empty_events(sequence:(tuple, list)):
     if len(sequence) == 0:
         return list()
     
-    if not all([isinstance(e, (neo.Event, dt.TriggerEvent)) for e in sequence]):
+    if not all([isinstance(e, (neo.Event, TriggerEvent)) for e in sequence]):
         raise TypeError("Expecting a sequence containing only neo.Event or datatypes.TriggerEvent objects")
     
     return [e for e in sequence if len(e)]
@@ -6330,17 +6336,17 @@ def detect_trigger_events(x, event_type, use_lo_hi=True, label=None, name=None):
     """
     from . import datatypes as dt
     
-    if not isinstance(x, (neo.AnalogSignal, dt.DataSignal, np.ndarray)):
+    if not isinstance(x, (neo.AnalogSignal, DataSignal, np.ndarray)):
         raise TypeError("Expecting a neo.AnalogSignal, or a datatypes.DataSignal, or a np.ndarray as first parameter; got %s instead" % type(x).__name__)
     
     if isinstance(event_type, str):
-        if event_type in list(dt.TriggerEventType.__members__.keys()):
-            event_type = dt.TriggerEventType[event_type]
+        if event_type in list(TriggerEventType.__members__.keys()):
+            event_type = TriggerEventType[event_type]
             
         else:
-            raise (ValueError("unknown trigger event type: %s; expecting one of %s" % event_type, " ".join(list([dt.TriggerEventType.__members__.keys()]))))
+            raise (ValueError("unknown trigger event type: %s; expecting one of %s" % event_type, " ".join(list([TriggerEventType.__members__.keys()]))))
         
-    elif not isinstance(event_type, dt.TriggerEventType):
+    elif not isinstance(event_type, TriggerEventType):
         raise TypeError("'event_type' expected to be a datatypes.TriggerEventType enum value, or a str in datatypes.TriggerEventType enum; got %s instead" % type(event_type).__name__)
 
     if label is not None and not isinstance(label, str):
@@ -6360,7 +6366,7 @@ def detect_trigger_events(x, event_type, use_lo_hi=True, label=None, name=None):
     else:
         times = hi_lo
         
-    trig = dt.TriggerEvent(times=times, units=x.times.units, event_type=event_type, labels=label, name=name)
+    trig = TriggerEvent(times=times, units=x.times.units, event_type=event_type, labels=label, name=name)
     
     if name is None:
         if label is not None:
@@ -6403,7 +6409,7 @@ def root_mean_square(x, axis = None):
     """
     from . import datatypes as dt
     
-    if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, dt.DataSignal)):
+    if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
         raise TypeError("Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datatypes.DataSignal; got %s instead" % type(x).__name__)
     
     if not isinstance(axis, (int, tuple, list, type(None))):
@@ -6454,7 +6460,7 @@ def signal_to_noise(x, axis=None, ddof=None, db=True):
     """
     from . import datatypes as dt
 
-    if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, dt.DataSignal)):
+    if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
         raise TypeError("Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datatypes.DataSignal; got %s instead" % type(x).__name__)
     
     if not isinstance(axis, (int, tuple, list, type(None))):
@@ -6554,8 +6560,8 @@ def detect_trigger_times(x):
 def remove_trigger_protocol(protocol, block):
     from . import datatypes as dt
 
-    if not isinstance(protocol, dt.TriggerProtocol):
-        raise TypeError("'protocol' expected to be a dt.TriggerProtocol; got %s instead" % type(protocol).__name__)
+    if not isinstance(protocol, TriggerProtocol):
+        raise TypeError("'protocol' expected to be a TriggerProtocol; got %s instead" % type(protocol).__name__)
     
     if not isinstance(block, neo.Block):
         raise TypeError("'block' was expected to be a neo.Block; got % instead" % type(block).__name__)
@@ -6588,8 +6594,8 @@ def modify_trigger_protocol(protocol, block):
     """
     from . import datatypes as dt
 
-    if not isinstance(protocol, dt.TriggerProtocol):
-        raise TypeError("'value' expected to be a dt.TriggerProtocol; got %s instead" % type(value).__name__)
+    if not isinstance(protocol, TriggerProtocol):
+        raise TypeError("'value' expected to be a TriggerProtocol; got %s instead" % type(value).__name__)
     
     if not isinstance(block, neo.Block):
         raise TypeError("'block' was expected to be a neo.Block; got % instead" % type(block).__name__)
@@ -6613,8 +6619,8 @@ def modify_trigger_protocol(protocol, block):
         # check if the segment has any events of the type found in the protocol
         # remove them and add the protocol's events instead
         # NOTE: ONE segment -- ONE protocol at all times.
-        if isinstance(protocol.presynaptic, dt.TriggerEvent) and protocol.presynaptic.event_type == dt.TriggerEventType.presynaptic:
-            presynaptic_events = [e for e in block.segments[k].events if isinstance(e, dt.TriggerEvent) and e.event_type == dt.TriggerEventType.presynaptic]
+        if isinstance(protocol.presynaptic, TriggerEvent) and protocol.presynaptic.event_type == TriggerEventType.presynaptic:
+            presynaptic_events = [e for e in block.segments[k].events if isinstance(e, TriggerEvent) and e.event_type == TriggerEventType.presynaptic]
             
             for event in presynaptic_events:
                 # should contain AT MOST ONE event object
@@ -6622,8 +6628,8 @@ def modify_trigger_protocol(protocol, block):
                 
             block.segments[k].events.append(protocol.presynaptic)
                 
-        if isinstance(protocol.postsynaptic, dt.TriggerEvent) and protocol.postsynaptic.event_type == dt.TriggerEventType.postsynaptic:
-            postsynaptic_events = [e for e in block.segments[k].events if isinstance(e, dt.TriggerEvent) and e.event_type == dt.TriggerEventType.postsynaptic]
+        if isinstance(protocol.postsynaptic, TriggerEvent) and protocol.postsynaptic.event_type == TriggerEventType.postsynaptic:
+            postsynaptic_events = [e for e in block.segments[k].events if isinstance(e, TriggerEvent) and e.event_type == TriggerEventType.postsynaptic]
             
             for event in postsynaptic_events:
                 block.segments[k].events.remove(event)
@@ -6631,8 +6637,8 @@ def modify_trigger_protocol(protocol, block):
             block.segments[k].events.append(protocol.postsynaptic)
             
             
-        if isinstance(protocol.photostimulation, dt.TriggerEvent) and protocol.photostimulation.event_type == dt.TriggerEventType.photostimulation:
-            photostimulation_events = [e for e in block.segments[k].events if isinstance(e, dt.TriggerEvent) and e.event_type == dt.TriggerEventType.photostimulation]
+        if isinstance(protocol.photostimulation, TriggerEvent) and protocol.photostimulation.event_type == TriggerEventType.photostimulation:
+            photostimulation_events = [e for e in block.segments[k].events if isinstance(e, TriggerEvent) and e.event_type == TriggerEventType.photostimulation]
             
             for event in photostimulation_events:
                 block.segments[k].events.remove(event)
@@ -6641,7 +6647,7 @@ def modify_trigger_protocol(protocol, block):
             
         if len(protocol.acquisition):
             for event in protocol.acquisition:
-                existing_events = [e for e in block.segments[k].events if isinstance(e, dt.TriggerEvent) and e.event_type == event.event_type]
+                existing_events = [e for e in block.segments[k].events if isinstance(e, TriggerEvent) and e.event_type == event.event_type]
                 
                 for e in existing_events:
                     block.segments[k].events.remove(e)
@@ -6735,8 +6741,8 @@ def remove_events(event, segment, byLabel=True):
             
             segment.events[:] = keep_events
             
-    elif isinstance(event, dt.TriggerEventType):
-        evs = [(k,e) for (k,e) in segment.events if isinstance(e, dt.TriggerEvent) and e.type & event]
+    elif isinstance(event, TriggerEventType):
+        evs = [(k,e) for (k,e) in segment.events if isinstance(e, TriggerEvent) and e.type & event]
 
         if len(evs):
             (evndx, events) = zip(*evs)
@@ -6809,7 +6815,7 @@ def embed_trigger_event(event, segment, clearSimilarEvents=True, clearTriggerEve
     """
     from . import datatypes as dt
     
-    if not isinstance(event, (neo.Event, dt.TriggerEvent)):
+    if not isinstance(event, (neo.Event, TriggerEvent)):
         raise TypeError("event expected to be a neo.Event; got %s instead" % type(event).__name__)
     
     if not isinstance(segment, neo.Segment):
@@ -6826,7 +6832,7 @@ def embed_trigger_event(event, segment, clearSimilarEvents=True, clearTriggerEve
             evs = [(k,e) for (k,e) in enumerate(segment.events) if is_same_as(event, e)]
             
         elif clearTriggerEvents:
-            evs = [(k,e) for (k,e) in enumerate(segment.events) if isinstance(e, dt.TriggerEvent)]
+            evs = [(k,e) for (k,e) in enumerate(segment.events) if isinstance(e, TriggerEvent)]
             
         if len(evs):
             (evndx, events) = zip(*evs)
@@ -6842,7 +6848,7 @@ def embed_trigger_event(event, segment, clearSimilarEvents=True, clearTriggerEve
             
 #@safeWrapper
 def embed_trigger_protocol(protocol, target, useProtocolSegments=True, clearTriggers=True, clearEvents=False):
-    """ Embeds dt.TriggerEvent objects found in the dt.TriggerProtocol 'protocol', 
+    """ Embeds TriggerEvent objects found in the TriggerProtocol 'protocol', 
     in the segments of 'target'.
     
     Inside the target, trigger event objects are stored by reference!
@@ -6875,12 +6881,12 @@ def embed_trigger_protocol(protocol, target, useProtocolSegments=True, clearTrig
     from . import datatypes as dt
 
     # check if there are synaptic events already in the scans data target:
-    # each segment can hold at most one dt.TriggerEvent object of each 
+    # each segment can hold at most one TriggerEvent object of each 
     # type (pre-, post-, photo-);
-    # NOTE: a dt.TriggerEvent actually holds an ARRAY of time points
+    # NOTE: a TriggerEvent actually holds an ARRAY of time points
     
-    if not isinstance(protocol, dt.TriggerProtocol):
-        raise TypeError("'protocol' expected to be a dt.TriggerProtocol; got %s instead" % type(protocol).__name__)
+    if not isinstance(protocol, TriggerProtocol):
+        raise TypeError("'protocol' expected to be a TriggerProtocol; got %s instead" % type(protocol).__name__)
     
     if not isinstance(target, (neo.Block, neo.Segment)):
         raise TypeError("'target' was expected to be a neo.Block or neo.Segment; got %s instead" % type(target).__name__)
@@ -6933,7 +6939,7 @@ def embed_trigger_protocol(protocol, target, useProtocolSegments=True, clearTrig
         
     for k in value_segments: 
         if clearTriggers:
-            trigs = [(evndx, ev) for (evndx, ev) in enumerate(segments[k].events) if isinstance(ev, dt.TriggerEvent)]
+            trigs = [(evndx, ev) for (evndx, ev) in enumerate(segments[k].events) if isinstance(ev, TriggerEvent)]
 
             if len(trigs): # TriggerEvent objects found in segment
                 (trigndx, trigevs) = zip(*trigs)
@@ -6955,7 +6961,7 @@ def embed_trigger_protocol(protocol, target, useProtocolSegments=True, clearTrig
             # for old API
             segments[k].events.append(protocol.acquisition[0]) # only ONE acquisition event per protocol!
                 
-        elif isinstance(protocol.acquisition, dt.TriggerEvent):
+        elif isinstance(protocol.acquisition, TriggerEvent):
             segments[k].events.append(protocol.acquisition)
                 
         if protocol.presynaptic is not None:
@@ -7003,7 +7009,7 @@ def is_same_as(e1, e2, rtol = 1e-4, atol =  1e-4, equal_nan = True):
     if any([not isinstance(e, neo.Event) for e in (e1,e2)]):
         return False
     
-    if all([isinstance(e, dt.TriggerEvent) for e in (e1,e2)]):
+    if all([isinstance(e, TriggerEvent) for e in (e1,e2)]):
         return e1.is_same_as(e2)
     
     compatible_units = e1.units == e2.units
@@ -7402,7 +7408,7 @@ def generate_spike_trace(spike_times, start, duration, sampling_frequency,
     
 @safeWrapper
 def parse_trigger_protocols(src):
-    """Constructs a list of TriggerProtocol objects by parsing dt.TriggerEvent objects in "src".
+    """Constructs a list of TriggerProtocol objects by parsing TriggerEvent objects in "src".
     
     Parameters:
     ==========
@@ -7417,11 +7423,11 @@ def parse_trigger_protocols(src):
     ATTENTION: this constructs TriggerProtocol objects with default names.
     Usually this is NOT what you want !!!
     
-    Individual dt.TriggerEvent objects can be manually appended to the events 
+    Individual TriggerEvent objects can be manually appended to the events 
         list of each neo.Segment.
     
     Alternatively, the function detect_trigger_times() in "neoutils" module can 
-    help generate dt.TriggerEvent objects from particular neo.AnalogSignal arrays
+    help generate TriggerEvent objects from particular neo.AnalogSignal arrays
     containing recorded trigger-like data (with transitions between a low and 
     a high state, e.g. rectangular pulses, or step functions).
     
@@ -7487,10 +7493,10 @@ def parse_trigger_protocols(src):
         imaq_names = []
         imaq_first = []
         
-        protocol = dt.TriggerProtocol() # name = protocol_name)
+        protocol = TriggerProtocol() # name = protocol_name)
         
         for e in events:
-            if e.event_type == dt.TriggerEventType.presynaptic:
+            if e.event_type == TriggerEventType.presynaptic:
                 if protocol.presynaptic is None:
                     protocol.presynaptic = e
                     
@@ -7500,7 +7506,7 @@ def parse_trigger_protocols(src):
                 else:
                     warnings.warn("skipping presynaptic event array %s as protocol %s has already got one (%s)" % (e, protocol.name, protocol.presynaptic))
                     
-            elif e.event_type == dt.TriggerEventType.postsynaptic:
+            elif e.event_type == TriggerEventType.postsynaptic:
                 if protocol.postsynaptic is None:
                     protocol.postsynaptic = e
 
@@ -7511,7 +7517,7 @@ def parse_trigger_protocols(src):
                 else:
                     warnings.warn("skipping postsynaptic event array %s as protocol %s has already got one (%s)" % (e, protocol.name, protocol.postsynaptic))
                     
-            elif e.event_type == dt.TriggerEventType.photostimulation:
+            elif e.event_type == TriggerEventType.photostimulation:
                 if protocol.photostimulation is None:
                     protocol.photostimulation = e
 
@@ -7521,7 +7527,7 @@ def parse_trigger_protocols(src):
                 else:
                     warnings.warn("skipping photostimulation event array %s as protocol %s has already got one (%s)" % (e, protocol.name, protocol.photostimulation))
                     
-            elif e.event_type & dt.TriggerEventType.acquisition:
+            elif e.event_type & TriggerEventType.acquisition:
                 # NOTE: only ONE acquisition trigger event per segment!
                 if isinstance(protocol.acquisition, (tuple, list)) and len(protocol.acquisition) == 0: # or e not in protocol.acquisition:
                     protocol.acquisition[:] = [e]
@@ -7532,7 +7538,7 @@ def parse_trigger_protocols(src):
                 imaq_names.append(e.name)
                 imaq_first.append(e.times.flatten()[0])
                 
-                if e.event_type == dt.TriggerEventType.imaging_frame:
+                if e.event_type == TriggerEventType.imaging_frame:
                     protocol.imagingDelay = e.times.flatten()[0]
                 
         # NOTE 2017-12-16 10:08:20 DISCARD empty protocols
@@ -7576,7 +7582,7 @@ def parse_trigger_protocols(src):
         # trigs is a sequence of tuples: (index, sequence of TriggerEvent objects)
         # segments without events are skipped
         # segment events that are NOT TriggerEvent objects are skipped
-        trigs = [ (k, [e for e in s.events if isinstance(e, dt.TriggerEvent)]) \
+        trigs = [ (k, [e for e in s.events if isinstance(e, TriggerEvent)]) \
                         for k,s in enumerate(src.segments) if len(s.events)]
         
         if len(trigs) == 0:
@@ -7591,7 +7597,7 @@ def parse_trigger_protocols(src):
                     src.segments[s].annotations["trigger_protocol"] = p.name
         
     elif isinstance(src, neo.Segment):
-        trigs = [e for e in src.events if isinstance(e, dt.TriggerEvent)]
+        trigs = [e for e in src.events if isinstance(e, TriggerEvent)]
         
         if len(trigs) == 0:
             return protocols, src
@@ -7602,7 +7608,7 @@ def parse_trigger_protocols(src):
             src.annotations["trigger_protocol"] = protocols[0].name
                 
     elif isinstance(src, (tuple, list) and all([isinstance(v, neo.Segment) for v in src])):
-        trigs = [ (k, [e for e in s.events if isinstance(e, dt.TriggerEvent)]) \
+        trigs = [ (k, [e for e in s.events if isinstance(e, TriggerEvent)]) \
                         for k,s in enumerate(src) if len(s.events)]
         
         if len(trigs) == 0:
@@ -7741,8 +7747,8 @@ def set_relative_time_start(data, t = 0 * pq.s):
                 for event in segment.events:
                     new_times = event.times - event.times[0] + t if event.times.size > 0 else event.times
                     
-                    if isinstance(event, dt.TriggerEvent):
-                        new_event = dt.TriggerEvent(times = new_times,
+                    if isinstance(event, TriggerEvent):
+                        new_event = TriggerEvent(times = new_times,
                                                     labels = event.labels,
                                                     units = event.units,
                                                     name = event.name,
@@ -7785,11 +7791,11 @@ def set_relative_time_start(data, t = 0 * pq.s):
                 for event in s.events:
                     event.times = event.times - event.times[0] + t
                 
-        elif all([isinstance(x, (neo.AnalogSignal, dt.DataSignal)) for x in data]):
+        elif all([isinstance(x, (neo.AnalogSignal, DataSignal)) for x in data]):
             for s in data:
                 s.t_start = t
                 
-        elif all([isinstance(x, (neo.IrregularlySampledSignal, dt.IrregularlySampledDataSignal))]):
+        elif all([isinstance(x, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal))]):
             for s in data:
                 s.times = s.times - s.times[0] + t
                 
@@ -7823,10 +7829,10 @@ def set_relative_time_start(data, t = 0 * pq.s):
         for event in data.events:
             event.times = event.times - event.times[0] + t
                 
-    elif isinstance(data, (neo.AnalogSignal, dt.DataSignal)):
+    elif isinstance(data, (neo.AnalogSignal, DataSignal)):
         data.t_start = t
         
-    elif isinstance(data, (neo.IrregularlySampledSignal, dt.IrregularlySampledDataSignal)):
+    elif isinstance(data, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
         data.times = data.times - data.times[0] + t
         
     elif isinstance(data, (neo.SpikeTrain, neo.Event, neo.Epoch)):
@@ -7920,7 +7926,7 @@ def lookup(signal, value, channel=0, rtol=1e-05, atol=1e-08, equal_nan = False, 
     from . import datatypes as dt
     
     if not isinstance(signal, (neo.AnalogSignal, neo.IrregularlySampledSignal, 
-                             dt.DataSignal, dt.IrregularlySampledDataSignal)):
+                             DataSignal, IrregularlySampledDataSignal)):
         raise TypeError("signal expected to be a signal; got %s instead" % type(signal).__name__)
     
     if not isinstance(value, (numbers.Number, tuple, list)):
@@ -8081,7 +8087,7 @@ def inverse_lookup(signal, value, channel=0, rtol=1e-05, atol=1e-08, equal_nan =
     from . import datatypes as dt
     
     if not isinstance(signal, (neo.AnalogSignal, neo.IrregularlySampledSignal, 
-                             dt.DataSignal, dt.IrregularlySampledDataSignal)):
+                             DataSignal, IrregularlySampledDataSignal)):
         raise TypeError("signal expected to be a signal; got %s instead" % type(signal).__name__)
     
     if not isinstance(value, (numbers.Number, tuple, list)):
@@ -8176,7 +8182,7 @@ class ElectrophysiologyDataParser(object):
         # default: "unknown"
         self._data_source_ = "unknown"  
         self._acquisition_protocol_ = dict()
-        self._acquisition_protocol_["trigger_protocol"] = dt.TriggerProtocol()
+        self._acquisition_protocol_["trigger_protocol"] = TriggerProtocol()
         self._averaged_runs_ = False
         self._alternative_DAC_command_output_ = False
         self._alternative_digital_outputs_ = False

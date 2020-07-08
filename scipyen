@@ -1,3 +1,4 @@
 #! /bin/sh 
-
-scipyen_start.py &
+executable=`realpath $0`
+scipyendir=`dirname $executable`
+python3 $scipyendir/scipyen.py &

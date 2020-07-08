@@ -81,7 +81,7 @@ CHANGELOG
 
 '''
 #### BEGIN core python modules
-from __future__ import print_function
+#from __future__ import print_function
 
 import sys, os, traceback, numbers, warnings, weakref, inspect, typing
 
@@ -127,22 +127,31 @@ from iolib import pictio as pio
 #### END pict.iolib modules
 
 #### BEGIN pict.core modules
-from core import datatypes as dt
-import core.utilities as utilities
-from core.utilities import safeWrapper
-from core import neoutils as neoutils
-from core import xmlutils, strutils
-from core import neoevent, neoepoch
-#from core.patchneo import *
+#from core import datatypes as dt
+from core.prog import safeWrapper
+from core.datatypes import (arraySlice, isColumnVector, isVector, normalized_index, normalized_axis_index, 
+                            normalized_sample_index,)
+
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
+from core.triggerprotocols import (TriggerEvent, TriggerProtocol,)
+from core.utilities import (unique, get_nested_value, set_nested_value,)
+from core.vigrautils import vigraKernel1D_to_ndarray
 from core.workspacefunctions import validateVarName
+
+
+
+from core import neoutils as neoutils
+from core import (xmlutils, strutils, neoevent, neoepoch,)
+#from core.patchneo import *
 
 #### BEGIN pict.gui modules
 #from . import imageviewer as iv
 from . import pictgui as pgui
 from . import quickdialog
 #from .pictgui import GraphicsObjectType, GraphicsObject, PathElements, Tier2PathElements, SignalCursor, Path, Start, Move, Line, Cubic, Rect, Ellipse, Quad, Arc, ArcMove
-from .scipyenviewer import ScipyenViewer, ScipyenFrameViewer
-from .dictviewer import InteractiveTreeWidget, DataViewer
+from .scipyenviewer import (ScipyenViewer, ScipyenFrameViewer,)
+from .dictviewer import (InteractiveTreeWidget, DataViewer,)
+from .cursors import SignalCursor
 #### END pict.gui modules
 
 # each spike is a small vertical line centered at 0.0, height of 1
@@ -177,1425 +186,6 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 Ui_SignalViewerWindow, QMainWindow = __loadUiType__(os.path.join(__module_path__,'signalviewer.ui'))
  
-class SignalCursor(QtCore.QObject):
-    """SignalCursor object.
-    Covers either a SINGLE pyqtgraph.PlotItem (see crosshair.py in pyqtgraph/examples)
-    or a pyqtgraph.GraphicsScene (with possibly multiple plot items)
-    """
-    # TODO: 2019-02-07 17:31:43
-    # 1) implement cursors linking
-    
-    sig_cursorSelected = pyqtSignal(str, name="sig_cursorSelected") 
-    sig_cursorDeselected = pyqtSignal(str, name="sig_cursorDeselected") 
-    #sig_cursorMoved = pyqtSignal(str, float, float, name="sig_cursorMoved")
-    sig_editMe = pyqtSignal(str, name="sig_editMe")
-    sig_reportPosition = pyqtSignal(str, name="sig_reportPosition")
-    #sig_reportDynamicPosition = pyqtSignal(str, name="sig_reportDynamicPosition")
-    sig_doubleClicked = pyqtSignal(str, name = "sig_doubleClicked")
-    
-    sig_axisPositionChanged = pyqtSignal(tuple, name="sig_axisPositionChanged")
-
-    #_cursorTypes_ = {(True, True):'crosshair', (True, False):'horizontal', (False,True):'vertical'}
-    
-    class SignalCursorTypes(Enum):
-        """Enumeration of signal cursor types.
-        """
-        vertical    = (False, True)
-        horizontal  = (True, False)
-        crosshair   = (True, True)
-        
-        @classmethod
-        def names(cls):
-            """List of the signal cursor type names
-            """
-            return [c.name for c in cls]
-        
-        @classmethod
-        def values(cls):
-            """List with the values to which the signal cursor types are mapped.
-            """
-            return [c.value for c in cls]
-        
-        @classmethod
-        def default(cls):
-            """The default signal cursor type
-            """
-            return cls.crosshair
-        
-        @classmethod
-        def types(cls):
-            """List of the defined signal cursor types.
-            """
-            return list(cls)
-        
-        @classmethod
-        def getType(cls, value: tuple):
-            """Inverse-lookup: returns signal cursor type mapped to value.
-            
-            Returns None if no signal cursor type is mapped to this value.
-            """
-            if isinstance(value, (tuple, list)) and len(value) == 2 and all([isinstance(v, bool) for v in value]):
-                value = tuple(value) # force cast to a tuple
-                types = [c for c in cls if c.value == value]
-                if len(types):
-                    return types[0]
-                
-                #types_values = [tv for nv in zip(*[(c, c.value) for c in cls])]
-                #types = types_values[0]
-                #values = types_values[1]
-                #if value in values:
-                    #return types[values.index(value)]
-        
-        @classmethod
-        def getName(cls, value: tuple):
-            """Inverse-lookup for name of a signal cursor type given its value.
-            
-            Returns None if no signal cursor type is mapped to this value.
-            """
-            if isinstance(value, (tuple, list)) and len(value) == 2 and all([isinstance(v, bool) for v in value]):
-                value = tuple(value) # force cast to a tuple
-                types = [c for c in cls if c.value == value]
-                #print(types)
-                if len(types):
-                    return types[0].name
-                
-                #names_values = [nv for nv in zip(*[(c.name, c.value) for c in cls])]
-                #names = names_values[0]
-                #values = names_values[1]
-                #if value in values:
-                    #return names[values.index(value)]
-                
-    def __init__(self, plot_item, x=None, y=None, xwindow=0.0, ywindow=0.0,
-                 cursor_type = None, cursorID="c", follower=False, parent=None, 
-                 xBounds=None, yBounds=None, 
-                 pen=None, hoverPen=None, linkedPen=None,
-                 **kwargs):
-        
-        super(SignalCursor, self).__init__(parent=parent)
-        
-        #print("SignalCursor.__init__ cursor_type", cursor_type)
-        
-        if not isinstance(parent, (SignalViewer, pg.PlotItem)):
-            raise TypeError("parent object of a SignalCursor can only be a pyqtgraph PlotItem or a SignalViewer; got %s instead" % type(parent).__name__)
-        
-        self._parent_plot_window_ = None
-        
-        self._host_graphics_item_ = None
-        
-        if not isinstance(plot_item, (pg.PlotItem, pg.GraphicsScene)):
-            raise TypeError("plot_item expected to be a pyqtgraph.PlotItem object or a pyqtgraph.GraphicsScene object got %s instead" % type(plot_items).__name__)
-        
-        self._host_graphics_item_ = plot_item
-        
-        #self.__is_single_axis__ = isinstance(self._host_graphics_item_, pg.GraphicsScene)
-        
-        if isinstance(parent, SignalViewer):
-            self._parent_plot_window_ = parent
-            
-        elif isinstance(parent, (pg.PlotItem, pg.GraphicsScene)) and self._host_graphics_item_ is None:
-            self._host_graphics_item_ = parent
-            
-        self._cursorId_ = None
-        
-        self._follows_mouse_ = False
-        
-        self._is_selected_ = False
-        
-        self._hl_ = None
-        self._vl_ = None
-        
-        self._x_ = None
-        self._y_ = None
-        
-        self._hWin_ = None
-        self._vWin_ = None
-        
-        self._cursor_type_ = None
-        
-        self._default_pen_ = None
-        
-        if isinstance(pen, QtGui.QPen):
-            self._pen_ = pen
-            
-        else:
-            self._pen_ = None
-        
-        if isinstance(hoverPen, QtGui.QPen):
-            self._hoverPen_ = hoverPen
-            
-        else:
-            self._hoverPen_ = None
-        
-        if isinstance(linkedPen, QtGui.QPen):
-            self._linkedPen_ = linkedPen
-            
-        else:
-            self._linkedPen_ = None
-        
-        # valid ranges where the cursor lines can go
-        self._x_range_ = None
-        self._y_range_ = None
-        
-        if self._pen_ is None:
-            self._pen_ = kwargs.pop("pen", None)
-            
-        if self._linkedPen_ is None:
-            self._linkedPen_ = kwargs.pop("linkedPen", None)
-            
-        if self._hoverPen_ is None:
-            self._hoverPen_ = kwargs.pop("hoverPen", None)
-        
-        # dict that maps PlotItem objects to SignalProxy objects -- only used for 
-        # dynamic cursors
-        self._signal_proxy_ = None
-        
-        self._linked_cursors_ = list()
-        
-        self._linked_ = False
-        
-        # for static cursors only (see InifiniteLine for the logic)
-        # to make the lines move in concert
-        self._dragging_ = False
-        
-        self._current_plot_item_ = None # for multi-axes cursors
-        
-        self._setup_(plot_item, x=x, y=y, xwindow=xwindow, ywindow=ywindow, 
-                         cursor_type=cursor_type, cursorID=cursorID,
-                         follower=follower, xBounds = xBounds, yBounds=yBounds,
-                         **kwargs)
-        
-    def _setup_lines_(self, h, v, **kwargs):
-        name = kwargs.get("name", self._cursor_type_)
-            
-        kwargs.pop("name", None)
-        
-        if self._follows_mouse_:
-            pos = QtCore.QPointF()
-            self._x_ = pos.x()
-            self._y_ = pos.y()
-            
-        else:
-            pos = QtCore.QPointF(self._x_, self._y_)
-            
-        scene = self.hostScene
-        
-        if h:
-            if not isinstance(self._hl_, pg.InfiniteLine):
-                self._hl_ = pg.InfiniteLine(pos=pos, 
-                                              angle=0, 
-                                              movable=not self._follows_mouse_, 
-                                              name="%s_h" % name, 
-                                              label=self._cursorId_,
-                                              pen=self._pen_, 
-                                              hoverPen = self._hoverPen_)
-            
-                if not self._follows_mouse_:
-                    if self._cursor_type_ == "horizontal":
-                        self._hl_.sigDragged.connect(self.slot_positionChanged)
-                        self._hl_.sigPositionChanged.connect(self.slot_positionChanged)
-                        self._hl_.sigPositionChangeFinished.connect(self.slot_positionChanged)
-                        
-            if isinstance(self._pen_, QtGui.QPen):
-                self._hl_.setPen(self._pen_)
-                
-            elif isinstance(self._default_pen_, QtGui.QPen):
-                self._pen_ = self._default_pen_
-                self._hl_.setPen(self._pen_)
-                
-            else:
-                self._default_pen_ = self._hl_.pen
-                self._pen_ = self._hl_.pen
-                
-            if isinstance(self._hoverPen_, QtGui.QPen):
-                self._hl_.setHoverPen(self._hoverPen_)
-                
-            else:
-                self._hoverPen_ = self._hl_.hoverPen
-                    
-            self._hl_.setBounds(self._y_range_)
-            
-        else:
-            self._hl_ = None
-            
-        #print("_setup_lines_ after hl xy", (self.x, self.y))
-            
-        if v:
-            if not isinstance(self._vl_, pg.InfiniteLine):
-                self._vl_ = pg.InfiniteLine(pos=pos, 
-                                              angle=90, 
-                                              movable=not self._follows_mouse_,
-                                              name="%s_v" % name, 
-                                              label=self._cursorId_,
-                                              pen=self._pen_, 
-                                              hoverPen = self._hoverPen_)
-            
-                if not self._follows_mouse_: 
-                    if self._cursor_type_ == "vertical":
-                        self._vl_.sigDragged.connect(self.slot_positionChanged)
-                        self._vl_.sigPositionChanged.connect(self.slot_positionChanged)
-                        self._vl_.sigPositionChangeFinished.connect(self.slot_positionChanged)
-                        
-            if isinstance(self._pen_, QtGui.QPen):
-                self._vl_.setPen(self._pen_)
-                
-            elif isinstance(self._default_pen_, QtGui.QPen):
-                self._pen_ = self._default_pen_
-                self._vl_.setPen(self._pen_)
-                
-            else:
-                self._default_pen_ = self._vl_.pen
-                self._pen_ = self._vl_.pen
-                
-            if isinstance(self._hoverPen_, QtGui.QPen):
-                self._vl_.setHoverPen(self._hoverPen_)
-                
-            else:
-                self._hoverPen_ = self._vl_.hoverPen
-                    
-            self._vl_.setBounds(self._x_range_)
-            
-        else:
-            self._vl_ = None
-            
-        if not isinstance(self._linkedPen_, QtGui.QPen):
-            self._linkedPen_ = self._default_pen_
-            
-        if not self._follows_mouse_:
-            scene.sigMouseMoved.connect(self._slot_mouse_event_)
-            
-    def _get_plotitem_data_bounds_(self, item):
-        plotDataItems = [i for i in item.listDataItems() if isinstance(i, pg.PlotDataItem)]
-        
-        mfun = lambda x: -np.inf if x is None else x
-        pfun = lambda x: np.inf if x is None else x
-        
-        xmin = min(map(mfun, [p.dataBounds(0)[0] for p in plotDataItems]))
-        xmax = max(map(pfun, [p.dataBounds(0)[1] for p in plotDataItems]))
-                
-        ymin = min(map(mfun, [p.dataBounds(1)[0] for p in plotDataItems]))
-        ymax = max(map(pfun, [p.dataBounds(1)[1] for p in plotDataItems]))
-                
-        #xmin = min([-np.inf if p.dataBounds(0)[0] is None else p.dataBounds(0)[0] for p in plotDataItems])
-        #xmax = max([np.inf if p.dataBounds(0)[1] is None else p.dataBounds(0)[1] for p in plotDataItems])
-        
-        #ymin = min([-np.inf if p.dataBounds(1)[0] is None else p.dataBounds(1)[0] for p in plotDataItems])
-        #ymax = max([np.inf if p.dataBounds(1)[1] is None else p.dataBounds(1)[1] for p in plotDataItems])
-        
-        return [[xmin, xmax], [ymin, ymax]]
-        
-    def _get_host_boundaries_(self, host):
-        """Get the useful boundaries for cursor lines, from the host
-        (unless they've been specified by caller)
-        Boundaries returnes in same format as for PlotItem.viewRange()
-        """
-        if isinstance(host, pg.PlotItem):
-            return self._get_plotitem_data_bounds_(host)
-        
-        elif isinstance(host, pg.GraphicsScene):
-            # host is a graphics scene when the cursor is intended to span
-            # NOTE 2019-02-07 17:14:27
-            # several axes.
-            # In this case, I cannot rely on data bounds (viewRange()[1]) 
-            # because each data in the plot can have different scales;
-            # so I have to rely on the plotitems' bounding rects
-            # 
-            # for best pracice, pre-determine the bounds in the caller, according
-            # to the plot items layout, data boundaries and type of cursor
-            # (vertical, horizontal or crosshair)
-            pIs = [i for i in host.items() if isinstance(i, pg.PlotItem)]
-            
-            if len(pIs):
-                # NOTE: 2019-02-07 17:25:24
-                # the disadvantage of this apporoach is that we can now move the cursor
-                # beyond the data boundaries, but then see NOTE 2019-02-07 17:14:27
-                
-                ## each range is [[xmin,xmax], [ymin,ymax]]
-                #ranges = [self._get_plotitem_data_bounds_(p) for p in pIs]
-                
-                #xmin = min([rg[0][0] for rg in ranges])
-                #xmax = 
-                
-                min_x = np.min([p.vb.boundingRect().x() for p in pIs])
-                max_x = np.max([p.vb.boundingRect().x() + p.sceneBoundingRect().width() for p in pIs])
-                
-                min_y = np.min([p.vb.boundingRect().y() for p in pIs])
-                max_y = np.max([p.vb.boundingRect().y() + p.sceneBoundingRect().height() for p in pIs])
-                
-                min_point = QtCore.QPointF(min_x, min_y)
-                max_point = QtCore.QPointF(max_x, max_y)
-                
-            else:
-                min_point = QtCore.QPointF(host.sceneRect().x(), host.sceneRect().y())
-                
-                max_point = QtCore.QPointF(host.sceneRect().x() + host.sceneRect().width(),
-                                           host.sceneRect().y() + host.sceneRect().height())
-                
-            return [[min_point.x(), max_point.x()], [min_point.y(), max_point.y()]]
-            
-        else:
-            raise TypeError("expecting a pyqtgraph.PlotItem or a pyqtgraph.GraphicsScene; got %s instead" % type(host).__name__)
-        
-    def _update_hline_position_(self, val, plotitem=None):
-        if isinstance(self._host_graphics_item_, pg.PlotItem):
-            self._hl_.setPos(val)
-            self._y_ = self._hl_.getYPos()
-            
-        else:
-            if plotitem is None:
-                plotitem = self._current_plot_item_
-                
-            if self._current_plot_item_ is None:
-                raise RuntimeError("Cannot determine the current plot item; consider calling self.setY(value, plotItem)")
-            
-            new_Y = plotItem.vb.mapViewToScene(QtCore.QPointF(0.0, val)).y()
-            
-            if self._hl_ is not None:
-                self._hl_.setYPos(new_Y)
-                self._y_ = self._hl_.getYPos()
-                
-    def _update_vline_position_(self, val, plotitem=None):
-        if isinstance(self._host_graphics_item_, pg.PlotItem):
-            self._vl_.setPos(val)
-            self._x_ = self._vl_.getXPos()
-            
-        else:
-            if plotitem is None:
-                plotitem = self._current_plot_item_
-                
-            if self._current_plot_item_ is None:
-                raise RuntimeError("Cannot determine the current plot item; consider calling self.setX(value, plotItem")
-            
-            new_X = plotItem.vb.mapViewToScene(QtCore.QPointF(val, 0.0)).x()
-            
-            if self._vl_ is not None:
-                self._vl_.setXPos(new_X)
-                self._x_ = self._vl_.getXPos()
-                
-    def _add_lines_to_host_(self):
-        if self._cursor_type_ == "crosshair":
-            pos = QtCore.QPointF(self._x_, self._y_)
-            
-        elif self._cursor_type_ == "horizontal":
-            pos = QtCore.QPointF(0.0, self._y_)
-            
-        else:
-            pos = QtCore.QPointF(self._x_, 0.0)
-        
-        if self._hl_ is not None:
-            if isinstance(self._host_graphics_item_, pg.PlotItem):
-                self._host_graphics_item_.addItem(self._hl_, ignoreBounds=True)
-                
-            else:
-                self._host_graphics_item_.addItem(self._hl_)
-            
-        if self._vl_ is not None:
-            if isinstance(self._host_graphics_item_, pg.PlotItem):
-                self._host_graphics_item_.addItem(self._vl_, ignoreBounds=True)
-            else:
-                self._host_graphics_item_.addItem(self._vl_)
-
-        if self._follows_mouse_:
-            if isinstance(self._host_graphics_item_, pg.PlotItem):
-                sig = self._host_graphics_item_.scene().sigMouseMoved
-            
-            else:
-                sig = self._host_graphics_item_.sigMouseMoved
-                
-            self._signal_proxy_ = pg.SignalProxy(sig, rateLimit=60, slot=self._slot_mouse_moved_)
-                
-        else:
-            if self._hl_ is not None:
-                self._hl_.setPos(pos.y())
-                    
-            if self._vl_ is not None:
-                self._vl_.setPos(pos.x())
-                    
-        #print("_add_lines_to_host_ xy", (self.x, self.y))
-        
-    @pyqtSlot()
-    @pyqtSlot(object)
-    @safeWrapper
-    def slot_positionChanged(self, evt=None):
-        self.sig_cursorSelected.emit(self._cursorId_)
-        
-        if self._hl_ is not None:
-            self._y_ = self._hl_.getYPos()
-            
-        if self._vl_ is not None:
-            self._x_ = self._vl_.getXPos()
-            
-        if self._cursor_type_ != "crosshair":
-            self.sig_reportPosition.emit(self.ID)
-            
-    @pyqtSlot(tuple)
-    @safeWrapper
-    def slot_linkedPositionChanged(self, pos):
-        signalBlockers = [QtCore.QSignalBlocker(c) for c in self._linked_cursors_]
-        self.x = pos[0]
-        self.y = pos[1]
-        
-    @pyqtSlot()
-    @safeWrapper
-    def _slot_line_selected_(self):
-        if not self._follows_mouse_:
-            self._is_selected_ = True
-            self.sig_cursorSelected.emit(self.ID)
-            
-        
-    @pyqtSlot(bool)
-    @safeWrapper
-    def slot_setSelected(self, val):
-        if not self._follows_mouse_:
-            if not isinstance(val, bool):
-                self._is_selected_ = False
-                
-            else:
-                self._is_selected_ = val
-            
-    def setBounds(self, host=None, xBounds=None, yBounds=None):
-        if host is None:
-            host = self._host_graphics_item_
-            
-        hostBounds = self._get_host_boundaries_(host) # [[xmin, xmax], [ymin, ymax]]
-        
-        if isinstance(xBounds, (tuple, list)) and len(xBounds) == 2:
-            if all([isinstance(v, numbers.Number) for v in xBounds]):
-                self._x_range_ = xBounds
-                
-            elif all([isinstance(v, pq.Quantity) and len(v) == 1 for v in xBounds]):
-                self._x_range_  = [v.flatten().magnitude for v in xBounds]
-                
-        elif isinstance(xBounds, np.ndarray) and xBounds.ndim> 0 and len(xBounds) == 2:
-            if isinstance(xBounds, pq.Quantity):
-                xBounds = xBounds.flatten().magnitude
-                
-            self._x_range_ = [v for v in xBounds]
-            
-        elif xBounds is not None:
-            raise TypeError("xBounds expected to be a sequence of two (possibly Quantity) scalars, or a numpy or Quantity array with two elements")
-            
-        else:
-            self._x_range_ = hostBounds[0]
-            
-        if self._vl_ is not None:
-            self._vl_.setBounds(self._x_range_)
-
-        if isinstance(yBounds, (tuple, list)) and len(yBounds) == 2:
-            if all([isinstance(v, numbers.Number) for v in yBounds]):
-                self._y_range_ = yBounds
-            
-            elif all([isinstance(v, pq.Quantity) and len(v) == 1 for v in xBounds]):
-                self._y_range_  = [v.flatten().magnitude for v in xBounds]
-            
-        elif isinstance(yBounds, np.ndarray) and yBounds.ndim> 0 and len(yBounds) == 2:
-            if isinstance(yBounds, pq.Quantity):
-                yBounds = yBounds.flatten().magnitude
-                
-            self._y_range_ = [v for v in yBounds]
-            
-        elif yBounds is not None:
-            raise TypeError("yBounds expected to be a sequence of two (possibly Quantity) scalars, or a numpy or Quantity array with two elements")
-            
-        else:
-            self._y_range_ = hostBounds[1]
-            
-        if self._hl_ is not None:
-            self._hl_.setBounds(self._y_range_)
-            
-    def linkTo(self, *other):
-        """ Bidirectionally link this cursor to at least another one of the same type.
-        All other cursors will be linked to this one and to each other.
-        For linked cursors, when one is moved by dx, dy, the linked cursor(s) is (are) 
-        moved by the same distance.
-        """
-        for c in other:
-            if self.cursorType != c.cursorType:
-                print('Can link only to SignalCursor instance of the same type')
-                return False
-            
-            if c not in self._linked_cursors_: # avoid "double" linking
-                self._linked_cursors_.append(c)
-                self.sig_axisPositionChanged[tuple].connect(c.slot_linkedPositionChanged)
-            
-            if self not in c._linked_cursors_: # avoid double linking
-                c._linked_cursors_.append(self)
-                s.sig_axisPositionChanged[tuple].connect(self.slot_linkedPositionChanged)
-            
-            for cc in other:
-                if cc is not c and c not in cc._linked_cursors_:# avoid "double" linking
-                    cc._linked_cursors_.append(c)
-                    cc.sig_axisPositionChanged[tuple].connect(c.slot_linkedPositionChanged)
-                    
-                if len(cc._linked_cursors_) > 0:
-                    cc.pen = self.linkedPen
-                     
-            if len(c._linked_cursors_) > 0:
-                c.pen = c.linkedPen
-                
-        if len(self._linked_cursors_) > 0:
-            self._linked_ = True
-            
-    def unlinkFrom(self, *other):
-        ret = False
-        
-        if len(other) > 0:
-            for c in other:
-                if self.cursorType != c.cursorType:
-                    print('Can link only to SignalCursor instance of the same type')
-                    return ret
-                
-                if self in c._linked_cursors_:
-                    c._linked_cursors_.remove(self)
-                    c.sig_axisPositionChanged[tuple].disconnect(self.slot_linkedPositionChanged)
-                    
-                    ret = True
-                    
-                if c in self._linked_cursors_:
-                    self._linked_cursors_.remove(c)
-                    self.sig_axisPositionChanged[tuple].disconnect(c.slot_linkedPositionChanged)
-                    ret = True
-                
-                if len(c._linked_cursors_) == 0:
-                    c.pen = c._default_pen_
-                    c._linked_ = False
-                
-            if len(self._linkedCursors) == 0:
-                self.pen = self._default_pen_
-                self._linked_ = False
-                
-            ret = len(self._linkedCursors) == 0
-        
-        else:
-            if len(self._linked_cursors_) > 0:
-                for c in self._linked_cursors_:
-                    if self in c._linked_cursors_:
-                        c._linked_cursors_.remove(self)
-                        c.sig_axisPositionChanged[tuple].disconnect(self.slot_linkedPositionChanged)
-                        
-                    if len(c._linked_cursors_) == 0:
-                        c.pen = c._default_pen_
-                        c._linked_ = False
-                
-                self._linked_cursors_.clear()
-                self.pen = self._default_pen_
-                self._linked_ = False
-                
-            ret = True
-            
-        return ret
-            
-    def detach(self):
-        if self._hl_ is not None:
-            self._host_graphics_item_.removeItem(self._hl_)
-            
-        if self._vl_ is not None:
-            self._host_graphics_item_.removeItem(self._vl_)
-            
-        if isinstance(self._signal_proxy_, pg.SignalProxy):
-            self._signal_proxy_.disconnect()
-            self._signal_proxy_ = None
-            
-    def attach(self, host, xBounds=None, yBounds=None, pos=None):
-        """Attaches this cursor to a PlotItem or a GraphicsScene 
-        (of the pyqtgraph framework)
-        TODO allow the attaching to a scene a cursor formerly attached to a 
-        plot item, aned vice-versa
-        this means we have to compute appropriate position coordinates!
-        """
-        self.setBounds(host, xBounds=xBounds, yBounds=yBounds)
-        
-        if pos is None:
-            if self._x_ is None:
-                self._x_ = 0.0
-                
-            if self._y_ is None:
-                self._y_ = 0.0
-                
-            
-        elif isinstance(pos, (QtCore.QPoint, QtCore.QPointF)):
-            self._x_ = float(val.x())
-            self._y_ = float(val.y())
-            
-        elif isinstance(pos, (tuple, list)) and len(val) == 2 and all([isinstance(v, (number.Number, type(None))) for v in val]):
-            self._x_ = val[0]
-            self._y_ = val[1]
-        
-        else:
-            raise TypeError("pos expected to be a QtCore.QPoint or QPointF or a pair of numbers or None")
-        
-        ctype_ndx = [v for v in SignalCursor._cursorTypes_.values()].index(self._cursor_type_)
-        keys = [k for k in SignalCursor._cursorTypes_.keys()]
-
-        show_lines = keys[ctype_ndx]
-        
-        self._host_graphics_item_ = host
-            
-        self._setup_lines_(*show_lines)
-            
-        self._add_lines_to_host_()
-        
-    def _setup_(self, host, cursor_type="crosshair", x=None, y=None, 
-                  xwindow=None, ywindow=None, follower=False, cursorID=None, 
-                  xBounds=None, yBounds=None, **kwargs):
-        
-        #print("SignalCursor._setup_ cursor_type %s" % cursor_type)
-        
-        show_lines = (False, False)
-        
-        if isinstance(cursor_type, str):
-            if len(cursor_type) == 1:
-                c_type_name = [name for name in SignalCursor.SignalCursorTypes.names() if name.startswith(cursor_type)]
-                if len(c_type_name):
-                    cursor_type = SignalCursor.SignalCursorTypes[c_type_name[0]]
-                    
-                else:
-                    cursor_type = None
-                
-            else:
-                if cursor_type in SignalCursor.SignalCursorTypes.names():
-                    cursor_type = SignalCursor.SignalCursorTypes[cursor_type]
-                    
-                else:
-                    cursor_type = None
-                
-        elif isinstance(cursor_type, (tuple, list)) and len(cursor_type) == 2 and all([isinstance(b, bool) for c in cursor_type]):
-            cursor_type = Signalcursor.SignalCursorTypes.getType(cursor_type) # this may return None
-            
-        elif not isinstance(cursor_type, SignalCursor.SignalCursorTypes):
-            raise TypeError("cursor_type expectec to be a str, a tuple of two booleans or a SignalCursor.SignalCursorTypes; got %s instead" % type(cursor_type).__name__)
-            
-        # to avoid doubts, is cursor_type is None then fallback to the default (crosshair)
-        if cursor_type is None:
-            cursor_type = SignalCursor.SignalCursorTypes.crosshair
-            
-        # now we can set which lines are shown
-        show_lines = cursor_type.value
-        
-        self._cursor_type_ = cursor_type
-            
-        #print("show_lines", show_lines)
-        
-        self.setBounds(host, xBounds=xBounds, yBounds=yBounds)
-        
-        if isinstance(x, numbers.Number):
-            self._x_ = x
-            
-        elif isinstance(x, pq.Quantity):
-            self._x_ = x.magnitude.flatten()[0]
-            
-        elif x is None:
-            self._x_ = self._x_range_[0] + np.diff(self._x_range_)/2
-            
-        else:
-            raise TypeError("x expected to be a number, python Quantity or None; got %s instead" % type(x).__name__)
-            
-        if isinstance(y, numbers.Number):
-            self._y_ = y
-            
-        elif isinstance(y, pq.Quantity):
-            self._y_ = y.magnitude.flatten()[0]
-            
-        elif y is None:
-            self._y_ = self._y_range_[0] + np.diff(self._y_range_)/2
-        
-        else:
-            raise TypeError("y expected to be a number, python Quantity or None; got %s instead" % type(y).__name__)
-            
-        if isinstance(xwindow, numbers.Number):
-            self._hWin_ = xwindow
-            
-        elif isinstance(xwindow, pq.Quantity):
-            self._hWin_ = xwindow.magnitude.flatten()[0]
-            
-        elif xwindow is None:
-            self._hWin_ = 0.0
-            
-        else:
-            raise TypeError("xwindow expected to be a number, python Quantity or None; got %s instead" % type(xwindow).__name__)
-            
-        if isinstance(ywindow, numbers.Number):
-            self._vWin_ = ywindow
-            
-        elif isinstance(ywindow, pq.Quantity):
-            self._vWin_ = ywindow.magnitude.flatten()[0]
-            
-        elif ywindow is None:
-            self._vWin_ = 0.0
-            
-        else:
-            raise TypeError("ywindow expected to be a number, python Quantity or None; got %s instead" % type(ywindow).__name__)
-        
-        if follower:
-            if cursorID is None:
-                cursorID = "d"
-                
-            elif isinstance(cursorID, str) and len(cursorID.strip()) == 0:
-                cursorID = "d"
-                
-        else:
-            if cursor_type == "crosshair":
-                if cursorID is None:
-                    cursorID = "c"
-                    
-                elif isinstance(cursorID, str) and len(cursorID.strip()) == 0:
-                    cursorID = "c"
-                    
-            elif cursor_type == "horizontal":
-                if cursorID is None:
-                    cursorID = "h"
-                    
-                elif isinstance(cursorID, str) and len(cursorID.strip()) == 0:
-                    cursorID = "h"
-                    
-                
-            elif cursor_type == "vertical":
-                if cursorID is None:
-                    cursorID = "v"
-                    
-                elif isinstance(cursorID, str) and len(cursorID.strip()) == 0:
-                    cursorID = "v"
-
-        self._cursorId_ = cursorID
-        
-        self._follows_mouse_ = follower
-        
-        # NOTE: 2019-02-03 14:48:05
-        # override default value of "movable"
-        if isinstance(host, pg.GraphicsScene):
-            kwargs["movable"] = not self._follows_mouse_
-            
-        else:
-            kwargs["movable"] = False
-        
-        if "name" not in kwargs.keys():
-            kwargs["name"] = self._cursor_type_
-
-        self._setup_lines_(*show_lines, **kwargs)
-        
-        #print("_setup_ after _setup_lines_ xy", (self.x, self.y))
-        
-        self._add_lines_to_host_()
-        #print("_setup_ after __add_lines_to_host__ xy", (self.x, self.y))
-        
-    def _interpret_scene_mouse_events_(self, scene=None):
-        """
-        """
-        if scene is None or not isinstance(scene, pg.GraphicsScene):
-            scene = self.hostScene
-            
-        if scene is None:
-            return
-        
-        self._dragging_ = False
-        
-        if scene.dragItem is not None:
-            if all([l is not None for l in (self._vl_, self._hl_)]):
-                if scene.dragItem in (self._vl_, self._hl_):
-                    self._dragging_ = True
-                    
-    @pyqtSlot(object)
-    @safeWrapper
-    def _slot_selected_in_scene_(self, evt):
-        # NOTE: 2019-02-09 23:29:22
-        # here, evt is a mouse event
-        scene = self.hostScene
-        
-        items = scene.items(evt.pos())
-        
-        if (self.vline is not None and self.vline in items) or \
-            (self.hline is not None and self.hline in items):
-            self.sig_cursorSelected.emit(self.ID)
-            
-    @pyqtSlot(object)
-    @safeWrapper
-    def _slot_mouse_event_(self, evt):
-        """Workaround to synchronize movement of BOTH lines when mouse is dragged in the scene.
-        Calls _interpret_scene_mouse_events_ because to find out if any of the lines
-        has been clicked on and if it's being dragged.
-        """
-        # NOTE: 2019-02-09 12:45:02
-        # We cannot rely on sigDragged signal from the line we currently interact from
-        # to inform the movement of the other line, because each of the cursor's 
-        # lines have one of the coordinates set to 0.0 (being orthogonal)
-        
-        # ATTENTION: 2019-02-09 23:11:56
-        # evt is a QtCore.QPointF, and NOT a mouse event object !!!
-        
-        scene = self.hostScene
-        
-        self._interpret_scene_mouse_events_(scene)
-        
-        if self._dragging_ and self._cursor_type_ == "crosshair":
-            self.sig_cursorSelected.emit(self._cursorId_)
-
-            if isinstance(evt, (tuple, list)):
-                pos = evt[0] 
-                
-            else:
-                pos = evt
-                
-            if isinstance(pos, (QtCore.QPointF, QtCore.QPoint)):
-                self._update_lines_from_pos_(pos)
-            
-        else:
-            if scene is not None and len(scene.clickEvents):
-                #print("SignalCursor._slot_mouse_event_ scene.clickEvents", scene.clickEvents)
-                mouseClickEvents = [e for e in scene.clickEvents if type(e).__name__ == "MouseClickEvent"]
-                #print("SignalCursor._slot_mouse_event_ mouseClickEvents", mouseClickEvents)
-                # NOTE: 2019-11-28 15:15:37
-                # douyble-click events do not seem to be captured ?
-                #print("SignalCursor._slot_mouse_event_ is double click", [e.double() for e in mouseClickEvents])
-                
-                if len(mouseClickEvents):
-                    #print("SignalCursor._slot_mouse_event_ modifiers", mouseClickEvents[0].modifiers())
-                    #print("SignalCursor._slot_mouse_event_ double", mouseClickEvents[0].double())
-                    #print("SignalCursor._slot_mouse_event_ double", mouseClickEvents[0].button())
-                    items = scene.items(evt)
-                    
-                    if any([i is not None and i in items for i in (self.vline, self.hline)]):
-                        self.sig_cursorSelected.emit(self.ID)
-                        
-                        #print("SignalCursor._slot_mouse_event_", QtWidgets.QApplication.keyboardModifiers())
-                        
-                        if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
-                            self.sig_editMe.emit(self.ID)
-                        
-                        
-                    #if self.vline is not None and self.vline in items:
-                        #self.sig_cursorSelected.emit(self.ID)
-                        
-                    #if self.hline is not None and self.hline in items:
-                        #self.sig_cursorSelected.emit(self.ID)
-                    
-                #if "MouseClickEvent" in str(scene.clickEvents[0]):
-                    ##print("click %s" % scene.clickEvents[0])
-                    #items = scene.items(evt)
-                    
-                    #if self.vline is not None and self.vline in items:
-                        #self.sig_cursorSelected.emit(self.ID)
-                        
-                    #if self.hline is not None and self.hline in items:
-                        #self.sig_cursorSelected.emit(self.ID)
-                
-            #try:
-                #if len(scene.clickEvents):
-                    #if "MouseClickEvent" in str(scene.clickEvents[0]):
-                        ##print("click %s" % scene.clickEvents[0])
-                        #items = scene.items(evt)
-                        
-                        #if self.vline is not None and self.vline in items:
-                            #self.sig_cursorSelected.emit(self.ID)
-                            
-                        #if self.hline is not None and self.hline in items:
-                            #self.sig_cursorSelected.emit(self.ID)
-                    
-            #except:
-                #pass
-                
-    def _slot_mouse_moved_(self, evt):
-        """Use only for dynamic cursors
-        """
-        # CAUTION
-        # when activated by the scene sigMouseMoved signal, this carries the
-        # mouse event's scenePos()
-        if not self._follows_mouse_:
-            return
-        
-        if isinstance(evt, (tuple, list)):
-            pos = evt[0] 
-            
-        else:
-            pos = evt
-
-        self._update_lines_from_pos_(pos)
-        
-    def _update_lines_from_pos_(self, pos):
-        # CAUTION
-        # when activated by the scene sigMouseMoved signal, this carries the
-        # mouse event's scenePos(); what if pos is NOT this but a point in 
-        # other coordinate system?
-        
-        if isinstance(self._host_graphics_item_, pg.PlotItem):
-            self._current_plot_item_ = self._host_graphics_item_
-            
-            if self._host_graphics_item_.sceneBoundingRect().contains(pos):
-                mp = self._host_graphics_item_.vb.mapSceneToView(pos)
-                
-                di = [d for d in self._host_graphics_item_.items if isinstance(d, pg.PlotDataItem)]
-                
-                if len(di):
-                    d = di[0]
-                    
-                    if mp.x() >= d.xData[0] and mp.x() <= d.xData[-1]:
-                        if self._hl_ is not None:
-                            self._hl_.setPos(mp.y())
-                            self._y_ = mp.y()
-                            
-                        if self._vl_ is not None:
-                            self._vl_.setPos(mp.x())
-                            self._x_ = mp.x()
-                            
-                # NOTE: only report position when mouse is in the sceneBoundingRect
-                self.sig_reportPosition.emit(self.ID)
-                
-        elif isinstance(self._host_graphics_item_, pg.GraphicsScene):
-            # FIXME  2019-02-10 21:30:29
-            # for multiaxes crosshair the horizontal line is stuck on top plot item
-            if self._hl_ is not None:
-                self._hl_.setPos(pos.y())
-                self._y_ = pos.y()
-                
-            if self._vl_ is not None:
-                self._vl_.setPos(pos.x())
-                self._x_ = pos.x()
-                
-            self.sig_reportPosition.emit(self.ID)
-            
-        self.sig_axisPositionChanged.emit((self.x, self.y))
-            
-        # NOTE: this will cause re-entrant code!
-        #if self._linked_ and len(self._linked_cursors_):
-            #for c in self._linked_cursors_:
-                ## CAUTION this may crash if no curent plot item is defined in C
-                #c.x = self.x
-                #c.y = self.y
-            
-    @property
-    def hostScene(self):
-        if isinstance(self._host_graphics_item_, pg.PlotItem):
-            return self._host_graphics_item_.scene()
-        
-        else:
-            return self._host_graphics_item_
-        
-    @property
-    def scenePlotItems(self):
-        """An ordered mapping (collections.OrderedDict) of PlotItems 
-        The plot items are those available to this cursor in the parent widget.
-        Returns a map of plot item (key) to its tuple of (x,y) coordinates in the scene (value).
-        These would include the plot item host of the cursor (for single axis cursors).
-        """
-        # get a list of all plot items in the scene
-        # CAUTION they may be hosted in different layouts!
-        plotitems = [i for i in self.hostScene.items() if isinstance(i, pg.PlotItem)]
-        
-        # FIXME: we're assuming the cursors are in a SignalViewer window (the only one
-        # that supports multi-axes cursors)
-        # therefore we're returning a list of plot items sorted by their Y coordinate 
-        # in the scene (as a SignalViewer will lay lot items vertically)
-        
-        # sort plot items by their row & column coordinate (i.e. x, and y coordinate)
-        # NOTE: in the scene, coordinate (0, 0) is the TOP LEFT 
-        pits = sorted(sorted(plotitems, key = lambda x: x.pos().y()), key=lambda x: x.pos().x())
-        
-        return collections.OrderedDict([(p, (p.pos().x(), p.pos().y())) for p in pits])
-        
-    @property
-    def hostItem(self):
-        """Read-only:
-        The GraphicsItem that hosts this cursor.
-        Currently, this is either a PlotItem, or a GraphicsScene
-        """
-        return self._host_graphics_item_
-    
-    @property
-    def isSingleAxis(self):
-        return isinstance(self._host_graphics_item_, pg.PlotItem)
-    
-    @property
-    def isMultiAxis(self):
-        return not self.isSingleAxis
-    
-    @property
-    def vline(self):
-        """Read-only
-        """
-        return self._vl_
-    
-    @property
-    def hline(self):
-        """Read-only
-        """
-        return self._hl_
-    
-    @property
-    def pos(self):
-        return QtCore.QPointF(self.x, self.y)
-    
-    @pos.setter
-    def pos(self, val):
-        if isinstance(val, (QtCore.QPoint, QtCore.QPointF)):
-            self.x = float(val.x())
-            self.y = float(val.y())
-            
-        elif isinstance(val, (tuple, list)) and len(val) == 2 and all([isinstance(v, (number.Number, type(None))) for v in val]):
-            self.x = val[0]
-            self.y = val[1]
-            
-    @property
-    def parameters(self):
-        """A tuple with cursor parameters.
-        
-        Vertical cursors: (x, xwindow, ID)
-        
-        Horizontal cursors: (y, ywindow, ID)
-        
-        Crosshair cursors: (x, xwindow, y, ywindow, ID)
-        
-        """
-        if self.cursorType == SignalCursor.SignalCursorTypes.vertical:
-            return (self.x, self.xwindow, self.ID)
-        
-        elif self.cursorType == SignalCursor.SignalCursorTypes.horizontal:
-            return (self.y, self.ywindow, self.ID)
-        
-        else:
-            return (self.x, self.xwindow, self.y, self.ywindow, self.ID)
-        
-    @property
-    def x(self):
-        """The X coordinate of the cursor in axes (PlotItem) data coordinates.
-        For multi-axes cursors this will return the value in the "current" PlotItem
-        (i.e., the plot where the cursor coordinates are mapped to a point in the
-        plot item's view range)
-        
-        NOTE: To obtain the "y" data coordinate in another PlotItem (axes system)
-        that is spanned by the cursor, call self.getX(plotitem)
-        """
-        if self._hl_ is None and self._vl_ is None:
-            return self._x_
-        
-        if self._vl_ is not None:
-            line = self._vl_
-            
-        else:
-            line = self._hl_ # as last resort
-        
-        if isinstance(self._host_graphics_item_, pg.PlotItem):
-            self._current_plot_item_ = self._host_graphics_item_
-            return line.getXPos()
-            
-        else:
-            pos = line.getPos() # NOTE: a pair of values, not a QtCore.QPoint/F
-            
-            plots = [p for p in self.scenePlotItems]
-            
-            if len(plots):
-                # CAUTION this may return None !!!
-                for plot in plots:
-                    vrange = plot.vb.viewRange()[0]
-                    plot_x = plot.vb.mapSceneToView(QtCore.QPointF(pos[0], pos[1])).x()
-                    if plot_x >= vrange[0] and plot_x <= vrange[1]:
-                        self._current_plot_item_ = plot
-                        return plot_x
-                    
-            else:
-                return line.getXPos() # up to the caller to do what it wants with this
-    
-    @x.setter
-    def x(self, val):
-        """Expects a value in a plotitem valid range
-        """
-        if isinstance(val, pq.Quantity):
-            val = val.magnitude.flatten()[0]
-            
-        elif not isinstance(val, numbers.Number):
-            raise TypeError("expected a numeric scalar value or a scalar python Quantity; got %s instead" % type(val).__name__)
-        
-        if self._vl_ is not None:
-            self._update_vline_position_(val)
-            
-    def getX(self, plotitem = None):
-        if isinstance(self._host_graphics_item_, pg.PlotItem):
-            # so that we can also use this function with single axis cursors
-            return self.x
-            #return self._host_graphics_item_.vb.mapSceneToView(QtCore.QPointF(self.x, self.y)).x()
-        
-        else:
-            if not isinstance(plotitem, pg.PlotItem):
-                raise TypeError("For multi-axes cursors, a pg.PlotItem parameter was expected; got %s instead" % type(plotitem).__name__)
-            
-            vrange = plotitem.vb.viewRange()[0]
-            
-            if self._vl_ is not None:
-                x = self._vl_.getXPos()
-                
-            elif self._hl_ is not None: # try this
-                x = self._hl_.getXPos()
-                
-            else:
-                x = self._x_ # very last resort; caller should check this
-            
-            return plotitem.vb.mapSceneToView(QtCore.QPointF(x, 0.0)).x()
-            
-    def setX(self, val, plotItem=None):
-        """Sets the X coordinate of a line.
-        
-        The X coordinate is specified in axis coordinates
-        
-        For single-axes cursors, this simply sets the "x" property.
-        
-        For multi-axes cursor one must also specify the PlotItem in which the value is given
-        
-        """
-        if isinstance(self.hostItem, pg.PlotItem):
-            # so that we can also use this function with single axis cursors
-            self.x = val
-            
-        else:
-            if isinstance(val, pq.Quantity):
-                val = val.magnitude.flatten()[0]
-                
-            elif not isinstance(val, numbers.Number):
-                raise TypeError("expected a numeric scalar value or a scalar python Quantity; got %s instead" % type(val).__name__)
-        
-            if not isinstance(plotItem, pg.PlotItem):
-                raise TypeError("For multi-axis cursor please also specify a PlotItem")
-            
-            if plotItem not in [p for p in self.scenePlotItems]:
-                raise ValueError("Plot item %s not found in this cursor's scene" % plotItem)
-            
-            self._update_vline_position_(val, plotItem)
-            
-    @property
-    def y(self):
-        """The Y coordinate of the cursor in axes (PlotItem) data coordinates.
-        For multi-axes cursors this will return the value in the "current" PlotItem
-        (i.e., the plot where the cursor coordinates are mapped to a point in the
-        plot item's view range)
-        
-        NOTE: To obtain the "y" data coordinate in another PlotItem (axes system)
-        that is spanned by the cursor, call self.getY(plotitem)
-        """
-        if self._hl_ is None and self._vl_ is None:
-            return self._y_
-        
-        if self._hl_ is not None:
-            line = self._hl_
-            
-        else:
-            line = self._vl_ # as last resort
-        
-        if isinstance(self._host_graphics_item_, pg.PlotItem):
-            self._current_plot_item_ = self._host_graphics_item_
-            return line.getYPos()
-            
-        else:
-            pos = line.getPos() # NOTE: a pair of values, not a QtCore.QPoint/F
-            
-            plots = [p for p in self.scenePlotItems]
-            
-            if len(plots):
-                # CAUTION this may return None !!!
-                for plot in plots:
-                    vrange = plot.vb.viewRange()[1]
-                    plot_y = plot.vb.mapSceneToView(QtCore.QPointF(pos[0], pos[1])).y()
-                    if plot_y >= vrange[0] and plot_y <= vrange[1]:
-                        self._current_plot_item_ = plot
-                        return plot_y
-                    
-            else:
-                return line.getYPos() # up to the caller to do what it wants with this
-                
-    @y.setter
-    def y(self, val):
-        if isinstance(val, pq.Quantity):
-            val = val.magnitude.flatten()[0]
-            
-        elif not isinstance(val, numbers.Number):
-            raise TypeError("expected a numeric scalar value or a scalar python Quantity; got %s instead" % type(val).__name__)
-        
-        if self._hl_ is not None:
-            self._update_hline_position_(val)
-            
-    def getY(self, plotitem=None):
-        if isinstance(self._host_graphics_item_, pg.PlotItem):
-            # so that we can also use this function with single axis cursors
-            return self.y
-            #return self._host_graphics_item_.vb.mapSceneToView(QtCore.QPointF(self.x, self.y)).y()
-        
-        else:
-            if not isinstance(plotitem, pg.PlotItem):
-                raise TypeError("For multi-axes cursors, a pg.PlotItem parameter was expected; got %s instead" % type(plotitem).__name__)
-            
-            vrange = plotitem.vb.viewRange()[0]
-            
-            if self._hl_ is not None:
-                y = self._hl_.getYPos()
-                
-            elif self._vl_ is not None: # try this
-                y = self._vl_.getYPos()
-                
-            else:
-                y = self._y_ # very last resort; caller should check this
-            
-            return plotitem.vb.mapSceneToView(QtCore.QPointF(0.0, y)).y()
-            
-    def setY(self, val, plotItem=None):
-        if isinstance(self.hostItem, pg.PlotItem):
-            # so that we can also use this function with single axis cursors
-            self.y = val
-            
-        else:
-            if isinstance(val, pq.Quantity):
-                val = val.magnitude.flatten()[0]
-                
-            elif not isinstance(val, numbers.Number):
-                raise TypeError("expected a numeric scalar value or a scalar python Quantity; got %s instead" % type(val).__name__)
-        
-            if not isinstance(plotItem, pg.PlotItem):
-                raise TypeError("For multi-axis cursor please also specify a PlotItem")
-            
-            if plotItem not in [p for p in self.scenePlotItems]:
-                raise ValueError("Plot item %s not found in this cursor's scene" % plotItem)
-            
-            self._update_hline_position_(val, plotItem)
-            
-    @property
-    def xwindow(self):
-        return self._hWin_
-    
-    @xwindow.setter
-    def xwindow(self, val):
-        if isinstance(val, pq.Quantity):
-            val = val.magnitude.flatten()[0]
-            
-        elif not isinstance(val, numbers.Number):
-            raise TypeError("expected a numeric scalar value or a scalar python Quantity; got %s instead" % type(val).__name__)
-        
-        self._hWin_ = val
-    
-    @property
-    def ywindow(self):
-        return self._vWin_
-    
-    @ywindow.setter
-    def ywindow(self, val):
-        if isinstance(val, pq.Quantity):
-            val = val.magnitude.flatten()[0]
-            
-        elif not isinstance(val, numbers.Number):
-            raise TypeError("expected a numeric scalar value or a scalar python Quantity; got %s instead" % type(val).__name__)
-        
-        self._vWin_ = val
-        
-    @property
-    def ID(self):
-        return self._cursorId_
-    
-    @ID.setter
-    def ID(self, val):
-        if not isinstance(val, str):
-            raise TypeError("expecting a string; got %s instead" % type(val).__name__)
-        
-        if len(val.strip()) == 0:
-            warnings.Warning("New ID is empty")
-            
-        self._cursorId_ = val
-        
-    @property
-    def defaultPen(self):
-        return self._default_pen_
-    
-    @property
-    def pen(self):
-        """A QtGui.QPen
-        """
-        return self._pen_
-    
-    @pen.setter
-    def pen(self, val):
-        if not isinstance(val, QtGui.QPen):
-            raise TypeError("expecting a QtGui.QPen; got a %s instead" % type(val).__name__)
-        
-        self._pen_ = val
-        
-        if self._hl_ is not None:
-            self._hl_.setPen(self._pen_)
-            
-        if self._vl_ is not None:
-            self._vl_.setPen(self.__pen)
-            
-    @property
-    def linkedPen(self):
-        return self._linkedPen_
-    
-    @linkedPen.setter
-    def linkedPen(self, val):
-        if not isinstance(val, QtGui.QPen):
-            raise TypeError("expecting a QtGui.QPen; got a %s instead" % type(val).__name__)
-        
-        self._linkedPen_ = val
-            
-        if self._hl_ is not None:
-            self._hl_.setPen(self._linkedPen_)
-            
-        if self._vl_ is not None:
-            self._vl_.setPen(self._linkedPen_)
-    
-    @property
-    def hoverPen(self):
-        return self._hoverPen_
-    
-    @hoverPen.setter
-    def hoverPen(self, val):
-        if not isinstance(val, QtGui.QPen):
-            raise TypeError("expecting a QtGui.QPen; got a %s instead" % type(val).__name__)
-        
-        self._hoverPen_ = val
-        
-        if self._hl_ is not None:
-            self._hl_.setHoverPen(self._hoverPen_)
-            
-        if self._vl_ is not None:
-            self._vl_.setHoverPen(self._hoverPen_)
-    
-    @property
-    def cursorTypeName(self):
-        return self.cursorType.name
-    
-    @property
-    def cursorType(self):
-        lines_tuple = (self._hl_ is not None, self._vl_ is not None)
-        
-        if self._cursor_type_ is None:
-            self._cursor_type_ = SignalCursor.SignalCursorTypes.getType(lines_tuple)
-            
-        elif isinstance(self._cursor_type_, str):
-            if self._cursor_type_ in SignalCursor.SignalCursorTypes.names():
-                self._cursor_type_ = SignalCursor.SignalCursorTypes[self._cursor_type_]
-            
-            else:
-                self._cursor_type_ = SignalCursor.SignalCursorTypes.getType(lines_tuple)
-
-        elif not isinstance(self._cursor_type_, SignalCursor.SignalCursorTypes):
-            self._cursor_type_ = SignalCursor.SignalCursorTypes.getType(lines_tuple)
-            
-        return self._cursor_type_
-                
-    @property
-    def isSelected(self):
-        return self._is_selected_
-    
-    @property
-    def isDynamic(self):
-        return self._follows_mouse_
-    
-    @property
-    def isCrosshair(self):
-        return self._vl_ is not None and self._hl_ is not None
-    
-    @property
-    def isHorizontal(self):
-        return self._hl_ is not None and self._vl_ is None
-    
-    
-    @property
-    def isVertical(self):
-        return self._vl_ is not None and self._hl_ is None
-            
-    
-###class SignalViewer(QMainWindow, Ui_SignalViewerWindow):
 class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     """ A plotter for multi-sweep signals ("frames" or "segments"), with cursors.
     
@@ -1748,8 +338,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     supported_types = (neo.Block, neo.Segment, neo.AnalogSignal, 
                        neo.IrregularlySampledSignal, neo.SpikeTrain, neo.Event,
                        neo.Epoch, neo.core.baseneo.BaseNeo,
-                        dt.DataSignal, dt.IrregularlySampledDataSignal,
-                        dt.TriggerEvent,dt.TriggerProtocol,
+                       DataSignal, IrregularlySampledDataSignal,
+                       TriggerEvent,TriggerProtocol,
                         vigra.filters.Kernel1D, np.ndarray,
                         tuple, list)
     
@@ -1767,8 +357,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     defaultEpochColor    = mpl.colors.to_rgba("xkcd:coral")
 
     def __init__(self, 
-                 x: (neo.core.baseneo.BaseNeo, dt.DataSignal, dt.IrregularlySampledDataSignal, dt.TriggerEvent,dt.TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
-                 y: (neo.core.baseneo.BaseNeo, dt.DataSignal, dt.IrregularlySampledDataSignal, dt.TriggerEvent,dt.TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
+                 x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
+                 y: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
                  parent: (QtWidgets.QMainWindow, type(None)) = None, 
                  pWin: (QtWidgets.QMainWindow, type(None))= None, 
                  ID:(int, type(None)) = None,
@@ -2114,7 +704,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             current_ndx = self.selectSignalComboBox.currentIndex()
             current_txt = self.selectSignalComboBox.currentText()
             
-            sig_names = ["All"] +  utilities.unique([s.name if isinstance(s.name, str) and len(s.name.strip()) else "Analog signal %d" % k for k, s in enumerate(analog)]) + ["Choose"]
+            sig_names = ["All"] +  unique([s.name if isinstance(s.name, str) and len(s.name.strip()) else "Analog signal %d" % k for k, s in enumerate(analog)]) + ["Choose"]
             
             if current_txt in sig_names:
                 new_ndx = sig_names.index(current_txt)
@@ -2143,7 +733,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             current_ndx = self.selectIrregularSignalComboBox.currentIndex()
             current_txt = self.selectIrregularSignalComboBox.currentText()
             
-            sig_names = ["All"] +  utilities.unique([s.name if isinstance(s.name, str) and len(s.name.strip()) else "Irregularly sampled signal %d" % k for k, s in enumerate(irregular)]) + ["Choose"]
+            sig_names = ["All"] +  unique([s.name if isinstance(s.name, str) and len(s.name.strip()) else "Irregularly sampled signal %d" % k for k, s in enumerate(irregular)]) + ["Choose"]
             
             if current_txt in sig_names:
                 new_ndx = sig_names.index(current_txt)
@@ -3182,6 +1772,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         kwargs: var-keyword parameters for SignalCursor constructor (pen, etc)
         """
         
+        #print("_addCursor_ x:", x, "y:", y)
+        
         if xwindow is None:
             xwindow = self.defaultCursorWindowSizeX
             
@@ -3295,8 +1887,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     yBounds = (scene_rect.y(), scene_rect.y() + scene_rect.height())
                 
             else:
-                min_x_axis = np.min([p.viewRange()[0][0] for p in self.signalsLayout.items])
-                max_x_axis = np.max([p.viewRange()[0][0] for p in self.signalsLayout.items])
+                pIs = self.plotItems
+                
+                min_x_axis = np.min([p.viewRange()[0][0] for p in pIs])
+                max_x_axis = np.max([p.viewRange()[0][1] for p in pIs])
+                
+                #print("_addCursor_ min_x_axis:", min_x_axis, "max_x_axis:", max_x_axis)
                 
                 topAxis_y_max = pIs[0].viewRange()[1][1]
                 bottomAxis_y_min = pIs[-1].viewRange()[1][0]
@@ -3328,6 +1924,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if yBounds is None:
                     yBounds = [min_point.y(), max_point.y()]
                 
+        #print("_addCursor_ x:", x, "y:", y)
+        
         if not isinstance(cursor_type, str):
             raise TypeError("cursor_type expected to be a str; got %s instead" % type(cursor_type).__name__)
         
@@ -3444,7 +2042,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 item_path.reverse()
                 
-                value = utilities.get_nested_value(self.dataAnnotations, item_path[1:]) # because 1st item is the insivible root name
+                value = get_nested_value(self.dataAnnotations, item_path[1:]) # because 1st item is the insivible root name
                 
                 values.append(value)
                 
@@ -4503,8 +3101,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     @safeWrapper
     def setData(self,  
-                x:(neo.core.baseneo.BaseNeo, dt.DataSignal, dt.IrregularlySampledDataSignal, dt.TriggerEvent,dt.TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
-                y:(neo.core.baseneo.BaseNeo, dt.DataSignal, dt.IrregularlySampledDataSignal, dt.TriggerEvent,dt.TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
+                x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
+                y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
                 doc_title:(str, type(None)) = None, 
                 frameAxis:(int, str, vigra.AxisInfo, type(None)) = None,
                 signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None,
@@ -4679,8 +3277,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     @safeWrapper
     def _set_data_(self, 
-                   x:(neo.core.baseneo.BaseNeo, dt.DataSignal, dt.IrregularlySampledDataSignal, dt.TriggerEvent,dt.TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
-                   y:(neo.core.baseneo.BaseNeo, dt.DataSignal, dt.IrregularlySampledDataSignal, dt.TriggerEvent,dt.TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
+                   x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
+                   y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
                    doc_title:(str, type(None)) = None, 
                    frameIndex:(int, tuple, list, range, slice, type(None)) = None, 
                    frameAxis:(int, type(None)) = None,
@@ -4808,7 +3406,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     raise TypeError("channelIndex expected to be a neo.ChannelIndex or None; got %s instead" % type(channelIndex).__name__)
                         
                 if self.channelIndex is None: # the above failed
-                    self.frameIndex = utilities.normalized_index(self._data_frames_, frameIndex)
+                    self.frameIndex = normalized_index(self._data_frames_, frameIndex)
                     self._number_of_frames_ = len(self.frameIndex)
                     self.channelIndex = None
                 
@@ -4853,7 +3451,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 #self.frameIndex = range(1)
                 #self._plotEpochs_(clear=True)
             
-            elif isinstance(y, (neo.core.AnalogSignal,dt.DataSignal)):
+            elif isinstance(y, (neo.core.AnalogSignal, DataSignal)):
                 self.y = y
                 
                 # NOTE: no need for these as there is only one signal
@@ -4871,7 +3469,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     raise TypeError("For AnalogSignal and DataSignal, frameAxis must be an int or None; got %s instead" % type(frameAxis).__name__)
 
                 self.signalChannelAxis = 1
-                self.signalChannelIndex = utilities.normalized_sample_index(self.y.as_array(), self.signalChannelAxis, signalChannelIndex)
+                self.signalChannelIndex = normalized_sample_index(self.y.as_array(), self.signalChannelAxis, signalChannelIndex)
                 
                 # dealt with by displayframe()
                 self.separateSignalChannels = separateSignalChannels
@@ -4884,15 +3482,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self.frameIndex = range(self._number_of_frames_)
                     
                 else:
-                    frameAxis = utilities.normalized_axis_index(self.y.as_array(), frameAxis)
+                    frameAxis = normalized_axis_index(self.y.as_array(), frameAxis)
                     if frameAxis != self.signalChannelAxis:
                         raise ValueError("For structured signals, frame axis and signal channel axis must be identical")
                     
                     self.frameAxis = frameAxis
-                    self.frameIndex = utilities.normalized_sample_index(self.y.as_array(), self.frameAxis, frameIndex)
+                    self.frameIndex = normalized_sample_index(self.y.as_array(), self.frameAxis, frameIndex)
                     self._number_of_frames_ = len(self.frameIndex)
                     
-            elif isinstance(y, (neo.core.IrregularlySampledSignal, dt.IrregularlySampledDataSignal)):
+            elif isinstance(y, (neo.core.IrregularlySampledSignal,  IrregularlySampledDataSignal)):
                 self.y = y
                 self.frameIndex = range(1)
                 #self.signalIndex = range(1)
@@ -4962,7 +3560,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 # TODO -- treat this as a numpy ndarray
                 
             elif isinstance(y, vigra.filters.Kernel1D):
-                self.x, self.y = dt.vigraKernel1D_to_ndarray(self.y)
+                self.x, self.y = vigraKernel1D_to_ndarray(self.y)
                 self._plotEpochs_(clear=True)
                 
                 self.frameIndex = range(1)
@@ -5004,13 +3602,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 if signalChannelAxis.key.lower().strip() != "c":
                                     warnings.warn("Channel axis index is specificed by non-canonical axis key %s" % signalChannelAxis)
                                     
-                        signalChannelAxis = utilities.normalized_axis_index(self.y, signalChannelAxis)
+                        signalChannelAxis = normalized_axis_index(self.y, signalChannelAxis)
                         
                     self.signalChannelAxis = signalChannelAxis
                     
                     dataAxis = 1 if self.signalChannelAxis == 0 else 0
                     
-                    self.signalChannelIndex = utilities.normalized_sample_index(self.y, self.signalChannelAxis, signalChannelIndex)
+                    self.signalChannelIndex = normalized_sample_index(self.y, self.signalChannelAxis, signalChannelIndex)
                     
                     self.separateSignalChannels = separateSignalChannels
                     
@@ -5029,7 +3627,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             
                     else:
                         # for 2D arrays, this forces plotting one channel per frame
-                        frameAxis = utilities.normalized_axis_index(self.y, frameAxis)
+                        frameAxis = normalized_axis_index(self.y, frameAxis)
                         
                         # NOTE: 2019-11-22 14:24:16
                         # for a 2D array it does not make sense to have frameAxis
@@ -5039,7 +3637,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         
                         self.frameAxis = frameAxis
                         
-                        self.frameIndex = utilities.normalized_sample_index(self.y, self.frameAxis, frameIndex)
+                        self.frameIndex = normalized_sample_index(self.y, self.frameAxis, frameIndex)
                         
                         self._number_of_frames_ = len(self.frameIndex)
                         #self._number_of_frames_ = self.y.shape[self.frameAxis]
@@ -5057,8 +3655,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if signalChannelAxis is None:
                         raise TypeError("for 3D arrays the signal channel axis must be specified")
                     
-                    frameAxis = utilities.normalized_axis_index(self.y, frameAxis)
-                    signalChannelAxis = utilities.normalized_axis_index(self.y, signalChannelAxis)
+                    frameAxis = normalized_axis_index(self.y, frameAxis)
+                    signalChannelAxis = normalized_axis_index(self.y, signalChannelAxis)
                     
                     if frameAxis  ==  signalChannelAxis:
                         raise ValueError("For 3D arrays the index of the frame axis must be different from the index of the signal channel axis")
@@ -5071,11 +3669,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     axes.remove(self.frameAxis)
                     axes.remove(self.signalChannelAxis)
                     
-                    self.frameIndex = utilities.normalized_sample_index(self.y, self.frameAxis, frameIndex)
+                    self.frameIndex = normalized_sample_index(self.y, self.frameAxis, frameIndex)
                     
                     self._number_of_frames_ = len(self.frameIndex)
 
-                    self.signalChannelIndex = utilities.normalized_sample_index(self.y, self.signalChannelAxis, signalChannelIndex)
+                    self.signalChannelIndex = normalized_sample_index(self.y, self.signalChannelAxis, signalChannelIndex)
                     
                     dataAxis = list(axes)[0]
 
@@ -5100,13 +3698,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         self.x = np.array(x)
                         
                     elif isinstance(x, np.ndarray):
-                        if not utilities.isVector(x):
+                        if not isVector(x):
                             raise TypeError("The supplied signal domain (x) must be a vector")
                         
                         if len(x) != self.y.shape[dataAxis]:
                             raise TypeError("The supplied signal domain (x) must have the same size as the data axis %s" % dataAxis)
                             
-                        if utilities.isColumnVector(x):
+                        if isColumnVector(x):
                             self.x = x
                             
                         else:
@@ -5127,7 +3725,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self.frameIndex = range(len(y))
                     self._number_of_frames_ = len(self.frameIndex)
                     self.signalIndex = 1
-                    xx, yy = [dt.vigraKernel1D_to_ndarray(i) for i in y]
+                    xx, yy = [vigraKernel1D_to_ndarray(i) for i in y]
                     
                     if x is None:
                         x = xx
@@ -5175,7 +3773,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self.signalIndex                    = signalIndex
                     self.irregularSignalIndex           = irregularSignalIndex
                     
-                elif all([isinstance(i, (neo.core.AnalogSignal, neo.core.IrregularlySampledSignal, dt.DataSignal)) for i in y]):
+                elif all([isinstance(i, (neo.core.AnalogSignal, neo.core.IrregularlySampledSignal,  DataSignal)) for i in y]):
                     # NOTE: 2019-11-30 09:42:27
                     # Treat this as a segment, EXCEPT that each signal is plotted
                     # in its own frame. This is because in a generic container
@@ -5239,7 +3837,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._docTitle_ = doc_title
                 
             else:
-                if isinstance(self.y, (neo.Block, neo.AnalogSignal, neo.IrregularlySampledSignal, neo.Segment, dt.DataSignal)) and (self.y.name is not None and len(self.y.name) > 0):
+                if isinstance(self.y, (neo.Block, neo.AnalogSignal, neo.IrregularlySampledSignal, neo.Segment,  DataSignal)) and (self.y.name is not None and len(self.y.name) > 0):
                     self._doctTitle_ = self.y.name
                     
                 elif isinstance(self.y, (neo.Epoch, neo.SpikeTrain, neo.Event)):
@@ -5586,7 +4184,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             #ox = self.ox
 
         #if type(oy).__name__ == "weakref":
-            #if isinstance(oy(), dt.DataSignal):
+            #if isinstance(oy(),  DataSignal):
                 #self._plotOverlaySignal_(oy().domain, oy(), *self.overlay_args, **self.overlay_kwargs)
             
             #elif isinstance(oy(), (neo.core.AnalogSignal, neo.core.IrregularlySampledSignal)):
@@ -5599,7 +4197,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 #self._plotOverlaySignal_(ox(), oy(), *self.overlay_args, **self.overlay_kwargs)
                 
         #else:
-            #if isinstance(oy, dt.DataSignal):
+            #if isinstance(oy,  DataSignal):
                 #self._plotOverlaySignal_(oy.domain, oy, *self.overlay_args, **self.overlay_kwargs)
                 
             #elif isinstance(oy, (neo.core.AnalogSignal, neo.core.IrregularlySampledSignal)):
@@ -5751,10 +4349,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # see setData() for list of kernel1D, datatypes.DataSignal, and np.ndarrays
             #print("displayFrame: self.x: ", self.x)
             
-            if all([isinstance(y_, (dt.DataSignal, 
+            if all([isinstance(y_, (DataSignal, 
                                     neo.core.AnalogSignal, 
                                     neo.core.IrregularlySampledSignal,
-                                    dt.IrregularlySampledDataSignal)) for y_ in self.y]):
+                                    IrregularlySampledDataSignal)) for y_ in self.y]):
                 self._plotSignal_(self.y[self._current_frame_index_], *self.plot_args, **self.plot_kwargs) # x is contained in the signal
                 self.currentFrameAnnotations = {type(self.y[self._current_frame_index_]).__name__: self.y[self._current_frame_index_].annotations}
                 
@@ -5803,9 +4401,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._plotSegment_(self.y, *self.plot_args, **self.plot_kwargs) # calls _setup_signal_choosers_() and _prepareAxes_()
                 
             elif isinstance(self.y, (neo.core.AnalogSignal, 
-                                     dt.DataSignal, 
+                                     DataSignal, 
                                      neo.core.IrregularlySampledSignal,
-                                     dt.IrregularlySampledDataSignal)):
+                                     IrregularlySampledDataSignal)):
                 self._plotSignal_(self.y, *self.plot_args, **self.plot_kwargs)
 
             elif isinstance(self.y, neo.core.Epoch): # plot an Epoch independently of data
@@ -6341,7 +4939,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 domain_name = "Time"
                 
             else:
-                domain_name = signal.domain_name # alternative is a dt.DataSignal
+                domain_name = signal.domain_name # alternative is a DataSignal
                 
             # apply whatever time slicing was required by arguments to setData()
             if self.plot_start is not None:
@@ -6384,7 +4982,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 domain_name = "Time"
                 
             else:
-                domain_name = signal.domain_name # alternative is a dt.IrregularlySampledDataSignal
+                domain_name = signal.domain_name # alternative is a IrregularlySampledDataSignal
         
             #print("_plotSegment_ irregular signal", signal.name, kAx)
             
@@ -6569,7 +5167,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self._prepareAxes_(len(self.signalChannelIndex))
                     for kchn, chNdx in enumerate(self.signalChannelIndex):
                         self._plot_numeric_data_(self.plotItem(kchn),
-                                                 x, y[utilities.arraySlice(y, {self.signalChannelAxis:chNdx})],
+                                                 x, y[arraySlice(y, {self.signalChannelAxis:chNdx})],
                                                  *args, **kwargs)
                         
                 else:
@@ -6580,7 +5178,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 self._prepareAxes_(1) # one axis per frame: one channel per frame
                 self._plot_numeric_data_(self.plotItem(0), 
-                                         x, y[utilities.arraySlice(y, {self.frameAxis:self.currentFrame})],
+                                         x, y[arraySlice(y, {self.frameAxis:self.currentFrame})],
                                          *args, **kwargs)
                 
         elif y.ndim == 3:
@@ -6590,13 +5188,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._prepareAxes_(len(self.signalChannelIndex))
                 for kchn, chNdx in enumerate(self.signalChannelIndex):
                     self._plot_numeric_data_(self.plotItem(kchn),
-                                             x, y[utilities.arraySlice(y, {self.signalChannelAxis, chNdx})],
+                                             x, y[arraySlice(y, {self.signalChannelAxis, chNdx})],
                                              *args, **kwargs)
                 
             else:
                 self._prepareAxes_(1)
                 self._plot_numeric_data_(self.plotItem(0), 
-                                         x, y[utilities.arraySlice(y, {self.frameAxis:self.currentFrame})],
+                                         x, y[arraySlice(y, {self.frameAxis:self.currentFrame})],
                                          *args, **kwargs)
                 
                 
@@ -6621,7 +5219,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if signal is None:
             return
 
-        #if not isinstance(signal, (neo.core.baseneo.BaseNeo, dt.DataSignal)):
+        #if not isinstance(signal, (neo.core.baseneo.BaseNeo, DataSignal)):
         if not isinstance(signal, neo.core.baseneo.BaseNeo):
             raise TypeError("_plotSignal_ expects an object from neo framework, or a datatypes.DataSignal or datatypes.IrregularlySampledDataSignal; got %s instead" % (type(signal).__name__))
             
