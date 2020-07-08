@@ -22,12 +22,28 @@ import numpy as np
 
 #### BEGIN pict.core modules
 import core.datatypes as dt
+import core.analysisunit
+from core.analysisunit import AnalysisUnit
+
+import core.axiscalibration
+from core.axiscalibration import AxisCalibration
+
+import core.scandata
+from core.scandata import ScanData
+
+import core.triggerprotocols
+from core.triggerprotocols import TriggerEvent, TriggerProtocol
+
+import core.datasignal
+from core.datasignal import DataSignal, IrregularlySampledDataSignal
 
 from core import xmlutils, strutils
 
 from core.workspacefunctions import validateVarName
 
-from core.utilities import safeWrapper, safeGUIWrapper, get_nested_value, set_nested_value, counterSuffix
+from core.utilities import (get_nested_value, set_nested_value, counterSuffix, )
+
+from core.prog import (safeWrapper, safeGUIWrapper, )
 
 #### END pict.core modules
 
@@ -58,11 +74,11 @@ class DataViewer(ScipyenViewer): #, QtWidgets.QMainWindow):
     # implement viewing of other data structures (e.g., viewing their __dict__
     # for the generic case, )
     supported_types = (dict, list, tuple,
-                        dt.AnalysisUnit,
-                        dt.AxisCalibration,
+                        AnalysisUnit,
+                        AxisCalibration,
                         neo.core.baseneo.BaseNeo,
-                        dt.ScanData, 
-                        dt.TriggerProtocol)
+                        ScanData, 
+                        TriggerProtocol)
     
     view_action_name = "Object"
     

@@ -27,15 +27,13 @@ CHANGELOG:
 """
 
 #### BEGIN core python modules
-
-from __future__ import print_function
-from __future__ import absolute_import # for python 2.5
 import faulthandler
 import sys, os, types, atexit, re, inspect, gc, sip, io, warnings, numbers
 import traceback, keyword, inspect, weakref, itertools, typing, functools
+from pprint import pprint
 from copy import copy, deepcopy
-
-from collections import ChainMap
+import collections
+#from collections import ChainMap
 
 from importlib import reload # I use this all too often !
 
@@ -132,45 +130,32 @@ from PyQt5.uic import loadUiType
 
 #### END PyQt5 modules
 
-#### BEGIN ipython/jupyter modules
-from qtconsole.rich_jupyter_widget import RichJupyterWidget # DIFFERENT from that in qtconsoleapp module !!!
-#NOTE: 2017-03-21 01:09:05 inheritance chain ("<" means inherits from)
-# RichJupyterWidget < RichIPythonWidget < JupyterWidget < FrontendWidget < (HistoryConsoleWidget, BaseFrontendMixin)
-#in turn, FrontendWidget < ... < ConsoleWidget which implements underlying 
-# Qt logic, including drag'n drop
-#from qtconsole.mainwindow import MainWindow as ConsoleMainWindow
-
-
-import jupyter_client
-
-from qtconsole.inprocess import QtInProcessKernelManager
-
-from IPython.utils.ipstruct import Struct as IPStruct
-
-from IPython.core.history import HistoryAccessor
-
 from IPython.lib.deepreload import reload as dreload
-
-#from ipykernel.inprocess.ipkernel import InProcessInteractiveShell
 
 from IPython.core.magic import (Magics, magics_class, line_magic,
                                 cell_magic, line_cell_magic,
                                 needs_local_scope)
 
+from IPython.core.history import HistoryAccessor
+
 from IPython.display import set_matplotlib_formats
-
-#### END ipython/jupyter modules
-
 
 #### END 3rd party modules
 
+#print("sys.path in %s named %s:\n" % (__file__, __name__),  sys.path)
 #### BEGIN pict.core modules
-from core import *
-#from core.patchneo import neo
 
-import core.plots as plots
-import core.datatypes as dt
+#import core.prog as prog
+from core.prog import (timefunc, timeblock, processtimefunc, processtimeblock, Timer, 
+                       safeWrapper, warn_with_traceback,)
+
+from core.utilities import safe_identity_test
+from core.workspacefunctions import * # NOTE: 2017-04-16 09:48:15 imported into the console in slot_initQtConsole
+
+from core import plots as plots
+from core import datatypes as dt
 from core.datatypes import * # also imports datetime & time
+#from core.datatypes import * # also imports datetime & time
 import core.xmlutils as xmlutils
 import core.neoutils as neoutils
 import core.tiwt as tiwt
@@ -180,23 +165,13 @@ import core.curvefitting as crvf
 import core.strutils
 import core.simulations as sim
 import core.data_analysis as anl
-from core.workspacefunctions import * # NOTE: 2017-04-16 09:48:15 imported into the console in slot_initQtConsole
-from core.utilities import safeWrapper, safe_identity_test, warn_with_traceback
-from core.utilities import timefunc, timeblock, processtimefunc, processtimeblock, Timer
-
-# FIXME: 2016-04-03 00:11:22
-# do I need this as a separate module? the advantage is it would unclutter the 
-# pict main window code; however, i need access to the gui api for creating menus
-# and actions, so it is probbly better to keep it inide the pict main window code
-# NOTE: 2016-04-03 00:04:43
-# proof of principle works in search_plugins.py
-# TODO -- do I need this at global namescope, or just inside the pict main window class?
-from core import pict_plugin_loader as pict_plugin_loader
 
 #### END pict.core modules
 
 #### BEGIN pict.iolib modules
-import iolib.pictio as pio
+#import iolib.pictio as pio
+from iolib import pictio as pio
+#import iolib.pictio as pio
 
 #### END pict.iolib modules
 
@@ -213,8 +188,9 @@ from . import pictgui as pgui
 from . import resources_rc as resources_rc
 from . import quickdialog
 from . import scipyenviewer
+from . import consoles
 
-from . import *
+from . import gui_viewers
 
 #### END pict.gui modules
 
@@ -311,6 +287,17 @@ class PictMagics(Magics):
         """
         if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
             local_ns["mainWindow"].slot_pictQuit()
+            
+        return line
+    
+    @line_magic
+    @needs_local_scope
+    def external_ipython(self, line, local_ns):
+        """%external_ipython magic launches a separate Jupyter Qt Console process
+        """
+        
+        if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
+            local_ns["mainWindow"]._init_ExternalIPython_()
             
         return line
     
@@ -1196,335 +1183,335 @@ class WorkspaceViewer(QtWidgets.QTableView):
             #self.mainWindow = mainWindow
             
 
-# NOTE: use Jupyter (IPython >= 4.x and qtconsole / qt5 by default)
-class ScipyenConsole(RichJupyterWidget):
-    """Console with in-process kernel manager for pythonic command interface.
-    Uses an in-process kernel generated and managed by QtInProcessKernelManager.
-    """
-    historyItemsDropped = pyqtSignal()
-    workspaceItemsDropped = pyqtSignal()
-    #workspaceItemsDropped = pyqtSignal(bool)
-    loadUrls = pyqtSignal(object, bool, QtCore.QPoint)
-    pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
+## NOTE: use Jupyter (IPython >= 4.x and qtconsole / qt5 by default)
+#class ScipyenConsole(RichJupyterWidget):
+    #"""Console with in-process kernel manager for pythonic command interface.
+    #Uses an in-process kernel generated and managed by QtInProcessKernelManager.
+    #"""
+    #historyItemsDropped = pyqtSignal()
+    #workspaceItemsDropped = pyqtSignal()
+    ##workspaceItemsDropped = pyqtSignal(bool)
+    #loadUrls = pyqtSignal(object, bool, QtCore.QPoint)
+    #pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
     
-    def __init__(self, kernel_manager=None, mainWindow=None):
-        ''' ScipyenConsole constructor
+    #def __init__(self, kernel_manager=None, mainWindow=None):
+        #''' ScipyenConsole constructor
         
-        Using Qt5 gui by default
-        NOTE:
-        Since August 2016 -- using Jupyter/IPython 4.x and qtconsole
-        
-        '''
-        super(RichJupyterWidget, self).__init__()
-        
-        if isinstance(mainWindow, (ScipyenWindow, type(None))):
-            self.mainWindow = mainWindow
-        
-#        super(RichIPythonWidget, self).__init__()
-        # NOTE: 2016-03-08 15:38:19
-        #super(IPythonWidget, self).__init__()
-        if not isinstance(kernel_manager, jupyter_client.KernelManager):
-            self.kernel_manager = QtInProcessKernelManager() # what if gui is NOT Qt?
-            
-        self.kernel_manager.start_kernel()
-        self.ipkernel = self.kernel_manager.kernel
-        
-        ## NOTE: 2016-03-20 14:37:37
-        ## this must be set BEFORE start_channels is called
-        ##self.ipkernel.shell.banner2 = "\n".join(ScipyenConsole.banner)
-        #self.ipkernel.shell.banner2 = u'\n*** NOTE: ***\n\nUser variables created here in console be visible in the User variables tab of the PICT main window.\n' +\
-        #u'\n\nThe Pict main window GUI object is accessible from the console as `mainWindow` or `mainWindow` (an alias of mainWindow)' +\
-        #u'\n\nExcept for user variables, if any of `mainWindow`, `mainWindow`, or loaded modules are deleted from the console workspace by calling del(...), they can be restored using the `Console/Restore Namespace` menu item.' +\
-        #u'\n\nThe "Workspace" dock widget of the Pict main window shows variables shared between the console (the IPython kernel) and the Pict window.' +\
-        #u'\n\nThe "matplotlib.pyplot" module is aliased as "plt". Use this prefix for pyplot functions (e.g., plt.plot(), plt.cla(), etc.)' +\
-        #u'\n\nTo clear this window at any time type %clear at the prompt'+\
-        #u'\n\nFor further details type console_info()'
-        
-        #self.kernel.shell.push(kwarg)
-        self.kernel_client = self.kernel_manager.client()
-        self.kernel_client.start_channels()
-        
-        self.ipkernel.gui = "qt"
-        # NOTE: 2019-08-07 16:34:58
-        # enforce qt5 backend for matplotlib
-        # see NOTE: 2019-08-07 16:34:23 
-        self.ipkernel.shell.run_line_magic("matplotlib", "qt5")
-        
-        self.drop_cache=None
-        
-        self.defaultFixedFont = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
-        
-        self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_X), self)
-        
-        self.clear_shortcut.activated.connect(self.slot_clearConsole)
-        
-        #self.settings = QtCore.QSettings("PICT", "PICT")
-        self.settings = QtCore.QSettings()
-        
-        self._load_settings_()
-        
-    def closeEvent(self, evt):
-        self._save_settings_()
-        evt.accept()
-
-    def _save_settings_(self):
-        self.settings.setValue("Console/Size", self.size())
-        self.settings.setValue("Console/Position", self.pos())
-        self.settings.setValue("Console/FontFamily", self.font.family())
-        self.settings.setValue("Console/FontPointSize", self.font.pointSize())
-        self.settings.setValue("Console/FontStyle", self.font.style())
-        self.settings.setValue("Console/FontWeight", self.font.weight())
-
-    def _load_settings_(self):
-        winSize = self.settings.value("Console/Size", QtCore.QSize(600, 350))
-        winPos = self.settings.value("Console/Position", QtCore.QPoint(0,0))
-        fontFamily = self.settings.value("Console/FontFamily", self.defaultFixedFont.family())
-        fontSize = int(self.settings.value("Console/FontPointSize", self.defaultFixedFont.pointSize()))
-        fontStyle = int(self.settings.value("Console/FontStyle", self.defaultFixedFont.style()))
-        fontWeight = int(self.settings.value("Console/FontWeight", self.defaultFixedFont.weight()))
-        
-        console_font = QtGui.QFont(fontFamily, fontSize, fontWeight, italic = fontStyle > 0)
-        
-        self.setFont(console_font)
-        
-        self._set_font(console_font)
-        
-        self.font = console_font
-
-        self.move(winPos)
-        self.resize(winSize)
-        self.setAcceptDrops(True)
-        
-        
-    def dragEnterEvent(self, evt):
-        #if "text/plain" in evt.mimeData().formats():
-            ##print("mime data text:\n", evt.mimeData().text())
-            #text = evt.mimeData().text()
-            #if len(text):
-                #self.drop_cache = text
-            #else:
-                #self.drop_cache = evt.mimeData().data("text/plain").data().decode()
-
-            #evt.acceptProposedAction();
-            
-        evt.acceptProposedAction();
-        evt.accept()
-        
-    @safeWrapper
-    def dropEvent(self, evt):
-        from textwrap import dedent
-        #print("ScipyenConsole.dropEvent: evt", evt)
-        #data = evt.mimeData().data(evt.mimeData().formats()[0])
-        src = evt.source()
-        #print("ScipyenConsole.dropEvent: evt.source:", src)
-        
-        #print("ScipyenConsole.dropEvent: evt.mimeData()", evt.mimeData())
-        
-        #print("ScipyenConsole.dropEvent: evt.proposedAction()", evt.proposedAction())
-        
-        #print("ScipyenConsole.dropEvent: evt.mimeData().hasText()", evt.mimeData().hasText())
-        #print(dir(evt.keyboardModifiers()))
-        #print("ScipyenConsole.dropEvent: event source: %s" % src)
-        
-        #print("ScipyenConsole.dropEvent: \nevt mimeData %s" % evt.mimeData())
-        #print("ScipyenConsole.dropEvent: \ndata: %s \nsrc: %s" % (text, src))
-        
-        # NOTE: 2019-08-10 00:23:42
-        # for drop events issued by mainWindow's workspace viewer and command
-        # history ignore the mimeData and simply paste the text via clipboard
-        # (is there a way to bypass this? it work well as it is, but...)
-        # we do this asynchronously, via Qt's signal/slot mechanism
-        #NOTE: 2017-03-21 22:56:23 ScipyenWindow is signalled to copy the command:
-        #
-        # copy string(s) to the system's cliboard then paste them directly 
-        # into the console
-        # this works fine, with the added bonus that the drag/dropped commands 
-        # are also available on the system clipboard to paste onto some text 
-        # editor
-        #if isinstance(self.mainWindow, ScipyenWindow):
-        if isinstance(self.mainWindow, ScipyenWindow) and src is self.mainWindow.workspaceView:
-            #print("ScipyenConsole.dropEvent mime data has text:",  evt.mimeData().hasText())
-            #if evt.mimeData().hasText():
-                #print(evt.mimeData().text())
-            #print("ScipyenConsole.dropEvent mime data has urls:", evt.mimeData().hasUrls())
-            #print("ScipyenConsole.dropEvent possible actions:", evt.possibleActions())
-            #print("ScipyenConsole.dropEvent proposed action:", evt.proposedAction())
-            #print("ScipyenConsole.dropEvent actual drop action:",  evt.dropAction())
-            
-            #print(evt.keyboardModifiers() & QtCore.Qt.ShiftModifier)
-            
-            #quoted = evt.keyboardModifiers() & QtCore.Qt.ShiftModifier
-            
-            #linesep = evt.keyboardModifiers() & QtCore.Qt.ControlModifier
-            
-            #self.mainWindow.slot_pasteWorkspaceSelection()
-            # NOTE: 2019-08-10 00:29:04
-            # do the above asynchronously
-            #self.workspaceItemsDropped.emit(bool(quoted))
-            self.workspaceItemsDropped.emit()
-            
-        elif isinstance(self.mainWindow, ScipyenWindow) and src is self.mainWindow.historyTreeWidget:
-            #print(evt.mimeData().hasText())
-            #print(evt.mimeData().hasUrls())
-            #print(evt.possibleActions())
-            #print(evt.proposedAction())
-            #print(evt.dropAction())
-            
-            #self.mainWindow.slot_pasteHistorySelection()
-            # NOTE: 2019-08-10 00:29:27
-            # do the above asynchronously
-            self.historyItemsDropped.emit()
-            
-        elif isinstance(self.mainWindow, ScipyenWindow) and src is self.mainWindow.fileSystemTreeView:
-            # NOTE: 2019-08-10 00:54:40
-            # TODO: load data from disk
-            pass
-                
-                
-            #evt.accept()
-                
-        else:
-            #NOTE: 2019-08-02 13:35:52
-            # allow dropping text in the console 
-            # useful for drag&drop python code directly from a python source file
-            # opened in a text editor (that also supports drag&drop)
-            # event source is from outside the Pict application (i.e. it is None)
-            #print("ScipyenConsole.dropEvent: \nproposed action: %s" % evt.proposedAction())
-            
-            #print("ScipyenConsole.dropEvent source:",  src)
-            #print("ScipyenConsole.dropEvent mime data has text:",  evt.mimeData().hasText())
-            #print("ScipyenConsole.dropEvent mime data has urls:",  evt.mimeData().hasUrls())
-            #print("ScipyenConsole.dropEvent possible actions:",  evt.possibleActions())
-            #print("ScipyenConsole.dropEvent proposed action:",  evt.proposedAction())
-            #print("ScipyenConsole.dropEvent actual drop action:",  evt.dropAction())
-            
-            if evt.mimeData().hasUrls():
-                urls = evt.mimeData().urls()
-                
-                if len(urls) == 1 and (urls[0].isRelative() or urls[0].isLocalFile()) and os.path.isfile(urls[0].path()):
-                    # check if this is a python source file
-                    mimeType = QtCore.QMimeDatabase().mimeTypeForFile(QtCore.QFileInfo(urls[0].path()))
-                    
-                    if all([s in mimeType.name() for s in ("text", "python")]):
-                        self.pythonFileReceived.emit(urls[0].path(), evt.pos())
-                        return
-                
-                # NOTE: 2019-08-10 00:32:00
-                # set mainWindow to load the URL asynchronously
-                # this also allows us to decide if we should also cd to the
-                # directory of the (local) URL, by pressing SHIFT while dropping
-                self.loadUrls.emit(urls, evt.keyboardModifiers() == QtCore.Qt.ShiftModifier, evt.pos())
-                
-            elif evt.mimeData().hasText() and len(evt.mimeData().text()):
-                # NOTE: 2019-08-10 00:33:00
-                # just write at the console whatever text has been dropped
-                if evt.proposedAction() in (QtCore.Qt.CopyAction, QtCore.Qt.MoveAction):
-                    text = evt.mimeData().text()
-                    #print("ScipyenConsole.dropEvent: text", text)
-                    #print("ScipyenConsole.dropEvent: mimeData.formats()", evt.mimeData().formats())
-                    echoing = not bool(evt.keyboardModifiers() & QtCore.Qt.ShiftModifier)
-                    store = bool(evt.keyboardModifiers() & QtCore.Qt.ControlModifier)
-                    
-                    #print(echoing)
-                    
-                    # NOTE: 2019-08-13 11:08:14
-                    # TODO: allow for running the code without writing it in console
-                    # but store in history nevertheless (maybe?)
-                    
-                    if echoing:
-                        # NOTE: 2019-08-13 11:03:52
-                        # displays the text in the console to be edited
-                        # to execute place cursor at the end of text and press
-                        # ENTER
-                        # executed statements are stored in python's command history
-                        self.writeText(text)
-                    
-                    else:
-                        # NOTE: 2019-08-13 11:04:26
-                        # does NOT write to the console, does NOT store in history
-                        wintitle = self.windowTitle()
-                        self.setWindowTitle("%s #executing..." % wintitle)
-                        self.ipkernel.shell.run_cell(text, store_history = False, silent=True, shell_futures=True)
-                        self.setWindowTitle(wintitle)
-                        
-            else:
-                # mime data formats contains text/plain but data is QByteArray
-                # (which wraps a Python bytes object)
-                if "text/plain" in evt.mimeData().formats():
-                    #print("mime data text:\n", evt.mimeData().text())
-                    text = evt.mimeData().text()
-                    if len(text) == 0:
-                        text = evt.mimeData().data("text/plain").data().decode()
-                        
-                    if len(text):
-                        self.writeText(text)
-
-            self.drop_cache=None
-                
-        evt.accept()
-        
-        
-        
+        #Using Qt5 gui by default
         #NOTE:
-        #NOTE: Other considered options:
-        #NOTE: 2017-03-21 22:41:53 connect this sigal to the _rerunCommand slot of ScipyenWindow:
-        #NOTE: half-baked approach that does not actually
-        #NOTE: paste the commands as input, but instead executes them directly
-        #NOTE: FIXME NOT REALLY WHAT IS INTENDED
-        #NOTE: TODO either use the paste mechanism of the ControlWidget superclass 
-        #NOTE: (tricky, because that accesses private member of that superclass)
-        #NOTE: TODO or completely customize the item model of the history tree such that 
-        #NOTE: upon drag event, the items DATA (specifically the command string(s)) 
-        #NOTE: are encoded as text mime format and thus decoded here
-        #NOTE: TODO FIXME this last suggestion would leave me again with the issue
-        #NOTE: of pasting them directly onto underlying text widget of the console, 
-        #NOTE: which is a private member
+        #Since August 2016 -- using Jupyter/IPython 4.x and qtconsole
         
-        #print("dropEvent")
-        #print("Event: ",evt)
-        #print("proposed action: ",evt.proposedAction())
-        #print("Event mime data formats: ", evt.mimeData().formats())
-        #print("Event data: ", data, " ", repr(data))
-        #print("Event source: ", repr(evt.source()))
-
-    @safeWrapper
-    def __write_text_in_console_buffer__(self, text):
-        from textwrap import dedent
-        # NOTE:2019-08-02 13:59:26
-        # code below taken from console_widget module in qtconsole package
-        if isinstance(text, str):
-            self._keep_cursor_in_buffer()
-            cursor = self._control.textCursor()
-            self._insert_plain_text_into_buffer(cursor, dedent(text))
-            
-    @safeWrapper
-    def writeText(self, text):
-        """Writes a text in console buffer
-        """
-        if isinstance(text, str):
-            self.__write_text_in_console_buffer__(text)
-            
-        elif isinstance(text, (tuple, list) and all([isinstance(s, str) for s in text])):
-            self.__write_text_in_console_buffer__("\n".join(text))
+        #'''
+        #super(RichJupyterWidget, self).__init__()
         
-    @safeWrapper
-    def slot_clearConsole(self):
-        self.ipkernel.shell.run_line_magic("clear", "", 2)
+        #if isinstance(mainWindow, (ScipyenWindow, type(None))):
+            #self.mainWindow = mainWindow
+        
+##        super(RichIPythonWidget, self).__init__()
+        ## NOTE: 2016-03-08 15:38:19
+        ##super(IPythonWidget, self).__init__()
+        #if not isinstance(kernel_manager, jupyter_client.KernelManager):
+            #self.kernel_manager = QtInProcessKernelManager() # what if gui is NOT Qt?
+            
+        #self.kernel_manager.start_kernel()
+        #self.ipkernel = self.kernel_manager.kernel
+        
+        ### NOTE: 2016-03-20 14:37:37
+        ### this must be set BEFORE start_channels is called
+        ###self.ipkernel.shell.banner2 = "\n".join(ScipyenConsole.banner)
+        ##self.ipkernel.shell.banner2 = u'\n*** NOTE: ***\n\nUser variables created here in console be visible in the User variables tab of the PICT main window.\n' +\
+        ##u'\n\nThe Pict main window GUI object is accessible from the console as `mainWindow` or `mainWindow` (an alias of mainWindow)' +\
+        ##u'\n\nExcept for user variables, if any of `mainWindow`, `mainWindow`, or loaded modules are deleted from the console workspace by calling del(...), they can be restored using the `Console/Restore Namespace` menu item.' +\
+        ##u'\n\nThe "Workspace" dock widget of the Pict main window shows variables shared between the console (the IPython kernel) and the Pict window.' +\
+        ##u'\n\nThe "matplotlib.pyplot" module is aliased as "plt". Use this prefix for pyplot functions (e.g., plt.plot(), plt.cla(), etc.)' +\
+        ##u'\n\nTo clear this window at any time type %clear at the prompt'+\
+        ##u'\n\nFor further details type console_info()'
+        
+        ##self.kernel.shell.push(kwarg)
+        #self.kernel_client = self.kernel_manager.client()
+        #self.kernel_client.start_channels()
+        
+        #self.ipkernel.gui = "qt"
+        ## NOTE: 2019-08-07 16:34:58
+        ## enforce qt5 backend for matplotlib
+        ## see NOTE: 2019-08-07 16:34:23 
+        #self.ipkernel.shell.run_line_magic("matplotlib", "qt5")
+        
+        #self.drop_cache=None
+        
+        #self.defaultFixedFont = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
+        
+        #self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_X), self)
+        
+        #self.clear_shortcut.activated.connect(self.slot_clearConsole)
+        
+        ##self.settings = QtCore.QSettings("PICT", "PICT")
+        #self.settings = QtCore.QSettings()
+        
+        #self._load_settings_()
+        
+    #def closeEvent(self, evt):
+        #self._save_settings_()
+        #evt.accept()
 
-# TODO 2016-03-24 13:47:48 
-# I quite like the stock Qt console of IPython that is launched by qtconsoleapp
-# - it's a customized QMainWindow with a rich ipython widget as the actual "console"
-#   with a lot of nice bells and whistles: magics listing, help, etc, but also
-#   functionality that I don't want/need: tabbed consoles (with new or the same kernel),
-#   possibility to restart/stop the current kernel
-#
-#   Therefore I'm deriving from it and override functions I find not necessary for picty
-#
-#   Actually it might be just damn simpler to generate my own console main window class
-#
-#   TODO
-#class _PictConsole(ConsoleMainWindow):
-    #pass
+    #def _save_settings_(self):
+        #self.settings.setValue("Console/Size", self.size())
+        #self.settings.setValue("Console/Position", self.pos())
+        #self.settings.setValue("Console/FontFamily", self.font.family())
+        #self.settings.setValue("Console/FontPointSize", self.font.pointSize())
+        #self.settings.setValue("Console/FontStyle", self.font.style())
+        #self.settings.setValue("Console/FontWeight", self.font.weight())
+
+    #def _load_settings_(self):
+        #winSize = self.settings.value("Console/Size", QtCore.QSize(600, 350))
+        #winPos = self.settings.value("Console/Position", QtCore.QPoint(0,0))
+        #fontFamily = self.settings.value("Console/FontFamily", self.defaultFixedFont.family())
+        #fontSize = int(self.settings.value("Console/FontPointSize", self.defaultFixedFont.pointSize()))
+        #fontStyle = int(self.settings.value("Console/FontStyle", self.defaultFixedFont.style()))
+        #fontWeight = int(self.settings.value("Console/FontWeight", self.defaultFixedFont.weight()))
+        
+        #console_font = QtGui.QFont(fontFamily, fontSize, fontWeight, italic = fontStyle > 0)
+        
+        #self.setFont(console_font)
+        
+        #self._set_font(console_font)
+        
+        #self.font = console_font
+
+        #self.move(winPos)
+        #self.resize(winSize)
+        #self.setAcceptDrops(True)
+        
+        
+    #def dragEnterEvent(self, evt):
+        ##if "text/plain" in evt.mimeData().formats():
+            ###print("mime data text:\n", evt.mimeData().text())
+            ##text = evt.mimeData().text()
+            ##if len(text):
+                ##self.drop_cache = text
+            ##else:
+                ##self.drop_cache = evt.mimeData().data("text/plain").data().decode()
+
+            ##evt.acceptProposedAction();
+            
+        #evt.acceptProposedAction();
+        #evt.accept()
+        
+    #@safeWrapper
+    #def dropEvent(self, evt):
+        #from textwrap import dedent
+        ##print("ScipyenConsole.dropEvent: evt", evt)
+        ##data = evt.mimeData().data(evt.mimeData().formats()[0])
+        #src = evt.source()
+        ##print("ScipyenConsole.dropEvent: evt.source:", src)
+        
+        ##print("ScipyenConsole.dropEvent: evt.mimeData()", evt.mimeData())
+        
+        ##print("ScipyenConsole.dropEvent: evt.proposedAction()", evt.proposedAction())
+        
+        ##print("ScipyenConsole.dropEvent: evt.mimeData().hasText()", evt.mimeData().hasText())
+        ##print(dir(evt.keyboardModifiers()))
+        ##print("ScipyenConsole.dropEvent: event source: %s" % src)
+        
+        ##print("ScipyenConsole.dropEvent: \nevt mimeData %s" % evt.mimeData())
+        ##print("ScipyenConsole.dropEvent: \ndata: %s \nsrc: %s" % (text, src))
+        
+        ## NOTE: 2019-08-10 00:23:42
+        ## for drop events issued by mainWindow's workspace viewer and command
+        ## history ignore the mimeData and simply paste the text via clipboard
+        ## (is there a way to bypass this? it work well as it is, but...)
+        ## we do this asynchronously, via Qt's signal/slot mechanism
+        ##NOTE: 2017-03-21 22:56:23 ScipyenWindow is signalled to copy the command:
+        ##
+        ## copy string(s) to the system's cliboard then paste them directly 
+        ## into the console
+        ## this works fine, with the added bonus that the drag/dropped commands 
+        ## are also available on the system clipboard to paste onto some text 
+        ## editor
+        ##if isinstance(self.mainWindow, ScipyenWindow):
+        #if isinstance(self.mainWindow, ScipyenWindow) and src is self.mainWindow.workspaceView:
+            ##print("ScipyenConsole.dropEvent mime data has text:",  evt.mimeData().hasText())
+            ##if evt.mimeData().hasText():
+                ##print(evt.mimeData().text())
+            ##print("ScipyenConsole.dropEvent mime data has urls:", evt.mimeData().hasUrls())
+            ##print("ScipyenConsole.dropEvent possible actions:", evt.possibleActions())
+            ##print("ScipyenConsole.dropEvent proposed action:", evt.proposedAction())
+            ##print("ScipyenConsole.dropEvent actual drop action:",  evt.dropAction())
+            
+            ##print(evt.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+            
+            ##quoted = evt.keyboardModifiers() & QtCore.Qt.ShiftModifier
+            
+            ##linesep = evt.keyboardModifiers() & QtCore.Qt.ControlModifier
+            
+            ##self.mainWindow.slot_pasteWorkspaceSelection()
+            ## NOTE: 2019-08-10 00:29:04
+            ## do the above asynchronously
+            ##self.workspaceItemsDropped.emit(bool(quoted))
+            #self.workspaceItemsDropped.emit()
+            
+        #elif isinstance(self.mainWindow, ScipyenWindow) and src is self.mainWindow.historyTreeWidget:
+            ##print(evt.mimeData().hasText())
+            ##print(evt.mimeData().hasUrls())
+            ##print(evt.possibleActions())
+            ##print(evt.proposedAction())
+            ##print(evt.dropAction())
+            
+            ##self.mainWindow.slot_pasteHistorySelection()
+            ## NOTE: 2019-08-10 00:29:27
+            ## do the above asynchronously
+            #self.historyItemsDropped.emit()
+            
+        #elif isinstance(self.mainWindow, ScipyenWindow) and src is self.mainWindow.fileSystemTreeView:
+            ## NOTE: 2019-08-10 00:54:40
+            ## TODO: load data from disk
+            #pass
+                
+                
+            ##evt.accept()
+                
+        #else:
+            ##NOTE: 2019-08-02 13:35:52
+            ## allow dropping text in the console 
+            ## useful for drag&drop python code directly from a python source file
+            ## opened in a text editor (that also supports drag&drop)
+            ## event source is from outside the Pict application (i.e. it is None)
+            ##print("ScipyenConsole.dropEvent: \nproposed action: %s" % evt.proposedAction())
+            
+            ##print("ScipyenConsole.dropEvent source:",  src)
+            ##print("ScipyenConsole.dropEvent mime data has text:",  evt.mimeData().hasText())
+            ##print("ScipyenConsole.dropEvent mime data has urls:",  evt.mimeData().hasUrls())
+            ##print("ScipyenConsole.dropEvent possible actions:",  evt.possibleActions())
+            ##print("ScipyenConsole.dropEvent proposed action:",  evt.proposedAction())
+            ##print("ScipyenConsole.dropEvent actual drop action:",  evt.dropAction())
+            
+            #if evt.mimeData().hasUrls():
+                #urls = evt.mimeData().urls()
+                
+                #if len(urls) == 1 and (urls[0].isRelative() or urls[0].isLocalFile()) and os.path.isfile(urls[0].path()):
+                    ## check if this is a python source file
+                    #mimeType = QtCore.QMimeDatabase().mimeTypeForFile(QtCore.QFileInfo(urls[0].path()))
+                    
+                    #if all([s in mimeType.name() for s in ("text", "python")]):
+                        #self.pythonFileReceived.emit(urls[0].path(), evt.pos())
+                        #return
+                
+                ## NOTE: 2019-08-10 00:32:00
+                ## set mainWindow to load the URL asynchronously
+                ## this also allows us to decide if we should also cd to the
+                ## directory of the (local) URL, by pressing SHIFT while dropping
+                #self.loadUrls.emit(urls, evt.keyboardModifiers() == QtCore.Qt.ShiftModifier, evt.pos())
+                
+            #elif evt.mimeData().hasText() and len(evt.mimeData().text()):
+                ## NOTE: 2019-08-10 00:33:00
+                ## just write at the console whatever text has been dropped
+                #if evt.proposedAction() in (QtCore.Qt.CopyAction, QtCore.Qt.MoveAction):
+                    #text = evt.mimeData().text()
+                    ##print("ScipyenConsole.dropEvent: text", text)
+                    ##print("ScipyenConsole.dropEvent: mimeData.formats()", evt.mimeData().formats())
+                    #echoing = not bool(evt.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+                    #store = bool(evt.keyboardModifiers() & QtCore.Qt.ControlModifier)
+                    
+                    ##print(echoing)
+                    
+                    ## NOTE: 2019-08-13 11:08:14
+                    ## TODO: allow for running the code without writing it in console
+                    ## but store in history nevertheless (maybe?)
+                    
+                    #if echoing:
+                        ## NOTE: 2019-08-13 11:03:52
+                        ## displays the text in the console to be edited
+                        ## to execute place cursor at the end of text and press
+                        ## ENTER
+                        ## executed statements are stored in python's command history
+                        #self.writeText(text)
+                    
+                    #else:
+                        ## NOTE: 2019-08-13 11:04:26
+                        ## does NOT write to the console, does NOT store in history
+                        #wintitle = self.windowTitle()
+                        #self.setWindowTitle("%s #executing..." % wintitle)
+                        #self.ipkernel.shell.run_cell(text, store_history = False, silent=True, shell_futures=True)
+                        #self.setWindowTitle(wintitle)
+                        
+            #else:
+                ## mime data formats contains text/plain but data is QByteArray
+                ## (which wraps a Python bytes object)
+                #if "text/plain" in evt.mimeData().formats():
+                    ##print("mime data text:\n", evt.mimeData().text())
+                    #text = evt.mimeData().text()
+                    #if len(text) == 0:
+                        #text = evt.mimeData().data("text/plain").data().decode()
+                        
+                    #if len(text):
+                        #self.writeText(text)
+
+            #self.drop_cache=None
+                
+        #evt.accept()
+        
+        
+        
+        ##NOTE:
+        ##NOTE: Other considered options:
+        ##NOTE: 2017-03-21 22:41:53 connect this sigal to the _rerunCommand slot of ScipyenWindow:
+        ##NOTE: half-baked approach that does not actually
+        ##NOTE: paste the commands as input, but instead executes them directly
+        ##NOTE: FIXME NOT REALLY WHAT IS INTENDED
+        ##NOTE: TODO either use the paste mechanism of the ControlWidget superclass 
+        ##NOTE: (tricky, because that accesses private member of that superclass)
+        ##NOTE: TODO or completely customize the item model of the history tree such that 
+        ##NOTE: upon drag event, the items DATA (specifically the command string(s)) 
+        ##NOTE: are encoded as text mime format and thus decoded here
+        ##NOTE: TODO FIXME this last suggestion would leave me again with the issue
+        ##NOTE: of pasting them directly onto underlying text widget of the console, 
+        ##NOTE: which is a private member
+        
+        ##print("dropEvent")
+        ##print("Event: ",evt)
+        ##print("proposed action: ",evt.proposedAction())
+        ##print("Event mime data formats: ", evt.mimeData().formats())
+        ##print("Event data: ", data, " ", repr(data))
+        ##print("Event source: ", repr(evt.source()))
+
+    #@safeWrapper
+    #def __write_text_in_console_buffer__(self, text):
+        #from textwrap import dedent
+        ## NOTE:2019-08-02 13:59:26
+        ## code below taken from console_widget module in qtconsole package
+        #if isinstance(text, str):
+            #self._keep_cursor_in_buffer()
+            #cursor = self._control.textCursor()
+            #self._insert_plain_text_into_buffer(cursor, dedent(text))
+            
+    #@safeWrapper
+    #def writeText(self, text):
+        #"""Writes a text in console buffer
+        #"""
+        #if isinstance(text, str):
+            #self.__write_text_in_console_buffer__(text)
+            
+        #elif isinstance(text, (tuple, list) and all([isinstance(s, str) for s in text])):
+            #self.__write_text_in_console_buffer__("\n".join(text))
+        
+    #@safeWrapper
+    #def slot_clearConsole(self):
+        #self.ipkernel.shell.run_line_magic("clear", "", 2)
+
+## TODO 2016-03-24 13:47:48 
+## I quite like the stock Qt console of IPython that is launched by qtconsoleapp
+## - it's a customized QMainWindow with a rich ipython widget as the actual "console"
+##   with a lot of nice bells and whistles: magics listing, help, etc, but also
+##   functionality that I don't want/need: tabbed consoles (with new or the same kernel),
+##   possibility to restart/stop the current kernel
+##
+##   Therefore I'm deriving from it and override functions I find not necessary for picty
+##
+##   Actually it might be just damn simpler to generate my own console main window class
+##
+##   TODO
+##class _PictConsole(ConsoleMainWindow):
+    ##pass
 
 # NOTE 2016-03-27 16:53:16
 # the way multiple inheritance works in pyqt dictates that additional signals are 
@@ -2614,18 +2601,18 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: python3 way
         #print("ScipyenWindow __init__")
         self.app                        = app
-        self.recentFiles                = datatypes.collections.OrderedDict()
-        self.recentDirectories          = datatypes.collections.deque()
-        self.fileSystemFilterHistory    = datatypes.collections.deque()
-        self.commandHistoryFinderList   = datatypes.collections.deque()
-        self.recentVariablesList        = datatypes.collections.deque()
-        self.recentlyRunScripts         = datatypes.collections.deque()
+        self.recentFiles                = collections.OrderedDict()
+        self.recentDirectories          = collections.deque()
+        self.fileSystemFilterHistory    = collections.deque()
+        self.commandHistoryFinderList   = collections.deque()
+        self.recentVariablesList        = collections.deque()
+        self.recentlyRunScripts         = collections.deque()
         self._recent_scripts_dict_      = dict()
         self.lastFileSystemFilter       = str()
         self.lastVariableFind           = str()
         self.lastCommandFind            = str()
-        self.navPrevDir                 = datatypes.collections.deque()
-        self.navNextDir                 = datatypes.collections.deque()
+        self.navPrevDir                 = collections.deque()
+        self.navNextDir                 = collections.deque()
         self.currentDir                 = None
         self.workspace                  = dict()
         self._nonInteractiveVars        = dict()
@@ -2634,6 +2621,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         self.shell                      = None
         self.historyAccessor            = None
         #self.scipyenEditor              = "kwrite"
+        
+        self.external_console           = None
         
         #pg.setConfigOptions(editorCommand=self.scipyenEditor)
         
@@ -2723,6 +2712,22 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         #self.app.focusWindowChanged[]
             
         self.threadpool = QtCore.QThreadPool()
+        
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_launchExternalIPython(self):
+        self._init_ExternalIPython_()
+        
+    @safeWrapper
+    def _init_ExternalIPython_(self):
+        if not isinstance(self.external_console, consoles.ExternalIPython):
+            self.external_console = consoles.ExternalIPython.launch()
+            self.workspace["external_console"] = self.external_console
+            self.workspaceModel.hidden_vars.update({"external_console":self.external_console})
+            
+        else:
+            self.external_console.window.setVisible(True)
 
         
     @pyqtSlot()
@@ -2736,12 +2741,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         self.slot_changeDirectory(self.recentDirectories[0])
         
     #@pyqtSlot()
-    @safeWrapper
-    def newConsole(self, kernel_manager=None):
+    #@safeWrapper
+    #def newConsole(self, kernel_manager=None):
         
-        console = ScipyenConsole(self, kernel_manager=kernel_manager, mainWindow=self)
+        #console = ScipyenConsole(self, kernel_manager=kernel_manager, mainWindow=self)
         
-        return console
+        #return console
 
         
     @safeWrapper
@@ -2803,146 +2808,148 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         
         #from core import custom_magics
         
-        self.console = ScipyenConsole(self) 
-        
-        self.console.executed.connect(self.slot_updateHistory)
-        self.console.executed.connect(self.slot_updateCwd)
+        if not isinstance(self.console, consoles.ScipyenConsole):
+            
+            self.console = consoles.ScipyenConsole(mainWindow=self) 
+            
+            self.console.executed.connect(self.slot_updateHistory)
+            self.console.executed.connect(self.slot_updateCwd)
 
-        self.ipkernel = self.console.ipkernel
-        
-        #NOTE: 2017-03-19 16:21:51 FYI:
-        #NOTE: The actual shell is an instance of 
-        #NOTE: ipykernel.inprocess.ipkernel.InProcessInteractiveShell
-        #NOTE: 
-        #NOTE: The shell is accessible as self.ipkernel.shell and is the SAME 
-        #NOTE: object at the one returned by manually calling get_ipython()
-        #NOTE: at the console
-        #NOTE:
-        #NOTE: This inherits from ZMQInteractiveShell which inherits from InteractiveShell
-        #NOTE:
-        #NOTE:
-        #NOTE: Some important & useful function (bound methods) of the shell instance:
-        #NOTE:
-        #NOTE: show_banner(banner=None)
-        #NOTE: to directly execute code inside the shell we can use one of its bound 
-        #NOTE: methods, inherited all the way from IPython.core.InteractiveShell:
-        #NOTE:
-        #NOTE: run_cell (overridden by ipkernel.zmqshell.ZMQInteractiveShell but syntax and functionality are the same)
-        #NOTE: run_cell_magic 
-        #NOTE: run_code
-        #NOTE: runcode, 
-        #NOTE: run_line_magic
-        #NOTE:
+            self.ipkernel = self.console.ipkernel
+            
+            #NOTE: 2017-03-19 16:21:51 FYI:
+            #NOTE: The actual shell is an instance of 
+            #NOTE: ipykernel.inprocess.ipkernel.InProcessInteractiveShell
+            #NOTE: 
+            #NOTE: The shell is accessible as self.ipkernel.shell and is the SAME 
+            #NOTE: object at the one returned by manually calling get_ipython()
+            #NOTE: at the console
+            #NOTE:
+            #NOTE: This inherits from ZMQInteractiveShell which inherits from InteractiveShell
+            #NOTE:
+            #NOTE:
+            #NOTE: Some important & useful function (bound methods) of the shell instance:
+            #NOTE:
+            #NOTE: show_banner(banner=None)
+            #NOTE: to directly execute code inside the shell we can use one of its bound 
+            #NOTE: methods, inherited all the way from IPython.core.InteractiveShell:
+            #NOTE:
+            #NOTE: run_cell (overridden by ipkernel.zmqshell.ZMQInteractiveShell but syntax and functionality are the same)
+            #NOTE: run_cell_magic 
+            #NOTE: run_code
+            #NOTE: runcode, 
+            #NOTE: run_line_magic
+            #NOTE:
 
-        #self.ipkernel.shell.push(self.a, self.testing) # fooling around
-        
-        self.shell = self.ipkernel.shell
+            #self.ipkernel.shell.push(self.a, self.testing) # fooling around
+            
+            self.shell = self.ipkernel.shell
 
-        self.executionCount = self.ipkernel.shell.execution_count # this is always 1 immediately after initialization
+            self.executionCount = self.ipkernel.shell.execution_count # this is always 1 immediately after initialization
 
-        self.historyAccessor = HistoryAccessor() # access history database independently of the shell
-                                                 # should not interfere with the history 
+            self.historyAccessor = HistoryAccessor() # access history database independently of the shell
+                                                    # should not interfere with the history 
 
 
-        # NOTE: 2019-08-03 17:03:03
-        # populate the command history widget
-        hist = self.historyAccessor.search('*')
+            # NOTE: 2019-08-03 17:03:03
+            # populate the command history widget
+            hist = self.historyAccessor.search('*')
 
-        sessionNo = None
-        
-        items = list()
+            sessionNo = None
+            
+            items = list()
 
-        for session, line, inline in hist:
-            if sessionNo is None or sessionNo != session:
-                sessionNo = session  #cache the session
-                sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [repr(sessionNo)])
-                items.append(sessionItem)
+            for session, line, inline in hist:
+                if sessionNo is None or sessionNo != session:
+                    sessionNo = session  #cache the session
+                    sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [repr(sessionNo)])
+                    items.append(sessionItem)
 
-            #lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [inline])
-            lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [repr(line), inline])
-            #lineItem.setText(0,repr(line))
-            #lineItem.setText(1,inline)
-            items.append(lineItem)
+                #lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [inline])
+                lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [repr(line), inline])
+                #lineItem.setText(0,repr(line))
+                #lineItem.setText(1,inline)
+                items.append(lineItem)
 
-        self.currentSessionTreeWidgetItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, ["Current"])
-        
-        items.append(self.currentSessionTreeWidgetItem)
-        
-        #self.console.historyItemsDropped.connect(self._rerunCommand)
-        #NOTE: 2017-03-21 22:55:57 much better!
-        # connect signals emitted by the console when processing a drop event
-        self.console.historyItemsDropped.connect(self.slot_pasteHistorySelection) 
-        self.console.workspaceItemsDropped.connect(self.slot_pasteWorkspaceSelection)
-        #self.console.workspaceItemsDropped[bool].connect(self.slot_pasteWorkspaceSelection)
-        self.console.loadUrls[object, bool, QtCore.QPoint].connect(self.slot_loadDroppedURLs)
-        self.console.pythonFileReceived[str, QtCore.QPoint].connect(self.slot_handlePythonTextFile)
+            self.currentSessionTreeWidgetItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, ["Current"])
+            
+            items.append(self.currentSessionTreeWidgetItem)
+            
+            #self.console.historyItemsDropped.connect(self._rerunCommand)
+            #NOTE: 2017-03-21 22:55:57 much better!
+            # connect signals emitted by the console when processing a drop event
+            self.console.historyItemsDropped.connect(self.slot_pasteHistorySelection) 
+            self.console.workspaceItemsDropped.connect(self.slot_pasteWorkspaceSelection)
+            #self.console.workspaceItemsDropped[bool].connect(self.slot_pasteWorkspaceSelection)
+            self.console.loadUrls[object, bool, QtCore.QPoint].connect(self.slot_loadDroppedURLs)
+            self.console.pythonFileReceived[str, QtCore.QPoint].connect(self.slot_handlePythonTextFile)
 
-        self.historyTreeWidget.insertTopLevelItems(0, items)
-        self.historyTreeWidget.scrollToItem(self.currentSessionTreeWidgetItem)
-        self.historyTreeWidget.setCurrentItem(self.currentSessionTreeWidgetItem)
+            self.historyTreeWidget.insertTopLevelItems(0, items)
+            self.historyTreeWidget.scrollToItem(self.currentSessionTreeWidgetItem)
+            self.historyTreeWidget.setCurrentItem(self.currentSessionTreeWidgetItem)
 
-        #NOTE: until input has been enetered at the console, this is the LAST session on record NOT the current one!
-        self.currentSessionID = self.historyAccessor.get_last_session_id()
-        
-        self.selectedSessionID = None
+            #NOTE: until input has been enetered at the console, this is the LAST session on record NOT the current one!
+            self.currentSessionID = self.historyAccessor.get_last_session_id()
+            
+            self.selectedSessionID = None
 
-        # ------------------------------
-        # set up a` COMMON workspace
-        # ------------------------------
-        #
-        # NOTE: 2016-03-20 14:29:16
-        # populate kernel namespace with the imports from this current module 
-        #
-        # this effectively is the second time they're being imported, but this time
-        # in the ipkernel environment
-        # __module_name__ is "pict" so we take all its contents into the kernel
-        # namespace (they're just references to those objects)
-        self.workspace = self.ipkernel.shell.user_ns
-        #self.workspace['mainWindow'] = self
-        self.workspace['mainWindow'] = self
+            # ------------------------------
+            # set up a` COMMON workspace
+            # ------------------------------
+            #
+            # NOTE: 2016-03-20 14:29:16
+            # populate kernel namespace with the imports from this current module 
+            #
+            # this effectively is the second time they're being imported, but this time
+            # in the ipkernel environment
+            # __module_name__ is "pict" so we take all its contents into the kernel
+            # namespace (they're just references to those objects)
+            self.workspace = self.ipkernel.shell.user_ns
+            #self.workspace['mainWindow'] = self
+            self.workspace['mainWindow'] = self
 
-        # NOTE: 2016-03-20 20:50:42 -- WRONG!
-        # get_ipython() returns an instance of the interactive shell, NOT the kernel
-        self.workspace['ipkernel'] = self.ipkernel
-        self.workspace['console'] = self.console # useful for testing functionality; remove upon release
-        self.workspace["shell"] = self.shell # alias to self.ipkernel.shell
-        
-        # NOTE: 2018-05-08 10:49:37
-        # console exit() is broken as of ipykernel 4.8.2/ipython 6.3.1/jupyter 1.0.0/jupyter-client 5.2.3/jupyter-console 5.2.0/jupyter-core 4.4.0
-        # override with our custom exit instead
-        # NOTE 2019-08-04 11:05:59
-        # directly call this slot
-        self.workspace["exit"] = self.slot_pictQuit
-        
-        # TODO/FIXME 2019-08-04 11:06:16
-        # this does not override ipython's exit: 
-        # this will have to be called as %exit line magic (i.e. automagic doesn't work)
-        self.ipkernel.shell.register_magics(PictMagics) 
-        
-        impcmd = ' '.join(['from', "".join(["gui.", __module_name__]), 'import *'])
-        
-        self.ipkernel.shell.run_cell(impcmd)
-        
-        # hide the variables added ot the workspace so far
-        # (ipkernel, console, shell)
-        
-        self._nonInteractiveVars.update([i for i in self.workspace.items()])
+            # NOTE: 2016-03-20 20:50:42 -- WRONG!
+            # get_ipython() returns an instance of the interactive shell, NOT the kernel
+            self.workspace['ipkernel'] = self.ipkernel
+            self.workspace['console'] = self.console # useful for testing functionality; remove upon release
+            self.workspace["shell"] = self.shell # alias to self.ipkernel.shell
+            
+            # NOTE: 2018-05-08 10:49:37
+            # console exit() is broken as of ipykernel 4.8.2/ipython 6.3.1/jupyter 1.0.0/jupyter-client 5.2.3/jupyter-console 5.2.0/jupyter-core 4.4.0
+            # override with our custom exit instead
+            # NOTE 2019-08-04 11:05:59
+            # directly call this slot
+            self.workspace["exit"] = self.slot_pictQuit
+            
+            # TODO/FIXME 2019-08-04 11:06:16
+            # this does not override ipython's exit: 
+            # this will have to be called as %exit line magic (i.e. automagic doesn't work)
+            self.ipkernel.shell.register_magics(PictMagics) 
+            
+            impcmd = ' '.join(['from', "".join(["gui.", __module_name__]), 'import *'])
+            
+            self.ipkernel.shell.run_cell(impcmd)
+            
+            # hide the variables added ot the workspace so far
+            # (ipkernel, console, shell)
+            
+            self._nonInteractiveVars.update([i for i in self.workspace.items()])
 
-        # --------------------------
-        # finally, customize console window title and show it
-        # -------------------------
-        self.console.setWindowTitle(u'Scipyen Console')
+            # --------------------------
+            # finally, customize console window title and show it
+            # -------------------------
+            self.console.setWindowTitle(u'Scipyen Console')
         
         self.console.show()
         
-    @pyqtSlot()
-    @safeWrapper
-    def slot_restoreWorkspace(self):
-        impcmd = ' '.join(['from', __module_name__, 'import *'])
-        self.ipkernel.shell.run_cell(impcmd)
-        #self.workspace['mainWindow'] = self
-        self.workspace['mainWindow'] = self #.workspace['mainWindow']
-        self.slot_updateWorkspaceTable(False)
+    #@pyqtSlot()
+    #@safeWrapper
+    #def slot_restoreWorkspace(self):
+        #impcmd = ' '.join(['from', __module_name__, 'import *'])
+        #self.ipkernel.shell.run_cell(impcmd)
+        ##self.workspace['mainWindow'] = self
+        #self.workspace['mainWindow'] = self #.workspace['mainWindow']
+        #self.slot_updateWorkspaceTable(False)
     
     # NOTE: 2016-03-20 21:18:32
     # to run code inside the console and use the console as stdout, 
@@ -3849,36 +3856,53 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         #NOTE: I guess I can live with this for now...
 
     def slot_pictQuit(self):
-        if not self._save_settings_guard_:
-            self._save_settings_()
-            self._save_settings_guard_ = True
+        evt = QtGui.QCloseEvent()
+        self.closeEvent(evt)
         
-        self.workspaceModel.clear()
+        #if not self._save_settings_guard_:
+            #self._save_settings_()
+            #self._save_settings_guard_ = True
+        
+        #self.workspaceModel.clear()
 
+        #if self.console is not None:
+            #self.console.kernel_manager.shutdown_kernel()
+            #self.console.close()
+            ##del self.console
+            #self.console = None
+            
+        #if self.external_console:
+            #self.external_console.window.closeEvent(evt)
+            #if not evt.isAccepted():
+                #return
+            #self.external_console = None
+            
+        #self.app.closeAllWindows()
+            
+    def closeEvent(self, evt):
+        if self.external_console is not None:
+            self.external_console.window.closeEvent(evt)
+            if not evt.isAccepted():
+                return
+            self.external_console = None
+            self.workspace["external_console"] = None
+            self.workspaceModel.hidden_vars["external_console"] = None
+            #self.slot_updateWorkspaceTable(False)
+            
         if self.console is not None:
             self.console.kernel_manager.shutdown_kernel()
             self.console.close()
             #del self.console
             self.console = None
             
-        self.app.closeAllWindows()
-            
-        #self.close()
+        self.lscatWindow.slot_Quit()
         
-    #"def" consoleExit(self):
-        #self.slot_pictQuit()
-        ##if self.console is not None:
-            ##self.console.kernel_manager.shutdown_kernel()
-            ##self.console.close()
-            ##self.console = None
-        
-    def closeEvent(self, evt):
         if not self._save_settings_guard_:
             self._save_settings_()
             self._save_settings_guard_ = True
             
-        self.lscatWindow.slot_Quit()
         self.app.closeAllWindows()
+        
         evt.accept()
         
     def _save_settings_(self):
@@ -3979,7 +4003,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         
         #self.console._set_font(consoleFont)
         
-        self.recentVariablesList        = self.settings.value("VariableSearch", datatypes.collections.deque())
+        self.recentVariablesList        = self.settings.value("VariableSearch", collections.deque())
         
         if len(self.recentVariablesList) > 0:
             for item in self.recentVariablesList:
@@ -3987,21 +4011,21 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                 
         self.lastVariableFind           = self.settings.value("LastVariableSearch", str())
         
-        self.commandHistoryFinderList   = self.settings.value("CommandSearch", datatypes.collections.deque())
+        self.commandHistoryFinderList   = self.settings.value("CommandSearch", collections.deque())
         
         self.lastCommandFind            = self.settings.value("LastCommandSearch", str())
         
-        used_file_filters = [s for s in self.settings.value("RecentFileSystemFilters", datatypes.collections.deque()) if isinstance(s, str)]
+        used_file_filters = [s for s in self.settings.value("RecentFileSystemFilters", collections.deque()) if isinstance(s, str)]
         
-        self.fileSystemFilterHistory    = datatypes.collections.deque(sorted(used_file_filters))
+        self.fileSystemFilterHistory    = collections.deque(sorted(used_file_filters))
         
         self.lastFileSystemFilter       = self.settings.value("LastFileSystemFilter", str())
         
         self.recentFiles = self.settings.value("RecentFiles", list())
         
-        self.recentDirectories = self.settings.value("RecentDirectories", datatypes.collections.deque())
+        self.recentDirectories = self.settings.value("RecentDirectories", collections.deque())
         
-        recentScripts = self.settings.value("RecentScripts", datatypes.collections.deque())
+        recentScripts = self.settings.value("RecentScripts", collections.deque())
         
         for script_file in recentScripts:
             if os.path.isfile(script_file):
@@ -4031,10 +4055,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         self.fileSystemModel.setNameFilters(self.lastFileSystemFilter.split())
 
         if isinstance(self.recentFiles, (tuple, list)) and len(self.recentFiles):
-            self.recentFiles = datatypes.collections.OrderedDict(zip(self.recentFiles, ["vigra"] * len(self.recentFiles)))
+            self.recentFiles = collections.OrderedDict(zip(self.recentFiles, ["vigra"] * len(self.recentFiles)))
 
         if self.recentFiles is None:
-            self.recentFiles = datatypes.collections.OrderedDict()
+            self.recentFiles = collections.OrderedDict()
 
         if len(self.recentDirectories) == 0:
             self.recentDirectories.appendleft(os.getcwd()) # this ensures recentDirectories is never empty
@@ -4141,9 +4165,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         
         self.actionQuit.triggered.connect(self.slot_pictQuit)
         
-        self.actionOpen_Console.triggered.connect(self.slot_initQtConsole)
-        self.actionRestore_Workspace.triggered.connect(self.slot_restoreWorkspace)
+        self.actionConsole.triggered.connect(self.slot_initQtConsole)
+        #self.actionRestore_Workspace.triggered.connect(self.slot_restoreWorkspace)
         self.actionHelp_On_Console.triggered.connect(self._helpOnConsole_)
+        
+        self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
+        
         self.actionOpen.triggered.connect(self.slot_openFiles)
         #self.actionOpen.triggered.connect(self.openFile)
         #self.actionOpen_Files.triggered.connect(self.slot_openFiles)
@@ -5564,7 +5591,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         #If you want multiple filters, separate them with ';;', for example:
         #"Images (*.png *.xpm *.jpgui);;Text files (*.txt);;XML files (*.xml)"
         
-        from utilities import makeFileFilterString
+        from core.utilities import makeFileFilterString
         
         if self.slot_openSelectedFileItems():
             return
@@ -5638,7 +5665,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
     def slot_openFiles(self):
         """Allows the opening of several files, as opposed to openFile.
         """
-        from utilities import makeFileFilterString
+        from core.utilities import makeFileFilterString
         
         if self.slot_openSelectedFileItems():
             return
@@ -6342,7 +6369,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         
         if len(pict_plugin_loader.loaded_plugins) > 0:
             for p in pict_plugin_loader.loaded_plugins.values():
-                menudict = datatypes.collections.OrderedDict([(p.__name__, (p.__file__, p.init_pict_plugin()) )])
+                menudict = collections.OrderedDict([(p.__name__, (p.__file__, p.init_pict_plugin()) )])
                 #menudict = p.init_pict_plugin()
                 if len(menudict) > 0:
                     for (k,v) in menudict.items():
@@ -6634,7 +6661,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                                         self._installPluginFunction_(ff[0], item, parentMenu)
 
                                 elif isinstance(ff, dict):
-                                    self._parsePluginFunctionDict_(datatypes.collections.OrderedDict(ff), item, parentMenu)
+                                    self._parsePluginFunctionDict_(collections.OrderedDict(ff), item, parentMenu)
 
                                 else:
                                     raise TypeError(" a function object or a list of function objects was expected")
@@ -6667,7 +6694,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                                 else:
                                     raise TypeError("function object expected")
                     elif isinstance(ff, dict):
-                        self._parsePluginFunctionDict_(datatypes.collections.OrderedDict(ff), pname, pluginsMenu)
+                        self._parsePluginFunctionDict_(collections.OrderedDict(ff), pname, pluginsMenu)
         else:
             raise ValueError("empty nested dict in plugin info")
     

@@ -58,7 +58,7 @@ from enum import Enum, IntEnum
 import numpy as np
 import quantities as pq
 import pyqtgraph as pgraph
-#import neo
+import neo
 import vigra
 #import vigra.pyqt 
 import matplotlib as mpl
@@ -76,11 +76,11 @@ from PyQt5.uic import loadUiType as __loadUiType__
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-from core import utilities as utilities
+from core import utilities
 from core.utilities import safeWrapper
 from core import strutils as strutils
 from core import datatypes as dt
-from core import neo
+#from core import neo
 #from core import metaclass_solver
 #### END pict.core modules
 
