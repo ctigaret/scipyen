@@ -1,6 +1,7 @@
 import os
 import signal
 import sys
+from functools import partial, partialmethod
 from warnings import warn
 
 from PyQt5 import (QtCore, QtGui, QtWidgets, )
@@ -102,6 +103,7 @@ class ExternalConsoleWindow(MainWindow):
     # TODO get rid of junk
     sig_shell_msg_recvd = pyqtSignal(object)
     sig_shell_msg_exec_reply_content = pyqtSignal(object)
+    sig_shell_msg_krnl_info_reply_content = pyqtSignal(object)
     
     
     def __init__(self, app,
@@ -129,7 +131,7 @@ class ExternalConsoleWindow(MainWindow):
         So it is up to the user of the ExternalConsoleWindow instance to take care
         of that - see ExternalIPython.init_qt_elements
         """
-        self.new_nrn_kernel_tab_act = QtWidgets.QAction("New &kernel with NEURON",
+        self.new_nrn_kernel_tab_act = QtWidgets.QAction("New Tab with New &Kernel + NEURON",
             self,
             shortcut="Ctrl+K",
             triggered=self.create_neuron_tab
@@ -147,7 +149,7 @@ class ExternalConsoleWindow(MainWindow):
         ctrl = "Meta" if sys.platform == 'darwin' else "Ctrl"
         kernel_menu_separators = [a for a in self.kernel_menu.actions() if a.isSeparator()]
         
-        self.initialize_neuron_act = QtWidgets.QAction("S&tart NEURON in kernel",
+        self.initialize_neuron_act = QtWidgets.QAction("S&tart NEURON in current Kernel",
                                                        self,
                                                        shortcut=ctrl+"R",
                                                        triggered=self.start_neuron_in_current_tab
@@ -208,16 +210,19 @@ class ExternalConsoleWindow(MainWindow):
         self.add_tab_with_frontend(widget)
         widget.kernel_client.execute(code=code, **kwargs)
         current_widget_index = self.tab_widget.indexOf(widget)
-        #old_title = self.tab_widget.tabText(self.tab_widget.currentIndex())
-        old_title = self.tab_widget.tabText(current_widget_index)
-        new_title= "NEURON %s" % old_title
-        self.tab_widget.setTabText(current_widget_index, new_title)
+        ##old_title = self.tab_widget.tabText(self.tab_widget.currentIndex())
+        #old_title = self.tab_widget.tabText(current_widget_index)
+        #new_title= "NEURON %s" % old_title
+        #self.tab_widget.setTabText(current_widget_index, new_title)
         
     def create_neuron_tab(self):
         from core.extipyutils import nrn_ipython_initialization_cmd
         self.create_new_tab_with_new_kernel_and_execute(code=nrn_ipython_initialization_cmd,
                                                         silent=True,
                                                         store_history=False)
+        
+        self.prefix_tab_title("NEURON ",
+                              self.tab_widget.indexOf(self.active_frontend))
         
     def start_neuron_in_current_tab(self):
         from core.extipyutils import nrn_ipython_initialization_cmd
@@ -226,10 +231,11 @@ class ExternalConsoleWindow(MainWindow):
                                                    store_history=False)
         
         current_widget_index = self.tab_widget.indexOf(self.active_frontend)
-        old_title = self.tab_widget.tabText(current_widget_index)
-        if "NEURON" not in old_title:
-            new_title= "NEURON %s" % old_title
-            self.tab_widget.setTabText(current_widget_index, new_title)
+        self.prefix_tab_title("NEURON ", current_widget_index)
+        #old_title = self.tab_widget.tabText(current_widget_index)
+        #if "NEURON" not in old_title:
+            #new_title= "NEURON %s" % old_title
+            #self.tab_widget.setTabText(current_widget_index, new_title)
             
 
     def insert_menu_action(self, menu, action, before, defer_shortcut=False):
@@ -246,7 +252,83 @@ class ExternalConsoleWindow(MainWindow):
 
         if defer_shortcut:
             action.setShortcutContext(QtCore.Qt.WidgetShortcut)
+            
+    def find_widget_with_kernel_manager(self, km, as_widget_list=True):
+        widget_list = [self.tab_widget.widget(i) for i in range(self.tab_widget.count())]
+        
+        #filtered_widget_list = [ widget for widget in widget_list if
+                                #widget.kernel_manager.connection_file == km.connection_file and
+                                #hasattr(widget,'_may_close') ]
+        
+        filtered_widget_list = [widget for widget in widget_list if
+                                widget.kernel_manager.connection_file == km.connection_file]
+        
+        if as_widget_list:
+            return filtered_widget_list
+        
+        else:
+            return [self.tab_widget.indexOf(w) for w in filtered_widget_list]
+        
+    def find_widget_with_kernel_client(self, km, as_widget_list=True):
+        widget_list = [self.tab_widget.widget(i) for i in range(self.tab_widget.count())]
+        
+        #filtered_widget_list = [ widget for widget in widget_list if
+                                #widget.kernel_manager.connection_file == km.connection_file and
+                                #hasattr(widget,'_may_close') ]
+        
+        filtered_widget_list = [widget for widget in widget_list if
+                                widget.kernel_client.connection_file == km.connection_file]
+        
+        if as_widget_list:
+            return filtered_widget_list
+        else:
+            return [self.tab_widget.indexOf(w) for w in filtered_widget_list]
+        
+    @safeWrapper
+    def prefix_tab_title(self, prefix, ndx):
+        """Prepends prefix to the tab title for tabs with indices in ndx.
+        Parameters:
+        ----------
+        prefix: str - the prefix
+        ndx: int -  the index of the tab in the tab widget.
+        
+        The function does nothing if prefix is empty or is not in the tab's title.
+        A prefix string containing only spaces or tab characters is considered
+        empty in this context.
+        """
+        if len(prefix.strip()) == 0:
+            return
+        
+        old_title = self.tab_widget.tabText(ndx)
+        
+        if prefix not in old_title:
+            new_title= "%s%s" % (prefix, old_title)
+            self.tab_widget.setTabText(ndx, new_title)
+            
+    @safeWrapper
+    def unprefix_tab_title(self, prefix, ndx):
+        """Removes prefix from the tab title for tabs with indices in ndx.
+        Parameters:
+        ----------
+        prefix: str - the prefix
+        ndx: int - the index of the tab in the tab widget.
+        
+        The function does nothing if prefix is empty or is not in the tab's title
+        A prefix string containing only spaces or tab characters is considered
+        empty in this context.
+        """
+        if len(prefix.strip()) == 0:
+            return
+        
+        #print(prefix)
 
+        old_title = self.tab_widget.tabText(ndx)
+        if prefix in old_title:
+            new_title = old_title.replace(prefix, "")
+            self.tab_widget.setTabText(ndx, new_title)
+            
+        
+        
     def add_tab_with_frontend(self,frontend,name=None):
         """ insert a tab with a given frontend in the tab bar, and give it a name
 
@@ -271,6 +353,7 @@ class ExternalConsoleWindow(MainWindow):
         # kernel are Qt objects (QtZMQSocketChannel). In particular, the channels
         # emit generic Qt signals that contain the actual kernel message
         frontend.kernel_client.shell_channel.message_received.connect(self.slot_kernel_shell_message_received)
+        frontend.kernel_manager.kernel_restarted.connect(self.slot_kernel_restarted)
         
 
     def closeEvent(self, event):
@@ -426,6 +509,7 @@ class ExternalConsoleWindow(MainWindow):
         elif keepkernel: #close console but leave kernel running (no prompt)
             self.tab_widget.removeTab(current_tab)
             background(kernel_client.stop_channels)
+            
         else: #close console and kernel (no prompt)
             self.tab_widget.removeTab(current_tab)
             if kernel_client and kernel_client.channels_running:
@@ -437,6 +521,20 @@ class ExternalConsoleWindow(MainWindow):
                 background(kernel_client.stop_channels)
 
         self.update_tab_bar_visibility()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_kernel_restarted(self):
+        """Re-sets the tag title after a kernel restart.
+        
+        """
+        # used specifically for NEURON tabs, where quitting NEURON GUI crashes the
+        # kernel (and the manager restarts it)
+        km = self.sender()
+        km_widgets_ndx = self.find_widget_with_kernel_manager(km, as_widget_list=False)
+        
+        for ndx in km_widgets_ndx:
+            self.unprefix_tab_title("NEURON ", ndx)
         
     @safeWrapper
     @pyqtSlot(object)
@@ -452,7 +550,7 @@ class ExternalConsoleWindow(MainWindow):
                 self.sig_shell_msg_exec_reply_content.emit(msg["content"])
                 
             elif msg_type == "kernel_info_reply":
-                pass
+                self.sig_shell_msg_krnl_info_reply_content.emit(msg["content"])
 
 
 class ExternalIPython(JupyterApp, JupyterConsoleApp):

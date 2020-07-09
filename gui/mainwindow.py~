@@ -137,6 +137,7 @@ from IPython.core.magic import (Magics, magics_class, line_magic,
                                 needs_local_scope)
 
 from IPython.core.history import HistoryAccessor
+from IPython.core.autocall import ZMQExitAutocall
 
 from IPython.display import set_matplotlib_formats
 
@@ -282,10 +283,20 @@ __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__,"ma
 __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__,"scriptmanagerwindow.ui"), from_imports=True, import_from="gui")
 
 @magics_class
-class PictMagics(Magics):
+class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def exit(self, line, local_ns):
+        """%exit line magic
+        """
+        if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
+            local_ns["mainWindow"].slot_pictQuit()
+            
+        return line
+    
+    @line_magic
+    @needs_local_scope
+    def quit(self, line, local_ns):
         """%exit line magic
         """
         if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
@@ -301,6 +312,17 @@ class PictMagics(Magics):
         
         if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
             local_ns["mainWindow"]._init_ExternalIPython_()
+            
+        return line
+    
+    @line_magic
+    @needs_local_scope
+    def neuron_ipython(self, line, local_ns):
+        """%external_ipython magic launches a separate Jupyter Qt Console process
+        """
+        
+        if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
+            local_ns["mainWindow"]._init_ExternalIPython_(new="neuron")
             
         return line
     
@@ -2618,7 +2640,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         self.navNextDir                 = collections.deque()
         self.currentDir                 = None
         self.workspace                  = dict()
-        self._nonInteractiveVars        = dict()
+        self._nonInteractiveVars_        = dict()
         self.console                    = None
         self.ipkernel                   = None
         self.shell                      = None
@@ -2660,13 +2682,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         #self.signalViewers = dict()
         
         # NOTE: 2018-10-07 21:12:14
-        # (re)initializes self.workspace, self._nonInteractiveVars, self.ipkernel, self.console and self.shell
+        # (re)initializes self.workspace, self._nonInteractiveVars_, self.ipkernel, self.console and self.shell
         self._init_QtConsole_() 
         
         self.fileSystemModel            = FileSystemModel(parent=self)
         
         self.workspaceModel             = WorkspaceModel(self.shell, parent=self)
-        self.workspaceModel.hidden_vars.update(self._nonInteractiveVars)
+        self.workspaceModel.hidden_vars.update(self._nonInteractiveVars_)
         
         self.shell.events.register("pre_execute", self.workspaceModel.pre_execute)
         self.shell.events.register("post_execute", self.workspaceModel.post_execute)
@@ -2979,17 +3001,29 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             self.workspace['console'] = self.console # useful for testing functionality; remove upon release
             self.workspace["shell"] = self.shell # alias to self.ipkernel.shell
             
-            # NOTE: 2018-05-08 10:49:37
-            # console exit() is broken as of ipykernel 4.8.2/ipython 6.3.1/jupyter 1.0.0/jupyter-client 5.2.3/jupyter-console 5.2.0/jupyter-core 4.4.0
-            # override with our custom exit instead
-            # NOTE 2019-08-04 11:05:59
-            # directly call this slot
-            self.workspace["exit"] = self.slot_pictQuit
+            #print("exit" in self.ipkernel.shell.user_ns)
+            
+            # NOTE 2020-07-09 11:36:34
+            # Override ExitAutocall objects in this kernel in order to let the 
+            # ScipyenMagics "exit" and "quit" to take over.
+            # By default, self.workspace["exit"] and self.workspace["quit"] are
+            # the same ExitAutocall object; see IPython.core.autocall module for 
+            # details
+            #
+            # The point of all this is that we quit the Scipyen application when
+            # either "exit" or "quit" are entered in the internal Scipyen Console
+            #
+            self.workspace["_exit_kernel_"] = self.workspace["exit"]
+            self.workspace.pop("exit", None)
+            self.workspace["_quit_kernel_"] = self.workspace["quit"]
+            self.workspace.pop("quit", None)
+            
+            
             
             # TODO/FIXME 2019-08-04 11:06:16
             # this does not override ipython's exit: 
             # this will have to be called as %exit line magic (i.e. automagic doesn't work)
-            self.ipkernel.shell.register_magics(PictMagics) 
+            self.ipkernel.shell.register_magics(ScipyenMagics) 
             
             impcmd = ' '.join(['from', "".join(["gui.", __module_name__]), 'import *'])
             
@@ -2998,7 +3032,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             # hide the variables added ot the workspace so far
             # (ipkernel, console, shell)
             
-            self._nonInteractiveVars.update([i for i in self.workspace.items()])
+            self._nonInteractiveVars_.update([i for i in self.workspace.items()])
 
             # --------------------------
             # finally, customize console window title and show it
@@ -3157,7 +3191,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
 
 
         varnames = [i for i in self.workspace 
-               if (not i.startswith('_') and i not in self._nonInteractiveVars.keys() and type(i) is not types.ModuleType)]
+               if (not i.startswith('_') and i not in self._nonInteractiveVars_.keys() and type(i) is not types.ModuleType)]
 
 
         # NOTE: 2016-04-16 00:12:26
@@ -5828,7 +5862,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             
     @pyqtSlot(object)
     @safeWrapper
-    def _slot_extkrn_shell_msg_exe_rep_ctnt_received(self, msg):
+    def _slot_extipy_shell_msg_exe_rep_ctnt_received(self, msg):
         pass
     
             
