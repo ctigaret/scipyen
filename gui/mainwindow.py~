@@ -137,8 +137,11 @@ from IPython.core.magic import (Magics, magics_class, line_magic,
                                 needs_local_scope)
 
 from IPython.core.history import HistoryAccessor
+from IPython.core.autocall import ZMQExitAutocall
 
 from IPython.display import set_matplotlib_formats
+
+from jupyter_client.session import Message
 
 #### END 3rd party modules
 
@@ -165,6 +168,7 @@ import core.curvefitting as crvf
 import core.strutils
 import core.simulations as sim
 import core.data_analysis as anl
+
 
 #### END pict.core modules
 
@@ -279,10 +283,20 @@ __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__,"ma
 __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__,"scriptmanagerwindow.ui"), from_imports=True, import_from="gui")
 
 @magics_class
-class PictMagics(Magics):
+class ScipyenMagics(Magics):
     @line_magic
     @needs_local_scope
     def exit(self, line, local_ns):
+        """%exit line magic
+        """
+        if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
+            local_ns["mainWindow"].slot_pictQuit()
+            
+        return line
+    
+    @line_magic
+    @needs_local_scope
+    def quit(self, line, local_ns):
         """%exit line magic
         """
         if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
@@ -297,7 +311,18 @@ class PictMagics(Magics):
         """
         
         if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
-            local_ns["mainwindow"]._init_ExternalIPython_()
+            local_ns["mainWindow"]._init_ExternalIPython_()
+            
+        return line
+    
+    @line_magic
+    @needs_local_scope
+    def neuron_ipython(self, line, local_ns):
+        """%external_ipython magic launches a separate Jupyter Qt Console process
+        """
+        
+        if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
+            local_ns["mainWindow"]._init_ExternalIPython_(new="neuron")
             
         return line
     
@@ -2615,7 +2640,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         self.navNextDir                 = collections.deque()
         self.currentDir                 = None
         self.workspace                  = dict()
-        self._nonInteractiveVars        = dict()
+        self._nonInteractiveVars_        = dict()
         self.console                    = None
         self.ipkernel                   = None
         self.shell                      = None
@@ -2657,13 +2682,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         #self.signalViewers = dict()
         
         # NOTE: 2018-10-07 21:12:14
-        # (re)initializes self.workspace, self._nonInteractiveVars, self.ipkernel, self.console and self.shell
+        # (re)initializes self.workspace, self._nonInteractiveVars_, self.ipkernel, self.console and self.shell
         self._init_QtConsole_() 
         
         self.fileSystemModel            = FileSystemModel(parent=self)
         
         self.workspaceModel             = WorkspaceModel(self.shell, parent=self)
-        self.workspaceModel.hidden_vars.update(self._nonInteractiveVars)
+        self.workspaceModel.hidden_vars.update(self._nonInteractiveVars_)
         
         self.shell.events.register("pre_execute", self.workspaceModel.pre_execute)
         self.shell.events.register("post_execute", self.workspaceModel.post_execute)
@@ -2719,14 +2744,76 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
     def slot_launchExternalIPython(self):
         self._init_ExternalIPython_()
         
+    @pyqtSlot()
     @safeWrapper
-    def _init_ExternalIPython_(self):
+    def slot_launchExternalNeuronIPython(self):
+        self._init_ExternalIPython_(new="neuron")
+        
+    @safeWrapper
+    def _init_ExternalIPython_(self, new:str = ""):
+        """External IPython launcher.
+        
+        If no External IPython console instance exists, launches an instance
+        of External IPytyhon console (running external kernels as separate processes).
+        
+        When parameter "new" is "neuron" the console initializes the NEURON python
+        environment in the console.
+        
+        If an External IPython console instance is already running, it raises the
+        external console window and, according to value of the "new" parameter 
+        (see below) it may create a new tab.
+        
+        Parameters:
+        -----------
+        new : str (optional, default is "") 
+            Allowed values are: "master", "slave", "connection", "neuron", "" (empty string, the default)
+            
+            "master":   creates a new tab with a client connected to a new, local, 
+                        kernel process
+                        
+            "slave":    creates a new tab with a client connected to an existing
+                        local kernel (local kernel); the existing local kernel
+                        is the one running behind the currently active master tab
+                        
+            "connection": asks for a kernel connection json file then creates 
+                        a new tab with a client connected to the (possibly remote) 
+                        kernel via the specified connection json file
+                        
+            "neuron"    : creates a new tab with a client connected to a new, local, 
+                        kernel process then initializes NEURON python environment.
+                        
+                        If no ExternalIPython console exists, launches an instance
+                        of ExternalIPython console and starts NEURON.
+            
+        """
         if not isinstance(self.external_console, consoles.ExternalIPython):
             self.external_console = consoles.ExternalIPython.launch()
             self.workspace["external_console"] = self.external_console
             self.workspaceModel.hidden_vars.update({"external_console":self.external_console})
             
+            if isinstance(new, str) and new == "neuron":
+                from core.extipyutils import nrn_ipython_initialization_cmd
+                self.external_console.execute(nrn_ipython_initialization_cmd,
+                                              silent=True,
+                                              store_history=False)
+            
         else:
+            if isinstance(new, str):
+                if new == "master":
+                    self.external_console.window.create_tab_with_new_frontend()
+                    
+                elif new == "slave":
+                    self.external_console.window.create_tab_with_current_kernel()
+                    
+                elif new == "connection":
+                    self.external_console.window.create_tab_with_existing_kernel()
+                    
+                elif new == "neuron":
+                    from core.extipyutils import nrn_ipython_initialization_cmd
+                    self.external_console.window.create_new_tab_with_new_kernel_and_execute(nrn_ipython_initialization_cmd,
+                                              silent=True,
+                                              store_history=False)
+                    
             self.external_console.window.setVisible(True)
 
         
@@ -2914,17 +3001,29 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             self.workspace['console'] = self.console # useful for testing functionality; remove upon release
             self.workspace["shell"] = self.shell # alias to self.ipkernel.shell
             
-            # NOTE: 2018-05-08 10:49:37
-            # console exit() is broken as of ipykernel 4.8.2/ipython 6.3.1/jupyter 1.0.0/jupyter-client 5.2.3/jupyter-console 5.2.0/jupyter-core 4.4.0
-            # override with our custom exit instead
-            # NOTE 2019-08-04 11:05:59
-            # directly call this slot
-            self.workspace["exit"] = self.slot_pictQuit
+            #print("exit" in self.ipkernel.shell.user_ns)
+            
+            # NOTE 2020-07-09 11:36:34
+            # Override ExitAutocall objects in this kernel in order to let the 
+            # ScipyenMagics "exit" and "quit" to take over.
+            # By default, self.workspace["exit"] and self.workspace["quit"] are
+            # the same ExitAutocall object; see IPython.core.autocall module for 
+            # details
+            #
+            # The point of all this is that we quit the Scipyen application when
+            # either "exit" or "quit" are entered in the internal Scipyen Console
+            #
+            self.workspace["_exit_kernel_"] = self.workspace["exit"]
+            self.workspace.pop("exit", None)
+            self.workspace["_quit_kernel_"] = self.workspace["quit"]
+            self.workspace.pop("quit", None)
+            
+            
             
             # TODO/FIXME 2019-08-04 11:06:16
             # this does not override ipython's exit: 
             # this will have to be called as %exit line magic (i.e. automagic doesn't work)
-            self.ipkernel.shell.register_magics(PictMagics) 
+            self.ipkernel.shell.register_magics(ScipyenMagics) 
             
             impcmd = ' '.join(['from', "".join(["gui.", __module_name__]), 'import *'])
             
@@ -2933,7 +3032,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             # hide the variables added ot the workspace so far
             # (ipkernel, console, shell)
             
-            self._nonInteractiveVars.update([i for i in self.workspace.items()])
+            self._nonInteractiveVars_.update([i for i in self.workspace.items()])
 
             # --------------------------
             # finally, customize console window title and show it
@@ -3092,7 +3191,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
 
 
         varnames = [i for i in self.workspace 
-               if (not i.startswith('_') and i not in self._nonInteractiveVars.keys() and type(i) is not types.ModuleType)]
+               if (not i.startswith('_') and i not in self._nonInteractiveVars_.keys() and type(i) is not types.ModuleType)]
 
 
         # NOTE: 2016-04-16 00:12:26
@@ -4170,7 +4269,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         self.actionHelp_On_Console.triggered.connect(self._helpOnConsole_)
         
         self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
-        
+        self.actionExternalNrnIPython.triggered.connect(self.slot_launchExternalNeuronIPython)
         self.actionOpen.triggered.connect(self.slot_openFiles)
         #self.actionOpen.triggered.connect(self.openFile)
         #self.actionOpen_Files.triggered.connect(self.slot_openFiles)
@@ -5760,6 +5859,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                     self._refreshRecentScriptsMenu_()
                 
             self._temp_python_filename_ = None
+            
+    @pyqtSlot(object)
+    @safeWrapper
+    def _slot_extipy_shell_msg_exe_rep_ctnt_received(self, msg):
+        pass
+    
             
     @safeWrapper
     def _import_python_module_file_(self, fileName):
