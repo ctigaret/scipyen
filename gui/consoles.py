@@ -29,6 +29,7 @@ from qtconsole.mainwindow import MainWindow, background
 from qtconsole.client import QtKernelClient
 from qtconsole.manager import QtKernelManager
 
+from jupyter_client.session import Message
 
 #import jupyter_client
 
@@ -57,6 +58,7 @@ from jupyter_client.localinterfaces import is_local_ip
 
 #from core import prog
 from core.prog import safeWrapper
+from core.extipyutils import init_commands
 
 flags = dict(base_flags)
 qt_flags = {
@@ -95,6 +97,13 @@ qt_aliases = set(qt_aliases.keys())
 qt_flags = set(qt_flags.keys())
 
 class ExternalConsoleWindow(MainWindow):
+    # NOTE 2020-07-08 23:24:47
+    # not all of these will be useful in the long term
+    # TODO get rid of junk
+    sig_shell_msg_recvd = pyqtSignal(object)
+    sig_shell_msg_exec_reply_content = pyqtSignal(object)
+    
+    
     def __init__(self, app,
                     confirm_exit=True,
                     new_frontend_factory=None, slave_frontend_factory=None,
@@ -105,11 +114,52 @@ class ExternalConsoleWindow(MainWindow):
                          slave_frontend_factory = slave_frontend_factory,
                          connection_frontend_factory=connection_frontend_factory)
         
+        # NOTE 2020-07-09 00:41:55
+        # no menu bar at this time!
         self.defaultFixedFont = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
         self.settings = QtCore.QSettings()
         self._console_font_ = None
         self._load_settings_()
+        self.app = app # this is Scipyen application, not the ExternalIPython!
         
+    def _supplement_file_menu_(self):
+        """To be called separately after calling self.__init__(...).
+        This is because _init__() does not initialize the menus: we don't get 
+        a menu until after self.init_menu_bar()
+        So it is up to the user of the ExternalConsoleWindow instance to take care
+        of that - see ExternalIPython.init_qt_elements
+        """
+        self.new_nrn_kernel_tab_act = QtWidgets.QAction("New &kernel with NEURON",
+            self,
+            shortcut="Ctrl+K",
+            triggered=self.create_neuron_tab
+            )
+        
+        self.insert_menu_action(self.file_menu, self.new_nrn_kernel_tab_act, self.slave_kernel_tab_act)
+
+    def _supplement_kernel_menu_(self):
+        """To be called separately after calling self.__init__().
+        This is because _init__() does not initialize the menus: we don't get 
+        a menu until after self.init_menu_bar()
+        So it is up to the user of the ExternalConsoleWindow instance to take care
+        of that - see ExternalIPython.init_qt_elements()
+        """
+        ctrl = "Meta" if sys.platform == 'darwin' else "Ctrl"
+        kernel_menu_separators = [a for a in self.kernel_menu.actions() if a.isSeparator()]
+        
+        self.initialize_neuron_act = QtWidgets.QAction("S&tart NEURON in kernel",
+                                                       self,
+                                                       shortcut=ctrl+"R",
+                                                       triggered=self.start_neuron_in_current_tab
+                                                       )
+        
+        if len(kernel_menu_separators):
+            self.insert_menu_action(self.kernel_menu,
+                                    self.initialize_neuron_act,
+                                    kernel_menu_separators[0])
+
+        else:
+            self.add_menu_action(self.kernel_menu, self.initialize_neuron_act)
         
     def _load_settings_(self):
         # located in $HOME/.config/Scipyen/Scipyen.conf
@@ -152,17 +202,76 @@ class ExternalConsoleWindow(MainWindow):
         self.settings.setValue("ExternalConsole/FontWeight", font.weight())
         
         
+    def create_new_tab_with_new_kernel_and_execute(self, code=None, **kwargs):
+        """create a new frontend and attach it to a new tab"""
+        widget = self.new_frontend_factory()
+        self.add_tab_with_frontend(widget)
+        widget.kernel_client.execute(code=code, **kwargs)
+        current_widget_index = self.tab_widget.indexOf(widget)
+        #old_title = self.tab_widget.tabText(self.tab_widget.currentIndex())
+        old_title = self.tab_widget.tabText(current_widget_index)
+        new_title= "NEURON %s" % old_title
+        self.tab_widget.setTabText(current_widget_index, new_title)
+        
+    def create_neuron_tab(self):
+        from core.extipyutils import nrn_ipython_initialization_cmd
+        self.create_new_tab_with_new_kernel_and_execute(code=nrn_ipython_initialization_cmd,
+                                                        silent=True,
+                                                        store_history=False)
+        
+    def start_neuron_in_current_tab(self):
+        from core.extipyutils import nrn_ipython_initialization_cmd
+        self.active_frontend.kernel_client.execute(code=nrn_ipython_initialization_cmd,
+                                                   silent=True,
+                                                   store_history=False)
+        
+        current_widget_index = self.tab_widget.indexOf(self.active_frontend)
+        old_title = self.tab_widget.tabText(current_widget_index)
+        if "NEURON" not in old_title:
+            new_title= "NEURON %s" % old_title
+            self.tab_widget.setTabText(current_widget_index, new_title)
+            
+
+    def insert_menu_action(self, menu, action, before, defer_shortcut=False):
+        """Inserts action to menu before "before", as well adds it to self
+
+        So that when the menu bar is invisible, its actions are still available.
+
+        If defer_shortcut is True, set the shortcut context to widget-only,
+        where it will avoid conflict with shortcuts already bound to the
+        widgets themselves.
+        """
+        menu.insertAction(before, action)
+        self.addAction(action)
+
+        if defer_shortcut:
+            action.setShortcutContext(QtCore.Qt.WidgetShortcut)
+
     def add_tab_with_frontend(self,frontend,name=None):
         """ insert a tab with a given frontend in the tab bar, and give it a name
 
         """
+        # The self.create_tab_*(...) methods that generate a frontend and a tab 
+        # name are inherited from qtconsole.mainwindow.MainWindow, and eventually
+        # call call this function
         if not name:
             name = 'kernel %i' % self.next_kernel_id
-        self.tab_widget.addTab(frontend,name)
+        self.tab_widget.addTab(frontend, name)
         self.update_tab_bar_visibility()
         self.make_frontend_visible(frontend)
-        frontend.font = self._console_font_
+        
         frontend.exit_requested.connect(self.close_tab)
+        
+        # NOTE 2020-07-08 21:24:28
+        # set our own font
+        frontend.font = self._console_font_
+        # NOTE 2020-07-08 21:24:45
+        # Mechanism for capturing kernel messages via the shell channel.
+        # In the Qt console framework these communication channels with the (remote)
+        # kernel are Qt objects (QtZMQSocketChannel). In particular, the channels
+        # emit generic Qt signals that contain the actual kernel message
+        frontend.kernel_client.shell_channel.message_received.connect(self.slot_kernel_shell_message_received)
+        
 
     def closeEvent(self, event):
         """ Forward the close event to every tabs contained by the windows
@@ -210,7 +319,7 @@ class ExternalConsoleWindow(MainWindow):
                 widget = self.active_frontend
                 widget._confirm_exit = False
                 if self.tab_widget.count() == 1:
-                    self._save_tab_settings_()
+                    self._save_tab_settings_(widget)
                 self.close_tab(widget)
             event.accept()
         
@@ -266,6 +375,7 @@ class ExternalConsoleWindow(MainWindow):
             # don't prompt, just terminate the kernel if we own it
             # or leave it alone if we don't
             keepkernel = closing_widget._existing
+            
         if keepkernel is None: #show prompt
             if kernel_client and kernel_client.channels_running:
                 title = self.window().windowTitle()
@@ -327,6 +437,22 @@ class ExternalConsoleWindow(MainWindow):
                 background(kernel_client.stop_channels)
 
         self.update_tab_bar_visibility()
+        
+    @safeWrapper
+    @pyqtSlot(object)
+    def slot_kernel_shell_message_received(self, msg):
+        #print(msg)
+        #message = Message(msg)
+        header = msg["header"]
+        msg_type = header["msg_type"]
+        #print("msg_id:", header["msg_id"], "session: ", header["session"])
+        current_widget = self.tab_widget.currentIndex()
+        if isinstance(msg, dict):
+            if msg_type == "execute_reply":
+                self.sig_shell_msg_exec_reply_content.emit(msg["content"])
+                
+            elif msg_type == "kernel_info_reply":
+                pass
 
 
 class ExternalIPython(JupyterApp, JupyterConsoleApp):
@@ -398,6 +524,8 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
 
     def new_frontend_master(self):
         """ Create and return new frontend attached to new kernel, launched on localhost.
+        This is NOT called upon ExternalIPython.launch(). Instead, that function
+        lands directly on ExternalConsoleWindow.add_tab_with_frontend(...)
         """
         kernel_manager = self.kernel_manager_class(
                                 connection_file=self._new_connection_file(),
@@ -422,6 +550,9 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         widget._may_close = True
         widget._confirm_exit = self.confirm_exit
         widget._display_banner = self.display_banner
+        #cmd = "\n".join(init_commands)
+        #print(cmd)
+        widget.kernel_client.execute(code = "\n".join(init_commands), silent=True, store_history=False)
         return widget
 
     def new_frontend_connection(self, connection_file):
@@ -506,6 +637,13 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         self.window.log = self.log
         self.window.add_tab_with_frontend(self.widget)
         self.window.init_menu_bar()
+        self.window._supplement_file_menu_()
+        self.window._supplement_kernel_menu_()
+        
+        # NOTE 2020-07-09 01:05:35
+        # run general kernel intialization python commands here, as this function
+        # does not call new_frontend_master(...)
+        self.widget.kernel_client.execute(code="\n".join(init_commands), silent=True, store_history=False)
 
         # Ignore on OSX, where there is always a menu bar
         if sys.platform != 'darwin' and self.hide_menubar:
@@ -670,6 +808,47 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         app.start()
         
         return app
+    
+    #### BEGIN some useful properties
+    
+    @property
+    def active_kernel_manager(self):
+        """The kernel manager of the active frontend.
+        This may be different from self.kernel_manager which is only set once
+        (and hence is the kernel manager of the first frontend of the console)
+        """
+        return self.window.active_frontend.kernel_manager
+    
+    @property
+    def active_kernel_client(self):
+        """The kernel client of the active frontend.
+        This may be different from self.kernel_client which is only set once
+        (and hence is the kernel client of the first frontend of the console)
+        """
+        return self.window.active_frontend.kernel_client
+    
+    @property
+    def active_manager_session(self):
+        """The kernel manager session of the active frontend.
+        This may be different from self.session which is only set once
+        (and hence is the session of the first frontend of the console)
+        """
+        return self.window.active_frontend.kernel_manager.session
+    
+    @property
+    def active_client_session(self):
+        """Kernel client session of the active frontend.
+        The manager and client session are different objects.
+        """
+        return self.window.active_frontend.kernel_client.session
+    
+    #### END some useful properties
+    
+    def execute(self, code:str, **kwargs):
+        """Execute code in the active kernel client.
+        The active kernel client is the client of the active frontend.
+        """
+        self.window.active_frontend.kernel_client.execute(code=code, **kwargs)
 
 # NOTE: use Jupyter (IPython >= 4.x and qtconsole / qt5 by default)
 class ScipyenConsole(RichJupyterWidget):

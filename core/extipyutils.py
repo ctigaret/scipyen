@@ -1,14 +1,27 @@
 # -*- coding: utf-8 -*-
-import sys, pickle, inspect
+"""Module with utilities for an external IPython kernel.
+To be used on the client side (i.e. Scipyen app side)
+"""
+import os, sys, pickle, inspect
 from functools import wraps
 #from contextlib import contextmanager
 #print(sys.path)
 
+__module_path__ = os.path.abspath(os.path.dirname(__file__))
+
+# NOTE: 2016-04-03 00:17:42
+__module_name__ = os.path.splitext(os.path.basename(__file__))[0]
+
+nrn_ipython_initialization_file = os.path.join(os.path.dirname(__module_path__),"neuron_python", "nrn_ipython.py")
+nrn_ipython_initialization_cmd = "".join(["run -i -n ", nrn_ipython_initialization_file])
+
 init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, importlib",
-                 "import traceback, keyword, inspect, weakref, itertools, typing, functools",
+                 "import traceback, keyword, inspect, itertools, functools, collections",
                  "import signal, pickle, json, csv",
                  "from importlib import reload",
-                 "sys.path=['" + sys.path[0] +"'] + sys.path",
+                 "from IPython.lib.deepreload import reload as dreload",
+                 "".join(["sys.path.insert(2, '", os.path.dirname(__module_path__), "')"]),
+                 #"sys.path=['" + sys.path[0] +"'] + sys.path",
                  ]
 
 def make_user_expression(**kwargs):
@@ -162,4 +175,47 @@ def pickling(f, *args, **kwargs):
 def put_data(dataname, data):
     datas = pickle.dumps({dataname:data})
     
+def execute(client, *args, **kwargs):
+    """Execute code in the kernel, sent via the specified kernel client.
+        
+    Parameters
+    ----------
+    client: a kernel client
+    *args, **kwargs - passed directly to client.execute(...), are as follows:
+        code : str
+        
+            A string of code in the kernel's language.
+        
+        silent : bool, optional (default False)
+            If set, the kernel will execute the code as quietly possible, and
+            will force store_history to be False.
+        
+        store_history : bool, optional (default True)
+            If set, the kernel will store command history.  This is forced
+            to be False if silent is True.
+        
+        user_expressions : dict, optional
+            A dict mapping names to expressions to be evaluated in the user's
+            dict. The expression values are returned as strings formatted using
+            :func:`repr`.
+        
+        allow_stdin : bool, optional (default self.allow_stdin)
+            Flag for whether the kernel can send stdin requests to frontends.
+        
+            Some frontends (e.g. the Notebook) do not support stdin requests.
+            If raw_input is called from code executed from such a frontend, a
+            StdinNotImplementedError will be raised.
+        
+        stop_on_error: bool, optional (default True)
+            Flag whether to abort the execution queue, if an exception is encountered.
     
+    Returns
+    -------
+    The msg_id of the message sent.
+
+
+    """
+    
+    return client.execute(*args, **kwargs)
+
+

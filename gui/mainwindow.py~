@@ -140,6 +140,8 @@ from IPython.core.history import HistoryAccessor
 
 from IPython.display import set_matplotlib_formats
 
+from jupyter_client.session import Message
+
 #### END 3rd party modules
 
 #print("sys.path in %s named %s:\n" % (__file__, __name__),  sys.path)
@@ -165,6 +167,7 @@ import core.curvefitting as crvf
 import core.strutils
 import core.simulations as sim
 import core.data_analysis as anl
+
 
 #### END pict.core modules
 
@@ -297,7 +300,7 @@ class PictMagics(Magics):
         """
         
         if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
-            local_ns["mainwindow"]._init_ExternalIPython_()
+            local_ns["mainWindow"]._init_ExternalIPython_()
             
         return line
     
@@ -2719,14 +2722,76 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
     def slot_launchExternalIPython(self):
         self._init_ExternalIPython_()
         
+    @pyqtSlot()
     @safeWrapper
-    def _init_ExternalIPython_(self):
+    def slot_launchExternalNeuronIPython(self):
+        self._init_ExternalIPython_(new="neuron")
+        
+    @safeWrapper
+    def _init_ExternalIPython_(self, new:str = ""):
+        """External IPython launcher.
+        
+        If no External IPython console instance exists, launches an instance
+        of External IPytyhon console (running external kernels as separate processes).
+        
+        When parameter "new" is "neuron" the console initializes the NEURON python
+        environment in the console.
+        
+        If an External IPython console instance is already running, it raises the
+        external console window and, according to value of the "new" parameter 
+        (see below) it may create a new tab.
+        
+        Parameters:
+        -----------
+        new : str (optional, default is "") 
+            Allowed values are: "master", "slave", "connection", "neuron", "" (empty string, the default)
+            
+            "master":   creates a new tab with a client connected to a new, local, 
+                        kernel process
+                        
+            "slave":    creates a new tab with a client connected to an existing
+                        local kernel (local kernel); the existing local kernel
+                        is the one running behind the currently active master tab
+                        
+            "connection": asks for a kernel connection json file then creates 
+                        a new tab with a client connected to the (possibly remote) 
+                        kernel via the specified connection json file
+                        
+            "neuron"    : creates a new tab with a client connected to a new, local, 
+                        kernel process then initializes NEURON python environment.
+                        
+                        If no ExternalIPython console exists, launches an instance
+                        of ExternalIPython console and starts NEURON.
+            
+        """
         if not isinstance(self.external_console, consoles.ExternalIPython):
             self.external_console = consoles.ExternalIPython.launch()
             self.workspace["external_console"] = self.external_console
             self.workspaceModel.hidden_vars.update({"external_console":self.external_console})
             
+            if isinstance(new, str) and new == "neuron":
+                from core.extipyutils import nrn_ipython_initialization_cmd
+                self.external_console.execute(nrn_ipython_initialization_cmd,
+                                              silent=True,
+                                              store_history=False)
+            
         else:
+            if isinstance(new, str):
+                if new == "master":
+                    self.external_console.window.create_tab_with_new_frontend()
+                    
+                elif new == "slave":
+                    self.external_console.window.create_tab_with_current_kernel()
+                    
+                elif new == "connection":
+                    self.external_console.window.create_tab_with_existing_kernel()
+                    
+                elif new == "neuron":
+                    from core.extipyutils import nrn_ipython_initialization_cmd
+                    self.external_console.window.create_new_tab_with_new_kernel_and_execute(nrn_ipython_initialization_cmd,
+                                              silent=True,
+                                              store_history=False)
+                    
             self.external_console.window.setVisible(True)
 
         
@@ -4170,7 +4235,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         self.actionHelp_On_Console.triggered.connect(self._helpOnConsole_)
         
         self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
-        
+        self.actionExternalNrnIPython.triggered.connect(self.slot_launchExternalNeuronIPython)
         self.actionOpen.triggered.connect(self.slot_openFiles)
         #self.actionOpen.triggered.connect(self.openFile)
         #self.actionOpen_Files.triggered.connect(self.slot_openFiles)
@@ -5760,6 +5825,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                     self._refreshRecentScriptsMenu_()
                 
             self._temp_python_filename_ = None
+            
+    @pyqtSlot(object)
+    @safeWrapper
+    def _slot_extkrn_shell_msg_exe_rep_ctnt_received(self, msg):
+        pass
+    
             
     @safeWrapper
     def _import_python_module_file_(self, fileName):
