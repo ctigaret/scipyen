@@ -59,7 +59,7 @@ from jupyter_client.localinterfaces import is_local_ip
 
 #from core import prog
 from core.prog import safeWrapper
-from core.extipyutils import init_commands
+from core.extipyutils import init_commands, execute
 
 flags = dict(base_flags)
 qt_flags = {
@@ -101,7 +101,7 @@ class ExternalConsoleWindow(MainWindow):
     # NOTE 2020-07-08 23:24:47
     # not all of these will be useful in the long term
     # TODO get rid of junk
-    sig_shell_msg_recvd = pyqtSignal(object)
+    sig_shell_msg_received = pyqtSignal(object)
     sig_shell_msg_exec_reply_content = pyqtSignal(object)
     sig_shell_msg_krnl_info_reply_content = pyqtSignal(object)
     
@@ -544,13 +544,17 @@ class ExternalConsoleWindow(MainWindow):
         header = msg["header"]
         msg_type = header["msg_type"]
         #print("msg_id:", header["msg_id"], "session: ", header["session"])
-        current_widget = self.tab_widget.currentIndex()
-        if isinstance(msg, dict):
-            if msg_type == "execute_reply":
-                self.sig_shell_msg_exec_reply_content.emit(msg["content"])
+        tab_name = self.tab_widget.tabText(self.tab_widget.currentIndex())
+        msg["tab"] = tab_name
+        self.sig_shell_msg_received.emit(msg)
+        #if isinstance(msg, dict):
+            #if msg_type == "execute_reply":
+                ##self.sig_shell_msg_exec_reply_content.emit(msg["content"])
+                #self.sig_shell_msg_exec_reply_content.emit(msg)
                 
-            elif msg_type == "kernel_info_reply":
-                self.sig_shell_msg_krnl_info_reply_content.emit(msg["content"])
+            #elif msg_type == "kernel_info_reply":
+                ##self.sig_shell_msg_krnl_info_reply_content.emit(msg["content"])
+                #self.sig_shell_msg_krnl_info_reply_content.emit(msg)
 
 
 class ExternalIPython(JupyterApp, JupyterConsoleApp):
@@ -741,7 +745,8 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         # NOTE 2020-07-09 01:05:35
         # run general kernel intialization python commands here, as this function
         # does not call new_frontend_master(...)
-        self.widget.kernel_client.execute(code="\n".join(init_commands), silent=True, store_history=False)
+        #self.widget.kernel_client.execute(code="\n".join(init_commands), silent=True, store_history=False)
+        execute(self.widget.kernel_client, code="\n".join(init_commands), silent=True, store_history=False)
 
         # Ignore on OSX, where there is always a menu bar
         if sys.platform != 'darwin' and self.hide_menubar:
@@ -946,7 +951,8 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         """Execute code in the active kernel client.
         The active kernel client is the client of the active frontend.
         """
-        self.window.active_frontend.kernel_client.execute(code=code, **kwargs)
+        execute(self.window.active_frontend.kernel_client, code=code, **kwargs)
+        #self.window.active_frontend.kernel_client.execute(code=code, **kwargs)
 
 # NOTE: use Jupyter (IPython >= 4.x and qtconsole / qt5 by default)
 class ScipyenConsole(RichJupyterWidget):

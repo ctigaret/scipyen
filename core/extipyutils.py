@@ -2,6 +2,13 @@
 """Module with utilities for an external IPython kernel.
 To be used on the client side (i.e. Scipyen app side)
 """
+# on the client side, in a received execute_reply message the keys of
+# msg["content"]["user_expressions"] are identical to those in the
+# sent execute_request message["content"]["user_expressions"] NOTE that such
+# execute_request message is sent when client.execute(...) is called, and the 
+# user_expressions field of the message gets the valueof the user_expressions
+# parameter ot that call.
+
 import os, sys, pickle, inspect
 from functools import wraps
 #from contextlib import contextmanager
@@ -19,13 +26,13 @@ init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, impo
                  "import traceback, keyword, inspect, itertools, functools, collections",
                  "import signal, pickle, json, csv",
                  "from importlib import reload",
-                 "from IPython.lib.deepreload import reload as dreload",
                  "".join(["sys.path.insert(2, '", os.path.dirname(__module_path__), "')"]),
+                 #"from IPython.lib.deepreload import reload as dreload",
                  #"sys.path=['" + sys.path[0] +"'] + sys.path",
                  ]
 
 def make_user_expression(**kwargs):
-    """Generates a single user_expression string for execution in a remote kernel.
+    """Generates a single user_expressions string for execution in a remote kernel.
 
     The user_expressions parameter to the kernel local client's execute() is a 
     dict mapping some name (local to the calling namespace) to a command string
@@ -34,7 +41,7 @@ def make_user_expression(**kwargs):
     user_expressions = {"output": expression_cmd}
     
     Upon execute() call, the remote kernel executes the 'expression_cmd' and
-    the returned object is mapped to the "output" key in user_expression, 
+    the returned object is mapped to the "output" key in user_expressions, 
     embedded in the 'execute_reply' message received from the remote kernel 
     via the kernel client's shell channel.
     
@@ -95,13 +102,13 @@ def make_user_expression(**kwargs):
         binds the result of dir() (a list of str - the contents of the remote
         kernel namespace) to the symbol "namespace".
         
-    In turn, the containing user_expression on the call side would be:
+    In turn, the containing user_expressions on the call side would be:
         {'namespace':pickled_sub_expression_cmd}
         
     and the string representation of the serialized dict 
         {"namespace":<result of dir()>} will be assigned to
     
-        message["contents"]["user_expression"]["namespace"]["data"]["text/plain"]
+        message["contents"]["user_expressions"]["namespace"]["data"]["text/plain"]
         
         in the execute_reply message (provided execution was successful).
         
@@ -144,6 +151,12 @@ def make_user_expression(**kwargs):
     """
     
     pass
+
+def pickle_wrap_expr(expr):
+    if not isinstance(expr, str):
+        raise TypeError("expecting a str, got %s" % type(expr).__name__)
+    
+    return "".join(["pickle.dumps(",expr,")"])
     
 
 def get_ipython_data_info_cmd(dataname:str):
@@ -153,18 +166,73 @@ def get_ipython_data_info_cmd(dataname:str):
     
     return [type_cmd, memsize_cmd]
 
-def pickling(f, *args, **kwargs):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        try:
-            cmds = f(*args, **kwargs)
+def cmd_request_remote_variable(varname:str) -> dict:
+    return {"pickled_%s" % varname:"".join(["pickle.dumps({'",
+                               varname,"':",
+                               varname,"})",
+                                ])}
+
+def cmd_request_remote_variables(*args) -> dict:
+    import itertools
+    vardicts = (cmd_request_remote_variable(arg) for arg in args)
+    return dict((x for x in itertools.chain(*(a.items() for a in vardicts))))
+
+def unpack_received_remote_variable(msg:dict) -> dict:
+    ret = dict()
+    # peel-off layers one by one so we can always be clear of what this does
+    msg_status = msg["content"]["status"]
+    usr_expr = msg["content"]["user_expressions"]
+    if msg_status == "ok":
+        for key, value in usr_expr.items():
+            #value = usr_expr[key]
+            value_status = value["status"]
+            if value_status == "ok":
+                data_str = value["data"]["text/plain"] # this nested dict exists only if value_status is OK
+                if key.startswith("pickled_"): # by OUR OWN convention, see cmd_request_remote_variable
+                    data_dict = pickle.loads(eval(data_str))
+                    
+                else:
+                    data_dict = {key:eval(data_str)}
+                    
+                ret.update(data_dict)
+                
             
-            return cmds
+            elif value_status == "error":
+                ret.update({"error_%s" % key: {"ename":value["ename"],
+                                      "evalue": value["evalue"],
+                                      "traceback": value["traceback"]}})
+                #print("Exception name: %s" % value["ename"])
+                #print("Exception value: %s" % value["evalue"])
+                #print("\n".join(value["traceback"]))
+                
+            else:
+                ret.update({"%s_%s" % (value_status, key): value_status})
+                    
+    elif msg_status == "error":
+        ret.update({"error_%s" % msg["msg_type"]: {"ename": msg["content"]["ename"],
+                                                  "evalue": msg["content"]["evalue"],
+                                                  "traceback": msg["content"]["traceback"]}})
+        #print("Exception name: %s" % msg["content"]["ename"])
+        #print("Exception value: %s" % msg["content"]["evalue"])
+        #print("\n".join(msg["content"]["traceback"]))
+        
+    else:
+        ret.update({"%s_%s" % (msg_status, msg["msg_type"]): msg_status})
+    
+    return ret
+
+#def pickling(f, *args, **kwargs):
+    #@wraps(f)
+    #def wrapper(*args, **kwargs):
+        #try:
+            #cmds = f(*args, **kwargs)
             
-        except:
-            pass
+            #return cmds
             
-    return wrapper
+        #except:
+            #pass
+            
+    #return wrapper
     
 
     #cmd = "pickle.dumps({"+ ",".join([cmds]) +"})"
@@ -181,7 +249,9 @@ def execute(client, *args, **kwargs):
     Parameters
     ----------
     client: a kernel client
+    
     *args, **kwargs - passed directly to client.execute(...), are as follows:
+    
         code : str
         
             A string of code in the kernel's language.
@@ -217,5 +287,7 @@ def execute(client, *args, **kwargs):
     """
     
     return client.execute(*args, **kwargs)
+
+
 
 

@@ -69,40 +69,40 @@ def processtimefunc(func):
         return r
     return wrapper
 
-def strfy(f, *args, **kwargs):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if inspect.isfunction(f) or inspect.isbuiltin(f):
-            # function, builtin function, method
-            fname = f.__name__
+#def strfy(f, *args, **kwargs):
+    #@wraps(f)
+    #def wrapper(*args, **kwargs):
+        #if inspect.isfunction(f) or inspect.isbuiltin(f):
+            ## function, builtin function, method
+            #fname = f.__name__
             
-            if fname == "<lambda>":
-                fname="lambda"
+            #if fname == "<lambda>":
+                #fname="lambda"
             
-        elif inspect.ismethod(f):
-            if inspect.isclass(f.__self__):
-                # this is a class method - OK
-                fname = "{}.{}".format(f.__self.__name, f.__name__)
+        #elif inspect.ismethod(f):
+            #if inspect.isclass(f.__self__):
+                ## this is a class method - OK
+                #fname = "{}.{}".format(f.__self.__name__, f.__name__)
                 
-            else:
-                raise TypeError("Instance methods are not supported")
+            #else:
+                #raise TypeError("Instance methods are not supported")
             
-        elif inspect.isclass(f) and hasattr(f, "__call__"):
-            # callable class (not object) - may also be a builtin, such as 'type', 'str'
-            if hasattr(f, "__name__"):
-                fname = f.__name__
+        #elif inspect.isclass(f) and hasattr(f, "__call__"):
+            ## callable class (not object) - may also be a builtin, such as 'type', 'str'
+            #if hasattr(f, "__name__"):
+                #fname = f.__name__
                 
-            else:
-                fname = f.__class__.__name__
+            #else:
+                #fname = f.__class__.__name__
                 
-        else:
-            raise TypeError("Expecting a function, classmethod, or callable class; got %s instead" % type(f).__name__)
+        #else:
+            #raise TypeError("Expecting a function, classmethod, or callable class; got %s instead" % type(f).__name__)
         
-        sig = inspect.signature(f)
+        #sig = inspect.signature(f)
         
-        return "".join([fname, str(sig)])
+        #return "".join([fname, str(sig)])
         
-    return wrapper
+    #return wrapper
 
 #### END Decorators
 
@@ -138,6 +138,73 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
     log = file if hasattr(file, "write") else sys.stderr
     traceback.print_stack(file=log)
     log.write(warnings.formatwarning(message, category, filename, lineno, line))
+    
+#def object_name(obj, frame):
+    #"""Returns the symbol to which object obj is bound in the call frame
+    #"""
+    
+    #if inspect.ismodule(obj):
+        #return obj.__name__
+    
+    #elif inspect.isbuiltin(obj):
+        #return obj.__qualname__
+    
+    #elif inspect.isclass(obj):
+        #return return obj.__qualname__
+    
+    #elif inspect.isfunction(obj):
+        
+    
+    #ret = [key for key in frame.f_locals if frame.f_locals[key] is obj]
+    
+    #if len(ret):
+        #return ret[0]
+    
+    #else:
+        #raise KeyError("Object not found")
+    
+#def func_strfy(f, *args, **kwargs):
+    #"""
+    #f: callable
+    #"""
+    #current_frame = inspect.currentframe()
+    #arginfo = inspect.getargvalues(current_frame)
+    #f_argspec = inspect.getfullargspec(f)
+    
+    ## generate string expression with the function name: 
+    #callargs = inspect.getcallargs(f, *args, **kwargs)
+    
+    #fullfname = f.__name__
+    
+    #if inspect.ismethod(f):
+        #if "self" in callargs:
+            ## instance method
+            #caller_obj = callargs.pop("self")
+            #caller_frame = inspect.getouterframes(current_frame)[1].frame
+            
+            #caller_obj_name = [key for key in caller_frame.f_locals if caller_frame.f_locals[key] is caller_obj]
+            #if len(caller_obj_name):
+                #caller_obj_name = caller_obj_name[0]
+                
+                #fullfname = ".".join([caller_obj_name, f.__name__])
+                
+        #elif "cls" in callargs:
+            ## class method
+            #caller_cls = callargs.pop("cls")
+            
+            #fullfname = f.__qualname__
+            
+    ## generate string representations for each argument
+    
+    
+            
+    #args_string = ", ".join([str(val) for val in callargs.values()])
+    
+    #expression = "%s(%s)" % (fullfname, args_string)
+            
+    ##print(my_call_args)
+    #return arginfo, callargs, expression
+    ##object_fun_path = 
     
 #"def" instanceMethodSingleDispatch(func):
     #"""

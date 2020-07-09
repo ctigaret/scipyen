@@ -25,7 +25,14 @@ CHANGELOG:
         
 
 """
-
+# TODO 2020-07-09 22:34:34 TODO TODO
+# use shell's API for variable management (e.g. shell_ofind(...) etc) in relation 
+# to mainWindow.workspace
+# TODO STUDY:
+# IPython/core/interactiveshell.py for InteractiveShell
+# ipykernel/zmqshell.py for ZMQInteractiveShell
+# ipykernel/inprocess/ipkernel.py for InProcessInteractiveshell
+# 
 #### BEGIN core python modules
 import faulthandler
 import sys, os, types, atexit, re, inspect, gc, sip, io, warnings, numbers
@@ -130,7 +137,7 @@ from PyQt5.uic import loadUiType
 
 #### END PyQt5 modules
 
-from IPython.lib.deepreload import reload as dreload
+#from IPython.lib.deepreload import reload as dreload
 
 from IPython.core.magic import (Magics, magics_class, line_magic,
                                 cell_magic, line_cell_magic,
@@ -165,7 +172,7 @@ import core.tiwt as tiwt
 import core.signalprocessing as sigp
 import core.imageprocessing as imgp
 import core.curvefitting as crvf
-import core.strutils
+import core.strutils as strutils
 import core.simulations as sim
 import core.data_analysis as anl
 
@@ -712,7 +719,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 ordertip = "array order: "
                 
                 memsz    = str(data.nbytes)
-                memsztip = "memory size: "
+                #memsz    = "".join([str(sys.getsizeof(data)), str(data.nbytes), "bytes"])
+                memsztip = "memory size (array nbytes): "
                 
             elif tt in ('Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 'SpikeTrain', "DataSignal", "IrregularlySampledDataSignal"):
                 dtypestr = str(data.dtype)
@@ -753,7 +761,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 shapetip = "shape: "
                 
                 memsz    = str(data.nbytes)
-                memsztip = "memory size: "
+                #memsz    = "".join([str(sys.getsizeof(data)), str(data.nbytes), "bytes"])
+                memsztip = "memory size (array nbytes): "
                 
             elif tt in ('Block', 'Segment'):
                 sz = str(data.size)
@@ -2796,6 +2805,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                 self.external_console.execute(nrn_ipython_initialization_cmd,
                                               silent=True,
                                               store_history=False)
+                
+            #self.external_console.window.sig_shell_msg_exec_reply_content.connect()
+            #self.external_console.window.sig_shell_msg_krnl_info_reply_content.connect()
+            self.external_console.window.sig_shell_msg_received[object].connect(self._slot_external_shell_message_received)
             
         else:
             if isinstance(new, str):
@@ -5860,11 +5873,28 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                 
             self._temp_python_filename_ = None
             
+    #@pyqtSlot(object)
+    #@safeWrapper
+    #def _slot_extipy_shell_msg_exe_rep_ctnt_received(self, msg):
+        #varname = "_".join([msg["header"]["msg_type"], msg["header"]["session"]])
+        #self.workspace[varname] = msg
+        
+        
     @pyqtSlot(object)
     @safeWrapper
-    def _slot_extipy_shell_msg_exe_rep_ctnt_received(self, msg):
-        pass
-    
+    def _slot_external_shell_message_received(self, msg):
+        from core.extipyutils import unpack_received_remote_variable
+        # TODO 2020-07-09 23:19:59
+        #### BEGIN get rid of this
+        varname = strutils.string_to_valid_identifier("_".join([msg["header"]["msg_type"], msg["header"]["session"]]))
+        self.workspace[varname] = msg
+        self.workspaceModel.updateTable(from_console=False)
+        #### END get rid of this
+        
+        if msg["msg_type"] == "execute_reply":
+            vardict = unpack_received_remote_variable(msg)
+            self.workspace.update(vardict)
+            self.workspaceModel.updateTable(from_console=False)
             
     @safeWrapper
     def _import_python_module_file_(self, fileName):
