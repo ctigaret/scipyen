@@ -46,7 +46,10 @@ def gen_trait_from_type(x, *args, **kwargs):
     
     kw = kwargs
     
-    if isinstance(x, bool):
+    if x is None:
+        return Any()
+    
+    elif isinstance(x, bool):
         if immclass != bool:
             # preserve its immediate :class:, otherwise this will slice subclasses
             return Instance(klass = x.__class__, args=args, kw=kw)

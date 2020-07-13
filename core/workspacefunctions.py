@@ -1,4 +1,4 @@
-""" Various utilities for PICT workspace functions
+""" Various utilities for Scipyen workspace functions
 All functions defined here are to be imported in the top namespace
 (e.g., 'from workspacefunctions import *')
 
@@ -116,7 +116,7 @@ def lsvars(*args, glob:bool=True, ws:[dict, type(None)]=None,
             the object.__dict__
         
         When None, the function tries ot find the user namespace (the "workspace")
-        as set up by the PICT Main Window in PICT application.
+        as set up by the Scipyen Main Window in Scipyen application.
     
     
     """
@@ -376,7 +376,7 @@ def assignin(variable, varname, ws=None):
         frames_list = inspect.getouterframes(inspect.currentframe())
         #print(frames_list)
         for (n,f) in enumerate(frames_list):
-            if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within PICT's IPython console
+            if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within Scipyen's IPython console
                 ws = f[0].f_globals["mainWindow"].workspace
                 #ws = f[0].f_globals
                 break
@@ -390,7 +390,7 @@ def userWorkspace():
     """
     frames_list = inspect.getouterframes(inspect.currentframe())
     for (n,f) in enumerate(frames_list):
-        if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within PICT's IPython console
+        if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within Scipyen's IPython console
             return f[0].f_globals["mainWindow"].workspace
             #return ws
     
