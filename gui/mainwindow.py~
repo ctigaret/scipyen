@@ -4810,7 +4810,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         # a.a -> [4,5,6,400]
         #
         # but the following idiom DOES work:
-        # b = list(a.a)
+        # b = list(a.a) # could in principle be generalized to b = type(a.a)(a.a)
+        #               # for built-in types only ?!? but also for user-defined
+        #               # types if they have a copy-constructor defined
         # b.append(1000) # a is unchanged
         # a.a = b -> notifies
         #

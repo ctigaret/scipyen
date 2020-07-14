@@ -5801,3 +5801,4 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             raise ValueError("empty nested dict in plugin info")
     
     
+# test git branch dev
