@@ -1676,14 +1676,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                         of ExternalIPython console and starts NEURON.
             
         """
+        from core.extipyutils_client import nrn_ipython_initialization_cmd
+        
         if not isinstance(self.external_console, consoles.ExternalIPython):
             self.external_console = consoles.ExternalIPython.launch()
             self.workspace["external_console"] = self.external_console
             self.workspaceModel.hidden_vars.update({"external_console":self.external_console})
             self.external_console.window.sig_kernel_count_changed[int].connect(self._slot_remote_kernel_count_changed)
+            #self.external_console.window.sig_will_close.connect(self._slot_external_console_closing_)
             
             if isinstance(new, str) and new == "neuron":
-                from core.extipyutils_client import nrn_ipython_initialization_cmd
                 self.external_console.execute(nrn_ipython_initialization_cmd,
                                               silent=True,
                                               store_history=False)
@@ -1691,31 +1693,48 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             self.external_console.window.sig_shell_msg_received[object].connect(self._slot_ext_krn_shell_chnl_msg_recvd)
             
         else:
-            if isinstance(new, str):
-                if new == "master":
-                    self.external_console.window.create_tab_with_new_frontend()
+            frontend_factory = None
+            
+            if self.external_console.window.active_frontend is None:
+                # console instance exists but does not have an active frontend anymore
+                if (self.external_console.kernel_manager is not None):
+                    self.external_console.kernel_manager.shutdown_kernel()
                     
-                elif new == "slave":
-                    self.external_console.window.create_tab_with_current_kernel()
-                    
-                elif new == "connection":
-                    self.external_console.window.create_tab_with_existing_kernel()
-                    
-                elif new == "neuron":
-                    from core.extipyutils_client import nrn_ipython_initialization_cmd
-                    self.external_console.window.create_new_tab_with_new_kernel_and_execute(nrn_ipython_initialization_cmd,
-                                              silent=True,
-                                              store_history=False)
-                    
-            #if self.external_console.window.active_frontend is None:
-                #self.external_console.window.create_tab_with_current_kernel()
+                frontend_factory = self.external_console.window.create_tab_with_new_frontend
                 
-            if self.external_console.window.active_frontend is None or \
-                not self.external_console.window.active_frontend.kernel_manager.is_alive():
-                self.external_console.window.active_frontend.kernel_manager.restart_kernel()
-                
-                    
-            self.external_console.window.setVisible(True)
+                if isinstance(new, str):
+                    if new == "connection":
+                        frontend_factory = self.external_console.window.create_tab_with_existing_kernel
+                    elif new == "neuron":
+                        from functools import partial
+                        frontend_factory = partial(self.external_console.window.create_new_tab_with_new_kernel_and_execute,
+                                                   nrn_ipython_initialization_cmd,
+                                                   silent=True, store_history=False)
+                                                   
+            else:
+                if isinstance(new, str):
+                    if new == "master":
+                        frontend_factory = self.external_console.window.create_tab_with_new_frontend
+                        
+                    elif new == "slave":
+                        frontend_factory = self.external_console.window.create_tab_with_current_kernel
+                        
+                    elif new == "connection":
+                        frontend_factory = self.external_console.window.create_tab_with_existing_kernel
+                        
+                    elif new == "neuron":
+                        from functools import partial
+                        frontend_factory = partial(self.external_console.window.create_new_tab_with_new_kernel_and_execute,
+                                                   nrn_ipython_initialization_cmd,
+                                                   silent=True, store_history=False)
+                        #from core.extipyutils_client import nrn_ipython_initialization_cmd
+                        #self.external_console.window.create_new_tab_with_new_kernel_and_execute(nrn_ipython_initialization_cmd,
+                                                #silent=True,
+                                                #store_history=False)
+                        
+            if frontend_factory is not None:
+                frontend_factory()
+                self.external_console.window.setVisible(True)
 
         
     @pyqtSlot()
@@ -4782,6 +4801,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
     @safeWrapper
     def _slot_remote_kernel_count_changed(self, count):
         self.workspaceModel.foreign_kernel_palette = list(sb.color_palette("pastel", count))
+        
+    ##@pyqtSlot()
+    ##@safeWrapper
+    ##def _slot_external_console_closing_(self):
+        ##self.external_console = None
             
     @pyqtSlot(object)
     @safeWrapper

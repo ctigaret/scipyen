@@ -62,7 +62,7 @@ from qtconsole.jupyter_widget import JupyterWidget # for use in the External Con
 from qtconsole.inprocess import QtInProcessKernelManager
 from qtconsole.jupyter_widget import JupyterWidget
 from qtconsole.mainwindow import (MainWindow, 
-                                  background, # Do I really need this? It's not used anywhere yet'
+                                  background,
                                   )
 from qtconsole.client import QtKernelClient
 from qtconsole.manager import QtKernelManager
@@ -144,16 +144,21 @@ class ExternalConsoleWindow(MainWindow):
     sig_shell_msg_exec_reply_content = pyqtSignal(object)
     sig_shell_msg_krnl_info_reply_content = pyqtSignal(object)
     sig_kernel_count_changed = pyqtSignal(int)
+    #sig_will_close = pyqtSignal()
     
     def __init__(self, app,
                     confirm_exit=True,
-                    new_frontend_factory=None, slave_frontend_factory=None,
+                    new_frontend_factory=None, 
+                    slave_frontend_factory=None,
                     connection_frontend_factory=None,
+                    new_frontend_orphan_kernel_factory=None,
                 ):
         super().__init__(app, confirm_exit = confirm_exit,
                          new_frontend_factory = new_frontend_factory,
                          slave_frontend_factory = slave_frontend_factory,
                          connection_frontend_factory=connection_frontend_factory)
+        
+        self.new_frontend_orphan_kernel_factory = new_frontend_orphan_kernel_factory
         
         # NOTE 2020-07-09 00:41:55
         # no menu bar at this time!
@@ -242,7 +247,6 @@ class ExternalConsoleWindow(MainWindow):
         self.settings.setValue("ExternalConsole/FontStyle", font.style())
         self.settings.setValue("ExternalConsole/FontWeight", font.weight())
         
-        
     def create_tab_with_existing_kernel(self):
         """create a new frontend attached to an external kernel in a new tab"""
         connection_file, file_type = QtWidgets.QFileDialog.getOpenFileName(self,
@@ -255,6 +259,11 @@ class ExternalConsoleWindow(MainWindow):
         name = "external {}".format(self.next_external_kernel_id)
         self.add_tab_with_frontend(widget, name=name)
         self.sig_kernel_count_changed.emit(self._kernel_counter + self._external_kernel_counter)
+        
+    def create_new_tab_with_orphan_kernel(self, km, kc):
+        widget=self.new_frontend_orphan_kernel_factory(km, kc)
+        self.add_tab_with_frontend(widget)
+        
 
     def create_new_tab_with_new_kernel_and_execute(self, code=None, **kwargs):
         """create a new frontend and attach it to a new tab"""
@@ -471,7 +480,6 @@ class ExternalConsoleWindow(MainWindow):
             self.tab_widget.setTabText(ndx, new_title)
             
         
-        
     def add_tab_with_frontend(self,frontend,name=None):
         """ insert a tab with a given frontend in the tab bar, and give it a name
 
@@ -506,6 +514,7 @@ class ExternalConsoleWindow(MainWindow):
         if self.tab_widget.count() == 0:
             # no tabs, just close
             self._save_settings_()
+            #self.sig_will_close.emit()
             event.accept()
             return
         
@@ -548,6 +557,7 @@ class ExternalConsoleWindow(MainWindow):
                 if self.tab_widget.count() == 1:
                     self._save_tab_settings_(widget)
                 self.close_tab(widget)
+            #self.sig_will_close.emit()
             event.accept()
         
     def close_tab(self,current_tab):
@@ -779,6 +789,37 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         super().parse_command_line(argv)
         self.build_kernel_argv(self.extra_args)
 
+    def new_frontend_master_with_orphan_kernel(self, km, kc):
+        """When user closed a tab but chose to leave the kernel alone.
+        
+        The orphan kernel is still running and its client stil has got a
+        reference somewhere - why not re-use them !?
+        
+        NOTE: to be used when the console hasn't got any more tabs; the kernel
+        will be considered as a "master" and the new frontend, a "master" 
+        frontend
+        
+        """
+        if km.connection_file != kc.connection_file:
+            raise ValueError("Both the kernel manager and client shoud have the same connection file; cinstead, I've got for manager: %s ; for client: %s" % (km.connection_file, kc.connection_file))
+        
+        if km.ip != kc.ip:
+            raise ValueError("Both the kernel manager and client must have same ip address; instead the manager has %s and the client has %s" % (km.ip, kc.ip))
+
+        is_local = km.ip == "127.0.0.1"
+        
+        widget = self.widget_factory(config=self.config,
+                                     local_kernel=is_local)
+        
+        self.init_colors(widget)
+        widget.kernel_manager = km
+        widget.kernel_client = kc
+        widget._existing = False # consider this as a "master" case
+        widget._may_close = True
+        widget._confirm_exit = self.confirm_exit
+        widget._display_banner = self.display_banner
+        return widget
+        
 
     def new_frontend_master(self):
         """ Create and return new frontend attached to new kernel, launched on localhost.
@@ -890,6 +931,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
                                 new_frontend_factory=self.new_frontend_master,
                                 slave_frontend_factory=self.new_frontend_slave,
                                 connection_frontend_factory=self.new_frontend_connection,
+                                new_frontend_orphan_kernel_factory=self.new_frontend_master_with_orphan_kernel,
                                 )
         
         self.window.log = self.log
