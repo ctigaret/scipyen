@@ -108,12 +108,12 @@ class ExternalConsoleWindow(MainWindow):
     
     def __init__(self, app,
                     confirm_exit=True,
-                    new_frontend_factory=None, slave_frontend_factory=None,
+                    new_frontend_factory=None, subordinate_frontend_factory=None,
                     connection_frontend_factory=None,
                 ):
         super().__init__(app, confirm_exit = confirm_exit,
                          new_frontend_factory = new_frontend_factory,
-                         slave_frontend_factory = slave_frontend_factory,
+                         subordinate_frontend_factory = subordinate_frontend_factory,
                          connection_frontend_factory=connection_frontend_factory)
         
         # NOTE 2020-07-09 00:41:55
@@ -137,7 +137,7 @@ class ExternalConsoleWindow(MainWindow):
             triggered=self.create_neuron_tab
             )
         
-        self.insert_menu_action(self.file_menu, self.new_nrn_kernel_tab_act, self.slave_kernel_tab_act)
+        self.insert_menu_action(self.file_menu, self.new_nrn_kernel_tab_act, self.subordinate_kernel_tab_act)
 
     def _supplement_kernel_menu_(self):
         """To be called separately after calling self.__init__().
@@ -423,30 +423,30 @@ class ExternalConsoleWindow(MainWindow):
         # when trying to be closed, widget might re-send a request to be
         # closed again, but will be deleted when event will be processed. So
         # need to check that widget still exists and skip if not. One example
-        # of this is when 'exit' is sent in a slave tab. 'exit' will be
-        # re-sent by this function on the master widget, which ask all slave
+        # of this is when 'exit' is sent in a subordinate tab. 'exit' will be
+        # re-sent by this function on the main widget, which ask all subordinate
         # widgets to exit
         if closing_widget is None:
             return
 
-        #get a list of all slave widgets on the same kernel.
-        slave_tabs = self.find_slave_widgets(closing_widget)
+        #get a list of all subordinate widgets on the same kernel.
+        subordinate_tabs = self.find_subordinate_widgets(closing_widget)
 
         keepkernel = None #Use the prompt by default
         if hasattr(closing_widget,'_keep_kernel_on_exit'): #set by exit magic
             keepkernel = closing_widget._keep_kernel_on_exit
             # If signal sent by exit magic (_keep_kernel_on_exit, exist and not None)
-            # we set local slave tabs._hidden to True to avoid prompting for kernel
+            # we set local subordinate tabs._hidden to True to avoid prompting for kernel
             # restart when they get the signal. and then "forward" the 'exit'
             # to the main window
             if keepkernel is not None:
-                for tab in slave_tabs:
+                for tab in subordinate_tabs:
                     tab._hidden = True
-                if closing_widget in slave_tabs:
+                if closing_widget in subordinate_tabs:
                     try :
-                        self.find_master_tab(closing_widget).execute('exit')
+                        self.find_main_tab(closing_widget).execute('exit')
                     except AttributeError:
-                        self.log.info("Master already closed or not local, closing only current tab")
+                        self.log.info("Main already closed or not local, closing only current tab")
                         self.tab_widget.removeTab(current_tab)
                     self.update_tab_bar_visibility()
                     return
@@ -485,9 +485,9 @@ class ExternalConsoleWindow(MainWindow):
                     box.setIconPixmap(pixmap)
                     reply = box.exec_()
                     if reply == 1: # close All
-                        for slave in slave_tabs:
-                            background(slave.kernel_client.stop_channels)
-                            self.tab_widget.removeTab(self.tab_widget.indexOf(slave))
+                        for subordinate in subordinate_tabs:
+                            background(subordinate.kernel_client.stop_channels)
+                            self.tab_widget.removeTab(self.tab_widget.indexOf(subordinate))
                         kernel_manager.shutdown_kernel()
                         self.tab_widget.removeTab(current_tab)
                         background(kernel_client.stop_channels)
@@ -513,9 +513,9 @@ class ExternalConsoleWindow(MainWindow):
         else: #close console and kernel (no prompt)
             self.tab_widget.removeTab(current_tab)
             if kernel_client and kernel_client.channels_running:
-                for slave in slave_tabs:
-                    background(slave.kernel_client.stop_channels)
-                    self.tab_widget.removeTab(self.tab_widget.indexOf(slave))
+                for subordinate in subordinate_tabs:
+                    background(subordinate.kernel_client.stop_channels)
+                    self.tab_widget.removeTab(self.tab_widget.indexOf(subordinate))
                 if kernel_manager:
                     kernel_manager.shutdown_kernel()
                 background(kernel_client.stop_channels)
@@ -620,7 +620,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         self.build_kernel_argv(self.extra_args)
 
 
-    def new_frontend_master(self):
+    def new_frontend_main(self):
         """ Create and return new frontend attached to new kernel, launched on localhost.
         This is NOT called upon ExternalIPython.launch(). Instead, that function
         lands directly on ExternalConsoleWindow.add_tab_with_frontend(...)
@@ -678,7 +678,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         widget.kernel_manager = None
         return widget
 
-    def new_frontend_slave(self, current_widget):
+    def new_frontend_subordinate(self, current_widget):
         """Create and return a new frontend attached to an existing kernel.
 
         Parameters
@@ -727,8 +727,8 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         
         self.window = ExternalConsoleWindow(self.app,
                                 confirm_exit=self.confirm_exit,
-                                new_frontend_factory=self.new_frontend_master,
-                                slave_frontend_factory=self.new_frontend_slave,
+                                new_frontend_factory=self.new_frontend_main,
+                                subordinate_frontend_factory=self.new_frontend_subordinate,
                                 connection_frontend_factory=self.new_frontend_connection,
                                 )
         
@@ -740,7 +740,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         
         # NOTE 2020-07-09 01:05:35
         # run general kernel intialization python commands here, as this function
-        # does not call new_frontend_master(...)
+        # does not call new_frontend_main(...)
         self.widget.kernel_client.execute(code="\n".join(init_commands), silent=True, store_history=False)
 
         # Ignore on OSX, where there is always a menu bar

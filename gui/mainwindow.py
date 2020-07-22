@@ -2766,14 +2766,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         Parameters:
         -----------
         new : str (optional, default is "") 
-            Allowed values are: "master", "slave", "connection", "neuron", "" (empty string, the default)
+            Allowed values are: "main", "subordinate", "connection", "neuron", "" (empty string, the default)
             
-            "master":   creates a new tab with a client connected to a new, local, 
+            "main":   creates a new tab with a client connected to a new, local, 
                         kernel process
                         
-            "slave":    creates a new tab with a client connected to an existing
+            "subordinate":    creates a new tab with a client connected to an existing
                         local kernel (local kernel); the existing local kernel
-                        is the one running behind the currently active master tab
+                        is the one running behind the currently active main tab
                         
             "connection": asks for a kernel connection json file then creates 
                         a new tab with a client connected to the (possibly remote) 
@@ -2799,10 +2799,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             
         else:
             if isinstance(new, str):
-                if new == "master":
+                if new == "main":
                     self.external_console.window.create_tab_with_new_frontend()
                     
-                elif new == "slave":
+                elif new == "subordinate":
                     self.external_console.window.create_tab_with_current_kernel()
                     
                 elif new == "connection":
@@ -2861,7 +2861,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         # whereas code entered in this console is executed in the ipython kernel
         # which therefore has to be "embedded" in the QApplication
         
-        # At any time there can be only ONE master event loop,
+        # At any time there can be only ONE main event loop,
         #
         # In this case, that's the QApplication event loop (PyQt5)
         
