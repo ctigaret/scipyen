@@ -530,9 +530,13 @@ class DataBag(Bunch):
                 self[key] = value
                 
     def observe(self, handler, names=All, type="change"):
+        if names == "length":
+            names = "__length__"
         self.__observer__.observe(handler, names=names, type=type)
         
     def unobserve(self, handler, names=All, type="change"):
+        if names == "length":
+            names = "__length__"
         self.__observer__.unobserve(handler, names=names, type=type)
         
     def link(self, name, other, other_name):

@@ -2,10 +2,369 @@
 '''
 Various utilities
 '''
-import traceback, re, itertools, time, typing, warnings
+import traceback, re, itertools, time, typing, warnings, numbers
+from sys import getsizeof
+from numpy import ndarray
 
 from .prog import safeWrapper
 
+abbreviated_type_names = {'IPython.core.macro.Macro' : 'Macro'}
+sequence_types = ['list', 'tuple', "deque"]
+set_types = ["set", "frozenset"]
+dict_types = ["dict"]
+neo_containers =["Block", "Segment"]
+# NOTE: 2020-07-10 12:52:57
+# PictArray is defunct
+#vigra_array_types = ["VigraArray", "PictArray"] 
+vigra_array_types = ["VigraArray"]
+signal_types = ['Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 
+                'SpikeTrain', "DataSignal", "IrregularlySampledDataSignal",
+                "TriggerEvent",
+                ]
+ndarray_type = ndarray.__name__
+
+
+standard_obj_summary_headers = ["Name","Workspace",
+                                "Type","Data Type", 
+                                "Minimum", "Maximum", "Size", "Dimensions",
+                                "Shape", "Axes", "Array Order", "Memory Size",
+                                ]
+
+
+def summarize_object_properties(objname, obj, namespace="Internal"):
+    """Returns a dict with object properties for display in Scipyen workspace.
+    The dict keys represent the column names in the WorkspaceViewer table, and 
+    are mapped to the a dict with two key: str value pairs: display, tooltip,
+    where:
+    
+    "display" : str with the display string of the property (display role for the
+                corresponding item)
+    "tooltip" : str with the tooltip contents (for the tooltip role in the 
+                workspace table)
+                
+    The contents of the dict will be used to generate a row in the Workspace Model
+    with the items being displayed in the corresponding Workspace Table view in
+    the Scipyen main window.
+    
+    """
+    #NOTE: memory size is reported as follows:
+        #result of obj.nbytes, for object types derived from numpy ndarray
+        #result of total_size(obj) for python containers
+            #by default, and as currently implemented, this is limited 
+            #to python container classes (tuple, list, deque, dict, set and frozenset)
+            
+        #result of sys.getsizeof(obj) for any other python object
+        
+        #TODO construct handlers for other object types as well including 
+        #PyQt5 objects (maybe)
+            
+    from numbers import Number
+    
+    result = dict(map(lambda x: (x, {"display":"", "tooltip":""}), standard_obj_summary_headers))
+    
+    objtype = type(obj)
+    typename = objtype.__name__
+    
+    objcls = obj.__class__
+    clsname = objcls.__name__
+    
+    result["Name"] = {"display": objname, "tooltip":objname}
+    
+    tt = abbreviated_type_names.get(typename, typename)
+    
+    if tt == "instance":
+        tt = abbreviated_type_names.get(clsname, clsname)
+        
+    result["Type"] = {"display": tt, "tooltip": "type: %s" % tt}
+    
+    # these get assigned values below
+    dtypestr = ""
+    dtypetip = ""
+    datamin = ""
+    mintip = ""
+    datamax = ""
+    maxtip = ""
+    sz = ""
+    sizetip = ""
+    ndims = ""
+    dimtip = ""
+    shp = ""
+    shapetip = ""
+    axes = ""
+    axestip = ""
+    arrayorder = ""
+    ordertip= ""
+    memsz = ""
+    memsztip = ""
+    
+
+    try:
+        if tt in sequence_types:
+            if len(obj) and all([isinstance(v, numbers.Number) for v in obj]):
+                datamin = str(min(obj))
+                mintip = "min: "
+                datamax = str(max(obj))
+                maxtip = "max: "
+            
+            sz = str(len(obj))
+            sizetip = "length: "
+            
+            #memsz    = str(total_size(obj)) # too slow for large collections
+            memsz    = str(getsizeof(obj))
+            memsztip = "memory size: "
+            
+        elif tt in set_types:
+            if len(obj) and all([isinstance(v, numbers.Number) for v in obj]):
+                datamin = str(min([v for v in obj]))
+                mintip = "min: "
+                datamax = str(max([v for v in obj]))
+                maxtip = "max: "
+            
+            sz = str(len(obj))
+            sizetip = "length: "
+            
+            memsz    = str(getsizeof(obj))
+            #memsz    = str(total_size(obj)) # too slow for large collections
+            memsztip = "memory size: "
+            
+        elif tt in dict_types:
+            sz = str(len(obj))
+            sizetip = "length: "
+            
+            #memsz    = str(total_size(obj)) # too slow for large collections
+            memsz    = str(getsizeof(obj))
+            memsztip = "memory size: "
+            
+        #elif tt in ('VigraArray', "PictArray"):
+        elif tt in vigra_array_types:
+            dtypestr = str(obj.dtype)
+            dtypetip = "dtype: "
+            
+            if obj.size > 0:
+                try:
+                    if np.all(np.isnan(obj[:])):
+                        datamin = str(np.nan)
+                        
+                    else:
+                        datamin = str(np.nanmin(obj))
+                        
+                except:
+                    pass
+                
+                mintip = "min: "
+                
+                try:
+                    if np.all(np.isnan(obj[:])):
+                        datamax = str(np.nan)
+                    
+                    else:
+                        datamax  = str(np.nanmax(obj))
+                        
+                except:
+                    pass
+                
+                maxtip = "max: "
+                
+            sz    = str(obj.size)
+            sizetip = "size: "
+            
+            ndims   = str(obj.ndim)
+            dimtip = "dimensions: "
+            
+            shp = str(obj.shape)
+            shapetip = "shape: "
+            
+            axes    = repr(obj.axistags)
+            axestip = "axes: "
+            
+            arrayorder    = str(obj.order)
+            ordertip = "array order: "
+            
+            memsz    = str(obj.nbytes)
+            #memsz    = "".join([str(getsizeof(obj)), str(obj.nbytes), "bytes"])
+            memsztip = "memory size (array nbytes): "
+            
+        #elif tt in ('Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 'SpikeTrain', "DataSignal", "IrregularlySampledDataSignal"):
+        elif tt in signal_types:
+            dtypestr = str(obj.dtype)
+            dtypetip = "dtype: "
+            
+            if obj.size > 0:
+                try:
+                    if np.all(np.isnan(obj[:])):
+                        datamin = str(np.nan)
+                        
+                    else:
+                        datamin = str(np.nanmin(obj))
+                        
+                except:
+                    pass
+                    
+                mintip = "min: "
+                    
+                try:
+                    if np.all(np.isnan(obj[:])):
+                        datamax = str(np.nan)
+                        
+                    else:
+                        datamax  = str(np.nanmax(obj))
+                        
+                except:
+                    pass
+                
+                maxtip = "max: "
+                
+            sz    = str(obj.size)
+            sizetip = "size: "
+            
+            ndims   = str(obj.ndim)
+            dimtip = "dimensions: "
+            
+            shp = str(obj.shape)
+            shapetip = "shape: "
+            
+            memsz    = str(obj.nbytes)
+            #memsz    = "".join([str(getsizeof(obj)), str(obj.nbytes), "bytes"])
+            memsztip = "memory size (array nbytes): "
+            
+        #elif tt in ('Block', 'Segment'):
+        elif tt in neo_containers:
+            sz = str(obj.size)
+            sizetip = "size: "
+                
+            memsz = str(getsizeof(obj))
+            memsztip = "memory size: "
+            
+        #elif tt == 'str':
+        elif isinstance(obj, str):
+            sz = str(len(obj))
+            sizetip = "size: "
+            
+            ndims = "1"
+            dimtip = "dimensions "
+            
+            shp = '('+str(len(obj))+',)'
+            shapetip = "shape: "
+
+            memsz = str(getsizeof(obj))
+            memsztip = "memory size: "
+            
+        elif isinstance(obj, Number):
+            dtypestr = tt
+            datamin = str(obj)
+            mintip = "min: "
+            datamax = str(obj)
+            maxtip = "max: "
+            sz = "1"
+            sizetip = "size: "
+            
+            ndims = "1"
+            dimtip = "dimensions: "
+            
+            shp = '(1,)'
+            shapetip = "shape: "
+
+            memsz = str(getsizeof(obj))
+            memsztip = "memory size: "
+            
+        #elif isinstance(obj, pd.Series):
+        elif  tt == "Series":
+            dtypestr = "%s" % obj.dtype
+            dtypetip = "dtype: "
+
+            sz = "%s" % obj.size
+            sizetip = "size: "
+
+            ndims = "%s" % obj.ndim
+            dimtip = "dimensions: "
+            
+            shp = str(obj.shape)
+            shapetip = "shape: "
+
+            memsz = str(getsizeof(obj))
+            memsztip = "memory size: "
+            
+        #elif isinstance(obj, pd.DataFrame):
+        elif tt == "DataFrame":
+            sz = "%s" % obj.size
+            sizetip = "size: "
+
+            ndims = "%s" % obj.ndim
+            dimtip = "dimensions: "
+            
+            shp = str(obj.shape)
+            shapetip = "shape: "
+
+            memsz = str(getsizeof(obj))
+            memsztip = "memory size: "
+            
+        elif tt == ndarray_type:
+            dtypestr = str(obj.dtype)
+            dtypetip = "dtype: "
+            
+            if obj.size > 0:
+                try:
+                    if np.all(np.isnan(obj[:])):
+                        datamin = str(np.nan)
+                        
+                    else:
+                        datamin = str(np.nanmin(obj))
+                except:
+                    pass
+                    
+                mintip = "min: "
+                    
+                try:
+                    if np.all(np.isnan(obj[:])):
+                        datamax = str(np.nan)
+                        
+                    else:
+                        datamax  = str(np.nanmax(obj))
+                        
+                except:
+                    pass
+                
+                maxtip = "max: "
+                
+            sz = str(obj.size)
+            sizetip = "size: "
+            
+            ndims = str(obj.ndim)
+            dimtip = "dimensions: "
+
+            shp = str(obj.shape)
+            shapetip = "shape: "
+            
+            memsz    = str(obj.nbytes)
+            memsztip = "memory size: "
+            
+        else:
+            #vmemsize = QtGui.QStandardItem(str(getsizeof(obj)))
+            memsz = str(getsizeof(obj))
+            memsztip = "memory size: "
+            
+            
+        #print("namespace", namespace)
+            
+        result["Data Type"]     = {"display": dtypestr,     "tooltip" : "%s%s" % (dtypetip, dtypestr)}
+        result["Workspace"]     = {"display": namespace,    "tooltip" : "Location: %s kernel namespace" % namespace}
+        result["Minimum"]       = {"display": datamin,      "tooltip" : "%s%s" % (mintip, datamin)}
+        result["Maximum"]       = {"display": datamax,      "tooltip" : "%s%s" % (maxtip, datamax)}
+        result["Size"]          = {"display": sz,           "tooltip" : "%s%s" % (sizetip, sz)}
+        result["Dimensions"]    = {"display": ndims,        "tooltip" : "%s%s" % (dimtip, ndims)}
+        result["Shape"]         = {"display": shp,          "tooltip" : "%s%s" % (shapetip, shp)}
+        result["Axes"]          = {"display": axes,         "tooltip" : "%s%s" % (axestip, axes)}
+        result["Array Order"]   = {"display": arrayorder,   "tooltip" : "%s%s" % (ordertip, arrayorder)}
+        result["Memory Size"]   = {"display": memsz,        "tooltip" : "%s%s" % (memsztip, memsz)}
+        
+        for key, value in result.items():
+            value["tooltip"] = "\n".join([value["tooltip"], "Namespace: %s" % result["Workspace"]["display"]])
+        
+    except Exception as e:
+        traceback.print_exc()
+
+    return result
+    
 def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True) -> typing.Union[tuple, int]:
     """Alternative to list.index(), such that a missing value returns None
     of raising an Exception
