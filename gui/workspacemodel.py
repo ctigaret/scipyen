@@ -66,17 +66,25 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # this should be updated whenever the variable name is selected/activated in the model table view
         self.currentVarName = "" 
         self.setColumnCount(len(standard_obj_summary_headers))
-        self.setHorizontalHeaderLabels(standard_obj_summary_headers)
+        self.setHorizontalHeaderLabels(standard_obj_summary_headers) # defined in core.utilities
         
         self._foreign_workspace_count_ = -1
-        self.foreign_kernel_palette = list(sb.color_palette("pastel", 1))
+        # TODO/FIXME 2020-07-31 00:07:29
+        # low priority: choose pallette in a clever way to take into account the
+        # currently used GUI palette - VERY low priority!
+        #self.foreign_kernel_palette = list(sb.color_palette("pastel", 1))
         
         self.foreign_namespaces = DataBag()
-        self.foreign_namespaces.observe(self._foreign_namespaces_changed_, names="length")
+        self.foreign_namespaces.observe(self._foreign_namespaces_count_changed_, names="length")
             
-    def _foreign_namespaces_changed_(self, change):
-        print(change["new"])
-        #pass
+    def _foreign_namespaces_count_changed_(self, change):
+        # FIXME / TODO 2020-07-30 23:49:13
+        # this assumes the GUI has the default (light coloured) palette e.g. Breeze
+        # or such like. What if the system uses a dark-ish palette?
+        # This approach is WRONG, but fixing it has low priority.
+        #self.foreign_kernel_palette = list(sb.color_palette("pastel", change["new"]))
+        #print("workspaceModel: foreign namespaces = %s, (old: %s, new: %s)" % (len(self.foreign_namespaces), change["old"], change["new"]))
+        pass
         
     def __reset_variable_dictionaries__(self):
         self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.hidden_vars and not item[0].startswith("_")])
@@ -84,6 +92,99 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.new_vars.clear()
         self.deleted_vars.clear()
         
+    def remove_foreign_namespace(self, txt):
+        #print("workspaceModel to remove %s namespace" % txt)
+        #if txt in self.foreign_namespaces:
+        self.clear_foreign_namespace_display(txt, remove=True)
+        #self.foreign_namespaces.pop(txt, None)
+            
+    def clear_foreign_namespace_display(self, txt, remove=False):
+        #print("workspaceModel to clear %s namespace" % txt)
+        if txt in self.foreign_namespaces:
+            self.foreign_namespaces[txt]["current"].clear()
+            ns = txt.replace("_", " ")
+            kernel_items_rows = self.rowIndexForItemsWithProps(Workspace=ns)
+            
+            #print("kernel_items_rows",kernel_items_rows)
+            if isinstance(kernel_items_rows, int):
+                if kernel_items_rows >= 0:
+                    #print("item", self.item(kernel_items_rows,0).text())
+                    self.removeRow(kernel_items_rows)
+                
+            else:
+                # must get the row for one item at a time, because the item's row
+                # will have changed after the removal of previous rows
+                itemnames = [self.item(r,0).text() for r in kernel_items_rows]
+                for name in itemnames:
+                    r = self.rowIndexForItemsWithProps(Name=name, Workspace=ns)
+                    try:
+                        self.removeRow(r)
+                    except:
+                        pass
+                    
+        if remove:
+            self.foreign_namespaces.pop(txt, None)
+                    
+    def update_foreign_namespace(self, name, val):
+        #print("WorkspaceModel.update_foreign_namespace name %s" % name)
+        #print("name", name)
+        user_ns_shown = set()
+        
+        if isinstance(val, dict):
+            user_ns_shown = val.get("user_ns", set())
+            
+        elif isinstance(val, (list, set, tuple)):
+            user_ns_shown = set([k for k in val])
+            
+        else:
+            raise TypeError("val expected to be a dict or a list; got %s instead" % type(val).__name__)
+                            
+        first_run = name not in self.foreign_namespaces
+        
+        if len(user_ns_shown):
+            if first_run:
+                # special treatment for objects loaded from NEURON at kernel 
+                # initialization time (see extipyutils_client 
+                # nrn_ipython_initialization_cmd and the 
+                # core.neuro_python.nrn_ipython module)
+                
+                current = set()
+                
+                for v in ("h", "ms", "mV",):
+                    if v in user_ns_shown:
+                        current.add(v)
+                        user_ns_shown.remove(v)
+                
+                # will trigger _foreign_namespaces_count_changed_ which at the 
+                # moment, does nothing
+                self.foreign_namespaces[name] = {"initial": user_ns_shown,
+                                                 "current": current}
+                
+                #color = QtGui.QColor(*[int(255*v) for v in self.foreign_kernel_palette[-1]])
+                
+                # NOTE 2020-07-31 00:08:48 
+                # see # TODO/FIXME 2020-07-31 00:07:29
+                #self.foreign_namespaces[name]["background"] = QtGui.QBrush(color)
+                #self.foreign_namespaces[name]["alternative"] = QtGui.QBrush(color.darker(110))
+                
+            else:    
+                removed_items = self.foreign_namespaces[name]["current"] - user_ns_shown
+                #print("removed_items", removed_items)
+                for vname in removed_items:
+                    #print("to remove: %s from %s" % (vname, name))
+                    self.removeRowForVariable(vname, ns = name.replace("_", " "))
+                
+                added_items = user_ns_shown - self.foreign_namespaces[name]["current"]
+                
+                self.foreign_namespaces[name]["current"] -= removed_items
+                
+                self.foreign_namespaces[name]["current"] |= added_items
+                
+                self.foreign_namespaces[name]["current"] -= self.foreign_namespaces[name]["initial"]
+                
+                #print("current_items", self.foreign_namespaces[name]["current"])
+                
+                
     def clear(self):
         self.cached_vars.clear()
         self.modified_vars.clear()
@@ -93,14 +194,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
     def pre_execute(self):
         self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.hidden_vars and not item[0].startswith("_")])
-        #self.cached_vars.update([item for item in self.shell.user_ns.items() if item[0] not in self.hidden_vars and not item[0].startswith("_")])
         
         self.modified_vars.clear()
         self.new_vars.clear()
         self.deleted_vars.clear()
-        
-        #cached_figs = [item[1] for item in self.cached_vars if isinstance(item[1], mpl.figure.Figure)]
-        #print("\npre_execute: cached figs", cached_figs)
         
     @safeWrapper
     def post_execute(self):
@@ -200,19 +297,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
             self.modified_vars.update([item for item in existing_vars if not safe_identity_test(item[1], self.cached_vars[item[0]])])
             
-            #print("modified vars:", len(self.modified_vars))
-            
             self.cached_vars.update(self.new_vars)
             
             self.cached_vars.update(self.modified_vars) # not really necessary? (vars are stored by ref)
             
-            #print("\ndeleted_vars", self.deleted_vars)
-            #print("\ncached_vars", self.cached_vars)
             cached_mpl_figs = [item[1] for item in self.cached_vars.items() if isinstance(item[1], mpl.figure.Figure)]
-            
-            #print("\npost_execute: cached figs", cached_mpl_figs)
-            
-            #print("\npost_execute: cached_vars", [k for k in self.cached_vars.keys()])
             
             for item in cached_mpl_figs:
                 if item not in mpl_figs_in_pyplot:
@@ -221,23 +310,13 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
             for item in self.deleted_vars.items():
                 self.cached_vars.pop(item[0], None)
-                #print(type(item[1]))
                 if isinstance(item[1], QtWidgets.QWidget) and hasattr(item[1], "winId"):
                     item[1].close()
                     self.windowVariableDeleted.emit(int(item[1].winId()))
-                    #print(item[0])
-                    #wid = int(item[1].winId())
-                    #print(wid)
-                    #for mapping in self.windows.maps:
-                        #mapping.pop(wid, None)
-                        
-                    #self.windows.pop(wid, None)
             
             self.cached_vars.clear()
-            #self.deleted_vars.clear()
             
         except Exception as e:
-            #pass
             traceback.print_exc()
             
         self.updateTable(from_console=True)
@@ -259,13 +338,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     
     @safeWrapper
     def generateRowContents2(self, dataname, data, namespace="Internal"):
-        #from core.utilities import (summarize_object_properties,
-                                    #standard_obj_summary_headers,
-                                    #)
-
         obj_props = summarize_object_properties(dataname, data, namespace=namespace)
-        
-        #row = [self._generate_standard_item_for_object_(obj_props[key], editable = (key=="Name")) for key in standard_obj_summary_headers]
         
         return self.generateRowFromPropertiesDict(obj_props)
     
@@ -275,376 +348,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return [self._generate_standard_item_for_object_(obj_props[key], editable = (key=="Name"), background=background, foreground=foreground) for key in standard_obj_summary_headers]
         
         
-    #def generateRowContents(self, dataname, data):
-        #'''   Generates a row in the workspace table view.
-        
-        #NOTE: memory size is reported as follows:
-            #result of obj.nbytes, for object types derived from numpy ndarray
-            #result of total_size(obj) for python containers
-                #by default, and as currently implemented, this is limited 
-                #to python container classes (tuple, list, deque, dict, set and frozenset)
-                
-            #result of sys.getsizeof(obj) for any other python object
-            
-            #TODO construct handlers for other object types as well including 
-                #PyQt5 objects
-                
-        #Returns: a row of QStandardItem objects.
-        #'''
-        #from numbers import Number
-        
-        #self.currentVarName = dataname # cache this
-        
-        #row = []
-
-        #dtypestr = ""
-        #dtypetip = ""
-        #datamin = ""
-        #mintip = ""
-        #datamax = ""
-        #maxtip = ""
-        #sz = ""
-        #sizetip = ""
-        #ndims = ""
-        #dimtip = ""
-        #shp = ""
-        #shapetip = ""
-        #axes = ""
-        #axestip = ""
-        #arrayorder = ""
-        #ordertip= ""
-        #memsz = ""
-        #memsztip = ""
-        
-        #vname = QtGui.QStandardItem(dataname)
-        #vname.setToolTip(dataname)
-        #vname.setStatusTip(dataname)
-        #vname.setWhatsThis(dataname)
-        
-        ## NOTE: 2016-03-26 23:18:00
-        ## somehow enabling variable name editing from within the workspace view
-        ## is NOT trivial, so we disable this for now
-        #vname.setEditable(True)
-        #row.append(vname) # so that we display at least the data name & type
-        
-        #tt = type(data).__name__
-        #tt = self.abbrevs.get(tt,tt)
-        
-        #if tt=='instance':
-            #tt = self.abbrevs.get(str(data.__class__),
-                                  #str(data.__class__))
-            
-        #vtype = QtGui.QStandardItem(tt)
-        #vtype.setToolTip("type: %s" % tt)
-        #vtype.setStatusTip("type: %s" % tt)
-        #vtype.setWhatsThis("type: %s" % tt)
-        #vtype.setEditable(False)
-        #row.append(vtype) # so that we display at least the data name & type
-        
-        #try:
-            #if tt in self.seq_types:
-                #if len(data) and all([isinstance(v, numbers.Number) for v in data]):
-                    #datamin = str(min(data))
-                    #mintip = "min: "
-                    #datamax = str(max(data))
-                    #maxtip = "max: "
-                
-                #sz = str(len(data))
-                #sizetip = "length: "
-                
-                ##memsz    = str(total_size(data)) # too slow for large collections
-                #memsz    = str(sys.getsizeof(data))
-                #memsztip = "memory size: "
-                
-            #elif tt in self.set_types:
-                #if len(data) and all([isinstance(v, numbers.Number) for v in data]):
-                    #datamin = str(min([v for v in data]))
-                    #mintip = "min: "
-                    #datamax = str(max([v for v in data]))
-                    #maxtip = "max: "
-                
-                #sz = str(len(data))
-                #sizetip = "length: "
-                
-                #memsz    = str(sys.getsizeof(data))
-                ##memsz    = str(total_size(data)) # too slow for large collections
-                #memsztip = "memory size: "
-                
-            #elif tt in self.dict_types:
-                #sz = str(len(data))
-                #sizetip = "length: "
-                
-                ##memsz    = str(total_size(data)) # too slow for large collections
-                #memsz    = str(sys.getsizeof(data))
-                #memsztip = "memory size: "
-                
-            #elif tt in ('VigraArray', "PictArray"):
-                #dtypestr = str(data.dtype)
-                #dtypetip = "dtype: "
-                
-                #if data.size > 0:
-                    #try:
-                        #if np.all(np.isnan(data[:])):
-                            #datamin = str(np.nan)
-                            
-                        #else:
-                            #datamin = str(np.nanmin(data))
-                            
-                    #except:
-                        #pass
-                    
-                    #mintip = "min: "
-                    
-                    #try:
-                        #if np.all(np.isnan(data[:])):
-                            #datamax = str(np.nan)
-                        
-                        #else:
-                            #datamax  = str(np.nanmax(data))
-                            
-                    #except:
-                        #pass
-                    
-                    #maxtip = "max: "
-                    
-                #sz    = str(data.size)
-                #sizetip = "size: "
-                
-                #ndims   = str(data.ndim)
-                #dimtip = "dimensions: "
-                
-                #shp = str(data.shape)
-                #shapetip = "shape: "
-                
-                #axes    = repr(data.axistags)
-                #axestip = "axes: "
-                
-                #arrayorder    = str(data.order)
-                #ordertip = "array order: "
-                
-                #memsz    = str(data.nbytes)
-                ##memsz    = "".join([str(sys.getsizeof(data)), str(data.nbytes), "bytes"])
-                #memsztip = "memory size (array nbytes): "
-                
-            #elif tt in ('Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 'SpikeTrain', "DataSignal", "IrregularlySampledDataSignal"):
-                #dtypestr = str(data.dtype)
-                #dtypetip = "dtype: "
-                
-                #if data.size > 0:
-                    #try:
-                        #if np.all(np.isnan(data[:])):
-                            #datamin = str(np.nan)
-                            
-                        #else:
-                            #datamin = str(np.nanmin(data))
-                            
-                    #except:
-                        #pass
-                        
-                    #mintip = "min: "
-                        
-                    #try:
-                        #if np.all(np.isnan(data[:])):
-                            #datamax = str(np.nan)
-                            
-                        #else:
-                            #datamax  = str(np.nanmax(data))
-                            
-                    #except:
-                        #pass
-                    
-                    #maxtip = "max: "
-                    
-                #sz    = str(data.size)
-                #sizetip = "size: "
-                
-                #ndims   = str(data.ndim)
-                #dimtip = "dimensions: "
-                
-                #shp = str(data.shape)
-                #shapetip = "shape: "
-                
-                #memsz    = str(data.nbytes)
-                ##memsz    = "".join([str(sys.getsizeof(data)), str(data.nbytes), "bytes"])
-                #memsztip = "memory size (array nbytes): "
-                
-            #elif tt in ('Block', 'Segment'):
-                #sz = str(data.size)
-                #sizetip = "size: "
-                    
-                #memsz = str(sys.getsizeof(data))
-                #memsztip = "memory size: "
-                
-            #elif tt == 'str':
-                #sz = str(len(data))
-                #sizetip = "size: "
-                
-                #ndims = "1"
-                #dimtip = "dimensions "
-                
-                #shp = '('+str(len(data))+',)'
-                #shapetip = "shape: "
-
-                #memsz = str(sys.getsizeof(data))
-                #memsztip = "memory size: "
-                
-            #elif isinstance(data, Number):
-                #dtypestr = tt
-                #datamin = str(data)
-                #mintip = "min: "
-                #datamax = str(data)
-                #maxtip = "max: "
-                #sz = "1"
-                #sizetip = "size: "
-                
-                #ndims = "1"
-                #dimtip = "dimensions: "
-                
-                #shp = '(1,)'
-                #shapetip = "shape: "
-
-                #memsz = str(sys.getsizeof(data))
-                #memsztip = "memory size: "
-                
-            ##elif isinstance(data, pd.Series):
-            #elif  tt == "Series":
-                #dtypestr = "%s" % data.dtype
-                #dtypetip = "dtype: "
-
-                #sz = "%s" % data.size
-                #sizetip = "size: "
-
-                #ndims = "%s" % data.ndim
-                #dimtip = "dimensions: "
-                
-                #shp = str(data.shape)
-                #shapetip = "shape: "
-
-                #memsz = str(sys.getsizeof(data))
-                #memsztip = "memory size: "
-                
-            ##elif isinstance(data, pd.DataFrame):
-            #elif tt == "DataFrame":
-                #sz = "%s" % data.size
-                #sizetip = "size: "
-
-                #ndims = "%s" % data.ndim
-                #dimtip = "dimensions: "
-                
-                #shp = str(data.shape)
-                #shapetip = "shape: "
-
-                #memsz = str(sys.getsizeof(data))
-                #memsztip = "memory size: "
-                
-            #elif tt == self.ndarray_type:
-                #dtypestr = str(data.dtype)
-                #dtypetip = "dtype: "
-                
-                #if data.size > 0:
-                    #try:
-                        #if np.all(np.isnan(data[:])):
-                            #datamin = str(np.nan)
-                            
-                        #else:
-                            #datamin = str(np.nanmin(data))
-                    #except:
-                        #pass
-                        
-                    #mintip = "min: "
-                        
-                    #try:
-                        #if np.all(np.isnan(data[:])):
-                            #datamax = str(np.nan)
-                            
-                        #else:
-                            #datamax  = str(np.nanmax(data))
-                            
-                    #except:
-                        #pass
-                    
-                    #maxtip = "max: "
-                    
-                #sz = str(data.size)
-                #sizetip = "size: "
-                
-                #ndims = str(data.ndim)
-                #dimtip = "dimensions: "
-
-                #shp = str(data.shape)
-                #shapetip = "shape: "
-                
-                #memsz    = str(data.nbytes)
-                #memsztip = "memory size: "
-                
-            #else:
-                #vmemsize = QtGui.QStandardItem(str(sys.getsizeof(data)))
-                #memsz = str(sys.getsizeof(data))
-                #memsztip = "memory size: "
-                
-            #vdtype   = QtGui.QStandardItem(dtypestr)
-            #vdtype.setToolTip("%s%s" % (dtypetip, dtypestr))
-            #vdtype.setStatusTip("%s%s" % (dtypetip, dtypestr))
-            #vdtype.setWhatsThis("%s%s" % (dtypetip, dtypestr))
-            #vdtype.setEditable(False)
-
-            #vmin = QtGui.QStandardItem(datamin)
-            #vmin.setToolTip("%s%s" % (mintip, datamin))
-            #vmin.setStatusTip("%s%s" % (mintip, datamin))
-            #vmin.setWhatsThis("%s%s" % (mintip, datamin))
-            #vmin.setEditable(False)
-
-            #vmax = QtGui.QStandardItem(datamax)
-            #vmax.setToolTip("%s%s" % (maxtip, datamax))
-            #vmax.setStatusTip("%s%s" % (maxtip, datamax))
-            #vmax.setWhatsThis("%s%s" % (maxtip, datamax))
-            #vmax.setEditable(False)
-
-            #vsize    = QtGui.QStandardItem(sz)
-            #vsize.setToolTip("%s%s" % (sizetip, sz))
-            #vsize.setStatusTip("%s%s" % (sizetip, sz))
-            #vsize.setWhatsThis("%s%s" % (sizetip, sz))
-            #vsize.setEditable(False)
-                
-            #vndims   = QtGui.QStandardItem(ndims)
-            #vndims.setToolTip("%s%s" % (dimtip, ndims))
-            #vndims.setStatusTip("%s%s" % (dimtip, ndims))
-            #vndims.setWhatsThis("%s%s" % (dimtip, ndims))
-            #vndims.setEditable(False)
-
-            #vshape   = QtGui.QStandardItem(shp)
-            #vshape.setToolTip("%s%s" % (shapetip, shp))
-            #vshape.setStatusTip("%s%s" % (shapetip, shp))
-            #vshape.setWhatsThis("%s%s" % (shapetip, shp))
-            #vshape.setEditable(False)
-
-            #vaxes    = QtGui.QStandardItem(axes)
-            #vaxes.setToolTip("%s%s" % (axestip, axes))
-            #vaxes.setStatusTip("%s%s" % (axestip, axes))
-            #vaxes.setWhatsThis("%s%s" % (axestip, axes))
-            #vaxes.setEditable(False)
-            
-            #vorder   = QtGui.QStandardItem(arrayorder)
-            #vorder.setToolTip("%s%s" % (ordertip, arrayorder))
-            #vorder.setStatusTip("%s%s" % (ordertip, arrayorder))
-            #vorder.setWhatsThis("%s%s" % (ordertip, arrayorder))
-            #vorder.setEditable(False)
-            
-            #vmemsize = QtGui.QStandardItem(memsz)
-            #vmemsize.setToolTip("%s%s" % (memsztip, memsz))
-            #vmemsize.setStatusTip("%s%s" % (memsztip, memsz))
-            #vmemsize.setWhatsThis("%s%s" % (memsztip, memsz))
-            #vmemsize.setEditable(False)
-
-            ## data name and type are always present
-            #row += [vdtype, vmin, vmax, vsize, vndims, vshape, vaxes, vorder, vmemsize]
-            
-        #except Exception as e:
-            #traceback.print_exc()
-            ##print(str(e))
-
-        #return row
-
     def getRowContents(self, row, asStrings=True):
         '''
         Returns a list of QStandardItem (or their display text, if strings is True)
@@ -703,9 +406,23 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             if originalRow is not None and col < len(originalRow) and originalRow[col] != v_row[col]:
                 self.setItem(row, col, v_row[col])
         
-    def updateRowForVariable(self, dataname, data):
-        # FIXME/TODO 2019-08-04 23:55:04
-        # make this faster
+    def updateRowForVariable(self, dataname, data, ns=None):
+        # CAUTION This is only for internal workspace, but 
+        # TODO 2020-07-30 22:18:35 merge & factor code for both interna and foreign
+        # kernels (make use of the ns parameter)
+        #
+        if ns is None:
+            ns = "Internal"
+            
+        elif isinstance(ns, str):
+            if len(ns.strip()) == 0:
+                ns = "Internal"
+                
+        else:
+            ns = "Internal"
+            
+        row = self.rowIndexForItemsWithProps(Workspace=ns)
+        
         items = self.findItems(dataname)
 
         if len(items) > 0:
@@ -714,21 +431,19 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             v_row = self.generateRowContents2(dataname, data) # generate model view row contents for existing item
             self.updateRow(row, v_row)
             
-            #originalRow = self.getRowContents(row, asStrings=False)
+    def updateRowFromProps(self, row, obj_props, background=None):
+        """
+        Parameters:
+        row = int
+        obj_props: dict, see generateRowContents2
+        """
+        if background is None:
+            v_row = self.generateRowFromPropertiesDict(obj_props)
             
-            ##v_row = self.generateRowContents(dataname, data) # generate model view row contents for existing item
+        else:
+            v_row = self.generateRowFromPropertiesDict(obj_props, background=background)
             
-            #for col in range(1, self.columnCount()):
-                #if originalRow is not None and col < len(originalRow) and originalRow[col] != v_row[col]:
-                    #self.setItem(row, col, v_row[col])
-                    
-    def updateRowFromProps(self, row, obj_props):
-        #originalRow = self.getRowContents(row, asStrings=False)
-        v_row = self.generateRowFromPropertiesDict(obj_props)
         self.updateRow(row, v_row)
-        #for col in range(1, self.columnCount()):
-            #if originalRow is not None and col < len(originalRow) and originalRow[col] != v_row[col]:
-                #self.setItem(row, col, v_row[col])
                 
     def updateRow(self, rowindex, newrowdata):
         originalRow = self.getRowContents(rowindex, asStrings=False)
@@ -737,14 +452,43 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 self.setItem(rowindex, col, newrowdata[col])
                 
 
-    def removeRowForVariable(self, dataname):
-        items = self.findItems(dataname)
+    def removeRowForVariable(self, dataname, ns=None):
+        #wscol = standard_obj_summary_headers.index("Workspace")
         
-        if len(items) > 0:
-            row = self.indexFromItem(items[0]).row()
+        if ns is None:
+            ns = "Internal"
+            
+        elif isinstance(ns, str):
+            if len(ns.strip()) == 0:
+                ns = "Internal"
+                
+        else:
+            ns = "Internal"
+            
+        row = self.rowIndexForItemsWithProps(Name=dataname, Workspace=ns)
+        
+        if row == -1:
+            return
+        
+        #print("removeRowForVariable data: %s ns: %s row: %s" % (dataname, ns, row))
+        
+        if isinstance(row, list):
+            for r in row:
+                self.removeRow(r)
+                
+        else:
             self.removeRow(row)
+        
+        #items = self.findItems(dataname)
+        
+        #if len(items) > 0:
+            #row = self.indexFromItem(items[0]).row()
+            
+            #self.removeRow(row)
             
     def addRowForVariable(self, dataname, data):
+        """CAUTION Only use for data in the internal workspace, not in remote ones.
+        """
         v_row = self.generateRowContents2(dataname, data) # generate model view row contents
         #v_row = self.generateRowContents(dataname, data) # generate model view row contents
         self.appendRow(v_row) # append the row to the model
@@ -753,7 +497,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.removeRows(0,self.rowCount())
         
     def updateTable(self, from_console:bool = False):
-        """Updates workspace model table
+        """CAUTION Updates model table only for vars in internal workspace.
+        For data in external kernels (i.e., in the external console) use 
+        updateFromExternal
+        
+        TODO/FIXME 2020-07-30 21:51:49 factor these two under a common logic
         """
         try:
             displayed_vars = self.getDisplayedVariableNames(asStrings=True)
@@ -872,21 +620,65 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         """
         #bg_cols = sb.color_palette("pastel", self._foreign_workspace_count_)
         
+        #self._foreign_workspace_count_ += 1
         for varname, props in prop_dicts.items():
-            items_row_ndx = self.rowIndexForNamedItemsWithProps(varname, Workspace=props["Workspace"])
+            ns = props["Workspace"]["display"]
+            ns_key = ns.replace(" ", "_")
             
-            if (isinstance(items_row_ndx, int) and items_row_ndx == -1) or \
-                (isinstance(items_row_ndx, (tuple, list)) and len(items_row_ndx) == 0):
-                self._foreign_workspace_count_ += 1
-                background = QtGui.QBrush(QtGui.QColor(*[int(255*v) for v in self.foreign_kernel_palette[self._foreign_workspace_count_]]))
-                row = self.generateRowFromPropertiesDict(props, background=background)
+            vname = varname.replace("properties_of_","")
+            
+            namespaces = sorted([k for k in self.foreign_namespaces.keys()])
+            
+            if ns_key not in namespaces:
+                continue # FIXME 2020-07-30 22:42:16 should NEVER happen 
+            
+            ns_index = namespaces.index(ns_key)
+            
+            #displayed_ns_items = self.rowIndexForItemsWithProps(Workspace=ns)
+            
+            #if isinstance(displayed_ns_items, int):
+                #n_items_shown = 1 if displayed_ns_items >= 0 else 0
+                
+            #elif isinstance(displayed_ns_items, (tuple, list)):
+                #n_items_shown = len(displayed_ns_items)
+            
+            items_row_ndx = self.rowIndexForNamedItemsWithProps(vname, Workspace=ns)
+            
+            #item_background = self.foreign_namespaces[ns_key]["background"] if n_items_shown%2 == 0 else self.foreign_namespaces[ns_key]["alternative"]
+            
+            if items_row_ndx is None:
+                #row = self.generateRowFromPropertiesDict(props, background=item_background)
+                row = self.generateRowFromPropertiesDict(props)
                 self.appendRow(row)
                 
-            else:
-                for row in items_row_ndx:
-                    self.updateRowFromProps(row, obj_props)
-            
-            
+            elif isinstance(items_row_ndx, int):
+                if items_row_ndx == -1:
+                    row = self.generateRowFromPropertiesDict(props)
+                    #row = self.generateRowFromPropertiesDict(props, background=item_background)
+                    self.appendRow(row)
+                
+                else:
+                    self.updateRowFromProps(items_row_ndx, props)
+                    #self.updateRowFromProps(items_row_ndx, props, background=item_background)
+                    
+            elif isinstance(items_row_ndx, (tuple, list)):
+                if len(items_row_ndx) == 0:
+                    row = self.generateRowFromPropertiesDict(props)
+                    #row = self.generateRowFromPropertiesDict(props, background=item_background)
+                    self.appendRow(row)
+                    
+                else:
+                    for r in items_row_ndx:
+                        if r  == -1:
+                            row = self.generateRowFromPropertiesDict()
+                            #row = self.generateRowFromPropertiesDict(props, background=item_background)
+                            self.appendRow(row)
+                            
+                        else:
+                            self.updateRowFromProps(r, props)
+                            #self.updateRowFromProps(r, props, background=item_background)
+                            
+                            
     @safeWrapper
     def rowIndexForItemsWithProps(self, **kwargs):
         """Returns row indices for all items that satisfy specified properties.
@@ -917,23 +709,30 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         """
         #from core.utilities import standard_obj_summary_headers
         
-        if len(kwargs == 0):
+        if len(kwargs) == 0:
             return range(self.rowCount())
 
         else:
+            if self.rowCount() == 0:
+                return -1
+            
             allrows = np.arange(self.rowCount())
             allndx = np.array([True] * self.rowCount())
+            
             for key, value in kwargs.items():
                 key_column = standard_obj_summary_headers.index(key.replace("_", " "))
                 
                 items_by_key = self.findItems(value, column=key_column)
+                
                 rows_by_key = [i.index().row() for i in items_by_key]
                 
                 key_ndx = np.array([allrows[k] in rows_by_key for k in range(len(allrows))])
                 
                 allndx = allndx & key_ndx
                 
-            ret = list(allrows[allndx])
+            ret = [int(v) for v in allrows[allndx]]
+            #print("rowIndexForItemsWithProps ret", ret)
+            #ret = list(allrows[allndx])
             
             if len(ret) == 1:
                 return ret[0]
@@ -1015,7 +814,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     
                     allndx = allndx & key_ndx
                     
-                ret = list(allrows[allndx])
+                ret = [int(v) for v in allrows[allndx]]
+                #ret = list(allrows[allndx])
                 
                 if len(ret) == 1:
                     return ret[0]
@@ -1040,5 +840,16 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         ret = [self.item(row).text() if asStrings else self.item(row) for row in range(self.rowCount()) if self.item(row, wscol).text() == "Internal"]
         
         return ret
+    
+    def getNumberOfDisplayedForeignKernels(self):
+        wcsol = standard_obj_summary_headers.index("Workspace")
+        foreign_kernels = set()
+        for row in range(self.rowCount()):
+            wstext = self.item(row, wscol).text()
+            if wstext != "Internal":
+                foreign_kernels.add(wstext)
+                
+        return len(foreign_kernels)
+        
     
 

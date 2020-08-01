@@ -1682,8 +1682,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             self.external_console = consoles.ExternalIPython.launch()
             self.workspace["external_console"] = self.external_console
             self.workspaceModel.hidden_vars.update({"external_console":self.external_console})
-            self.external_console.window.sig_kernel_count_changed[int].connect(self._slot_remote_kernel_count_changed)
-            #self.external_console.window.sig_will_close.connect(self._slot_external_console_closing_)
+            #self.external_console.window.sig_kernel_count_changed[int].connect(self._slot_remote_kernel_count_changed)
             
             if isinstance(new, str) and new == "neuron":
                 self.external_console.execute(nrn_ipython_initialization_cmd,
@@ -1691,6 +1690,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                                               store_history=False)
                 
             self.external_console.window.sig_shell_msg_received[object].connect(self._slot_ext_krn_shell_chnl_msg_recvd)
+            self.external_console.window.sig_kernel_exit[str].connect(self._slot_ext_krn_exit)
+            self.external_console.window.sig_kernel_restart[str].connect(self._slot_ext_krn_restart)
+            self.external_console.window.sig_kernel_stopped_channels[str].connect(self._slot_ext_krn_stop)
             
         else:
             frontend_factory = None
@@ -1727,10 +1729,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                         frontend_factory = partial(self.external_console.window.create_new_tab_with_new_kernel_and_execute,
                                                    nrn_ipython_initialization_cmd,
                                                    silent=True, store_history=False)
-                        #from core.extipyutils_client import nrn_ipython_initialization_cmd
-                        #self.external_console.window.create_new_tab_with_new_kernel_and_execute(nrn_ipython_initialization_cmd,
-                                                #silent=True,
-                                                #store_history=False)
                         
             if frontend_factory is not None:
                 frontend_factory()
@@ -1746,15 +1744,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         self.shell.events.register("post_execute", self.workspaceModel.post_execute)
         
         self.slot_changeDirectory(self.recentDirectories[0])
-        
-    #@pyqtSlot()
-    #@safeWrapper
-    #def newConsole(self, kernel_manager=None):
-        
-        #console = ScipyenConsole(self, kernel_manager=kernel_manager, mainWindow=self)
-        
-        #return console
-
         
     @safeWrapper
     def _init_QtConsole_(self):
@@ -2386,7 +2375,19 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                 self.console.execute(self.workspaceModel.currentVarName)
                 
     @safeWrapper
-    def genContextMenuForIntervalVariables(self, indexList, cm):
+    def _genExternalVarContextMenu(self, indexList, cm):
+        if not cm.isEmpty():
+            cm.addSeparator()
+        copyVarToInternal = cm.addAction("Copy to Internal Workspace")
+        copyVarToInternal.setToolTip("Copies selected variable to the internal user workspace.\nCAUTION: Existing variables with the same name will be overwritten")
+        copyVarToInternal.setStatusTip("Copies selected variable to the internal user workspace.\nCAUTION: Existing variables with the same name will be overwritten")
+        copyVarToInternal.setWhatsThis("Copies selected variable to the internal user workspace.\nCAUTION: Existing variables with the same name will be overwritten")
+        copyVarToInternal.triggered.connect(self._slot_copyFromExternalWS)
+                
+    @safeWrapper
+    def _genInternalVarContextMenu(self, indexList, cm):
+        if not cm.isEmpty():
+            cm.addSeparator()
         copyVarNames = cm.addAction("Copy name(s)")
         copyVarNames.setToolTip("Copy variable names to clipboard.\nPress SHIFT to quote the names; press CTRL to have one name per line")
         copyVarNames.setStatusTip("Copy variable names to clipboard.\nPress SHIFT to quote the names; press CTRL to have one name per line")
@@ -2470,6 +2471,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         delVars.triggered.connect(self.slot_deleteSelectedVars)
         delVars.hovered.connect(self._slot_showActionStatusMessage_)
         
+        if len(self.workspaceModel.foreign_namespaces) > 0 and self.external_console is not None:
+            ns = self.external_console.window.find_tab_title(self.external_console.window.active_frontend)
+            cm.addSeparator()
+            copyVarToActiveExternalNamespace = cm.addAction("Copy to %s namespace" % ns)
+            copyVarToActiveExternalNamespace.setToolTip("Copies selected variable to the namespace of the active external kernel namespace (currently %s)" % ns)
+            copyVarToActiveExternalNamespace.setStatusTip("Copies selected variable to the namespace of the active external kernel namespace (currently %s)" % ns)
+            copyVarToActiveExternalNamespace.setWhatsThis("Copies selected variable to the namespace of the active external kernel namespace (currently %s)" % ns)
+            copyVarToActiveExternalNamespace.triggered.connect(self._slot_copyToExternalWS)
+        
     @pyqtSlot("QPoint")
     @safeWrapper
     def slot_workspaceViewContextMenuRequest(self, point):
@@ -2490,10 +2500,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         cm.setToolTipsVisible(True)
         
         if len(internal_var_indices):
-            self.genContextMenuForIntervalVariables(internal_var_indices, cm)
+            self._genInternalVarContextMenu(internal_var_indices, cm)
             
         if len(external_var_indices):
-            pass # TODO
+            self._genExternalVarContextMenu(external_var_indices, cm)
         
         cm.popup(self.workspaceView.mapToGlobal(point))#, copyVarNames)
         #cm.popup(self.workspaceView.mapToGlobal(point), cm.actions()[0])
@@ -2736,24 +2746,19 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         if len(indexList) == 0:
             return
         
+        wscol = standard_obj_summary_headers.index("Workspace")
+        
         if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
-            varnames = ["'%s'" % self.workspaceModel.item(i.row(),0).text() for i in indexList]
+            varnames = ["'%s'" % self.workspaceModel.item(i.row(),0).text() for i in indexList if self.workspaceModel.item(i.row(),wscol).text() == "Internal"]
             
         else:
-            varnames = [self.workspaceModel.item(i.row(),0).text() for i in indexList]
+            varnames = [self.workspaceModel.item(i.row(),0).text() for i in indexList if self.workspaceModel.item(i.row(),wscol).text() == "Internal"]
             
         if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier):
             self.app.clipboard().setText(",\n".join(varnames))
             
         else:
             self.app.clipboard().setText(", ".join(varnames))
-        
-        #varNames = list()
-        
-        #for i in indexList:
-            #varNames.append(self.workspaceModel.item(i.row(),0).text())
-            
-        #self.app.clipboard().setText(", ".join(varNames))
         
     @pyqtSlot()
     @safeWrapper
@@ -2763,16 +2768,18 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         """
         warnings.warn("DEPRECATED", DeprecationWarning)
         
-        indexList = [i for i in self.workspaceView.selectedIndexes() if i.column() == 0]
-        #indexList = self.workspaceView.selectedIndexes()
         
+        indexList = [i for i in self.workspaceView.selectedIndexes() if i.column() == 0]
         if len(indexList) == 0:
             return
+
+        wscol = standard_obj_summary_headers.index("Workspace")
         
         varNames = list()
         
         for i in indexList:
-            varNames.append("'%s'" % self.workspaceModel.item(i.row(),0).text())
+            if self.workspaceModel.item(i.row(),wscol).text() == "Internal":
+                varNames.append("'%s'" % self.workspaceModel.item(i.row(),0).text())
             
         self.app.clipboard().setText(", ".join(varNames))
         
@@ -4797,16 +4804,76 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                 
             self._temp_python_filename_ = None
             
-    @pyqtSlot(int)
-    @safeWrapper
-    def _slot_remote_kernel_count_changed(self, count):
-        self.workspaceModel.foreign_kernel_palette = list(sb.color_palette("pastel", count))
+    #@pyqtSlot(int)
+    #@safeWrapper
+    #def _slot_remote_kernel_count_changed(self, count):
+        #self.workspaceModel.foreign_kernel_palette = list(sb.color_palette("pastel", count))
         
-    ##@pyqtSlot()
-    ##@safeWrapper
-    ##def _slot_external_console_closing_(self):
-        ##self.external_console = None
+    @pyqtSlot(str)
+    @safeWrapper
+    def _slot_ext_krn_exit(self, txt):
+        #print("mainWindow: _slot_ext_krn_exit %s" % txt)
+        signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
+        self.workspaceModel.remove_foreign_namespace(txt)
+        
+    @pyqtSlot(str)
+    @safeWrapper
+    def _slot_ext_krn_stop(self, txt):
+        #print("mainWindow: _slot_ext_krn_stop %s" % txt)
+        signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
+        self.workspaceModel.remove_foreign_namespace(txt)
+        
+    @pyqtSlot(str)
+    @safeWrapper
+    def _slot_ext_krn_restart(self, txt):
+        #print("mainWindow: _slot_ext_krn_restart %s" % txt)
+        from core.extipyutils_client import (cmd_foreign_shell_ns_listing,
+                                             )
+        signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
+        self.workspaceModel.remove_foreign_namespace(txt)
+        self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=txt.replace("_", " ")))
+        
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_copyToExternalWS(self):
+        from core.extipyutils_client import (cmd_copy_to_foreign, )
+        # get the model indices of the selected workspace model items
+        indexList = [i for i in self.workspaceView.selectedIndexes() if i.column() == 0]
+        if len(indexList) == 0:
+            return
+        wscol = standard_obj_summary_headers.index("Workspace")
+        varnames = [self.workspaceModel.item(i.row(),0).text() for i in indexList if self.workspaceModel.item(i.row(), wscol).text() == "Internal"]
+        ns = self.external_console.window.find_tab_title(self.external_console.window.active_frontend)
+        for varname in varnames:
+            #print("_slot_copyToExternalWS: varname = %s , data = %s" % (varname, self.workspace[varname]))
+            self.external_console.execute(cmd_copy_to_foreign(varname, self.workspace[varname]),
+                                          where = ns)
             
+        self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=ns))
+    
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_copyFromExternalWS(self):
+        from core.utilities import (standard_obj_summary_headers, )
+        from core.extipyutils_client import (cmd_copies_from_foreign, )
+        
+        # get the model indices of the selected workspace model items
+        indexList = [i for i in self.workspaceView.selectedIndexes() if i.column() == 0]
+        if len(indexList) == 0:
+            return
+    
+        wscol = standard_obj_summary_headers.index("Workspace")
+        
+        # deal with those that belong to an external workspace
+        for ns in self.workspaceModel.foreign_namespaces:
+            wsname = ns.replace("_", " ")
+            varnames = [self.workspaceModel.item(i.row(),0).text() for i in indexList if self.workspaceModel.item(i.row(), wscol).text() == wsname]
+            
+            if len(varnames):
+                self.external_console.execute(cmd_copies_from_foreign(*varnames),
+                                              where = wsname)
+    
+        
     @pyqtSlot(object)
     @safeWrapper
     def _slot_ext_krn_shell_chnl_msg_recvd(self, msg):
@@ -4840,23 +4907,34 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         # b.append(1000) # a is unchanged
         # a.a = b -> notifies
         #
-        from core.extipyutils_client import unpack_data_recvd_on_shell_chnl
+        from core.extipyutils_client import (unpack_data_recvd_on_shell_chnl, 
+                                             cmds_get_foreign_data_props,
+                                             cmd_foreign_shell_ns_listing,
+                                             )
         # TODO 2020-07-09 23:19:59
         #### BEGIN get rid of this once done developing
-        varname = strutils.string_to_valid_identifier("_".join([msg["header"]["msg_type"], msg["header"]["session"]]))
-        session_id = msg["header"]["session"]
-        self.workspace[varname] = msg
-        self.workspaceModel.updateTable(from_console=False)
+        #varname = strutils.string_to_valid_identifier("_".join([msg["header"]["msg_type"], msg["header"]["session"]]))
+        #session_id = msg["header"]["session"]
+        #self.workspace[varname] = msg
+        #self.workspaceModel.updateTable(from_console=False)
         #### END get rid of this once done developing
         
+        if self.external_console.window.tab_widget.count() == 0:
+            # only listen to kernels that have a frontend 
+            return
+        
         if msg["msg_type"] == "execute_reply":
+            #print("mainWindow: kernel sent execute_reply %s" % msg["tab"])
             vardict = unpack_data_recvd_on_shell_chnl(msg)
+            
+            #print("mainWindow: %s len(vardict)" % msg["tab"], len(vardict))
             
             if isinstance(vardict, dict) and len(vardict):
                 prop_dicts = dict([(key, val) for key, val in vardict.items() if key.startswith("properties_of_")])
                 
                 ns_listings = dict([(key, val) for key, val in vardict.items() if key.startswith("ns_listing_of_")])
                 
+                # this is needed here so that they don't clutter our own namespace
                 for key in prop_dicts.keys():
                     vardict.pop(key, None)
                     
@@ -4866,27 +4944,52 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                 self.workspace.update(vardict)
                 self.workspaceModel.updateTable(from_console=False)
                 
-                for key, value in prop_dicts.items():
-                    if value["Workspace"]["display"] == "Internal":
-                        value["Workspace"] = {"display":msg["tab"], "tooltip":"Location: %s kernel namespace" % msg["tab"]}
+                if len(prop_dicts):
+                    #print("mainWindow: len(prop_dicts)", len(prop_dicts))
+                    for key, value in prop_dicts.items():
+                        if value["Workspace"]["display"] == "Internal":
+                            value["Workspace"] = {"display":msg["tab"], "tooltip":"Location: %s kernel namespace" % msg["tab"]}
+                            
+                        for propname in value.keys():
+                            value[propname]["tooltip"] = value[propname]["tooltip"].replace("Internal", msg["tab"])
                         
-                    for propname in value.keys():
-                        value[propname]["tooltip"] = value[propname]["tooltip"].replace("Internal", msg["tab"])
-                    
-                self.workspaceModel.updateFromExternal(prop_dicts)
+                    self.workspaceModel.updateFromExternal(prop_dicts)
                 
                 if len(ns_listings):
+                    #print("mainwindow: %s len(ns_listings)" % msg["tab"], len(ns_listings))
                     for key, val in ns_listings.items():
                         ns_name = key.replace("ns_listing_of_","").replace(" ", "_")
-                        self.workspaceModel.foreign_namespaces[ns_name] = val
-                        
-            else:
-                # listen here for possible changes in the remote user_ns?
-                pass
+                        if isinstance(val, dict):
+                            self.workspaceModel.update_foreign_namespace(ns_name, val)
+                            if ns_name in self.workspaceModel.foreign_namespaces:
+                                for varname in self.workspaceModel.foreign_namespaces[ns_name]["current"]:
+                                    self.external_console.execute(cmds_get_foreign_data_props(varname, namespace=msg["tab"]),
+                                                                    where = msg["tab"])
+                            
+            #else:
+                ## listen here for possible changes in the remote user_ns?
+                #self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["tab"]),
+                                              #where = msg["tab"])
+                ##pass
                 
-                
-                    
+        elif msg["msg_type"] == "kernel_info_reply":
+            #print("mainWindow: kernel sent kernel_info_reply")
+            # usually sent when right after the kernel started - we use this as
+            # a signal that the kernel has been started, by which we trigger
+            # an initial directory listing.
+            #pass
+            self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["tab"]))
             
+        elif msg["msg_type"] == "is_complete_reply":
+            #print("mainWindow: kernel sent is_complete_reply")
+            #pass
+            self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["tab"]),
+                                          where = msg["tab"])
+            
+                    
+    def execute_in_external_console(self, call, where=None):
+        self.external_console.execute(call, where=where)
+        
     @safeWrapper
     def _import_python_module_file_(self, fileName):
         import importlib.util
@@ -5411,7 +5514,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             viewers_type_list = VTH.get_handlers_for_type(type(obj))
             
             if len(viewers_type_list) == 0:
-                warnings.warn("%s objects have no specialized viewer" % type(obj).__name__)
                 return False
             
             winType = viewers_type_list[0][1]

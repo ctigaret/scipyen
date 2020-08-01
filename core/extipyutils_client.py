@@ -72,18 +72,18 @@ from core.traitcontainers import DataBag
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-# NOTE: 2016-04-03 00:17:42
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 nrn_ipython_initialization_file = os.path.join(os.path.dirname(__module_path__),"neuron_python", "nrn_ipython.py")
-nrn_ipython_initialization_cmd = "".join(["run -i -n ", nrn_ipython_initialization_file])
+nrn_ipython_initialization_cmd = "".join(["run -i -n ", nrn_ipython_initialization_file, " 'gui'"])
 
 init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, importlib",
                  "import traceback, keyword, inspect, itertools, functools, collections",
                  "import signal, pickle, json, csv",
                  "from importlib import reload",
                  "".join(["sys.path.insert(2, '", os.path.dirname(__module_path__), "')"]),
-                 "from core import extipyutils_host as hostutils"
+                 "from core import extipyutils_host as hostutils",
+                 
                  #"from IPython.lib.deepreload import reload as dreload",
                  #"sys.path=['" + sys.path[0] +"'] + sys.path",
                  ]
@@ -306,7 +306,7 @@ def cmds_get_foreign_data_props(dataname:str, namespace:str="Internal") -> list:
     # etc.
     exec_calls = list()
     
-    special = "properties_of_"
+    special = "properties_of"
     
     # Using strategy A (see NOTE 2020-07-11 10:26:38):
     
@@ -316,18 +316,12 @@ def cmds_get_foreign_data_props(dataname:str, namespace:str="Internal") -> list:
     
     # executes the definition of the function
     exec_calls.append(ForeignCall(code=cmd))
-    #exec_calls.append({"code":cmd, "silent": True, "store_history":False, 
-                       #"user_expressions": None})
     
     # calls the function defined above then captures the result in user_expressions
     exec_calls.append(ForeignCall(user_expressions={"%s_%s" % (special, dataname): "".join(["f('", dataname, "', ", dataname, ")"])}))
-    #exec_calls.append({"code": "", "silent": True, "store_history":False, 
-                       #"user_expressions": {"%s_%s" % (special, dataname): "".join(["f('", dataname, "', ", dataname, ")"])}})
     
     # cleans up after use.
     exec_calls.append(ForeignCall(code="del f"))
-    #exec_calls.append({"code": "del f", "silent": True, "store_history":False, 
-                       #"user_expressions": None})
     
     #### END variant 1
     
@@ -347,17 +341,18 @@ def cmds_get_foreign_data_props(dataname:str, namespace:str="Internal") -> list:
     
     ##exec_calls.append({"code":"del f_gen"})
     
-    ##### END variant 2
+    ##### END variant 3
     return exec_calls
     
 def cmds_get_foreign_data_props2(dataname:str, namespace:str="Internal") -> list:
     """Creates a list of execute calls retrieving data properties in foregn ns
     
     """
+    exec_calls = list()
     #### BEGIN variant 2 - works but the with statement must be executed (hence
     # passed as code , not as part of user_expressions)
     # a bit more convoluted, as it creates sub_special_%(dataname) in the foreign namespace
-    special = "properties_of_"
+    special = "properties_of"
     sub_special = "obj_props_"
     
      # defines a generator fcn decorated with contextmanager
@@ -391,7 +386,7 @@ def cmds_get_foreign_data_props2(dataname:str, namespace:str="Internal") -> list
     
     return exec_calls
     
-def cmd_fetch_copy_of_foreign_variable(varname:str, as_call=True) -> typing.Union[ForeignCall, dict]:
+def cmd_copy_from_foreign(varname:str, as_call=True) -> typing.Union[ForeignCall, dict]:
     """Create user expression to fetch varname from a foreign kernel's namespace.
     
     The foreign kernel is the with which the kernel client executing this command
@@ -437,7 +432,7 @@ def cmd_fetch_copy_of_foreign_variable(varname:str, as_call=True) -> typing.Unio
     NOTE: This mechanism creates in the caller's namespace copies of the data 
     existing in the remote kernel (byte-to-byte identical to their originals).
     
-    To fetch several variables use cmd_fetch_copies_of_foreign_variables().
+    To fetch several variables use cmd_copies_from_foreign().
     
     See also unpack_data_recvd_on_shell_chnl.
     
@@ -447,11 +442,7 @@ def cmd_fetch_copy_of_foreign_variable(varname:str, as_call=True) -> typing.Unio
     
     """
     special = "pickled_"
-    
-    #expr = {"%s_%s" % (special,varname):"".join(["pickle.dumps({'",varname,"':",varname,"})",])}
-    
-    remote_expr = "{'",varname,"':",varname,"}"
-    
+    remote_expr = "".join(["{'",varname,"':",varname,"}"])
     expr = {"%s_%s" % (special,varname):pickle_wrap_expr(remote_expr)}
     
     if as_call:
@@ -460,7 +451,7 @@ def cmd_fetch_copy_of_foreign_variable(varname:str, as_call=True) -> typing.Unio
     else:
         return expr
 
-def cmd_fetch_copies_of_foreign_variables(*args, as_call=True) -> typing.Union[ForeignCall, dict]:
+def cmd_copies_from_foreign(*args, as_call=True) -> typing.Union[ForeignCall, dict]:
     """Create user expressions to fetch several variables from a foreign kernel.
     
     The foreign kernel is the with which the kernel client executing this command
@@ -471,7 +462,7 @@ def cmd_fetch_copies_of_foreign_variables(*args, as_call=True) -> typing.Union[F
     args - variable sequence of strings - the names of the variables we want to
             fetch from the remote kernel
             
-            This function calls cmd_fetch_copy_of_foreign_variable() for each element 
+            This function calls cmd_copy_from_foreign() for each element 
             in args then merges the results in a dict.
             
             
@@ -489,7 +480,7 @@ def cmd_fetch_copies_of_foreign_variables(*args, as_call=True) -> typing.Union[F
         When evaluated, the commands trigger the serialization (pickling) of the
         named variables in the remote kernel.
             
-    Similar to cmd_fetch_copy_of_foreign_variable() function, the dict returned 
+    Similar to cmd_copy_from_foreign() function, the dict returned 
     here needs to be included in the "user_expressions" parameter of the kernel's 
     client execute() method.
     
@@ -511,7 +502,8 @@ def cmd_fetch_copies_of_foreign_variables(*args, as_call=True) -> typing.Union[F
     
     """
     import itertools
-    vardicts = (cmd_fetch_copy_of_foreign_variable(arg, as_call=False) for arg in args)
+
+    vardicts = (cmd_copy_from_foreign(arg, as_call=False) for arg in args)
     
     expr = dict((x for x in itertools.chain(*(a.items() for a in vardicts))))
     
@@ -520,7 +512,7 @@ def cmd_fetch_copies_of_foreign_variables(*args, as_call=True) -> typing.Union[F
 
     return expr
 
-def cmd_push_copy_of_data_to_foreign(dataname, data:typing.Any, as_call=True) -> str:
+def cmd_copy_to_foreign(dataname, data:typing.Any) -> str:
     """Creates a user expression to place a copy of data to a remote kernel space.
     
     The data will be bound, in the remote namespace, to the identifier specified
@@ -531,7 +523,7 @@ def cmd_push_copy_of_data_to_foreign(dataname, data:typing.Any, as_call=True) ->
     dataname: str
     data: typing.Any - Must be serializable.
     
-    Unlike the result from cmd_fetch_copy_of_foreign_variable(s), the command string 
+    Unlike the result from cmd_copy_from_foreign(s), the command string 
     returned by this function can be passed to the remote kernel for evaluation
     as the "code" parameter of the client's execute() method.
     
@@ -539,14 +531,32 @@ def cmd_push_copy_of_data_to_foreign(dataname, data:typing.Any, as_call=True) ->
     identifier WILL be overwritten ATTENTION.
     
     """
+    exec_calls = list()
+    #print("cmd_copy_to_foreign: dataname=%s , data=%s" % (dataname, data))
     pickle_str = str(pickle.dumps({dataname:data}))
+    #print("cmd_copy_to_foreign: pickle_str = %s" % pickle_str)
     
-    cmd = " ".join([dataname, "=", "pickle.loads(eval(" + pickle_str + "))"])
+    prepper_cmd="\n".join(["@hostutils.contextExecutor()",
+    "def f(picklebytes):",
+    "   data = pickle.loads(eval(str(picklebytes)))",
+    "   get_ipython().user_ns.update(data)"])
     
-    if as_call:
-        return {"code":cmd, "silent":True, "store_history":False, "user_expressions":None}
+    exec_calls.append(ForeignCall(code=prepper_cmd))
     
-    return cmd
+    unpickler_cmd = "".join(["f(", pickle_str, ")"])
+    exec_calls.append(ForeignCall(code=unpickler_cmd))
+    
+    cleanup_cmd = "del(f)"
+    exec_calls.append(ForeignCall(code = "del f"))
+    
+    return exec_calls
+    #unpickler_cmd = "".join([__unpickled_data__, "=", "pickle.loads(eval(str(", pickle_str, ")))"])
+    #assigner_cmd = "".join
+    
+    #if as_call:
+        #return {"code":cmd, "silent":True, "store_history":False, "user_expressions":None}
+    
+    #return cmd
     
     
 def cmd_foreign_namespace_listing(namespace:str="Internal", as_call=True) -> dict:
@@ -554,6 +564,36 @@ def cmd_foreign_namespace_listing(namespace:str="Internal", as_call=True) -> dic
     """
     
     expr = {"ns_listing_of_%s" % namespace : "dir()"}
+    
+    if as_call:
+        return ForeignCall(user_expressions = expr)
+    
+    return expr
+    
+def cmd_foreign_shell_ns_listing(namespace:str="Internal", as_call=True) -> dict:
+    """Creates a user_expression containing the variable names in a foreign namespace.
+    
+    This one returns get_ipython().user_ns and get_ipython().user_ns_hidden
+    """
+    
+    # NOTE 2020-07-29 22:51:02: WRONG: the value of "ns_listing_of_%s" % namespace
+    # must be a str
+    #expr = {"ns_listing_of_%s" % namespace : {"user_ns":"[k for k in get_ipython().user_ns.keys()",
+                                              #"user_ns_hidden": "[k for k in get_ipython().user_ns_hidden.keys()]"}}
+    
+    ue1 = "{'user_ns':set([k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys() and not inspect.ismodule(get_ipython().user_ns[k]) and not k.startswith('_') ])}"
+    #ue1 = ["{'user_ns':'[k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys() and not k.startswith(",
+           #'"_"',
+           #")]'}"]
+    #ue1 = "{'user_ns':'[k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys()]'}"
+    #ue2 = "'user_ns_hidden': '[k for k in get_ipython().user_ns_hidden.keys()]'}"
+    
+    
+    #expr = {"ns_listing_of_%s" % namespace : "".join([ue1, ue2])}
+    #expr = {"ns_listing_of_%s" % namespace : "".join(ue1)}
+    expr = {"ns_listing_of_%s" % namespace : ue1}
+    
+    #expr = {"ns_listing_of_%s" % namespace : "get_ipython().user_ns"}
     
     if as_call:
         return ForeignCall(user_expressions = expr)
@@ -613,13 +653,13 @@ def unpack_data_recvd_on_shell_chnl(msg:dict) -> dict:
     ret = dict()
     # peel-off layers one by one so we can always be clear of what this does
     msg_status = msg["content"]["status"]
-    usr_expr = msg["content"]["user_expressions"]
+    usr_expr = msg["content"].get("user_expressions", {})
     if msg_status == "ok":
         for key, value in usr_expr.items():
             value_status = value["status"]
             if value_status == "ok":
                 data_str = value["data"]["text/plain"] # this nested dict exists only if value_status is OK
-                if key.startswith("pickled_"): # by OUR OWN convention, see cmd_fetch_copy_of_foreign_variable
+                if key.startswith("pickled_"): # by OUR OWN convention, see cmd_copy_from_foreign
                     data_dict = pickle.loads(eval(data_str))
                     
                 else:
@@ -629,20 +669,20 @@ def unpack_data_recvd_on_shell_chnl(msg:dict) -> dict:
                 
             
             elif value_status == "error":
-                ret.update({"error_%s" % key: {"ename":value["ename"],
+                ret.update({"error_%s_%s" % (key, msg["tab"].replace(" ", "_")): {"ename":value["ename"],
                                                "evalue": value["evalue"],
                                                "traceback": value["traceback"]}})
                 
             else:
-                ret.update({"%s_%s" % (value_status, key): value_status})
+                ret.update({"%s_%s_%s" % (value_status, key, msg["tab".replace(" ", "_")]): value_status})
                     
     elif msg_status == "error":
-        ret.update({"error_%s" % msg["msg_type"]: {"ename": msg["content"]["ename"],
+        ret.update({"error_%s_%s" % (msg["msg_type"], msg["tab"].replace(" ","_")): {"ename": msg["content"]["ename"],
                                                    "evalue": msg["content"]["evalue"],
                                                    "traceback": msg["content"]["traceback"]}})
         
     else:
-        ret.update({"%s_%s" % (msg_status, msg["msg_type"]): msg_status})
+        ret.update({"%s_%s_%s" % (msg_status, msg["msg_type"], msg["tab"].replace(" ", "_")): msg_status})
     
     return ret
 

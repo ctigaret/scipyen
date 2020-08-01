@@ -97,6 +97,7 @@ from jupyter_client.localinterfaces import is_local_ip
 #from core import prog
 from core.prog import safeWrapper
 from core.extipyutils_client import init_commands, execute, ForeignCall
+from core.strutils import string_to_valid_identifier
 
 flags = dict(base_flags)
 qt_flags = {
@@ -144,6 +145,10 @@ class ExternalConsoleWindow(MainWindow):
     sig_shell_msg_exec_reply_content = pyqtSignal(object)
     sig_shell_msg_krnl_info_reply_content = pyqtSignal(object)
     sig_kernel_count_changed = pyqtSignal(int)
+    sig_kernel_started_channels = pyqtSignal(str)
+    sig_kernel_stopped_channels = pyqtSignal(str)
+    sig_kernel_restart = pyqtSignal(str)
+    sig_kernel_exit = pyqtSignal(str)
     #sig_will_close = pyqtSignal()
     
     def __init__(self, app,
@@ -271,10 +276,6 @@ class ExternalConsoleWindow(MainWindow):
         self.add_tab_with_frontend(widget)
         widget.kernel_client.execute(code=code, **kwargs)
         current_widget_index = self.tab_widget.indexOf(widget)
-        ##old_title = self.tab_widget.tabText(self.tab_widget.currentIndex())
-        #old_title = self.tab_widget.tabText(current_widget_index)
-        #new_title= "NEURON %s" % old_title
-        #self.tab_widget.setTabText(current_widget_index, new_title)
         
     def create_neuron_tab(self):
         from core.extipyutils_client import nrn_ipython_initialization_cmd
@@ -282,8 +283,11 @@ class ExternalConsoleWindow(MainWindow):
                                                         silent=True,
                                                         store_history=False)
         
-        self.prefix_tab_title("NEURON ",
-                              self.tab_widget.indexOf(self.active_frontend))
+        ndx = self.tab_widget.indexOf(self.active_frontend)
+        
+        #if "NEURON" not in self.tab_widget.tabText(ndx):
+            #self.prefix_tab_title("NEURON ", ndx)
+                                ####self.tab_widget.indexOf(self.active_frontend))
         
     def start_neuron_in_current_tab(self):
         from core.extipyutils_client import nrn_ipython_initialization_cmd
@@ -292,7 +296,7 @@ class ExternalConsoleWindow(MainWindow):
                                                    store_history=False)
         
         current_widget_index = self.tab_widget.indexOf(self.active_frontend)
-        self.prefix_tab_title("NEURON ", current_widget_index)
+        #self.prefix_tab_title("NEURON ", current_widget_index)
         #old_title = self.tab_widget.tabText(current_widget_index)
         #if "NEURON" not in old_title:
             #new_title= "NEURON %s" % old_title
@@ -314,7 +318,7 @@ class ExternalConsoleWindow(MainWindow):
         if defer_shortcut:
             action.setShortcutContext(QtCore.Qt.WidgetShortcut)
             
-    def find_widget_with_kernel_manager(self, km, as_widget_list=True):
+    def find_widget_with_kernel_manager(self, km, as_widget_list=True, alive_only=False):
         """Find the frontends with the specified kernel manager.
         
         For a given kernel manager there is onyl one "master" frontend (the 
@@ -323,7 +327,7 @@ class ExternalConsoleWindow(MainWindow):
         
         Parameters:
         -----------
-        km = kernel manager for which is_alive() returns True
+        km = kernel manager 
         
         as_widget_list: bool (optional default is True)
             When true, returns a list of frontends (only one is master, if found;
@@ -332,6 +336,9 @@ class ExternalConsoleWindow(MainWindow):
             When False, returns a list of indices of the frontend found, in the
             console window's tab bar.
             
+            
+        alive_only: bool (optional, default is False) ; looks up the widget for
+            alive kernel mangers only
             
         Returns:
         -------
@@ -342,8 +349,11 @@ class ExternalConsoleWindow(MainWindow):
         
         
         """
-        if not km.is_alive():
-            return
+        
+        if alive_only and not km.is_alive():
+            return []
+        #if not km.is_alive():
+            #return
         
         
         widget_list = [self.tab_widget.widget(i) for i in range(self.tab_widget.count())]
@@ -433,6 +443,9 @@ class ExternalConsoleWindow(MainWindow):
             if ndx in tab_titles:
                 return self.tab_widget.widget(tab_titles.index(ndx))
             
+            #else:
+                #raise ValueError("tab %s not found" % ndx)
+            
         else:
             raise TypeError("Expecting an int or a str; got %s instead" % type(ndx.__name__))
         
@@ -478,6 +491,9 @@ class ExternalConsoleWindow(MainWindow):
         if prefix in old_title:
             new_title = old_title.replace(prefix, "")
             self.tab_widget.setTabText(ndx, new_title)
+            return new_title
+        
+        return old_title
             
         
     def add_tab_with_frontend(self,frontend,name=None):
@@ -504,6 +520,8 @@ class ExternalConsoleWindow(MainWindow):
         # kernel are Qt objects (QtZMQSocketChannel). In particular, the channels
         # emit generic Qt signals that contain the actual kernel message
         frontend.kernel_client.shell_channel.message_received.connect(self.slot_kernel_shell_chnl_msg_recvd)
+        #frontend.kernel_client.started_channels.connect(self.slot_kernel_client_started_channels)
+        #frontend.kernel_client.stopped_channels.connect(self.slot_kernel_client_stopped_channels)
         #frontend.kernel_client.iopub_channel.
         frontend.kernel_manager.kernel_restarted.connect(self.slot_kernel_restarted)
         
@@ -596,9 +614,12 @@ class ExternalConsoleWindow(MainWindow):
             if keepkernel is not None:
                 for tab in slave_tabs:
                     tab._hidden = True
-                if closing_widget in slave_tabs:
+                if closing_widget in slave_tabs: # closing a slave tab
                     try :
-                        self.find_master_tab(closing_widget).execute('exit')
+                        master_tab = self.find_master_tab(closing_widget)
+                        master_tab_ndx = self.tab_widget.indexOf(master_tab).replace(" ", "_")
+                        master_tab.execute('exit')
+                        self.sig_kernel_exit.emit(self.tab_widget.tabText(master_ndx))
                     except AttributeError:
                         self.log.info("Master already closed or not local, closing only current tab")
                         self.tab_widget.removeTab(current_tab)
@@ -607,6 +628,7 @@ class ExternalConsoleWindow(MainWindow):
 
         kernel_client = closing_widget.kernel_client
         kernel_manager = closing_widget.kernel_manager
+        closing_tab_text = self.tab_widget.tabText(current_tab).replace(" ", "_")
 
         if keepkernel is None and not closing_widget._confirm_exit:
             # don't prompt, just terminate the kernel if we own it
@@ -645,6 +667,7 @@ class ExternalConsoleWindow(MainWindow):
                         kernel_manager.shutdown_kernel()
                         self.tab_widget.removeTab(current_tab)
                         background(kernel_client.stop_channels)
+                        self.sig_kernel_exit.emit(closing_tab_text)
                     elif reply == 0: # close Console
                         if not closing_widget._existing:
                             # Have kernel: don't quit, just close the tab
@@ -665,6 +688,7 @@ class ExternalConsoleWindow(MainWindow):
             background(kernel_client.stop_channels)
             
         else: #close console and kernel (no prompt)
+            tab_text = self.tab_widget.tabText(current_tab).replace(" ", "_")
             self.tab_widget.removeTab(current_tab)
             if kernel_client and kernel_client.channels_running:
                 for slave in slave_tabs:
@@ -673,8 +697,21 @@ class ExternalConsoleWindow(MainWindow):
                 if kernel_manager:
                     kernel_manager.shutdown_kernel()
                 background(kernel_client.stop_channels)
+                self.sig_kernel_exit.emit(tab_text)
 
         self.update_tab_bar_visibility()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_kernel_client_started_channels(self):
+        tab_txt = self.tab_widget.tabText(self.tab_widget.indexOf(self.current_widget)).replace(" ", "_")
+        self.sig_kernel_started_channels.emit(tab_txt)
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_kernel_client_stopped_channels(self):
+        tab_txt = self.tab_widget.tabText(self.tab_widget.indexOf(self.current_widget)).replace(" ", "_")
+        self.sig_kernel_stopped_channels.emit(tab_txt)
         
     @pyqtSlot()
     @safeWrapper
@@ -688,7 +725,14 @@ class ExternalConsoleWindow(MainWindow):
         km_widgets_ndx = self.find_widget_with_kernel_manager(km, as_widget_list=False)
         
         for ndx in km_widgets_ndx:
-            self.unprefix_tab_title("NEURON ", ndx)
+            tab_text = self.tab_widget.tabText(ndx).replace(" ", "_")
+            widget = self.tab_widget.widget(ndx)
+            widget.kernel_client.execute(code = "\n".join(init_commands), silent=True, store_history=False)
+            self.sig_kernel_restart.emit(tab_text)
+            
+            #if "NEURON" in tab_text:
+                #tab_text = self.unprefix_tab_title("NEURON ", ndx)
+                #self.sig_kernel_start.emit(tab_text)
         
     @safeWrapper
     @pyqtSlot(object)
@@ -713,10 +757,10 @@ class ExternalConsoleWindow(MainWindow):
                 tab_name = self.find_tab_title(masters[0])
                 
             else:
-                tab_name = sessionID
+                tab_name = string_to_valid_identifier("session_%s" % sessionID)
         
         else:
-            tab_name = sessionID
+            tab_name = string_to_valid_identifier("session_%s" % sessionID)
         #tab_name = self.tab_widget.tabText(self.tab_widget.currentIndex())
         
         msg["tab"] = tab_name
@@ -1151,9 +1195,9 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
     
     @safeWrapper
     def execute(self, *code:typing.Union[str, dict, tuple, list, ForeignCall], 
-                frontend : typing.Optional[typing.Union[int, str, RichJupyterWidget]]=None, 
+                where : typing.Optional[typing.Union[int, str, RichJupyterWidget, QtKernelClient]]=None, 
                 **kwargs) -> typing.Union[str, list]:
-        """Execute code in the kernel running behind the active frontend.
+        """Execute code, by default in the kernel behind the active frontend.
         
         Revamped version of the kernel client execute() where "code" can be 
         a dict carrying all the parameters expected by the "legacy" execute()
@@ -1164,7 +1208,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         code: str or dict or sequence of these (mixing allowed)
             When a str, it contains the executed code, possibly empty.
             
-            Whe a dict, it must contain the following keys:
+            When a dict, it must contain the following keys:
                 "code" : str (default "")
                 "silent": bool (default True)
                 "store_history": bool (default False)
@@ -1173,8 +1217,22 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
                 These are 'unfolded' to parameters expected by the "legacy" 
                 execute() method of the lerel client
                 
+        where: QtKernelClient, RichJupyterWidget, int, str (optional, default 
+            is None) = Where to execute the code.
+            
+            When None (default), the code is executed by the active frontend's 
+            kernel  client.
+            
+            Otherwise, it allows to specifiy a kernel client to execute the code,
+            either directly (i.e passing the kernel client here) or indirectly
+            by passing its frontend (RichJupyterWidget) or by looking it up 
+            using the tab's index (int) or name (str).
+            
         **kwargs: additional keyword arguments to kernel_client.execute() as 
-                detailed below:
+                detailed below.
+                
+                ATTENTION These may override contents of the code, if code is
+                a ForeignCall object
                 
                 
         Help on method execute in module jupyter_client.client:
@@ -1223,13 +1281,15 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         -------
         
         TypeError
-            If the frontend parameter is not an int, str or RichJupyterWidget
+            If the where parameter is not an int, str, RichJupyterWidget or 
+                QtKernelClient
+                
             If the code does not resolve to a str or a dict, or a tuple of these
                 (mixing is allowed)
                 
         ValueError
-            If the frontend parameters (int or str) does not resolve to an
-            existing frontend in this console.
+            If the where parameter (int or str) does not resolve to an existing
+            frontend in this console.
         
         Returns:
         -------
@@ -1249,7 +1309,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         # For the former, see RichJupyterWidget.execute()
         
         
-        def _exec_call_(call, fe, **kwargs):
+        def _exec_call_(call, kc, **kwargs):
             # allow kwargs to override named parameters but protect against 
             # overriding the execution code; 
             # NOTE user_expressions are still vulnerable to this
@@ -1264,14 +1324,17 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
                 if len(kwargs):
                     call2 = call.copy()
                     call2.update(kwargs)
-                    return fe.kernel_client.execute(*call2()) # -> str
+                    return kc.execute(*call2()) # -> str
+                    #return fe.kernel_client.execute(*call2()) # -> str
                 
-                return fe.kernel_client.execute(*call()) # -> str
+                #return fe.kernel_client.execute(*call()) # -> str
+                return kc.execute(*call()) # -> str
             
             elif isinstance(call, dict):
                 # one call expression as a dict
                 call.update(kwargs)
-                return fe.kernel_client.execute(**call) # -> return a str
+                return kc.execute(**call) # -> return a str
+                #return fe.kernel_client.execute(**call) # -> return a str
             
                 #silent = call.get("silent", kw_silent)
                 #store_history = call.get("store_history", kw_store_history)
@@ -1298,15 +1361,18 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
                         if len(kwargs):
                             expr2 = expr.copy()
                             expr2.update(kwargs)
-                            ret.append(fe.kernel_client.execute(*expr2())) 
+                            ret.append(kc.execute(*expr2())) 
+                            #ret.append(fe.kernel_client.execute(*expr2())) 
                         else:
-                            ret.append(fe.kernel_client.execute(*expr())) 
+                            ret.append(kc.execute(*expr())) 
+                            #ret.append(fe.kernel_client.execute(*expr())) 
 
                     elif isinstance(expr, dict):
                         # allows overriding by named parameters in kwargs
                         # "code" is protected against this
                         expr.update(kwargs)
-                        ret.append(fe.kernel_client.execute(**expr)) 
+                        ret.append(kc.execute(**expr)) 
+                        #ret.append(fe.kernel_client.execute(**expr)) 
                         
                         #silent = expr.get("silent", kw_silent)
                         #store_history = expr.get("store_history", kw_store_history)
@@ -1322,7 +1388,8 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
                     elif isinstance(expr, str):
                         # just the code was given - we need the kwargs here unless
                         # we're relying on the default
-                        ret.append(fe.kernel_client.execute(expr, **kwargs))
+                        ret.append(kc.execute(expr, **kwargs))
+                        #ret.append(fe.kernel_client.execute(expr, **kwargs))
                         #ret.append(fe.kernel_client.execute(expr, silent=kw_silent, 
                                               #store_history=kw_store_history,
                                               #user_expressions=kw_user_expressions,
@@ -1336,7 +1403,8 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         
             elif isinstance(call, str):
                 # a command string -> fall-through to the end "return fe.execute(...)"
-                return fe.kernel_client.execute(call, **kwargs)
+                return kc.execute(call, **kwargs)
+                #return fe.kernel_client.execute(call, **kwargs)
 
                 #call_str = call
                 #silent = kwargs.get("silent", True)
@@ -1360,29 +1428,51 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
                               #silent=silent, 
                               #store_history=store_history,
                               #user_expressions=user_expressions) # -> return a str
+        client = None
         
-        # identify and check the frontend
-        if frontend is None:
+        if where is None:
             frontend = self.window.active_frontend
+            if frontend is None:
+                return
             
-        elif isinstance(frontend, (int, str)):
-            frontend = self.window.get_frontend(frontend)
+            client = self.window.active_frontend.kernel_client
             
-        elif not isinstance(frontend, RichJupyterWidget):
-            raise TypeError("frontend expected to be a RichJupyterWidget, int or str; got %s instead" % type(frontend).__name__)
+        # identify and check the "where" parameter
+        elif isinstance(where, RichJupyterWidget):
+            client = where.kernel_client
+            
+        elif isinstance(where, int):
+            frontend = self.window.get_frontend(where)
+            if frontend is None:
+                return
+            
+            client = frontend.kernel_client
+            
+        elif isinstance(where, str):
+            frontend = self.window.get_frontend(where.replace("_", " "))
+            if frontend is None:
+                return
+            
+            client = frontend.kernel_client
+            
+        elif isinstance(where, QtKernelClient):
+            client = where
+            
+        else:
+            raise TypeError("'where' parameter expected to be a QtKernelClient, RichJupyterWidget, int, str or None; got %s instead" % type(where).__name__)
         
-        if frontend is None:
-            raise ValueError("Frontend %s not found" % frontend)
-        
+        if client is None:
+            return
+            
         if len(code) == 1:
             # one element in *code sequence - this may be a str, dict, or a sequence of dicts
             # accordingly returns an int or a list of ints
-            return _exec_call_(code[0], frontend, **kwargs)# -> return str or list of str
+            return _exec_call_(code[0], client, **kwargs)# -> return str or list of str
 
         else:
             ret = []
             for call in code:
-                res = _exec_call_(call, frontend, **kwargs)
+                res = _exec_call_(call, client, **kwargs)
                 
                 if isinstance(res, str):
                     ret.append(res)
@@ -1394,84 +1484,87 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
                     
              
         
-    def frontend_execute(self, frontend, **kwargs) -> bool:
-        """Delegates to frontend.execute() method.
+    #def frontend_execute(self, frontend, **kwargs) -> bool:
+        #"""Delegates to frontend.execute() method.
         
-        ATTENTION 
-        DO NOT confuse frontend.execute() with frontend.kernel_client.execute()
+        #ATTENTION 
+        #DO NOT confuse frontend.execute() with frontend.kernel_client.execute().
+        #fronted.execute() is actually qtconsole.ConsoleWidget.execute()
+        #although they both end up doing the same thing?
         
-        Here we use the former, see RichJupyterWidget.execute()
+        #Here we use the former, see RichJupyterWidget.execute(); to execute code
+        #by calling kernel_client.execute() and allow
         
         
-        Parameters:
+        #Parameters:
         
-        -----------
-        frontend: RichJupyterWidget, int or str, or None.
-            int = the index of the frontend's tab in the tab bar of the console
-                    window
+        #-----------
+        #frontend: RichJupyterWidget, int or str, or None.
+            #int = the index of the frontend's tab in the tab bar of the console
+                    #window
                     
-            str = the title of the frontend's tab, in the console window
+            #str = the title of the frontend's tab, in the console window
             
-            RichJupyterWidget: the frontend itself (it may belong to another
-            console)
+            #RichJupyterWidget: the frontend itself (it may belong to another
+            #console)
             
             
-            When None, this is set to the active frontend. Otherwise, code is 
-            executed in the specified frontend, or in the frontend at the 
-            specified index in the console's tab bar, or at the tab with the 
-            specified title
+            #When None, this is set to the active frontend. Otherwise, code is 
+            #executed in the specified frontend, or in the frontend at the 
+            #specified index in the console's tab bar, or at the tab with the 
+            #specified title
             
-        **kwargs: additional keyword arguments passed directly to 
-            frontend.execute, as follows:
+        #**kwargs: additional keyword arguments passed directly to 
+            #frontend.execute, as follows:
             
-            source : str, optional
+            #source : str, optional
 
-                The source to execute. If not specified, the input buffer will be
-                used. If specified and 'hidden' is False, the input buffer will be
-                replaced with the source before execution.
+                #The source to execute. If not specified, the input buffer will be
+                #used. If specified and 'hidden' is False, the input buffer will be
+                #replaced with the source before execution.
 
-            hidden : bool, optional (default False)
+            #hidden : bool, optional (default False)
 
-                If set, no output will be shown and the prompt will not be modified.
-                In other words, it will be completely invisible to the user that
-                an execution has occurred.
+                #If set, no output will be shown and the prompt will not be modified.
+                #In other words, it will be completely invisible to the user that
+                #an execution has occurred.
 
-            interactive : bool, optional (default False)
+            #interactive : bool, optional (default False)
 
-                Whether the console is to treat the source as having been manually
-                entered by the user. The effect of this parameter depends on the
-                subclass implementation.
+                #Whether the console is to treat the source as having been manually
+                #entered by the user. The effect of this parameter depends on the
+                #subclass implementation.
 
-        Raises
-        ------
-        RuntimeError
-            If incomplete input is given and 'hidden' is True. In this case,
-            it is not possible to prompt for more input.
+        #Raises
+        #------
+        #RuntimeError
+            #If incomplete input is given and 'hidden' is True. In this case,
+            #it is not possible to prompt for more input.
             
-        ValueError
-            If the specified frontend index or name was not found
+        #ValueError
+            #If the specified frontend index or name was not found
             
-        TypeError
-            If the specified frontend is neither an int, str or RichJupyterWidget
+        #TypeError
+            #If the specified frontend is neither an int, str or RichJupyterWidget
 
-        Returns
-        -------
-        A boolean indicating whether the source was executed.        
-        """
-        # TODO factorize this with self.execute()
-        if frontend is None:
-            frontend = self.window.active_frontend
+        #Returns
+        #-------
+        #A boolean indicating whether the source was executed.        
+        #"""
+        ## TODO factorize this with self.execute()
+        #if frontend is None:
+            #frontend = self.window.active_frontend
             
-        elif isinstance(frontend, (int, str)):
-            frontend = self.window.get_frontend(frontend)
+        #elif isinstance(frontend, (int, str)):
+            #frontend = self.window.get_frontend(frontend)
             
-        elif not isinstance(frontend, RichJupyterWidget):
-            raise TypeError("frontend expected to be a RichJupyterWidget, int or str; got %s instead" % type(frontend).__name__)
+        #elif not isinstance(frontend, RichJupyterWidget):
+            #raise TypeError("frontend expected to be a RichJupyterWidget, int or str; got %s instead" % type(frontend).__name__)
         
-        if frontend is None:
-            raise ValueError("Frontend %s not found" % frontend)
+        #if frontend is None:
+            #raise ValueError("Frontend %s not found" % frontend)
         
-        return frontend.execute(**kwargs)
+        #return frontend.execute(**kwargs)
 
 # NOTE: use Jupyter (IPython >= 4.x and qtconsole / qt5 by default)
 class ScipyenConsole(RichJupyterWidget):

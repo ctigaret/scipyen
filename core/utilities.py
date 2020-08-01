@@ -24,10 +24,10 @@ signal_types = ['Quantity', 'AnalogSignal', 'IrregularlySampledSignal',
 ndarray_type = ndarray.__name__
 
 
-standard_obj_summary_headers = ["Name","Type","Data Type", 
+standard_obj_summary_headers = ["Name","Workspace",
+                                "Type","Data Type", 
                                 "Minimum", "Maximum", "Size", "Dimensions",
                                 "Shape", "Axes", "Array Order", "Memory Size",
-                                "Workspace",
                                 ]
 
 
@@ -43,10 +43,21 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
                 workspace table)
                 
     The contents of the dict will be used to generate a row in the Workspace Model
-    with the items being displayed in the corresponding Workspace Table view
-    pf the Scipyen main window.
+    with the items being displayed in the corresponding Workspace Table view in
+    the Scipyen main window.
     
     """
+    #NOTE: memory size is reported as follows:
+        #result of obj.nbytes, for object types derived from numpy ndarray
+        #result of total_size(obj) for python containers
+            #by default, and as currently implemented, this is limited 
+            #to python container classes (tuple, list, deque, dict, set and frozenset)
+            
+        #result of sys.getsizeof(obj) for any other python object
+        
+        #TODO construct handlers for other object types as well including 
+        #PyQt5 objects (maybe)
+            
     from numbers import Number
     
     result = dict(map(lambda x: (x, {"display":"", "tooltip":""}), standard_obj_summary_headers))
@@ -336,6 +347,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         #print("namespace", namespace)
             
         result["Data Type"]     = {"display": dtypestr,     "tooltip" : "%s%s" % (dtypetip, dtypestr)}
+        result["Workspace"]     = {"display": namespace,    "tooltip" : "Location: %s kernel namespace" % namespace}
         result["Minimum"]       = {"display": datamin,      "tooltip" : "%s%s" % (mintip, datamin)}
         result["Maximum"]       = {"display": datamax,      "tooltip" : "%s%s" % (maxtip, datamax)}
         result["Size"]          = {"display": sz,           "tooltip" : "%s%s" % (sizetip, sz)}
@@ -344,7 +356,6 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         result["Axes"]          = {"display": axes,         "tooltip" : "%s%s" % (axestip, axes)}
         result["Array Order"]   = {"display": arrayorder,   "tooltip" : "%s%s" % (ordertip, arrayorder)}
         result["Memory Size"]   = {"display": memsz,        "tooltip" : "%s%s" % (memsztip, memsz)}
-        result["Workspace"]     = {"display": namespace,    "tooltip" : "Location: %s kernel namespace" % namespace}
         
         for key, value in result.items():
             value["tooltip"] = "\n".join([value["tooltip"], "Namespace: %s" % result["Workspace"]["display"]])

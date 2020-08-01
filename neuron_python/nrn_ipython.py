@@ -18,9 +18,12 @@ sys.path.insert(2, __module_path__)
 h("nrnversion()") # print NEURON version
 h("nrnversion(8)")# print machine where this copy of NEURON was compiled
 
-from neuron import gui
+start_gui = "gui" in sys.argv
 
-h.load_file("stdrun.hoc")
+if start_gui:
+    from neuron import gui
+
+    h.load_file("stdrun.hoc")
 
 sessions = [i for i in sys.argv if "ses" in os.path.splitext(i)[1]]
 
@@ -45,5 +48,11 @@ hocs = [i for i in sys.argv if "hoc" in os.path.splitext(i)[1]]
 for hoc_file in hocs:
     h.load_file(hoc_file)
     
-del(sessions, hocs)
+del(sessions, hocs, start_gui)
+
+#if __name__ == os.path.basename(os.path.splitext(__file__)[0]):
+    ## run -n option
+    #pass
+
+
             
