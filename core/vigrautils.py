@@ -1,3 +1,4 @@
+import vigra
 def getFrameLayout(img, userFrameAxis=None):
     """Parses a vigra array to identify a reasonable axis defining "frames".
     

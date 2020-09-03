@@ -7,6 +7,7 @@ import vigra
 from core import prog, traitcontainers 
 from core.prog import safeWrapper
 from core.traitcontainers import DataBag
+from core.vigrautils import getFrameLayout
 
 
 class ScanData(object):

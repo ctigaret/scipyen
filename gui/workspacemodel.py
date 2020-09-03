@@ -489,6 +489,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def addRowForVariable(self, dataname, data):
         """CAUTION Only use for data in the internal workspace, not in remote ones.
         """
+        print("addRowForVariable: ", dataname, data)
         v_row = self.generateRowContents2(dataname, data) # generate model view row contents
         #v_row = self.generateRowContents(dataname, data) # generate model view row contents
         self.appendRow(v_row) # append the row to the model
@@ -505,7 +506,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         """
         try:
             displayed_vars = self.getDisplayedVariableNames(asStrings=True)
-            
             if from_console:
                 # NOTE: 2018-10-07 21:46:03
                 # added/removed/modified variables as a result of code executed
@@ -576,6 +576,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 self.pre_execute()
                 
                 displayed_vars = self.getDisplayedVariableNames(asStrings=True)
+                print("displayed_vars", displayed_vars)
                 
                 # variables deleted from workspace or modified by code executed 
                 # outside the console

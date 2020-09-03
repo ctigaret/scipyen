@@ -4436,6 +4436,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             # fix insane file names 
             bName = strutils.string_to_valid_identifier(bName)
             
+            print("loadDiskFile", bName)
+            
             if fileReader is None:
                 fileReader = pio.getLoaderForFile(fName)
                 
@@ -4460,6 +4462,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             return_types = reader_signature.return_annotation
             
             data = fileReader(fName)
+            
+            print("loaded data", data)
             
             if return_types is inspect.Signature.empty:
                 # no return annotation

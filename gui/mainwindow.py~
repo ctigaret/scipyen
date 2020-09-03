@@ -4436,6 +4436,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             # fix insane file names 
             bName = strutils.string_to_valid_identifier(bName)
             
+            print("loadDiskFile", bName)
+            
             if fileReader is None:
                 fileReader = pio.getLoaderForFile(fName)
                 
@@ -4845,9 +4847,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         varnames = [self.workspaceModel.item(i.row(),0).text() for i in indexList if self.workspaceModel.item(i.row(), wscol).text() == "Internal"]
         ns = self.external_console.window.find_tab_title(self.external_console.window.active_frontend)
         for varname in varnames:
-            print("_slot_copyToExternalWS: varname = %s , data = %s" % (varname, self.workspace[varname]))
+            #print("_slot_copyToExternalWS: varname = %s , data = %s" % (varname, self.workspace[varname]))
             self.external_console.execute(cmd_copy_to_foreign(varname, self.workspace[varname]),
                                           where = ns)
+            
+        self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=ns))
     
     @pyqtSlot()
     @safeWrapper
