@@ -1,7 +1,10 @@
-import vigra
+import vigra, numbers
+import quantities as pq
 
-from core import datatypes
-from core.datatypes import arbitrary_unit
+from core import datatypes, xmlutils
+from core.datatypes import arbitrary_unit, pixel_unit
+from core.axisutils import axisTypeFlags, defaultAxisTypeName, defaultAxisTypeSymbol, defaultAxisTypeUnits
+
 
 class AxisCalibration(object):
     """Axis calibration.

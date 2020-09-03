@@ -23,6 +23,8 @@ from . import datatypes as dt
 from . import strutils
 from . import curvefitting as crvf
 
+from core.axisutils import axisTypeFlags
+
 #from .patchneo import neo
 #### END pict.core modules
 
@@ -1045,9 +1047,9 @@ def insertAxis(img, axinfo, axdim):
         raise TypeError("Expecting 'img' as a VigraArray; got %s instead" % type(img).__name__)
     
     if isinstance(axinfo, str):
-        axinfo = vigra.AxisInfo(key=axinfo, typeFlags = dt.axisTypeFlags[axinfo], 
+        axinfo = vigra.AxisInfo(key=axinfo, typeFlags = axisTypeFlags[axinfo], 
                                 resolution = 1.0, 
-                                description = dt.defaultAxisTypeName(dt.axisTypeFlags[axinfo]))
+                                description = dt.defaultAxisTypeName(axisTypeFlags[axinfo]))
         
     elif not isinstance(axinfo, vigra.AxisInfo):
         raise TypeError("Expecting 'axinfo' as an AxisInfo object or a str; got %s instead" % type(axinfo).__name__)
@@ -1188,9 +1190,9 @@ def imageIndexObject(img, slicing=None, newAxis=None, newAxisDim=None):
         
         if isinstance(newAxis, str):
             newAxis = vigra.AxisInfo(key=newAxis, 
-                                     typeFlags=dt.axisTypeFlags[newAxis],
+                                     typeFlags=axisTypeFlags[newAxis],
                                      resolution=1.0,
-                                     description=dt.defaultAxisTypeName(dt.axisTypeFlags[newAxis]))
+                                     description=dt.defaultAxisTypeName(axisTypeFlags[newAxis]))
             
         elif not isinstance(newAxis, vigra.AxisInfo):
             raise TypeError("newAxis parameter expected to be a vigra.AxisInfo object, or a vigra.AxisInfo key string, or None")
@@ -1494,9 +1496,9 @@ Arrays are concatenated in two ways, explained here by examples:
             
             catAxisNdx = min_dims
             
-            newaxis = vigra.AxisInfo(key = catAxis, typeFlags = dt.axisTypeFlags[catAxis],
+            newaxis = vigra.AxisInfo(key = catAxis, typeFlags = axisTypeFlags[catAxis],
                                      resolution=1.0,
-                                     description = dt.defaultAxisTypeName(dt.axisTypeFlags[catAxis]))
+                                     description = dt.defaultAxisTypeName(axisTypeFlags[catAxis]))
             for img in images:
                 new_images.append(insertAxis(img, newaxis, catAxisNdx))
                 

@@ -4436,11 +4436,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             # fix insane file names 
             bName = strutils.string_to_valid_identifier(bName)
             
-            print("loadDiskFile", bName)
+            #print("loadDiskFile", fName)
+            #print("to assign to ", bName)
+            
             
             if fileReader is None:
                 fileReader = pio.getLoaderForFile(fName)
                 
+            #print("fileReader", fileReader)
+            
             if fileReader is None:
                 return False
             
@@ -4461,7 +4465,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             #   return_types)
             return_types = reader_signature.return_annotation
             
+            print("return_types", return_types)
+            
             data = fileReader(fName)
+            
+            #print("loaded data", data)
             
             if return_types is inspect.Signature.empty:
                 # no return annotation
@@ -4508,6 +4516,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
                                     else:
                                         name = "%s_%s_%d" % (bName, "var", k)
                                         self.workspace[name] = data[k]
+                                        
+                        else:
+                            if type(data) not in return_types[0]:
+                                warnings.warn("Data type %s is not listed in the return signature of %s" % (type(data), fileReader))
+                                
+                            self.workspace[bName] = data
                                         
             self._addRecentFile_(fName, fileReader)
             

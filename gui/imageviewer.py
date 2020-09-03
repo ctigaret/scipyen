@@ -82,6 +82,7 @@ from core import strutils as strutils
 from core import datatypes as dt
 from core import vigrautils as vu
 from core import axisutils
+from core.axisutils import axisTypeFlags, defaultAxisTypeName, defaultAxisTypeSymbol, defaultAxisTypeUnits
 from core import axiscalibration
 #from core import neo
 #from core import metaclass_solver
@@ -315,9 +316,9 @@ class AxesCalibrationDialog(QDialog, Ui_AxisCalibrationDialog):
         self.axisIndexSpinBox.setValue(self.selectedAxisIndex)
         
         if self.arrayshape is None:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, dt.defaultAxisTypeName(self.axistags[self.selectedAxisIndex])))
+            self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, defaultAxisTypeName(self.axistags[self.selectedAxisIndex])))
         else:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, dt.defaultAxisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
+            self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, defaultAxisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
             
         self.unitsLineEdit.setClearButtonEnabled(True)
         
@@ -370,9 +371,9 @@ class AxesCalibrationDialog(QDialog, Ui_AxisCalibrationDialog):
         self.description    = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
 
         if self.arrayshape is None:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, dt.defaultAxisTypeName(self.axistags[self.selectedAxisIndex])))
+            self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, defaultAxisTypeName(self.axistags[self.selectedAxisIndex])))
         else:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, dt.defaultAxisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
+            self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, defaultAxisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
             
         self.unitsLineEdit.setText(self.units.__str__().split()[1])
         self.originSpinBox.setValue(self.origin)
@@ -3532,12 +3533,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             # NOTE: 2017-07-26 22:18:14
             # get calibrates axes sizes
             cals = "(%s x %s)" % \
-                (strutils.print_scalar_quantity(dt.getCalibratedAxisSize(self._data_, self.widthAxisInfo.key)), \
-                    strutils.print_scalar_quantity(dt.getCalibratedAxisSize(self._data_, self.heightAxisInfo.key)))
+                (strutils.print_scalar_quantity(vu.getCalibratedAxisSize(self._data_, self.widthAxisInfo.key)), \
+                    strutils.print_scalar_quantity(vu.getCalibratedAxisSize(self._data_, self.heightAxisInfo.key)))
     
             shapeTxt = "%s x %s: %d x %d %s" % \
-                (dt.defaultAxisTypeName(self.widthAxisInfo), \
-                    dt.defaultAxisTypeName(self.heightAxisInfo), \
+                (defaultAxisTypeName(self.widthAxisInfo), \
+                    defaultAxisTypeName(self.heightAxisInfo), \
                     w, h, cals)
             
             self.slot_displayColorBar(self.displayColorBarAction.isChecked())
@@ -3592,12 +3593,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 ## NOTE: 2017-07-26 22:18:14
                 ## get calibrates axes sizes
                 #cals = "(%s x %s)" % \
-                    #(strutils.print_scalar_quantity(dt.getCalibratedAxisSize(self._data_, self.widthAxisInfo.key)), \
-                        #strutils.print_scalar_quantity(dt.getCalibratedAxisSize(self._data_, self.heightAxisInfo.key)))
+                    #(strutils.print_scalar_quantity(vu.getCalibratedAxisSize(self._data_, self.widthAxisInfo.key)), \
+                        #strutils.print_scalar_quantity(vu.getCalibratedAxisSize(self._data_, self.heightAxisInfo.key)))
         
                 #shapeTxt = "%s x %s: %d x %d %s" % \
-                    #(dt.defaultAxisTypeName(self.widthAxisInfo), \
-                        #dt.defaultAxisTypeName(self.heightAxisInfo), \
+                    #(defaultAxisTypeName(self.widthAxisInfo), \
+                        #defaultAxisTypeName(self.heightAxisInfo), \
                         #w, h, cals)
                 
                 #self.slot_displayColorBar(self.displayColorBarAction.isChecked())
