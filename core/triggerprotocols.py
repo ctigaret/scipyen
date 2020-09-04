@@ -1,11 +1,13 @@
-import enum
+import enum, numbers
 import numpy as np
 import quantities as pq
 import neo
 from neo.core import baseneo
 from neo.core import basesignal
 from neo.core import container
-from neo.core.dataobject import DataObject, ArrayDict
+from neo.core.dataobject import (DataObject, ArrayDict)
+
+from core.datatypes import (check_time_units, is_string)
 
 from core import prog
 from core.prog import safeWrapper

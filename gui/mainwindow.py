@@ -2904,26 +2904,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         evt = QtGui.QCloseEvent()
         self.closeEvent(evt)
         
-        #if not self._save_settings_guard_:
-            #self._save_settings_()
-            #self._save_settings_guard_ = True
-        
-        #self.workspaceModel.clear()
-
-        #if self.console is not None:
-            #self.console.kernel_manager.shutdown_kernel()
-            #self.console.close()
-            ##del self.console
-            #self.console = None
-            
-        #if self.external_console:
-            #self.external_console.window.closeEvent(evt)
-            #if not evt.isAccepted():
-                #return
-            #self.external_console = None
-            
-        #self.app.closeAllWindows()
-            
     def closeEvent(self, evt):
         if self.external_console is not None:
             self.external_console.window.closeEvent(evt)

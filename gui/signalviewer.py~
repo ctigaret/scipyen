@@ -1889,13 +1889,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 pIs = self.plotItems
                 
-                #min_x_axis = np.min([p.viewRange()[0][0] for p in self.signalsLayout.items])
-                #max_x_axis = np.max([p.viewRange()[0][0] for p in self.signalsLayout.items])
-                
                 min_x_axis = np.min([p.viewRange()[0][0] for p in pIs])
                 max_x_axis = np.max([p.viewRange()[0][1] for p in pIs])
                 
-                print("_addCursor_ min_x_axis:", min_x_axis, "max_x_axis:", max_x_axis)
+                #print("_addCursor_ min_x_axis:", min_x_axis, "max_x_axis:", max_x_axis)
                 
                 topAxis_y_max = pIs[0].viewRange()[1][1]
                 bottomAxis_y_min = pIs[-1].viewRange()[1][0]
@@ -1927,7 +1924,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if yBounds is None:
                     yBounds = [min_point.y(), max_point.y()]
                 
-        print("_addCursor_ x:", x, "y:", y)
+        #print("_addCursor_ x:", x, "y:", y)
         
         if not isinstance(cursor_type, str):
             raise TypeError("cursor_type expected to be a str; got %s instead" % type(cursor_type).__name__)

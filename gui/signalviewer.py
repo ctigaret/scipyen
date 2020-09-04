@@ -631,31 +631,31 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def dockWidgets(self):
         return [(name, win) for name, win in self.__dict__.items() if isinstance(win, QtWidgets.QDockWidget)]
                 
-    def __del__(self):
-        #super(SignalViewer, self).__del__()
-        self.linkedCrosshairCursors.clear()
-        self.linkedHorizontalCursors.clear()
-        self.linkedVerticalCursors.clear()
-        self.crosshairSignalCursors.clear() # a dict of SignalCursors mapping str name to cursor object
-        self.verticalSignalCursors.clear()
-        self.horizontalSignalCursors.clear()
-        self._data_cursors_.clear()
+    #def __del__(self):
+        ##super(SignalViewer, self).__del__()
+        #self.linkedCrosshairCursors.clear()
+        #self.linkedHorizontalCursors.clear()
+        #self.linkedVerticalCursors.clear()
+        #self.crosshairSignalCursors.clear() # a dict of SignalCursors mapping str name to cursor object
+        #self.verticalSignalCursors.clear()
+        #self.horizontalSignalCursors.clear()
+        #self._data_cursors_.clear()
         
-        self.y = None
-        self.x = None
-        self.oy = None
-        self.ox = None
+        #self.y = None
+        #self.x = None
+        #self.oy = None
+        #self.ox = None
         
-        self.overlays.clear()
+        #self.overlays.clear()
         
-        self._current_plot_item_= None
-        self._focussed_plot_item_ = None
+        #self._current_plot_item_= None
+        #self._focussed_plot_item_ = None
         
-        self.canvas = None
-        self.fig = None
-        self.framesQSlider = None
-        self.framesQSpinBox = None
-        self.menuBar = None
+        #self.canvas = None
+        #self.fig = None
+        #self.framesQSlider = None
+        #self.framesQSpinBox = None
+        #self.menuBar = None
         
     def _update_annotations_(self, data=None):
         self.dataAnnotations.clear()

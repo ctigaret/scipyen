@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """traitlets-aware containers
 """
+import traceback
 from inspect import getcallargs
 from traitlets import (HasTraits, TraitType, Int, Bool, All, is_trait, observe,TraitError)
 from traitlets.utils.bunch import Bunch
+
 from .traitutils import (gen_trait_from_type, transform_link, 
                         TraitsObserver, ContainerTraitsObserver,
                         HasTraits, TraitType, Int, Bool, All, is_trait, observe)
@@ -11,60 +13,64 @@ from .traitutils import (gen_trait_from_type, transform_link,
 from .prog import safeWrapper
 from .strutils import string_to_valid_identifier
 
-#class DataList(list):
-    #"""A list which dynamically generates a TraitType for its elements
-    #CAUTION Use sparingly, as this may incur large overheads, depending on the size of the list
-    #"""
-    #__observer__ = ContainerTraitsObserver()
+class DataBagTraitsObserver(HasTraits):
+    __length__ = Int(default_value=0)
+    __mutable_trait_types__ = Bool(default=False) # WARNING experimental
+    __cast_trait_types__ = Bool(default=False)
     
-    #def __init__(self, *args, **kwargs):
-        #use_mutable = kwargs.pop("mutable_types", False)
-        #do_type_cast = kwargs.pop("cast_types", False)
+    def add_traits(self, **traits):
+        # NOTE 2020-07-04 22:43:58
+        # the super's add_traits blows away non-trait attributes
+        # because existing traits are reverted to the default value
+        length = object.__getattribute__(self, "__length__")
+        mutable = object.__getattribute__(self,"__mutable_trait_types__")
+        do_type_casting = object.__getattribute__(self, "__cast_trait_types__")
         
-        #super().__init__(*args, **kwargs)
+        # NOTE 2020-07-04 22:42:42
+        # __length__ and __mutable_trait_types__ need to be reset to their
+        # current values (see NOTE 2020-07-04 22:43:58)
+        # we do this here in order to avoid triggering a change notification
+        traits.update({"__length__":gen_trait_from_type(length), 
+                    "__mutable_trait_types__":gen_trait_from_type(mutable),
+                    "__cast_trait_types__": gen_trait_from_type(do_type_casting)})
         
-        #try:
-            #trdict = dict(map(lambda k: ("%s"%k, gen_trait_from_type(self[k])), range(self.__len__())))
-            
-            ##callargs = getcallargs(self.__init__, *args, **kwargs)
-            ##print(callargs)
-            
-            ##if len(args):
-                ### NOTE 2020-07-06 12:00:35 list takes at most one argument (an iterable)
-                ##if isinstance(args[0], (tuple, list, range)):
-                    ### parameter is an iterable
-                    ##trdict = dict(map(lambda k: ("_%s"%k, gen_trait_from_type(args[0][k])), range(len(args[0]))))
-                    
-                    
-            
-            ##dd = dict(*args, **kwargs)
-            
-            ##trdict = dict(map(lambda x: (x, gen_trait_from_type(dd[x])), dd.keys()))
-            
-            #trdict.update({"__length__": gen_trait_from_type(self.__len__()),
-                           #"__mutable_trait_types__": gen_trait_from_type(use_mutable==True),
-                           #"__cast_trait_types__": gen_trait_from_type(do_type_cast==True)})
-            
-            ## NOTE 2020-07-05 11:54:44
-            ## this is so that each DataBag instance carries its own instance of
-            ## TraitsObserver
-            ##
-            ## Because of this, self.copy() creates a new object (i.e. does not
-            ## have shallow copy semantics anymore)
-            #obs = ContainerTraitsObserver()
-            
-            #object.__setattr__(self, "__observer__", obs)
-            
-            #super(ContainerTraitsObserver, obs).add_traits(**trdict)
-            
-            #obs.__setattr__("parent", self)
-            #obs.__length__ = self.__len__()
-            
-        #except:
-            #raise
+        super().add_traits(**traits) # this DOES keep __length__ and __mutable_trait_types__ traits but reverts them to the defaults
         
-    #def append(self, item):
+        # this also works, but triggers a change notification, which we don't 
+        # need right now
+        #self.__length__ = length
+        #self.__mutable_trait_types__ = mutable
         
+    def remove_traits(self, **traits):
+        current_traits = self.traits()
+        keep_traits  = dict([(k, current_traits[k]) for k in current_traits if k not in traits])
+        
+        length = self.__length__
+        mutable = self.__mutable_trait_types__
+        do_type_casting = self.__cast_trait_types__
+        
+        
+        # again, this resets the maintenance traits to their default values, 
+        # so we need to restore them (see NOTE 2020-07-04 22:43:58 and 
+        # NOTE 2020-07-04 22:42:42)
+        keep_traits.update({"__length__":gen_trait_from_type(length), 
+                            "__mutable_trait_types__":gen_trait_from_type(mutable),
+                            "__cast_trait_types__": gen_trait_from_type(do_type_casting)})
+        
+        self.__class__ = type(self.__class__.__name__, (HasTraits, ), {"changed":self.changed, "remove_traits":self.remove_traits})
+        
+        self.add_traits(**keep_traits)
+        
+    @observe(All)
+    def changed(self, change):
+        return
+        ## NOTE: 2020-07-05 18:01:01 that's what you can to with these
+        #print("self.changed: change['owner']:\n",change["owner"], "\n")
+        #print("self.changed: change['name']:\n",change["name"], "\n")
+        #print("self.changed: change['old']:\n",change["old"], "\n")
+        #print("self.changed: change['new']:\n",change["new"], "\n")
+
+
         
 class DataBag(Bunch):
     """Dictionary with semantics for direct attribute reference and attribute change observer.
@@ -110,68 +116,27 @@ class DataBag(Bunch):
     # controlled/configurable
     
             
-    class __TraitsObserver__(HasTraits):
-        __length__ = Int(default_value=0)
-        __mutable_trait_types__ = Bool(default=False) # WARNING experimental
-        __cast_trait_types__ = Bool(default=False)
-        
-        def add_traits(self, **traits):
-            # NOTE 2020-07-04 22:43:58
-            # the super's add_traits blows away non-trait attributes
-            # because existing traits are reverted to the default value
-            length = object.__getattribute__(self, "__length__")
-            mutable = object.__getattribute__(self,"__mutable_trait_types__")
-            do_type_casting = object.__getattribute__(self, "__cast_trait_types__")
-            
-            # NOTE 2020-07-04 22:42:42
-            # __length__ and __mutable_trait_types__ need to be reset to their
-            # current values (see NOTE 2020-07-04 22:43:58)
-            # we do this here in order to avoid triggering a change notification
-            traits.update({"__length__":gen_trait_from_type(length), 
-                           "__mutable_trait_types__":gen_trait_from_type(mutable),
-                           "__cast_trait_types__": gen_trait_from_type(do_type_casting)})
-            
-            super().add_traits(**traits) # this DOES keep __length__ and __mutable_trait_types__ traits but reverts them to the defaults
-            
-            # this also works, but triggers a change notification, which we don't 
-            # need right now
-            #self.__length__ = length
-            #self.__mutable_trait_types__ = mutable
-            
-        def remove_traits(self, **traits):
-            current_traits = self.traits()
-            keep_traits  = dict([(k, current_traits[k]) for k in current_traits if k not in traits])
-            
-            length = self.__length__
-            mutable = self.__mutable_trait_types__
-            do_type_casting = self.__cast_trait_types__
-            
-            
-            # again, this resets the maintenance traits to their default values, 
-            # so we need to restore them (see NOTE 2020-07-04 22:43:58 and 
-            # NOTE 2020-07-04 22:42:42)
-            keep_traits.update({"__length__":gen_trait_from_type(length), 
-                                "__mutable_trait_types__":gen_trait_from_type(mutable),
-                                "__cast_trait_types__": gen_trait_from_type(do_type_casting)})
-            
-            self.__class__ = type(self.__class__.__name__, (HasTraits, ), {"changed":self.changed, "remove_traits":self.remove_traits})
-            
-            self.add_traits(**keep_traits)
-            
-        @observe(All)
-        def changed(self, change):
-            return
-            ## NOTE: 2020-07-05 18:01:01 that's what you can to with these
-            #print("self.changed: change['owner']:\n",change["owner"], "\n")
-            #print("self.changed: change['name']:\n",change["name"], "\n")
-            #print("self.changed: change['old']:\n",change["old"], "\n")
-            #print("self.changed: change['new']:\n",change["new"], "\n")
-    
-    __observer__ = __TraitsObserver__()
+    __observer__ = DataBagTraitsObserver()
     
     def __init__(self, *args, **kwargs):
+        """Constructor for a DataBag.
+        
+        *args    : not used
+        **kwargs : attributes to go into the data bag, and the 
+                    following options:
+        
+        mutable_types: bool, default is False
+            When True, an attribute can be of any type that is
+            in the type hierarchy of the current attribute
+            
+        do_type_cast: bool default False
+            When True, and mutable_types is also True,
+            setting an attribute casts its value to
+            the initial type (which is ... ?)
+            
+        """
         use_mutable = kwargs.pop("mutable_types", False)
-        do_type_cast = kwargs.pop("cast_types", False)
+        do_type_cast = kwargs.pop("use_casting", False)
         
         super().__init__(*args, **kwargs)
         
@@ -186,15 +151,15 @@ class DataBag(Bunch):
             
             # NOTE 2020-07-05 11:54:44
             # this is so that each DataBag instance carries its own instance of
-            # TraitsObserver
+            # DataBagTraitsObserver
             #
             # Because of this, self.copy() creates a new object (i.e. does not
             # have shallow copy semantics anymore)
-            obs = DataBag.__TraitsObserver__()
+            obs = DataBagTraitsObserver()
             
             object.__setattr__(self, "__observer__", obs)
             
-            super(DataBag.__TraitsObserver__, obs).add_traits(**trdict)
+            super(DataBagTraitsObserver, obs).add_traits(**trdict)
             
             obs.__setattr__("parent", self)
             
@@ -215,7 +180,7 @@ class DataBag(Bunch):
             self.__observer__.__mutable_trait_types__ = val
             return
         
-        if key == "cast_types" and isinstance(val, bool):
+        if key == "use_casting" and isinstance(val, bool):
             self.__observer__.__cast_trait_types__ = val
             
         # NOTE 2020-07-04 17:32:16 :
@@ -253,6 +218,7 @@ class DataBag(Bunch):
         
         #if isinstance(obs, HasTraits):
         if obs.has_trait(key):
+            # assigns value to an existing trait
             # NOTE 2020-07-04 21:47:57
             # Emulate a "dict" behaviour, where one can assign to a pre-exising
             # key an object of a different type than the object previously assigned
@@ -262,68 +228,45 @@ class DataBag(Bunch):
             # of having observable traits in the first place, but I could imagine 
             # cases where this may be desirable.
             #
+            #object.__setattr__(obs, key, val)
+            
             try:
-                # checks that val is of the type expected by the trait
-                # NOTE 2020-07-04 23:00:47 this may cause casting
-                if object.__getattribute__(obs, "__cast_trait_types__"):
-                    # allow type casting regardless of whether we allow mutation
-                    # of the trait type associated with 'key'
-                    #
-                    # the following statement will check if val type can be 
-                    # casted to the type expected by the current trait
-                    #
-                    # if type(val) cannot be casted (hence fails validation by
-                    # the trait type) the code falls through the except clause,
-                    # below, thus causing a type mutation only if allowed by the
-                    # '__mutable_trait_types__' flag.
-                    #
-                    # if type(val) is not the type expected by the trait, but
-                    # casting is allowed, then val will be casted to the type 
-                    # encapsulated by the trait type
-                    object.__setattr__(obs, key, val)
-                    
-                else:
-                    # explicitly check for type validity
-                    if type(object.__getattribute__(obs, key)) != type(val):
-                        if object.__getattribute__(obs, "__mutable_trait_types__"):
-                            self.__coerce_trait__(obs, key, val)
-                            
-                        else:
-                            raise TraitError("Unexpected value type (%s) for %s trait '%s'" %
-                                            (type(val).__name__, type(obs.traits()[key]).__name__, key))
+                if type(object.__getattribute__(obs, key)) != type(val):
+                    print("type mismatch: expecting %s, got %s instead" % (type(object.__getattribute__(obs, key)).__name__, type(val).__name__))
+                    #print("check if accept casting values")
+                    if object.__getattribute__(obs, "__cast_trait_types__"):
+                        print("casting traits OK")
+                        target_type = type(object.__getattribute__(obs, key))
+                        
+                        new_val = target_type(val) # this may fail
+                        object.__setattr__(obs, key, new_val)
+                        
+                        
+                    elif object.__getattribute__(obs, "__mutable_trait_types__"):
+                        print("not accepting casting, but can mutate")
+                        self.__coerce_trait__(obs, key, val)
                         
                     else:
-                        object.__setattr__(obs, key, val)
-                
+                        print("force through")
+                        #super().__setitem__(key, val) # when all fails don't get here
+                        object.__setattr__(obs, "__length__", self.__len__())
+                        
+                else:
+                    #print("all OK")
+                    object.__setattr__(obs, "__length__", self.__len__())
+                    #super().__setitem__(key, val) # when all fails don't get here
+                    
+                        
+            except:
+                print("assignment of attribute failed")
+                traceback.print_exc()
                 super().__setitem__(key, val) # when all fails don't get here
                 object.__setattr__(obs, "__length__", self.__len__())
                 
-            except:
-                # NOTE 2020-07-04 21:48:08
-                # One option is to remove the previous trait and assign a new
-                # trait based on the new type(val), bound to the same 'key'
-                #
-                # Another option would be to use traitlets.Union(...) from the 
-                # get go, instead of atomic traitlets.TraitType types, but 
-                # depending on what the Union "contains", this could be either 
-                # too prescriptive, or too general.
-                #
-                # The first approach may be a more constly in terms of function
-                # calls. Changes are notified in terms of change in the value of
-                # the trait (implicitly, signalling a new type)
-                if object.__getattribute__(obs, "__mutable_trait_types__"):
-                    # is val has a different type than what's expected by the 
-                    # existing trait, then replace the existing trait with a new
-                    # one, with the same name (key)
-                    #
-                    self.__coerce_trait__(obs, key, val)
-                    super().__setitem__(key, val) # when all fails don't get here
-                    object.__setattr__(obs, "__length__", self.__len__())
-                    
-                else:
-                    raise 
+                        
                 
         else:
+            # adds a new trait
             trdict = {key:gen_trait_from_type(val)}
             obs.add_traits(**trdict)
             super().__setitem__(key, val) # when all fails we don't get here
@@ -446,16 +389,18 @@ class DataBag(Bunch):
     
     @mutable_types.setter
     def mutable_types(self, value):
-        self.__observer__.__mutable_trait_types__ = value
+        setattr(self.__observer__, "__mutable_trait_types__", value==True)
+        #self.__observer__.__mutable_trait_types__ = value
         
     @property
-    def cast_types(self):
+    def use_casting(self):
         obs = object.__getattribute__(self, "__observer__")
         return getattr(obs, "__cast_trait_types__")
     
-    @cast_types.setter
-    def cast_types(self, value):
-        self.__observer__.__cast_trait_types__ = value
+    @use_casting.setter
+    def use_casting(self, value):
+        setattr(self.__observer__, "__cast_trait_types__", value==True)
+        #self.__observer__.__cast_trait_types__ = value
         
     @property
     def notifiers(self):
@@ -513,15 +458,15 @@ class DataBag(Bunch):
         
         """
         dd = dict(self)
-        return DataBag(dd, mutable_types = self.mutable_types, cast_types=self.cast_types)
+        return DataBag(dd, mutable_types = self.mutable_types, use_casting=self.use_casting)
             
         #result.mutable_types = self.mutable_types
-        #result.cast_types = self.cast_types
+        #result.use_casting = self.use_casting
             
         #return result
     
     def update(self, other):
-        # leaves self.mutable_types and self.cast_types unchanged
+        # leaves self.mutable_types and self.use_casting unchanged
         # the behaviour depends on whether self accepts mutating or casting type
         # traits
         

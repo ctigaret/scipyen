@@ -2946,6 +2946,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             self._save_settings_()
             self._save_settings_guard_ = True
             
+        lscatWindows = [w for w in self.app.allWidgets() if isinstance(w, CaTanalysis.LSCaTWindow)]
+        for w in lscatWindows:
+            w.slot_Quit()
+            
         self.app.closeAllWindows()
         
         evt.accept()
