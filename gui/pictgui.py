@@ -72,6 +72,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 #### BEGIN pict.core modules
 from core.utilities import safeWrapper
+from core.traitcontainers import DataBag
 
 #import datatypes as dt
 #from datatypes import DataBag
@@ -699,7 +700,7 @@ class PlanarGraphics(object):
             if vernum >= 0.2:
                 return
             
-        default_state = dt.DataBag()
+        default_state = DataBag()
         for d in self._planar_descriptors_:
             state[d] = 0
             
@@ -710,7 +711,7 @@ class PlanarGraphics(object):
         __upgrade_attribute__("__states__", "_states_", list, list())
         __upgrade_attribute__("__frontends__", "_frontends_", list, list())
         __upgrade_attribute__("__ID__", "_ID_", type(None), None)
-        __upgrade_attribute__("__currentstate__", "_currentstate_", dt.DataBag, default_state)
+        __upgrade_attribute__("__currentstate__", "_currentstate_", DataBag, default_state)
         
         if isinstance(self, Path):
             __upgrade_attribute__("__objects__", "_objects_", list, list())
@@ -854,8 +855,8 @@ class PlanarGraphics(object):
     
         #### BEGIN NOTE: 2019-03-21 11:51:22 check currentframe
         if isinstance(currentframe, int):
-            if currentframe < 0:
-                raise ValueError("current frame expected to be >= 0; got %d instead" % currentframe)
+            #if currentframe < 0: # 2020-09-04 10:31:46 FIXME allow -1
+                #raise ValueError("current frame expected to be >= 0; got %d instead" % currentframe)
             
             if len(frameindex):
                 if currentframe not in frameindex:
@@ -931,7 +932,7 @@ class PlanarGraphics(object):
                     #  used by self.copy()
                     if all([isinstance(v, numbers.Real) for v in args[0]]):
                         # contruct from sequence of planar descriptors
-                        state = dt.DataBag()
+                        state = DataBag()
                         
                         for k, key in enumerate(shape_descriptors):
                             setattr(state, key, args[0][k])
@@ -966,7 +967,7 @@ class PlanarGraphics(object):
                             else:
                                 self._graphics_object_type_ = graphicstype
                                 
-                    elif all([isinstance(v, dt.DataBag) and self._check_state_(v) for v in args[0]]):
+                    elif all([isinstance(v, DataBag) and self._check_state_(v) for v in args[0]]):
                         # construct from sequence of states
                         # NOTE: UNPICKLING sequence of states
                         # get the frame indices from the states, or from the frameindices if specified
@@ -1011,8 +1012,8 @@ class PlanarGraphics(object):
                             else:
                                 self._graphics_object_type_ = graphicstype
                                 
-                elif isinstance(args[0], dt.DataBag) and all ([hasattr(args[0], a) for a in shape_descriptors]):
-                    # NOTE: constructor from a single state object (dt.DataBag) 
+                elif isinstance(args[0], DataBag) and all ([hasattr(args[0], a) for a in shape_descriptors]):
+                    # NOTE: constructor from a single state object (DataBag) 
                     # also used for UNPICKLING planar graphics object with single state
                     # 
                     # since the args[0] is a single DataBag, we assume it is a common state
@@ -1094,7 +1095,7 @@ class PlanarGraphics(object):
                                 
                 elif isinstance(args[0], str):
                     # PlanarGraphics of type "text"
-                    state = dt.DataBag()
+                    state = DataBag()
                     state.text = args[0]
                     state.z_frame = None
                     #setattr(state, "text", args[0])
@@ -1135,7 +1136,7 @@ class PlanarGraphics(object):
                     raise TypeError("Cannot use parametric constructor to initaalise a Path")
                 
                 
-                state = dt.DataBag()
+                state = DataBag()
                 
                 self._states_ = []
 
@@ -1186,7 +1187,7 @@ class PlanarGraphics(object):
                     self._graphics_object_type_ = graphicstype
                         
         else: # no var-positional parameters given
-            state = dt.DataBag()
+            state = DataBag()
             state.z_frame = None
             
             # use default values for planar descriptors
@@ -1264,7 +1265,7 @@ class PlanarGraphics(object):
                                          self._linked_objects_.copy())
         
         else:
-            state = dt.DataBag()
+            state = DataBag()
             
             for d in shape_descriptors:
                 state[d] = 0
@@ -1412,7 +1413,7 @@ class PlanarGraphics(object):
     def _check_state_(self, value):
         import core.datatypes as dt
         
-        if not isinstance(value, dt.DataBag):
+        if not isinstance(value, DataBag):
             return False
         
         shape_descriptors = [d for d in self._planar_descriptors_ if d != "z_frame"]
@@ -1720,13 +1721,14 @@ class PlanarGraphics(object):
         """
         #print("PlanarGraphics.defaultState()")
         import core.datatypes as dt
-        state = dt.DataBag()
+        state = DataBag()
         for d in self._planar_descriptors_:
             state[d] = 0
             
         # NOTE: 2019-07-22 09:07:46
         # make this np.nan rather than None, so we can handle it numerically
-        state.z_frame = None
+        #state.z_frame = None
+        state.z_frame = -1 # 2020-09-04 10:24:35 FIXME as a DataBag this is expected to be an Int trait
         #state.z_frame = np.nan
         
         return state
@@ -1749,7 +1751,7 @@ class PlanarGraphics(object):
         if state is None:
             return ret
         
-        if isinstance(state, dt.DataBag) and len(state)==0:
+        if isinstance(state, DataBag) and len(state)==0:
             ret.append(Move(state.x, state.y))
             # NOTE: 2018-04-20 16:08:03
             # override in a :subclass: 
@@ -1773,7 +1775,7 @@ class PlanarGraphics(object):
         else:
             state = self.getState(frame)
         
-        if isinstance(state, dt.DataBag) and len(state):
+        if isinstance(state, DataBag) and len(state):
             ret.append(self.__class__(state.copy(), graphicstype = self._graphics_object_type_))
             
         return ret
@@ -2174,7 +2176,7 @@ class PlanarGraphics(object):
         import bisect
         import core.datatypes as dt
         
-        if not isinstance(state, dt.DataBag):
+        if not isinstance(state, DataBag):
             raise TypeError("state expected to be a datatypes.DataBag; got %s instead" % type(state).__name__)
         
         if not self._check_state_(state):                                       # make sure state complies with this planar type
@@ -2388,7 +2390,7 @@ class PlanarGraphics(object):
             else:
                 raise ValueError("No state found for frame %d" % stateOrFrame)
             
-        elif isinstance(stateOrFrame, dt.DataBag):
+        elif isinstance(stateOrFrame, DataBag):
             if state in self._states_:
                 self._states_.remove(state)
                 
@@ -2408,7 +2410,7 @@ class PlanarGraphics(object):
                 else:
                     raise ValueError("No states found for frames in %s" % stateOrFrame)
                 
-            elif all([isinstance(v, dt.DataBag) for v in stateOrFrame]):
+            elif all([isinstance(v, DataBag) for v in stateOrFrame]):
                 for states in stateOrFrame:
                     if state in self._states_:
                         self._states_.remove(state)
@@ -2831,7 +2833,7 @@ class PlanarGraphics(object):
         if prev is None:
             x0 = y0 = 0.
             
-        elif isinstance(prev, dt.DataBag):
+        elif isinstance(prev, DataBag):
             if not any([p in prev for p in ("x", "y", "cx", "cy", "c1x", "c1y", "c2x", "c2y", "z_frame")]):
                 raise TypeError("Incompatible data for prev")
             
@@ -2842,7 +2844,7 @@ class PlanarGraphics(object):
             raise TypeError("prev expected to be a datatypes.DataBag compatible with a PlanarGraphics, or None; got %s instead" % type(prev).__name__)
         
         
-        if isinstance(obj, dt.DataBag):
+        if isinstance(obj, DataBag):
             if not any([p in obj for p in ("x", "y", "cx", "cy", "c1x", "c1y", "c2x", "c2y", "z_frame")]):
                 raise TypeError("Incompatible data for obj")
             
@@ -2892,7 +2894,7 @@ class PlanarGraphics(object):
                 return spatial.distance.euclidean([x1, y1], [x0, y0])
                 
         elif isinstance(obj, (tuple, list)): # sequence of states from a Path
-            if not all([isinstance(o, dt.DataBag) for o in obj]):
+            if not all([isinstance(o, DataBag) for o in obj]):
                 raise TypeError("The sequence must contain datatypes.DataBag objects")
             
             if any([not any([p in o for p in ("x", "y", "cx", "cy", "c1x", "c1y", "c2x", "c2y", "z_frame")]) for o in obj]):
@@ -5671,7 +5673,7 @@ class Path(PlanarGraphics):
         if not isinstance(states, (tuple, list)):
             return False
         
-        return all([isinstance(state, dt.DataBag) and all([hasattr(state, a) for a in element._planar_descriptors_]) for (state, element) in zip(states, self._objects_)])
+        return all([isinstance(state, DataBag) and all([hasattr(state, a) for a in element._planar_descriptors_]) for (state, element) in zip(states, self._objects_)])
             
     def _check_frame_states_(self, value):
         if not isinstance(value, dict):
@@ -5689,7 +5691,7 @@ class Path(PlanarGraphics):
         if len(self._objects_) == 0:
             raise RuntimeError("This path object has no elements")
         
-        if not isinstance(state, dt.DataBag):
+        if not isinstance(state, DataBag):
             raise TypeError("state expected to be a datatypes.DataBag; got %s instead" % type(state).__name__)
         
         if not self._check_state_(state):                                       # make sure state complies with this planar type

@@ -37,7 +37,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 #from core import neo
 #from core import patchneo
 from core import (xmlutils, strutils, axisutils, datatypes, datasignal,
-                  scandata, analysisunit, axiscalibration, triggerprotocols,
+                  scandata, axiscalibration, triggerprotocols,
                   neoutils,)
 
 from core.axisutils import *
@@ -859,7 +859,7 @@ def loadAxonFile(fileName:str) -> neo.Block:
     Returns:
     ---------
     
-    data : neo.Block; its "annotatins" attribute is updated to include
+    data : neo.Block; its "annotations" attribute is updated to include
         the axon_info "meta data" augumented with t_start and sampling_rate
         
     NOTE: 2020-02-17 09:31:05
@@ -966,7 +966,7 @@ def loadPickleFile(fileName):
         else:
             raise e
         
-    if isinstance(result, (scandata.ScanData, analysisunit.AnalysisUnit, axiscalibration.AxisCalibration, pictgui.PlanarGraphics)):
+    if isinstance(result, (scandata.ScanData, scandata.AnalysisUnit, axiscalibration.AxisCalibration, pictgui.PlanarGraphics)):
         result._upgrade_API_()
     
     if "neoevent" in sys.modules:

@@ -2,7 +2,7 @@
 """traitlets-aware containers
 """
 from inspect import getcallargs
-from traitlets import (HasTraits, TraitType, Int, Bool, All, is_trait, observe,)
+from traitlets import (HasTraits, TraitType, Int, Bool, All, is_trait, observe,TraitError)
 from traitlets.utils.bunch import Bunch
 from .traitutils import (gen_trait_from_type, transform_link, 
                         TraitsObserver, ContainerTraitsObserver,

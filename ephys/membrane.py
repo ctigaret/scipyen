@@ -53,9 +53,9 @@ import core.datatypes as dt
 import core.plots as plots
 import core.neoutils as neoutils
 import core.datasignal as datasignal
-from core.datasignal import DataSignal, IrregularlySampledDataSignal
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 import core.triggerprotocols
-from core.triggerprotocols import TriggerEvent, TriggerEventType, TriggerProtocol
+from core.triggerprotocols import (TriggerEvent, TriggerEventType, TriggerProtocol)
 import core.scandata
 from core.scandata import ScanData
 

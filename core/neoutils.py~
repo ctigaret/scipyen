@@ -674,25 +674,25 @@ import pyqtgraph as pg
 
 #### BEGIN pict.core modules
 #from . import plots
-from .datasignal import DataSignal, IrregularlySampledDataSignal
-
-from .triggerprotocols import TriggerEvent, TriggerProtocol
-
-from .scandata import ScanData
-
 from .prog import safeWrapper
+from .datatypes import  normalized_index
+from .datasignal import (DataSignal, IrregularlySampledDataSignal)
+from .triggerprotocols import (TriggerEvent, TriggerEventType, TriggerProtocol)
 
 from . import datatypes as dt
 from . import workspacefunctions
 from . import signalprocessing as sigp
 from . import utilities
 
+
 #from .patchneo import neo
 
-from gui.signalviewer import SignalCursor as SignalCursor
 
-from .datatypes import  normalized_index
 #### END pict.core modules
+
+class SignalCursor:
+    # dummy
+    pass
 
 if __debug__:
     global __debug_count__
@@ -1094,6 +1094,8 @@ def cursors2epoch(*args, **kwargs) -> typing.Union[neo.Epoch, typing.Sequence]:
     >> interval == interval2
     True
     """
+    from gui.signalviewer import SignalCursor as SignalCursor
+
     intervals = kwargs.get("intervals", False)
     
     units = kwargs.get("units", pq.s)
@@ -1316,7 +1318,7 @@ def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal],
     cursors, just call max(), min(), argmax() argmin() on a signal time slice 
     obtained using the two cursor's x values.
     """
-    
+    from gui.signalviewer import SignalCursor as SignalCursor
     t0,t1, _ = cursors2intervals(cursor, signal.times.units)
     
     if t0 == t1:
@@ -1353,7 +1355,8 @@ def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
     the sample index of the cursor's x coordinate relative to the beginning of
     the signal.
     """
-    
+    from gui.signalviewer import SignalCursor as SignalCursor
+
     t0,t1,_ = cursors2intervals(cursor, units=signal.times.units)
     
     t0_ndx = np.array(signal.time_index(t0)).flatten()
@@ -1390,7 +1393,8 @@ def cursor_min(signal: typing.Union[neo.AnalogSignal, DataSignal],
     at the cursor's x coordinate if cursor window is zero.
     
     """
-    
+    from gui.signalviewer import SignalCursor as SignalCursor
+
     t0,t1,_ = cursors2intervals(cursor, units=signal.times.units)
     
     if t0 == t1:
@@ -1427,7 +1431,8 @@ def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     the sample index of the cursor's x coordinate relative to the beginning of
     the signal.
     """
-    
+    from gui.signalviewer import SignalCursor as SignalCursor
+
     t0,t1, _ = cursors2intervals(cursor, units=signal.times.units)
     
     t0_ndx = np.array(signal.time_index(t0)).flatten()
@@ -1468,6 +1473,8 @@ def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     object is still a two-element tuple).
     
     """
+    from gui.signalviewer import SignalCursor as SignalCursor
+
     t0,t1, _ = cursors2intervals(cursor, units = signal.times.units)
     
     if t0==t1:
@@ -1498,6 +1505,8 @@ def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
                      channel: typing.Optional[int] = None) -> tuple:
     """The indices of signal maximum and minimum across the cursor's window.
     """
+    from gui.signalviewer import SignalCursor as SignalCursor
+
     t0,t1,_ = cursors2intervals(cursor, units=signal.times.units)
     
     t0_ndx = np.array(signal.time_index(t0)).flatten()
@@ -1549,6 +1558,8 @@ def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
     A python Quantity with the same units as the signal.
     
     """
+    from gui.signalviewer import SignalCursor as SignalCursor
+
     
     t0, t1, _ = cursors2intervals(cursor, units=signal.times.units)
     if t0 == t1:
@@ -1599,6 +1610,8 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal],
     when channel is specified.
     
     """
+    from gui.signalviewer import SignalCursor as SignalCursor
+
     
     data_index = cursor_index(signal, cursor)
     
@@ -1635,6 +1648,8 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
     An int: index of the sample
     
     """
+    from gui.signalviewer import SignalCursor as SignalCursor
+
     # NOTE: specifying a channel doesn't make sense here because all
     # channels in the signal sharethe domain and have the same number of
     # samples
@@ -1683,6 +1698,8 @@ def cursors_measure(func, data, *cursors,
     """
     data: a neo.AnalogSignal or datatypes.DataSignal
     """
+    from gui.signalviewer import SignalCursor as SignalCursor
+
     
     def __signal_measure__(f, x, *cursors, **kwargs):
         return f(x, *cursors, **kwargs)
@@ -1762,7 +1779,8 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
     (1, ) when channel is specified.
         
     """
-    
+    from gui.signalviewer import SignalCursor as SignalCursor
+
     y0 = cursor_average(signal, cursor0, channel=channel)
     y1 = cursor_average(signal, cursor1, channel=channel)
     
@@ -1896,6 +1914,8 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
         gui.signalviewer.SignalCursor of type "vertical"
     
     """
+    from gui.signalviewer import SignalCursor as SignalCursor
+
     t0 = cursor0[0] if isinstance(cursor0, tuple) else cursor0.x
     
     y0 = cursor_average(signal, cursor0, channel=channel)
@@ -1958,6 +1978,8 @@ def epoch2cursors(epoch: neo.Epoch,
     When axis is not None, the cursors are added to the PlotItem or GraphicsScene
     specified by the 'axis' parameter.
     """
+    from gui.signalviewer import SignalCursor as SignalCursor
+
     keep_units = kwargs.pop("keep_units", False)
     if not isinstance(keep_units, bool):
         keep_units = False
@@ -2130,6 +2152,8 @@ def intervals2cursors(*args, **kwargs) -> typing.Sequence:
     each specifying an interval
     
     """
+    from gui.signalviewer import SignalCursor as SignalCursor
+
     axis = kwargs.pop("axis", None)
     if not isinstance(axis, (int, pg.PlotItem, type(None))):
         raise TypeError("axis expected to be an int, a PlotItem or None; got %s instead" % type(axis).__name__)
@@ -5869,14 +5893,14 @@ def forward_difference(sig:[neo.AnalogSignal, DataSignal, np.ndarray],
     
     return ret
 
-def auto_detect_trigger_protocols(data:[ScanData, neo.Block], 
+def auto_detect_trigger_protocols(data: neo.Block, 
                                presynaptic:tuple=(), 
                                postsynaptic:tuple=(),
                                photostimulation:tuple=(),
                                imaging:tuple=(),
                                clear:bool=False):
     
-    """Determines the set of trigger protocols in scandata by searching for 
+    """Determines the set of trigger protocols in a neo.Block by searching for 
     trigger waveforms in the analogsignals contained in data.
     
     Time stamps of the detected trigger protocols will then be used to construct
@@ -5886,10 +5910,7 @@ def auto_detect_trigger_protocols(data:[ScanData, neo.Block],
     Positional parameters:
     =====================
     
-    data:   either a ScanData object, or a neo.Block object
-            
-            If a ScanData object, it must contain a non-empty electrophysiology
-            block.
+    data:   a neo.Block object
             
     Named parameters:
     =================
@@ -5928,18 +5949,14 @@ def auto_detect_trigger_protocols(data:[ScanData, neo.Block],
     """
     from . import datatypes as dt
 
-    if isinstance(data, ScanData):
-        target = data.electrophysiology
-        
-    elif isinstance(data, neo.Block):
-        target = data
-        
-    else:
-        raise TypeError("Expecting a datatypes.ScanData or a neo.Block; got %s instead" % type(data).__name__)
+    if not isinstance(data, neo.Block):
+        raise TypeError("Expecting a neo.Block; got %s instead" % type(data).__name__)
+    
     
     if not isinstance(clear, bool):
         raise TypeError("clear parameter expected to be a boolean; got %s instead" % type(clear).__name__)
         
+    target = data
     #print("auto_detect_trigger_protocols: presynaptic", presynaptic)
     #print("auto_detect_trigger_protocols: postsynaptic", postsynaptic)
     #print("auto_detect_trigger_protocols: photostimulation", photostimulation)
@@ -5949,11 +5966,7 @@ def auto_detect_trigger_protocols(data:[ScanData, neo.Block],
         clear_events(target)
     
     # NOTE: 2019-03-14 21:43:21
-    # each auto-detection below embeds detected events in the "target" 
-    # (for ScanData, the "target" is the electrophysiology block, as it is the 
-    # only container of signals with trigger waveforms
-    # 
-    # depending on the length of the kwyrod parameters (see the docstring)
+    # depending on the length of the keword parameters (see the docstring)
     # we detect events in the whole signal or we limit detetion to a defined 
     # time-slice of the signal
     
@@ -7462,7 +7475,7 @@ def parse_trigger_protocols(src):
     
         NOTE: Permissible modifications to TriggerEvents are changes to their 
             labels, names, and units. These will be reflected in the embedded
-            events whenn they are stored by reference.
+            events when they are stored by reference.
         
             Event time stamps can only be changed by creating an new TriggerEvent.
             To reflect time stamp changes in the "src" events, call remove_events()

@@ -167,15 +167,18 @@ from core.workspacefunctions import validateVarName
 from core.utilities import (get_nested_value, set_nested_value, counterSuffix, )
 from core.prog import (safeWrapper, safeGUIWrapper, )
 import core.datasignal as datasignal
-from core.datasignal import DataSignal, IrregularlySampledDataSignal
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 import core.triggerprotocols
-from core.triggerprotocols import TriggerEvent, TriggerEventType, TriggerProtocol
+from core.triggerprotocols import (TriggerEvent, TriggerEventType, TriggerProtocol)
 import core.scandata
-from core.scandata import ScanData
+from core.scandata import (ScanData, AnalysisUnit)
 import core.axisutils
-from core.axisutils import calibration
+#from core.axisutils import (calibration, axisChannelName)
 import core.traitcontainers
 from core.traitcontainers import DataBag
+from core.axiscalibration import (AxisCalibration, calibration, axisChannelName,
+                                  )
+import core.vigrautils as vu
 
 #### END pict.core modules
 
@@ -1251,16 +1254,20 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
     
     # NOTE: determine the f0Range: the temporal boundaries of the F0 (on the t axis)
     #
-    if isinstance(lsdata.scans[0], dt.PictArray):
-        units = lsdata.scans[0].axiscalibration.getUnits(lsdata.scans[0].axistags["t"])
-        origin = lsdata.scans[0].axiscalibration.getOrigin(lsdata.scans[0].axistags["t"])
-        resolution = lsdata.scans[0].axiscalibration.getResolution(lsdata.scans[0].axistags["t"])
+    cal = AxisCalibration(lsdata.scans[0].axistags["t"])
+    units = cal.getUnits(lsdata.scans[0].axistags["t"])
+    origin = cal.getOrigin(lsdata.scans[0].axistags["t"])
+    resolution = cal.getResolution(lsdata.scans[0].axistags["t"])
+    #if isinstance(lsdata.scans[0], dt.PictArray):
+        #units = lsdata.scans[0].axiscalibration.getUnits(lsdata.scans[0].axistags["t"])
+        #origin = lsdata.scans[0].axiscalibration.getOrigin(lsdata.scans[0].axistags["t"])
+        #resolution = lsdata.scans[0].axiscalibration.getResolution(lsdata.scans[0].axistags["t"])
         
-    else:
-        cal = dt.AxisCalibration(lsdata.scans[0].axistags["t"])
-        units = cal.getUnits(lsdata.scans[0].axistags["t"])
-        origin = cal.getOrigin(lsdata.scans[0].axistags["t"])
-        resolution = cal.getResolution(lsdata.scans[0].axistags["t"])
+    #else:
+        #cal = AxisCalibration(lsdata.scans[0].axistags["t"])
+        #units = cal.getUnits(lsdata.scans[0].axistags["t"])
+        #origin = cal.getOrigin(lsdata.scans[0].axistags["t"])
+        #resolution = cal.getResolution(lsdata.scans[0].axistags["t"])
     
     f0TimeRange = lsdata.analysisoptions["Intervals"]["F0"]
     
@@ -1884,7 +1891,7 @@ def analyseFrame(lsdata, frame, unit=None,
     else:
         reference_channel_ndx = None
 
-    cal = dt.AxisCalibration(lsdata.scans[0].axistags["t"])
+    cal = AxisCalibration(lsdata.scans[0].axistags["t"])
     #print("analyseFrame time axis calibration:")
     #print(cal)
     
@@ -2108,16 +2115,21 @@ def computeLSCaT(roiRange, f0Range, ca_data, ref_data=None, detrend=False,
     if roiRange[0] == roiRange[1]:
         warnings.warn("ROI window range is empty: %s" % str(roiRange), RuntimeWarning)
         
-    if isinstance(ca_data, dt.PictArray):
-        tunits = ca_data.axiscalibration.getUnits(ca_data.axistags["t"])
-        torigin = ca_data.axiscalibration.getOrigin(ca_data.axistags["t"])
-        tresolution = ca_data.axiscalibration.getResolution(ca_data.axistags["t"])
+    tcal = AxisCalibration(ca_data.axistags["t"])
+    tunits = tcal.getUnits(ca_data.axistags["t"])
+    torigin = tcal.getOrigin(ca_data.axistags["t"])
+    tresolution = tcal.getResolution(ca_data.axistags["t"])
+    
+    #if isinstance(ca_data, dt.PictArray):
+        #tunits = ca_data.axiscalibration.getUnits(ca_data.axistags["t"])
+        #torigin = ca_data.axiscalibration.getOrigin(ca_data.axistags["t"])
+        #tresolution = ca_data.axiscalibration.getResolution(ca_data.axistags["t"])
         
-    else:
-        tcal = dt.AxisCalibration(ca_data.axistags["t"])
-        tunits = tcal.getUnits(ca_data.axistags["t"])
-        torigin = tcal.getOrigin(ca_data.axistags["t"])
-        tresolution = tcal.getResolution(ca_data.axistags["t"])
+    #else:
+        #tcal = AxisCalibration(ca_data.axistags["t"])
+        #tunits = tcal.getUnits(ca_data.axistags["t"])
+        #torigin = tcal.getOrigin(ca_data.axistags["t"])
+        #tresolution = tcal.getResolution(ca_data.axistags["t"])
     
     # NOTE: 2018-01-28 08:54:41
     # ATTENTION: VigraArrays are indexed with x first !
@@ -2358,7 +2370,7 @@ def fitEPSCaT(data, p0, bounds, fitWindow = None, integration=None):
         
         return int_dict
         
-    if not isinstance(data, (neo.AnalogSignal, dt.DataSignal)):
+    if not isinstance(data, (neo.AnalogSignal, DataSignal)):
         raise TypeError("Expecting a neo.AnalogSignal or datatypes.DataSignal; got %s instead" % type(data).__name__)
     
     
@@ -3477,7 +3489,7 @@ def epscatOptions(detection_predicate=1.3, roi_width = 10,
 
 @safeWrapper
 def detectRoisInProfile(profile, order, *args, **kwargs):
-    if not isinstance(profile, (dt.DataSignal, np.ndarray)):
+    if not isinstance(profile, (DataSignal, np.ndarray)):
         raise TypeError("Expecting a datatypes.DataBag or a numpy.ndarray; got %s instead" % type(profile).__name__)
     
     bounds = (0, np.inf)
@@ -3833,7 +3845,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     
     defaultPureletFilterOptions = DataBag()
     
-    print(type(defaultPureletFilterOptions))
+    #print(type(defaultPureletFilterOptions))
     
     defaultPureletFilterOptions.scene = DataBag()
     
@@ -5511,11 +5523,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         # if that fails, carry on to construct lsdata w/o ephys
         try:
             if len(ephysFileNames) > 0:
-                if all([mimetypes.guess_type(f)[0] == "application/axon-data" for f in ephysFileNames]):
-                    axon_data = [pio.loadAxonFile(f) for f in ephysFileNames]
+                #if all([mimetypes.guess_type(f)[0] == "application/axon-data" for f in ephysFileNames]):
+                if all(["application/axon" in mimetypes.guess_type(f)[0] for f in ephysFileNames]):
+                    blocks = [pio.loadAxonFile(f) for f in ephysFileNames]
+                    #axon_data = [pio.loadAxonFile(f) for f in ephysFileNames]
+                    #print("axon_data", axon_data)
                     # NOTE: 2020-02-17 13:34:19
                     # axon file loader in iolib.pictio now return a triplet of variables
-                    blocks = [d[0] for d in axon_data]
+                    #blocks = [d[0] for d in axon_data]
                     
                 else:
                     blocks = [pio.loadPickleFile(f) for f in ephysFileNames]
@@ -5554,21 +5569,21 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             # ephys constructed, now check if has as many segments as there are
             # frames in lsdata;
             # adjust segments if necessary
-            if len(ephysData.segments) > lsdata.__scans_frames__:
+            if len(ephysData.segments) > lsdata.nScanFrames:
                 msgbox_btn = QtWidgets.QMessageBox.question(self, "Importing electrophysiology into %s" % tempDataVarName,
-                                                "Block data has more segments (%d) that linescan frames (%d).\n Do you wish to discard surplus segments?" % (len(ephysData.segments), lsdata.__scans_frames__))
+                                                "Block data has more segments (%d) that linescan frames (%d).\n Do you wish to discard surplus segments?" % (len(ephysData.segments), lsdata.nScanFrames))
 
 
                 if msgbox_btn in (QtWidgets.QMessageBox.Yes,  QtWidgets.QMessageBox.Ok):
-                    for k in range(len(ephysData.segments), lsdata.__scans_frames__):
-                        ephysData.segments = ephysData.segments[0:lsdata.__scans_frames__]
+                    for k in range(len(ephysData.segments), lsdata.nScanFrames):
+                        ephysData.segments = ephysData.segments[0:lsdata.nScanFrames]
                         
-            elif len(ephysData.segments) < lsdata.__scans_frames__:
+            elif len(ephysData.segments) < lsdata.nScanFrames:
                 msgbox_btn = QtWidgets.QMessageBox.question(self, "Importing electrophysiology into %s" % tempDataVarName,
-                                                "Block data has fewer segments (%d) that linescan frames (%d).\n Do you wish to append empty segments to electrophysiology?" % (len(ephysData.segments), lsdata.__scans_frames__))
+                                                "Block data has fewer segments (%d) that linescan frames (%d).\n Do you wish to append empty segments to electrophysiology?" % (len(ephysData.segments), lsdata.nScanFrames))
 
                 if msgbox_btn in (QtWidgets.QMessageBox.Yes,  QtWidgets.QMessageBox.Ok):
-                    for k in range(len(ephysData.segments), lsdata.__scans_frames__):
+                    for k in range(len(ephysData.segments), lsdata.nScanFrames):
                         ephysData.segments.append(neo.Segment())
 
             # now go ahead and try to "guess" trigger events based on the user's dialog
@@ -6293,12 +6308,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     rev_p = protocol.reverseAcquisition(copy=True)
                     
                     neoutils.embed_trigger_protocol(rev_p,
-                                                    self._data_.__scans_block__,
+                                                    self._data_.scansBlock,
                                                     clearTriggers=True,
                                                     clearEvents=False)
                     
                     neoutils.embed_trigger_protocol(rev_p,
-                                                    self._data_.__scene_block__,
+                                                    self._data_.sceneBlock,
                                                     clearTriggers=True,
                                                     clearEvents=False)
                     
@@ -10208,16 +10223,21 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
 
         scandata_name_vars = getvarsbytype(ScanData, ws = self._scipyenWindow_.workspace)
         
+        #print("scandata_name_vars", scandata_name_vars)
+        
         if len(scandata_name_vars) == 0:
             return
         
-        name_list = sorted([name for name in scandata_name_vars.keys() if self._check_for_linescan_data_(scandata_name_vars[name])])
+        #name_list = sorted([name for name in scandata_name_vars.keys() if self._check_for_linescan_data_(scandata_name_vars[name])])
+        name_list = sorted([name for name in scandata_name_vars.keys()])# if self._check_for_linescan_data_(scandata_name_vars[name])])
         
         if self._data_ is not None and self._data_.name in name_list:
             pre_selected = self._data_.name
             
         else:
             pre_selected = None
+            
+        #print("name_list", name_list)
         
         choiceDialog = pgui.ItemsListDialog(parent=self, title="Load ScanData Object", itemsList = name_list, preSelected = pre_selected)
         
@@ -10907,10 +10927,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
             if len(self._data_.scene) > 1:
                 # multiple single-channel arrays
-                self.sceneviewers[k].setWindowTitle("%s %s" % ("Scene", dt.AxisCalibration(self._data_.scene[k].axistags["c"]).channelIndicesAndNames()[0][1]))
+                self.sceneviewers[k].setWindowTitle("%s %s" % ("Scene", AxisCalibration(self._data_.scene[k].axistags["c"]).channelIndicesAndNames()[0][1]))
                 
             else: # single possibly multi-channel array
-                axcal = dt.AxisCalibration(self._data_.scene[k].axistags["c"])
+                axcal = AxisCalibration(self._data_.scene[k].axistags["c"])
                 chnames = [s[1] for s in axcal.channelIndicesAndNames()]
                 chnames = "+",join(chnames)
                 
@@ -11540,11 +11560,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
             if len(self._data_.scans) > 1:
                 # multiple single-channel arrays
-                self.scansviewers[k].setWindowTitle("%s %s" % ("Scan", dt.AxisCalibration(self._data_.scans[k].axistags["c"]).channelIndicesAndNames()[0][1]))
+                self.scansviewers[k].setWindowTitle("%s %s" % ("Scan", AxisCalibration(self._data_.scans[k].axistags["c"]).channelIndicesAndNames()[0][1]))
                 
             else:
                 # single, possibly multi-channel array
-                axcal = dt.AxisCalibration(self._data_.scans[k].axistags["c"])
+                axcal = AxisCalibration(self._data_.scans[k].axistags["c"])
                 chnames = [s[1] for s in axcal.channelIndicesAndNames()]
                 chnales = "+".join(chnames)
                 
@@ -12438,7 +12458,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         refChannelName = self._data_.analysisoptions["Channels"]["Reference"]
         
-        channel_ndx = neoutils.get_index_of_named_signal(profiles.segments[frame], refChannelName, stype=dt.DataSignal)
+        channel_ndx = neoutils.get_index_of_named_signal(profiles.segments[frame], refChannelName, stype=DataSignal)
         
         fitted_params, fitted_pcov, \
             rsquare, fitted_profile, \
@@ -12799,9 +12819,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     # the following conditions are met:
                     # len(profiles) == number of frames >>> True
                     # len(profiles[k]) == number of channels for k in range(number of frames) >>> all True
-                    profiles = [[dt.DataSignal(getProfile(img, self._data_.scanRegion.objectForFrame(k)), \
-                                                sampling_period=dt.getAxisResolution(img.axistags["x"]), \
-                                                name="%s" % dt.axisChannelName(subarray.axistags["c"], j), \
+                    profiles = [[DataSignal(getProfile(img, self._data_.scanRegion.objectForFrame(k)), \
+                                                sampling_period=vu.getAxisResolution(img.axistags["x"]), \
+                                                name="%s" % axisChannelName(subarray.axistags["c"], j), \
                                                 index = j) \
                                             for j, img in dt.dimEnum(subarray, "c")] \
                                     for k, subarray in dt.dimEnum(data[0], self._data_.sceneFrameAxis)] \
@@ -12827,9 +12847,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     
                     profiles = list()
                     
-                    profiles = [[dt.DataSignal(getProfile(subarray.bindAxis(self._data_.sceneFrameAxis, k), self._data_.scanRegion.objectForFrame(k)), \
-                                                sampling_period=dt.getAxisResolution(subarray.bindAxis(self._data_.sceneFrameAxis, k).axistags["x"]), \
-                                                name="%s" % dt.axisChannelName(subarray.axistags["c"], 0), index = j) \
+                    profiles = [[DataSignal(getProfile(subarray.bindAxis(self._data_.sceneFrameAxis, k), self._data_.scanRegion.objectForFrame(k)), \
+                                                sampling_period=vu.getAxisResolution(subarray.bindAxis(self._data_.sceneFrameAxis, k).axistags["x"]), \
+                                                name="%s" % axisChannelName(subarray.axistags["c"], 0), index = j) \
                                             for j, subarray in enumerate(data)] \
                                     for k in range(self._data_.sceneFrames)]
                     
@@ -12877,9 +12897,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if len(data) == 1: 
                 # single array, either single-band or multi-band
                 # SEE ALSO comments in self.generateScanRegionProfilesFromScene()
-                profiles = [[dt.DataSignal(np.array(img.mean(axis=1)), \
-                                        sampling_period = dt.getAxisResolution(img.axistags["x"]), \
-                                        name="%s" % dt.axisChannelName(subarray.axistags["c"], j), \
+                profiles = [[DataSignal(np.array(img.mean(axis=1)), \
+                                        sampling_period = vu.getAxisResolution(img.axistags["x"]), \
+                                        name="%s" % axisChannelName(subarray.axistags["c"], j), \
                                         index = j) \
                                     for j, img in dt.dimEnum(subarray, "c")] \
                                 for k, subarray in dt.dimEnum(data[0], self._data_.scansFrameAxis)]
@@ -12907,9 +12927,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                                     #for j, subarray in enumerate(data)] \
                                 #for k in range(data[chNdx].shape[data[chNdx].axistags.index(self.scansFrameAxis)])]
                 
-                profiles = [[dt.DataSignal(np.array(subarray.bindAxis(self._data_.scansFrameAxis, k).mean(axis=1)), \
-                                        sampling_period = dt.getAxisResolution(subarray.bindAxis(self._data_.scansFrameAxis, k).axistags["x"]), \
-                                        name="%s" % dt.axisChannelName(subarray.axistags["c"],0), \
+                profiles = [[DataSignal(np.array(subarray.bindAxis(self._data_.scansFrameAxis, k).mean(axis=1)), \
+                                        sampling_period = vu.getAxisResolution(subarray.bindAxis(self._data_.scansFrameAxis, k).axistags["x"]), \
+                                        name="%s" % axisChannelName(subarray.axistags["c"],0), \
                                         index = j) \
                                     for j, subarray in enumerate(data)] \
                                 for k in range(data[chNdx].shape[data[chNdx].axistags.index(self._data_.scansFrameAxis)])]
@@ -13084,9 +13104,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 if progresSignal is not None:
                     progressSignal.emit(frame_index)
                     
-            source_chn_cal = dt.AxisCalibration(source[0].axistags["c"])
+            source_chn_cal = AxisCalibration(source[0].axistags["c"])
             source_chn_cal.calibrateAxis(result[0].axistags["c"])
-            #result_chn_cal = dt.AxisCalibration(result[0].axistags["c"])
+            #result_chn_cal = AxisCalibration(result[0].axistags["c"])
             #for chn_ndx, chn_name in zip(process_channel_ndx, process_channel_names):
                 #result_chn_cal.setChannelCalibration(chn_ndx, name=chn_name, 
                                                      #units=source_chn_cal.getUnits("c", channel=chn_ndx), 
@@ -13130,7 +13150,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     progressSignal.emit(frame_index)
                     
             for k in process_channel_ndx:
-                chn_cal = dt.AxisCalibration(source[k].axistags["c"])
+                chn_cal = AxisCalibration(source[k].axistags["c"])
                 chn_cal.calibrateAxis(result[k].axistags["c"])
             
             #target[:] = result[:]
@@ -13354,10 +13374,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         except Exception as e:
             traceback.print_exc()
             
+        self._data_ = None
+        
         if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
             self._scipyenWindow_.slot_updateWorkspaceTable(False)
+            self._scipyenwindow_
         
-        self._data_ = None
         
         # finally close this window
         self.close()

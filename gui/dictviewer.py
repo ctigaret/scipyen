@@ -22,20 +22,18 @@ import numpy as np
 
 #### BEGIN pict.core modules
 import core.datatypes as dt
-import core.analysisunit
-from core.analysisunit import AnalysisUnit
 
 import core.axiscalibration
 from core.axiscalibration import AxisCalibration
 
 import core.scandata
-from core.scandata import ScanData
+from core.scandata import (ScanData, AnalysisUnit)
 
 import core.triggerprotocols
-from core.triggerprotocols import TriggerEvent, TriggerProtocol
+from core.triggerprotocols import (TriggerEvent, TriggerProtocol)
 
 import core.datasignal
-from core.datasignal import DataSignal, IrregularlySampledDataSignal
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 
 from core import xmlutils, strutils
 

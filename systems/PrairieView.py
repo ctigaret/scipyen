@@ -23,6 +23,9 @@ import core.datatypes as dt
 import core.imageprocessing as imgp
 import core.neoutils as neoutils
 from core.axisutils import axisTypeFlags, defaultAxisTypeName, defaultAxisTypeSymbol, defaultAxisTypeUnits
+from core.axiscalibration import AxisCalibration
+from core.traitcontainers import DataBag
+from core.scandata import ScanData
 #from core import *
 #### END pict.core modules
 
@@ -178,17 +181,11 @@ class PVLinescanDefinition(object):
                 except:
                     val = k.value
                     
-                #if k.name == "mode":
-                    #self.__dict__[k.name] = PVLinescanMode[val].value
-                ##else:
-                    ##self.__attributes__[k.name] = val
-                
                 if k.name == "mode":
                     self.__attributes__[k.name] = PVLinescanMode[val].value
                 else:
                     self.__attributes__[k.name] = val
                 
-        #if self.__dict__["mode"] == PVLinescanMode.freeHand.value:
         if self.__attributes__["mode"] == PVLinescanMode.freeHand:
             freehandnodes = node.getElementsByTagName("Freehand")
             
@@ -276,6 +273,14 @@ class PVLinescanDefinition(object):
         ret.append(" length = %g\n" % (self.line_length))
         
         return "".join(ret)
+    
+    def metadata(self):
+        metadata = dict()
+        metadata["attributes"] = self.__attributes__
+        metadata["coordinates"] = self.__coordinates__
+        metadata["line_length"] = self.line_length
+        
+        return DataBag(metadata)
         
 
 class PVLaser(object):
@@ -299,9 +304,9 @@ class PVLaser(object):
             ##self.__dict__.update(dict([(k.name, k.value) for k in node.attributes.values()]))
             
         if node.attributes is not None:
-            self.__attributes__ = dt.DataBag(xmlutils.attributesToDict(node))
+            self.__attributes__ = DataBag(xmlutils.attributesToDict(node))
         else:
-            self.__attributes__ = dt.DataBag(dict())
+            self.__attributes__ = DataBag(dict())
             #self.__dict__.update(dict([(k.name, k.value) for k in node.attributes.values()]))
             
     @property
@@ -348,10 +353,10 @@ class PVSystemConfiguration(object):
                 raise TypeError("Parent of a PVSystemConfiguration can only be one or a PVScan object")
 
         if node.attributes is not None:
-            self.__attributes__ = dt.DataBag(xmlutils.attributesToDict(node))
+            self.__attributes__ = DataBag(xmlutils.attributesToDict(node))
             
         else:
-            self.__attributes__ = dt.DataBag(dict())
+            self.__attributes__ = DataBag(dict())
         
         lasers = node.getElementsByTagName("Laser")
         
@@ -420,7 +425,7 @@ class PVStateShard(object):
             else:
                 raise TypeError("Parent of a PVStateShard can only be None or a PVFrame object")
         
-        self.__attributes__ = dt.DataBag(dict())
+        self.__attributes__ = DataBag(dict())
 
         for n in keyNodes:
             try:
@@ -558,11 +563,11 @@ class PVFrame(object):
             ##self.__attributes__ = dict()
             
         if node.attributes is not None:
-            self.__attributes__ = dt.DataBag(xmlutils.attributesToDict(node))
+            self.__attributes__ = DataBag(xmlutils.attributesToDict(node))
         else:
-            self.__attributes__ = dt.DataBag(dict())
+            self.__attributes__ = DataBag(dict())
             
-        self.__files__ = [dt.DataBag(xmlutils.attributesToDict(n)) for n in node.getElementsByTagName("File")]
+        self.__files__ = [DataBag(xmlutils.attributesToDict(n)) for n in node.getElementsByTagName("File")]
         
         #for f in self.__files__:
             #if not "source" in f.keys():
@@ -571,7 +576,7 @@ class PVFrame(object):
         ep = node.getElementsByTagName("ExtraParameters")
         
         if len(ep) > 0:
-            self.ExtraParameters = [dt.DataBag(xmlutils.attributesToDict(n)) for n in ep]
+            self.ExtraParameters = [DataBag(xmlutils.attributesToDict(n)) for n in ep]
         else:
             self.ExtraParameters = None
         
@@ -794,7 +799,7 @@ class PVFrame(object):
             # NOTE: 2018-06-03 22:15:10
             # axis_0_info is the AxisInfo object for the 1st (spatial) dimension (axis)
             axis_0_info = fdata.axistags[0]
-            axis_0_cal  = dt.AxisCalibration(axis_0_info,
+            axis_0_cal  = AxisCalibration(axis_0_info,
                                                     units=pq.um,
                                                     origin=0.0,
                                                     resolution=self.state.attributes["micronsPerPixel_XAxis"],
@@ -815,7 +820,7 @@ class PVFrame(object):
                                              typeFlags=vigra.AxisType.Time, 
                                              resolution = self.state.attributes["scanlinePeriod"])
                 
-                axis_1_cal  = dt.AxisCalibration(axis_1_info,
+                axis_1_cal  = AxisCalibration(axis_1_info,
                                                         units=pq.s,
                                                         origin=0.0,
                                                         resolution=self.state.attributes["scanlinePeriod"],
@@ -826,7 +831,7 @@ class PVFrame(object):
             else:
                 axis_1_info = fdata.axistags[1]
                 
-                axis_1_cal = dt.AxisCalibration(axis_1_info,
+                axis_1_cal = AxisCalibration(axis_1_info,
                                                        units = pq.um,
                                                        origin=0.0,
                                                        resolution = self.state.attributes["micronsPerPixel_YAxis"],
@@ -846,8 +851,8 @@ class PVFrame(object):
             else:
                 axis_2_info = fdata.axistags["c"]
             
-            axis_2_cal = dt.AxisCalibration(axis_2_info, 
-                                                   units = dt.defaultAxisTypeUnits(axis_2_info),
+            axis_2_cal = AxisCalibration(axis_2_info, 
+                                                   units = defaultAxisTypeUnits(axis_2_info),
                                                    origin=0.0,
                                                    resolution = 1.0,
                                                    axisname=self.files[k]["channelName"])
@@ -880,7 +885,7 @@ class PVFrame(object):
                     sdata.insertChannelAxis() # make sure there is a channel axis
                     
                 axis_0_info = sdata.axistags[0]
-                axis_0_cal = dt.AxisCalibration(axis_0_info,
+                axis_0_cal = AxisCalibration(axis_0_info,
                                                        units=pq.um, 
                                                        origin=0.0, 
                                                        resolution=self.state.attributes["micronsPerPixel_XAxis"],
@@ -889,7 +894,7 @@ class PVFrame(object):
                 axis_0_info = axis_0_cal.calibrateAxis(axis_0_info)
                 
                 axis_1_info = sdata.axistags[1]
-                axis_1_cal = dt.AxisCalibration(axis_1_info,
+                axis_1_cal = AxisCalibration(axis_1_info,
                                                        units=pq.um, 
                                                        origin=0.0, 
                                                        resolution=self.state.attributes["micronsPerPixel_YAxis"],
@@ -899,8 +904,8 @@ class PVFrame(object):
                 
                 axis_2_info = sdata.axistags["c"]
                 
-                axis_2_cal = dt.AxisCalibration(axis_2_info,
-                                                       units=dt.defaultAxisTypeUnits(axis_2_info), 
+                axis_2_cal = AxisCalibration(axis_2_info,
+                                                       units=defaultAxisTypeUnits(axis_2_info), 
                                                        origin=0.0, 
                                                        resolution=1.0)
                 axis_2_cal.setChannelCalibration(0, name = self.files[k]["channelName"],
@@ -933,7 +938,7 @@ class PVFrame(object):
                 
                 merged_channel_axis_info = mergedFrameData.axistags["c"]
                 
-                merged_channel_axis_cal = dt.AxisCalibration(merged_channel_axis_info,
+                merged_channel_axis_cal = AxisCalibration(merged_channel_axis_info,
                                                                     axisname = defaultAxisTypeName(merged_channel_axis_info))
                 
                 for channel in channels:
@@ -947,7 +952,7 @@ class PVFrame(object):
                     
                     merged_source_channel_axis_info = mergedSourceData.axistags["c"]
                     
-                    merged_source_channel_axis_cal = dt.AxisCalibration(merged_source_channel_axis_info,
+                    merged_source_channel_axis_cal = AxisCalibration(merged_source_channel_axis_info,
                                                                                axisname = defaultAxisTypeName(merged_source_channel_axis_info))
                     
                     for channel in channels:
@@ -987,7 +992,7 @@ class PVFrame(object):
         
         metadata["type"] = self.__class__.__name__
         
-        return dt.DataBag(metadata)
+        return DataBag(metadata)
         
         
     def __repr__(self):
@@ -1035,7 +1040,7 @@ class PVSequence (object):
             else:
                 raise TypeError("Parent of a PVSequence can only be None or a PVScan object")
         
-        self.__attributes__ = dt.DataBag(dict())
+        self.__attributes__ = DataBag(dict())
         
         if node.attributes is not None:
             for k in node.attributes.values():
@@ -1055,7 +1060,7 @@ class PVSequence (object):
             self.__definition__ = PVLinescanDefinition(node.getElementsByTagName("PVLinescanDefinition")[0], \
                                                         parent=self)
             
-            self.__syncZAxis__ = dt.DataBag(xmlutils.attributesToDict(node.getElementsByTagName("PVLinescanSynchZ")[0]))
+            self.__syncZAxis__ = DataBag(xmlutils.attributesToDict(node.getElementsByTagName("PVLinescanSynchZ")[0]))
             
         else: # TODO / FIXME code for other sequence tyes
             self.__definition__ = None
@@ -1246,7 +1251,7 @@ class PVSequence (object):
                                                 resolution=framePeriod, \
                                                 description=defaultAxisTypeName(axisTypeFlags["t"]))
                     
-                    newAxisCal = dt.AxisCalibration(newAxisInfo,
+                    newAxisCal = AxisCalibration(newAxisInfo,
                                                            units=pq.s, 
                                                            origin=float(self.frames[0].attributes["absoluteTime"]), 
                                                            resolution = framePeriod,
@@ -1270,7 +1275,7 @@ class PVSequence (object):
                                                 resolution=zres, \
                                                 description=defaultAxisTypeName(axisTypeFlags["z"]))
                     
-                    newAxisCal = dt.AxisCalibration(newAxisInfo,
+                    newAxisCal = AxisCalibration(newAxisInfo,
                                                            units=pq.um, 
                                                            origin=float(self.frames[0].state.attributes["positionCurrent_ZAxis"]), 
                                                            resolution=zres,
@@ -1366,7 +1371,7 @@ class PVSequence (object):
                                                 resolution=zres, \
                                                 description=defaultAxisTypeName(axisTypeFlags["z"]))
                     
-                    newAxisCal = dt.AxisCalibration(newAxisInfo,
+                    newAxisCal = AxisCalibration(newAxisInfo,
                                                            units=pq.um, 
                                                            origin=float(self.frames[0].state.attributes["positionCurrent_ZAxis"]), 
                                                            resolution=zres,
@@ -1438,7 +1443,7 @@ class PVSequence (object):
         """Returns metadata for this sequence.
         
         This is an ordered dictionary with the following fields:
-        sequence    = dictionary with the sequence attributes
+        attributes    = dictionary with the sequence attributes
         length      = number of frames in the sequence
         definition  = for Linescan sequences this is the actual linescan definition; this is None for other sequence types
         zsync       = Z axis synchronization parameters
@@ -1447,11 +1452,11 @@ class PVSequence (object):
         """
         metadata = dict()
         
-        metadata["sequence"]    = self.attributes
+        metadata["attributes"]  = self.attributes
         metadata["length"]      = self.length
-        metadata["definition"]  = self.definition
+        metadata["definition"]  = self.definition.metadata()
         metadata["zsync"]       = self.zAxisSynchronization
-        metadata["file_path"]    = self.filepath
+        metadata["file_path"]   = self.filepath
         
         if self.type == PVSequenceType.Linescan:
             if self.definition.mode in (PVLinescanMode.straightLine, \
@@ -1509,7 +1514,7 @@ class PVSequence (object):
         
         metadata["type"] = self.__class__.__name__
         
-        return dt.DataBag(metadata)
+        return DataBag(metadata)
         
     @property
     def parent(self):
@@ -1668,9 +1673,9 @@ class PVScan(object):
         # at various places in the code, unless you write code to manage it.
         # -- too work for little benefit
         if doc.documentElement.attributes is not None:
-            self.__attributes__ = dt.DataBag(xmlutils.attributesToDict(doc.documentElement))
+            self.__attributes__ = DataBag(xmlutils.attributesToDict(doc.documentElement))
         else:
-            self.__attributes__ = dt.DataBag(dict())
+            self.__attributes__ = DataBag(dict())
             
         # query its children
         if not doc.documentElement.hasChildNodes():
@@ -1812,7 +1817,7 @@ class PVScan(object):
                                                        resolution=framePeriod, \
                                                        description=defaultAxisTypeName(axisTypeFlags["t"]))
                 
-                newAxisCal = dt.AxisCalibration(newAxisInfo,
+                newAxisCal = AxisCalibration(newAxisInfo,
                                                        units=pq.s,
                                                        origin=float(self.sequences[0].frames[0].attributes["absoluteTime"]),
                                                        resolution=framePeriod,
@@ -1910,13 +1915,13 @@ class PVScan(object):
                     # NOTE: 2017-10-25 00:46:39
                     # returns a tuple of single-band frame data channels & single-band source data channels 
                     #print("fdata")
-                    fdata = [imgp.concatenateImages([imgp.insertAxis(frmdata[sequence][channel], newAxisInfo, newAxisDim) \
+                    fdata = [imgp.concatenateImages(*[imgp.insertAxis(frmdata[sequence][channel], newAxisInfo, newAxisDim) \
                                                         for sequence in range(len(self.sequences))], \
                                                         axis=newAxisInfo) \
                             for channel in range(len(frmdata[0]))]
                     
                     #print("sdata")
-                    sdata = [imgp.concatenateImages([imgp.insertAxis(srcdata[sequence][channel], newAxisInfo, newAxisDim) \
+                    sdata = [imgp.concatenateImages(*[imgp.insertAxis(srcdata[sequence][channel], newAxisInfo, newAxisDim) \
                                                         for sequence in range(len(self.sequences))], \
                                                         axis=newAxisInfo) \
                             for channel in range(len(srcdata[0]))]
@@ -1989,7 +1994,7 @@ class PVScan(object):
         
         meta = self.metadata()
         #print("PVScan.scanData  c'tuct ScanData")
-        ret = dt.ScanData(scene=scene, scans=scans, metadata=meta, name=self.name)
+        ret = ScanData(scene=scene, scans=scans, metadata=meta, name=self.name)
         
         if analysisoptions is not None:
             ret.analysisoptions = analysisoptions
@@ -2038,7 +2043,7 @@ class PVScan(object):
             
         metadata["type"] = self.__class__.__name__
         
-        return dt.DataBag(metadata)
+        return DataBag(metadata)
     
     def mergeChannels(self, filepath=None):
         """Coerce reading the files as a multiband image.

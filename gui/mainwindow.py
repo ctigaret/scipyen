@@ -2122,12 +2122,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
 
         return varnames
     
-    def _removeFromWorkspace_(self, name:str, from_console:bool=True):
+    def removeFromWorkspace(self, name:str, from_console:bool=True):
         self.workspace.pop(name, None)
         self.slot_updateWorkspaceTable(from_console)
 
-    def _assignToWorkspace_(self, name:str, val:object, from_console:bool = False):
-        #print("MainWindow._assignToWorkspace_", name, val)
+    def assignToWorkspace(self, name:str, val:object, from_console:bool = False):
+        #print("MainWindow.assignToWorkspace", name, val)
         self.workspace[name] = val
         self.slot_updateWorkspaceTable(from_console)
         
@@ -2213,7 +2213,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
     @pyqtSlot()
     @safeWrapper
     def slot_launchCaTAnalysis(self):
-        self.lscatWindow.show()
+        lscatWindow = CaTanalysis.LSCaTWindow(parent=self, pWin=self, win_title="LSCaT")
+        lscatWindow.show()
+        #self.lscatWindow.show()
         
     def _getHistoryBlockAsCommand_(self, magic=None):
         cmd = ""
@@ -2938,11 +2940,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             #del self.console
             self.console = None
             
-        self.lscatWindow.slot_Quit()
+        #self.lscatWindow.slot_Quit()
         
         if not self._save_settings_guard_:
             self._save_settings_()
             self._save_settings_guard_ = True
+            
+        lscatWindows = [w for w in self.app.allWidgets() if isinstance(w, CaTanalysis.LSCaTWindow)]
+        for w in lscatWindows:
+            w.slot_Quit()
             
         self.app.closeAllWindows()
         
@@ -3176,7 +3182,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
         # NOTE: 2017-11-10 14:17:11
         # TODO factor the follwing out in a plugin-like framework
         # BEGIN
-        self.lscatWindow = CaTanalysis.LSCaTWindow(parent=self, pWin=self, win_title="LSCaT")
+        #self.lscatWindow = CaTanalysis.LSCaTWindow(parent=self, pWin=self, win_title="LSCaT")
         
         # NOTE: 2017-11-11 21:30:58 add this as a menu command, and open it in a
         # separate window, rather than tabbed window, which is more useful for
@@ -4465,7 +4471,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__):
             #   return_types)
             return_types = reader_signature.return_annotation
             
-            print("return_types", return_types)
+            #print("return_types", return_types)
             
             data = fileReader(fName)
             

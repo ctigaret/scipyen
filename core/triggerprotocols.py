@@ -303,10 +303,13 @@ class TriggerEvent(DataObject):
                 
         if labels is None:
             labels = np.array([], dtype='S')
+            
         else:
             labels = np.array(labels)
             if labels.size != times.size and labels.size:
-                raise ValueError("Labels array has different length to times")
+                warnings.warn("Labels array has different length to times")
+                #raise ValueError("Labels array has different length to times")
+            
         if units is None:
             # No keyword units, so get from `times`
             try:

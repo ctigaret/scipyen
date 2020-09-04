@@ -1,4 +1,5 @@
 import vigra
+import numpy as np
 import quantities as pq
 from core.axiscalibration import AxisCalibration
 
@@ -360,7 +361,7 @@ def getAxisOrigin(axisinfo):
     return axcal.getOrigin(axisinfo.key)
     
 def specifyAxisTags(image, newtags, newshape=None, in_place=False):
-    """Assigns a new AxisTags object to a VigraArray or PictArray.
+    """Assigns a new AxisTags object to a VigraArray.
     Optionally, reshapes the data array and removes or inserts new axes
     if necessary.
     
