@@ -3085,7 +3085,7 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
             # alongside neo.AnalogSignal objects ( guess ... TODO check this)
             
             if silent:
-                return [utilities.silentindex([i.name for i in getattr(j, signal_collection)], names) for j in data]
+                return [utilities.silentindex([i.name for i in getattr(j, signal_collection)], names, multiple=False) for j in data]
             
             return [[i.name for i in getattr(j, signal_collection)].index(names) for j in data]
              
@@ -3095,41 +3095,25 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
                 # list of lists, where each list element has the indices for a given
                 # signal name
                 if silent:
-                    return [[utilities.silentindex([i.name for i in getattr(j, signal_collection)], k) for k in names] for j in data]
+                    return [[utilities.silentindex([i.name for i in getattr(j, signal_collection)], k, multiple=False) for k in names] for j in data]
                 
                 return [[[i.name for i in getattr(j, signal_collection)].index(k) for k in names ] for j in data]
                 
     elif isinstance(src, neo.core.Segment):
         objectList = getattr(src, signal_collection)
-        #if stype in (neo.AnalogSignal, DataSignal) or \
-            #(isinstance(stype, (tuple, list)) and all([s.__name__ in ("AnalogSignal", "DataSignal") for s in stype])):
-            #objectList = src.analogsignals
-            
-        #elif stype is neo.IrregularlySampledSignal:
-            #objectList = src.irregularlysampledsignals
-            
-        #elif stype is neo.SpikeTrain:
-            #objectList = src.spiketrains
-            
-        #elif stype is neo.Event:
-            #objectList = src.events
-            
-        #elif stype is neo.Epoch:
-            #objectList = src.epochs
-            
-        #else:
-            #raise TypeError("Invalid stype")
         
         if isinstance(names, str):
             if silent:
-                return utilities.silentindex([i.name for i in objectList], names)
+                #ret = utilities.silentindex([i.name for i in objectList], names, multiple=False)
+                #print("ret", ret)
+                return utilities.silentindex([i.name for i in objectList], names, multiple=False)
             
             return [i.name for i in objectList].index(names)
             
         elif isinstance(names, (list, tuple)):
             if np.all([isinstance(i,str) for i in names]):
                 if silent:
-                    return [utilities.silentindex([i.name for i in objectList], j) for j in names]
+                    return [utilities.silentindex([i.name for i in objectList], j, multiple=False) for j in names]
                 
                 return [[i.name for i in objectList].index(j) for j in names]
             

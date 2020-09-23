@@ -1,13 +1,3 @@
-import os, sys, traceback, warnings, json, pickle, csv
-from pprint import pprint
-
-import numpy as np
-import scipy
-
-import matplotlib as mpl
-from matplotlib import pyplot as plt
-from matplotlib import cm
-
 import neuron
 from neuron import h, rxd, units, nrn
 from neuron.units import ms, mV

@@ -247,9 +247,18 @@ class ScipyenViewer(QtWidgets.QMainWindow):
             if enforce or self._winTitle_ is None or (isinstance(self._winTitle_, str) and len(self._winTitle_.strip()) == 0): 
                 # auto-set viewer title ONLY if not already set, or enforce is True
                 if self._scipyenWindow_ is not None:
-                    viewerVarName = [k for k in self._scipyenWindow_.workspace.keys() if \
-                                    type(self._scipyenWindow_.workspace[k]).__name__ == type(self).__name__ and \
-                                    self._scipyenWindow_.workspace[k].ID == self._scipyenWindow_.currentImageViewerWindowID]
+                    if self.__class__ in self._scipyenWindow_.currentViewers:
+                        currentViewer = self._scipyenWindow_.currentViewers[self.__class__]
+                        
+                    else:
+                        currentViewer = None
+                        
+                    if currentViewer is None:
+                        viewerVarName = []
+                    else:
+                        viewerVarName = [k for k in self._scipyenWindow_.workspace.keys() if \
+                                        type(self._scipyenWindow_.workspace[k]).__name__ == type(self).__name__ and \
+                                        self._scipyenWindow_.workspace[k].ID == currentViewer.ID]
                     
                     # NOTE: 2019-11-09 13:40:54
                     # when called from __init__, self is not bound to any

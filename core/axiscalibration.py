@@ -1,5 +1,6 @@
 import numbers, traceback
 import vigra 
+import numpy as np
 import quantities as pq
 
 from core import datatypes, xmlutils
@@ -2517,7 +2518,14 @@ class AxisCalibration(object):
             raise KeyError("Axis %s not found in this AxisCalibration object" % key)
         
         if isinstance(value, numbers.Real):
-            value *= self._calibration_[key][channel]["units"]
+            if self._calibration_[key]["axistype"] & vigra.AxisType.Channels:
+                if channel not in self._calibration_[key].keys():
+                    raise KeyError("Channel %d not found for axis %s with key %s" % (channel, self._calibration_[key]["axisname"], self._calibration_[key]["axiskey"]))
+                
+                value *= self._calibration_[key][channel]["units"]
+                
+            else:
+                value *= self._calibration_[key]["units"]
             
         elif not isinstance(value, pq.Quantity):
             raise TypeError("Expecting a python Quantity; got %s instead" % type(value).__name__)

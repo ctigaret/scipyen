@@ -153,7 +153,8 @@ class AnalysisUnit(object):
         
         self._protocols_ = list() #  holds REFERENCES to TriggerProtocols in the parent
         
-        self._descriptors_ = DataBag()
+        self._descriptors_ = DataBag(mutable_types=True, allow_none=True)
+        #self._descriptors_.mutable_types = True
         
         if not isinstance(landmark, (pgui.PlanarGraphics, type(None))):
             raise TypeError("landmark expected to be a pictgui.PlanarGraphics; got %s instead" % type(landmark).__name__)
@@ -300,7 +301,7 @@ class AnalysisUnit(object):
         _upgrade_attribute_("__sample_source__", "_sample_source_", str, "NA")
         _upgrade_attribute_("__unit_name__", "_unit_name_", (str, type(None)), None)
         _upgrade_attribute_("__protocols__", "_protocols_", list, list())
-        _upgrade_attribute_("__descriptors__", "_descriptors_", DataBag, DataBag())
+        _upgrade_attribute_("__descriptors__", "_descriptors_", DataBag, DataBag(mutable_types=True, allow_none=True))
         _upgrade_attribute_("__landmark__", "_landmark_", (pgui.PlanarGraphics, type(None)), None)
         
         if isinstance(self._landmark_, pgui.PlanarGraphics):
@@ -1146,7 +1147,7 @@ class AnalysisUnit(object):
         """The descriptors dictionary (a DataBag object)
         """
         if not hasattr(self, "_descriptors_"):
-            self._descriptors_ = DataBag()
+            self._descriptors_ = DataBag(mutable_types=True, allow_none=True)
             
         if hasattr(self, "_descriptors"):
             self._descriptors_ = self._descriptors
@@ -1159,7 +1160,7 @@ class AnalysisUnit(object):
         if isinstance(value, (DataBag, dict)):
             self._descriptors_.clear()
             
-            v = DataBag()
+            v = DataBag(mutable_types=True, allow_none=True)
             for item in value.items():
                 if not isinstance(item[0], str):
                     raise TypeError("Expecting a dict or a DataBag with string keys only")
@@ -1177,7 +1178,7 @@ class AnalysisUnit(object):
         For convenience.
         """
         if not hasattr(self, "_descriptors_"):
-            self._descriptors_ = DataBag()
+            self._descriptors_ = DataBag(mutable_types=True, allow_none=True)
             
         if hasattr(self, "_descriptors"):
             self._descriptors_ = self._descriptors
@@ -1191,7 +1192,7 @@ class AnalysisUnit(object):
         """Returns None if descriptor name does not exist.
         """
         if not hasattr(self, "_descriptors_"):
-            self._descriptors_ = DataBag()
+            self._descriptors_ = DataBag(mutable_types=True, allow_none=True)
             
         if hasattr(self, "_descriptors"):
             self._descriptors_ = self._descriptors
@@ -1205,7 +1206,7 @@ class AnalysisUnit(object):
         """Sets/adds a descriptor.
         """
         if not hasattr(self, "_descriptors_"):
-            self._descriptors_ = DataBag()
+            self._descriptors_ = DataBag(mutable_types=True, allow_none=True)
             
         if hasattr(self, "_descriptors"):
             self._descriptors_ = self._descriptors
@@ -1961,7 +1962,7 @@ class ScanData(object):
             if vernum >= 0.2:
                 return
             
-        _upgrade_attribute_("__metadata__", "_metadata_", DataBag, DataBag())
+        _upgrade_attribute_("__metadata__", "_metadata_", DataBag, DataBag(mutable_types=True, allow_none=True))
         _upgrade_attribute_("__name__", "_name_", str, "ScanData")
         _upgrade_attribute_("__modified__", "_modified_", bool, False)
         _upgrade_attribute_("__processed__", "_processed_", bool, False)
@@ -4727,7 +4728,7 @@ class ScanData(object):
         else:
             raise TypeError("protocol expected to be a TriggerProtocol object, a string (protocol name), a sequence of TriggerProtocol objects or of strings (protocol names); got %s instead" % type(protocol).__name__)
         
-        if isinstance(landmark, pgui.PlanarGraphics):
+        if isinstance(landmark, (pgui.PlanarGraphics, str)):
             if scene:
                 landmarks = list(self.sceneRois.values()) + list(self.sceneCursors.values()) # use scene landmarks
                 
@@ -4740,8 +4741,21 @@ class ScanData(object):
             landmark_names = [l.name for l in landmarks]
             landmark_types = [l.type for l in landmarks]
             
-            if landmark not in landmarks or landmark.name not in landmark_names or landmark.type not in landmark_types:
-                raise ValueError("landmark %s does not exist in %s images of %s" % (landmark.name, where, self.name))
+            if isinstance(landmark, pgui.PlanarGraphics):
+                if landmark not in landmarks or landmark.name not in landmark_names or landmark.type not in landmark_types:
+                    raise ValueError("landmark %s does not exist in %s images of %s" % (landmark.name, where, self.name))
+                
+            elif isinstance(landmark, str):
+                if landmark not in landmark_names:
+                    raise ValueError("landmark %s not found" % landmark)
+                
+                # find the landmark with given name
+                ldmrk = [l for l in landmarks if l.name == landmark]
+                if len(ldmrk) == 0:
+                    raise ValueError("landmark %s not found" % landmark)
+                
+                landmark = ldmrk[0]
+                    
             
             # create analysis unit, add it to the self._analysis_units_ set 
             unit = AnalysisUnit(self, landmark=landmark, protocols=protocols, scene=scene, cell = self._analysis_unit_.cell, field=self._analysis_unit_.field)

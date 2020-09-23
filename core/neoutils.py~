@@ -3101,28 +3101,12 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
                 
     elif isinstance(src, neo.core.Segment):
         objectList = getattr(src, signal_collection)
-        #if stype in (neo.AnalogSignal, DataSignal) or \
-            #(isinstance(stype, (tuple, list)) and all([s.__name__ in ("AnalogSignal", "DataSignal") for s in stype])):
-            #objectList = src.analogsignals
-            
-        #elif stype is neo.IrregularlySampledSignal:
-            #objectList = src.irregularlysampledsignals
-            
-        #elif stype is neo.SpikeTrain:
-            #objectList = src.spiketrains
-            
-        #elif stype is neo.Event:
-            #objectList = src.events
-            
-        #elif stype is neo.Epoch:
-            #objectList = src.epochs
-            
-        #else:
-            #raise TypeError("Invalid stype")
         
         if isinstance(names, str):
             if silent:
-                return utilities.silentindex([i.name for i in objectList], names)
+                ret = utilities.silentindex([i.name for i in objectList], names)
+                print("ret", ret)
+                #return utilities.silentindex([i.name for i in objectList], names)
             
             return [i.name for i in objectList].index(names)
             
@@ -6349,7 +6333,7 @@ def detect_trigger_events(x, event_type, use_lo_hi=True, label=None, name=None):
     A datatypes.TriggerEvent object (essentially an array of time stamps)
     
     """
-    from . import datatypes as dt
+    #from . import datatypes as dt
     
     if not isinstance(x, (neo.AnalogSignal, DataSignal, np.ndarray)):
         raise TypeError("Expecting a neo.AnalogSignal, or a datatypes.DataSignal, or a np.ndarray as first parameter; got %s instead" % type(x).__name__)

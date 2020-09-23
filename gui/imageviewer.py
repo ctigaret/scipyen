@@ -2749,7 +2749,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._currentZoom_ -=1
         self.viewerWidget.slot_zoom(2**self._currentZoom_)
         
-    @pyqtSlot(bool)
+    @pyqtSlot()
     @safeWrapper
     def slot_selectZoom(self):
         self.viewerWidget.interactiveZoom()

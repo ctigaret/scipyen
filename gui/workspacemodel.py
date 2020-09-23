@@ -504,6 +504,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         TODO/FIXME 2020-07-30 21:51:49 factor these two under a common logic
         """
+
+        #print("updateTable from_console", from_console)
         try:
             displayed_vars = self.getDisplayedVariableNames(asStrings=True)
             if from_console:
@@ -556,11 +558,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                             if item[0] in self.cached_vars and not safe_identity_test(item[1], self.cached_vars[item[0]]):
                                 self.updateRowForVariable(item[0], item[1])
                                 
-                            else:
-                                self.removeRowForVariable(item[0])
+                            #else:
+                                #self.removeRowForVariable(item[0])
                         
                 self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.hidden_vars and not item[0].startswith("_")])
                 self.deleted_vars.clear()
+                self.new_vars.clear()
                 
             else:
                 # NOTE:; 2018-10-07 21:54:45

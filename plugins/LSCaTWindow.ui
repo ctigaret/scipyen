@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>757</width>
-    <height>754</height>
+    <height>774</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -357,7 +357,7 @@
        </sizepolicy>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>2</number>
       </property>
       <widget class="QWidget" name="ScanDataTab">
        <attribute name="title">
@@ -1185,20 +1185,20 @@
           <attribute name="horizontalHeaderCascadingSectionResizes">
            <bool>true</bool>
           </attribute>
-          <attribute name="horizontalHeaderDefaultSectionSize">
+          <attribute name="horizontalHeaderMinimumSectionSize">
            <number>100</number>
           </attribute>
-          <attribute name="horizontalHeaderMinimumSectionSize">
+          <attribute name="horizontalHeaderDefaultSectionSize">
            <number>100</number>
           </attribute>
           <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
            <bool>true</bool>
           </attribute>
-          <attribute name="verticalHeaderDefaultSectionSize">
-           <number>20</number>
-          </attribute>
           <attribute name="verticalHeaderMinimumSectionSize">
            <number>15</number>
+          </attribute>
+          <attribute name="verticalHeaderDefaultSectionSize">
+           <number>20</number>
           </attribute>
           <column>
            <property name="text">
@@ -1278,6 +1278,77 @@ Integral values are in the interval [0,5]
              </size>
             </property>
            </spacer>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_63">
+            <property name="toolTip">
+             <string>Uncaging artifact size (pixels)</string>
+            </property>
+            <property name="statusTip">
+             <string>Uncaging artifact size (pixels)</string>
+            </property>
+            <property name="whatsThis">
+             <string>Uncaging artifact size (pixels)</string>
+            </property>
+            <property name="text">
+             <string>Uncaging artifact size:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="uncagingArtifactWidth_spinBox">
+            <property name="toolTip">
+             <string>Uncaging artifact size (pixels)</string>
+            </property>
+            <property name="statusTip">
+             <string>Uncaging artifact size (pixels)</string>
+            </property>
+            <property name="whatsThis">
+             <string>Uncaging artifact size (pixels)</string>
+            </property>
+            <property name="maximum">
+             <number>10</number>
+            </property>
+            <property name="value">
+             <number>2</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_64">
+            <property name="text">
+             <string>Background begin/end:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="artifactBackgroundBeginDoubleSpinBox"/>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="artifactBackgroundEndDoubleSpinBox">
+            <property name="singleStep">
+             <double>0.010000000000000</double>
+            </property>
+            <property name="value">
+             <double>0.050000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="blankUncagingArtifactBtn">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remove uncaging artifact.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600; font-style:italic; text-decoration: underline;&quot;&gt;WARNING&lt;/span&gt;  Use for single-frame data only&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="statusTip">
+             <string>Remove uncaging artifact</string>
+            </property>
+            <property name="whatsThis">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remove uncaging artifact.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600; font-style:italic; text-decoration: underline;&quot;&gt;WARNING&lt;/span&gt;  Use for single-frame data only&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="text">
+             <string>Remove</string>
+            </property>
+           </widget>
           </item>
          </layout>
         </item>
@@ -2796,10 +2867,10 @@ Integral values are in the interval [0,5]
           <attribute name="horizontalHeaderDefaultSectionSize">
            <number>50</number>
           </attribute>
-          <attribute name="verticalHeaderDefaultSectionSize">
+          <attribute name="verticalHeaderMinimumSectionSize">
            <number>20</number>
           </attribute>
-          <attribute name="verticalHeaderMinimumSectionSize">
+          <attribute name="verticalHeaderDefaultSectionSize">
            <number>20</number>
           </attribute>
          </widget>
@@ -3049,7 +3120,7 @@ Integral values are in the interval [0,5]
      <x>0</x>
      <y>0</y>
      <width>757</width>
-     <height>28</height>
+     <height>29</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuLoad">
@@ -3273,7 +3344,7 @@ Integral values are in the interval [0,5]
   </widget>
   <action name="actionLoadFromWorkspace">
    <property name="text">
-    <string>&amp;Load...</string>
+    <string>&amp;Load from Workspace...</string>
    </property>
    <property name="toolTip">
     <string>Load ScanData from workspace</string>
@@ -3354,7 +3425,7 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionCopy_to_workspace">
    <property name="text">
-    <string>&amp;Copy</string>
+    <string>&amp;Export to Workspace</string>
    </property>
    <property name="toolTip">
     <string>Copy current ScanData to workspace, under a new name</string>

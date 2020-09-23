@@ -110,7 +110,7 @@ class ScipyenViewer(QtWidgets.QMainWindow):
     supported_types = (object, )
     view_action_name = None
     
-    def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
+    def __init__(self, data: (object, type(None))=None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
                  pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
                  *args, **kwargs) -> None:
@@ -247,9 +247,13 @@ class ScipyenViewer(QtWidgets.QMainWindow):
             if enforce or self._winTitle_ is None or (isinstance(self._winTitle_, str) and len(self._winTitle_.strip()) == 0): 
                 # auto-set viewer title ONLY if not already set, or enforce is True
                 if self._scipyenWindow_ is not None:
-                    viewerVarName = [k for k in self._scipyenWindow_.workspace.keys() if \
-                                    type(self._scipyenWindow_.workspace[k]).__name__ == type(self).__name__ and \
-                                    self._scipyenWindow_.workspace[k].ID == self._scipyenWindow_.currentImageViewerWindowID]
+                    currentViewer = self._scipyenWindow_.currentViewers[self.__class__]
+                    if currentViewer is None:
+                        viewerVarName = []
+                    else:
+                        viewerVarName = [k for k in self._scipyenWindow_.workspace.keys() if \
+                                        type(self._scipyenWindow_.workspace[k]).__name__ == type(self).__name__ and \
+                                        self._scipyenWindow_.workspace[k].ID == currentViewer.ID]
                     
                     # NOTE: 2019-11-09 13:40:54
                     # when called from __init__, self is not bound to any
@@ -367,15 +371,15 @@ class ScipyenViewer(QtWidgets.QMainWindow):
         """
         self.setData(data, doc_title=doc_title, *args, **kwargs)
     
-    def setData(self, data: (object, type(None)), 
-                doc_title: (str, type(None)) = None, 
-                *args, **kwargs):
-        """Sets data to be displayed by this viewer.
+    def setData(self, *args, **kwargs):
+        """Generic function to set the data to be displayed by this viewer.
         
         Checks that data is one of the supported types, or inherits from one of
         the supported types.
         
         Sets up the window title based on doc_title.
+        
+        May/should be overridden in the derived viewer type.
         
         Parameters:
         ----------
@@ -390,8 +394,15 @@ class ScipyenViewer(QtWidgets.QMainWindow):
         show: bool (default: True); when True, make the window visible
             
         """
+        if len(args):
+            data = args[0]
+            
+        else:
+            data  = None
         
         show = kwargs.get("show", True)
+        
+        doc_title = kwargs.get("doc_title", None)
         
         data_mro = type(data).mro()
         
@@ -406,17 +417,24 @@ class ScipyenViewer(QtWidgets.QMainWindow):
             
         else:
             self._docTitle_ = None
+            
+        #print("ScipyenViewer setData args", args)
+        #print("ScipyenViewer setData kwargs", kwargs)
         
-        self._set_data_(data)
+        if len(args)>1:
+            self._set_data_(data, *args[1:], **kwargs)
+            
+        else:
+            self._set_data_(data, **kwargs)
         
         self.update_title(doc_title = doc_title, win_title=self._winTitle_)
         
         if show:
             self.setVisible(True)
-            self.show()
+            #self.show()
         
     @abstractmethod
-    def _set_data_(self, data: object = None, *args, **kwargs):
+    def _set_data_(self, data: object, *args, **kwargs):
         pass
     
     @property
@@ -615,9 +633,10 @@ class ScipyenViewer(QtWidgets.QMainWindow):
             
             self.setData(data)
         """
-        if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-            if self._data_ in self._scipyenWindow_.workspace.values():
-                pass
+        pass
+        #if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
+            #if self._data_ in self._scipyenWindow_.workspace.values():
+                #pass
                 
             #if isinstance(self._data_var_name_, str) and len(self._data_var_name_.strip()) and self._data_var_name_ in self._scipyenWindow_.workspace:
                 #self.setData(self._scipyenWindow_.workspace[self._data_var_name_])
@@ -677,14 +696,18 @@ class ScipyenFrameViewer(ScipyenViewer):
     # signal emitted when the viewer displays 
     frameChanged            = pyqtSignal(int, name="frameChanged")
     
-    def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
-                 win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
-                 frame:(int, type(None)) = None,
+    def __init__(self, data: (object, type(None)) = None, 
+                 parent: (QtWidgets.QMainWindow, type(None)) = None, 
+                 pWin: (QtWidgets.QMainWindow, type(None))= None, 
+                 ID:(int, type(None)) = None,
+                 win_title: (str, type(None)) = None, 
+                 doc_title: (str, type(None)) = None,
+                 frameIndex:(int, tuple, list, range, slice, type(None)) = None,
+                 currentFrame:(int, type(None)) = None,
                  *args, **kwargs):
         super().__init__(data=data, parent=parent, pWin=pWin, ID=ID,
                          win_title=win_title, doc_title=doc_title,
-                         frame=frame, *args, **kwargs)
+                         *args, **kwargs)
         """Constructor for ScipyenFrameViewer.
         
         Parameters:
@@ -710,14 +733,15 @@ class ScipyenFrameViewer(ScipyenViewer):
             When None (the default) the window title will contain only the
             viewer name suffixed with the window ID.
         
-        frame: int or None (default). The index of the data frame to be displayed.
+        frameIndex: int or None (default). The index of the data frameIndex to be displayed.
         
         *args, **kwargs: variadic argument and keywords specific to the constructor of the
             derived subclass.
         """
         
-        self._current_frame_index_      = 0 if frame is None else frame
+        self._current_frame_index_      = 0 
         self._number_of_frames_         = 1 # determined from the data
+        self.rameIndex                  = range(self._number_of_frames_)
         #self._linkedViewers_            = list()
         
         # These two should hold a reference to the actual QSlider and QSpinBox
@@ -736,29 +760,50 @@ class ScipyenFrameViewer(ScipyenViewer):
     
     @property
     def dataFrames(self):
-        """The number of data "frames" this viewer knows of.
+        """The number of "frames" (segments, sweeps) in which data is organized.
         """
-        return self._number_of_frames_
+        return self._data_frames_
     
     @property
     def nFrames(self):
-        """The number of data "frames" this viewer knows of.
-        Alias for dataFrames
+        """The number of display "frames" this viewer knows of.
+        The displayed frames may be a subset of the frames that the data is 
+        logically organized in, consisting of the frames selected for viewing.
+        
+        In the general case,
+            self.nFrames <= self.dataFrames
+            
+        An exception from this rule is case multi-channel signal plotted in
+        SignalViewer, with one channel being plotted per frame - hence, there
+        are several frames displayed one at a time, even if data is logically
+        organized in just one frame.
         """
         return self._number_of_frames_
         
     @property
     def currentFrame(self):
         """The index of the current data "frame".
+        Actually, the index into the current data frame index.
+        
+        For example, when only a subset of data frames are selected for display, 
+        say, frames 1, 5, 7 out of a total of 10 frames, then nFrames = 3
+        and currentFrame takes values in the half-open interval [0,3).
+        
         Abstract method: it must be implemented in the derived class.
         This property also has a setter (also an abstract method that must be
-        implemented in the derived class)
+        implemented in the derived class).
         """
         return self._current_frame_index_
     
     @currentFrame.setter
     def currentFrame(self, value:int):
         """Sets value of the current frame (to be displayed).
+        
+        The function actually sets the index into the current frame index; when
+        the viewer displays only a subset of the available data frames, 
+        currentFrame is an index into THAT subset, and not an index into all of
+        the data frames.
+        
         Does not emit frameChanged signal.
         
         Developer information:

@@ -1,4 +1,4 @@
-import enum, numbers
+import enum, numbers, warnings
 import numpy as np
 import quantities as pq
 import neo

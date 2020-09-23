@@ -3928,7 +3928,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             wy = None
             
         if isinstance(self._data_, vigra.VigraArray):
-            # this can also be a PictArray!
+            # this can also be a PictArray! 
+            # NOTE: 2020-09-04 08:51:38 PictArray is defunct and removed from the API
             # NOTE: 2017-07-24 09:03:38
             # w and h are a convention here
             #w = self._data_.shape[0]

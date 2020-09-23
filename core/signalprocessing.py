@@ -278,8 +278,11 @@ def waveform_amplitude(x:np.ndarray, method:str="direct") -> np.ndarray:
             of the signal x (see state_levels() function in this module)
     
     """
+    #print("waveform_amplitude x:", x)
+    
     if not isinstance(x, np.ndarray):
         raise TypeError("Expecting a np.ndarray object or a derived type; got %s instead" % type(x).__name__)
+    
     
     if len(x.shape)> 1:
         if x.ndim > 2 or x.shape[1] > 1:
@@ -293,6 +296,11 @@ def waveform_amplitude(x:np.ndarray, method:str="direct") -> np.ndarray:
     if method.lower() not in ("direct", "levels"):
         return ValueError("method expected to be 'direct' or 'levels'; got %s instead" % method)
     
+    if x.size == 0:
+        if isinstance(x, pq.Quantity):
+            return 0. * x.units
+        
+        return 0.
     
     if method.lower() == "direct":
         return np.abs(np.nanmax(x) - np.nanmin(x))
