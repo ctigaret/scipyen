@@ -83,7 +83,7 @@ Protocol file: AltStim2PathwaysAvgTwoChannels.pro - see Example Protocol below.
 Protocol defines ONE trial, to be run from a sequencer key which calls itself 
 with 10 s delay, in an infinite loop.
 
-Do NOT use Repeat mode in the acquisition toolbar, as this will start a trial 
+In the acquisition toolbar turn Repeat mode OFF, otherwise trials will start 
 right after the end of the previous one.
 
 The Trial contains 6 runs (which automatically enables averaging of data from
