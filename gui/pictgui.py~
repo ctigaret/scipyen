@@ -1625,10 +1625,7 @@ class PlanarGraphics(object):
                     #raise ValueError("Mismatch between the number of states (%d) and that of frame indices (%d)" % (len(self._states_), len(frameindex)))
         
             
-    def _set_current_states_(self, frame=None):
-        if isinstance(frame, int) and frame >= 0:
-            self._currentframe_ = frame
-            
+    def _set_current_states_(self):
         if not isinstance(self._currentframe_, int) or self._currentframe_ <0 :
             self._currentframe_ = 0
             
@@ -2753,7 +2750,6 @@ class PlanarGraphics(object):
         # NOT be present in self._states_
         
         if frame is None:
-            
             frame = self._currentframe_
             
         elif not isinstance(frame, int):

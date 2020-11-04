@@ -2858,7 +2858,7 @@ class PlanarGraphics(object):
             
             self._states_.append(state)
             
-        self._set_current_states_()
+            self._set_current_states_()
             
             #if self._currentstates_ == state_to_replace:
                 #self._currentstates_ = state
