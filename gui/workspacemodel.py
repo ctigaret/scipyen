@@ -1,3 +1,20 @@
+# -*- coding: utf-8 -*-
+"""
+The workspace model - also used by the internal shell, to which ii provides the
+event handlers pre_execute() and post_execute().
+
+"""
+# NOTE 2020-10-19 14:53:39
+# TODO factorize and bring here the code for handling the variables according to
+# their types when selected & right-clicked or double-clicked in the workspace viewer
+#
+# TODO related to the above, also include a way to call (execute) functions in 
+# the workspace by double-clicking; use a GUI prompt for parameters when needed
+#
+# TODO bring here the code for finding variables by name, link to the variable name 
+# filter/finder in workspace viewer
+#
+
 import traceback, typing
 
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -32,13 +49,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     This may be used by code external to ScipyenWindow (e.g. CaTanalysis etc)
     
     '''
-    # TODO 2020-07-12 11:23:47 
-    # remove the dependency on shell; instead, supply a reference to it as a
-    # parameters to the relevant methods
-    #
-    # alsothiyg thsi also supplied event handlers for the internal shell, so 
-    # maybe I should keed this.
-    
     modelContentsChanged = pyqtSignal(name = "modelContentsChanged")
     windowVariableDeleted = pyqtSignal(int, name="windowVariableDeleted")
     
@@ -160,18 +170,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 self.foreign_namespaces[name] = {"initial": user_ns_shown,
                                                  "current": current}
                 
-                #color = QtGui.QColor(*[int(255*v) for v in self.foreign_kernel_palette[-1]])
-                
-                # NOTE 2020-07-31 00:08:48 
-                # see # TODO/FIXME 2020-07-31 00:07:29
-                #self.foreign_namespaces[name]["background"] = QtGui.QBrush(color)
-                #self.foreign_namespaces[name]["alternative"] = QtGui.QBrush(color.darker(110))
-                
             else:    
                 removed_items = self.foreign_namespaces[name]["current"] - user_ns_shown
-                #print("removed_items", removed_items)
                 for vname in removed_items:
-                    #print("to remove: %s from %s" % (vname, name))
                     self.removeRowForVariable(vname, ns = name.replace("_", " "))
                 
                 added_items = user_ns_shown - self.foreign_namespaces[name]["current"]
@@ -181,8 +182,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 self.foreign_namespaces[name]["current"] |= added_items
                 
                 self.foreign_namespaces[name]["current"] -= self.foreign_namespaces[name]["initial"]
-                
-                #print("current_items", self.foreign_namespaces[name]["current"])
                 
                 
     def clear(self):
@@ -255,21 +254,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
             #print("\npost_execute: figs in pyplot", mpl_figs_in_pyplot)
             
-            #mpl_figs_in_ns = [item[1] for item in self.cached_vars.items() if isinstance(item[1], mpl.figure.Figure)]
             mpl_figs_in_ns = [item[1] for item in self.shell.user_ns.items() if isinstance(item[1], mpl.figure.Figure)]
-            
-            #dict_of_mpl_figs_in_ns = dict([item for item in self.cached_vars.items() if isinstance(item[1], mpl.figure.Figure)])
-            #print("\npost_execute: figs in ns", mpl_figs_in_ns)
             
             # 1) deleted variables -- present in cached vars but not in the user namespace anymore
             self.deleted_vars.update([item for item in self.cached_vars.items() if item[0] not in self.shell.user_ns])
             
-            #dict_of_mpl_figs_deleted_in_ns = [item for item in dict_of_mpl_figs_in_ns.items() if item[1] not in mpl_figs_in_pyplot]
-            
-            #deleted_mpl_figs = [item for item in mpl_figs_in_ns if item[1] not in mpl_figs_in_pyplot]
             deleted_mpl_figs = [item for item in mpl_figs_in_ns if item not in mpl_figs_in_pyplot]
-            
-            #print("\npost_execute: deleted figs", deleted_mpl_figs)
             
             for item in deleted_mpl_figs:
                 self.cached_vars.pop(item, None)
@@ -455,10 +445,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def removeRowForVariable(self, dataname, ns=None):
         #wscol = standard_obj_summary_headers.index("Workspace")
         
-        if ns is None:
-            ns = "Internal"
-            
-        elif isinstance(ns, str):
+        if isinstance(ns, str):
             if len(ns.strip()) == 0:
                 ns = "Internal"
                 
@@ -505,9 +492,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         TODO/FIXME 2020-07-30 21:51:49 factor these two under a common logic
         """
 
-        #print("updateTable from_console", from_console)
         try:
-            displayed_vars = self.getDisplayedVariableNames(asStrings=True)
+            displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
+
             if from_console:
                 # NOTE: 2018-10-07 21:46:03
                 # added/removed/modified variables as a result of code executed
@@ -534,39 +521,34 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 #       missing from cached_vars) => new_vars
                 #
                 
-                #print("deleted variables:", self.deleted_vars)
-                
                 # variables deleted via a call to "del()" in the console
-                for varname in self.deleted_vars.keys():
+                for varname in self.deleted_vars.keys(): # this is populated by post_execute()
                     self.removeRowForVariable(varname)
                     
                 #print("modified variables:", self.modified_vars)
                 
                 # variables modified via code executed in the console
-                for item in self.modified_vars.items():
+                for item in self.modified_vars.items(): # populated by post_execute
                     self.updateRowForVariable(item[0], item[1])
                 
                 #print("added variables:", self.new_vars)
                 
                 # variables created by code executed in the console
-                for item in self.new_vars.items():
+                for item in self.new_vars.items(): # populated by post_execute
                     if item[0] not in self.hidden_vars and not item[0].startswith("_"):
-                        if item[0] not in displayed_vars:
+                        if item[0] not in displayed_vars_types:
                             self.addRowForVariable(item[0], item[1])
                         
                         else:
                             if item[0] in self.cached_vars and not safe_identity_test(item[1], self.cached_vars[item[0]]):
                                 self.updateRowForVariable(item[0], item[1])
                                 
-                            #else:
-                                #self.removeRowForVariable(item[0])
-                        
                 self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.hidden_vars and not item[0].startswith("_")])
                 self.deleted_vars.clear()
                 self.new_vars.clear()
                 
             else:
-                # NOTE:; 2018-10-07 21:54:45
+                # NOTE 2018-10-07 21:54:45
                 # for variables added/modified/deleted from code executed outside
                 # the console, unfortunately we cannot easily rely on the event handlers
                 # pre_execute and post_execute;
@@ -575,39 +557,52 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 
                 # NOTE: 2020-03-06 11:02:01
                 # 1. updates self.cached_vars
-                # 2. clears self.new_vars and self.deleted_vars
+                # 2. clears self.new_vars 
+                # 3. clears self.deleted_vars
                 self.pre_execute()
                 
-                displayed_vars = self.getDisplayedVariableNames(asStrings=True)
-                #print("displayed_vars", displayed_vars)
-                
-                # variables deleted from workspace or modified by code executed 
+                # variables DELETED from workspace or MODIFIED by code executed 
                 # outside the console
-                for varname in displayed_vars:
+                for varname in displayed_vars_types:
                     if varname not in self.shell.user_ns: # deleted by GUI
                         self.removeRowForVariable(varname)
                         
-                    elif varname in self.cached_vars:
-                        if not safe_identity_test(self.shell.user_ns[varname], self.cached_vars[varname]):
+                    elif varname in self.cached_vars: # should also be in user_ns
+                        if type(self.cached_vars[varname]).__name__ != displayed_vars_types[varname]:
                             self.updateRowForVariable(varname, self.shell.user_ns[varname])
                             
-                # variables created by code executed outside the console
-                for item in self.shell.user_ns.items():
-                    if item[0] not in self.hidden_vars and not item[0].startswith("_"):
-                        if item[0] not in displayed_vars:
-                            self.addRowForVariable(item[0], item[1])
+                        elif not safe_identity_test(self.shell.user_ns[varname], self.cached_vars[varname]):
+                            self.updateRowForVariable(varname, self.shell.user_ns[varname])
                             
-                        else:
-                            if not safe_identity_test(item[1], self.cached_vars[item[0]]):
-                                self.updateRowForVariable(item[0], item[1])
+                # variables CREATED by code executed outside the console
+                for item in self.cached_vars.items():
+                    if item[0] not in displayed_vars_types:
+                        self.addRowForVariable(item[0], item[1])
                         
-                #print("displayed vars again:", self.getDisplayedVariableNames(asStrings=True))
-                        
+                    #else: # NOTE: 2020-09-24 11:02:39 this is now redundant
+                        #if not safe_identity_test(item[1], self.cached_vars[item[0]]):
+                            ## NOTE: This will always fail to detect when a symbol
+                            ## that exists in user_ns has been reassigned to a variable
+                            ## of a different TYPE. This happens because cached_vars
+                            ## contains a snapshot of the user_ns, created AFTER
+                            ## the new variable/object has been bound to the same
+                            ## symbol.
+                            ##
+                            ## Hpwever it should work OK when the TYPE is the same
+                            ## but its contents have been changed
+                            
+                            #print("update row for variable", item[0])
+                            #self.updateRowForVariable(item[0], item[1])
+                            
+                        #else:
+                            #print("what to do with", item[0])
+                       
+                # is this still needed !?!
                 self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.hidden_vars and not item[0].startswith("_")])
 
         except Exception as e:
+            print("\n\n***Exception in updateTable: ***\n")
             traceback.print_exc()
-            print("Exception in updateTable")
 
         self.modelContentsChanged.emit()
         
@@ -638,49 +633,33 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
             ns_index = namespaces.index(ns_key)
             
-            #displayed_ns_items = self.rowIndexForItemsWithProps(Workspace=ns)
-            
-            #if isinstance(displayed_ns_items, int):
-                #n_items_shown = 1 if displayed_ns_items >= 0 else 0
-                
-            #elif isinstance(displayed_ns_items, (tuple, list)):
-                #n_items_shown = len(displayed_ns_items)
-            
             items_row_ndx = self.rowIndexForNamedItemsWithProps(vname, Workspace=ns)
             
-            #item_background = self.foreign_namespaces[ns_key]["background"] if n_items_shown%2 == 0 else self.foreign_namespaces[ns_key]["alternative"]
-            
             if items_row_ndx is None:
-                #row = self.generateRowFromPropertiesDict(props, background=item_background)
                 row = self.generateRowFromPropertiesDict(props)
                 self.appendRow(row)
                 
             elif isinstance(items_row_ndx, int):
                 if items_row_ndx == -1:
                     row = self.generateRowFromPropertiesDict(props)
-                    #row = self.generateRowFromPropertiesDict(props, background=item_background)
                     self.appendRow(row)
                 
                 else:
                     self.updateRowFromProps(items_row_ndx, props)
-                    #self.updateRowFromProps(items_row_ndx, props, background=item_background)
                     
             elif isinstance(items_row_ndx, (tuple, list)):
                 if len(items_row_ndx) == 0:
                     row = self.generateRowFromPropertiesDict(props)
-                    #row = self.generateRowFromPropertiesDict(props, background=item_background)
                     self.appendRow(row)
                     
                 else:
                     for r in items_row_ndx:
                         if r  == -1:
                             row = self.generateRowFromPropertiesDict()
-                            #row = self.generateRowFromPropertiesDict(props, background=item_background)
                             self.appendRow(row)
                             
                         else:
                             self.updateRowFromProps(r, props)
-                            #self.updateRowFromProps(r, props, background=item_background)
                             
                             
     @safeWrapper
@@ -832,28 +811,78 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 
             else:
                 return -1
+            
+    def getDisplayedVariableNamesAndTypes(self, ws="Internal"):
+        """Returns a mapping of displayed variable names to their type names (as string).
+        
+        Parameters:
+        -----------
+        ws: str (optional, default is "Internal")
+        
+        """
+        if not isinstance(ws, str):
+            ws = "Internal"
+            
+        wscol = standard_obj_summary_headers.index("Workspace")
+        typecol = standard_obj_summary_headers.index("Type")
+        
+        ret = dict([(self.item(row,0).text(), self.item(row,typecol).text()) for row in range(self.rowCount()) if self.item(row,wscol).text() == ws])
+        
+        return ret
+            
+    def getDisplayedVariableTypes(self, asStrings=True, ws = "Internal"):
+        """Returns the DISPLAYED type of the variables.
+
+        CAUTION: These may be different from the name of the actual type of 
+        the variable, in the user_ns.
+        
+        Parameters:
+        -----------
+        asStrings: bool (optional, default True) 
+            When True variable names are returned as (a Python list of) strings, 
+            otherwise they are returned as Python list of QStandardItems
+
+        ws: str (optional, default is "Internal")
+        
+        """
+        if not isinstance(ws, str):
+            ws = "Internal"
+            
+        wscol = standard_obj_summary_headers.index("Workspace")
+        typecol = standard_obj_summary_headers.index("Type")
+        
+        ret = [self.item(row, typecol).text() if asStrings else self.item(row, typecol) for row in range(self.rowCount()) if self.item(row, wscol).text() == ws]
+        
+        return ret
                 
-    def getDisplayedVariableNames(self, asStrings=True):
+    def getDisplayedVariableNames(self, asStrings=True, ws="Internal"):
         '''Returns names of variables in the internal workspace, registered with the model.
+
         Parameter: strings (boolean, optional, default True) variable names are 
                             returned as (a Python list of) strings, otherwise 
                             they are returned as Python list of QStandardItems
         '''
         #from core.utilities import standard_obj_summary_headers
         wscol = standard_obj_summary_headers.index("Workspace")
-        ret = [self.item(row).text() if asStrings else self.item(row) for row in range(self.rowCount()) if self.item(row, wscol).text() == "Internal"]
+        ret = [self.item(row).text() if asStrings else self.item(row) for row in range(self.rowCount()) if self.item(row, wscol).text() == ws]
         
         return ret
     
     def getNumberOfDisplayedForeignKernels(self):
+        return len(self.getDisplayedWorkspaces(foreign_only=True))
+    
+    def getDisplayedWorkspaces(self, foreign_only=False):
+        """Returns a set with the names of the workspaces shown.
+        """
         wcsol = standard_obj_summary_headers.index("Workspace")
-        foreign_kernels = set()
+        workspaces = set()
         for row in range(self.rowCount()):
-            wstext = self.item(row, wscol).text()
-            if wstext != "Internal":
-                foreign_kernels.add(wstext)
-                
-        return len(foreign_kernels)
+            wsname = self.item(row, wscol).text()
+            if foreign_only and wsname == "Internal":
+                continue
+            
+            workspaces.add(wsname)
         
+        return workspaces
     
 

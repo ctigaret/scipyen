@@ -78,9 +78,9 @@ from jupyter_client.session import Message
 
 #from IPython.lib.deepreload import reload as dreload
 
-from IPython.core.magic import (Magics, magics_class, line_magic,
-                                cell_magic, line_cell_magic,
-                                needs_local_scope)
+#from IPython.core.magic import (Magics, magics_class, line_magic,
+                                #cell_magic, line_cell_magic,
+                                #needs_local_scope)
 
 from jupyter_core.application import JupyterApp, base_flags, base_aliases
 from jupyter_client.consoleapp import (

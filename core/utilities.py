@@ -4,6 +4,7 @@ Various utilities
 '''
 import traceback, re, itertools, time, typing, warnings, numbers
 from sys import getsizeof
+import numpy as np
 from numpy import ndarray
 
 from .prog import safeWrapper
@@ -71,6 +72,9 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     result["Name"] = {"display": objname, "tooltip":objname}
     
     tt = abbreviated_type_names.get(typename, typename)
+    
+    if typename in signal_types and hasattr(obj, "dimensionality"):
+        typename += " (%s)" % obj.dimensionality
     
     if tt == "instance":
         tt = abbreviated_type_names.get(clsname, clsname)
@@ -391,7 +395,7 @@ def yyMdd(now=None):
 
 
 
-def makeFileFilterString(extList, genericName):
+def make_file_filter_string(extList, genericName):
     extensionList = [''.join(i) for i in zip('*' * len(extList), '.' * len(extList), extList)]
 
     fileFilterString = genericName + ' (' + ' '.join(extensionList) +')'
@@ -404,7 +408,7 @@ def makeFileFilterString(extList, genericName):
     
     return (fileFilterString, individualFilterStrings)
 
-def counterSuffix(x, strings):
+def counter_suffix(x, strings):
     """Appends a counter suffix to x is x is found in the list of strings
     
     Parameters:
@@ -450,7 +454,7 @@ def counterSuffix(x, strings):
                     
     return ret
                 
-    
+
 def get_nested_value(src, path):
     """Returns a value contained in the nested dictionary structure src.
     
@@ -560,6 +564,13 @@ def pairwise(iterable):
     a, b = itertools.tee(iterable)
     next(b, None)
     return zip(a, b)
+
+def sort_with_none(iterable, none_last = True):
+    import math
+    
+    noneph = math.inf if none_last else -math.info
+    
+    return sorted(iterable, key=lambda x: x if x is not None else noneph)
 
 def unique(seq):
     """Returns a sequence of unique elements in sequence 'seq'.

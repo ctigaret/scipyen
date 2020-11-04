@@ -17,7 +17,7 @@
    <set>QMainWindow::AllowNestedDocks|QMainWindow::AllowTabbedDocks|QMainWindow::AnimatedDocks|QMainWindow::VerticalTabs</set>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QGridLayout" name="gridLayout_12">
+   <layout class="QGridLayout" name="gridLayout_20">
     <item row="0" column="0">
      <layout class="QVBoxLayout" name="verticalLayout_12">
       <item>
@@ -357,7 +357,7 @@
        </sizepolicy>
       </property>
       <property name="currentIndex">
-       <number>2</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="ScanDataTab">
        <attribute name="title">
@@ -402,7 +402,7 @@
                     <string>Show scan line trajectory in the scene and generates scanline profile from scene data.</string>
                    </property>
                    <property name="text">
-                    <string>Scanline</string>
+                    <string>Scanline profiles</string>
                    </property>
                    <property name="checked">
                     <bool>true</bool>
@@ -1161,76 +1161,145 @@
        <attribute name="title">
         <string>Protocols</string>
        </attribute>
-       <layout class="QGridLayout" name="gridLayout_28">
+       <layout class="QGridLayout" name="gridLayout_12">
         <item row="0" column="0">
-         <widget class="QTableWidget" name="protocolTableWidget">
-          <property name="toolTip">
-           <string>Trigger protocols</string>
-          </property>
-          <property name="statusTip">
-           <string>Trigger protocols</string>
-          </property>
-          <property name="whatsThis">
-           <string>Trigger protocols</string>
-          </property>
-          <property name="alternatingRowColors">
-           <bool>true</bool>
-          </property>
-          <property name="gridStyle">
-           <enum>Qt::NoPen</enum>
-          </property>
-          <property name="columnCount">
-           <number>6</number>
-          </property>
-          <attribute name="horizontalHeaderCascadingSectionResizes">
-           <bool>true</bool>
-          </attribute>
-          <attribute name="horizontalHeaderMinimumSectionSize">
-           <number>100</number>
-          </attribute>
-          <attribute name="horizontalHeaderDefaultSectionSize">
-           <number>100</number>
-          </attribute>
-          <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
-           <bool>true</bool>
-          </attribute>
-          <attribute name="verticalHeaderMinimumSectionSize">
-           <number>15</number>
-          </attribute>
-          <attribute name="verticalHeaderDefaultSectionSize">
-           <number>20</number>
-          </attribute>
-          <column>
-           <property name="text">
-            <string>Name</string>
-           </property>
-          </column>
-          <column>
-           <property name="text">
-            <string>Presynaptic</string>
-           </property>
-          </column>
-          <column>
-           <property name="text">
-            <string>Postsynaptic</string>
-           </property>
-          </column>
-          <column>
-           <property name="text">
-            <string>Photostimulation</string>
-           </property>
-          </column>
-          <column>
-           <property name="text">
-            <string>Imaging delay</string>
-           </property>
-          </column>
-          <column>
-           <property name="text">
-            <string>Frames</string>
-           </property>
-          </column>
-         </widget>
+         <layout class="QVBoxLayout" name="verticalLayout_13">
+          <item>
+           <widget class="QTableWidget" name="protocolTableWidget">
+            <property name="toolTip">
+             <string>Trigger protocols</string>
+            </property>
+            <property name="statusTip">
+             <string>Trigger protocols</string>
+            </property>
+            <property name="whatsThis">
+             <string>Trigger protocols</string>
+            </property>
+            <property name="alternatingRowColors">
+             <bool>true</bool>
+            </property>
+            <property name="gridStyle">
+             <enum>Qt::NoPen</enum>
+            </property>
+            <property name="columnCount">
+             <number>6</number>
+            </property>
+            <attribute name="horizontalHeaderCascadingSectionResizes">
+             <bool>true</bool>
+            </attribute>
+            <attribute name="horizontalHeaderMinimumSectionSize">
+             <number>100</number>
+            </attribute>
+            <attribute name="horizontalHeaderDefaultSectionSize">
+             <number>100</number>
+            </attribute>
+            <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
+             <bool>true</bool>
+            </attribute>
+            <attribute name="verticalHeaderMinimumSectionSize">
+             <number>15</number>
+            </attribute>
+            <attribute name="verticalHeaderDefaultSectionSize">
+             <number>20</number>
+            </attribute>
+            <column>
+             <property name="text">
+              <string>Name</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>Presynaptic</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>Postsynaptic</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>Photostimulation</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>Imaging delay</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>Frames</string>
+             </property>
+            </column>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_29">
+            <item>
+             <widget class="QPushButton" name="detectProtocolsPushButton">
+              <property name="toolTip">
+               <string>Detect protocols</string>
+              </property>
+              <property name="statusTip">
+               <string>Detect protocols</string>
+              </property>
+              <property name="whatsThis">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Detect triggers from TTL-like signals embedded in the electrophysiology data&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
+              <property name="text">
+               <string>Detect</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="importProtocolsPushButton">
+              <property name="toolTip">
+               <string>Import from another ScanData object</string>
+              </property>
+              <property name="statusTip">
+               <string>Import from another ScanData object</string>
+              </property>
+              <property name="whatsThis">
+               <string>Import from another ScanData object</string>
+              </property>
+              <property name="text">
+               <string>Import</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="clearProtocolsPushButton">
+              <property name="toolTip">
+               <string>Clear protocols</string>
+              </property>
+              <property name="statusTip">
+               <string>Clear protocols</string>
+              </property>
+              <property name="whatsThis">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Removes all Trigger Protocols and Trigger Events embedded in the data&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
+              <property name="text">
+               <string>Clear</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="horizontalSpacer_3">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+         </layout>
         </item>
        </layout>
       </widget>

@@ -18,12 +18,9 @@ import neo
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-from . import tiwt
-from . import datatypes as dt
-from . import strutils
-from . import curvefitting as crvf
+from core import (tiwt, datatypes as dt, strutils, curvefitting as crvf,)
 
-from core.axisutils import axisTypeFlags
+from imaging.axisutils import axisTypeFlags
 
 #from .patchneo import neo
 #### END pict.core modules
@@ -1372,7 +1369,7 @@ Arrays are concatenated in two ways, explained here by examples:
                                          |__|
     
     """
-    from core.axiscalibration import AxisCalibration
+    from .axiscalibration import AxisCalibration
 
     catAxis = 0
     

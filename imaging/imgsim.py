@@ -1,4 +1,4 @@
-"""Routines to generate synthetic data for ScanData object components.
+"""Synthetic imaging data (image simulations)
 """
 #### BEGIN core python modules
 import collections 
@@ -22,20 +22,21 @@ import neo
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-from . import datatypes as dt
-from . import imageprocessing as imgp
-from . import signalprocessing as sgp
-from . import curvefitting as crvf
-from . import models
-from . import strutils
-from .utilities import safeWrapper, counterSuffix, unique
+from core import (datatypes as dt, signalprocessing as sgp, curvefitting as crvf,
+                  models, strutils, )
+
+# NOTE: 2020-10-08 09:45:31
+# inside core.utilities, safeWrapper below is imported from core.prog
+from core.utilities import (safeWrapper, counter_suffix, unique, )
 
 #from .patchneo import neo
 from neo.core import baseneo
 from neo.core import basesignal
 from neo.core import container
 
-from . import neoutils
+from ephys import ephys
+
+from . import imageprocessing as imgp
 #### END pict.core modules
 
 
@@ -174,174 +175,6 @@ def synthetic_transients(duration, sampling_frequency, *args, **kwargs):
         raise TypeError("duration expected to be a float, int, or a scalar Python Quantity; got %s instead" % type(duration).__name__)
         
     return waveform_signal(duration, sampling_frequency, __f__, *args, **kwargs)
-    
-
-def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs):
-    """Generates a signal containing a synthetic waveform, as a column vector.
-    
-    Parameters:
-    ===========
-    extent              : float scalar, interpreted as having dimensionality of t or samples
-                        the extent of the entire signal that contains the synthetic waveform
-                        
-                        This is either the duration (for time-varying signals) or
-                        otherwise the extent of the natural domain of the signal
-                        that the synthetic waveform is part of.
-                        
-                        NOTE: This is NOT the duration (or extent, otherwise) of the waveform
-                        itself. The waveform is part of the signal
-                        
-    sampling_frequency  : float scalar, interpreted as having dimensionality of 1/t or 1/samples; must be > 0
-                        sampling frequency of the signal containing the synthetic waveform
-                        
-    model_function      : one of the model functions in the models module or a wrapper of it
-                        such that it has the following signature:
-                        
-                        y = func(x, parameters, **kwargs)
-                        
-                        where:
-                            y is a numpy array (one column vector)
-                            x is a numpy array (one column vector) with the definition domain of y
-                            parameters: a sequence of funciton parameters
-                            
-                        The (possibly wrapped) model function generates a realization of
-                        
-                        y = f(x|parameters)
-    
-    Variadic parameters and keyword parameters:
-    ===========================================
-    *args,              : additional parameters to the model_function (the first 
-                        parameter, "x" will be generated internally; see the 
-                        documentation of the particular model_function for details) 
-    
-    **kwargs            : keyword parameters for the model function and those for
-                        the constructor of neo.AnalogSignal or datatypes.DataSignal, 
-                        used when asSignal is True (see below, for details)
-                        
-    Keyword parameters of special interest:
-    
-        asSignal        : boolean default False; when True, returns a neo.AnalogSignal
-                        of datatypes.DataSignal according to the keyword parameter
-                        "domain_units" (see below).
-                        When False, returns a np.array (column vector).
-                        
-        domain_units    : Python UnitQuantity or Quantity; default is s.
-                        When different from pq.s and asSignal is True, then the
-                        function returns a datatypes.DataSignal; othwerise the 
-                        function returns a neo.AnalogSignal unless asSignal is False
-                        in which case it returns a numpy array
-                        
-        endpoint        : boolean, default True: whether to include the stop in the generated
-                        function domain (a linear space, see numpy.linspace for detail)
-                        
-                        
-    Returns:
-    ========
-    When asSignal is False (default):
-    
-        returns the tuple (x, y) containing two numpy arrays (each a column vector) 
-            representing, respectively, the waveform (y) and its definition domain (x)
-    
-        ATTENTION NOTE the ORDER in the tuple: x, y
-    
-    When asSignal is True:
-        
-        when "domain_units" is present in kwargs and is NOT a time unit:
-            returns a datatypes.DataSignal
-                
-        otherwise:
-            returns a neo.AnalogSignal (domain units are s by default)
-   
-    """
-    # TODO: contemplate using scipy.signal to generate AnalogSignal with waveforms
-    
-    import inspect
-    
-    if any([v <= 0 for v in (extent, sampling_frequency)]):
-        raise ValueError("Both extent and sampling_frequency must be strictly positive")
-        
-    nSamples = int(extent * sampling_frequency)
-    
-    analogsignal_param_names_list = ("units", "dtype", "copy", "t_start", "sampling_rate", "sampling_period", "name", "file_origin", "description")
-    
-    datasignal_param_names_list = ("units", "dtype", "copy", "origin", "sampling_rate", "sampling_period", "name", "file_origin", "description")
-    
-    model_function_keyword_list = list()
-    
-    signal_keyword_params = dict()
-    
-    model_function_keyword_params = dict()
-    
-    annotation_keyword_params = dict()
-    
-    # NOTE: 2018-09-13 10:18:44
-    # when asSignal is True:
-    # if domain_units are specified and NOT time units, then return DataSignal
-    # otherwise return AnalogSignal
-    domain_units = kwargs.pop("domain_units", None)
-    
-    asSignal = kwargs.pop("asSignal", False)
-    
-    endpoint = kwargs.pop("endpoint", True)
-    
-    if domain_units is not None:
-        if not isinstance(domain_units, (pq.UnitQuantity, pq.Quantity)):
-            raise TypeError("When specified, domain_units must be a Python UnitQuantity or Quantity object; got %s instead" % type(domain_units).__name__)
-        
-        
-        if dt.check_time_units(domain_units):
-            returnDataSignal = False
-            
-        else:
-            returnDataSignal = True
-    
-    else:
-        returnDataSignal = False
-        
-    if type(model_function).__name__ != "function":
-        raise TypeError("model_function expected to be a function; got %s instead" % type(model_function).__name__)
-    
-    model_function_signature = inspect.signature(model_function)
-    
-    for param in model_function_signature.parameters.values():
-        if param.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.VAR_KEYWORD) \
-            and param.default is not param.empty:
-                model_function_keyword_list.append(param.name) 
-            
-    
-    for (key, value) in kwargs.items():
-        if key in analogsignal_param_names_list:
-            signal_keyword_params[key] = value
-            
-        elif key in datasignal_param_names_list:
-            signal_keyword_params[key] = value
-            
-        elif key in model_function_keyword_list:
-            model_function_keyword_params[key] = value
-            
-        else:
-            annotation_keyword_params[key] = value
-    
-    
-    #print("*args", args)
-    x = np.linspace(0, extent, nSamples, endpoint=endpoint) # don't include endpoint
-    
-    
-    y = model_function(x, *args, **model_function_keyword_params)
-    
-    if asSignal:
-        signalkwargs = dict()
-        signalkwargs.update(signal_keyword_params)
-        signalkwargs.update(annotation_keyword_params)
-
-        if returnDataSignal:
-            origin = 0*domain_units
-            return dt.DataSignal(y, origin=origin, **signalkwargs)
-            
-        else:
-            return neo.AnalogSignal(y, **signalkwargs)
-    
-    return x, y
     
     
 def synthetic_spine(field_width, spatial_resolution, *args, **kwargs):

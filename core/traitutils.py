@@ -9,13 +9,14 @@ from inspect import getmro
 
 import traitlets
 
-from traitlets import (
+from traitlets import (six,
     HasTraits, MetaHasTraits, TraitType, Any, Bool, CBytes, Dict, Enum, Set,
     Int, CInt, Long, CLong, Integer, Float, CFloat, Complex, Bytes, Unicode,
     TraitError, Union, All, Undefined, Type, This, Instance, TCPAddress,
     List, Tuple, UseEnum, ObjectName, DottedObjectName, CRegExp, link, directional_link,
     ForwardDeclaredType, ForwardDeclaredInstance, validate, observe, default,
     observe_compat, BaseDescriptor, HasDescriptors, is_trait, getmembers,
+    class_of, repr_type, add_article, EventHandler,
 )
 
 from traitlets.utils.bunch import Bunch as Bunch
@@ -24,7 +25,9 @@ import numpy as np
 import vigra
 import pandas as pd
 import neo
+import quantities as pq
 from core import datasignal
+from core.datatypes import units_convertible
 
 #from prog import safeWrapper
 
@@ -32,43 +35,49 @@ from core import datasignal
 class TraitsObserver(HasTraits):
     """ CAUTION do not use yet
     """
-    __mutable_trait_types__ = Bool(default=False)
-    __cast_trait_types__ = Bool(default=False)
+    mutable_types = Bool(default=False)
+    use_casting = Bool(default=False)
+    allow_none = Bool(default=False)
+    hidden_traits = ("mutable_types", "use_casting", "allow_none",)
     
     def add_traits(self, **traits):
         # NOTE 2020-07-04 22:43:58
         # the super's add_traits blows away non-trait attributes
         # because existing traits are reverted to the default value
-        mutable = object.__getattribute__(self,"__mutable_trait_types__")
-        do_type_casting = object.__getattribute__(self, "__cast_trait_types__")
+        mutable = object.__getattribute__(self,"mutable_types")
+        use_casting = object.__getattribute__(self, "use_casting")
+        allow_none = object.__getattribute__(self, "allow_none")
         
         # NOTE 2020-07-04 22:42:42
-        # __length__ and __mutable_trait_types__ need to be reset to their
+        # __length__ and mutable_types need to be reset to their
         # current values (see NOTE 2020-07-04 22:43:58)
         # we do this here in order to avoid triggering a change notification
-        traits.update({"__mutable_trait_types__":trait_from_type(mutable),
-                       "__cast_trait_types__": trait_from_type(do_type_casting)})
+        traits.update({"mutable_types":trait_from_type(mutable),
+                       "use_casting": trait_from_type(use_casting),
+                       "allow_none": trait_from_type(allow_none)})
         
-        super().add_traits(**traits) # this DOES keep __length__ and __mutable_trait_types__ traits but reverts them to the defaults
+        super().add_traits(**traits) # this DOES keep __length__ and mutable_types traits but reverts them to the defaults
         
         # this also works, but triggers a change notification, which we don't 
         # need right now
         #self.__length__ = length
-        #self.__mutable_trait_types__ = mutable
+        #self.mutable_types = mutable
         
     def remove_traits(self, **traits):
         current_traits = self.traits()
         keep_traits  = dict([(k, current_traits[k]) for k in current_traits if k not in traits])
         
-        mutable = self.__mutable_trait_types__
-        do_type_casting = self.__cast_trait_types__
+        mutable = self.mutable_types
+        use_casting = self.use_casting
+        allow_none = self.allow_none
         
         
         # again, this resets the maintenance traits to their default values, 
         # so we need to restore them (see NOTE 2020-07-04 22:43:58 and 
         # NOTE 2020-07-04 22:42:42)
-        keep_traits.update({"__mutable_trait_types__":trait_from_type(mutable),
-                            "__cast_trait_types__": trait_from_type(do_type_casting)})
+        keep_traits.update({"mutable_types":trait_from_type(mutable),
+                            "use_casting": trait_from_type(use_casting),
+                            "allow_none": trait_from_type(allow_none==True)})
         
         self.__class__ = type(self.__class__.__name__, (HasTraits, ), {"changed":self.changed, "remove_traits":self.remove_traits})
         
@@ -88,47 +97,47 @@ class ContainerTraitsObserver(HasTraits):
     """ CAUTION do not use yet
     """
     __length__ = Int(default_value=0)
-    __mutable_trait_types__ = Bool(default=False)
-    __cast_trait_types__ = Bool(default=False)
+    mutable_types = Bool(default=False)
+    use_casting = Bool(default=False)
     
     def add_traits(self, **traits):
         # NOTE 2020-07-04 22:43:58
         # the super's add_traits blows away non-trait attributes
         # because existing traits are reverted to the default value
         length = object.__getattribute__(self, "__length__")
-        mutable = object.__getattribute__(self,"__mutable_trait_types__")
-        do_type_casting = object.__getattribute__(self, "__cast_trait_types__")
+        mutable = object.__getattribute__(self,"mutable_types")
+        use_casting = object.__getattribute__(self, "use_casting")
         
         # NOTE 2020-07-04 22:42:42
         # these "maintenance" traits need to be reset to their current values
         # (see NOTE 2020-07-04 22:43:58)
         # we do this here in order to avoid triggering a change notification
         traits.update({"__length__":trait_from_type(length), 
-                       "__mutable_trait_types__":trait_from_type(mutable),
-                       "__cast_trait_types__": trait_from_type(do_type_casting)})
+                       "mutable_types":trait_from_type(mutable),
+                       "use_casting": trait_from_type(use_casting)})
         
-        super().add_traits(**traits) # this DOES keep __length__ and __mutable_trait_types__ traits but reverts them to the defaults
+        super().add_traits(**traits) # this DOES keep __length__ and mutable_types traits but reverts them to the defaults
         
         # this also works, but triggers a change notification, which we don't 
         # need right now
         #self.__length__ = length
-        #self.__mutable_trait_types__ = mutable
+        #self.mutable_types = mutable
         
     def remove_traits(self, **traits):
         current_traits = self.traits()
         keep_traits  = dict([(k, current_traits[k]) for k in current_traits if k not in traits])
         
         length = self.__length__
-        mutable = self.__mutable_trait_types__
-        do_type_casting = self.__cast_trait_types__
+        mutable = self.mutable_types
+        use_casting = self.use_casting
         
         
         # again, this resets the maintenance traits to their default values, 
         # so we need to restore them (see NOTE 2020-07-04 22:43:58 and 
         # NOTE 2020-07-04 22:42:42)
         keep_traits.update({"__length__":trait_from_type(length), 
-                            "__mutable_trait_types__":trait_from_type(mutable),
-                            "__cast_trait_types__": trait_from_type(do_type_casting)})
+                            "mutable_types":trait_from_type(mutable),
+                            "use_casting": trait_from_type(use_casting)})
         
         self.__class__ = type(self.__class__.__name__, (HasTraits, ), {"changed":self.changed, "remove_traits":self.remove_traits})
         
@@ -199,7 +208,7 @@ class transform_link(traitlets.link):
         self.source[0].unobserve(self._update_target, names=self.source[1])
         self.target[0].unobserve(self._update_source, names=self.target[1])
         self.source, self.target = None, None
-
+        
 class ArrayTrait(Instance):
     info_text = "Trait for numpy arrays"
     default_value = np.array([])
@@ -212,32 +221,22 @@ class ArrayTrait(Instance):
         
         if isinstance(args, np.ndarray):
             self.default_value = args
-            args = None
             
-        elif isinstance(args, (tuple, list)) and len(args):
-            if isinstance(args[0], np.ndarray):
-                self.default_value = args[0]
-                
-                if len(args) == 1:
-                    args = None
-                else:
-                    args = args[1:]
-                    
-                    
+        elif isinstance(args, (tuple, list)):
             if len(args):
-                self.default_value = np.array(*args, **kwargs)
-            #if isinstance(args, np.ndarray):
-                #self.default_value = args
-                #args = None
-                
-            #elif isinstance(args, (tuple, list)) and len(args):
-                        
+                if isinstance(args[0], np.ndarray):
+                    self.default_value = args[0]
+                    
+                else:
+                    self.default_value = np.array(*args, **kwargs)
+                    
             else:
                 self.default_value = np.array([])
                 
         else:
             self.default_value = np.array([])
                 
+        args = None
         super().__init__(klass = self.klass, args=args, kw=kw, 
                          default_value=default_value, **kwargs)
         
@@ -249,7 +248,104 @@ class ArrayTrait(Instance):
         
     def make_dynamic_default(self):
         return np.array(self.default_value)
+    
+class QuantityTrait(Instance):
+    info_text = "Trait for python quantities"
+    default_value = pq.Quantity([]) # array([], dtype=float64) * dimensionless
+    klass = pq.Quantity
+    
+    def __init__(self, args=None, kw=None, **kwargs):
+        # allow 1st argument to be the array instance
+        default_value = kwargs.pop("default_value", None)
+        self.allow_none = kwargs.pop("allow_none", False)
+        if isinstance(kw, dict) and len(kw):
+            units = kw.pop("units", pq.dimensionless)
+            
+        else:
+            kw = dict()
+            units = kwargs.pop("units", pq.dimensionless)
         
+        if isinstance(args, np.ndarray):
+            if isinstance(args, pq.Quantity):
+                units = args.units
+                
+            self.default_value = pq.Quantity(args, units=units)
+            
+        elif isinstance(args, (tuple, list)):
+            if len(args):
+                if isinstance(args[0], np.ndarray):
+                    if isinstance(args[0], pq.Quantity):
+                        units = args[0].units
+                        self.default_value = pq.Quantity(args[0], units=units)
+                            
+                    else:
+                        self.default_value = pq.Quantity(args[0], units=units)
+                        
+                else:
+                    self.default_value = pq.Quantity(*args, units=units **kwargs)
+                    
+            else:
+                self.default_value = pq.Quantity([], units=units)
+                            
+        else:
+            self.default_value = pq.Quantity([], units=units)
+            
+        args=None
+                
+        kw["units"] = units
+        
+        super().__init__(klass = self.klass, args=args, kw=kw, 
+                         default_value=default_value, **kwargs)
+        
+    def validate(self, obj, value):
+        if isinstance(value, pq.Quantity) and units_convertible(value, self.default_value):
+            return value
+        
+        self.error(obj, value)
+        
+    def make_dynamic_default(self):
+        return pq.Quantity(self.default_value)
+    
+    def info(self):
+        if isinstance(self.klass, six.string_types):
+            klass = self.klass
+        else:
+            klass = self.klass.__name__
+            
+        result = "%s with dimensionality (units) of %s " % (class_of(klass), self.default_value.dimensionality)
+        
+        if self.allow_none:
+            result += ' or None'
+
+        return result
+
+    def error(self, obj, value):
+        kind = type(value)
+        if six.PY2 and kind is InstanceType:
+            msg = 'class %s' % value.__class__.__name__
+        else:
+            msg = '%s (i.e. %s)' % ( str( kind )[1:-1], repr( value ) )
+
+        if obj is not None:
+            if isinstance(value, pq.Quantity):
+                e = "The '%s' trait of %s instance must be %s, but a Quantity with dimensionality (units) of %s was specified." \
+                    % (self.name, class_of(obj),
+                    self.info(), value.dimensionality)
+                
+            else:
+                e = "The '%s' trait of %s instance must be %s, but a value of %s was specified." \
+                    % (self.name, class_of(obj),
+                    self.info(), msg)
+        else:
+            if isinstance(value, pq.Quantity):
+                e = "The '%s' trait must be %s, but a Quantity with dimensionality (units) of %s was specified." \
+                    % (self.name, self.info(), value.dimensionality)
+            else:
+                e = "The '%s' trait must be %s, but a value of %r was specified." \
+                    % (self.name, self.info(), msg)
+            
+        raise TraitError(e)
+
     
 def trait_from_type(x, *args, **kwargs):
     """Generates a TraitType for object x.
@@ -266,9 +362,12 @@ def trait_from_type(x, *args, **kwargs):
     library. Anything else needs a bit of work.
     
     Options:
+    --------
+    
     allow_none: bool default is False
     
     """
+    #from core.traitcontainers import DataBag
     allow_none = kwargs.pop("allow_none", False)
     
     immclass = getmro(x.__class__)[0]
@@ -338,6 +437,10 @@ def trait_from_type(x, *args, **kwargs):
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
         return Tuple(default_value=x, allow_none = allow_none)
+    
+    #elif "DataBag" in type(x).__name__:
+    #elif isinstance(x, DataBag):
+        #return DataBagTrait(default_value=x, allow_none=allow_none)
     
     elif isinstance(x, dict):
         if immclass != dict:
@@ -448,6 +551,22 @@ def trait_from_type(x, *args, **kwargs):
                 for attr in x._all_attrs:
                     if attr[0] not in kw:
                         kw[attr[0]] = getattr(x, attr[0])
+                        
+            elif isinstance(x, pq.Quantity):
+                if "units" not in kw:
+                    kw["units"] = x.units
+                
+                if "dtype" not in kw:
+                    kw["dtype"] = x.dtype
+                    
+                if "buffer" not in kw:
+                    kw["buffer"] = x.data
+                
+                kw["default_value"] = x
+                
+                kw["allow_none"] = allow_none
+                
+                return QuantityTrait(x, **kw)
                 
             elif isinstance(x, np.ndarray):
                 #shp = tuple(list(x.shape))

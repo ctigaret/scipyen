@@ -16,6 +16,7 @@ from IPython.core.magic import (Magics, magics_class, line_magic,
                                 needs_local_scope)
 
 from core.utilities import summarize_object_properties
+from core.prog import ContextExecutor
 
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -27,22 +28,12 @@ nrngui_magic_cmd = "".join(["-i -n ", nrn_ipython_initialization_file, " 'gui'"]
 nrnpy_magic_cmd = "".join(["-i -n ", nrn_ipython_initialization_file])
 
 
-class contextExecutor(ContextDecorator):
-    # TODO - what are you trying to resolve?
-    
-    #def __init__(self, f, *args, **kwargs):
-        #self.func = f
-        #self.args = args
-        #self.kw = kwargs
-    
-    def __enter__(self):
-        #print('Starting')
-        
-        return self
+#class ContextExecutor(ContextDecorator):
+    #def __enter__(self):
+        #return self
 
-    def __exit__(self, *exc):
-        #print('Finishing')
-        return False
+    #def __exit__(self, *exc):
+        #return False
     
 @magics_class
 class NeuronMagics(Magics):

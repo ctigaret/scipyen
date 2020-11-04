@@ -19,8 +19,8 @@ from neo.core.baseneo import BaseNeo, merge_annotations
 PY_VER = sys.version_info[0]
 
 def _new_event(cls, signal, times = None, labels=None, units=None, name=None, 
-               file_origin=None, description=None,
-               annotations=None, segment=None):
+               file_origin=None, description=None, annotations=None, segment=None,
+               *args, **kwargs):
     '''
     A function to map Event.__new__ to function that does not do the unit checking.
     This is needed for pickle to work with older pkl files. 

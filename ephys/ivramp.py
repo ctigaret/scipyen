@@ -30,7 +30,6 @@ from PyQt5.uic import loadUiType as __loadUiType__
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-import core.neoutils as neoutils
 import core.workspacefunctions as wf
 import core.datatypes as datatypes
 import core.signalprocessing as sigp
@@ -38,6 +37,7 @@ import core.curvefitting as crvf
 import core.plots as plots
 import core.models as models
 import core.strutils as strutils
+import core.neoutils as neoutils
 #from core.patchneo import *
 #### END pict.core modules
 
@@ -50,7 +50,7 @@ import gui.signalviewer as sv
 #### END pict.gui modules
 
 #### BEGIN pict.ephys modules
-#from . import epsignal
+import ephys.ephys as ephys
 #### END pict.ephys modules
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -596,7 +596,7 @@ def plotIVramp(block, segment=0, epoch=None,
     
     if isinstance(ImSignal, str):
         try:
-            ImSignal = neoutils.get_index(block.segments[0], ImSignal)
+            ImSignal = neoutils.get_index_of_named_signal(block.segments[0], ImSignal)
             
         except Exception as e:
             raise RuntimeError("%s signal not found" % ImSignal)
@@ -607,7 +607,7 @@ def plotIVramp(block, segment=0, epoch=None,
         
     if isinstance(VmSignal, str):
         try:
-            VmSignal = neoutils.get_index(block.segments[0], VmSignal)
+            VmSignal = neoutils.get_index_of_named_signal(block.segments[0], VmSignal)
             
         except Exception as e:
             raise RuntimeError("%s signal not found" % VmSignal)
@@ -663,16 +663,6 @@ def plotIVramp(block, segment=0, epoch=None,
     if len(kwargs) == 0:
         kwargs = dict()
     
-    #if len(kwargs) > 0:
-    
-    #time_axis = kwargs.pop("time_axis", False)
-    
-    #if "time_axis" not in kwargs.keys():
-        #time_axis = False
-    #else:
-        #time_axis = kwargs["time_axis"]
-        #kwargs.pop("time_axis", None)
-    
     if "legend" not in kwargs.keys():
         if block.name is None or len(block.name) == 0:
             if block.file_origin is None or len(block.file_origin) == 0:
@@ -694,94 +684,39 @@ def plotIVramp(block, segment=0, epoch=None,
         kwargs["legend"] = name
 
     if "xlabel" not in kwargs.keys():
-        kwargs["xlabel"] = "%s (%s)" % (block.segments[segment].analogsignals[VmSignal].name, \
-                            block.segments[segment].analogsignals[VmSignal].dimensionality)
+        kwargs["xlabel"] = "%s (%s)" % (block.segments[segment].analogsignals[VmSignal].name, 
+                                        block.segments[segment].analogsignals[VmSignal].dimensionality)
     
         
     if "ylabel" not in kwargs.keys():
-        kwargs["ylabel"] = "%s (%s)" % (block.segments[segment].analogsignals[ImSignal].name, \
-                            block.segments[segment].analogsignals[ImSignal].dimensionality )
+        kwargs["ylabel"] = "%s (%s)" % (block.segments[segment].analogsignals[ImSignal].name, 
+                                        block.segments[segment].analogsignals[ImSignal].dimensionality )
         
             
     if isinstance(VmRest, pq.Quantity):
         if t_start is None or t_stop is None:
-            (lines, ax) = plots.plotZeroCrossedAxes(block.segments[segment].analogsignals[VmSignal] + VmRest, \
-                            block.segments[segment].analogsignals[ImSignal], \
-                            **kwargs)
+            (lines, ax) = plots.plotZeroCrossedAxes(block.segments[segment].analogsignals[VmSignal].magnitude + VmRest,
+                                                    block.segments[segment].analogsignals[ImSignal].magnitude, 
+                                                    **kwargs)
             
         else:
-            (lines, ax) = plots.plotZeroCrossedAxes(block.segments[segment].analogsignals[VmSignal].time_slice(t_start, t_stop) + VmRest, \
-                            block.segments[segment].analogsignals[ImSignal].time_slice(t_start, t_stop), \
-                            **kwargs)
+            (lines, ax) = plots.plotZeroCrossedAxes(block.segments[segment].analogsignals[VmSignal].time_slice(t_start, t_stop).magnitude + VmRest, 
+                                                    block.segments[segment].analogsignals[ImSignal].time_slice(t_start, t_stop).magnitude, 
+                                                    **kwargs)
         
     else:
         if t_start is None or t_stop is None:
-            (lines, ax) = plots.plotZeroCrossedAxes(block.segments[segment].analogsignals[VmSignal], \
-                            block.segments[segment].analogsignals[ImSignal], \
-                            **kwargs)
+            (lines, ax) = plots.plotZeroCrossedAxes(block.segments[segment].analogsignals[VmSignal].magnitude, 
+                                                    block.segments[segment].analogsignals[ImSignal].magnitude, 
+                                                    **kwargs)
             
         else:
-            (lines, ax) = plots.plotZeroCrossedAxes(block.segments[segment].analogsignals[VmSignal].time_slice(t_start, t_stop), \
-                            block.segments[segment].analogsignals[ImSignal].time_slice(t_start, t_stop), \
-                            **kwargs)
+            (lines, ax) = plots.plotZeroCrossedAxes(block.segments[segment].analogsignals[VmSignal].time_slice(t_start, t_stop).magnitude, 
+                                                    block.segments[segment].analogsignals[ImSignal].time_slice(t_start, t_stop).magnitude,
+                                                    **kwargs)
     
     return (lines, ax)
     
-    #if time_axis:
-        #from scipy.interpolate import interp1d
-        
-        #plt.subplots_adjust(hspace=0.3)
-        #ax1 = ax.twin()
-        
-        #ax1.axis["top"].set_visible(True)
-        
-        #for direction in ["xzero", "yzero", "left", "right", "bottom"]:
-            #ax1.axis[direction].set_visible(False)
-            
-        #ax1.set_xscale("iv2time")
-        ##ax1.axis["top"].set_transform("iv2time")
-        ##ax1.axis["top"].set_xscale("iv2time")
-            
-        ##f = interp1d(block.segments[segment].analogsignals[VmSignal].time_slice(t_start, t_stop).squeeze().magnitude, \
-                     ##block.segments[segment].analogsignals[VmSignal].time_slice(t_start, t_stop).times.magnitude, \
-                     ##fill_value = "extrapolate", kind="nearest")
-        
-        ###ax1_xticks = ax1.get_xticks()
-        
-        ##vMin = block.segments[segment].analogsignals[VmSignal].time_slice(t_start, t_stop).min()
-        ##vMax = block.segments[segment].analogsignals[VmSignal].time_slice(t_start, t_stop).max()
-        ##vRange = vMax - vMin
-        
-        ##print("vMin ", vMin, " vMax ", vMax, " vRange ", vRange)
-        
-        ##xtvalues = []
-        
-        
-        ##print("ax x ticks: ", ax.get_xticks())
-        
-        ###for xt in ax1.get_xticks():
-        ##for xt in ax.get_xticks():
-            ##xtt = f(xt)
-            ##print("xtick: ", xt, " tick label: ", xtt)
-            ###if xtt == np.nan:
-                ###xtt = 0
-            ##xtvalues.append(xtt)
-            
-        
-        ##ticklabels = ["%1.4f" % xtv for xtv in xtvalues]
-        
-        ##ax1.set_xticks(ax.get_xticks())
-        ##ax1.set_xticklabels(ticklabels)
-        
-    #else:
-        #plt.subplots_adjust(top=0.9)
-        #plt.subplots_adjust(hspace=0.2)
-        #ax1 = None
-        ##f = None
-
-    
-    #return (lines, ax, ax1)
-        
     
 def average_ivramps(epoch, *blocks, **kwargs):
     """Averages several blocks each containing IV curve data from Vm ramp 
@@ -790,7 +725,7 @@ def average_ivramps(epoch, *blocks, **kwargs):
     Arguments:
     ==========
     
-        epoch: neo.EPoch object with:
+        epoch: neo.Epoch object with:
                 times = start time of the Vm ramp, and 
                 durations = duration of the Vm ramp
                 (all in pq.s).
@@ -934,10 +869,10 @@ def average_ivramps(epoch, *blocks, **kwargs):
             name = kwargs["name"]
     
     if len(blocks)> 1:
-        ivrampBlock = neoutils.average_blocks(*blocks, segment_index = segment, signal_index = [ImSignal,VmSignal, RawImSignal], name=name)
+        ivrampBlock = ephys.average_blocks(*blocks, segment = segment, analog = [ImSignal,VmSignal, RawImSignal], name=name)
         
         if isinstance(VmSignal, str):
-            VmSignalNdx = neoutils.get_index(ivrampBlock.segments[0],VmSignal)
+            VmSignalNdx = neoutils.get_index_of_named_signal(ivrampBlock.segments[0],VmSignal)
         else:
             VmSignalNdx = VmSignal
         
@@ -976,7 +911,7 @@ def average_ivramps(epoch, *blocks, **kwargs):
                 
         if isinstance(ImSignal, str):
             try:
-                ImSignalNdx = neoutils.get_index(blocks[0].segments[0], ImSignal)
+                ImSignalNdx = neoutils.get_index_of_named_signal(blocks[0].segments[0], ImSignal)
             except Exception as e:
                 raise RuntimeError("%s signal not found" % ImSignal)
             
@@ -985,7 +920,7 @@ def average_ivramps(epoch, *blocks, **kwargs):
             
         if isinstance(VmSignal, str):
             try:
-                VmSignalNdx = neoutils.get_index(blocks[0].segments[0], VmSignal)
+                VmSignalNdx = neoutils.get_index_of_named_signal(blocks[0].segments[0], VmSignal)
             except Exception as e:
                 raise RuntimeError("%s signal not found" % VmSignal)
         
@@ -994,7 +929,7 @@ def average_ivramps(epoch, *blocks, **kwargs):
         
         if isinstance(RawImSignal, str):
             try:
-                RawImSignalNdx = neoutils.get_index(blocks[0], RawImSignal)
+                RawImSignalNdx = neoutils.get_index_of_named_signal(blocks[0], RawImSignal)
             except Exception as e:
                 raise RuntimeError("%s signal not found" % RawImSignal)
             
@@ -1017,19 +952,21 @@ def average_ivramps(epoch, *blocks, **kwargs):
 def guessIVrampEpoch(data, duration=0.16 * pq.s, segment = 0, VmSignal="Vm_sec_1"):
     if isinstance(data, neo.Block):
         if isinstance(VmSignal, str):
-            VmSignal = neoutils.get_index(data.segments[segment], VmSignal)
+            VmSignal = neoutils.get_index_of_named_signal(data.segments[segment], VmSignal)
             
         sig = data.segments[segment].analogsignals[VmSignal]
         
     elif isinstance(data, neo.Segment):
         if isinstance(VmSignal, str):
-            VmSignal = neoutils.get_index(data[segment])
+            VmSignal = neoutils.get_index_of_named_signal(data[segment])
             
         sig = data[segment].analogsignals[VmSignal]
         
-    else:
+    elif isinstance(data, neo.AnalogSignal):
+        sig = data
         
-           sig = data
+    else:
+        raise TypeError("Expecting an AnalogSignal, Segment, or Block; got %s instead" % type(data).__name__)
            
     rampEndTime = sig.times[np.argmax(sig)]
     rampStartTime = rampEndTime - duration
@@ -1166,6 +1103,7 @@ def IVRampAnalysis(data, **kwargs):
     If "name" is given, then results are also written to a csv file in the 
     current directory, named after the value of "name".
     
+    NOTE: Talbot & Sayer seems to be a better fit
         
     """
     
@@ -1207,6 +1145,7 @@ def IVRampAnalysis(data, **kwargs):
                 "VmSignal", "temperature", "externalCa", "ivbase_start", "ivbase_end",\
                     "v_tol", "i_tol", "name", "rs_shift", "Vmin", "Vmax", "integration"]
     
+    # ### BEGIN parse parameters
     # 1.1) parse arguments
     if len(kwargs) > 0:
         for k in kwargs.keys():
@@ -1342,14 +1281,14 @@ def IVRampAnalysis(data, **kwargs):
 
     if isinstance(ImSignal, str):
         try:
-            ImSignal = neoutils.get_index(data.segments[segment], ImSignal)
+            ImSignal = neoutils.get_index_of_named_signal(data.segments[segment], ImSignal)
             
         except Exception as e:  
             raise ValueError("%s signal not found" % ImSignal)
         
     if isinstance(VmSignal, str):
         try:
-            VmSignal = neoutils.get_index(data.segments[segment], VmSignal)
+            VmSignal = neoutils.get_index_of_named_signal(data.segments[segment], VmSignal)
             
         except Exception as e:
             raise ValueError("%s signal not found" % VmSignal)
@@ -1454,12 +1393,15 @@ def IVRampAnalysis(data, **kwargs):
         if t_stop > subtract.segments[segment].analogsignals[ImSignal].t_stop:
             raise ValueError("The IV ramp cannot end (%g) after subtracted Im signal ends (%g)" % (t_stop, subtract.segments[segment].analogsignals[ImSignal].t_stop))
         
+    #### END parse parameters 
     
+    #### BEGIN analysis
     # 2) finally do what we're here to do
     
     # 2.1) extract Im and Im regions corresponding to the Vm ramp, in Control
     #
 
+    #### BEGIN Analysis of (control) data
     im_control = data.segments[segment].analogsignals[ImSignal].time_slice(t_start, t_stop)
     
     data_name = data.name
@@ -1477,7 +1419,7 @@ def IVRampAnalysis(data, **kwargs):
     
     im_control_peak = im_control.min()
     
-    im_control_peak_normalized = neoutils.peak_normalise_signal(im_control, i_min, im_control_peak)
+    im_control_peak_normalized = ephys.peak_normalise_signal(im_control, i_min, im_control_peak)
     
     im_control_peak_normalized.name = "%s peak normalized" % im_control.name
     
@@ -1487,16 +1429,16 @@ def IVRampAnalysis(data, **kwargs):
     control_macroscopic = macroscopic_conductance(vm_control, im_control, **kwargs)
     
     iv_fig = plt.figure()
-    iv_norm = plt.figure()
+    iv_norm_fig = plt.figure()
     
     iv_fig.show()
-    iv_norm.show()
+    iv_norm_fig.show()
     
-    plots.plotZeroCrossedAxes(vm_control, im_control, fig=iv_fig, legend=[data_name], newPlot=True)
+    plots.plotZeroCrossedAxes(vm_control.magnitude, im_control.magnitude, fig=iv_fig, legend=[data_name], newPlot=True)
     
-    plots.plotZeroCrossedAxes(vm_control, im_control_peak_normalized, ylabel="Im normalized", fig = iv_norm, legend=[data_name], newPlot=True)
+    plots.plotZeroCrossedAxes(vm_control.magnitude, im_control_peak_normalized.magnitude, ylabel="Im normalized", fig = iv_norm_fig, legend=[data_name], newPlot=True)
     
-    # 2.1.3) fit the I-V curve with the Talbot & Sayer model
+    # 2.1.3) fit the control I-V curve with the Talbot & Sayer model
     try:
         im_control_fit_TS, im_control_fit_TS_params, im_control_fit_TS_rsq, *_ = \
             fit_Talbot_Sayer(vm_control, im_control, t=temperature, ca_out = externalCa)
@@ -1510,19 +1452,19 @@ def IVRampAnalysis(data, **kwargs):
         
         im_control_fit_TS_peak = im_control_fit_TS.min()
         
-        im_control_fit_TS_peak_normalized = neoutils.peak_normalise_signal(im_control_fit_TS, i_min, im_control_fit_TS_peak)
+        im_control_fit_TS_peak_normalized = ephys.peak_normalise_signal(im_control_fit_TS, i_min, im_control_fit_TS_peak)
         
         im_control_fit_TS_peak_normalized.name = "%s peak normalized" % im_control_fit_TS.name
         
-        plots.plotZeroCrossedAxes(vm_control, im_control_fit_TS, fig = iv_fig, legend=["%s Talbot & Sayer fit" % data_name])
-        plots.plotZeroCrossedAxes(vm_control, im_control_fit_TS_peak_normalized, fig = iv_norm, legend=["%s Talbot & Sayer fit peak-normalized" % data_name])
+        plots.plotZeroCrossedAxes(vm_control.magnitude, im_control_fit_TS.magnitude, fig = iv_fig, legend=["%s Talbot & Sayer fit" % data_name])
+        plots.plotZeroCrossedAxes(vm_control.magnitude, im_control_fit_TS_peak_normalized.magnitude, fig = iv_norm_fig, legend=["%s Talbot & Sayer fit peak-normalized" % data_name])
     
     except Exception as e:
         im_control_fit_TS = None
         traceback.print_exc()
         
         
-    # 2.1.4) fit with Markwardt & Nilius model
+    # 2.1.4) fit control I(V) with Markwardt & Nilius model
     try:
         im_control_fit_MN, im_control_fit_MN_params, im_control_fit_MN_rsq, *_ = \
             fit_Markwardt_Nilius(vm_control, im_control, \
@@ -1539,20 +1481,20 @@ def IVRampAnalysis(data, **kwargs):
         
         im_control_fit_MN_peak = im_control_fit_MN.min()
         
-        im_control_fit_MN_peak_normalized = neoutils.peak_normalise_signal(im_control_fit_MN, i_min, im_control_fit_MN_peak)
+        im_control_fit_MN_peak_normalized = ephys.peak_normalise_signal(im_control_fit_MN, i_min, im_control_fit_MN_peak)
         
         im_control_fit_MN_peak_normalized.name = "%s peak normalized" % im_control_fit_MN.name
         
-        plots.plotZeroCrossedAxes(vm_control, im_control_fit_MN, fig = iv_fig, legend=["%s Markwardt & Nilius fit" % data_name])
+        plots.plotZeroCrossedAxes(vm_control.magnitude, im_control_fit_MN.magnitude, fig = iv_fig, legend=["%s Markwardt & Nilius fit" % data_name])
         
-        plots.plotZeroCrossedAxes(vm_control, im_control_fit_MN_peak_normalized, fig = iv_norm, legend=["%s Makwardt & Nilius fit peak-normalized" % data_name])
+        plots.plotZeroCrossedAxes(vm_control.magnitude, im_control_fit_MN_peak_normalized.magnitude, fig = iv_norm_fig, legend=["%s Makwardt & Nilius fit peak-normalized" % data_name])
     
     except Exception as e:
         im_control_fit_MN = None
         traceback.print_exc()
     
-    # 2.1.5) generate a new Block with the analogsignals generated so far -- conveniently, these all have a common time base
-    #control_result = neo.Block(name="IV analysis for %s" % data_name)
+    # 2.1.5) generate a new Block with the analogsignals generated so far -- 
+    # NOTE: conveniently, these all have a common time base
     
     result = neo.Block()
     
@@ -1572,9 +1514,13 @@ def IVRampAnalysis(data, **kwargs):
 
     control_segment.annotate(PeakIm=im_control_peak, \
                             macroscopic=control_macroscopic)
+
     
-    #control_segment.annotate(macroscopic=control_macroscopic)
-    
+    # NOTE: integrate fit curves for the Control condition (area under the curve
+    # on the given Vm interval)
+    # NOTE: Marwardt & Nilius fits: g slope, Erev and activation slope
+    # NOTE: Talbot & Sayer fits: V half-max (on activation side), activation slope, 
+    #                           scale and [Ca] in
     if integration is None:
         if control_macroscopic["Erev"] is None:
             int_c_limits = (float(vm_control.min()), float(vm_control.max()))
@@ -1605,19 +1551,29 @@ def IVRampAnalysis(data, **kwargs):
         control_TS["V0.5"]              = im_control_fit_TS_params[3]
         control_TS["rsq"]               = im_control_fit_TS_rsq
         
-        
-        #intg = quad(lambda x, a, b, c, x0: models.Talbot_Sayer(x, a, b, c, x0, t=temperature, o=externalCa), \
-            #float(vm_control[0]), float(control_macroscopic["Erev"]), \
-            #tuple(im_control_fit_TS_params))
-        
-        intg = quad(lambda x, a, b, c, x0: models.Talbot_Sayer(x, a, b, c, x0, t=temperature, o=externalCa), \
-            int_c_limits[0], int_c_limits[1], \
-            tuple(im_control_fit_TS_params))
+        # NOTE: integrate the Talbot & Sayer fit curve
+        intg = quad(lambda x, a, b, c, x0: models.Talbot_Sayer(x, a, b, c, x0, t=temperature, o=externalCa), 
+                    int_c_limits[0], int_c_limits[1], 
+                    tuple(im_control_fit_TS_params))
         
         control_TS["integral"] = intg[0]
         control_TS["integral_error"] = intg[1]
         
         control_segment.annotations["Talbot_Sayer"] = control_TS
+        
+    else:
+        control_TS = OrderedDict()
+        
+        control_TS["PeakImFit"]         = np.nan
+        control_TS["activation_slope"]  = np.nan
+        control_TS["scale"]             = np.nan
+        control_TS["Ca_in"]             = np.nan
+        control_TS["V0.5"]              = np.nan
+        control_TS["rsq"]               = np.nan
+        control_TS["integral"]          = np.nan
+        control_TS["integral_error"]    = np.nan
+        
+    control_TS_df = pd.DataFrame(control_TS, index=pd.Index(["Control_TS"]))
 
     if im_control_fit_MN is not None:
         control_segment.analogsignals.append(im_control_fit_MN)
@@ -1631,24 +1587,34 @@ def IVRampAnalysis(data, **kwargs):
         control_MN["activation_slope"]  = im_control_fit_MN_params[3]
         control_MN["rsq"]               = im_control_fit_MN_rsq
         
-        #intg = quad(models.Markwardt_Nilius, \
-            #float(vm_control[0]), float(control_macroscopic["Erev"]), \
-                #tuple(im_control_fit_MN_params))
-        
-        intg = quad(models.Markwardt_Nilius, \
-            int_c_limits[0], int_c_limits[1], \
-                tuple(im_control_fit_MN_params))
+        # NOTE: integrate the Markwardt & Nilius fit curve
+        intg = quad(models.Markwardt_Nilius, int_c_limits[0], int_c_limits[1], 
+                    tuple(im_control_fit_MN_params))
         
         control_MN["integral"] = intg[0]
         
         control_MN["integral_error"] = intg[1]
         
         control_segment.annotations["Markwardt_Nilius"] = control_MN
-    
-    #control_result.segments.append(control_segment)
-    
+        
+    else:
+        control_MN = OrderedDict()
+        control_MN["PeakImFit"]         = np.nan
+        control_MN["g_slope"]           = np.nan
+        control_MN["Erev"]              = np.nan
+        control_MN["V0.5"]              = np.nan
+        control_MN["activation_slope"]  = np.nan
+        control_MN["rsq"]               = np.nan
+        control_MN["integral"]          = np.nan
+        control_MN["integral_error"]    = np.nan
+        
+    control_MN_df = pd.DataFrame(control_MN, index=pd.Index(["Control_MN"]))
+
     result.segments.append(control_segment)
     
+    #### END Analysis of (control) data
+    
+    #### BEGIN Analysis of test (drug) data
     # now, do the analysis for test (if test was passed)
     if test is not None:
         test_name = test.name
@@ -1672,14 +1638,24 @@ def IVRampAnalysis(data, **kwargs):
         
         i_min = im_control.time_slice(ivbase_start, ivbase_end).mean()
         
-        im_test_normalized_to_control_peak = neoutils.peak_normalise_signal(im_test, i_min, im_control_peak)
-        
+        # normalize current during test (i.e. drug) to peak control value => peak-normalized I(V) during drug
+        # NOTE: this represents the fraction of current NOT blocked by the drug
+        # NOTE: the fraction blocked by the drug would be 1 - this
+        im_test_normalized_to_control_peak = ephys.peak_normalise_signal(im_test, i_min, im_control_peak)
         im_test_normalized_to_control_peak.name = "%s peak normalized to Control" % test_name
         
+        # get the maximal value of peak-normalized drug I(V)
+        # NOTE: this is the fraction of the peak current NOT blocked by the drug
         im_test_peak_normalized_to_control = im_test_normalized_to_control_peak.max()
         
+        # calculate the drug-sensitive fraction i.e. how much the drug has blocked
+        # NOTE: this is the difference between peak-normalized control I(V) and peak-normalized drug I(V)
+        # NOTE: im_control_peak_normalized was calculated above
         im_test_sensitive_fraction = im_control_peak_normalized - im_test_normalized_to_control_peak
         
+        # get the value of the drug-sensitive fraction pf peak (IV)  = 1 - im_test_peak_normalized_to_control:
+        # NOTE: the (1 * ...) creates a quantity of 1 * signal units
+        # NOTE: the results is a signal with one element (hence it has name and description attributes)
         im_test_peak_sensitive_fraction = (1*im_test_peak_normalized_to_control.units) - im_test_peak_normalized_to_control
         
         im_test_sensitive_fraction.name = "%s-sensitive" % test_name
@@ -1690,63 +1666,49 @@ def IVRampAnalysis(data, **kwargs):
         test_macroscopic["IpeakNorm"] = im_test_peak_normalized_to_control
         test_macroscopic["%s-sensitive peak fraction" % test_name] = im_test_peak_sensitive_fraction
         
-        plots.plotZeroCrossedAxes(vm_test, im_test, fig=iv_fig, legend=[test_name])
+        plots.plotZeroCrossedAxes(vm_test.magnitude, im_test.magnitude, fig=iv_fig, legend=[test_name])
         
-        plots.plotZeroCrossedAxes(vm_test, im_test_normalized_to_control_peak, fig=iv_norm, legend=["%s normalized to %s peak" % (test_name, data_name)])
+        plots.plotZeroCrossedAxes(vm_test.magnitude, im_test_normalized_to_control_peak.magnitude, fig=iv_norm_fig, legend=["%s normalized to %s peak" % (test_name, data_name)])
         
         
         # fit the test I-V curve with the Talbot & Sayer model
         try:
-            #if Vmin is not None and Vmax is not None:
-                #im_test_fit_TS, im_test_fit_TS_params, im_test_fit_TS_rsq, *_ = \
-                    #fit_Talbot_Sayer(vm_test, im_test, t=temperature, ca_out = externalCa, Vmin=Vmin, Vmax=Vmax)
-                
-                
-            #else:
-                #im_test_fit_TS, im_test_fit_TS_params, im_test_fit_TS_rsq, *_ = fit_Talbot_Sayer(vm_test, im_test, t=temperature, ca_out = externalCa)
-
+            # fit I(V) durinfg drug with Talbot & Sayer model
             im_test_fit_TS, im_test_fit_TS_params, im_test_fit_TS_rsq, *_ = fit_Talbot_Sayer(vm_test, im_test, t=temperature, ca_out = externalCa)
             
             im_test_fit_TS.name = "Talbot-Sayer %s" % test_name
+            
+            im_test_fit_TS_peak = im_test_fit_TS.min()
             
             im_test_fit_TS.description = "Talbot-Sayer of %s, %s" % (test_name, im_test.name)
             
             i_min = im_test_fit_TS.time_slice(ivbase_start, ivbase_end).mean()
             
-            im_test_fit_TS_normalized_to_control_peak = neoutils.peak_normalise_signal(im_test_fit_TS, i_min, im_control_fit_TS_peak)
+            # normalize the fit to the max of control fit (peak-normalized fit)
+            # NOTE: im_control_fit_TS_peak was calculated above
+            # NOTE: this represents the fraction of I(V) fit cure NOT blocked by the drug
+            # NOTE: the fraction blocked by the drug would be 1 - this
+            im_test_fit_TS_normalized_to_control_peak = ephys.peak_normalise_signal(im_test_fit_TS, i_min, im_control_fit_TS_peak)
             
             im_test_fit_TS_normalized_to_control_peak.name = "%s peak normalized to fitted Control" % im_test_fit_TS.name
             
+            # get the maximum value of the peak-normalized fit => the max I(V) fit NOT blocked
             im_test_fit_TS_peak_normalized_to_control = im_test_fit_TS_normalized_to_control_peak.max()
             
+            # get the drug-sensitive fraction of the maximum of I(V) fit curve
             im_test_fit_TS_peak_normalized_sensitive_fraction = (1 * im_test_fit_TS_peak_normalized_to_control.units) - im_test_fit_TS_peak_normalized_to_control
             
-            plots.plotZeroCrossedAxes(vm_test, im_test_fit_TS, fig=iv_fig, legend=["%s Talbot & Sayer fit" % test_name])
+            plots.plotZeroCrossedAxes(vm_test.magnitude, im_test_fit_TS.magnitude, fig=iv_fig, legend=["%s Talbot & Sayer fit" % test_name])
             
-            plots.plotZeroCrossedAxes(vm_test, im_test_fit_TS_normalized_to_control_peak, fig=iv_norm, legend=["%s Talbot & Sayer fit normalized to %s peak" % (test_name, data_name)])
+            plots.plotZeroCrossedAxes(vm_test.magnitude, im_test_fit_TS_normalized_to_control_peak.magnitude, fig=iv_norm_fig, legend=["%s Talbot & Sayer fit normalized to %s peak" % (test_name, data_name)])
         
         except Exception as e:
             im_test_fit_TS = None
             traceback.print_exc()
             
         # fit the test I-V curve with the Markwardt & Nilius model
+        # NOTE: see NOTE annotations in the above block of code for Talbot & Sayer
         try:
-            #if Vmin is not None and Vmax is not None:
-                #im_test_fit_MN, im_test_fit_MN_params, im_test_fit_MN_rsq, *_ = \
-                    #fit_Markwardt_Nilius(vm_test, im_test, \
-                        #g = test_macroscopic["g_slope"], \
-                        #Erev = test_macroscopic["emf"], \
-                        #Vhmax = test_macroscopic["VmHalfMaxAct"], \
-                        #slope = 1, Vmin=Vmin, Vmax=Vmax)
-            
-            #else:
-                #im_test_fit_MN, im_test_fit_MN_params, im_test_fit_MN_rsq, *_ = \
-                    #fit_Markwardt_Nilius(vm_test, im_test, \
-                        #g = test_macroscopic["g_slope"], \
-                        #Erev = test_macroscopic["emf"], \
-                        #Vhmax = test_macroscopic["VmHalfMaxAct"], \
-                        #slope = 1)
-            
             im_test_fit_MN, im_test_fit_MN_params, im_test_fit_MN_rsq, *_ = \
                 fit_Markwardt_Nilius(vm_test, im_test, \
                     g = test_macroscopic["g_slope"], \
@@ -1758,9 +1720,11 @@ def IVRampAnalysis(data, **kwargs):
             
             im_test_fit_MN.description = "Markwardt-Nilius fit of %s, %s" % (test_name, im_test.name)
             
+            im_test_fit_MN_peak = im_test_fit_MN.min()
+            
             i_min = im_test_fit_MN.time_slice(ivbase_start, ivbase_end).mean()
             
-            im_test_fit_MN_normalized_to_control_peak = neoutils.peak_normalise_signal(im_test_fit_MN, i_min, im_control_fit_MN_peak)
+            im_test_fit_MN_normalized_to_control_peak = ephys.peak_normalise_signal(im_test_fit_MN, i_min, im_control_fit_MN_peak)
             
             im_test_fit_MN_normalized_to_control_peak.name = "%s peak normalized to fitted Control" % im_test_fit_MN.name
             
@@ -1768,13 +1732,15 @@ def IVRampAnalysis(data, **kwargs):
             
             im_test_fit_MN_peak_normalized_sensitive_fraction = (1 * im_test_fit_MN_peak_normalized_to_control.units) - im_test_fit_MN_peak_normalized_to_control
             
-            plots.plotZeroCrossedAxes(vm_test, im_test_fit_MN, fig=iv_fig, legend=["%s Markwardt & Nilius fit" % test_name])
+            plots.plotZeroCrossedAxes(vm_test.magnitude, im_test_fit_MN.magnitude, fig=iv_fig, legend=["%s Markwardt & Nilius fit" % test_name])
             
-            plots.plotZeroCrossedAxes(vm_test, im_test_fit_MN_normalized_to_control_peak, fig=iv_norm, legend=["%s Marwardt & Nilius fit normalized to %s peak" % (test_name, data_name)])
+            plots.plotZeroCrossedAxes(vm_test.magnitude, im_test_fit_MN_normalized_to_control_peak.magnitude, fig=iv_norm_fig, legend=["%s Marwardt & Nilius fit normalized to %s peak" % (test_name, data_name)])
         
         except Exception as e:
             im_test_fit_MN = None
             traceback.print_exc()
+            
+        # NOTE: collect measurements and derived signals into a new segment
             
         #test_result  = neo.Block(name="IVRamp analysis for %s" % test.name)
         test_segment = neo.Segment(name="IV analysis result for %s" % test_name, index=0)
@@ -1790,7 +1756,7 @@ def IVRampAnalysis(data, **kwargs):
         
         test_segment.epochs.append(neo.Epoch(times = im_test.t_start, durations = im_test.duration.rescale(pq.s), name="IVRamp"))
         
-        if integration is None:
+        if integration is None: # perform integration (area under the curve)
             if test_macroscopic["Erev"] is None:
                 int_t_limits = (float(vm_test.min()), float(vm_test.max()))
             else:
@@ -1812,58 +1778,83 @@ def IVRampAnalysis(data, **kwargs):
             test_segment.analogsignals.append(im_test_fit_TS_normalized_to_control_peak)
             
             test_TS = OrderedDict()
+            test_TS["PeakImFit"]        = im_test_fit_TS_peak
             test_TS["activation_slope"] = im_test_fit_TS_params[0]
             test_TS["scale"]            = im_test_fit_TS_params[1]
             test_TS["Ca_in"]            = im_test_fit_TS_params[2]
             test_TS["V0.5"]             = im_test_fit_TS_params[3]
             test_TS["rsq"]              = im_test_fit_TS_rsq
             
-            #intg = quad(lambda x, a, b, c, x0: models.Talbot_Sayer(x, a, b, c, x0, t=temperature, o = externalCa), \
-                                    #float(vm_test[0]), float(test_macroscopic["Erev"]), \
-                                    #tuple(im_test_fit_TS_params))
-            
-            intg = quad(lambda x, a, b, c, x0: models.Talbot_Sayer(x, a, b, c, x0, t=temperature, o = externalCa), \
-                                    int_t_limits[0], int_t_limits[1], \
-                                    tuple(im_test_fit_TS_params))
+            # NOTE: integrate the Talbot & Sayer fit for the drug I(V)
+            intg = quad(lambda x, a, b, c, x0: models.Talbot_Sayer(x, a, b, c, x0, t=temperature, o = externalCa), 
+                        int_t_limits[0], int_t_limits[1], 
+                        tuple(im_test_fit_TS_params))
             
             test_TS["integral"] = intg[0]
             test_TS["integral_error"] = intg[1]
             
-            
+            # NOTE: if Control was fitted (which it should have) then calculate
+            # drug-sensitive fraction of the fits
             if im_control_fit_TS is not None:
                 # test-sensitive fraction on the fitted curves
                 im_test_sensitive_fraction_fit_TS = im_control_fit_TS_peak_normalized - im_test_fit_TS_normalized_to_control_peak
                 im_test_sensitive_fraction_fit_TS.name="%s-sensitive fraction" % test_name
                 im_test_sensitive_fraction_fit_TS.description="%s-sensitive fraction, Talbot & Sayer fit" % test_name
                 
+                # NOTE: the drug-sensitive fraction of area under the fitted I(V) curve
+                # is 1 - Inegral(test)/Integral(control)
                 test_TS["%s-sensitive Integral" % test_name] = 1 - test_TS["integral"]/control_TS["integral"]
                 
+                # NOTE: done above
                 test_TS["%s-sensitive peak fraction" % test_name] = im_test_fit_TS_peak_normalized_sensitive_fraction
                 
                 test_TS["PeakImFitNorm"] = im_test_fit_TS_peak_normalized_to_control
                 
                 test_segment.analogsignals.append(im_test_sensitive_fraction_fit_TS)
-            
+                
+            else:
+                test_TS["%s-sensitive Integral" % test_name] = np.nan
+                
+                test_TS["%s-sensitive peak fraction" % test_name] = np.nan
+                
+                test_TS["PeakImFitNorm"] = np.nan
+                
+                
             test_segment.annotations["Talbot_Sayer"] = test_TS
+            
+            
+        else:
+            test_TS = OrderedDict()
+            test_TS["PeakImFit"]        = np.nan
+            test_TS["activation_slope"] = np.nan
+            test_TS["scale"]            = np.nan
+            test_TS["Ca_in"]            = np.nan
+            test_TS["V0.5"]             = np.nan
+            test_TS["rsq"]              = np.nan
+            test_TS["integral"]         = np.nan
+            test_TS["integral_error"]   = np.nan
+            test_TS["%s-sensitive Integral" % test_name] = np.nan
+            test_TS["%s-sensitive peak fraction" % test_name] = np.nan
+            test_TS["PeakImFitNorm"] = np.nan
+            
+        test_TS_df = pd.DataFrame(test_TS, index = pd.Index(["%s_TS" % test_name]))
+            
             
         if im_test_fit_MN is not None:
             test_segment.analogsignals.append(im_test_fit_MN)
             test_segment.analogsignals.append(im_test_fit_MN_normalized_to_control_peak)
             
             test_MN = OrderedDict()
+            test_MN["PeakImFit"]        = im_test_fit_MN_peak
             test_MN["g_slope"]          = im_test_fit_MN_params[0]
             test_MN["Erev"]             = im_test_fit_MN_params[1]
             test_MN["V0.5"]             = im_test_fit_MN_params[2]
             test_MN["activation_slope"] = im_test_fit_MN_params[3]
             test_MN["rsq"]              = im_test_fit_MN_rsq
             
-            #intg = quad(models.Markwardt_Nilius, \
-                                    #float(vm_test[0]), float(test_macroscopic["Erev"]), \
-                                    #tuple(im_test_fit_MN_params))
-            
-            intg = quad(models.Markwardt_Nilius, \
-                                    int_t_limits[0], int_t_limits[1], \
-                                    tuple(im_test_fit_MN_params))
+            # NOTE: integrate the Markwadt & Nilius fit for the drug I(V)
+            intg = quad(models.Markwardt_Nilius, int_t_limits[0], int_t_limits[1], 
+                        tuple(im_test_fit_MN_params))
             
             test_MN["integral"] = intg[0]
             
@@ -1882,10 +1873,58 @@ def IVRampAnalysis(data, **kwargs):
                 test_MN["PeakImFitNorm"] = im_test_fit_MN_peak_normalized_to_control
                 
                 test_segment.analogsignals.append(im_test_sensitive_fraction_fit_MN)
+                
+            else:
+                test_MN["%s-sensitive Integral" % test_name] = np.nan
+                test_MN["%s-sensitive peak fraction" % test_name] = np.nan
+                test_MN["PeakImFitNorm"] = np.nan
+                
+            test_segment.annotations["Markwardt_Nilius"] = test_MN
             
-        test_segment.annotations["Markwardt_Nilius"] = test_MN
+        else:
+            test_MN = OrderedDict()
+            test_MN["PeakImFit"]        = np.nan
+            test_MN["g_slope"]          = np.nan
+            test_MN["Erev"]             = np.nan
+            test_MN["V0.5"]             = np.nan
+            test_MN["activation_slope"] = np.nan
+            test_MN["rsq"]              = np.nan
+            test_MN["%s-sensitive Integral" % test_name] = np.nan
+            test_MN["%s-sensitive peak fraction" % test_name] = np.nan
+            test_MN["PeakImFitNorm"] = np.nan
+            
+        test_MN_df = pd.DataFrame(test_MN, index = pd.Index(["%s_MN"%test_name]))
         
         result.segments.append(test_segment)
+        
+    else:
+        test_TS = OrderedDict()
+        test_TS["PeakImFit"]        = np.nan
+        test_TS["activation_slope"] = np.nan
+        test_TS["scale"]            = np.nan
+        test_TS["Ca_in"]            = np.nan
+        test_TS["V0.5"]             = np.nan
+        test_TS["rsq"]              = np.nan
+        test_TS["integral"]         = np.nan
+        test_TS["integral_error"]   = np.nan
+        test_TS["%s-sensitive Integral" % test_name] = np.nan
+        test_TS["%s-sensitive peak fraction" % test_name] = np.nan
+        test_TS["PeakImFitNorm"] = np.nan
+        test_TS_df = pd.DataFrame(test_TS)
+        
+        test_MN = OrderedDict()
+        test_MN["PeakImFit"]        = np.nan
+        test_MN["g_slope"]          = np.nan
+        test_MN["Erev"]             = np.nan
+        test_MN["V0.5"]             = np.nan
+        test_MN["activation_slope"] = np.nan
+        test_MN["rsq"]              = np.nan
+        test_MN["%s-sensitive Integral" % test_name] = np.nan
+        test_MN["%s-sensitive peak fraction" % test_name] = np.nan
+        test_MN["PeakImFitNorm"] = np.nan
+        test_MN_df = pd.DataFrame(test_MN)
+        
+    #### END Analysis of test (drug) data
         
     block_annot = OrderedDict()
     
@@ -1907,14 +1946,17 @@ def IVRampAnalysis(data, **kwargs):
     block_annot["test_int_start"]   = int_t_limits[0]
     block_annot["test_int_end"]     = int_t_limits[1]
     
-    
         
     result.annotations = block_annot
     
-    if result.name is not None and len(result.name) > 0:
-        resultsToCsv(result)
+    # ### END analysis
     
-    return result
+    #if result.name is not None and len(result.name) > 0:
+        #resultsToCsv(result)
+        
+    result_df = pd.concat([control_TS_df, test_TS_df, control_MN_df, test_MN_df])
+    
+    return result, result_df
 
 def resultsToCsv(data, filebasename=None):
     import csv

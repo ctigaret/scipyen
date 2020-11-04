@@ -270,11 +270,11 @@ def define_foreign_data_props_getter_fun_str(dataname:str, namespace:str="Intern
     """Defines a function to retieve object properties in the foreign namespace.
     
     The function is wrapped by a context manager so that any module imports are
-    are not reflected in the foreign namespace.
+    are not reflected in the foreign namespace. - is this true !?
     
     The function should be removed from the foreign ns after use.
     """
-    return "\n".join(["@hostutils.contextExecutor()", # core.extipyutils_host is imported remotely as hostutils
+    return "\n".join(["@hostutils.ContextExecutor()", # core.extipyutils_host is imported remotely as hostutils
     "def f(objname, obj):",                           # use regular function wrapped in a context manager
     "    from core.utilities import summarize_object_properties",
     "    return summarize_object_properties(objname, obj, namespace='%s')" % namespace,
@@ -335,7 +335,7 @@ def cmds_get_foreign_data_props(dataname:str, namespace:str="Internal") -> list:
     
     ##### BEGIN variant 3 - no joy - remote kernel reports attribute error __enter__
     # when using a generator instead of a function -- why ??!
-    #cmd1 = "\n".join(["@hostutils.contextExecutor()", # core.extipyutils_host is imported remotely as hostutils
+    #cmd1 = "\n".join(["@hostutils.ContextExecutor()", # core.extipyutils_host is imported remotely as hostutils
     #"def f_gen(objname, obj):",             # use a generator func
     #"    from core.utilities import summarize_object_properties",
     #"    yield summarize_object_properties(objname, obj)",
@@ -544,7 +544,7 @@ def cmd_copy_to_foreign(dataname, data:typing.Any) -> str:
     pickle_str = str(pickle.dumps({dataname:data}))
     #print("cmd_copy_to_foreign: pickle_str = %s" % pickle_str)
     
-    prepper_cmd="\n".join(["@hostutils.contextExecutor()",
+    prepper_cmd="\n".join(["@hostutils.ContextExecutor()",
     "def f(picklebytes):",
     "   data = pickle.loads(eval(str(picklebytes)))",
     "   get_ipython().user_ns.update(data)"])

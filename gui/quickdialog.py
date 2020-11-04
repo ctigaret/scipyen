@@ -387,7 +387,7 @@ class VariableNameStringInput(StringInput):
         
         
         def fixup(self, s):
-            return validateVarName(s)
+            return validate_varname(s)
             
             
     def __init__(self, parent, label, ws):
@@ -402,7 +402,7 @@ class VariableNameStringInput(StringInput):
             QtWidgets.QMessageBox.critical(None, "Error","Field '%s' empty" % (self.label.text()))
             return False
         else:
-            self.variable.setText(validateVarName(self.text()))
+            self.variable.setText(validate_varname(self.text()))
         return True
     
 class QuickDialog(QtWidgets.QDialog):

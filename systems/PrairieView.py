@@ -2,11 +2,12 @@
 """Import routines for PrairieView data
 """
 #### BEGIN core python modules
-import os, sys, traceback, warnings, datetime, time, mimetypes, io
+import os, sys, traceback, warnings, datetime, time, mimetypes, io, typing
 from enum import Enum, IntEnum #, unique
 from collections import OrderedDict
 import concurrent.futures
 import threading
+#import xml
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -18,15 +19,13 @@ import vigra
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-import core.xmlutils as xmlutils
-import core.datatypes as dt
-import core.imageprocessing as imgp
-import core.neoutils as neoutils
-from core.axisutils import axisTypeFlags, defaultAxisTypeName, defaultAxisTypeSymbol, defaultAxisTypeUnits
-from core.axiscalibration import AxisCalibration
+from core.utilities import safeWrapper
 from core.traitcontainers import DataBag
-from core.scandata import ScanData
-#from core import *
+from core.triggerprotocols import TriggerProtocol
+import core.xmlutils as xmlutils
+import core.strutils as strutils
+import core.datatypes as dt
+
 #### END pict.core modules
 
 #### BEGIN pict.iolib modules
@@ -35,6 +34,7 @@ import iolib.pictio as pio
 
 #### BEGIN pict.gui modules
 #from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
+from PyQt5 import (QtCore, QtWidgets, QtGui,)
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 from PyQt5.uic import loadUiType as __loadUiType__ 
 #from gui import *
@@ -43,12 +43,24 @@ from gui import resources_rc as resources_rc
 #from gui import pyqtSignal as pyqtSignal
 #from gui import pyqtSlot as pyqtSlot
 from gui import quickdialog as quickdialog
+from gui import pictgui as pgui
+from gui.workspacegui import WorkspaceGuiMixin
 #### END pict.gui modules
 
+from imaging import (imageprocessing as imgp, axisutils, axiscalibration,)
+from imaging.scandata import (ScanData, ScanDataOptions, scanDataOptions,)
 
-_module_path_ = os.path.abspath(os.path.dirname(__file__))
+from imaging.axisutils import (axisTypeFlags, defaultAxisTypeName, 
+                               defaultAxisTypeSymbol, defaultAxisTypeUnits,)
+from imaging.axiscalibration import AxisCalibration
 
-__UI_PVImporterDialog__, __QDialog__ = __loadUiType__(os.path.join(_module_path_,"PVImporterDialog.ui"), from_imports=True, import_from="gui")
+import ephys.ephys as ephys
+
+__module_path__ = os.path.abspath(os.path.dirname(__file__))
+
+__UI_PVImporterDialog__, __QDialog__ = __loadUiType__(os.path.join(__module_path__,"PVImporterDialog.ui"), from_imports=True, import_from="gui")
+__UI_PrairieImporter, __QDialog__ = __loadUiType__(os.path.join(__module_path__, "PrairieImporter.ui"), from_imports=True, import_from="gui")
+
 # TODO:
 # factor out common functions in a superclass
 
@@ -333,13 +345,12 @@ class PVLaser(object):
     def __str__(self):
         ret = ["Laser:\n"]
         ret += [" %s = %s\n" % (i[0], i[1]) for i in self.__attributes__.items()]
-        #ret += [" %s = %s\n" % (i[0], i[1]) for i in self.__dict__.items()]
-        #ret.append("\n")
         
         return "".join(ret)
 
 class PVSystemConfiguration(object):
     def __init__(self, node, parent=None):
+        #print("PVSystemConfiguration.__init__: node = %s (node name: %s)" % (node, node.nodeName))
         if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName != "SystemConfiguration":
             raise ValueError("Expecting an element node named 'SystemConfiguration'")
 
@@ -389,6 +400,13 @@ class PVSystemConfiguration(object):
     @property
     def attributes(self):
         return self.__attributes__
+    
+    def as_dict(self):
+        ret = dict()
+        ret.update(self.attributes)
+        ret["lasers"] = [laser.attributes for laser in self.lasers]
+        
+        return DataBag(ret)
     
     #def laser(self, index):
         #return self.lasers[index]
@@ -1813,8 +1831,8 @@ class PVScan(object):
                     
                 #print("PVScan.__call__() framePeriod", framePeriod)
                     
-                newAxisInfo = vigra.AxisInfo(key="t1", typeFlags=vigra.AxisType.Time, \
-                                                       resolution=framePeriod, \
+                newAxisInfo = vigra.AxisInfo(key="t1", typeFlags=vigra.AxisType.Time, 
+                                                       resolution=framePeriod, 
                                                        description=defaultAxisTypeName(axisTypeFlags["t"]))
                 
                 newAxisCal = AxisCalibration(newAxisInfo,
@@ -1976,7 +1994,7 @@ class PVScan(object):
             raise ValueError("Unknown sequence type %d" % self.sequencetype)
             
 
-    def scanData(self, mergeChannels=False, analysisoptions=None, electrophysiology=None, name=None):
+    def scanData(self, mergeChannels=False, analysisOptions=None, electrophysiology=None, name=None):
         """Returns a datatypes.ScanData object
         """
         
@@ -1996,8 +2014,8 @@ class PVScan(object):
         #print("PVScan.scanData  c'tuct ScanData")
         ret = ScanData(scene=scene, scans=scans, metadata=meta, name=self.name)
         
-        if analysisoptions is not None:
-            ret.analysisoptions = analysisoptions
+        if analysisOptions is not None:
+            ret.analysisOptions = analysisOptions
             
         if isinstance(electrophysiology, neo.Block):
             ret.electrophysiology = electrophysiology
@@ -2016,7 +2034,7 @@ class PVScan(object):
         """
         
         metadata = dict()
-        metadata["configuration"] = self.configuration
+        metadata["configuration"] = self.configuration.as_dict()
         metadata["file_path"] = self.filepath
         
         if self.sequences[0].type == PVSequenceType.Linescan:
@@ -2161,8 +2179,16 @@ class PVScan(object):
         return "\n".join(ret)
     
     
-class PVImporterDialog(__UI_PVImporterDialog__, __QDialog__):
-    def __init__(self, parent, currentdir, presyn_trigger_detect, postsyn_trigger_detect, photo_trigger_detect, imaging_trigger_detect, data_name=None, ephys_name=None):
+class PVImportDialog(__UI_PVImporterDialog__, __QDialog__):
+    def __init__(self, parent, currentdir, 
+                 presyn_trigger_detect=None, 
+                 postsyn_trigger_detect=None, 
+                 photo_trigger_detect=None, 
+                 imaging_trigger_detect=None, 
+                 name=None,
+                 pvdata_name=None, 
+                 ephys_name=None, 
+                 options=None):
         super().__init__(self, parent)
         
         if not isinstance(parent, QtWidgets, QWidget):
@@ -2177,48 +2203,55 @@ class PVImporterDialog(__UI_PVImporterDialog__, __QDialog__):
         for n, t in zip(("presyn_trigger_detect", "postsyn_trigger_detect", "photo_trigger_detect", "imaging_trigger_detect"),
                         (presyn_trigger_detect, postsyn_trigger_detect, photo_trigger_detect, imaging_trigger_detect)):
         
-            if not isinstance(t, (tuple, list)):
-                raise TypeError("%s expected to be a tuple or list; got %s instead" % (n, type(t).__name__))
-            
-            if len(t) not in (3, 4):
-                raise TypeError("%s expected to have three or four elements; got %d instead" % (n, len(t)))
-            
-            if not isinstance(t[0], bool):
-                raise TypeError("first element of %s expected to be a bool; got %s instead" % (n, type(t[0]).__name__))
-            
-            if not isinstance(t[1], int):
-                raise TypeError("second element of %s expected to be an int; got %s instead" % (n, type(t[1]).__name__))
-            
-            if t[1] < 0:
-                raise ValueError("second element of %s must be >= 0; got %d instead" % (n, t[1]))
-            
-            if not isinstance(t[2], str):
-                raise TypeError("third element of %s expected to be a str; got %s instead" % (n, type(t[2]).__name__))
-            
-            if len(t[2]) == 0:
-                raise ValueError("third element of %s must not be an epmty string" % n)
-            
-            if len(t) == 4:
-                if not insinstance(t[3], tuple):
-                    raise TypeError("fourth element of %s must be a tuple; got %s instead" % (n, type(t[3]).__name__))
+            if not t is None:
+                if not isinstance(t, (tuple, list)):
+                    raise TypeError("%s expected to be a tuple or list; got %s instead" % (n, type(t).__name__))
                 
-                if len(t[3]) != 2:
-                    raise TypeError("fourth element of %s must have two elements; got %d instead" % (n, len(presyn_trigger_detect[3])))
+                if len(t) not in (3, 4):
+                    raise TypeError("%s expected to have three or four elements; got %d instead" % (n, len(t)))
                 
-                if not all([isinstance(p, float) for p in t[3]]):
-                    raise TypeError("fourth element of %s must contain float values" % n)
+                if not isinstance(t[0], bool):
+                    raise TypeError("first element of %s expected to be a bool; got %s instead" % (n, type(t[0]).__name__))
+                
+                if not isinstance(t[1], int):
+                    raise TypeError("second element of %s expected to be an int; got %s instead" % (n, type(t[1]).__name__))
+                
+                if t[1] < 0:
+                    raise ValueError("second element of %s must be >= 0; got %d instead" % (n, t[1]))
+                
+                if not isinstance(t[2], str):
+                    raise TypeError("third element of %s expected to be a str; got %s instead" % (n, type(t[2]).__name__))
+                
+                if len(t[2]) == 0:
+                    raise ValueError("third element of %s must not be an empty string" % n)
+                
+                if len(t) == 4:
+                    if not insinstance(t[3], tuple):
+                        raise TypeError("fourth element of %s must be a tuple; got %s instead" % (n, type(t[3]).__name__))
+                    
+                    if len(t[3]) != 2:
+                        raise TypeError("fourth element of %s must have two elements; got %d instead" % (n, len(presyn_trigger_detect[3])))
+                    
+                    if not all([isinstance(p, float) for p in t[3]]):
+                        raise TypeError("fourth element of %s must contain float values" % n)
         
-        if not isinstance(data_name, (str, type(None))):
-            raise TypeError("data_name extected to be a string, or None; got %s instead" % type(data_name).__name__)
+        if not isinstance(name, (str, type(None))):
+            raise TypeError("'name' expected to be a string, or None; got %s instead" % type(name).__name__)
         
-        if isinstance(data_name, str) and len(data_name.strip()) == 0:
-            raise ValueError("data_name cannopt be an empty string")
+        if not isinstance(pvdata_name, (str, type(None))):
+            raise TypeError("'pvdata_name' extected to be a string, or None; got %s instead" % type(pvdata_name).__name__)
+        
+        if isinstance(pvdata_name, str) and len(pvdata_name.strip()) == 0:
+            raise ValueError("'pvdata_name' cannot be an empty string")
         
         if not isinstance(ephys_name, (str, type(None))):
-            raise TypeError("ephys_name expected to be astring; got %s instead" % type(ephys_name).__name__)
+            raise TypeError("'ephys_name' expected to be astring; got %s instead" % type(ephys_name).__name__)
         
         if isinstance(ephys_name, str) and len(ephys_name.strip()) == 0:
-            raise ValueError("ephys_name cannot be an empty string")
+            raise ValueError("'ephys_name' cannot be an empty string")
+        
+        if not isinstance(options, (dict, type(None))):
+            raise TypeError("'options' expected to be a dict or None; got %s instead" % type(options).__name__)
         
         self.targetdir              = currentdir
         self.presyn_trigger_detect  = presyn_trigger_detect
@@ -2230,18 +2263,23 @@ class PVImporterDialog(__UI_PVImporterDialog__, __QDialog__):
         self.pickleFileFilter       = "Pickle Files (*.pkl)"
         self.ephysFilesFilter       = ";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)"])
         
-        self.data_name              = data_name
+        self.name                   = name
+        self.pvdata_name            = data_name
         self._ephys_name            = ephys_name
         
         self.pvXMLfileName          = None
         self.pvscan                 = None
-        self.epscatoptions          = None
+        self.scanDataOptions          = None
         
         self.ephysdata              = None
         
         self.scandata               = None
         
     def __configure_UI__(self):
+        self.setupUi(self)
+        #self.pvScanFileChooserToolButton.clicked.connect(self.slot_choosePVFile)
+        #self.pvScanImportFromWorkspaceToolButton.clicked.connect(self.slot_importPVData)
+        
         pass
         
         
@@ -2272,32 +2310,6 @@ class PVImporterDialog(__UI_PVImporterDialog__, __QDialog__):
             
             
     @pyqtSlot()
-    def slot_chooseOptionsFile(self):
-        epscatOptionsFileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
-                                                                         caption="Open EPSCaT Options file", 
-                                                                         filter=self.pickleFileFilter,
-                                                                         directory=self.targetdir)
-        
-        if len(epscatOptionsFileName) == 0:
-            self.epscatoptions = epscatOptions()
-            
-        else:
-            try:
-                self.epscatoptions = pio.loadPickleFile(epscatOptionsFileName)
-                
-            except Exception as e:
-                s = io.StringIO()
-                sei = sys.exc_info()
-                traceback.print_exception(file=s, *sei)
-                msgbox = QtWidgets.QMessageBox()
-                msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-                msgbox.setWindowTitle(sei[0].__class__.__name__)
-                msgbox.setText(sei[0].__class__.__name__)
-                msgbox.setDetailedText(s.getvalue())
-                msgbox.exec()
-                return
-                
-    @pyqtSlot()
     def slot_chooseEphysFiles(self):
         ephysFileNames, _ = QtWidgets.QFileDialog.getOpenFileNames(self, 
                                                                caption="Open electrophysiology files",
@@ -2317,7 +2329,7 @@ class PVImporterDialog(__UI_PVImporterDialog__, __QDialog__):
                     
             if len(blocks) > 0:
                 if all([isinstance(b, neo.Block) for b in blocks]):
-                    self.ephysData = neoutils.concatenate_blocks(*blocks)
+                    self.ephysData = ephys.concatenate_blocks(*blocks)
                     
                 elif all([isinstance(b, neo.Segment) for b in blocks]):
                     self.ephysData = neo.Block()
@@ -2338,19 +2350,568 @@ class PVImporterDialog(__UI_PVImporterDialog__, __QDialog__):
             msgbox.setDetailedText(s.getvalue())
             msgbox.exec()
             return
+
+    @pyqtSlot()
+    def slot_chooseOptionsFile(self):
+        from imaging.scandata import (scanDataOptions, ScanDataOptions, )
+        epscatOptionsFileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
+                                                                         caption="Open EPSCaT Options file", 
+                                                                         filter=self.pickleFileFilter,
+                                                                         directory=self.targetdir)
         
+        if len(epscatOptionsFileName) == 0:
+            self.scanDataOptions = scanDataOptions()
+            
+        else:
+            try:
+                self.scanDataOptions = pio.loadPickleFile(epscatOptionsFileName)
+                
+            except Exception as e:
+                s = io.StringIO()
+                sei = sys.exc_info()
+                traceback.print_exception(file=s, *sei)
+                msgbox = QtWidgets.QMessageBox()
+                msgbox.setIcon(QtWidgets.QMessageBox.Critical)
+                msgbox.setWindowTitle(sei[0].__class__.__name__)
+                msgbox.setText(sei[0].__class__.__name__)
+                msgbox.setDetailedText(s.getvalue())
+                msgbox.exec()
+                return
+                
         
-        
-    def importData(self):
-        dlg = quickdialog.QuickDialog(self, "Import PrairieView Data")
-        
-        namePrompt = quickdialog.StringInput(dlg, "Data name:")
-        
-        namePrompt.variable.setClearButtonEnabled(True)
-        namePrompt.variable.redoAvailable=True
-        namePrompt.variable.undoAvailable=True
+    @pyqtSlot()
+    def slot_importPVData(self):
+        from core.workspacefunctions import getvarsbytype
+        pvdatadocs = getvarsbytype(xmlutils.xml.dom.minidom.Document)
         
         
         
     
+class PrairieViewImporter(__QDialog__, __UI_PrairieImporter, WorkspaceGuiMixin):
+    def __init__(self, 
+                 name: typing.Optional[str] = None,
+                 pvScanFileName: typing.Optional[str]=None, 
+                 optionsFileName: typing.Optional[str]=None, 
+                 ephysFileNames: typing.Optional[typing.Union[str, tuple, list]]=None,
+                 protocolFileName: typing.Optional[str]=None,
+                 **kwargs): # parent, flags - see documentation for QDialog constructor in Qt Assistant
+        
+        super().__init__(**kwargs)
+        
+        self.scanData = None # the outcome: a ScanData object
+        
+        self.pvscan = None # the xml.dom.minidom.Document that specifies the
+                            # the PVScan experiment
+        
+        self.dataName = "" # the value of lsdata "name" attribute
+        
+        self.pvScanFileName = "" # the PV Scan XML document file - contains
+                                 # scan experiment information & location of
+                                 # the files with the numerical data of lsdata
+                                 
+        self.scanDataVarName = "" # the name that will be assigned to lsdata in the
+                                # user's workspace
+                                
+        self.protocolFileName = "" # pickle file containing the trigger protocols
+        
+        self.optionsFileName = "" # pickle file containing saved ESPCaT options
+        
+        self.ephysFileNames = list() 
+        
+        #self.pvscan = None  # the PVScan document - generated from self.pvScanFileName
+        self.scanDataOptions = None # ScanDataOptions object - to be assigned to lsdata
+        
+        self.ephys = None   # a neo.Block with electrophysiology recordings associated
+                            # with lsdata
+                            
+        self.triggerProtocols = list()    # list of TriggerProtocol objects associated
+                                        # with lsdata
+                                        
+        if isinstance(name, str) and len(name.strip()):
+            self.dataName = name
+            self.scanDataVarName = strutils.string_to_valid_identifier(self.dataName)
+        
+        if isinstance(pvScanFileName, str) and len(pvScanFileName.strip()):
+            if os.path.isfile(pvScanFileName) and any([mime in pio.mimetypes.guess_type(pvScanFileName)[0] for mime in ("xml", "pickle")]):
+                self.pvScanFileName = pvScanFileName
+        
+        if isinstance(optionsFileName, str) and len(optionsFileName.strip()):
+            if os.path.isfile(optionsFileName) and "pickle" in pio.mimetypes.guess_type(optionsFileName)[0]:
+                self.optionsFileName = optionsFileName
+        
+        if isinstance(ephysFileNames, str) and len(ephysFileNames.strip()):
+            if os.path.isfile(ephysFileNames) and any([mime in pio.mimetypes.guess_type(ephysFileNames)[0] for mime in ("pickle", "axon")]):
+                self.ephysFileNames = [ephysFileNames]
+            
+        elif isinstance(ephysFileNames, (tuple, list)) and all([isinstance(v, str) for v in ephysFileNames]):
+            self.ephysFileNames = [s for s in ephysFileNames if (len(s.strip()) and any([mime in pio.mimetypes.guess_type(s)[0]]))]
+        
+        if isinstance(protocolFileName, str) and len(protocolFileName.strip()):
+            if os.path.isfile(self.protocolFileName) and "pickle" in pio.mimetypes.guess_type(self.protocolFileName)[0]:
+                self.protocolFileName = protocolFileName
+        
+        self._configureUI_()
+        
+        self.generateScanData()
+        
+    def _configureUI_(self):
+        self.setupUi(self)
+        
+        self.dataNameLineEdit.undoAvailable=True
+        self.dataNameLineEdit.redoAvailable=True
+        self.dataNameLineEdit.setClearButtonEnabled(True)
+        if len(self.dataName):
+            self.dataNameLineEdit.setText(self.dataName)
+        self.dataNameLineEdit.editingFinished.connect(self._slot_setDataName)
+        
+        self.pvScanFileNameLineEdit.undoAvailable=True
+        self.pvScanFileNameLineEdit.redoAvailable=True
+        self.pvScanFileNameLineEdit.setClearButtonEnabled(True)
+        if len(self.pvScanFileName):
+            self.pvScanFileNameLineEdit.setText(self.pvScanFileName)
+        self.pvScanFileNameLineEdit.editingFinished.connect(self._slot_setPVScanFileName)
+        
+        self.pvScanFileChooserToolButton.clicked.connect(self._slot_choosePVScanFile)
+        self.pvScanImportFromWorkspaceToolButton.clicked.connect(self._slot_importPVScanFromWorkspace)
+        
+        self.optionsFileNameLineEdit.undoAvailable=True
+        self.optionsFileNameLineEdit.redoAvailable=True
+        self.optionsFileNameLineEdit.setClearButtonEnabled(True)
+        
+        if len(self.optionsFileName):
+            self.optionsFileNameLineEdit.setText(self.optionsFileName)
+        self.optionsFileNameLineEdit.editingFinished.connect(self._slot_setOptionsFileName)
+        
+        self.optionsFileChooserToolButton.clicked.connect(self._slot_chooseOptionFile)
+        self.optionsImportToolButton.clicked.connect(self._slot_importOptionsFromWorkspace)
+        
+        self.ephysFileNameLineEdit.undoAvailable=True
+        self.ephysFileNameLineEdit.redoAvailable=True
+        self.ephysFileNameLineEdit.setClearButtonEnabled(True)
+        self.ephysFileNameLineEdit.setText(os.pathsep.join(self.ephysFileNames))
+        self.ephysFileNameLineEdit.editingFinished.connect(self._slot_setEphysFileNames)
+        
+        self.ephysFileChooserToolButton.clicked.connect(self._slot_chooseEphysFiles)
+        self.ephysImportFromWorkspaceToolButon.clicked.connect(self._slot_importEphysFromWorkspace)
+        
+        self.triggerProtocolFileNameLineEdit.undoAvailable=True
+        self.triggerProtocolFileNameLineEdit.redoAvailable=True
+        self.triggerProtocolFileNameLineEdit.setClearButtonEnabled(True)
+        if len(self.protocolFileName):
+            self.triggerProtocolFileNameLineEdit.setText(protocolFile)
+        self.triggerProtocolFileNameLineEdit.editingFinished.connect(self._slot_setProtocolFileName)
+        
+        self.triggerProtocolFileChooserToolButton.clicked.connect(self._slot_chooseProtocolFile)
+        self.protocolsImportToolButton.clicked.connect(self._slot_importProtocolFromWorkspace)
+        
+        self.detectTriggersToolButton.clicked.connect(self._slot_detectTriggers)
+        
+        
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_choosePVScanFile(self):
+        fileFilter = ";;".join(["XML Files (*.xml)", "Pickle files (*.pkl)", "All files (*.*)"])
+        
+        self.pvScanFileName, fileFilter = self.chooseFile(caption="Open PrairieView file",
+                                   fileFilter=fileFilter)
+        
+        if self.loadPVScan(self.pvScanFileName):
+            self.generateScanData()
+
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_setPVScanFileName(self):
+        self.pvScanFileName = self.pvScanFileNameLineEdit.text().strip()
+        
+        if self.loadPVScan(self.pvScanFileName):
+            self.generateScanData()
+                
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_setOptionsFileName(self):
+        self.optionsFileName = self.optionsFileNameLineEdit.text()
+        if self.loadOptions(self.optionsFileName):
+            if not isinstance(self.scanData, ScanData):
+                self.generateScanData()
+                
+            else:
+                self.scanData.analysisOptions = self.scanDataOptions
+        
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_chooseOptionFile(self):
+        caption = "Open ScanData Options file for %s" % self.scanDataVarName if (isinstance(self.scanDataVarName, str) and len(self.scanDataVarName.strip())) else "Open EPSCaT Options file"
+        
+        self.optionsFileName, _ = self.chooseFile(caption=caption, fileFilter="Pickle Files (*.pkl)")
+        
+        if self.loadOptions(self.optionsFileName):
+            if not isinstance(self.scanData, ScanData):
+                self.generateScanData()
+                
+            else:
+                self.scanData.analysisOptions = self.scanDataOptions
+        
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_setEphysFileNames(self):
+        self.ephysFileNames = self.ephysFileNameLineEdit.text().split(os.pathsep)
+        if self.loadEphys(self.ephysFileNames):
+            if isinstance(self.scanData, ScanData):
+                self.scanData.electrophysiology = self.ephys
+                
+            else:
+                self.generateScanData()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_chooseEphysFiles(self):
+        #targetDir = os.getcwd()
+        caption = "Open Electrophysiology Data file(s) for %s" % self.scanDataVarName if (isinstance(self.scanDataVarName, str) and len(self.scanDataVarName.strip())) else "Open Electrophysiology Data file(s)"
+        
+        fileFilter = ";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)"])
+        
+        self.ephysFileNames, _ = self.chooseFile(caption=caption, fileFilter=fileFilter, single=False)
+        
+        if self.loadEphys(self.ephysFileNames):
+            if isinstance(self.scanData, ScanData):
+                self.scanData.electrophysiology = self.ephys
+                
+            else:
+                self.generateScanData()
     
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_setDataName(self):
+        self.dataName = self.dataNameLineEdit.text()
+        if len(self.dataName):
+            self.scanDataVarName = strutils.string_to_valid_identifier(self.dataName)
+            
+            if isinstance(self.scanData, ScanData):
+                self.scanData.name = self.dataName
+                
+            else:
+                self.generateScanData()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_setProtocolFileName(self):
+        self.protocolFileName = self.triggerProtocolFileNameLineEdit.text()
+        if self.loadProtocols(self.protocolFileName):
+            if isinstance(self.ldata, ScanData):
+                self.scanData.protocols = self.triggerProtocols
+                
+            else:
+                self.generateScanData()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_chooseProtocolFile(self):
+        targetdir = os.getcwd()
+        caption = "Open Trigger Protocol file for %s" % self.scanDataVarName if (isinstance(self.scanDataVarName, str) and len(self.scanDataVarName.strip())) else "Open Trigger Protocol file"
+            
+        self.protocolFileName, _ = self.chooseFile(caption=caption, filefilter="Pickle Files (*.pkl)")
+        
+        if len(self.protocolFileName):
+            self.triggerProtocolFileNameLineEdit.setText(self.protocolFileName)
+            if self.loadProtocols(self.protocolFileName):
+                if isinstance(self.ldata, ScanData):
+                    self.scanData.protocols = self.triggerProtocols
+                    
+                else:
+                    self.generateScanData()
+            
+        else:
+            self.triggerProtocolFileNameLineEdit.clear()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_importPVScanFromWorkspace(self):
+        vars_ = self.importWorkspaceData(xmlutils.xml.dom.minidom.Document,
+                                         title="Import PVSCan Document",
+                                         single=True)
+        
+        if len(vars_):
+            self.pvscan = vars_[0]
+            self.pvScanFileNameLineEdit.clear()
+            
+            self.generateScanData()
+            
+            
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_importOptionsFromWorkspace(self):
+        vars_ = self.importWorkspaceData([ScanData, dict],
+                                        title="Import Options",
+                                        single=True)
+        
+        if len(vars_):
+            options = vars_[0]
+            
+            if isinstance(options, ScanData):
+                options = options.analysisOptions
+                
+            self.scanDataOptions = options
+            self.optionsFileNameLineEdit.clear()
+            
+            if isinstance(self.scanData, ScanData):
+                self.scanData.analysisoptions = self.scanDataOptions
+                
+            else:
+                self.generateScanData()
+            
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_importEphysFromWorkspace(self):
+        import neo
+        from imaging.scandata import ScanData
+        
+        vars_ = self.importWorkspaceData([ScanData, neo.Block, neo.Segment, 
+                                          neo.AnalogSignal, tuple, list],
+                                        title="Import electrophysiology",
+                                        single=False)
+        if len(vars_) == 1:
+            if isinstance(vars_[0], ScanData):
+                self.ephys = vars_[0].electrophysiology
+                
+            elif isinstance(vars_[0], neo.Block):
+                self.ephys = vars_[0]
+                
+            elif isinstance(vars_[0], neo.Segment):
+                self.ephys = neo.Block()
+                self.ephys.segments[:] = vars_[0]
+                
+            elif isinstance(vars_[0], neo.AnalogSignal):
+                self.ephys = neo.Block()
+                self.ephys.segments.append(neo.Segment())
+                self.ephys.segments[0].analogsignals.append(vars_[0])
+                
+            elif isinstance(vars_[0], (tuple, list)) and len(vars_[0]):
+                if all([isinstance(v, neo.Segment) for v in vars_[0]]):
+                    self.ephys = neo.Block()
+                    self.ephys.segments[:] = vars_[0][:]
+                    
+                elif all([isinstance(v, neo.AnalogSignal) for v in vars_[0]]):
+                    self.ephys = neo.Block()
+                    self.ephys.segments.append(neo.Segment())
+                    self.ephys.segments[0].analogsignals[:] = vars_[0][:]
+                    
+                else:
+                    raise TypeError("Cannot import ephys data %s" % vars_[0])
+                
+            else:
+                raise TypeError("Cannot import ephys data %s" % vars_[0])
+                
+            self.ephysFileNameLineEdit.clear()
+                
+        elif len(vars_) > 1:
+            if all([isinstance(v, neo.Segment) for v in vars_]):
+                self.ephys = neo.Block()
+                self.ephys.segments[:] = vars_[:]
+                
+            else:
+                raise TypeError("Cannot import ephys data %s" % vars_)
+
+            self.ephysFileNameLineEdit.clear()
+            
+        if isinstance(self.ephys, neo.Block):
+            if isinstance(self.scanData, ScanData):
+                self.scanData.electrophysiology = self.ephys
+                
+            else:
+                self.generateScanData()
+
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_importProtocolFromWorkspace(self):
+        from core.triggerprotocols import (TriggerProtocol,)
+        from imaging.scandata import ScanData
+        
+        vars_ = self.importWorkspaceData([ScanData, TriggerProtocol, tuple, list],
+                                         title="Import Protocol",
+                                         single=False)
+        
+        if len(vars_):
+            if len(vars_) == 1:
+                if isinstance(vars_[0], ScanData):
+                    self.triggerProtocols[:] = vars_[0].triggerProtocols[:]
+                    
+                elif isinstance(vars_[0], (tuple, list)) and all([isinstance(v, TriggerProtocol) for v in vars_[0]]):
+                    self.triggerProtocols[:] = vars_[0][:]
+                    
+                elif isinstance(vars_[0], TriggerProtocol):
+                    self.triggerProtocols = [vars_[0]]
+                    
+                else:
+                    raise TypeError("Expecting a ScanData, a TriggerProtocol or a sequence of TriggerProtocol objects; got %s instead" % vars_[0])
+                    
+                self.triggerProtocolFileNameLineEdit.clear()
+                
+            else:
+                if all([isinstance(v, TriggerProtocol) for v in vars_]):
+                    self.triggerProtocols[:] = vars_[:]
+                    
+                else:
+                    raise TypeError("Expecting a multiple selection of TriggerProtocol objects; got %s instead" % vars_)
+        
+                self.triggerProtocolFileNameLineEdit.clear()
+                
+        if len(self.triggerProtocols) and all([isinstance(p, TriggerProtocol) for p in self.triggerProtocols]):
+            if isinstance(self.scanData, ScanData):
+                self.scanData.protocols = self.triggerProtocols
+                
+            else:
+                self.generateScanData()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_detectTriggers(self):
+        if self.scanData is None:
+            return
+        
+        if isinstance(self.scanData.electrophysiology, neo.Block) and len(self.scanData.electrophysiology.segments):
+            ephys_preview = sv.SignalViewer(pWin = self._scipyenWindow_)
+            ephys_preview.plot(self.ephys)
+            
+        
+            
+        
+    @safeWrapper
+    def loadPVScan(self, fileName):
+        signalblockers = [QtCore.QSignalBlocker(w) for w in (self.pvScanFileNameLineEdit, self.dataNameLineEdit)]
+        
+        if len(fileName) and os.path.isfile(fileName):
+            mime_type, file_type, encoding = pio.getMimeAndFileType(fileName)
+            
+            if "xml" in mime_type:
+                self.pvscan = PVScan(pio.loadXMLFile(fileName))
+                
+            elif "pickle" in mime_type:
+                self.pvscan = pio.loadPickleFile(fileName)
+                
+            else:
+                self.errorMessage("PrairieView Importer - Prairiew View Scan file", "%s is not an XML or Pickle file" % self.pvScanFileName)
+                self.pvScanFileNameLineEdit.clear()
+                self.pvScanFileName=""
+                self.scanDataVarName = ""
+                self.dataName = ""
+                return False
+            
+            self.pvScanFileNameLineEdit.setText(fileName)
+            
+            tempDataVarName = os.path.splitext(os.path.basename(fileName))[0]
+            self.scanDataVarName = strutils.string_to_valid_identifier(tempDataVarName)
+            
+            if len(self.dataName) == 0:
+                self.dataName = self.scanDataVarName
+                self.dataNameLineEdit.setText(self.dataName)
+                
+            return True
+        
+        return False
+    
+    @safeWrapper
+    def loadEphys(self, fileNamesList):
+        signalblockers =[QtCore.QSignalBlocker(w) for w in (self.ephysFileNameLineEdit,)]
+    
+        if len(fileNamesList):
+            bad_files = [f for f in fileNamesList if not os.path.isfile(f)]
+            if len(bad_files):
+                self.criticalMessage("PrairieView Importer - Electrophysiology files ", "The following files could not be found %s" % os.pathsep.join(fileNamesList))
+                return False
+            
+            blocks = list()
+            
+            if all(["application/axon" in pio.getMimeAndFileType(f)[0] for f in fileNamesList]):
+                # NOTE 2020-10-06 16:24:08
+                # this is simple: each axon file generates one block
+                blocks[:] = [pio.loadAxonFile(f) for f in fileNamesList]
+                
+            elif all(["pickle" in pio.getMimeAndFileType(f)[0] for f in fileNamesList]):
+                # CAUTION 2020-10-06 16:22:25
+                # when loading pickle files, they can contain either:
+                # a) one block with one segment for each sweep => concatenate them
+                # b) a single block with as many segments as sweeps => use ths first 
+                # block and discard the others
+                blocks[:] = [pio.loadPickleFile(f) for f in fileNamesList]
+                
+            else:
+                self.errorMessage("PrairieView Importer - Electrophysiology files ", "Expecting Axon or Pickle files for electrophysiology")
+                return False
+                    
+            ephysData = None
+            
+            if len(blocks):
+                if all([isinstance(b, neo.Block) for b in blocks]):
+                    self.ephys = ephys.concatenate_blocks(*blocks)
+                    
+                    return True
+                    
+                elif all([isinstance(b, neo.Segment) for b in blocks]):
+                    self.ephys = neo.Block()
+                    self.ephys.segments[:] = blocks[:]
+                    
+                    return true
+                    
+                else:
+                    QtWidgets.QMessageBox.critical("PrairieView Importer - Electrophysiology files must contain neo.Blocks or individual neo.Segments")
+                    
+        return False
+    
+    @safeWrapper
+    def loadOptions(self, fileName):
+        signalblockers = [QtCore.QSignalBlocker(w) for w in (self.optionsFileNameLineEdit,)]
+        
+        if len(fileName) and os.path.isfile(fileName) and "pickle" in pio.getMimeAndFileType(fileName)[0]:
+            self.optionsFileName = fileName
+            self.optionsFileNameLineEdit.setText(self.optionsFileName)
+            self.scanDataOptions = pio.loadPickleFile(fileName)
+            return True
+        
+        else:
+            self.errorMessage("PrairieView Importer - Options file", "%s is not an XML or Pickle file" % self.pvScanFileName)
+            self.optionsFileName = ""
+            self.optionsFileNameLineEdit.clear()
+            return False
+        
+    @safeWrapper
+    def loadProtocols(self, fileName):
+        signalblockers = [QtCore.QSignalBlocker(w) for w in (self.triggerProtocolFileNameLineEdit,)]
+        mime_type = pio.getMimeAndFileType(fileName)[0]
+        if len(fileName) and os.path.isfile(fileName) and "pickle" in mime_type:
+            self.protocolFileName = fileName
+            self.triggerProtocolFileNameLineEdit.setText(self.protocolFileName)
+            self.triggerProtocols = pio.loadPickleFile(self.protocolFileName)
+            return True        
+        
+        else:
+            self.errorMessage("PrairieView Importer - Protocols File", "Expecting a Pickle file; got %s which is a %s instead" % (fileName, mime_type))
+            self.protocolFileName = ""
+            self.triggerProtocolFileNameLineEdit.clear()
+            return False
+        
+        
+    @safeWrapper
+    def generateScanData(self):
+        import neo
+        
+        if isinstance(self.pvscan, PVScan):
+            self.scanData = self.pvscan.scandata()
+            
+        if isinstance(self.scanData, ScanData):
+            if len(self.dataName):
+                self.scanData.name = self.dataName
+                
+            if isinstance(self.ephys, neo.Block):
+                # NOTE: 2020-10-06 19:32:24 the check below is performed by 
+                # ScanData setter
+                #if len(self.ephys.segments) != self.scanData.nScansFrames:
+                    #self.warningMessage("PrairieView Importer", "Mismatch between the number of electrophysiology swweeps (%d) and that of scans sweeps (%d)" % (len(self.ephys.segments), self.scanData.nScansFrames))
+                        
+                self.scanData.electrophysiology = self.ephys
+                
+            if isinstance(self.scanDataOptions, (ScanDataOptions, dict)):
+                self.scanData.analysisOptions = self.scanDataOptions
+                
+            if isinstance(self.triggerProtocols, (tuple, list)) and all([isinstance(v, triggerprotocols.TriggerProtocol) for v in self.triggerProtocols]):
+                self.scanData.triggerProtocols = self.triggerProtocols
+            

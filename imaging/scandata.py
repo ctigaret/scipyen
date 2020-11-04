@@ -4,10 +4,9 @@ import quantities as pq
 import neo
 import vigra
 
-from core import (prog, traitcontainers, strutils, neoutils)
+from core import (prog, traitcontainers, strutils, neoutils,models,)
 from core.prog import safeWrapper
 from core.traitcontainers import DataBag
-from core.vigrautils import getFrameLayout
 from core.datatypes import (UnitTypes,Genotypes, arbitrary_unit, pixel_unit, 
                             channel_unit,
                             space_frequency_unit,
@@ -19,10 +18,315 @@ from core.datatypes import (UnitTypes,Genotypes, arbitrary_unit, pixel_unit,
                             embryonic_day, embryonic_week, embryonic_month,
                             )
 
-from core.axiscalibration import AxisCalibration
 
-from core.triggerprotocols import (TriggerEvent, TriggerEventType, TriggerProtocol)
+from core.triggerprotocols import (TriggerEvent, TriggerEventType, TriggerProtocol,
+                                   embed_trigger_protocol, embed_trigger_event,)
+from ephys import ephys
 
+from imaging.vigrautils import getFrameLayout
+from imaging.axiscalibration import AxisCalibration
+
+class ScanDataOptions(DataBag):
+    def __init__(self, detection_predicate=1.3, roi_width = 10, roi_auto_width=False,
+                  reference="Ch1", indicator="Ch2", 
+                  bleed_ref_ind = 0., bleed_ind_ref = 0., 
+                  f0_begin = 0.10*pq.s, f0_end = 0.15*pq.s,
+                  fit_begin = 0.05 * pq.s, fit_end = 1 * pq.s, 
+                  int_begin = 0. * pq.s, int_end = 0.5 * pq.s,
+                  peak_begin = 0.15 * pq.s, peak_end = 0.3 * pq.s,
+                  initial=[], lower=[], upper=[], **kwargs):
+        
+        mutable_types = kwargs.pop("mutable_types", False)
+        use_casting = kwargs.pop("use_casting", False)
+        allow_none = kwargs.pop("allow_none", False)
+        
+        
+        options = self.__defaults__(detection_predicate = detection_predicate, 
+                           roi_width = roi_width, 
+                           roi_auto_width=roi_auto_width,
+                           reference = reference,
+                           indicator = indicator,
+                           bleed_ref_ind = bleed_ref_ind, 
+                           bleed_ind_ref = bleed_ind_ref, 
+                           f0_begin = f0_begin, 
+                           f0_end = f0_end,
+                           fit_begin = fit_begin, 
+                           fit_end = fit_end,
+                           int_begin = int_begin, 
+                           int_end = int_end,
+                           peak_begin = peak_begin, 
+                           peak_end = peak_end,
+                           initial = initial, 
+                           lower = lower, 
+                           upper = upper)
+        
+        super().__init__(options, 
+                         mutable_types=mutable_types, 
+                         use_casting=use_casting,
+                         allow_none=allow_none)
+        
+    def defaults(self):
+        return ScanDataOptions(self.__defaults__)
+    
+    def __defaults__(self, detection_predicate=1.3, roi_width = 10, roi_auto_width=False,
+                    reference="Ch1", indicator="Ch2", 
+                    bleed_ref_ind = 0., bleed_ind_ref = 0., 
+                    f0_begin = 0.10*pq.s, f0_end = 0.15*pq.s,
+                    fit_begin = 0.05 * pq.s, fit_end = 1 * pq.s, 
+                    int_begin = 0. * pq.s, int_end = 0.5 * pq.s,
+                    peak_begin = 0.15 * pq.s, peak_end = 0.3 * pq.s,
+                    initial=[], lower=[], upper=[]):
+        """
+        TODO: Customize all parameters on function signature; also write a GUI for this
+        """
+        # NOTE: 2020-09-28 13:10:15
+        # top container is a DataBag
+        # NOTE: 2018-06-20 09:14:25
+        # now uses OrderedDict (small overhead but worth it)
+        # updated to include event (trigger protocol) detection from the ephys data
+        # (mapped to the key: "TriggerEventDetection")
+        
+        #ret = collections.OrderedDict()
+        ret = dict()
+        #ret = DataBag()
+        ret["name"] = "ScanDataOptions"
+        
+        #ret["Channels"] = collections.OrderedDict()
+        ret["Channels"] = DataBag()
+        ret["Channels"]["Reference"] = reference
+        ret["Channels"]["Indicator"] = indicator
+        ret["Channels"]["Bleed_ref_ind"] = bleed_ref_ind # fraction of reference channel that bleeds into indicator channel
+        ret["Channels"]["Bleed_ind_ref"] = bleed_ind_ref # fraction of indicator channel that bleeds into reference channel
+        
+        #ret["IndicatorCalibration"] = collections.OrderedDict() # when all None, this is uncalibrated
+        ret["IndicatorCalibration"] = DataBag() # when all None, this is uncalibrated
+        # all must be either None, or scalars
+        ret["IndicatorCalibration"]["Name"] = None
+        ret["IndicatorCalibration"]["Kd"]   = np.nan
+        ret["IndicatorCalibration"]["Fmin"] = np.nan
+        ret["IndicatorCalibration"]["Fmax"] = np.nan
+
+        #ret["Discrimination"] = collections.OrderedDict() # sucess vs failure
+        ret["Discrimination"] = DataBag() # sucess vs failure
+        
+        # NOTE: 2017-11-22 11:46:41
+        # mapping of a func_name to a dict of keyword params (**kwargs)
+        # func signature must be func_name(x, **kwargs) and returns a scalar
+        # default is below (Frobenius norm for matrices)):
+        # axis is None because we operate on single-channel analogsignals (or datasignals)
+        
+        # NOTE: for multi component EPSCaTs (e.g.a train of EPSCaTs) there are more
+        # than one base and peak intervals defined, respectively, before and after 
+        # the trigger time for for the corresponding EPSCaT 
+        #
+        # since the comparison should be done between similarly sized regions, we 
+        # define only one such window, that we the take UP TO the trigger time (for 
+        # the base) or FROM the trigger time onward (for the peak) 
+        
+        # NOTE: the trigger times are established by trigger protocols, and NOT 
+        # defined here
+        
+        #ret["Discrimination"]["Base"] = {"np.linalg.norm":{"axis":None, "ord":None}, "window": 0.05 * pq.s}
+        ##ret["Discrimination"]["Peak"] = {"np.linalg.norm":{"axis":None, "ord":None}, "window": 0.05 * pq.s} 
+        
+        #ret["Discrimination"]["Function"] = {"np.linalg.norm":{"axis":None, "ord":None}}
+        ret["Discrimination"]["Function"] = DataBag({"np.linalg.norm":{"axis":None, "ord":None}})
+        ret["Discrimination"]["BaseWindow"] = 0.05 * pq.s
+        ret["Discrimination"]["PeakWindow"] = 0.05 * pq.s
+        ret["Discrimination"]["Discr_2D"] = False
+        ret["Discrimination"]["WindowChoice"] = "delays" # one of "delays", "triggers", "cursors"
+        ret["Discrimination"]["First"] = True
+
+        ret["Discrimination"]["Predicate"] = "lambda x,y: x >= y" # binary predicate: 
+                                                            # generates a function by 
+                                                            # calling func = eval(str)
+                                                            # where str is as shown here
+                                                        
+        ret["Discrimination"]["PredicateFunc"] = "lambda x,y: x/y" # calculates one scalar
+                                                        # result between peak and base
+                                                        
+        ret["Discrimination"]["PredicateValue"] = detection_predicate # this will test a scalar (x) against
+                                                # this value using the binary predicate 
+                                                # given above
+                                                #
+                                                # scalar x is generated by PredicateFunc
+                                                
+        #ret["Roi"] = collections.OrderedDict()
+        ret["Roi"] = DataBag()
+        ret["Roi"]["width"] = roi_width # an int or "auto" => use widths generated by the scan roi detection algorithm
+        ret["Roi"]["auto"] = roi_auto_width # when True, set use 
+        
+        #ret["Intervals"] = collections.OrderedDict()
+        ret["Intervals"] = DataBag()
+        ret["Intervals"]["DarkCurrent"] = [None, None] #start, end, both quantities or None
+        ret["Intervals"]["F0"] = [f0_begin, f0_end] # start, end both quantities
+        ret["Intervals"]["Fit"] = [fit_begin, fit_end] # start, end both quantities
+        ret["Intervals"]["Integration"] = [int_begin, int_end] # start, end, both quantities; 
+        
+        ret["AmplitudeMethod"] = "direct" # one of "direct" or "levels"
+        
+        ret["Intervals"]["Peak"] = [peak_begin, peak_end] #  start, end both quantities
+        
+        
+        # Fitting model parameters
+        # NOTE: 2017-12-23 13:06:45
+        # for each EPSCaT there are n * 2 + 3 parameters packed in a list, where n 
+        # is the number of decay components in a single EPSCaT (this is done for 
+        # generality, although in most cases single EPSCaT data is fitted well by a 
+        # transient with one decay component)
+        #
+        # NOTE: 2017-12-23 13:12:15 
+        # the last parameter in the list is a so-called "delay" (or "onset") and
+        # represents the "location" of the transient relative to the beginning of 
+        # the sweep.
+        # WARNING its value may be the string "trigger", meaning it will be updated 
+        # from the trigger protocols
+        
+        # For multiple EPSCaTs (e.g. an EPSCaT train, or when stimuli generate several
+        # individually resolvable EPSCaTs) a list of such parameters must be given 
+        # for every single EPSCaT in the compound, and packed in a list
+        
+        # Hence the ["Fitting"]["Initial"] is a list of lists of parameters
+        # and so are the ["Fitting"]["Lower"] and ["Fitting"]["Upper"], for the 
+        # lower and upper bounds, respectively, to replicate ["Fitting"]["Initial"]
+        
+        #ret["TriggerEventDetection"] = collections.OrderedDict()
+        #ret["TriggerEventDetection"]["Presynaptic"] = collections.OrderedDict()
+        ret["TriggerEventDetection"] = DataBag()
+        ret["TriggerEventDetection"]["Presynaptic"] = DataBag()
+        ret["TriggerEventDetection"]["Presynaptic"]["Channel"] = 0
+        ret["TriggerEventDetection"]["Presynaptic"]["DetectionBegin"] = 0.2 * pq.s
+        ret["TriggerEventDetection"]["Presynaptic"]["DetectionEnd"] = 0.3 * pq.s
+        ret["TriggerEventDetection"]["Presynaptic"]["DetectEvents"] = False
+        ret["TriggerEventDetection"]["Presynaptic"]["Name"] = "epsp"
+        
+        #ret["TriggerEventDetection"]["Postsynaptic"] = collections.OrderedDict()
+        ret["TriggerEventDetection"]["Postsynaptic"] = DataBag()
+        ret["TriggerEventDetection"]["Postsynaptic"]["Channel"] = 1
+        ret["TriggerEventDetection"]["Postsynaptic"]["DetectionBegin"] = 0.2 * pq.s
+        ret["TriggerEventDetection"]["Postsynaptic"]["DetectionEnd"] = 0.3 * pq.s
+        ret["TriggerEventDetection"]["Postsynaptic"]["DetectEvents"] = False
+        ret["TriggerEventDetection"]["Postsynaptic"]["Name"] = "bAP"
+        
+        #ret["TriggerEventDetection"]["Photostimulation"] = collections.OrderedDict()
+        ret["TriggerEventDetection"]["Photostimulation"] = DataBag()
+        ret["TriggerEventDetection"]["Photostimulation"]["Channel"] = 0
+        ret["TriggerEventDetection"]["Photostimulation"]["DetectionBegin"] = 0 * pq.s
+        ret["TriggerEventDetection"]["Photostimulation"]["DetectionEnd"] = 0 * pq.s
+        ret["TriggerEventDetection"]["Photostimulation"]["DetectEvents"] = False
+        ret["TriggerEventDetection"]["Photostimulation"]["Name"] = "uepsp"
+        
+        #ret["TriggerEventDetection"]["Photostimulation"] = collections.OrderedDict()
+        ret["TriggerEventDetection"]["Photostimulation"] = DataBag()
+        ret["TriggerEventDetection"]["Photostimulation"]["Channel"] = 0
+        ret["TriggerEventDetection"]["Photostimulation"]["DetectionBegin"] = 0 * pq.s
+        ret["TriggerEventDetection"]["Photostimulation"]["DetectionEnd"] = 0 * pq.s
+        ret["TriggerEventDetection"]["Photostimulation"]["DetectEvents"] = False
+        ret["TriggerEventDetection"]["Photostimulation"]["Name"] = "uepsp"
+        
+        #ret["TriggerEventDetection"]["Imaging frame trigger"] = collections.OrderedDict()
+        ret["TriggerEventDetection"]["Imaging frame trigger"] = DataBag()
+        ret["TriggerEventDetection"]["Imaging frame trigger"]["Channel"] = 3
+        ret["TriggerEventDetection"]["Imaging frame trigger"]["DetectionBegin"] = 0.05 * pq.s
+        ret["TriggerEventDetection"]["Imaging frame trigger"]["DetectionEnd"] = 0.1 * pq.s
+        ret["TriggerEventDetection"]["Imaging frame trigger"]["DetectEvents"] = False
+        ret["TriggerEventDetection"]["Imaging frame trigger"]["Name"] = "imaging"
+        
+        #ret["Fitting"] = collections.OrderedDict()
+        ret["Fitting"] = DataBag()
+        ret["Fitting"]["Fit"] = True
+        ret["Fitting"]["FitComponents"] = True # when True, fits individual EPSCaT components in an EPSCaT train
+        
+        nParams = 0
+        
+        if len(initial) > 0:
+            if all([isinstance(i, float) for i in initial]):
+                ret["Fitting"]["Initial"] = [initial]
+                if models.check_rise_decay_params(initial) <= 1:
+                    raise ValueError("Incorrect number of initial EPSCaT parameter values: %d; must be N x 2 + 3, for N decays" % len(initial))
+                
+                nParams = [len(initial)]
+                
+            elif all([all([isinstance(i, (tuple, list)) for i in i_] for i_ in initial)]):
+                if all([models.check_rise_decay_params(i) >= 1 for i in initial]):
+                    ret["Fitting"]["Initial"] = initial
+                    
+                else:
+                    raise ValueError("Incorrect number of initial EPSCaT parameter values")
+                
+                nParams = [len(initial) for i in initial]
+                
+            else:
+                raise TypeError("Initial EPSCaT parameter values expected to be a list of floats or a list of lists of floats; got %s instead" % initial)
+                
+        else:
+            ret["Fitting"]["Initial"] = [[1, 0.01, 0, 0.01, 0.25]]
+            nParams = [5]
+            
+        if len(lower) > 0:
+            if all([isinstance(i, float) for i in lower]):
+                if len(lower) == 1:
+                    ret["Fitting"]["Lower"] = [lower * p for p in nParams]
+                    
+                elif any([len(lower) != p for p in nParams]):
+                    raise TypeError("Lower bounds must contain 1 or %d values; got %d instead" % (nParams, len(lower)))
+                
+                ret["Fitting"]["Lower"] = [lower] * len(initial)
+                
+            
+            elif all([all([isinstance(i, float) for i in i_]) for i_ in lower]):
+                if len(lower) == len(ret["Fitting"]["Initial"]):
+                    if all([len(l) == p for p in nParams]):
+                        ret["Fitting"]["Lower"] = lower
+                
+                else:
+                    raise TypeError("Mismatch between number of initial EPSCaT parameter values and lower bounds")
+                
+            else:
+                raise TypeError("Lower bounds expected to be a list of floats or a list of lists of floats; got %s instead" % lower)
+            
+        else:
+            ret["Fitting"]["Lower"] = [[0, 0, 0, 0, 0]]
+            
+        if len(upper) > 0:
+            if all([isinstance(i, float) for i in upper]):
+                if len(upper) == 1:
+                    ret["Fitting"]["Upper"] = [upper * p for p in nParams]
+                    
+                elif any([len(upper) != p for p in nParams]):
+                    raise TypeError("Upper bounds must contain 1 or %d values; got %d instead" % (nParams, len(upper)))
+                
+                ret["Fitting"]["Upper"] = [upper] * len(initial)
+                
+            
+            elif all([all([isinstance(i, float) for i in i_]) for i_ in upper]):
+                if len(upper) == len(ret["Fitting"]["Initial"]):
+                    if all([len(l) == p for p in nParams]):
+                        ret["Fitting"]["Upper"] = upper
+                
+                else:
+                    raise TypeError("Mismatch between number of initial EPSCaT parameter values and upper bounds")
+                
+            else:
+                raise TypeError("Upper bounds expected to be a list of floats or a list of lists of floats; got %s instead" % upper)
+            
+            
+        else:
+            ret["Fitting"]["Upper"] = [[np.inf, np.inf, 1, np.inf, np.inf]]
+            
+        nDecays = max([models.check_rise_decay_params(i) for i in ret["Fitting"]["Initial"]])
+        
+        cfNames = list()
+        
+        for k in range(nDecays):
+            cfNames.append("scale_%d" % k)
+            cfNames.append("taudecay_%d" % k)
+            
+        cfNames += ["offset", "taurise", "delay"]
+            
+        ret["Fitting"]["CoefficientNames"] = cfNames
+        
+        return ret
 
 class AnalysisUnit(object):
     """ Encapsulates a ScanData analysis unit.
@@ -306,7 +610,7 @@ class AnalysisUnit(object):
         
         if isinstance(self._landmark_, pgui.PlanarGraphics):
             self._landmark_._upgrade_API_()
-        
+            
         self.apiversion = (0, 2)
         
     #"def" __eq__(self, other):
@@ -493,14 +797,14 @@ class AnalysisUnit(object):
                                 (f, self.name, self.parent.name), RuntimeWarning)
                         
                         if self.landmark is None:
-                            signal_index = neoutils.get_index_of_named_signal(self.parent.sceneBlock.segments[f], self.name, silent=True)
+                            signal_index = ephys.get_index_of_named_signal(self.parent.sceneBlock.segments[f], self.name, silent=True)
                             
                             if signal_index is None:
                                 raise RuntimeError("Analysis unit %s on entire scan data %s does not appear to have been analysed for frame %d" %\
                                     (self.name, self.parent.name, f))
                             
                         else:
-                            signal_index = neoutils.get_index_of_named_signal(self.parent.sceneBlock.segments[f], self.landmark.name, silent=True)
+                            signal_index = ephys.get_index_of_named_signal(self.parent.sceneBlock.segments[f], self.landmark.name, silent=True)
                         
                             if signal_index is None:
                                 raise RuntimeError("Analysis unit %s on landmark %s in scan data %s does not appear to have been analysed for frame %d" %\
@@ -514,14 +818,14 @@ class AnalysisUnit(object):
                                 (f, self.name, self.parent.name))
                         
                         if self.landmark is None:
-                            signal_index = neoutils.get_index_of_named_signal(self.parent.scansBlock.segments[f], self.name, silent=True)
+                            signal_index = ephys.get_index_of_named_signal(self.parent.scansBlock.segments[f], self.name, silent=True)
                             
                             if signal_index is None:
                                 raise RuntimeError("Analysis unit %s on entire scan data %s does not appear to have been analysed for frame %d" %\
                                     (self.name, self.parent.name, f))
                             
                         else:
-                            signal_index = neoutils.get_index_of_named_signal(self.parent.scansBlock.segments[f], self.landmark.name, silent=True)
+                            signal_index = ephys.get_index_of_named_signal(self.parent.scansBlock.segments[f], self.landmark.name, silent=True)
                         
                             if signal_index is None:
                                 raise RuntimeError("Analysis unit %s on landmark %s in scan data %s does not appear to have been analysed for frame %d" %\
@@ -548,14 +852,14 @@ class AnalysisUnit(object):
                             (f, self.name, self.parent.name))
                     
                     if self.landmark is None:
-                        signal_index = neoutils.get_index_of_named_signal(self.parent.sceneBlock.segments[f], self.name, silent=True)
+                        signal_index = ephys.get_index_of_named_signal(self.parent.sceneBlock.segments[f], self.name, silent=True)
                         
                         if signal_index is None:
                             raise RuntimeError("Analysis unit %s on entire scan data %s does not appear to have been analysed for frame %d" %\
                                 (self.name, self.parent.name, f))
                         
                     else:
-                        signal_index = neoutils.get_index_of_named_signal(self.parent.sceneBlock.segments[f], self.landmark.name, silent=True)
+                        signal_index = ephys.get_index_of_named_signal(self.parent.sceneBlock.segments[f], self.landmark.name, silent=True)
                     
                         if signal_index is None:
                             raise RuntimeError("Analysis unit %s on landmark %s in scan data %s does not appear to have been analysed for frame %d" %\
@@ -569,14 +873,14 @@ class AnalysisUnit(object):
                             (f, self.name, self.parent.name))
                     
                     if self.landmark is None:
-                        signal_index = neoutils.get_index_of_named_signal(self.parent.scansBlock.segments[f], self.name, silent=True)
+                        signal_index = ephys.get_index_of_named_signal(self.parent.scansBlock.segments[f], self.name, silent=True)
                         
                         if signal_index is None:
                             raise RuntimeError("Analysis unit %s on entire scan data %s does not appear to have been analysed for frame %d" %\
                                 (self.name, self.parent.name, f))
                         
                     else:
-                        signal_index = neoutils.get_index_of_named_signal(self.parent.scansBlock.segments[f], self.landmark.name, silent=True)
+                        signal_index = ephys.get_index_of_named_signal(self.parent.scansBlock.segments[f], self.landmark.name, silent=True)
                     
                         if signal_index is None:
                             raise RuntimeError("Analysis unit %s on landmark %s in scan data %s does not appear to have been analysed for frame %d" %\
@@ -1389,6 +1693,8 @@ class ScanData(object):
         frame       = 1
         volume      = 2
         
+    apiversion = (0,3)
+        
     def __init__(self, scene: (vigra.VigraArray, tuple, list, type(None)) = None, 
                  scans: (vigra.VigraArray, tuple, list, type(None)) = None, 
                  metadata: (DataBag, dict, type(None)) = None,
@@ -1397,7 +1703,7 @@ class ScanData(object):
                  name: (str, type(None)) = "ScanData", 
                  electrophysiology: (neo.Block, type(None)) = None, 
                  triggers: (str, tuple, list, type(None)) = None,
-                 analysisoptions: (dict, type(None)) = dict()):
+                 analysisOptions: (dict, type(None)) = dict()):
         """Constructs a ScanData object.
         
         The object contains only raw (unfiltered) data as given by
@@ -1711,7 +2017,7 @@ class ScanData(object):
         
         # END comments
         
-        self.apiversion = (0,2)
+        self.apiversion = (0,3) # MAJOR, MINOR
         #print("ScanData.__init__ start")
         # user-defined (meta) data
         self._annotations_ = dict()
@@ -1736,7 +2042,7 @@ class ScanData(object):
         self._scene_block_                        = neo.Block(name="Scene")
         
         # NOTE: 2017-12-06 10:39:24
-        # especially for linescan mode, these reuire special treatment
+        # especially for linescan mode, these require special treatment
         #self.__scanline_profiles_scene__            = neo.Block(name="Scanline_profiles_scene")
         self._scan_region_scene_profiles_         = neo.Block(name="Scan region scene profiles")
         
@@ -1764,8 +2070,8 @@ class ScanData(object):
             
         # CAUTION: the contents of _analysis_options_ are problem-dependent
         # and typically will be changed at application level
-        if isinstance(analysisoptions, dict):
-            self._analysis_options_ = analysisoptions
+        if isinstance(analysisOptions, dict):
+            self._analysis_options_ = analysisOptions
             
         else:
             self._analysis_options_ = dict()
@@ -1845,7 +2151,7 @@ class ScanData(object):
             #
         # END
 
-        # BEGIN comment on analysismode and scandatatype
+        # BEGIN comment on analysisMode and scandatatype
             # NOTE: 2017-11-19 22:27:30 _analysismode_ and _scandatatype_
             # how is the "scans" data subset going to be analysed?
             #
@@ -1859,7 +2165,7 @@ class ScanData(object):
             # NOTE: this has to be somewhat in sync with _scandatatype_
             # NOTE: _analysismode_ probably makes _scandatatype_ obsolete
             #
-        # END comment on analysismode and scandatatype
+        # END comment on analysisMode and scandatatype
         
         # TODO (maybe) to be assigned by self._parse_metadata_()
         # valid values are "frame", "volume"
@@ -1926,32 +2232,35 @@ class ScanData(object):
         import gui.pictgui as pgui
         
         def _upgrade_attribute_(old_name, new_name, attr_type, default):
-            needs_must = False
-            if not hasattr(self, new_name):
-                needs_must = True
+            #print("self._upgrade_API_._upgrade_attribute_()", old_name, new_name, attr_type, default, ")")
+            
+            
+            if hasattr(self, new_name):
+                if isinstance(getattr(self, new_name), attr_type):
+                    return
                 
-            else:
-                attribute = getattr(self, new_name)
-                
-                if not isinstance(attribute, attr_type):
-                    needs_must = True
-                    
-            if needs_must:
-                if hasattr(self, old_name):
-                    old_attribute = getattr(self, old_name)
-                    
-                    if isinstance(old_attribute, attr_type):
-                        setattr(self, new_name, old_attribute)
-                        delattr(self, old_name)
-                        
-                    else:
-                        setattr(self, new_name, default)
-                        delattr(self, old_name)
-                        
                 else:
-                    setattr(self, new_name, default)
-                    
-                    
+                    setattr(self, new_name, default) # CAUTION
+            
+            if hasattr(self, old_name):
+                value = getattr(self, old_name)
+                
+                if not isinstance(value, attr_type):
+                    try:
+                        value = attr_type(value) # try casting
+                        
+                    except:
+                        value = default
+                        
+            else:
+                value = default
+            
+            #print("\tvalue", value)
+            setattr(self, new_name, value)
+            
+            if hasattr(self, old_name):
+                delattr(self, old_name)
+            
         def _remove_attribute_(name):
             if hasattr(self, name):
                 delattr(self, name)
@@ -1959,8 +2268,14 @@ class ScanData(object):
         if hasattr(self, "apiversion") and isinstance(self.apiversion, tuple) and len(self.apiversion)>=2 and all(isinstance(v, numbers.Number) for v in self.apiversion):
             vernum = self.apiversion[0] + self.apiversion[1]/10
             
-            if vernum >= 0.2:
+            class_vernum = ScanData.apiversion[0] + ScanData.apiversion[1]/10
+            
+            #print("ScanData._upgrade_API_", vernum)
+            if vernum >= class_vernum:
                 return
+            
+        
+            
             
         _upgrade_attribute_("__metadata__", "_metadata_", DataBag, DataBag(mutable_types=True, allow_none=True))
         _upgrade_attribute_("__name__", "_name_", str, "ScanData")
@@ -2141,7 +2456,7 @@ class ScanData(object):
                     # associated analysis data
                     segments = data_block.segments
                     for seg in segments:
-                        stale_signal_index = neoutils.get_index_of_named_signal(seg, u.name, silent=True)
+                        stale_signal_index = ephys.get_index_of_named_signal(seg, u.name, silent=True)
                         if isinstance(stale_signal_index, (tuple, list)):
                             for ndx in stale_signal_index:
                                 if ndx is not None:
@@ -2169,7 +2484,7 @@ class ScanData(object):
                         # => we remove this unit and its associated analysis data
                         segments = data_block.segments
                         for seg in segments:
-                            stale_signal_index = neoutils.get_index_of_named_signal(seg, u.name, silent=True)
+                            stale_signal_index = ephys.get_index_of_named_signal(seg, u.name, silent=True)
                             if isinstance(stale_signal_index, (tuple, list)):
                                 for ndx in stale_signal_index:
                                     if ndx is not None:
@@ -2184,14 +2499,20 @@ class ScanData(object):
                         except Exception as e:
                             traceback.print_exc()
                             
-        self.apiversion = (0,2)
+        neoutils.upgrade_neo_api(self._electrophysiology_)
+        neoutils.upgrade_neo_api(self._scans_block_)
+        neoutils.upgrade_neo_api(self._scene_block_)
+        neoutils.upgrade_neo_api(self._scan_region_scene_profiles_)
+        neoutils.upgrade_neo_api(self._scan_region_scans_profiles_)
+        
+        self.apiversion = ScanData.apiversion
                     
     def __repr__(self):
         result = list()
         result.append("%s: " % self.__class__.__name__)
         result.append("Name: %s" % self.name)
-        result.append("Type: %s" % self.scantype.name)
-        result.append("Analysis mode: %s" % self.analysismode.name)
+        result.append("Type: %s" % self.scanType.name)
+        result.append("Analysis mode: %s" % self.analysisMode.name)
         result.append("Scene channels: %s" % str(self.sceneChannelNames))
         result.append("Scene frames: %d" % self.sceneFrames)
         result.append("Scene frame axis: %s" % self.sceneFrameAxis)
@@ -2220,8 +2541,8 @@ class ScanData(object):
         result = list()
         result.append("%s: " % self.__class__.__name__)
         result.append("Name: %s;" % self.name)
-        result.append("Type: %s;" % self.scantype.name)
-        result.append("Analysis mode: %s;" % self.analysismode.name)
+        result.append("Type: %s;" % self.scanType.name)
+        result.append("Analysis mode: %s;" % self.analysisMode.name)
         result.append("Scene channels: %s;" % str(self.sceneChannelNames))
         result.append("Scene frames: %d;" % self.sceneFrames)
         result.append("Scene frame axis: %s;" % self.sceneFrameAxis)
@@ -2509,6 +2830,8 @@ class ScanData(object):
         from systems.PrairieView import PVSequenceType
         #print("ScanData._parse_metadata_()")
         
+        #print("metadata: ", value)
+        
         if value is None:
             self._metadata_ = None
             return
@@ -2546,10 +2869,6 @@ class ScanData(object):
                     self._scan_region_ = roi
                         
                     roi.frameIndices = [f for f in range(self.sceneFrames)]
-                    
-                    # set linescan trajectory as one roi in each frame of the 
-                    # scene data subset
-                    #self.setRois(roi, scans=False) 
                     
             else: # TODO parse ScanImage data structures as well
                 # see NOTE: 2017-11-19 22:27:30 _analysismode_ and _scandatatype_
@@ -2607,12 +2926,16 @@ class ScanData(object):
         if len(tp):
             for p in tp:
                 rev_p = p.reverseAcquisition(copy=True)
+                if isinstance(self._electrophysiology_, neo.Block) and len(self._electrophysiology_.segments):
+                    embed_trigger_protocol(p, self._electrophysiology_)
+                    
+                if isinstance(self._scans_block_, neo.Block) and len(self._scans_block_.segments):
+                    embed_trigger_protocol(rev_p, self._scans_block_)
+                    
+                if isinstance(self._scene_block_, neo.Block) and len(self._scene_block_.segments):
+                    embed_trigger_protocol(rev_p, self._scene_block_)
                 
-                neoutils.embed_trigger_protocol(p, self._electrophysiology_)
-                neoutils.embed_trigger_protocol(rev_p, self._scans_block_)
-                neoutils.embed_trigger_protocol(rev_p, self._scene_block_)
-                
-    #@safeWrapper
+    @safeWrapper
     def _parse_electrophysiology_(self, value):
         """Checks for consistency between frames and segments, then assigns
         value to self._electrophysiology_
@@ -2621,27 +2944,35 @@ class ScanData(object):
         separately.
         
         NOTE: 2017-12-15 22:51:41
-        Trigger events handled by neoutils protocol and separate member functions
+        Trigger events handled by ephys protocol and separate member functions
         in ScanData
         """
+        
+        if self._scans_frames_ == 0:
+            return
+            
+        
         if isinstance(value, neo.Block): 
             if len(value.segments) != self._scans_frames_:
-                warnings.warn("Expecting a neo.Block with as many segments as there are scan frames (%d); got %d segments instead" \
-                    % (self._scans_frames_, len(value.segments)), RuntimeWarning)
-                return
-                #raise TypeError("Expecting a neo.Block with as many segments as there are scan frames (%d); got %d segments instead" \
-                    #% (self._scans_frames_, len(value.segments)))
+                if len(value.segments) == 1:
+                    value.segments *= self._scans_frames_
+                else:
+                    warnings.warn("Expecting a neo.Block with as many segments as there are scan frames (%d); got %d segments instead" \
+                        % (self._scans_frames_, len(value.segments)), RuntimeWarning)
+                    return
             
             self._electrophysiology_ = value
             
         elif isinstance(value, (tuple, list)) and all([isinstance(v, neo.Segment) for v in value]):
             # set it up from a sequence of neo.Segments
             if len(value) != self._scans_frames_:
-                warnings.warn("Expecting as many segments as there are scan frames (%d); got %d instead" \
-                    % (self._scans_frames_, len(values)), RuntimeWarning)
-            
-                #raise TypeError("Expecting as many segments as there are scan frames (%d); got %d instead" \
-                    #% (self._scans_frames_, len(values)))
+                if len(value) ==1:
+                    value *= self._scans_frames_
+                else:
+                    warnings.warn("Expecting as many segments as there are scan frames (%d); got %d instead" \
+                        % (self._scans_frames_, len(values)), RuntimeWarning)
+                    
+                    return
             
             self._electrophysiology_.segments[:] = [s for s in value]
             
@@ -2652,7 +2983,10 @@ class ScanData(object):
                     s.name = "Frame_%d" % s.index
                     
         elif isinstance(value, neo.Segment):
-            if self._scans_frames_ != 1:
+            if self._scans_frames_ > 1:
+                value = [value] * self._scans_frames_
+                
+            else:
                 raise TypeError("Expecting as many segments as there are scan frames (%d); got 1 neo.Segment instead" \
                     % self._scans_frames_)
                 
@@ -2920,9 +3254,9 @@ class ScanData(object):
         # deepcopy "slices" the events into quantities
         # if it is a reference, any modifications in the copy will also touch the
         # original !
-        ephys = neoutils.neo_copy(self.electrophysiology)
+        ephys = ephys.neo_copy(self.electrophysiology)
         
-        analysisoptions = copy.deepcopy(self.analysisoptions)
+        analysisOptions = copy.deepcopy(self.analysisOptions)
         
         result = ScanData(scene = new_scene,
                           scans = new_scans,
@@ -2930,7 +3264,7 @@ class ScanData(object):
                           sceneFrameAxis = copy.deepcopy(self.sceneFrameAxis),
                           scansFrameAxis = copy.deepcopy(self.scansFrameAxis),
                           electrophysiology = ephys,
-                          analysisoptions = analysisoptions)
+                          analysisOptions = analysisOptions)
         
         # MUST reaassign triggerProtocols because the constructor above tries to 
         # parse the trigger events in electrophysiology which might result in 
@@ -2941,11 +3275,11 @@ class ScanData(object):
         result._scans_filters_ = copy.deepcopy(self._scans_filters_)
         
         # neo.Block does not have a copy() method so we need to use our own
-        result._scene_block_ = neoutils.neo_copy(self._scene_block_)
-        result._scans_block_ = neoutils.neo_copy(self._scans_block_)
+        result._scene_block_ = ephys.neo_copy(self._scene_block_)
+        result._scans_block_ = ephys.neo_copy(self._scans_block_)
         
-        result._scan_region_scans_profiles_ = neoutils.neo_copy(self._scan_region_scans_profiles_)
-        result._scan_region_scene_profiles_ = neoutils.neo_copy(self._scan_region_scene_profiles_)
+        result._scan_region_scans_profiles_ = ephys.neo_copy(self._scan_region_scans_profiles_)
+        result._scan_region_scene_profiles_ = ephys.neo_copy(self._scan_region_scene_profiles_)
         
         #result._scan_region_scans_profiles_ = copy.deepcopy(self._scan_region_scans_profiles_)
         #result._scan_region_scene_profiles_ = copy.deepcopy(self._scan_region_scene_profiles_)
@@ -3487,11 +3821,11 @@ class ScanData(object):
         #filtered data for generating the profiles.
         
         #"""
-        #if self.analysismode != ScanData.ScanDataAnalysisMode.frame:
-            #raise NotImplementedError("%s analysis not yet supported" % self.analysismode)
+        #if self.analysisMode != ScanData.ScanDataAnalysisMode.frame:
+            #raise NotImplementedError("%s analysis not yet supported" % self.analysisMode)
         
-        #if self.scantype != ScanData.ScanDataType.linescan:
-            #raise NotImplementedError("%s not yet supported" % self.scantype)
+        #if self.scanType != ScanData.ScanDataType.linescan:
+            #raise NotImplementedError("%s not yet supported" % self.scanType)
 
         #data = self.scans
         #target = self._scan_region_scans_profiles_
@@ -3524,13 +3858,13 @@ class ScanData(object):
                 ## ATTENTION: they only have a singleton channel axis, but they must 
                 ## ALL have the same number of frames -- checked in _parse_image_arrays_
                 ##
-                #if len(self.analysisoptions) == 0 or \
-                    #"Channels" not in self.analysisoptions or \
-                        #"Reference" not in self.analysisoptions["Channels"] or \
-                            #len(self.analysisoptions["Channels"]["Reference"]) == 0:
+                #if len(self.analysisOptions) == 0 or \
+                    #"Channels" not in self.analysisOptions or \
+                        #"Reference" not in self.analysisOptions["Channels"] or \
+                            #len(self.analysisOptions["Channels"]["Reference"]) == 0:
                                 #raise RuntimeError("No reference channel is defined, or it has not been named")
                 
-                #chNdx = self.scansChannelNames.index(self.analysisoptions["Channels"]["Reference"])
+                #chNdx = self.scansChannelNames.index(self.analysisOptions["Channels"]["Reference"])
                 
                 ##profiles = [[DataSignal(np.array(subarray.bindAxis(self.scansFrameAxis, k).mean(axis=1)), \
                                         ##sampling_period = self.getAxisResolution(subarray.bindAxis(self.scansFrameAxis, k).axistags["x"]), \
@@ -3565,11 +3899,11 @@ class ScanData(object):
         #filtered data for generating the profiles.
         
         #"""
-        #if self.analysismode != ScanData.ScanDataAnalysisMode.frame:
-            #raise NotImplementedError("%s analysis not yet supported" % self.analysismode)
+        #if self.analysisMode != ScanData.ScanDataAnalysisMode.frame:
+            #raise NotImplementedError("%s analysis not yet supported" % self.analysisMode)
         
-        #if self.scantype != ScanData.ScanDataType.linescan:
-            #raise NotImplementedError("%s not yet supported" % self.scantype)
+        #if self.scanType != ScanData.ScanDataType.linescan:
+            #raise NotImplementedError("%s not yet supported" % self.scanType)
         
         #data = self.scene
         #target = self._scan_region_scene_profiles_
@@ -3616,13 +3950,13 @@ class ScanData(object):
                     ## ALL have the same number of frames -- checked in _parse_image_arrays_
                     ##
                     
-                    #if len(self.analysisoptions) == 0 or \
-                        #"Channels" not in self.analysisoptions.keys() or \
-                            #"Reference" not in self.analysisoptions["Channels"] or \
-                                #len(self.analysisoptions["Channels"]["Reference"]) == 0:
+                    #if len(self.analysisOptions) == 0 or \
+                        #"Channels" not in self.analysisOptions.keys() or \
+                            #"Reference" not in self.analysisOptions["Channels"] or \
+                                #len(self.analysisOptions["Channels"]["Reference"]) == 0:
                                     #raise RuntimeError("No reference channel is defined, or it has no name")
                     
-                    #chNdx = self.sceneChannelNames.index(self.analysisoptions["Channels"]["Reference"])
+                    #chNdx = self.sceneChannelNames.index(self.analysisOptions["Channels"]["Reference"])
                     
                     #profiles = list()
                     
@@ -3642,11 +3976,11 @@ class ScanData(object):
         #multi-channel VigraArray
         
         #"""
-        #if self.analysismode != ScanData.ScanDataAnalysisMode.frame:
-            #raise NotImplementedError("%s analysis not yet supported" % self.analysismode)
+        #if self.analysisMode != ScanData.ScanDataAnalysisMode.frame:
+            #raise NotImplementedError("%s analysis not yet supported" % self.analysisMode)
         
-        #if self.scantype != ScanData.ScanDataType.linescan:
-            #raise NotImplementedError("%s not yet supported" % self.scantype)
+        #if self.scanType != ScanData.ScanDataType.linescan:
+            #raise NotImplementedError("%s not yet supported" % self.scanType)
 
         #self.generateScanRregionProfilesFromScans() 
         #self.generateScanRegionProfilesFromScene() 
@@ -3823,7 +4157,7 @@ class ScanData(object):
         #print("ScanData.concatenate() self copy() to result %s" % self.name )
         result = self.copy() # carries over trigger protocols in self
         
-        #print("ScanData.concatenate() %s result=self.copy(): analysismode:" % self.name, result._analysismode_)
+        #print("ScanData.concatenate() %s result=self.copy(): analysisMode:" % self.name, result._analysismode_)
         
         if not isinstance(source, ScanData):
             raise TypeError("Can only concatenate a ScanData object")
@@ -4349,10 +4683,10 @@ class ScanData(object):
                 result._scans_block_.segments.append(neo.Segment())
         else:
             if len(source._scans_block_.segments) > source.scansFrames:
-                result._scans_block_.segments += [neoutils.neo_copy(s) for s in source._scans_block_.segments[0:source.scansFrames]]
+                result._scans_block_.segments += [ephys.neo_copy(s) for s in source._scans_block_.segments[0:source.scansFrames]]
                 
             else:
-                result._scans_block_.segments += [neoutils.neo_copy(s) for s in source._scans_block_.segments]
+                result._scans_block_.segments += [ephys.neo_copy(s) for s in source._scans_block_.segments]
                 
                 new_scans_frames = original_scans_frames + source.scansFrames
                 #print("ScanData.concatenate: current scans frames %d" % result.scansFrames)
@@ -4378,10 +4712,10 @@ class ScanData(object):
                 
         else:
             if len(source._scene_block_.segments) > source.sceneFrames:
-                result._scene_block_.segments += [neoutils.neo_copy(s) for s in source._scene_block_.segments[0:source.sceneFrames]]
+                result._scene_block_.segments += [ephys.neo_copy(s) for s in source._scene_block_.segments[0:source.sceneFrames]]
                 
             else:
-                result._scene_block_.segments += [neoutils.neo_copy(s) for s in source._scene_block_.segments]
+                result._scene_block_.segments += [ephys.neo_copy(s) for s in source._scene_block_.segments]
                 
                 new_scene_frames = original_scene_frames + source.sceneFrames
                 
@@ -4398,7 +4732,7 @@ class ScanData(object):
         
         #### BEGIN 7) concatenate electrophysiology
         if len(source._electrophysiology_.segments):
-            result._electrophysiology_.segments += [neoutils.neo_copy(s) for s in source._electrophysiology_.segments]
+            result._electrophysiology_.segments += [ephys.neo_copy(s) for s in source._electrophysiology_.segments]
             
         else:
             # fill up with empty segments
@@ -4932,23 +5266,23 @@ class ScanData(object):
         #print("ScanData.removeAnalysisUnit: ", unit.name)
         
         for segment in self.scansBlock.segments:
-            signal_index = neoutils.get_index_of_named_signal(segment, unit.name, stype=(neo.AnalogSignal, DataSignal), silent=True)
+            signal_index = ephys.get_index_of_named_signal(segment, unit.name, stype=(neo.AnalogSignal, DataSignal), silent=True)
             
             if signal_index is not None:
                 del segment.analogsignals[signal_index]
             
-            signal_index = neoutils.get_index_of_named_signal(segment, unit.name, stype=neo.IrregularlySampledSignal, silent=True)
+            signal_index = ephys.get_index_of_named_signal(segment, unit.name, stype=neo.IrregularlySampledSignal, silent=True)
             
             if signal_index is not None:
                 del segment.irregularlysampledsignals[signal_index]
             
         for segment in self.sceneBlock.segments:
-            signal_index = neoutils.get_index_of_named_signal(segment, unit.name, stype=(neo.AnalogSignal, DataSignal), silent=True)
+            signal_index = ephys.get_index_of_named_signal(segment, unit.name, stype=(neo.AnalogSignal, DataSignal), silent=True)
             
             if signal_index is not None:
                 del segment.analogsignals[signal_index]
         
-            signal_index = neoutils.get_index_of_named_signal(segment, unit.name, stype=neo.IrregularlySampledSignal, silent=True)
+            signal_index = ephys.get_index_of_named_signal(segment, unit.name, stype=neo.IrregularlySampledSignal, silent=True)
             
             if signal_index is not None:
                 del segment.irregularlysampledsignals[signal_index]
@@ -4962,7 +5296,7 @@ class ScanData(object):
                     
     def _remove_data_signal_from_block_(self, src, name):
         for segment in src:
-            signal_index = neoutils.get_index_of_named_signal(segment, name, stype=(neo.AnalogSignal, DataSignal), silent=True)
+            signal_index = ephys.get_index_of_named_signal(segment, name, stype=(neo.AnalogSignal, DataSignal), silent=True)
             if signal_index is not None:
                 del segment.analogsignals[signal_index]
         
@@ -5545,9 +5879,9 @@ class ScanData(object):
         #
         result = ScanData()
         
-        result._scandatatype_ = self.scantype
-        result._analysismode_ = self.analysismode
-        result.analysisoptions  = deepcopy(self.analysisoptions)
+        result._scandatatype_ = self.scanType
+        result._analysismode_ = self.analysisMode
+        result.analysisOptions  = deepcopy(self.analysisOptions)
         
         result._processed_ = self._processed_
         result._annotations_["extracted"] = dict()
@@ -5703,7 +6037,7 @@ class ScanData(object):
                 if average:
                     # NOTE: 2018-06-15 09:59:21
                     # "segments" here is a list even if it has only one segment!
-                    segments = neoutils.average_segments([neoutils.neo_copy(self.electrophysiology.segments[f]) for f in kprotocol_frames])
+                    segments = ephys.average_segments([ephys.neo_copy(self.electrophysiology.segments[f]) for f in kprotocol_frames])
                     
                     if len(segments) > 1:
                         raise RuntimeError("averaging segments for protocol %s yielded in electrophysiology block more than one segment!" % current_protocol.name)
@@ -5718,7 +6052,7 @@ class ScanData(object):
                         
                         
                 else:
-                    segments = [neoutils.neo_copy(self.electrophysiology.segments[f]) for f in kprotocol_frames]
+                    segments = [ephys.neo_copy(self.electrophysiology.segments[f]) for f in kprotocol_frames]
                     
                     for kseg, seg in enumerate(segments):
                         seg.name = current_protocol.name
@@ -5744,17 +6078,17 @@ class ScanData(object):
                 # we therefore should FIRST extract the analogsignal (if found)
                 # into a new set of segments and average these if necessary
                 
-                segments = [neoutils.neo_copy(self.scansBlock.segments[f]) for f in kprotocol_frames]
+                segments = [ephys.neo_copy(self.scansBlock.segments[f]) for f in kprotocol_frames]
                 
                 segments = list()
                 
                 for f in kprotocol_frames:
-                    seg = neoutils.neo_copy(self.scansBlock.segments[f])
+                    seg = ephys.neo_copy(self.scansBlock.segments[f])
                     
                     signals = seg.analogsignals
                     
                     if analysis_unit.landmark is not None and len(signals) > 1:
-                        keep_signal_ndx = neoutils.get_index_of_named_signal(seg, analysis_unit.landmark.name, silent=True)
+                        keep_signal_ndx = ephys.get_index_of_named_signal(seg, analysis_unit.landmark.name, silent=True)
                     
                         if keep_signal_ndx is not None:
                             # epscat found for this analysis unit
@@ -5773,7 +6107,7 @@ class ScanData(object):
                         segments.append(seg)
                             
                 if average:
-                    segments = neoutils.average_segments(segments)
+                    segments = ephys.average_segments(segments)
                     
                     if len(segments) > 1:
                         raise RuntimeError("averaging segments for protocol %s in scans block yielded more than one segment!" % current_protocol.name)
@@ -5810,7 +6144,7 @@ class ScanData(object):
                 
             if len(self.sceneBlock.segments):
                 if average:
-                    segments = neoutils.average_segments([neoutils.neo_copy(self.sceneBlock.segments[f]) for f in kprotocol_frames])
+                    segments = ephys.average_segments([ephys.neo_copy(self.sceneBlock.segments[f]) for f in kprotocol_frames])
                     
                     if len(segments) > 1:
                         raise RuntimeError("averaging segments for protocol %s in scene block yielded more than one segment!" % current_protocol.name)
@@ -5821,7 +6155,7 @@ class ScanData(object):
                             # the association is based on name: landmark name is also
                             # the name of the signal
                             signals = seg.analogsignals
-                            keep_signal_ndx = neoutils.get_index_of_named_signal(seg, analysis_unit.landmark.name, silent=True)
+                            keep_signal_ndx = ephys.get_index_of_named_signal(seg, analysis_unit.landmark.name, silent=True)
                             
                             if keep_signal_ndx is not None:
                                 signal = signals[keep_signal_ndx]
@@ -5835,7 +6169,7 @@ class ScanData(object):
                         seg.index = kprotocol
                     
                 else:
-                    segments = [neoutils.neo_copy(self.sceneBlock.segments[f]) for f in kprotocol_frames]
+                    segments = [ephys.neo_copy(self.sceneBlock.segments[f]) for f in kprotocol_frames]
                     
                     for kseg, seg in enumerate(segments):
                         if analysis_unit.landmark is not None:
@@ -5843,7 +6177,7 @@ class ScanData(object):
                             # the association is based on name: landmark name is also
                             # the name of the signal
                             signals = seg.analogsignals
-                            keep_signal_ndx = neoutils.get_index_of_named_signal(seg, analysis_unit.landmark.name, silent=True)
+                            keep_signal_ndx = ephys.get_index_of_named_signal(seg, analysis_unit.landmark.name, silent=True)
                             
                             if keep_signal_ndx is not None:
                                 signal = signals[keep_signal_ndx]
@@ -5878,7 +6212,7 @@ class ScanData(object):
             if len(self.scanRegionScansProfiles.segments) > 0:
                 if average:
                     try:
-                        segments = neoutils.average_segments([neoutils.neo_copy(self.scanRegionScansProfiles.segments[f]) for f in kprotocol_frames])
+                        segments = ephys.average_segments([ephys.neo_copy(self.scanRegionScansProfiles.segments[f]) for f in kprotocol_frames])
                         
                     except:
                         segments = []
@@ -5895,7 +6229,7 @@ class ScanData(object):
                         seg.index = kprotocol
                     
                 else:
-                    segments = [neoutils.neo_copy(self.scanRegionScansProfiles.segments[f]) for f in kprotocol_frames]
+                    segments = [ephys.neo_copy(self.scanRegionScansProfiles.segments[f]) for f in kprotocol_frames]
                     
                     for kseg, seg in enumerate(segments):
                         seg.name  = current_protocol.name
@@ -5912,7 +6246,7 @@ class ScanData(object):
             #### BEGIN copy scan region profile in scene data
             if len(self.scanRegionSceneProfiles.segments) > 0:
                 if average:
-                    segments = neoutils.average_segments([neoutils.neo_copy(self.scanRegionSceneProfiles.segments[f]) for f in kprotocol_frames])
+                    segments = ephys.average_segments([ephys.neo_copy(self.scanRegionSceneProfiles.segments[f]) for f in kprotocol_frames])
                     
                     if len(segments) > 1:
                         raise RuntimeError("averaging segments for protocol %s in scene block yielded more than one segment!" % current_protocol.name)
@@ -5926,7 +6260,7 @@ class ScanData(object):
                         seg.index = kprotocol
                     
                 else:
-                    segments = [neoutils.neo_copy(self.scanRegionSceneProfiles.segments[f]) for f in kprotocol_frames]
+                    segments = [ephys.neo_copy(self.scanRegionSceneProfiles.segments[f]) for f in kprotocol_frames]
                     
                     for kseg, seg in enumerate(segments):
                         seg.name  = current_protocol.name
@@ -6492,7 +6826,7 @@ class ScanData(object):
         # add the trigger protocols:
         #if len(result._electrophysiology_.segments):
             #for p in protocol_list:
-                #neoutils.embed_trigger_protocol(p, result._electrophysiology_)
+                #ephys.embed_trigger_protocol(p, result._electrophysiology_)
             
         # NOTE: 2018-06-17 16:24:30
         # adopt trigger protocols - do I still need this ?
@@ -6683,7 +7017,7 @@ class ScanData(object):
             raise TypeError("Expecting a ScanData object; got %s instead" % type(source).__name__)
         
         # NOTE: a local copy is made by the property setter
-        self.analysisoptions = source.analysisoptions 
+        self.analysisOptions = source.analysisOptions 
         
     #@safeWrapper
     def adoptAnalysisUnits(self, source):
@@ -7448,15 +7782,15 @@ class ScanData(object):
             for p in self._trigger_protocols_:
                 #print("ScanData.adoptTriggerProtocols:", p.name)
                 rev_p = p.reverseAcquisition(copy=True)
-                neoutils.embed_trigger_protocol(p, 
+                ephys.embed_trigger_protocol(p, 
                                                 self._electrophysiology_,
                                                 clearTriggers=True)
                 
-                neoutils.embed_trigger_protocol(rev_p, 
+                ephys.embed_trigger_protocol(rev_p, 
                                                 self._scans_block_,
                                                 clearTriggers=True)
                 
-                neoutils.embed_trigger_protocol(rev_p, 
+                ephys.embed_trigger_protocol(rev_p, 
                                                 self._scene_block_,
                                                 clearTriggers=True)
                 
@@ -7466,11 +7800,11 @@ class ScanData(object):
                     # do not run if the source is in this data
                     return
                 
-            src_protocols, _ = neoutils.parse_trigger_protocols(src) # creates NEW  protocols
+            src_protocols, _ = ephys.parse_trigger_protocols(src) # creates NEW  protocols
                 
             self._trigger_protocols_.clear()
             
-            #neoutils.clear_events(target)
+            #ephys.clear_events(target)
             
             if len(src_protocols):
                 for protocol in src_protocols:
@@ -7482,16 +7816,16 @@ class ScanData(object):
                     
                     if imaging_source: # adopting protocol from a scans or scene block
                         # store ref to reversed acquisition of original
-                        neoutils.embed_trigger_protocol(reversedProtocol,
+                        ephys.embed_trigger_protocol(reversedProtocol,
                                                         self._electrophysiology_,
                                                         clearTriggers=True)
                         
                         # store copy of original
-                        neoutils.embed_trigger_protocol(protocol,
+                        ephys.embed_trigger_protocol(protocol,
                                                         self._scans_block_,
                                                         clearTriggers=True)
                         
-                        neoutils.embed_trigger_protocol(protocol,
+                        ephys.embed_trigger_protocol(protocol,
                                                         self._scene_block_,
                                                         clearTriggers=True)
                         
@@ -7499,17 +7833,17 @@ class ScanData(object):
                         
                     else: # adopting protocol from an ephys block
                         # store ref to original
-                        neoutils.embed_trigger_protocol(protocol,
+                        ephys.embed_trigger_protocol(protocol,
                                                         self._electrophysiology_,
                                                         clearTriggers=True)
                         
                         # store ref to reverse acquisition copy of origiinal
-                        neoutils.embed_trigger_protocol(reversedProtocol,
+                        ephys.embed_trigger_protocol(reversedProtocol,
                                                         self._scans_block_,
                                                         clearTriggers=True)
                         
                         # store ref to reverse acquisition copy of original
-                        neoutils.embed_trigger_protocol(reversedProtocol,
+                        ephys.embed_trigger_protocol(reversedProtocol,
                                                         self._scene_block_,
                                                         clearTriggers=True)
                         
@@ -7523,9 +7857,9 @@ class ScanData(object):
     def clearTriggerProtocols(self):
         self._trigger_protocols_.clear()
         
-        neoutils.clear_events(self._electrophysiology_,   triggersOnly = True)
-        neoutils.clear_events(self._scans_block_,         triggersOnly = True)
-        neoutils.clear_events(self._scene_block_,         triggersOnly = True)
+        ephys.clear_events(self._electrophysiology_,   triggersOnly = True)
+        ephys.clear_events(self._scans_block_,         triggersOnly = True)
+        ephys.clear_events(self._scene_block_,         triggersOnly = True)
         
     @safeWrapper
     def addTriggerProtocol(self, protocol, sort=False):
@@ -7565,15 +7899,15 @@ class ScanData(object):
         # in imaging block we store COPIES of protocol events with reversed acquisition!
         rev_p = protocol.reverseAcquisition(copy=True)
         
-        neoutils.embed_trigger_protocol(protocol,
+        ephys.embed_trigger_protocol(protocol,
                                         self._electrophysiology_,
                                         clearEvents=False)
         
-        neoutils.embed_trigger_protocol(rev_p,
+        ephys.embed_trigger_protocol(rev_p,
                                         self._scans_block_,
                                         clearEvents=False)
         
-        neoutils.embed_trigger_protocol(rev_p,
+        ephys.embed_trigger_protocol(rev_p,
                                         self._scene_block_,
                                         clearEvents=False)
         
@@ -7620,9 +7954,9 @@ class ScanData(object):
         
         rev_p = protocol.reverseAcquisition(copy=True)
         
-        neoutils.remove_trigger_protocol(protocol, self._electrophysiology_)
-        neoutils.remove_trigger_protocol(rev_p, self._scans_block_)
-        neoutils.remove_trigger_protocol(rev_p, self._scene_block_)
+        ephys.remove_trigger_protocol(protocol, self._electrophysiology_)
+        ephys.remove_trigger_protocol(rev_p, self._scans_block_)
+        ephys.remove_trigger_protocol(rev_p, self._scene_block_)
         
         del self._trigger_protocols_[protocolNdx]
         
@@ -7639,9 +7973,9 @@ class ScanData(object):
         """
         return self.triggerProtocol(index)
     
-    #@safeWrapper
+    @safeWrapper
     def triggerProtocol(self, nameOrSegmentIndex):
-        """Returns a trigger protocol specified by protocol name or by frame nameOrSegmentIndex.
+        """Accesses a trigger protocol in this ScanData, specified by name or frame.
         
         Parameters:
         ==========
@@ -7836,14 +8170,14 @@ class ScanData(object):
             if value in irreg_sig_names:
                 raise ValueError("A signal named '%s' already exists in scansBlock segment %d" % (value, ks))
             
-            sig_ndx = neoutils.get_index_of_named_signal(segment, u_name, silent=True)
+            sig_ndx = ephys.get_index_of_named_signal(segment, u_name, silent=True)
             
             #print("ScanData.renameAnalysisUnit: sig_ndx %d in segment %d" % (sig_ndx, ks))
             
             if sig_ndx is not None:
                 segment.analogsignals[sig_ndx].name = value
             
-            irreg_sig_ndx = neoutils.get_index_of_named_signal(segment, u_name, stype=neo.IrregularlySampledSignal, silent=True)
+            irreg_sig_ndx = ephys.get_index_of_named_signal(segment, u_name, stype=neo.IrregularlySampledSignal, silent=True)
             
             if irreg_sig_ndx is not None:
                 segment.irregularlysampledsignals[irreg_sig_ndx].name = value
@@ -7858,12 +8192,12 @@ class ScanData(object):
             if value in irreg_sig_names:
                 raise ValueError("A signal named '%s' already exists in scansBlock segment %d" % (value, ks))
             
-            sig_ndx = neoutils.get_index_of_named_signal(segment, analysis_unit.name, silent=True)
+            sig_ndx = ephys.get_index_of_named_signal(segment, analysis_unit.name, silent=True)
             
             if sig_ndx is not None:
                 segment.analogsignals[sig_ndx].name = value
             
-            irreg_sig_ndx = neoutils.get_index_of_named_signal(segment, analysis_unit.name, stype=neo.IrregularlySampledSignal, silent=True)
+            irreg_sig_ndx = ephys.get_index_of_named_signal(segment, analysis_unit.name, stype=neo.IrregularlySampledSignal, silent=True)
             
             if irreg_sig_ndx is not None:
                 segment.irregularlysampledsignals[irreg_sig_ndx].name = value
@@ -8142,9 +8476,23 @@ class ScanData(object):
             return self.scansCursors[name]
         
     @safeWrapper
+    def scanCursor(self, name):
+        """Same as scansCursor
+        """
+        if name in self.scanCursors.keys():
+            return self.scanCursors[name]
+        
+    @safeWrapper
     def scansRoi(self, name):
         if name in self.scansRois.keys():
             return self.scansRois[name]
+        
+    @safeWrapper
+    def scanRoi(self, name):
+        """Same as scansRoi
+        """
+        if name in self.scanRois.keys():
+            return self.scanRois[name]
         
     @safeWrapper
     def setCursor(self, cursor, scans=True, append=False):
@@ -8209,7 +8557,7 @@ class ScanData(object):
         
         if append:
             if cursor.name in cursordict.keys():
-                cursor.name = counterSuffix(cursor.name, list(cursordict.keys()))
+                cursor.name = counter_suffix(cursor.name, list(cursordict.keys()))
                 
             if cursor in cursordict.values():
                 cursor = cursor.copy()
@@ -8511,17 +8859,17 @@ class ScanData(object):
             for p in self._trigger_protocols_:
                 rev_p = p.reverseAcquisition(copy=True)
                 
-                neoutils.embed_trigger_protocol(p,
+                ephys.embed_trigger_protocol(p,
                                                 self._electrophysiology_,
                                                 clearTriggers=True,
                                                 clearEvents=False)
                 
-                neoutils.embed_trigger_protocol(rev_p,
+                ephys.embed_trigger_protocol(rev_p,
                                                 self._scans_block_,
                                                 clearTriggers=True,
                                                 clearEvents=False)
                 
-                neoutils.embed_trigger_protocol(rev_p,
+                ephys.embed_trigger_protocol(rev_p,
                                                 self._scene_block_,
                                                 clearTriggers=True,
                                                 clearEvents=False)
@@ -8789,7 +9137,7 @@ class ScanData(object):
             
         if append:
             if roi.name in roidict.keys():
-                roi.name = counterSuffix(roi.name, list(roidict.keys()))
+                roi.name = counter_suffix(roi.name, list(roidict.keys()))
                 
             if roi in roidict.values():
                 roi = roi.copy()
@@ -9041,9 +9389,9 @@ class ScanData(object):
         """
         result = ScanData()
         
-        result._scandatatype_ = self.scantype
-        result._analysismode_ = self.analysismode
-        result.analysisoptions  = deepcopy(self.analysisoptions)
+        result._scandatatype_ = self.scanType
+        result._analysismode_ = self.analysisMode
+        result.analysisOptions  = deepcopy(self.analysisOptions)
         
         result._processed_ = self._processed_
         
@@ -9117,11 +9465,11 @@ class ScanData(object):
         if len(frame_ndx) > 1:
             # NOTE: 2018-01-30 23:11:10 no averaging needed when there's only one segment!
             events = self.electrophysiology.segments[frame_ndx[0]].events
-            avg_segment = neoutils.average_segments([self.electrophysiology.segments[f] for f in frame_ndx])
+            avg_segment = ephys.average_segments([self.electrophysiology.segments[f] for f in frame_ndx])
             avg_segment[0].events[:] = events
             
         else:
-            avg_segment = neoutils.average_segments(self.electrophysiology.segments)
+            avg_segment = ephys.average_segments(self.electrophysiology.segments)
             avg_segment[0].events[:] = self.electrophysiology.segments[0].events[:]
             
         result.electrophysiology.segments[:] = avg_segment
@@ -9129,10 +9477,10 @@ class ScanData(object):
         result.scansBlock.segments.clear()
         
         if len(frame_ndx) > 1:
-            avg_segment = neoutils.average_segments([self.scansBlock.segments[f] for f in frame_ndx])
+            avg_segment = ephys.average_segments([self.scansBlock.segments[f] for f in frame_ndx])
             
         else:
-            avg_segment = neoutils.average_segments(self.scansBlock.segments)
+            avg_segment = ephys.average_segments(self.scansBlock.segments)
             
         result.scansBlock.segments[:] = avg_segment # NOTE: events will be assigned below
 
@@ -9468,17 +9816,14 @@ class ScanData(object):
                 for p in self._trigger_protocols_:
                     rev_p = p.reverseAcquisition(copy=True)
                     
-                    neoutils.embed_trigger_protocol(p,
-                                                    self._electrophysiology_,
-                                                    clearEvents=False)
+                    ephys.embed_trigger_protocol(p, self._electrophysiology_,
+                                                 clearEvents=False)
                     
-                    neoutils.embed_trigger_protocol(rev_p,
-                                                    self._scans_block_,
-                                                    clearEvents=False)
+                    ephys.embed_trigger_protocol(rev_p, self._scans_block_,
+                                                 clearEvents=False)
                     
-                    neoutils.embed_trigger_protocol(rev_p,
-                                                    self._scene_block_,
-                                                    clearEvents=False)
+                    ephys.embed_trigger_protocol(rev_p, self._scene_block_,
+                                                 clearEvents=False)
             
                 
                 # a reference to this data's trigger protocols
@@ -9494,7 +9839,7 @@ class ScanData(object):
     def protocols(self):
         """Alias to triggerProtocols
         """
-        return self.triggerProtocol
+        return self.triggerProtocols
     
     @protocols.setter
     def protocols(self, value):
@@ -9523,21 +9868,6 @@ class ScanData(object):
     def electrophysiology(self, value):
         self._parse_electrophysiology_(value)
     
-    #@property
-    #"def" index(self):
-        #return self._index
-    
-    #@index.setter
-    #"def" index(self, value):
-        #if value is None:
-            #self._index = 0
-            #return
-        
-        #if not isinstance(value, int):
-            #raise TypeError("Expecting an int; got %s instead" % type(value).__name__)
-        
-        #self._index = value
-        
     @property
     def name(self):
         return self._name_
@@ -9573,6 +9903,13 @@ class ScanData(object):
         """   
         
         return self._scanscursors_
+    
+    @property
+    def scanCursors(self):
+        """Same as scansCursors
+        """
+        return self._scanscursors_
+        
         
     @property
     def sceneRois(self):
@@ -9603,11 +9940,23 @@ class ScanData(object):
         return self._scansrois_
     
     @property
+    def scanRois(self):
+        """Same as scansRois
+        """
+        return self._scansrois_
+    
+    @property
     def scansLandmarks(self):
         """
         A list of landmarks defined in the scans images.
         
         The list is sorted by landmark name
+        """
+        return sorted([l for l in self.scansCursors.values()], key=lambda x:x.name)
+    
+    @property
+    def scanLandmarks(self):
+        """Same as scansLandmarks
         """
         return sorted([l for l in self.scansCursors.values()], key=lambda x:x.name)
     
@@ -9726,43 +10075,43 @@ class ScanData(object):
         self.scanRegion = obj
     
     @property
-    def scantype(self):
+    def scanType(self):
         """Read-only
         """
         return self._scandatatype_
     
     @property
-    def scantypeName(self):
+    def scanTypeName(self):
         return self._scandatatype_.name
     
     @property
-    def scantypeValue(self):
+    def scanTypeValue(self):
         return self._scandatatype_.value
     
     @property
-    def analysismode(self):
+    def analysisMode(self):
         """Analysis mode (read-only)
         """
         return self._analysismode_
     
     @property
-    def analysismodeName(self):
+    def analysisModeName(self):
         return self._analysismode_.name
     
     @property
-    def analysismodeValue(self):
+    def analysisModeValue(self):
         return self._analysismode_.value
     
     @property
-    def analysisoptions(self):
+    def analysisOptions(self):
         if "Discrimination" in self._analysis_options_.keys() and isinstance(self._analysis_options_["Discrimination"], dict):
             if "MinimumR2" not in self._analysis_options_["Discrimination"].keys():
                 self._analysis_options_["Discrimination"]["MinimumR2"] = 0.5
         
         return self._analysis_options_
     
-    @analysisoptions.setter
-    def analysisoptions(self, value):
+    @analysisOptions.setter
+    def analysisOptions(self, value):
         """Set everything for linescan CaT analysis, for now.
         TODO Expand this in the future for other types of analysis.
         NOTE: This is application-dependent;
@@ -9775,8 +10124,12 @@ class ScanData(object):
         
         #if "MinimumR2" not in value["Discrimination"].keys():
             #value["Discrimination"]["MinimumR2"] = 0.5
-        
-        self._analysis_options_ = deepcopy(value)
+            
+        if isinstance(value, ScanDataOptions):
+            self._analysis_options_ = value
+            
+        else: # plain dict
+            self._analysis_options_ = deepcopy(value)
         
     @property
     def metadata_keys(self):
@@ -10210,20 +10563,20 @@ def __set_valid_key_names__(obj):
         for au in obj._analysis_units_:
             __set_valid_key_names__(au)
             
-        if len(obj.analysisoptions) and isinstance(obj.analysisoptions, dict):
-            __set_valid_key_names__(obj.analysisoptions)
+        if len(obj.analysisOptions) and isinstance(obj.analysisOptions, dict):
+            __set_valid_key_names__(obj.analysisOptions)
                 
-            if "Discrimination" in obj.analysisoptions and isinstance(obj.analysisoptions["Discrimination"], dict):
-                if "data_2D" in obj.analysisoptions["Discrimination"]:
-                    d2d = obj.analysisoptions["Discrimination"]["data_2D"]
-                    obj.analysisoptions["Discrimination"].pop("data_2D", None)
-                    obj.analysisoptions["Discrimination"]["Discr_2D"] = d2d
+            if "Discrimination" in obj.analysisOptions and isinstance(obj.analysisOptions["Discrimination"], dict):
+                if "data_2D" in obj.analysisOptions["Discrimination"]:
+                    d2d = obj.analysisOptions["Discrimination"]["data_2D"]
+                    obj.analysisOptions["Discrimination"].pop("data_2D", None)
+                    obj.analysisOptions["Discrimination"]["Discr_2D"] = d2d
                     
-            if "Fitting" in obj.analysisoptions and isinstance(obj.analysisoptions["Fitting"], dict):
-                if "CoefficientNames" in obj.analysisoptions["Fitting"] and \
-                    isinstance(obj.analysisoptions["Fitting"]["CoefficientNames"], (tuple, list)) and \
-                        len(obj.analysisoptions["Fitting"]["CoefficientNames"]):
-                            __set_valid_key_names__(obj.analysisoptions["Fitting"]["CoefficientNames"])
+            if "Fitting" in obj.analysisOptions and isinstance(obj.analysisOptions["Fitting"], dict):
+                if "CoefficientNames" in obj.analysisOptions["Fitting"] and \
+                    isinstance(obj.analysisOptions["Fitting"]["CoefficientNames"], (tuple, list)) and \
+                        len(obj.analysisOptions["Fitting"]["CoefficientNames"]):
+                            __set_valid_key_names__(obj.analysisOptions["Fitting"]["CoefficientNames"])
             
     elif isinstance(obj, AnalysisUnit):
         __set_valid_key_names__(obj.descriptors)
@@ -10275,3 +10628,250 @@ def check_apiversion(data):
         return data.apiversion[0] + data.apiversion[1]/10 >= 0.2
             
     return True
+
+
+@safeWrapper
+def scanDataOptions(detection_predicate=1.3, roi_width = 10, 
+                  reference="Ch1", indicator="Ch2", 
+                  bleed_ref_ind = 0, bleed_ind_ref = 0, 
+                  f0_begin = 0.10*pq.s, f0_end = 0.15*pq.s,
+                  fit_begin = 0.05 * pq.s, fit_end = 1 * pq.s, 
+                  int_begin = 0 * pq.s, int_end = 0.5 * pq.s,
+                  peak_begin = 0.15 * pq.s, peak_end = 0.3 * pq.s,
+                  initial=[], lower=[], upper=[]):
+    """
+    TODO: Customize all parameters on function signature; also write a GUI for this
+    TODO: change API to use ScanDataOptions
+    """
+    # NOTE: 2018-06-20 09:14:25
+    # now uses OrderedDict (small overhead but worth it)
+    # updated to include event (trigger protocol) detection from the ephys data
+    # (mapped to the key: "TriggerEventDetection")
+    
+    ret = collections.OrderedDict()
+    ret["name"] = "ScanDataOptions"
+    
+    ret["Channels"] = collections.OrderedDict()
+    ret["Channels"]["Reference"] = reference
+    ret["Channels"]["Indicator"] = indicator
+    ret["Channels"]["Bleed_ref_ind"] = bleed_ref_ind # fraction of reference channel that bleeds into indicator channel
+    ret["Channels"]["Bleed_ind_ref"] = bleed_ind_ref # fraction of indicator channel that bleeds into reference channel
+    
+    ret["IndicatorCalibration"] = collections.OrderedDict() # when all None, this is uncalibrated
+    # all must be either None, or scalars
+    ret["IndicatorCalibration"]["Name"] = None
+    ret["IndicatorCalibration"]["Kd"]   = np.nan
+    ret["IndicatorCalibration"]["Fmin"] = np.nan
+    ret["IndicatorCalibration"]["Fmax"] = np.nan
+
+    ret["Discrimination"] = collections.OrderedDict() # sucess vs failure
+    
+    # NOTE: 2017-11-22 11:46:41
+    # mapping of a func_name to a dict of keyword params (**kwargs)
+    # func signature must be func_name(x, **kwargs) and returns a scalar
+    # default is below (Frobenius norm for matrices)):
+    # axis is None because we operate on single-channel analogsignals (or datasignals)
+    
+    # NOTE: for multi component EPSCaTs (e.g.a train of EPSCaTs) there are more
+    # than one base and peak intervals defined, respectively, before and after 
+    # the trigger time for for the corresponding EPSCaT 
+    #
+    # since the comparison should be done between similarly sized regions, we 
+    # define only one such window, that we the take UP TO the trigger time (for 
+    # the base) or FROM the trigger time onward (for the peak) 
+    
+    # NOTE: the trigger times are established by trigger protocols, and NOT 
+    # defined here
+    
+    #ret["Discrimination"]["Base"] = {"np.linalg.norm":{"axis":None, "ord":None}, "window": 0.05 * pq.s}
+    ##ret["Discrimination"]["Peak"] = {"np.linalg.norm":{"axis":None, "ord":None}, "window": 0.05 * pq.s} 
+    
+    ret["Discrimination"]["Function"] = {"np.linalg.norm":{"axis":None, "ord":None}}
+    ret["Discrimination"]["BaseWindow"] = 0.05 * pq.s
+    ret["Discrimination"]["PeakWindow"] = 0.05 * pq.s
+    ret["Discrimination"]["Discr_2D"] = False
+    ret["Discrimination"]["WindowChoice"] = "delays" # one of "delays", "triggers", "cursors"
+    ret["Discrimination"]["First"] = True
+
+    ret["Discrimination"]["Predicate"] = "lambda x,y: x >= y" # binary predicate: 
+                                                        # generates a function by 
+                                                        # calling func = eval(str)
+                                                        # where str is as shown here
+                                                    
+    ret["Discrimination"]["PredicateFunc"] = "lambda x,y: x/y" # calculates one scalar
+                                                    # result between peak and base
+                                                    
+    ret["Discrimination"]["PredicateValue"] = detection_predicate # this will test a scalar (x) against
+                                            # this value using the binary predicate 
+                                            # given above
+                                            #
+                                            # scalar x is generated by PredicateFunc
+                                            
+    ret["Roi"] = collections.OrderedDict()
+    ret["Roi"]["width"] = roi_width # an int or "auto" => use widths generated by the scan roi detection algorithm
+    #ret["Roi"]["auto"] = False # when True, set use 
+    
+    ret["Intervals"] = collections.OrderedDict()
+    ret["Intervals"]["DarkCurrent"] = [None, None] #start, end, both quantities or None
+    ret["Intervals"]["F0"] = [f0_begin, f0_end] # start, end both quantities
+    ret["Intervals"]["Fit"] = [fit_begin, fit_end] # start, end both quantities
+    ret["Intervals"]["Integration"] = [int_begin, int_end] # start, end, both quantities; 
+    
+    ret["AmplitudeMethod"] = "direct" # one of "direct" or "levels"
+    
+    #ret["Intervals"]["Peak"] = [peak_begin, peak_end] #  start, end both quantities
+    
+    
+    # Fitting model parameters
+    # NOTE: 2017-12-23 13:06:45
+    # for each EPSCaT there are n * 2 + 3 parameters packed in a list, where n 
+    # is the number of decay components in a single EPSCaT (this is done for 
+    # generality, although in most cases single EPSCaT data is fitted well by a 
+    # transient with one decay component)
+    #
+    # NOTE: 2017-12-23 13:12:15 
+    # the last parameter in the list is a so-called "delay" (or "onset") and
+    # represents the "location" of the transient relative to the beginning of 
+    # the sweep.
+    # WARNING its value may be the string "trigger", meaning it will be updated 
+    # from the trigger protocols
+    
+    # For multiple EPSCaTs (e.g. an EPSCaT train, or when stimuli generate several
+    # individually resolvable EPSCaTs) a list of such parameters must be given 
+    # for every single EPSCaT in the compound, and packed in a list
+    
+    # Hence the ["Fitting"]["Initial"] is a list of lists of parameters
+    # and so are the ["Fitting"]["Lower"] and ["Fitting"]["Upper"], for the 
+    # lower and upper bounds, respectively, to replicate ["Fitting"]["Initial"]
+    
+    ret["TriggerEventDetection"] = collections.OrderedDict()
+    ret["TriggerEventDetection"]["Presynaptic"] = collections.OrderedDict()
+    ret["TriggerEventDetection"]["Presynaptic"]["Channel"] = 0
+    ret["TriggerEventDetection"]["Presynaptic"]["DetectionBegin"] = 0.2 * pq.s
+    ret["TriggerEventDetection"]["Presynaptic"]["DetectionEnd"] = 0.3 * pq.s
+    ret["TriggerEventDetection"]["Presynaptic"]["DetectEvents"] = False
+    ret["TriggerEventDetection"]["Presynaptic"]["Name"] = "epsp"
+    
+    ret["TriggerEventDetection"]["Postsynaptic"] = collections.OrderedDict()
+    ret["TriggerEventDetection"]["Postsynaptic"]["Channel"] = 1
+    ret["TriggerEventDetection"]["Postsynaptic"]["DetectionBegin"] = 0.2 * pq.s
+    ret["TriggerEventDetection"]["Postsynaptic"]["DetectionEnd"] = 0.3 * pq.s
+    ret["TriggerEventDetection"]["Postsynaptic"]["DetectEvents"] = False
+    ret["TriggerEventDetection"]["Postsynaptic"]["Name"] = "bAP"
+    
+    ret["TriggerEventDetection"]["Photostimulation"] = collections.OrderedDict()
+    ret["TriggerEventDetection"]["Photostimulation"]["Channel"] = 0
+    ret["TriggerEventDetection"]["Photostimulation"]["DetectionBegin"] = 0 * pq.s
+    ret["TriggerEventDetection"]["Photostimulation"]["DetectionEnd"] = 0 * pq.s
+    ret["TriggerEventDetection"]["Photostimulation"]["DetectEvents"] = False
+    ret["TriggerEventDetection"]["Photostimulation"]["Name"] = "uepsp"
+    
+    ret["TriggerEventDetection"]["Photostimulation"] = collections.OrderedDict()
+    ret["TriggerEventDetection"]["Photostimulation"]["Channel"] = 0
+    ret["TriggerEventDetection"]["Photostimulation"]["DetectionBegin"] = 0 * pq.s
+    ret["TriggerEventDetection"]["Photostimulation"]["DetectionEnd"] = 0 * pq.s
+    ret["TriggerEventDetection"]["Photostimulation"]["DetectEvents"] = False
+    ret["TriggerEventDetection"]["Photostimulation"]["Name"] = "uepsp"
+    
+    ret["TriggerEventDetection"]["Imaging frame trigger"] = collections.OrderedDict()
+    ret["TriggerEventDetection"]["Imaging frame trigger"]["Channel"] = 3
+    ret["TriggerEventDetection"]["Imaging frame trigger"]["DetectionBegin"] = 0.05 * pq.s
+    ret["TriggerEventDetection"]["Imaging frame trigger"]["DetectionEnd"] = 0.1 * pq.s
+    ret["TriggerEventDetection"]["Imaging frame trigger"]["DetectEvents"] = False
+    ret["TriggerEventDetection"]["Imaging frame trigger"]["Name"] = "imaging"
+    
+    ret["Fitting"] = collections.OrderedDict()
+    ret["Fitting"]["Fit"] = True
+    ret["Fitting"]["FitComponents"] = True # when True, fits individual EPSCaT components in an EPSCaT train
+    
+    nParams = 0
+    
+    if len(initial) > 0:
+        if all([isinstance(i, float) for i in initial]):
+            ret["Fitting"]["Initial"] = [initial]
+            if models.check_rise_decay_params(initial) <= 1:
+                raise ValueError("Incorrect number of initial EPSCaT parameter values: %d; must be N x 2 + 3, for N decays" % len(initial))
+            
+            nParams = [len(initial)]
+            
+        elif all([all([isinstance(i, (tuple, list)) for i in i_] for i_ in initial)]):
+            if all([models.check_rise_decay_params(i) >= 1 for i in initial]):
+                ret["Fitting"]["Initial"] = initial
+                
+            else:
+                raise ValueError("Incorrect number of initial EPSCaT parameter values")
+            
+            nParams = [len(initial) for i in initial]
+            
+        else:
+            raise TypeError("Initial EPSCaT parameter values expected to be a list of floats or a list of lists of floats; got %s instead" % initial)
+            
+    else:
+        ret["Fitting"]["Initial"] = [[1, 0.01, 0, 0.01, 0.25]]
+        nParams = [5]
+        
+    if len(lower) > 0:
+        if all([isinstance(i, float) for i in lower]):
+            if len(lower) == 1:
+                ret["Fitting"]["Lower"] = [lower * p for p in nParams]
+                
+            elif any([len(lower) != p for p in nParams]):
+                raise TypeError("Lower bounds must contain 1 or %d values; got %d instead" % (nParams, len(lower)))
+            
+            ret["Fitting"]["Lower"] = [lower] * len(initial)
+            
+        
+        elif all([all([isinstance(i, float) for i in i_]) for i_ in lower]):
+            if len(lower) == len(ret["Fitting"]["Initial"]):
+                if all([len(l) == p for p in nParams]):
+                    ret["Fitting"]["Lower"] = lower
+            
+            else:
+                raise TypeError("Mismatch between number of initial EPSCaT parameter values and lower bounds")
+            
+        else:
+            raise TypeError("Lower bounds expected to be a list of floats or a list of lists of floats; got %s instead" % lower)
+        
+    else:
+        ret["Fitting"]["Lower"] = [[0, 0, 0, 0, 0]]
+        
+    if len(upper) > 0:
+        if all([isinstance(i, float) for i in upper]):
+            if len(upper) == 1:
+                ret["Fitting"]["Upper"] = [upper * p for p in nParams]
+                
+            elif any([len(upper) != p for p in nParams]):
+                raise TypeError("Upper bounds must contain 1 or %d values; got %d instead" % (nParams, len(upper)))
+            
+            ret["Fitting"]["Upper"] = [upper] * len(initial)
+            
+        
+        elif all([all([isinstance(i, float) for i in i_]) for i_ in upper]):
+            if len(upper) == len(ret["Fitting"]["Initial"]):
+                if all([len(l) == p for p in nParams]):
+                    ret["Fitting"]["Upper"] = upper
+            
+            else:
+                raise TypeError("Mismatch between number of initial EPSCaT parameter values and upper bounds")
+            
+        else:
+            raise TypeError("Upper bounds expected to be a list of floats or a list of lists of floats; got %s instead" % upper)
+        
+        
+    else:
+        ret["Fitting"]["Upper"] = [[np.inf, np.inf, 1, np.inf, np.inf]]
+        
+    nDecays = max([models.check_rise_decay_params(i) for i in ret["Fitting"]["Initial"]])
+    
+    cfNames = list()
+    
+    for k in range(nDecays):
+        cfNames.append("scale_%d" % k)
+        cfNames.append("taudecay_%d" % k)
+        
+    cfNames += ["offset", "taurise", "delay"]
+        
+    ret["Fitting"]["CoefficientNames"] = cfNames
+    
+    return ret
+

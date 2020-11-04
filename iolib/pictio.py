@@ -12,12 +12,14 @@ Add signature annotations to file loaders to help file data handling
 #### BEGIN core python modules
 from __future__ import print_function
 
-import os, sys, traceback, inspect, keyword, warnings
+import inspect, keyword, os, sys, traceback, typing, warnings, io, importlib
 # import  threading
 import concurrent.futures
 import pickle, pickletools, copyreg, csv, numbers, mimetypes
 import collections
-from functools import singledispatch
+#from functools import singledispatch
+#from contextlib import (contextmanager,
+                        #ContextDecorator,)
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -36,13 +38,18 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 #### BEGIN pict.core modules
 #from core import neo
 #from core import patchneo
-from core import (xmlutils, strutils, axisutils, datatypes, datasignal,
-                  scandata, axiscalibration, triggerprotocols,
-                  neoutils,)
+from core import (xmlutils, strutils, datatypes, datasignal,
+                  triggerprotocols, neoutils,)
 
-from core.axisutils import *
 
-from core.prog import safeWrapper
+from core.prog import (ContextExecutor, NeoPatchCtx, ShimModule, 
+                       safeWrapper, needs_neo_patch,import_module,)
+
+from core.workspacefunctions import (user_workspace, get_symbol_in_namespace,)
+
+from imaging import (axisutils, axiscalibration, scandata, )
+
+from imaging.axisutils import *
 
 #import datatypes
 #### END pict.core modules
@@ -87,6 +94,7 @@ except Exception as e:
 __vigra_formats__ = vigra.impex.listExtensions()
 __ephys_formats__ = ["abf"]
 __generic_formats__ = ["pkl", "h5", "csv"]
+__tabular_formats__ = ["xls", "xlsx", "xlsm", "xlsb", "odf", "ods", "odt", "csv", "tsv" ]
 
 #SUPPORTED_IMAGE_TYPES = __vigra_formats__.split() + [i for i in bioformats.READABLE_FORMATS if i not in __vigra_formats__]
 SUPPORTED_IMAGE_TYPES = __vigra_formats__.split() # + [i for i in bioformats.READABLE_FORMATS if i not in __vigra_formats__]
@@ -133,6 +141,101 @@ mimetypes.add_type("application/x-matlab", ".mat")
 mimetypes.add_type("application/x-octave", ".oct")
 mimetypes.add_type("text/plain", ".cfg") # adds to already known extensions
 
+class CustomUnpickler(pickle.Unpickler):
+    """ Custom unpickler
+        NOTE: 2020-10-30 16:30:16
+        This is supposed to deal with pickled data expects classes or functions
+        to be defined in modules as advertised inside the pickle data stream, but
+        this no longerhappens at the time of unpickling.
+        
+        It is possible that between the time of pickling and this unpickling, the
+        definitions of some classes and functions have been moved to a "new" module.
+        
+        It is also possible that the original module was moved (e.g. in a different
+        package or it is a submodule of another module).
+        
+        The following contingencies are possible:
+        
+        a) the definitions of the classes or functions have been moved to a 
+        "new" module, but both the "old" (original) and the "new" module have been
+        successfully imported (hence, they are present in sys.modules)
+        
+        b) the definitions of the classes and/or functions have been moved to a
+        "new" module, and only the "new" module is loaded (the "old" module has
+        been removed from the API, since pickling)
+        
+        c) definitions have been moved to a new module that hasn't been loaded
+        (imported) yet
+        
+        
+    """
+    
+    def _find_relocate_(self, old_modname, symbol):
+        """Deals with contingencies (a) and (b):
+            "old" (original) module and the "new" module have been succesfully
+            imported and are present in sys.modules
+            
+        More importantly, the "new" module MUST have been imported, hence it is
+        one of sys.modules keys.
+        
+        Returns the module that currently contains the symbol in symbol
+            
+        """
+        #print("search for %s in sys.modules", symbol)
+        # NOTE 2020-10-30 10:20:46
+        # this is to cover the case of nested classes, i.e. classes
+        # defined as class attrbutes - e.g. ScanData.ScanDataType
+        itemnames = symbol.split(".") # to cover the case of nested classes
+        
+        # also make sure we don't end up with the "old" module, if that is still 
+        # around
+        containers = [k for k, v in sys.modules.items() if hasattr(v, itemnames[0]) and k != old_modname]
+        
+        if len(containers):
+            result = getattr(sys.modules[containers[0]], itemnames[0])
+            module = result.__module__
+            parent = module
+            # now go get the attribute that is being sought
+            for iname in itemnames[1:]:
+                if hasattr(result, iname):
+                    parent = ".".join([parent, result.__name__])
+                    result = getattr(result, iname)
+                    
+                else:
+                    raise AttributeError("%s has no attribute named %s" % (result.__name__, iname))
+                
+            #print("find_class() found %s in %s\n" % (result.__name__, parent))
+        
+        else:
+            raise AttributeError("%s not found in sys.modules" % symbol)
+                
+        return result
+    
+    def find_class(self, modname, symbol):
+        #print("find_class():", "old module:", modname, "name", symbol)
+        
+        #print("old module", modname, "is in sys.modules: ", modname in sys.modules)
+        
+        try:
+            # NOTE: 2020-10-30 14:54:16
+            # see if the 'symbol' symbol is found where expected
+            #
+            # NOTE: this requires that modname exists and is present is
+            # sys.modules i.e. it has successfully been imported;
+            #
+            
+            return super().find_class(modname, symbol)
+        
+        except Exception as e:
+            #print(type(e))
+            # if symbol symbol does not exist in the predicted modname 
+            # (the try statement has failed) 
+            if isinstance(e, (AttributeError, ModuleNotFoundError)):
+                return self._find_relocate_(modname, symbol)
+                
+            else:
+                raise
+        
 def __ndArray2csv__(data, writer):
     for l in data:
         writer.writerow(l)
@@ -916,168 +1019,98 @@ def loadAxonFile(fileName:str) -> neo.Block:
     except Exception as e:
         traceback.print_exc()
         
-def loadPickleFile(fileName):
-    #from core import neoepoch, neoevent
-    from core import neoepoch as neoepoch
-    from core import neoevent as neoevent
-    #from core import scandata, analysisunit, axiscalibration, triggerprotocols
-    #from core import 
-    #from core import datatypes
-    from core.workspacefunctions import assignin
-    from gui import pictgui
-    from plugins import CaTanalysis
-    result = None
-    # NOTE: 2019-10-08 10:46:46
-    # migration to a new package directory layout
-    # breaks loading of old pickle files
-    # this affects all pickles that rely on classes previosuly defined in 
-    # modules that were present in the top level package but now have been
-    # modev to sub-packages (notably, in core)
-    # the following attempts to fix this
-    sys.modules["neoevent"] = neoevent
-    sys.modules["neoepoch"] = neoepoch
-    #sys.modules["datatypes"] = datatypes
-    sys.modules["pictgui"] = pictgui
-    sys.modules["CaTanalysis"] = CaTanalysis
+@safeWrapper
+def importDataFrame(fileName):
+    fileType = getMimeAndFileType(fileName)[0]
     
+    if any([s in fileType for s in ("excel", "spreadsheet")]):
+        return pd.read_excel(fileName)
+        
+    elif any([s in fileType for s in ("csv", "tab-separated-values")]):
+        # figure out separator: tab or comma?
+        # NOTE: 2020-10-01 23:29:35 csv can also be tab-separated !!!
+        with open(fileName, "rt") as csvfile:
+            dialect = csv.Sniffer().sniff(csvfile.read(2048))
+            
+        if dialect.delimiter in ("\t", " "): # tab-separated
+            return pd.read_table(fileName)
+            
+        elif dialect.delimiter == ",": # comma-separated
+            return pd.read_csv(fileName)
+        
+        else:
+            warnings.warn("Unsupported delimiter: %s" % dialect.delimiter)
+            
+    else:
+        warnings.warn("Unsupported file type: %s" % fileType)
+        
+def custom_unpickle(src:typing.Union[str, io.BufferedReader]) -> object:
+    if isinstance(src, str):
+        if os.path.isfile(src):
+            with open(src, mode="rb") as fileSrc:
+                return CustomUnpickler(fileSrc).load()
+            
+        else:
+            raise FileNotFoundError()
+            
+    elif isinstance(src, io.BufferedReader):
+        return CustomUnpickler(src).load()
+    
+    else:
+        raise TypeError("Expecting a str containing an exiting file name or a BufferedReader; got %s instead" % type(src).__name__)
+        
+    return ret
+            
+def loadPickleFile(fileName):
     try:
+        # NOTE: try pickle first - in  python3 this is fast (via cPickle)
         with open(fileName, mode="rb") as fileSrc:
             result = pickle.load(fileSrc)
             
     except Exception as e:
-        exc_info = sys.exc_info()
-        frame_summaries = traceback.extract_tb(exc_info[2])
-        
-        #for kf, frame_summary in enumerate(frame_summaries):
-            #print("frame %d" % kf, frame_summary.name)
+        try:
+            result = custom_unpickle(fileName)
             
-        frame_names = [f.name for f in frame_summaries]
+        except:
+            traceback.print_exc()
+            raise
+        #exc_info = sys.exc_info()
+        #if needs_neo_patch(exc_info):
+            ## FIXME 2020-10-29 16:45:20 - buggy
+            ## intention: load pickled neo data where some of the c'tors have been
+            ## "hacked" through the use of neoevent and neoepoch
+            ## problem: messes up the sys.modules
+            #with NeoPatchCtx():
+                #result = loadPickleFile(fileName)
+                
+        #elif isinstance(e, ModuleNotFoundError) and hasattr(e, "msg"):
+            ## NOTE: for data pickled with a different module layout
+            ## i.e. the module exists, but its location in scipyen tree has changed
+            #m = e.msg.split("No module named ")[1].replace("'", "")
+            #modname = m.split(".")[-1]
             
-        last_frame = frame_summaries[-1]
-        offending_module_filename = last_frame.filename
-        offending_function = last_frame.name
+            #with ShimModule(modname):
+                #result = loadPickleFile(fileName)
+                
+        #elif isinstance(e, AttributeError):
+            #print("loadPickleFile AttributeError")
+            #try:
+                #result = custom_unpickle(fileName)
+                
+            #except:
+                #raise
+                
+        #else:
+            #traceback.print_exc()
+            #raise e
         
-        #print("offending module:", offending_module_filename)
-        
-        #if "neo" in offending_module_filename or any(["neo" in frn for frn in frame_names]):
-        if any([any([s in frn for frn in frame_names]) for s in ("neo", "event", "epoch", "analogsignal", "irregularlysampledsignal")]):
-            result = unpickleNeoData(fileName)
-            
-        else:
-            raise e
-        
-    if isinstance(result, (scandata.ScanData, scandata.AnalysisUnit, axiscalibration.AxisCalibration, pictgui.PlanarGraphics)):
+    if type(result).__name__ in ("ScanData", "AnalysisUnit", "AxisCalibration", "PlanarGraphics"):
+        #print("loaded", type(result))
         result._upgrade_API_()
-    
-    if "neoevent" in sys.modules:
-        del sys.modules["neoevent"]
         
-    if "neoepoch" in sys.modules:
-        del sys.modules["neoepoch"]
+    elif isinstance(result, (neo.Block, neo.Segment, dict)):
+        neoutils.upgrade_neo_api(result) # in-place
         
-    #if "datatypes" in sys.modules:
-        #del sys.modules["datatypes"]
-        
-    if "pictgui" in sys.modules:
-        del sys.modules["pictgui"]
-        
-    if "CaTanalysis" in sys.modules:
-        del sys.modules["CaTanalysis"]
-    
-    return result
-
-def unpickleNeoData(fileName):
-    import core.patchneo as patchneo
-    import core.neoevent as neoevent
-    import core.neoepoch as neoepoch
-    
-    current_new_AnalogSignalArray = neo.core.analogsignal._new_AnalogSignalArray
-    current_new_IrregularlySampledSignal = neo.core.irregularlysampledsignal._new_IrregularlySampledSignal
-    current_new_spiketrain = neo.core.spiketrain._new_spiketrain
-    
-    current_new_event = neo.core.event._new_event
-    current_Event = neo.core.event.Event
-    current_Epoch = neo.core.epoch.Epoch
-    
-    current_normalize_array_annotations = neo.core.dataobject._normalize_array_annotations
-    
-    
-    try:
-        sys.modules["neoevent"] = neoevent
-        sys.modules["neoepoch"] = neoepoch
-        
-        neo.core.dataobject._normalize_array_annotations = patchneo._normalize_array_annotations
-        
-        neo.core.analogsignal._new_AnalogSignalArray = patchneo._new_AnalogSignalArray_v1
-        neo.core.spiketrain._new_spiketrain = patchneo._new_spiketrain_v1
-        neo.core.irregularlysampledsignal._new_IrregularlySampledSignal = patchneo._new_IrregularlySampledSignal_v1
-        
-        neo.core.event._new_event = neoevent._new_event
-        neo.core.event.Event = neoevent.Event
-        neo.core.Event = neoevent.Event
-        neo.io.axonio.Event = neoevent.Event
-        neo.Event = neoevent.Event
-        
-        neo.core.epoch.Epoch = neoepoch.Epoch
-        neo.core.Epoch = neoepoch.Epoch
-        neo.Epoch = neoepoch.Epoch
-        
-        
-        with open(fileName, mode="rb") as fileSrc:
-            result = pickle.load(fileSrc)
-            
-        del sys.modules["neoevent"]
-        del sys.modules["neoepoch"]
-                
-    except:
-        sys.modules["neoevent"] = neoevent
-        sys.modules["neoepoch"] = neoepoch
-        
-        neo.core.dataobject._normalize_array_annotations = patchneo._normalize_array_annotations
-        
-        neo.core.analogsignal._new_AnalogSignalArray = patchneo._new_AnalogSignalArray_v2
-        neo.core.spiketrain._new_spiketrain = patchneo._new_spiketrain_v1
-        neo.core.irregularlysampledsignal._new_IrregularlySampledSignal = patchneo._new_IrregularlySampledSignal_v1
-        
-        neo.core.event._new_event = neoevent._new_event
-        neo.core.event.Event = neoevent.Event
-        neo.core.Event = neoevent.Event
-        neo.io.axonio.Event = neoevent.Event
-        neo.Event = neoevent.Event
-        
-        neo.core.epoch.Epoch = neoepoch.Epoch
-        neo.core.Epoch = neoepoch.Epoch
-        neo.Epoch = neoepoch.Epoch
-        
-        with open(fileName, mode="rb") as fileSrc:
-            result = pickle.load(fileSrc)
-                
-        del sys.modules["neoevent"]
-        del sys.modules["neoepoch"]
-                
-    neo.core.dataobject._normalize_array_annotations = current_normalize_array_annotations
-    
-    neo.core.analogsignal._new_AnalogSignalArray = current_new_AnalogSignalArray
-    neo.core.spiketrain._new_spiketrain = current_new_spiketrain
-    neo.core.irregularlysampledsignal._new_IrregularlySampledSignal = current_new_IrregularlySampledSignal
-    
-    neo.core.event._new_event = current_Event
-    neo.core.event.Event = current_Event
-    neo.core.Event = current_Event
-    neo.io.axonio.Event = current_Event
-    neo.Event = current_Event
-    neo.core.event._new_event = current_new_event
-    
-    neo.core.epoch.Epoch = current_Epoch
-    neo.core.Epoch = current_Epoch
-    neo.Epoch = current_Epoch
-    
-    if "neoevent" in sys.modules:
-        del sys.modules["neoevent"]
-    
-    if "neoepoch" in sys.modules:
-        del sys.modules["neoepoch"]
-    
     return result
 
 def savePickleFile(val, fileName, protocol=None):
@@ -1510,7 +1543,7 @@ def loadXMLFile(fileName):
     #else:
         #raise OSError("File %s not found" % fileName)
 
-def loadTextFile(fileName):
+def loadTextFile(fileName, forceText=False):
     if os.path.isfile(fileName):
         # we may have been landed here from an Axon Text File
         root, ext = os.path.splitext(fileName)
@@ -1527,7 +1560,7 @@ def loadTextFile(fileName):
         # NOTE: 2017-06-29 14:29:01
         # sometimes a text file contains XML data but it has not been recognized
         # as such by the mime type / magic systems
-        if "<?xml version" in text[0]:
+        if "<?xml version" in text[0] and not forceText:
             import xml.dom.minidom
             try:
                 text1 = ret.replace("&#x1;", "; ")
@@ -1594,7 +1627,7 @@ def getLoaderForFile(fName):
                     ret = loadAxonFile
                     
                 else:
-                    warnings.warning("Don't know how to open %s" % fName, RuntimeWarning)
+                    warnings.warn("Don't know how to open %s" % fName, RuntimeWarning)
 
         
         ## plain python mimtype module has failed;
@@ -1644,9 +1677,9 @@ def getMimeAndFileType(fileName):
         
         Will be set to None if the file type could not be determined
         
+    encoding: str or None; 
+        the encoding of the file as reported by the system's mime-type utilities 
     """
-    #encoding: str or None; 
-        #the encoding of the file as reported by the system's mime-type utilities 
     
     file_type = None
     mime_type = None
@@ -1685,7 +1718,7 @@ def getMimeAndFileType(fileName):
             #mime_type = mime.get_comment() # don't rely on this as it can have more than just "media/subtype" !
         
         except Exception as e:
-            traceback_print_exc()
+            traceback.print_exc()
             
     # 2.2) try the mimetypes module
     if mime_type is None:
@@ -1810,3 +1843,67 @@ def export_to_hdf5(obj, filenameOrGroup, name=None):
     
 
     f.close()
+
+@safeWrapper
+def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None, 
+             ws:typing.Optional[dict]=None, mode:str="pkl", **kwargs):
+    """Saves variable(s) in the current working directory.
+    WARNING Do not confuse with IPython %save line magic
+    TODO adapt to other modes
+    """
+    
+    # NOTE: 2020-10-22 13:41:18
+    # better to set this here so that get_symbol_in_namespace looks up in the
+    # correct namespace
+    if ws is None:
+        ws = user_workspace()
+        
+    if len(args) == 1:
+        x = args[0]
+        
+        if name is None or (isinstance(name, str) and len(name.strip()) == 0):
+            names = get_symbol_in_namespace(x, ws=ws)
+            
+        if len(names):
+            fileName = names[0]
+            
+        else:
+            fileName = "object"
+            
+        if mode == "pkl":
+            savePickleFile(x, fileName)
+            
+        elif mode == "csv":
+            writeCsv(x, fileName)  # this picks up if x is a pandas data object and calls the appropriate function
+            
+        elif mode == "hdf":
+            raise NotImplementedError("Saving to HDF5 files not yet supported")
+        
+        elif mode in ("tif", "png", "jpg"):
+            saveImageFile(x, fileName)
+            
+        elif mode in ("txt", "ascii"):
+            with open(fileName, mode="wt") as fileDest:
+                fileDest.write(x)
+        
+        else:
+            raise ValueError("Unexpected mode %s" % mode)
+        
+    else:
+        if len(kwargs) > 0:
+            if len(kwargs) != len(args):
+                raise ValueError("For saving multiple variables, keyword params must be either empty or have the same length as the variadic parameter")
+            
+            kw = [k for k in kwargs]
+            
+        else:
+            kw = []
+            
+        for k,x in enumerate(args):
+            if len(kw):
+                name = kw[k]
+                mode = kwargs[kw[k]]
+            
+            save(x, name=name, mode=mode, ws = ws)
+        
+    

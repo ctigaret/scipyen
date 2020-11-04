@@ -131,6 +131,11 @@ import datetime
 import bisect
 #### END core python modules
 
+#### BEGIN traitlets
+#from traitlets import (HasTraits, Integer, Float, Complex, Unicode, Bytes,
+                       #List, Set, Tuple, Dict, Bool, )
+#### END
+
 #### BEGIN 3rd party modules
 
 # NOTE: 2019-07-29 13:13:23 TODO load PyQt5 modules via the pict.gui package
@@ -156,29 +161,22 @@ import vigra
 import core.tiwt as tiwt
 import core.datatypes as dt
 #from core.patchneo import neo
-import core.neoutils as neoutils
 import core.strutils as strutils
 import core.curvefitting as crvf
 import core.models as models
-import core.imageprocessing as imgp
-from core.imageprocessing import *
 import core.signalprocessing as sgp
-from core.workspacefunctions import validateVarName
-from core.utilities import (get_nested_value, set_nested_value, counterSuffix, )
+from core.workspacefunctions import validate_varname
+from core.utilities import (get_nested_value, set_nested_value, counter_suffix, )
 from core.prog import (safeWrapper, safeGUIWrapper, )
-import core.datasignal as datasignal
+#import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
-import core.triggerprotocols
+#import core.triggerprotocols
 from core.triggerprotocols import (TriggerEvent, TriggerEventType, TriggerProtocol)
-import core.scandata
-from core.scandata import (ScanData, AnalysisUnit, check_apiversion)
-import core.axisutils
 #from core.axisutils import (calibration, axisChannelName)
 import core.traitcontainers
 from core.traitcontainers import DataBag
-from core.axiscalibration import (AxisCalibration, calibration, axisChannelName,
-                                  )
-import core.vigrautils as vu
+from core.traitutils import (TraitsObserver, trait_from_type, )
+                                  
 
 #### END pict.core modules
 
@@ -192,16 +190,28 @@ import gui.pictgui as pgui
 import gui.quickdialog as quickdialog
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import (ScipyenViewer, ScipyenFrameViewer)
+from gui.workspacegui import WorkspaceGuiMixin
 #### END pict.gui modules
+
+#### BEGIN imaging modules
+from . import vigrautils as vu
+from . import imageprocessing as imgp
+from .imageprocessing import *
+from . import scandata
+from .scandata import (ScanData, AnalysisUnit, check_apiversion, scanDataOptions)
+from . import axisutils
+from .axiscalibration import (AxisCalibration, calibration, axisChannelName,)
+#### END imaging modules
 
 #### BEGIN pict.iolib modules
 import iolib.pictio as pio
 #### END pict.iolib modules
+import ephys.ephys as ephys
 
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-# Form class,        Base class
+# Form class,        Base class                                                                               package with the resources.qrc file
 __UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LSCaTWindow.ui"), from_imports=True, import_from="gui")
 
 def vCursor2ScanlineProjection(v, path, span=None):
@@ -629,7 +639,10 @@ def vCursorPos2ScanlineCoords(v, path, span=None):
         # TODO find a way to get the real width of the linescan image served/scanned
         # by the vertical cursor "v"
         # as workaround, we introduce span as an optional parameter
-        span = v.width
+        span = v.width if v.width > 0 else 1
+        
+    if span == 0:
+        span =1
         
     if not isinstance(path, pgui.Path):
         raise TypeError("Expecting a Path object; got %s instead" % type(path).__name__)
@@ -650,6 +663,8 @@ def vCursorPos2ScanlineCoords(v, path, span=None):
         #raise RuntimeError("%s object has no state defined for frame %d" % (path.name, v.currentFrame))
     
         return None, None
+    
+    print("vCursorPos2ScanlineCoords span", span)
     
     if v.x < 0:
         v_pos = 0
@@ -928,6 +943,15 @@ def mapScansVCToScenePCOnPath(v, p, path, span=None):
         #return
     
     if span is None:
+        if len(v.frontends):
+            pw = v.frontends[0].parentWidget
+        
+            if type(pw).__name__ == "ImageViewer":
+                v.width = pw.imageWidth
+                
+        if v.width == 0:
+            v.width = 1
+        
         span = v.width # this is the stand-in for the linescan image width; we map 
                     # the position of v to a position for p along the path by
                     # taking this into account -- not very wise... 
@@ -985,14 +1009,14 @@ def getTimeSlice(scandata, t0, t1):
     
     scans = [scan[:,start:stop,...] for scan in scandata.scans]
     
-    ephys = neoutils.get_time_slice(scandata.electrophysiology, t0, t1)
+    ephys = ephys.get_time_slice(scandata.electrophysiology, t0, t1)
     
     ret = ScanData(scene, scans, 
                       electrophysiology=ephys, 
                       sceneFrameAxis = scandata.sceneFrameAxis,
                       scansFrameAxis = scandata.scansFrameAxis,
                       name = scandata.name,
-                      analysisoptions = scandata.analysisoptions)
+                      analysisOptions = scandata.analysisOptions)
     
     ret.adoptTriggerProtocols(ephys)
     ret.sceneCursors.update(scandata.sceneCursors)
@@ -1001,7 +1025,7 @@ def getTimeSlice(scandata, t0, t1):
     ret.scansRois.update(scandata.scansRois)
     
     if len(scandata.scansBlock.segments) > 0:
-        scansblock = neoutils.get_time_slice(scandata.scansBlock, t0, t1)
+        scansblock = ephys.get_time_slice(scandata.scansBlock, t0, t1)
         ret.scansBlock.segments[:] = scansblock.segments
         
     ret._scandatatype_ = scandata._scandatatype_
@@ -1044,11 +1068,11 @@ def getProfile(scandata, roi, scene=True):
     
     
     
-    if scandata.analysismode != ScanData.ScanDataAnalysisMode.frame:
-        raise NotImplementedError("%s analysis not yet supported" % self.analysismode)
+    if scandata.analysisMode != ScanData.ScanDataAnalysisMode.frame:
+        raise NotImplementedError("%s analysis not yet supported" % self.analysisMode)
     
-    if scandata.scantype != ScanData.ScanDataType.linescan:
-        raise NotImplementedError("%s not yet supported" % self.scantype)
+    if scandata.scanType != ScanData.ScanDataType.linescan:
+        raise NotImplementedError("%s not yet supported" % self.scanType)
     
 def averageEPSCaTs(scandata, epscatname, frame_index = None):
     if not isinstance(scandata, ScanData):
@@ -1064,14 +1088,14 @@ def averageEPSCaTs(scandata, epscatname, frame_index = None):
     if isinstance(frame_index, TriggerProtocol):
         frame_index = frame_index.segmentIndices()
     
-    ret = neoutils.average_segments_in_block(scandata.scansBlock, signal_index=epscatname, segment_index = frame_index)
+    ret = ephys.average_segments_in_block(scandata.scansBlock, signal_index=epscatname, segment_index = frame_index)
     
     return ret
 
 def analyseLSData(*args, **kwargs):
     """Batch analysis, useful for bulk (re-) analysis of ScanData objects.
     
-    all analysisoptions are stored in the ScanData objects.
+    all analysisOptions are stored in the ScanData objects.
     
     Var-positional parameters:
     =========================
@@ -1098,7 +1122,7 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
     
     The EPSCaT waveform is computed on an AnalysisUnit!
     
-    Uses analysisoptions stored in lsdata.
+    Uses analysisOptions stored in lsdata.
     
     lsdata: a ScanData object
     
@@ -1124,7 +1148,7 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
     discr_2D = True
 
     # NOTE: protocol will help establish the discrimination windows
-    # according to triggers if so required by the analysisoptions
+    # according to triggers if so required by the analysisOptions
     
     protocol = None
     
@@ -1134,13 +1158,13 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
     if len(lsdata.scans) == 0:
         raise ValueError("no linescan data was found in %s" % lsdata.name)
     
-    if lsdata.scantype != ScanData.ScanDataType.linescan:
-        raise ValueError("%s was expected to be a ScanData.ScanDataType.linescan experiment; it has %s instead" % (lsdata.name,lsdata.scantype))
+    if lsdata.scanType != ScanData.ScanDataType.linescan:
+        raise ValueError("%s was expected to be a ScanData.ScanDataType.linescan experiment; it has %s instead" % (lsdata.name,lsdata.scanType))
         
-    if lsdata.analysismode != ScanData.ScanDataAnalysisMode.frame:
-        raise ValueError("%s was expected to have a ScanData.ScanDataAnalysisMode.frame analysis mode; it has %s instead" % (lsdata.name, lsdata.analysismode))
+    if lsdata.analysisMode != ScanData.ScanDataAnalysisMode.frame:
+        raise ValueError("%s was expected to have a ScanData.ScanDataAnalysisMode.frame analysis mode; it has %s instead" % (lsdata.name, lsdata.analysisMode))
         
-    if len(lsdata.analysisoptions) == 0:
+    if len(lsdata.analysisOptions) == 0:
         raise ValueError("%s has no analysis options" % lsdata.name)
     
     # NOTE: use analysis unit instead of cursor, but allow for cursor to be 
@@ -1278,7 +1302,7 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
         #origin = cal.getOrigin(lsdata.scans[0].axistags["t"])
         #resolution = cal.getResolution(lsdata.scans[0].axistags["t"])
     
-    f0TimeRange = lsdata.analysisoptions["Intervals"]["F0"]
+    f0TimeRange = lsdata.analysisOptions["Intervals"]["F0"]
     
     f0Range = [int((t + origin)/resolution) for t in f0TimeRange]
     
@@ -1314,14 +1338,14 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
     # NOTE: 2018-08-03 10:04:57
     # EPSCaT waveform fitted here
     if do_fit:
-        fit_p0    = lsdata.analysisoptions["Fitting"]["Initial"] # initial parameter values for the EPSCaT model
+        fit_p0    = lsdata.analysisOptions["Fitting"]["Initial"] # initial parameter values for the EPSCaT model
                                                                  # and their
-        fit_lower = lsdata.analysisoptions["Fitting"]["Lower"]   # lower boundaries
-        fit_upper = lsdata.analysisoptions["Fitting"]["Upper"]   # upper boundaries 
+        fit_lower = lsdata.analysisOptions["Fitting"]["Lower"]   # lower boundaries
+        fit_upper = lsdata.analysisOptions["Fitting"]["Upper"]   # upper boundaries 
         
-        fitWindow = lsdata.analysisoptions["Intervals"]["Fit"]   # signal is fitted within these temporal boundaries
+        fitWindow = lsdata.analysisOptions["Intervals"]["Fit"]   # signal is fitted within these temporal boundaries
         
-        integrationInterval = lsdata.analysisoptions["Intervals"]["Integration"][1] # interval for the integration of the fitted curve
+        integrationInterval = lsdata.analysisOptions["Intervals"]["Integration"][1] # interval for the integration of the fitted curve
         
         # NOTE: 2018-08-03 09:59:13
         # fitted_EPSCaT contains BOTH the EPSCaT waveform and the fitted waveform(s)
@@ -1354,14 +1378,14 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
     # also calculate EPSCaT amplitude (both rely on the chosen method of 
     # determining the temporal boundaries for baseline and peak regions)
     # we have suitable defaults defined at NOTE: 2018-08-03 09:31:28
-    # in case lsdata.analysisoptions does not provide them
-    if "Discrimination" in lsdata.analysisoptions:
-        discr_func      = lsdata.analysisoptions["Discrimination"].get("Function", discr_func)
-        discr_pred_func = lsdata.analysisoptions["Discrimination"].get("PredicateFunc", discr_pred_func)
-        discr_pred      = lsdata.analysisoptions["Discrimination"].get("Predicate", discr_pred)
-        discr_value     = lsdata.analysisoptions["Discrimination"].get("PredicateValue", discr_value)
-        discr_2D        = lsdata.analysisoptions["Discrimination"].get("Discr_2D", discr_2D)
-        min_r2_discr    = lsdata.analysisoptions["Discrimination"].get("MinimumR2", min_r2_discr)
+    # in case lsdata.analysisOptions does not provide them
+    if "Discrimination" in lsdata.analysisOptions:
+        discr_func      = lsdata.analysisOptions["Discrimination"].get("Function", discr_func)
+        discr_pred_func = lsdata.analysisOptions["Discrimination"].get("PredicateFunc", discr_pred_func)
+        discr_pred      = lsdata.analysisOptions["Discrimination"].get("Predicate", discr_pred)
+        discr_value     = lsdata.analysisOptions["Discrimination"].get("PredicateValue", discr_value)
+        discr_2D        = lsdata.analysisOptions["Discrimination"].get("Discr_2D", discr_2D)
+        min_r2_discr    = lsdata.analysisOptions["Discrimination"].get("MinimumR2", min_r2_discr)
         
         
 
@@ -1378,9 +1402,9 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
     # waveform amplitude on the interval from the beginning of the "baseline" to
     # the end of the "peak"
     
-    d_base_window   = int((lsdata.analysisoptions["Discrimination"]["BaseWindow"] + origin)/resolution)
+    d_base_window   = int((lsdata.analysisOptions["Discrimination"]["BaseWindow"] + origin)/resolution)
     
-    d_peak_window   = int((lsdata.analysisoptions["Discrimination"]["PeakWindow"] + origin)/resolution)
+    d_peak_window   = int((lsdata.analysisOptions["Discrimination"]["PeakWindow"] + origin)/resolution)
     
     d_base = ()
     d_peak = ()
@@ -1389,7 +1413,7 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
     # NOTE: protocols are needed here only to query their trigger time stamps
     # and NOT for determining which frame to analyse; this is done in
     # analyse LSData
-    if lsdata.analysisoptions["Discrimination"]["WindowChoice"] == "triggers":
+    if lsdata.analysisOptions["Discrimination"]["WindowChoice"] == "triggers":
         if protocol is None:
             raise RuntimeError("Analysis options require triggers for discrimination windows but no protocol could be found for frame %d" % frame)
     
@@ -1441,7 +1465,7 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
         if len(triggers):
             triggers.sort()
             
-            if lsdata.analysisoptions["Discrimination"]["First"]:
+            if lsdata.analysisOptions["Discrimination"]["First"]:
                 d_base = [(int(min(triggers) - d_base_window), int(min(triggers)))]
                 d_peak = [(int(min(triggers)), int(min(triggers) + d_peak_window))]
                 
@@ -1455,10 +1479,10 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
         else:
             raise RuntimeError("Analysis options require triggers for discrimination windows but no triggers could be found for frame %d" % frame)
             
-    elif lsdata.analysisoptions["Discrimination"]["WindowChoice"] == "delays":
+    elif lsdata.analysisOptions["Discrimination"]["WindowChoice"] == "delays":
         # NOTE: 2018-08-02 16:22:34
         # use fitted delay if fitted_epscat is not None, 
-        # else use initial delay value given in the EPSCaT model in analysisoptions
+        # else use initial delay value given in the EPSCaT model in analysisOptions
         
         if fitted_epscat is not None:
             # use the fitted delay to calculate the discrimination windows
@@ -1468,7 +1492,7 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
         else:
             # use delays as given in the initial parameter values for the EPSCaT fit model
             delays = [(p[-1]*units + origin)/resolution \
-                        for p in lsdata.analysisoptions["Fitting"]["Initial"]]
+                        for p in lsdata.analysisOptions["Fitting"]["Initial"]]
             
         d_base = [(int(delay - d_base_window), int(delay)) \
                     for delay in delays]
@@ -1476,11 +1500,11 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
         d_peak = [(int(delay), int(delay + d_peak_window)) \
                     for delay in delays]
         
-        if lsdata.analysisoptions["Discrimination"]["First"]:
+        if lsdata.analysisOptions["Discrimination"]["First"]:
             d_base = [d_base[0]]
             d_peak = [d_peak[0]]
             
-    elif lsdata.analysisoptions["Discrimination"]["WindowChoice"] == "cursors":
+    elif lsdata.analysisOptions["Discrimination"]["WindowChoice"] == "cursors":
         h_cursors = sorted([(n,c) for (n,c) in lsdata.scansCursors.items()
                         if cbase.type == pgui.GraphicsObjectType.horizontal_cursor],
                         key = lambda x: x[1].y)
@@ -1498,7 +1522,7 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
             d_peak = [(int((c.y - c.ywindow//2 + origin.magnitude.flatten()[0])/resolution.magnitude.flatten()[0]), int((c.y + c.ywindow//2 + cal.origin.magnitude.flatten()[0])/cal.resolution.magnitude.flatten()[0])) \
                         for c in peakCursors]
             
-        if lsdata.analysisoptions["Discrimination"]["First"]:
+        if lsdata.analysisOptions["Discrimination"]["First"]:
             d_base = [d_base[0]]
             d_peak = [d_peak[0]]
             
@@ -1657,7 +1681,7 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
     # NOTE: this depends on how many EPSCaT Triggers are there, or how many delays
     # have been determined/defined in the model, or on how many horizontal cursors
     # have been manually places, according to the value of
-    # lsdata.analysisoptions["Discrimination"]["WindowChoice"], see NOTE: 2018-08-03 09:43:44
+    # lsdata.analysisOptions["Discrimination"]["WindowChoice"], see NOTE: 2018-08-03 09:43:44
     #
     if len(d_base) and len(d_peak) and len(d_base) == len(d_peak):
         amplitudeWindows = [[base[0], peak[1]] for base, peak in zip(d_base, d_peak)]
@@ -1665,7 +1689,7 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
     else:
         amplitudeWindows = None
     
-    amplitudeMethod = lsdata.analysisoptions["AmplitudeMethod"]
+    amplitudeMethod = lsdata.analysisOptions["AmplitudeMethod"]
     
     # NOTE: 2018-08-02 13:10:32
     # compute EPSCaT amplitude(s) HERE
@@ -1754,7 +1778,7 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
         return epscat #, src_base, src_peak
     
     else:
-        result_annotations["FitResult"]["CoefficientNames"] = get_nested_value(lsdata.analysisoptions, ["Fitting", "CoefficientNames"])
+        result_annotations["FitResult"]["CoefficientNames"] = get_nested_value(lsdata.analysisOptions, ["Fitting", "CoefficientNames"])
         result_annotations["FitResult"]["FitAmplitude"] = fit_amplitude
         
         
@@ -1768,7 +1792,7 @@ def analyseFrame(lsdata, frame, unit=None,
                  detrend=False,
                  gen_long_fits=False):
     """Modifies ScanData in place !
-    Uses analysisoptions stored in lsdata.
+    Uses analysisOptions stored in lsdata.
     
     lsdata: a ScanData object
     
@@ -1800,13 +1824,13 @@ def analyseFrame(lsdata, frame, unit=None,
     if len(lsdata.scans) == 0:
         raise ValueError("no linescan data was found in %s" % lsdata.name)
     
-    if lsdata.scantype != ScanData.ScanDataType.linescan:
-        raise ValueError("%s was expected to be a ScanData.ScanDataType.linescan experiment; it has %s instead" % (lsdata.name, lsdata.scantype))
+    if lsdata.scanType != ScanData.ScanDataType.linescan:
+        raise ValueError("%s was expected to be a ScanData.ScanDataType.linescan experiment; it has %s instead" % (lsdata.name, lsdata.scanType))
         
-    if lsdata.analysismode != ScanData.ScanDataAnalysisMode.frame:
-        raise ValueError("%s was expected to have a ScanData.ScanDataAnalysisMode.frame analysis mode; it has %s instead" % (lsdata.name, lsdata.analysismode))
+    if lsdata.analysisMode != ScanData.ScanDataAnalysisMode.frame:
+        raise ValueError("%s was expected to have a ScanData.ScanDataAnalysisMode.frame analysis mode; it has %s instead" % (lsdata.name, lsdata.analysisMode))
         
-    if len(lsdata.analysisoptions) == 0:
+    if len(lsdata.analysisOptions) == 0:
         raise ValueError("%s has no analysis options defined" % lsdata.name)
     
     #if not isinstance(unit, (AnalysisUnit, type(None))):
@@ -1876,7 +1900,7 @@ def analyseFrame(lsdata, frame, unit=None,
         raise TypeError("Expecting a datatypes.AnalysisUnit object, or None; got %s instead" % type(unit).__name__)
     
     if indicator_channel_ndx is None:
-        indicator_channel_ndx = lsdata.scansChannelNames.index(lsdata.analysisoptions["Channels"]["Indicator"])
+        indicator_channel_ndx = lsdata.scansChannelNames.index(lsdata.analysisOptions["Channels"]["Indicator"])
         
     elif not isinstance(indicator_channel_ndx, int):
         raise TypeError("indicator_channel_ndx was expected to be an int or None; got %s instead" % type(indicator_channel_ndx).__name__)
@@ -1884,9 +1908,9 @@ def analyseFrame(lsdata, frame, unit=None,
     if indicator_channel_ndx < 0 or indicator_channel_ndx >= lsdata.scansChannels:
         raise ValueError("invalid indicator channel index: %d; must satisfy 0 <= index < %d" % (indicator_channel_ndx, len(lsdata.scanChannels)))
     
-    if len(lsdata.analysisoptions["Channels"]["Reference"]):
+    if len(lsdata.analysisOptions["Channels"]["Reference"]):
         if reference_channel_ndx is None:
-            reference_channel_ndx = lsdata.scansChannelNames.index(lsdata.analysisoptions["Channels"]["Reference"])
+            reference_channel_ndx = lsdata.scansChannelNames.index(lsdata.analysisOptions["Channels"]["Reference"])
             
         elif not isinstance(reference_channel_ndx, int):
             raise TypeError("reference_channel_ndx was expected to be an int or None; got %s instead" % type(reference_channel_ndx).__name__)
@@ -1904,8 +1928,8 @@ def analyseFrame(lsdata, frame, unit=None,
     #print("analyseFrame time axis calibration:")
     #print(cal)
     
-    if "Fit" in lsdata.analysisoptions["Fitting"]:
-        doFit = lsdata.analysisoptions["Fitting"]["Fit"]
+    if "Fit" in lsdata.analysisOptions["Fitting"]:
+        doFit = lsdata.analysisOptions["Fitting"]["Fit"]
         
     else:
         doFit = True
@@ -2940,7 +2964,7 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
                         sig_index = 0
                         
                     else:
-                        sig_index = neoutils.get_index_of_named_signal(scandata.scansBlock.segments[frame], analysis_unit.name, silent=True)
+                        sig_index = ephys.get_index_of_named_signal(scandata.scansBlock.segments[frame], analysis_unit.name, silent=True)
                         
                     #print("sig_index", sig_index)
                     #print("unit name", analysis_unit.name)
@@ -3269,250 +3293,6 @@ def writeEPSCaTReport(result, filename):
     else:
         raise TypeError("Expecting a pandas.DataFrame or a python list; got %s instead" % type(result).__name__)
     
-    
-@safeWrapper
-def epscatOptions(detection_predicate=1.3, roi_width = 10, 
-                  reference="Ch1", indicator="Ch2", 
-                  bleed_ref_ind = 0, bleed_ind_ref = 0, 
-                  f0_begin = 0.10*pq.s, f0_end = 0.15*pq.s,
-                  fit_begin = 0.05 * pq.s, fit_end = 1 * pq.s, 
-                  int_begin = 0 * pq.s, int_end = 0.5 * pq.s,
-                  peak_begin = 0.15 * pq.s, peak_end = 0.3 * pq.s,
-                  initial=[], lower=[], upper=[]):
-    """
-    TODO: Customize all parameters on function signature; also write a GUI for this
-    """
-    # NOTE: 2018-06-20 09:14:25
-    # now uses OrderedDict (small overhead but worth it)
-    # updated to include event (trigger protocol) detection from the ephys data
-    # (mapped to the key: "TriggerEventDetection")
-    
-    ret = collections.OrderedDict()
-    ret["name"] = "EPSCaTOptions"
-    
-    ret["Channels"] = collections.OrderedDict()
-    ret["Channels"]["Reference"] = reference
-    ret["Channels"]["Indicator"] = indicator
-    ret["Channels"]["Bleed_ref_ind"] = bleed_ref_ind # fraction of reference channel that bleeds into indicator channel
-    ret["Channels"]["Bleed_ind_ref"] = bleed_ind_ref # fraction of indicator channel that bleeds into reference channel
-    
-    ret["IndicatorCalibration"] = collections.OrderedDict() # when all None, this is uncalibrated
-    # all must be either None, or scalars
-    ret["IndicatorCalibration"]["Name"] = None
-    ret["IndicatorCalibration"]["Kd"]   = np.nan
-    ret["IndicatorCalibration"]["Fmin"] = np.nan
-    ret["IndicatorCalibration"]["Fmax"] = np.nan
-
-    ret["Discrimination"] = collections.OrderedDict() # sucess vs failure
-    
-    # NOTE: 2017-11-22 11:46:41
-    # mapping of a func_name to a dict of keyword params (**kwargs)
-    # func signature must be func_name(x, **kwargs) and returns a scalar
-    # default is below (Frobenius norm for matrices)):
-    # axis is None because we operate on single-channel analogsignals (or datasignals)
-    
-    # NOTE: for multi component EPSCaTs (e.g.a train of EPSCaTs) there are more
-    # than one base and peak intervals defined, respectively, before and after 
-    # the trigger time for for the corresponding EPSCaT 
-    #
-    # since the comparison should be done between similarly sized regions, we 
-    # define only one such window, that we the take UP TO the trigger time (for 
-    # the base) or FROM the trigger time onward (for the peak) 
-    
-    # NOTE: the trigger times are established by trigger protocols, and NOT 
-    # defined here
-    
-    #ret["Discrimination"]["Base"] = {"np.linalg.norm":{"axis":None, "ord":None}, "window": 0.05 * pq.s}
-    ##ret["Discrimination"]["Peak"] = {"np.linalg.norm":{"axis":None, "ord":None}, "window": 0.05 * pq.s} 
-    
-    ret["Discrimination"]["Function"] = {"np.linalg.norm":{"axis":None, "ord":None}}
-    ret["Discrimination"]["BaseWindow"] = 0.05 * pq.s
-    ret["Discrimination"]["PeakWindow"] = 0.05 * pq.s
-    ret["Discrimination"]["Discr_2D"] = False
-    ret["Discrimination"]["WindowChoice"] = "delays" # one of "delays", "triggers", "cursors"
-    ret["Discrimination"]["First"] = True
-
-    ret["Discrimination"]["Predicate"] = "lambda x,y: x >= y" # binary predicate: 
-                                                        # generates a function by 
-                                                        # calling func = eval(str)
-                                                        # where str is as shown here
-                                                    
-    ret["Discrimination"]["PredicateFunc"] = "lambda x,y: x/y" # calculates one scalar
-                                                    # result between peak and base
-                                                    
-    ret["Discrimination"]["PredicateValue"] = detection_predicate # this will test a scalar (x) against
-                                            # this value using the binary predicate 
-                                            # given above
-                                            #
-                                            # scalar x is generated by PredicateFunc
-                                            
-    ret["Roi"] = collections.OrderedDict()
-    ret["Roi"]["width"] = roi_width # an int or "auto" => use widths generated by the scan roi detection algorithm
-    #ret["Roi"]["auto"] = False # when True, set use 
-    
-    ret["Intervals"] = collections.OrderedDict()
-    ret["Intervals"]["DarkCurrent"] = [None, None] #start, end, both quantities or None
-    ret["Intervals"]["F0"] = [f0_begin, f0_end] # start, end both quantities
-    ret["Intervals"]["Fit"] = [fit_begin, fit_end] # start, end both quantities
-    ret["Intervals"]["Integration"] = [int_begin, int_end] # start, end, both quantities; 
-    
-    ret["AmplitudeMethod"] = "direct" # one of "direct" or "levels"
-    
-    #ret["Intervals"]["Peak"] = [peak_begin, peak_end] #  start, end both quantities
-    
-    
-    # Fitting model parameters
-    # NOTE: 2017-12-23 13:06:45
-    # for each EPSCaT there are n * 2 + 3 parameters packed in a list, where n 
-    # is the number of decay components in a single EPSCaT (this is done for 
-    # generality, although in most cases single EPSCaT data is fitted well by a 
-    # transient with one decay component)
-    #
-    # NOTE: 2017-12-23 13:12:15 
-    # the last parameter in the list is a so-called "delay" (or "onset") and
-    # represents the "location" of the transient relative to the beginning of 
-    # the sweep.
-    # WARNING its value may be the string "trigger", meaning it will be updated 
-    # from the trigger protocols
-    
-    # For multiple EPSCaTs (e.g. an EPSCaT train, or when stimuli generate several
-    # individually resolvable EPSCaTs) a list of such parameters must be given 
-    # for every single EPSCaT in the compound, and packed in a list
-    
-    # Hence the ["Fitting"]["Initial"] is a list of lists of parameters
-    # and so are the ["Fitting"]["Lower"] and ["Fitting"]["Upper"], for the 
-    # lower and upper bounds, respectively, to replicate ["Fitting"]["Initial"]
-    
-    ret["TriggerEventDetection"] = collections.OrderedDict()
-    ret["TriggerEventDetection"]["Presynaptic"] = collections.OrderedDict()
-    ret["TriggerEventDetection"]["Presynaptic"]["Channel"] = 0
-    ret["TriggerEventDetection"]["Presynaptic"]["DetectionBegin"] = 0.2 * pq.s
-    ret["TriggerEventDetection"]["Presynaptic"]["DetectionEnd"] = 0.3 * pq.s
-    ret["TriggerEventDetection"]["Presynaptic"]["DetectEvents"] = False
-    ret["TriggerEventDetection"]["Presynaptic"]["Name"] = "epsp"
-    
-    ret["TriggerEventDetection"]["Postsynaptic"] = collections.OrderedDict()
-    ret["TriggerEventDetection"]["Postsynaptic"]["Channel"] = 1
-    ret["TriggerEventDetection"]["Postsynaptic"]["DetectionBegin"] = 0.2 * pq.s
-    ret["TriggerEventDetection"]["Postsynaptic"]["DetectionEnd"] = 0.3 * pq.s
-    ret["TriggerEventDetection"]["Postsynaptic"]["DetectEvents"] = False
-    ret["TriggerEventDetection"]["Postsynaptic"]["Name"] = "bAP"
-    
-    ret["TriggerEventDetection"]["Photostimulation"] = collections.OrderedDict()
-    ret["TriggerEventDetection"]["Photostimulation"]["Channel"] = 0
-    ret["TriggerEventDetection"]["Photostimulation"]["DetectionBegin"] = 0 * pq.s
-    ret["TriggerEventDetection"]["Photostimulation"]["DetectionEnd"] = 0 * pq.s
-    ret["TriggerEventDetection"]["Photostimulation"]["DetectEvents"] = False
-    ret["TriggerEventDetection"]["Photostimulation"]["Name"] = "uepsp"
-    
-    ret["TriggerEventDetection"]["Photostimulation"] = collections.OrderedDict()
-    ret["TriggerEventDetection"]["Photostimulation"]["Channel"] = 0
-    ret["TriggerEventDetection"]["Photostimulation"]["DetectionBegin"] = 0 * pq.s
-    ret["TriggerEventDetection"]["Photostimulation"]["DetectionEnd"] = 0 * pq.s
-    ret["TriggerEventDetection"]["Photostimulation"]["DetectEvents"] = False
-    ret["TriggerEventDetection"]["Photostimulation"]["Name"] = "uepsp"
-    
-    ret["TriggerEventDetection"]["Imaging frame trigger"] = collections.OrderedDict()
-    ret["TriggerEventDetection"]["Imaging frame trigger"]["Channel"] = 3
-    ret["TriggerEventDetection"]["Imaging frame trigger"]["DetectionBegin"] = 0.05 * pq.s
-    ret["TriggerEventDetection"]["Imaging frame trigger"]["DetectionEnd"] = 0.1 * pq.s
-    ret["TriggerEventDetection"]["Imaging frame trigger"]["DetectEvents"] = False
-    ret["TriggerEventDetection"]["Imaging frame trigger"]["Name"] = "imaging"
-    
-    ret["Fitting"] = collections.OrderedDict()
-    ret["Fitting"]["Fit"] = True
-    ret["Fitting"]["FitComponents"] = True # when True, fits individual EPSCaT components in an EPSCaT train
-    
-    nParams = 0
-    
-    if len(initial) > 0:
-        if all([isinstance(i, float) for i in initial]):
-            ret["Fitting"]["Initial"] = [initial]
-            if models.check_rise_decay_params(initial) <= 1:
-                raise ValueError("Incorrect number of initial EPSCaT parameter values: %d; must be N x 2 + 3, for N decays" % len(initial))
-            
-            nParams = [len(initial)]
-            
-        elif all([all([isinstance(i, (tuple, list)) for i in i_] for i_ in initial)]):
-            if all([models.check_rise_decay_params(i) >= 1 for i in initial]):
-                ret["Fitting"]["Initial"] = initial
-                
-            else:
-                raise ValueError("Incorrect number of initial EPSCaT parameter values")
-            
-            nParams = [len(initial) for i in initial]
-            
-        else:
-            raise TypeError("Initial EPSCaT parameter values expected to be a list of floats or a list of lists of floats; got %s instead" % initial)
-            
-    else:
-        ret["Fitting"]["Initial"] = [[1, 0.01, 0, 0.01, 0.25]]
-        nParams = [5]
-        
-    if len(lower) > 0:
-        if all([isinstance(i, float) for i in lower]):
-            if len(lower) == 1:
-                ret["Fitting"]["Lower"] = [lower * p for p in nParams]
-                
-            elif any([len(lower) != p for p in nParams]):
-                raise TypeError("Lower bounds must contain 1 or %d values; got %d instead" % (nParams, len(lower)))
-            
-            ret["Fitting"]["Lower"] = [lower] * len(initial)
-            
-        
-        elif all([all([isinstance(i, float) for i in i_]) for i_ in lower]):
-            if len(lower) == len(ret["Fitting"]["Initial"]):
-                if all([len(l) == p for p in nParams]):
-                    ret["Fitting"]["Lower"] = lower
-            
-            else:
-                raise TypeError("Mismatch between number of initial EPSCaT parameter values and lower bounds")
-            
-        else:
-            raise TypeError("Lower bounds expected to be a list of floats or a list of lists of floats; got %s instead" % lower)
-        
-    else:
-        ret["Fitting"]["Lower"] = [[0, 0, 0, 0, 0]]
-        
-    if len(upper) > 0:
-        if all([isinstance(i, float) for i in upper]):
-            if len(upper) == 1:
-                ret["Fitting"]["Upper"] = [upper * p for p in nParams]
-                
-            elif any([len(upper) != p for p in nParams]):
-                raise TypeError("Upper bounds must contain 1 or %d values; got %d instead" % (nParams, len(upper)))
-            
-            ret["Fitting"]["Upper"] = [upper] * len(initial)
-            
-        
-        elif all([all([isinstance(i, float) for i in i_]) for i_ in upper]):
-            if len(upper) == len(ret["Fitting"]["Initial"]):
-                if all([len(l) == p for p in nParams]):
-                    ret["Fitting"]["Upper"] = upper
-            
-            else:
-                raise TypeError("Mismatch between number of initial EPSCaT parameter values and upper bounds")
-            
-        else:
-            raise TypeError("Upper bounds expected to be a list of floats or a list of lists of floats; got %s instead" % upper)
-        
-        
-    else:
-        ret["Fitting"]["Upper"] = [[np.inf, np.inf, 1, np.inf, np.inf]]
-        
-    nDecays = max([models.check_rise_decay_params(i) for i in ret["Fitting"]["Initial"]])
-    
-    cfNames = list()
-    
-    for k in range(nDecays):
-        cfNames.append("scale_%d" % k)
-        cfNames.append("taudecay_%d" % k)
-        
-    cfNames += ["offset", "taurise", "delay"]
-        
-    ret["Fitting"]["CoefficientNames"] = cfNames
-    
-    return ret
 
 @safeWrapper
 def detectRoisInProfile(profile, order, *args, **kwargs):
@@ -3862,8 +3642,8 @@ def removeMirrorCursor(data, vc):
     
     data.sceneCursors.pop(vc.name, None)
     
-            
-class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
+    
+class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
     supported_types = (ScanData,)
     
     view_action_name = "Launch LSCaT"
@@ -3945,7 +3725,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     defaultBinomialFilterOptions.scans.ind = DataBag()
     defaultBinomialFilterOptions.scans.ind.radius = 10
 
-    def __init__(self, **kwargs):
+    def __init__(self,*args, **kwargs):
         super().__init__(**kwargs)
         
         #if type(pwin).__name__ != "ScipyenWindow":
@@ -3964,6 +3744,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._generic_work_idle_ = True
         
         #self._scipyenWindow_ = pwin
+        
+        
+        scandata = None
+        
+        if len(args):
+            if isinstance(args[0], ScanData):
+                scandata = args[0]
         
         self._data_ = None
         self._current_frame_scan_region_ = list() # so that its contents will be updated
@@ -4146,6 +3933,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #self.appGUISettings["MainWindow"]["position"] = self.settings.value("LSCaTAnalysis/MainWindow_Position", None)
         #self.appGUISettings["MainWindow"]["state"] = self.settings.value("LSCaTAnalysis/MainWindow_State", None)
         
+        if isinstance(scandata, ScanData):
+            self.setData(newdata = scandata)
+        
     def _connect_gui_slots_(self, signal_slots):
         for item in signal_slots:
             if len(item) == 3 and isinstance(item[2], QtCore.Qt.ConnectionType):
@@ -4160,7 +3950,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
     def _save_viewer_settings_(self):
         from matplotlib.colors import Colormap
-        #self.settings = QtCore.QSettings()
         
         self.settings.setValue("LSCaTAnalysis/Use_Opaque_Labels", self.actionOpaque_cursor_labels.isChecked())
         
@@ -4168,14 +3957,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.settings.setValue("LSCaTAnalysis/Plot_long_fits", self.actionPlot_long_fits.isChecked())
 
-        #self.appGUISettings["MainWindow"]["size"] = self.size()
-        #self.appGUISettings["MainWindow"]["position"] = self.pos()
-        #self.appGUISettings["MainWindow"]["state"] = self.saveState()
-        #self.settings.setValue("LSCaTAnalysis/MainWindow_Size",self.size())
-        #self.settings.setValue("LSCaTAnalysis/MainWindow_Position",self.pos())
-        ##self.settings.setValue("LSCaTAnalysis/MainWindow_Geometry",self.geometry())
-        #self.settings.setValue("LSCaTAnalysis/MainWindow_State",self.saveState())
-        
         for k, w in enumerate(self.sceneviewers):
             if isinstance(w.colorMap, Colormap):
                 self.settings.setValue("LSCaTAnalysis/SceneWindow_%d_ColorMap" % k, w.colorMap.name)
@@ -4193,7 +3974,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self.settings.setValue("LSCaTAnalysis/SceneWindow_%d_SharedRoisColor" % k, w.sharedRoisColor)
                 
         for k, w in enumerate(self.scansviewers):
-            #print(w.colorMap)
             if isinstance(w.colorMap, Colormap):
                 self.settings.setValue("LSCaTAnalysis/ScansWindow_%d_ColorMap" % k, w.colorMap.name)
                 
@@ -4284,26 +4064,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             self.actionPlot_long_fits.setChecked(plot_long_fits)
             
-        #windowSize = self.settings.value("LSCaTAnalysis/MainWindow_Size", None)
-        #if windowSize is not None:
-            #self.resize(windowSize)
-        #if self.appGUISettings["MainWindow"]["size"] is not None:
-            #self.resize(self.appGUISettings["MainWindow"]["size"])
-            
-        #windowPos = self.settings.value("LSCaTAnalysis/MainWindow_Position", None)
-        #if windowPos is not None:
-            #self.move(windowPos)
-        #if self.appGUISettings["MainWindow"]["position"] is not None:
-            #self.move(self.appGUISettings["MainWindow"]["position"])
-            
-        #windowState = self.settings.value("LSCaTAnalysis/MainWindow_State", None)
-        #if windowState is not None:
-            #self.restoreState(windowState)
-            
-        #if self.appGUISettings["MainWindow"]["state"] is not None:
-            #self.restoreState(self.appGUISettings["MainWindow"]["state"])
-        
-        
     def _configureGUI_(self):
         self.setupUi(self)
         
@@ -4342,7 +4102,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 [self.actionDetect_triggers.triggered,                  self.slot_detectTriggers,               QtCore.Qt.QueuedConnection],
                 [self.actionRefresh.triggered,                          self.slot_refreshAllDisplays,           QtCore.Qt.QueuedConnection],
                 [self.actionRemove_all_protocols.triggered,             self.slot_removeAllProtocols,           QtCore.Qt.QueuedConnection],
-                [self.actionExport_analysis_options_to_file.triggered,  self.slot_exportEPSCaTOptions,          QtCore.Qt.QueuedConnection],
+                [self.actionExport_analysis_options_to_file.triggered,  self.slot_exportScanDataOptions,          QtCore.Qt.QueuedConnection],
                 [self.actionLoad_options_file.triggered,                self.slot_loadOptionsFile,              QtCore.Qt.QueuedConnection],
                 [self.actionConcatenate.triggered,                      self.slot_concatenateLSData,            QtCore.Qt.QueuedConnection],
                 [self.actionAppend_LSData.triggered,                    self.slot_appendLSData,                 QtCore.Qt.QueuedConnection],
@@ -4989,7 +4749,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         data filtering function is associated with the individual ScanData object
         because it allows the processing to be tractable to the particular
         ScanData instance (the processing function & parameters are included in 
-        the "analysisoptions "property of the ScanData object)
+        the "analysisOptions "property of the ScanData object)
         
         NOTE: 2017-12-20 07:53:59 The ability to process selected frames has been
         dropped for two reasons:
@@ -5020,70 +4780,70 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if not isinstance(self._data_, ScanData):
             return
         
-        if len(self._data_.analysisoptions) == 0:
+        if len(self._data_.analysisOptions) == 0:
             warnings.warn("No analysis options have been set up. Cannot continue")
             return
         
-        if "Channels" not in self._data_.analysisoptions or len(self._data_.analysisoptions["Channels"]) == 0:
+        if "Channels" not in self._data_.analysisOptions or len(self._data_.analysisOptions["Channels"]) == 0:
             warnings.warn("No analysis channels have been specified in the current analysis options. Cannot continue")
             return
             
-        if "Reference" not in self._data_.analysisoptions["Channels"] or \
-            self._data_.analysisoptions["Channels"]["Reference"] is None or \
-                len(self._data_.analysisoptions["Channels"]["Reference"]) == 0:
+        if "Reference" not in self._data_.analysisOptions["Channels"] or \
+            self._data_.analysisOptions["Channels"]["Reference"] is None or \
+                len(self._data_.analysisOptions["Channels"]["Reference"]) == 0:
                 warnings.warn("No reference channel is mentioned in the current analysis options")
                 return
                 
-        if "Indicator" not in self._data_.analysisoptions["Channels"] or \
-            self._data_.analysisoptions["Channels"]["Indicator"] is None or \
-                len(self._data_.analysisoptions["Channels"]["Indicator"]) == 0:
+        if "Indicator" not in self._data_.analysisOptions["Channels"] or \
+            self._data_.analysisOptions["Channels"]["Indicator"] is None or \
+                len(self._data_.analysisOptions["Channels"]["Indicator"]) == 0:
                 warnings.warn("No indicator channel is mentioned in the current analysis options")
                 return
             
         if len(self._data_.scene) > 0:
-            if self._data_.analysisoptions["Channels"]["Reference"] not in self._data_.sceneChannelNames:
-                warnings.warn("Reference channel %s not found among scene channels" % self._data_.analysisoptions["Channels"]["Reference"])
+            if self._data_.analysisOptions["Channels"]["Reference"] not in self._data_.sceneChannelNames:
+                warnings.warn("Reference channel %s not found among scene channels" % self._data_.analysisOptions["Channels"]["Reference"])
                 return
             
-            if self._data_.analysisoptions["Channels"]["Reference"] not in self._scene_filters_:
+            if self._data_.analysisOptions["Channels"]["Reference"] not in self._scene_filters_:
                 warnings.warn("No filter function has been configured for scene reference channel %s" \
-                    % self._data_.analysisoptions["Channels"]["Reference"])
+                    % self._data_.analysisOptions["Channels"]["Reference"])
                 return
             
-            if self._data_.analysisoptions["Channels"]["Indicator"] not in self._data_.sceneChannelNames:
-                warnings.warn("Indicator channel %s not found among scene channels" % self._data_.analysisoptions["Channels"]["Indicator"])
+            if self._data_.analysisOptions["Channels"]["Indicator"] not in self._data_.sceneChannelNames:
+                warnings.warn("Indicator channel %s not found among scene channels" % self._data_.analysisOptions["Channels"]["Indicator"])
                 return
             
-            if self._data_.analysisoptions["Channels"]["Indicator"] not in self._scene_filters_:
+            if self._data_.analysisOptions["Channels"]["Indicator"] not in self._scene_filters_:
                 warnings.warn("No filter function has been configured for scene indicator channel %s" \
-                    % self._data_.analysisoptions["Channels"]["Indicator"])
+                    % self._data_.analysisOptions["Channels"]["Indicator"])
                 return
             
         if len(self._data_.scans) > 0:
-            if self._data_.analysisoptions["Channels"]["Reference"] not in self._data_.scansChannelNames:
-                warnings.warn("Reference channel %s not found among scans channels" % self._data_.analysisoptions["Channels"]["Reference"])
+            if self._data_.analysisOptions["Channels"]["Reference"] not in self._data_.scansChannelNames:
+                warnings.warn("Reference channel %s not found among scans channels" % self._data_.analysisOptions["Channels"]["Reference"])
                 return
             
-            if self._data_.analysisoptions["Channels"]["Reference"] not in self._scans_filters_:
+            if self._data_.analysisOptions["Channels"]["Reference"] not in self._scans_filters_:
                 warnings.warn("No filter function has been configured for scans reference channel %s" \
-                    % self._data_.analysisoptions["Channels"]["Reference"])
+                    % self._data_.analysisOptions["Channels"]["Reference"])
                 return
             
-            if self._data_.analysisoptions["Channels"]["Indicator"] not in self._data_.scansChannelNames:
-                warnings.warn("Indicator channel %s not found among scans channels" % self._data_.analysisoptions["Channels"]["Indicator"])
+            if self._data_.analysisOptions["Channels"]["Indicator"] not in self._data_.scansChannelNames:
+                warnings.warn("Indicator channel %s not found among scans channels" % self._data_.analysisOptions["Channels"]["Indicator"])
                 return
             
-            if self._data_.analysisoptions["Channels"]["Indicator"] not in self._scans_filters_:
+            if self._data_.analysisOptions["Channels"]["Indicator"] not in self._scans_filters_:
                 warnings.warn("No filter function has been configured for scans indicator channel %s" \
-                    % self._data_.analysisoptions["Channels"]["Indicator"])
+                    % self._data_.analysisOptions["Channels"]["Indicator"])
                 return
             
         #### BEGIN unthreaded execution - for debugging
         # make sure to comment out the other one
         #if scene and len(self._data_.scene) > 0:
             #self._scene_processing_idle_ = True
-            #f_scene = self.processData(scene=True, channel = [self._data_.analysisoptions["Channels"]["Reference"], 
-                                                              #self._data_.analysisoptions["Channels"]["Indicator"]])
+            #f_scene = self.processData(scene=True, channel = [self._data_.analysisOptions["Channels"]["Reference"], 
+                                                              #self._data_.analysisOptions["Channels"]["Indicator"]])
             #for k in range(len(self._data_.scene)):
                 #self._data_.scene[k] = f_scene[k]
                 
@@ -5092,8 +4852,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 ##win.displayFrame()
                 
         #if scans and len(self._data_.scans) > 0:
-            #f_scans = self.processData(scene=False, channel = [self._data_.analysisoptions["Channels"]["Reference"], 
-                                                               #self._data_.analysisoptions["Channels"]["Indicator"]])
+            #f_scans = self.processData(scene=False, channel = [self._data_.analysisOptions["Channels"]["Reference"], 
+                                                               #self._data_.analysisOptions["Channels"]["Indicator"]])
             
             #for k in range(len(self._data_.scans)):
                 #self._data_.scans[k] = f_scans[k]
@@ -5127,8 +4887,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             pdlg = QtWidgets.QProgressDialog("De-noising scene data...", "Abort", 0, self._data_.sceneFrames, self)
 
             sceneWorker = pgui.ProgressWorker(self.processData, pdlg,
-                                      channel = [self._data_.analysisoptions["Channels"]["Reference"], 
-                                                 self._data_.analysisoptions["Channels"]["Indicator"]],
+                                      channel = [self._data_.analysisOptions["Channels"]["Reference"], 
+                                                 self._data_.analysisOptions["Channels"]["Indicator"]],
                                       scene=True)
             
             sceneWorker.signals.signal_finished.connect(pdlg.reset)
@@ -5145,8 +4905,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             pdlg = QtWidgets.QProgressDialog("De-noising scans data...", "Abort", 0, self._data_.scansFrames, self)
             
             scansWorker = pgui.ProgressWorker(self.processData, pdlg,
-                                      channel = [self._data_.analysisoptions["Channels"]["Reference"], 
-                                                 self._data_.analysisoptions["Channels"]["Indicator"]],
+                                      channel = [self._data_.analysisOptions["Channels"]["Reference"], 
+                                                 self._data_.analysisOptions["Channels"]["Indicator"]],
                                       scene=False)
             
             scansWorker.signals.signal_finished.connect(pdlg.reset)
@@ -5356,7 +5116,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @pyqtSlot(float)
     @safeWrapper
     def slot_epscat_bleed_ind_ref_changed(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
         if value > 1:
@@ -5365,13 +5125,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if value < 0:
             value = 0
             
-        self._data_.analysisoptions["Channels"]["Bleed_ind_ref"] = value
+        self._data_.analysisOptions["Channels"]["Bleed_ind_ref"] = value
         
     
     @pyqtSlot(float)
     @safeWrapper
     def slot_epscat_bleed_ref_ind_changed(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
         if value > 1:
@@ -5380,7 +5140,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if value < 0:
             value = 0
             
-        self._data_.analysisoptions["Channels"]["Bleed_ref_ind"] = value
+        self._data_.analysisOptions["Channels"]["Bleed_ref_ind"] = value
         
     @pyqtSlot()
     @safeWrapper
@@ -5428,7 +5188,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                                                                          directory=targetDir)
         
         if len(epscatOptionsFileName) == 0:
-            epscatoptions = epscatOptions()
+            epscatoptions = scanDataOptions()
             
         else:
             try:
@@ -5448,7 +5208,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 msgbox.exec()
                 return
                 
-        self._data_.analysisoptions = epscatoptions
+        self._data_.analysisOptions = epscatoptions
         
         self.displayFrame()
         
@@ -5501,7 +5261,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         from systems import PrairieView
 
         #targetDir = self._scipyenWindow_.recentDirectories[0]
-        targetDir = self._scipyenWindow_.currentDir
+        #targetDir = self._scipyenWindow_.currentDir
+        targetDir = os.getcwd()
         
         lsdata = None
 
@@ -5546,7 +5307,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                                                                          directory=targetDir)
         
         if len(epscatOptionsFileName) == 0:
-            epscatoptions = epscatOptions()
+            epscatoptions = scanDataOptions()
             
         else:
             try:
@@ -5555,9 +5316,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 # NOTE: 2018-06-20 09:13:58
                 # this will ensure we have these options in as well (epscat)
                 # this is so that the parameters for event detection are stored in the 
-                # ScanData analysisoptions as well
+                # ScanData analysisOptions as well
                 if "TriggerEventDetection" not in epscatoptions:
-                    defaultoptions = epscatOptions()
+                    defaultoptions = scanDataOptions()
                     epscatoptions["TriggerEventDetection"] = defaultoptions["TriggerEventDetection"]
                     
             except Exception as e:
@@ -5619,7 +5380,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     
             if len(blocks) > 0:
                 if all([isinstance(b, neo.Block) for b in blocks]):
-                    ephysData = neoutils.concatenate_blocks(*blocks)
+                    ephysData = ephys.concatenate_blocks(*blocks)
                     
                 elif all([isinstance(b, neo.Segment) for b in blocks]):
                     ephysData = neo.Block()
@@ -5698,7 +5459,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 ephysNamePrompt.setText(os.path.splitext(os.path.basename(ephysFileNames[0]))[0])
                 
                 
-                tp, _  = neoutils.parse_trigger_protocols(ephysData) # this may be an empty list
+                tp, _  = ephys.parse_trigger_protocols(ephysData) # this may be an empty list
         
                 if len(tp) == 0:
                     # will call dlg.exec() from within self._trigger_events_detection_gui_
@@ -5717,7 +5478,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                         imaging = trig_dlg_result[3]
                         epscatoptions = trig_dlg_result[4]
                     
-                        tp = neoutils.auto_detect_trigger_protocols(ephysData, 
+                        tp = ephys.auto_detect_trigger_protocols(ephysData, 
                                                     presynaptic=presyn, 
                                                     postsynaptic=postsyn,
                                                     photostimulation=photo,
@@ -5726,18 +5487,18 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                         
                         ephys_preview.plot(ephysData)
                         
-                        lsdata.electrophysiology = neoutils.neo_copy(ephysData)
+                        lsdata.electrophysiology = ephys.neo_copy(ephysData)
                         lsdata.electrophysiology.name = ephysNamePrompt.text()
                 
                 else: # we still need to call dlg.exec()
                     if dlg.exec() == QtWidgets.QDialog.Accepted: # if rejected, do create lsdata w/o ephys
-                        lsdata.electrophysiology = neoutils.neo_copy(ephysData) # just accept ephys data
+                        lsdata.electrophysiology = ephys.neo_copy(ephysData) # just accept ephys data
                         lsdata.electrophysiology.name = ephysNamePrompt.text()
                         
                 if isinstance(tp, (tuple, list)) and len(tp) and len(lsdata.electrophysiology.segments):
                     lsdata.triggerProtocols = tp # will "adopt" protocols and embed events in the ephys, scans & scene block
                     
-                lsdata.analysisoptions = epscatoptions
+                lsdata.analysisOptions = epscatoptions
                 
                 lsdata_varname = namePrompt.text()
                 lsdata.name = namePrompt.text()
@@ -5870,12 +5631,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             else:
                 bname = strutils.string_to_valid_identifier(obj.name)
             
-            newVarName = validateVarName(bname, self._scipyenWindow_.workspace)
+            newVarName = validate_varname(bname, self._scipyenWindow_.workspace)
             
             namePrompt.setText(newVarName)
             
             if dlg.exec() == QtWidgets.QDialog.Accepted:
-                newVarName = validateVarName(namePrompt.text(), self._scipyenWindow_.workspace)
+                newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
                 
                 self._scipyenWindow_.assignToWorkspace(newVarName, obj)
                 
@@ -5988,10 +5749,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
             lsdata = scandata_name_vars[choiceDialog.selectedItem]
-            if len(lsdata.analysisoptions):
-                if "TriggerEventDetection" not in lsdata.analysisoptions.keys():
-                    default_options = epscatOptions()
-                    lsdata.analysisoptions["TriggerEventDetection"] = default_options["TriggerEventDetection"]
+            if len(lsdata.analysisOptions):
+                if "TriggerEventDetection" not in lsdata.analysisOptions.keys():
+                    default_options = scanDataOptions()
+                    lsdata.analysisOptions["TriggerEventDetection"] = default_options["TriggerEventDetection"]
                     
                 self._data_.adoptAnalysisOptions(lsdata)
             
@@ -6198,7 +5959,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                                                      defaultButton = QtWidgets.QMessageBox.Yes)
                 
                 if btn == QtWidgets.QMessageBox.Yes:
-                    ephysData = neoutils.set_relative_time_start(neoutils.neo_copy(ephysData), start_times[0])
+                    ephysData = ephys.set_relative_time_start(ephys.neo_copy(ephysData), start_times[0])
                     
                 else:
                     return
@@ -6217,17 +5978,17 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
                 ephysNamePrompt.setText(strutils.string_to_valid_identifier(ephys_varname))
                 
-                if "TriggerEventDetection" not in self._data_.analysisoptions:
-                    default_options = epscatOptions()
+                if "TriggerEventDetection" not in self._data_.analysisOptions:
+                    default_options = scanDataOptions()
                     
-                    self._data_.analysisoptions["TriggerEventDetection"] = default_options["TriggerEventDetection"]
+                    self._data_.analysisOptions["TriggerEventDetection"] = default_options["TriggerEventDetection"]
                 
-                self._data_.electrophysiology = neoutils.neo_copy(ephysData)
+                self._data_.electrophysiology = ephys.neo_copy(ephysData)
                 
-                tp, _ = neoutils.parse_trigger_protocols(self._data_.electrophysiology)
+                tp, _ = ephys.parse_trigger_protocols(self._data_.electrophysiology)
                 
                 if len(tp) == 0:
-                    OK, trig_dlg_result = self._trigger_events_detection_gui_(self._data_.analysisoptions,
+                    OK, trig_dlg_result = self._trigger_events_detection_gui_(self._data_.analysisOptions,
                                                                                 ephysStart, ephysEnd,
                                                                                 dlg=dlg)
                     
@@ -6238,14 +5999,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                         imaging = trig_dlg_result[3]
                         options = trig_dlg_result[4]
                         
-                        tp, _ = neoutils.auto_detect_trigger_protocols(self._data_.electrophysiology,
+                        tp, _ = ephys.auto_detect_trigger_protocols(self._data_.electrophysiology,
                                                 presynaptic=presyn,
                                                 postsynaptic=postsyn,
                                                 photostimulation=photo,
                                                 imaging=imaging,
                                                 clear=True)
                         
-                        self._data_.analysisoptions = options
+                        self._data_.analysisOptions = options
                         
                     else:
                         return
@@ -6403,12 +6164,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     
                     rev_p = protocol.reverseAcquisition(copy=True)
                     
-                    neoutils.embed_trigger_protocol(rev_p,
+                    ephys.embed_trigger_protocol(rev_p,
                                                     self._data_.scansBlock,
                                                     clearTriggers=True,
                                                     clearEvents=False)
                     
-                    neoutils.embed_trigger_protocol(rev_p,
+                    ephys.embed_trigger_protocol(rev_p,
                                                     self._data_.sceneBlock,
                                                     clearTriggers=True,
                                                     clearEvents=False)
@@ -6453,7 +6214,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     
             if len(blocks) > 0:
                 if all([isinstance(b, neo.Block) for b in blocks]):
-                    ephysData = neoutils.concatenate_blocks(*blocks)
+                    ephysData = ephys.concatenate_blocks(*blocks)
                     
                 elif all([isinstance(b, neo.Segment) for b in blocks]):
                     ephysData = neo.Block()
@@ -6487,7 +6248,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                                                      defaultButton = QtWidgets.QMessageBox.Yes)
                 
                 if btn == QtWidgets.QMessageBox.Yes:
-                    ephysData = neoutils.set_relative_time_start(neoutils.neo_copy(ephysData), start_times[0])
+                    ephysData = ephys.set_relative_time_start(ephys.neo_copy(ephysData), start_times[0])
                     
                 else:
                     ephysData = None
@@ -6521,17 +6282,17 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
                 ephysNamePrompt.setText(os.path.splitext(os.path.basename(ephysFileNames[0]))[0])
                 
-                if "TriggerEventDetection" not in self._data_.analysisoptions:
-                    default_options = epscatOptions()
-                    self._data_.analysisoptions["TriggerEventDetection"] = default_options["TriggerEventDetection"]
+                if "TriggerEventDetection" not in self._data_.analysisOptions:
+                    default_options = scanDataOptions()
+                    self._data_.analysisOptions["TriggerEventDetection"] = default_options["TriggerEventDetection"]
                 
                 self._data_.electrophysiology = ephysData
                 self._display_ephys_()
                 
-                tp, _ = neoutils.parse_trigger_protocols(self._data_.electrophysiology)
+                tp, _ = ephys.parse_trigger_protocols(self._data_.electrophysiology)
                 
                 if len(tp) == 0:
-                    OK, trig_dlg_result = self._trigger_events_detection_gui_(self._data_.analysisoptions,
+                    OK, trig_dlg_result = self._trigger_events_detection_gui_(self._data_.analysisOptions,
                                                                                 ephysStart, ephysEnd,
                                                                                 dlg=dlg)
                     
@@ -6542,14 +6303,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                         imaging = trig_dlg_result[3]
                         options = trig_dlg_result[4]
                         
-                        tp = neoutils.auto_detect_trigger_protocols(self._data_.electrophysiology,
+                        tp = ephys.auto_detect_trigger_protocols(self._data_.electrophysiology,
                                                                         presynaptic=presyn,
                                                                         postsynaptic=postsyn,
                                                                         photostimulation=photo,
                                                                         imaging=imaging,
                                                                         clear=True)
                         
-                        self._data_.analysisoptions = options
+                        self._data_.analysisOptions = options
                         
                     else:
                         return
@@ -6579,7 +6340,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @pyqtSlot()
     @safeWrapper
     def slot_analyseData(self):
-        if self._data_ is None or len(self._data_.analysisoptions)==0:
+        if self._data_ is None or len(self._data_.analysisOptions)==0:
             return
         
         if len(self._data_.scansBlock.segments) != self._data_.scansFrames:
@@ -6608,7 +6369,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @pyqtSlot()
     @safeWrapper
     def slot_analyseCurrentFrame(self):
-        if self._data_ is None or len(self._data_.analysisoptions)==0:
+        if self._data_ is None or len(self._data_.analysisOptions)==0:
             return
         
         detrend = self.detrendEPSCaTsCheckBox.isChecked()
@@ -6627,7 +6388,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @pyqtSlot()
     @safeWrapper
     def slot_analyseCurrentLandmarkInCurrentFrame(self):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
         detrend = self.detrendEPSCaTsCheckBox.isChecked()
@@ -6675,7 +6436,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @pyqtSlot()
     @safeWrapper
     def slot_analyseCurrentLandmarkInFrames(self):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
         if len(self._data_.scansCursors) == 0:
@@ -6742,7 +6503,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @pyqtSlot(QtWidgets.QTableWidgetItem)
     @safeWrapper
     def slot_epscatParameterChanged(self, item):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
         row = item.row()
@@ -6761,17 +6522,17 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 QtWidgets.QMessageBox.critical(self, "EPSCaT Parameters", str(e))
                 return
                 
-            if "Fitting" not in self._data_.analysisoptions.keys():
+            if "Fitting" not in self._data_.analysisOptions.keys():
                 return
         
             if row == epscatIndex: # initial value changed
-                self._data_.analysisoptions["Fitting"]["Initial"][epscatIndex][paramIndex] = value
+                self._data_.analysisOptions["Fitting"]["Initial"][epscatIndex][paramIndex] = value
                 
             elif row == epscatIndex + 1: # lower bound value changed
-                self._data_.analysisoptions["Fitting"]["Lower"][epscatIndex][paramIndex] = value
+                self._data_.analysisOptions["Fitting"]["Lower"][epscatIndex][paramIndex] = value
                 
             elif row == epscatIndex + 2: # upper bound value changed
-                self._data_.analysisoptions["Fitting"]["Upper"][epscatIndex][paramIndex] = value
+                self._data_.analysisOptions["Fitting"]["Upper"][epscatIndex][paramIndex] = value
                 
             # NOTE: 2018-06-17 21:01:31 DO NOT DELETE
             #self.statusBar().showMessage("Done!")
@@ -6779,125 +6540,125 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @pyqtSlot(str)
     @safeWrapper
     def slot_indicatorNameChanged(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "IndicatorCalibration" not in self._data_.analysisoptions.keys():
+        if "IndicatorCalibration" not in self._data_.analysisOptions.keys():
             return
         
-        self._data_.analysisoptions["IndicatorCalibration"]["Name"] = value
+        self._data_.analysisOptions["IndicatorCalibration"]["Name"] = value
         
     @pyqtSlot(float)
     @safeWrapper
     def slot_indicatorKdChanged(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "IndicatorCalibration" not in self._data_.analysisoptions.keys():
+        if "IndicatorCalibration" not in self._data_.analysisOptions.keys():
             return
         
         if value == -1:
-            self._data_.analysisoptions["IndicatorCalibration"]["Kd"] = np.nan
+            self._data_.analysisOptions["IndicatorCalibration"]["Kd"] = np.nan
             
         else:
-            self._data_.analysisoptions["IndicatorCalibration"]["Kd"] = value
+            self._data_.analysisOptions["IndicatorCalibration"]["Kd"] = value
         
     @pyqtSlot(float)
     @safeWrapper
     def slot_indicatorFminChanged(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "IndicatorCalibration" not in self._data_.analysisoptions.keys():
+        if "IndicatorCalibration" not in self._data_.analysisOptions.keys():
             return
         
         if value == -1:
-            self._data_.analysisoptions["IndicatorCalibration"]["Fmin"] = np.nan
+            self._data_.analysisOptions["IndicatorCalibration"]["Fmin"] = np.nan
             
         else:
-            self._data_.analysisoptions["IndicatorCalibration"]["Fmin"] = value
+            self._data_.analysisOptions["IndicatorCalibration"]["Fmin"] = value
         
     @pyqtSlot(float)
     @safeWrapper
     def slot_indicatorFmaxChanged(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "IndicatorCalibration" not in self._data_.analysisoptions.keys():
+        if "IndicatorCalibration" not in self._data_.analysisOptions.keys():
             return
         
         if value == -1:
-            self._data_.analysisoptions["IndicatorCalibration"]["Fmax"] = value
+            self._data_.analysisOptions["IndicatorCalibration"]["Fmax"] = value
             
         else:
-            self._data_.analysisoptions["IndicatorCalibration"]["Fmax"] = value
+            self._data_.analysisOptions["IndicatorCalibration"]["Fmax"] = value
             
     @pyqtSlot(int)
     def slot_discrimination2DChanged(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "Discrimination" not in self._data_.analysisoptions.keys():
-            self._data_.analysisoptions["Discrimination"] = collections.OrderedDict()
+        if "Discrimination" not in self._data_.analysisOptions.keys():
+            self._data_.analysisOptions["Discrimination"] = collections.OrderedDict()
         
         if value == QtCore.Qt.Checked:
-            self._data_.analysisoptions["Discrimination"]["Discr_2D"] = True
+            self._data_.analysisOptions["Discrimination"]["Discr_2D"] = True
             
         else:
-            self._data_.analysisoptions["Discrimination"]["Discr_2D"] = False
+            self._data_.analysisOptions["Discrimination"]["Discr_2D"] = False
             
         self._data_.modified=True
         self.displayFrame()
             
     @pyqtSlot(int)
     def slot_useFirstDiscriminationWindowChanged(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "Discrimination" not in self._data_.analysisoptions.keys():
+        if "Discrimination" not in self._data_.analysisOptions.keys():
             return
         
         if value == QtCore.Qt.Checked:
-            self._data_.analysisoptions["Discrimination"]["First"] = True
+            self._data_.analysisOptions["Discrimination"]["First"] = True
             
         else:
-            self._data_.analysisoptions["Discrimination"]["First"] = False
+            self._data_.analysisOptions["Discrimination"]["First"] = False
             
         self._data_.modified=True
         self.displayFrame()
             
     @pyqtSlot(bool)
     def slot_discriminationWindowChoiceChanged(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
         btn = self.sender()
         
-        if "Discrimination" not in self._data_.analysisoptions.keys():
+        if "Discrimination" not in self._data_.analysisOptions.keys():
             return
         
         if value:
             if btn == self.useIntervalsRadioButton:
-                self._data_.analysisoptions["Discrimination"]["WindowChoice"] = "delays"
+                self._data_.analysisOptions["Discrimination"]["WindowChoice"] = "delays"
                 
             elif btn == self.useTriggersRadioButton:
-                self._data_.analysisoptions["Discrimination"]["WindowChoice"] = "triggers"
+                self._data_.analysisOptions["Discrimination"]["WindowChoice"] = "triggers"
                 
             elif btn == self.useCursorsForDiscriminationRadioButton:
-                self._data_.analysisoptions["Discrimination"]["WindowChoice"] = "cursors"
+                self._data_.analysisOptions["Discrimination"]["WindowChoice"] = "cursors"
             
         self._data_.modified=True
         self.displayFrame()
         
     @pyqtSlot(float)
     def slot_minimumR2Changed(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "Discrimination" not in self._data_.analysisoptions.keys():
+        if "Discrimination" not in self._data_.analysisOptions.keys():
             return
         
-        self._data_.analysisoptions["Discrimination"]["MinimumR2"] = value
+        self._data_.analysisOptions["Discrimination"]["MinimumR2"] = value
             
         self._data_.modified=True
         self.displayFrame()
@@ -6905,13 +6666,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
     @pyqtSlot(float)
     def slot_fsDiscriminantChanged(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "Discrimination" not in self._data_.analysisoptions.keys():
+        if "Discrimination" not in self._data_.analysisOptions.keys():
             return
         
-        self._data_.analysisoptions["Discrimination"]["PredicateValue"] = value
+        self._data_.analysisOptions["Discrimination"]["PredicateValue"] = value
             
         self._data_.modified=True
         self.displayFrame()
@@ -6919,14 +6680,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @pyqtSlot(float)
     @safeWrapper
     def slot_setBaseDiscriminationWindow(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "Discrimination" not in self._data_.analysisoptions.keys():
+        if "Discrimination" not in self._data_.analysisOptions.keys():
             return
         
-        window = self._data_.analysisoptions["Discrimination"]["BaseWindow"]
-        self._data_.analysisoptions["Discrimination"]["BaseWindow"] = value * window.units
+        window = self._data_.analysisOptions["Discrimination"]["BaseWindow"]
+        self._data_.analysisOptions["Discrimination"]["BaseWindow"] = value * window.units
             
         self._data_.modified=True
         self.displayFrame()
@@ -6934,14 +6695,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @pyqtSlot(float)
     @safeWrapper
     def slot_setPeakDiscriminationWindow(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "Discrimination" not in self._data_.analysisoptions.keys():
+        if "Discrimination" not in self._data_.analysisOptions.keys():
             return
         
-        window = self._data_.analysisoptions["Discrimination"]["PeakWindow"]
-        self._data_.analysisoptions["Discrimination"]["PeakWindow"] = value * window.units
+        window = self._data_.analysisOptions["Discrimination"]["PeakWindow"]
+        self._data_.analysisOptions["Discrimination"]["PeakWindow"] = value * window.units
         
         self._data_.modified=True
         self.displayFrame()
@@ -6949,93 +6710,93 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @pyqtSlot(float)
     @safeWrapper
     def slot_epscatDarkCurrentBeginChanged(self, value=None):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
         if value is None:
             value = self.peakWindowDoubleSpinBox.value()
         
-        if "Intervals" not in self._data_.analysisoptions.keys():
+        if "Intervals" not in self._data_.analysisOptions.keys():
             return
         
-        self._data_.analysisoptions["Intervals"]["DarkCurrent"][0] = value * pq.s
+        self._data_.analysisOptions["Intervals"]["DarkCurrent"][0] = value * pq.s
         
     @pyqtSlot(float)
     @safeWrapper
     def slot_epscatDarkCurrentEndChanged(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "Intervals" not in self._data_.analysisoptions.keys():
+        if "Intervals" not in self._data_.analysisOptions.keys():
             return
         
-        self._data_.analysisoptions["Intervals"]["DarkCurrent"][1] = value * pq.s
+        self._data_.analysisOptions["Intervals"]["DarkCurrent"][1] = value * pq.s
         
     @pyqtSlot(float)
     @safeWrapper
     def slot_epscatF0BeginChanged(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "Intervals" not in self._data_.analysisoptions.keys():
+        if "Intervals" not in self._data_.analysisOptions.keys():
             return
         
-        self._data_.analysisoptions["Intervals"]["F0"][0] = value * pq.s
+        self._data_.analysisOptions["Intervals"]["F0"][0] = value * pq.s
         
     @pyqtSlot(float)
     @safeWrapper
     def slot_epscatF0EndChanged(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "Intervals" not in self._data_.analysisoptions.keys():
+        if "Intervals" not in self._data_.analysisOptions.keys():
             return
         
-        self._data_.analysisoptions["Intervals"]["F0"][1] = value * pq.s
+        self._data_.analysisOptions["Intervals"]["F0"][1] = value * pq.s
         
     @pyqtSlot(float)
     @safeWrapper
     def slot_epscatFitBeginChanged(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "Intervals" not in self._data_.analysisoptions.keys():
+        if "Intervals" not in self._data_.analysisOptions.keys():
             return
         
-        self._data_.analysisoptions["Intervals"]["Fit"][0] = value * pq.s
+        self._data_.analysisOptions["Intervals"]["Fit"][0] = value * pq.s
     
     @pyqtSlot(float)
     @safeWrapper
     def slot_epscatFitEndChanged(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "Intervals" not in self._data_.analysisoptions.keys():
+        if "Intervals" not in self._data_.analysisOptions.keys():
             return
         
-        self._data_.analysisoptions["Intervals"]["Fit"][1] = value * pq.s
+        self._data_.analysisOptions["Intervals"]["Fit"][1] = value * pq.s
         
     @pyqtSlot(float)
     @safeWrapper
     def slot_epscatIntegralBeginChanged(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "Intervals" not in self._data_.analysisoptions.keys():
+        if "Intervals" not in self._data_.analysisOptions.keys():
             return
         
-        self._data_.analysisoptions["Intervals"]["Integration"][0] = value * pq.s
+        self._data_.analysisOptions["Intervals"]["Integration"][0] = value * pq.s
         
     @pyqtSlot(float)
     @safeWrapper
     def slot_epscatIntegralEndChanged(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
         
-        if "Intervals" not in self._data_.analysisoptions.keys():
+        if "Intervals" not in self._data_.analysisOptions.keys():
             return
         
-        self._data_.analysisoptions["Intervals"]["Integration"][1] = value * pq.s
+        self._data_.analysisOptions["Intervals"]["Integration"][1] = value * pq.s
         
     @pyqtSlot(int)
     @safeWrapper
@@ -7058,10 +6819,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             return
         
         if value == QtCore.Qt.Unchecked:
-            self._data_.analysisoptions["Fitting"]["Fit"] = False
+            self._data_.analysisOptions["Fitting"]["Fit"] = False
             
         elif value == QtCore.Qt.Checked:
-            self._data_.analysisoptions["Fitting"]["Fit"] = True
+            self._data_.analysisOptions["Fitting"]["Fit"] = True
             
     #@pyqtSlot(bool)
     #@safeWrapper
@@ -7082,10 +6843,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             #return
         
         #if value == QtCore.Qt.Unchecked:
-            #self._data_.analysisoptions["Fitting"]["FitComponents"] = False
+            #self._data_.analysisOptions["Fitting"]["FitComponents"] = False
             
         #elif value == QtCore.Qt.Checked:
-            #self._data_.analysisoptions["Fitting"]["FitComponents"] = True
+            #self._data_.analysisOptions["Fitting"]["FitComponents"] = True
         
         
     @pyqtSlot()
@@ -7103,11 +6864,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             ephysStart = self._data_.electrophysiology.segments[0].analogsignals[0].t_start.magnitude.flatten()[0]
             ephysEnd   = self._data_.electrophysiology.segments[0].analogsignals[0].t_stop.magnitude.flatten()[0]
             
-            if "TriggerEventDetection" not in self._data_.analysisoptions.keys():
-                default_options = epscatOptions()
-                self._data_.analysisoptions["TriggerEventDetection"] = default_options["TriggerEventDetection"]
+            if "TriggerEventDetection" not in self._data_.analysisOptions.keys():
+                default_options = scanDataOptions()
+                self._data_.analysisOptions["TriggerEventDetection"] = default_options["TriggerEventDetection"]
                 
-            OK, trig_dlg_result = self._trigger_events_detection_gui_(self._data_.analysisoptions,
+            OK, trig_dlg_result = self._trigger_events_detection_gui_(self._data_.analysisOptions,
                                                                         ephysStart, ephysEnd)
             
             if OK:
@@ -7117,7 +6878,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 imaging = trig_dlg_result[3]
                 options = trig_dlg_result[4]
             
-                tp = neoutils.auto_detect_trigger_protocols(self._data_.electrophysiology, 
+                tp = ephys.auto_detect_trigger_protocols(self._data_.electrophysiology, 
                                                 presynaptic=presyn, 
                                                 postsynaptic=postsyn,
                                                 photostimulation=photo,
@@ -7126,7 +6887,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 # NOTE: the events in the protocol list are already 
                 # references to the events stored in the ephys block
                 self._data_.triggerProtocols = tp
-                self._data_.analysisoptions = options
+                self._data_.analysisOptions = options
                     
                 self.displayFrame()
                 self._update_report_()
@@ -7518,7 +7279,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
             self._data_.embedTriggerEvents(protocol) 
             self._data_.embedTriggerEvents(protocol, to_imaging=False)
-            #neoutils.embed_trigger_protocol(protocol, self._data_.electrophysiology, clearTriggers=True)
+            #ephys.embed_trigger_protocol(protocol, self._data_.electrophysiology, clearTriggers=True)
             
             #print("slot_protocolTableEdited", protocol)
             
@@ -7530,15 +7291,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @safeWrapper
     def slot_epscatIndicatorChannelChanged(self, value):
         # NOTE: 2017-12-22 11:49:51
-        # cannot assume a standardized data structure for analysisoptions
+        # cannot assume a standardized data structure for analysisOptions
         # other than it must be a dict and that is should contain a dict under
         # the "Channels" key
-        # if neither of these are satisfied, the whole analysisoptions dict
+        # if neither of these are satisfied, the whole analysisOptions dict
         # will be modified/overwritten
         if self._data_ is None:
             return
         
-        self._data_.analysisoptions["Channels"]["Indicator"] = self._data_.scansChannelNames[value]
+        self._data_.analysisOptions["Channels"]["Indicator"] = self._data_.scansChannelNames[value]
         self._data_.modified=True
         self.displayFrame()
             
@@ -7546,10 +7307,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @pyqtSlot(int)
     @safeWrapper
     def slot_epscatReferenceChannelChanged(self, value):
-        if self._data_ is None or len(self._data_.analysisoptions) == 0:
+        if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
                 
-        self._data_.analysisoptions["Channels"]["Reference"] = self._data_.scansChannelNames[value]
+        self._data_.analysisOptions["Channels"]["Reference"] = self._data_.scansChannelNames[value]
         self._data_.modified=True
         self.displayFrame()
             
@@ -7680,27 +7441,28 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if self._data_ is None:
             return
         
-        #QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-        self.setCursor(QtCore.Qt.WaitCursor)
+        ##QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+        #self.setCursor(QtCore.Qt.WaitCursor)
         
         #self._display_ephys_()
         #self._display_epscats_()
         
         for win in self.scansviewers + self.sceneviewers + self.ephysviewers + self.profileviewers + self.scansblockviewers + self.sceneblockviewers:
             win.displayFrame()
-            if not win.isVisible():
-                win.show()
+            #print("window visible", win.isVisible())
+            #if not win.isVisible():
+                #win.show()
         
         self._display_graphics_overlays_()
         
-        #if self.showScanlineCheckBox.checkState() == QtCore.Qt.Checked:# plot scanline profile
-            #self._display_scanline_profiles_()
+        if self.showScanlineCheckBox.checkState() == QtCore.Qt.Checked:# plot scanline profile
+            self._display_scanline_profiles_()
             
         self._update_protocol_display_()
         
         self._update_ui_fields_()
         
-        self.unsetCursor()
+        #self.unsetCursor()
         
     def concatenateScanData(self, name_list, progressSignal=None):
         import io
@@ -8146,7 +7908,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 var_name = "collated_analysis_result"
             
             
-            newVarName = validateVarName(var_name, self._scipyenWindow_.workspace)
+            newVarName = validate_varname(var_name, self._scipyenWindow_.workspace)
             
             dlg = quickdialog.QuickDialog(self, "Export collated results")
 
@@ -8447,7 +8209,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.statusBar().showMessage("Done!")
         
     @pyqtSlot()
-    def slot_exportEPSCaTOptions(self):
+    def slot_exportScanDataOptions(self):
         if self._data_ is None:
             return
         
@@ -8465,7 +8227,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             fName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
                                                           caption="Save options", 
                                                           filter=fileFilter)
-        pio.savePickleFile(self._data_.analysisoptions, fName)
+        pio.savePickleFile(self._data_.analysisOptions, fName)
         
         
             
@@ -10084,7 +9846,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
             try:
                 if newVarName != self._data_var_name_:
-                    newVarNameOK = validateVarName(newVarName, self._scipyenWindow_.workspace)
+                    newVarNameOK = validate_varname(newVarName, self._scipyenWindow_.workspace)
                     
                     if self._data_var_name_ != newVarNameOK:
                         self._scipyenWindow_.assignToWorkspace(newVarNameOK, self._data_)
@@ -10108,7 +9870,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             bname = self._data_var_name_
             
-        newVarName = validateVarName(bname, self._scipyenWindow_.workspace)
+        newVarName = validate_varname(bname, self._scipyenWindow_.workspace)
         
         dlg = quickdialog.QuickDialog(self, "Export data copy to workspace")
         namePrompt = quickdialog.StringInput(dlg, "Export data as:")
@@ -10120,7 +9882,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         namePrompt.setText(newVarName)
         
         if dlg.exec() == QtWidgets.QDialog.Accepted:
-            newVarName = validateVarName(namePrompt.text(), self._scipyenWindow_.workspace)
+            newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
             
             self._scipyenWindow_.assignToWorkspace(newVarName, self._data_)
             
@@ -10379,14 +10141,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         ans = choiceDialog.exec()
         
         if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
-            if self._data_ is not None:
-                self._clear_contents_()
+            #if self._data_ is not None:
+                #self._clear_contents_()
                 
             lsdata = scandata_name_vars[choiceDialog.selectedItem]
             lsdata_varname = choiceDialog.selectedItem
             
-            self.setData(lsdata, lsdata_varname)
-            #self._parsedata_(lsdata, lsdata_varname)
+            self.setData(newdata=lsdata, doc_title=lsdata_varname)
                 
     @pyqtSlot()
     @safeWrapper
@@ -10491,6 +10252,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 win.signal_graphicsObjectSelected[object].connect(self.slot_graphics_object_selected_in_window, type = QtCore.Qt.QueuedConnection)
                 win.signal_graphicsObjectDeselected.connect(self.slot_graphics_objects_deselected, type = QtCore.Qt.QueuedConnection)
                 
+                #### BEGIN load settings
                 winSettingsStrPrefix = "LSCaTAnalysis/SceneWindow_%d" % k
                 
                 if self.settings.contains("%s_CursorsColor" % winSettingsStrPrefix):
@@ -10537,6 +10299,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     if windowState is not None:
                         win.restoreState(windowState)
                         
+                #### END load settings
+                        
                 self.sceneviewers.append(win)
                 
             else:
@@ -10550,18 +10314,18 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if win.framesSpinner is not None:
                 win.framesSpinner.setMaximum(self._data_.sceneFrames)
                 
-            win.view(self._data_.scene[k])
+            win.view(self._data_.scene[k], get_focus=False)
             
             if isinstance(self._data_.scanRegion, pgui.PlanarGraphics):
                 signalBlockers = [QtCore.QSignalBlocker(w) for w in self.sceneviewers]
-                
-                #print("scanRegion frontends", obj.frontends)
 
                 if len(self._data_.scanRegion.frontends) == 0:
                     for win in self.sceneviewers:
-                        win.addGraphicsObject(self._data_.scanRegion, showLabel=False, 
-                                                movable=False, editable=False,
-                                                labelShowsPosition=False)
+                        win.addGraphicsObject(self._data_.scanRegion,
+                                              showLabel=False,
+                                              movable=False,
+                                              editable=False,
+                                              labelShowsPosition=False)
 
             win.setWindowTitle("Scene %s - %s" % (self._data_.sceneChannelNames[k], self._data_var_name_))
             
@@ -10595,6 +10359,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 win.signal_graphicsObjectSelected[object].connect(self.slot_graphics_object_selected_in_window, type = QtCore.Qt.QueuedConnection)
                 win.signal_graphicsObjectDeselected.connect(self.slot_graphics_objects_deselected, type = QtCore.Qt.QueuedConnection)
                 
+                #### BEGIN load settings
                 winSettingsStrPrefix = "LSCaTAnalysis/ScansWindow_%d" % k
                 
                 if self.settings.contains("%s_CursorsColor" % winSettingsStrPrefix):
@@ -10641,6 +10406,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     if windowState is not None:
                         win.restoreState(windowState)
                         
+                #### END load settings
+                        
                 self.scansviewers.append(win)
                 
             else:
@@ -10654,7 +10421,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if win.framesSpinner is not None:
                 win.framesSpinner.setMaximum(self._data_.scansFrames)
                 
-            win.view(self._data_.scans[k])
+            win.view(self._data_.scans[k], get_focus=False)
             
             win.setWindowTitle("Scans %s - %s" % (self._data_.scansChannelNames[k], self._data_var_name_))
         
@@ -10727,7 +10494,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if win.framesSpinner is not None:
                 win.framesSpinner.setMaximum(len(self._data_.electrophysiology.segments))
                 
-            win.view(self._data_.electrophysiology)
+            win.view(self._data_.electrophysiology, get_focus=False)
             
             win.setWindowTitle("Electrophysiology - %s" % self._data_var_name_)
             
@@ -10833,7 +10600,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if win.framesSpinner is not None:
                 win.framesSpinner.setMaximum(len(self._data_.scanRegionSceneProfiles.segments))
                 
-            win.view(self._data_.scanRegionSceneProfiles)
+            win.view(self._data_.scanRegionSceneProfiles, get_focus=False)
             
             win.setWindowTitle("Scan Region Profile - %s" % self._data_var_name_)
             
@@ -10923,7 +10690,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if win.framesSpinner is not None:
                 win.framesSpinner.setMaximum(len(self._data_.scansBlock.segments))
                 
-            win.view(self._data_.scansBlock)
+            win.view(self._data_.scansBlock, get_focus=False)
             
             win.setWindowTitle("Scan Data - %s" % self._data_var_name_)
             
@@ -10996,7 +10763,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if win.framesSpinner is not None:
                 win.framesSpinner.setMaximum(len(self._data_.sceneBlock.segments))
                 
-            win.view(self._data_.sceneBlock)
+            win.view(self._data_.sceneBlock, get_focus=False)
             
             win.setWindowTitle("Scene Data - %s" % self._data_var_name_)
             
@@ -11254,7 +11021,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     def _trigger_events_detection_gui_(self, options, ephys_start, ephys_end, dlg = None, title = "Detect triggers"):
         
         if "TriggerEventDetection" not in options:
-            default_options = epscatOptions()
+            default_options = scanDataOptions()
             options["TriggerEventDetection"] = default_options["TriggerEventDetection"]
         
         presynaptic_trigger = options["TriggerEventDetection"]["Presynaptic"]["DetectEvents"]
@@ -11771,6 +11538,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
             else:
                 graphicsObjects    = self._data_.scansCursors
+                if isinstance(self._data_.scans, (tuple, list)) and len(self._data_.scans):
+                    cursor_span = self._data_.scans[0].shape[0]
+                    
+                elif isinstance(self._data_.scans, vigra.VigraArray):
+                    cursor_span = self._data_scans.shape[0]
+                    
+                for c in graphicsObjects.values():
+                    c.width = cursor_span
+                    
                 # see NOTE: 2018-09-25 22:19:58
                 sigBlock = QtCore.QSignalBlocker(self.selectCursorSpinBox)
                 self.selectCursorSpinBox.setMaximum(len(self._data_.scansCursors)-1)
@@ -11850,7 +11626,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     
                     displayed_report.rename(columns = new_colnames, copy=False, inplace=True)
                 
-                self.reportWindow.view(displayed_report, doc_title = report_win_title, show=self.reportWindow.isVisible())
+                self.reportWindow.view(displayed_report, doc_title = report_win_title, got_focus=False)
+                #self.reportWindow.view(displayed_report, doc_title = report_win_title, show=self.reportWindow.isVisible())
             
         except Exception as e:
             traceback.print_exc()
@@ -12122,9 +11899,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                  self.epscatIntegralBeginDoubleSpinBox, self.epscatIntegralEndDoubleSpinBox,
                  self.doFitCheckBox, self.epscatComponentsTableWidget)]
             
-            if len(self._data_.analysisoptions):
+            if len(self._data_.analysisOptions):
                 # Channels groupbox
-                val = get_nested_value(self._data_.analysisoptions, ["Channels", "Indicator"])
+                val = get_nested_value(self._data_.analysisOptions, ["Channels", "Indicator"])
                 
                 if val is not None:
                     self.indicatorChannelComboBox.setCurrentIndex(self._data_.scansChannelNames.index(val))
@@ -12132,7 +11909,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 else:
                     self.indicatorChannelComboBox.setCurrentIndex(0)
                     
-                val = get_nested_value(self._data_.analysisoptions, ["Channels", "Reference"])
+                val = get_nested_value(self._data_.analysisOptions, ["Channels", "Reference"])
                 
                 if val is not None:
                     self.referenceChannelComboBox.setCurrentIndex(self._data_.scansChannelNames.index(val))
@@ -12140,23 +11917,23 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 else:
                     self.referenceChannelComboBox.setCurrentIndex(0)
                 
-                val = get_nested_value(self._data_.analysisoptions, ["Channels", "Bleed_ind_ref"])
+                val = get_nested_value(self._data_.analysisOptions, ["Channels", "Bleed_ind_ref"])
                 
                 if isinstance(val, float):
                     self.ind2refBleedDoubleSpinBox.setValue(val)
                     
-                val = get_nested_value(self._data_.analysisoptions, ["Channels", "Bleed_ref_ind"])
+                val = get_nested_value(self._data_.analysisOptions, ["Channels", "Bleed_ref_ind"])
                 
                 if isinstance(val, float):
                     self.ref2indBleedDoubleSpinBox.setValue(val)
                     
                 # Indicator calibration group box
-                val = get_nested_value(self._data_.analysisoptions, ["IndicatorCalibration", "Name"])
+                val = get_nested_value(self._data_.analysisOptions, ["IndicatorCalibration", "Name"])
                 
                 if isinstance(val, str):
                     self.indicatorNameLineEdit.setText(val)
                     
-                val = get_nested_value(self._data_.analysisoptions, ["IndicatorCalibration", "Kd"])
+                val = get_nested_value(self._data_.analysisOptions, ["IndicatorCalibration", "Kd"])
                 
                 if isinstance(val, float):
                     if np.isnan(val) or np.isinf(val):
@@ -12164,7 +11941,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     else:
                         self.indicatorKdDoubleSpinBox.setValue(val)
                     
-                val = get_nested_value(self._data_.analysisoptions, ["IndicatorCalibration", "Fmin"])
+                val = get_nested_value(self._data_.analysisOptions, ["IndicatorCalibration", "Fmin"])
                 
                 if isinstance(val, float):
                     if np.isnan(val) or np.isinf(val):
@@ -12173,7 +11950,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     else:
                         self.indicatorFminDoubleSpinBox.setValue(val)
                     
-                val = get_nested_value(self._data_.analysisoptions, ["IndicatorCalibration", "Fmax"])
+                val = get_nested_value(self._data_.analysisOptions, ["IndicatorCalibration", "Fmax"])
                 
                 if isinstance(val, float):
                     if np.isnan(val) or np.isinf(val):
@@ -12182,7 +11959,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                         self.indicatorFmaxDoubleSpinBox.setValue(val)
                     
                 # BEGIN detection group box
-                val = get_nested_value(self._data_.analysisoptions, ["Intervals", "DarkCurrent"])
+                val = get_nested_value(self._data_.analysisOptions, ["Intervals", "DarkCurrent"])
                 
                 if isinstance(val, (tuple, list)) and len(val) == 2:
                     if isinstance(val[0], pq.Quantity) and dt.check_time_units(val[0]):
@@ -12191,7 +11968,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     if isinstance(val[1], pq.Quantity) and dt.check_time_units(val[1]):
                         self.espcatDarkCurrentEndDoubleSpinBox.setValue(val[1].magnitude.flatten()[0])
                         
-                val = get_nested_value(self._data_.analysisoptions, ["Intervals", "F0"])
+                val = get_nested_value(self._data_.analysisOptions, ["Intervals", "F0"])
                 #print("Intervals F0", val)
 
                 if isinstance(val, (tuple, list)) and len(val) == 2:
@@ -12201,7 +11978,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     if isinstance(val[1], pq.Quantity) and dt.check_time_units(val[1]):
                         self.epscatF0EndDoubleSpinBox.setValue(val[1].magnitude.flatten()[0])
                     
-                val = get_nested_value(self._data_.analysisoptions, ["Intervals", "Fit"])
+                val = get_nested_value(self._data_.analysisOptions, ["Intervals", "Fit"])
                 #print("Intervals Fit", val)
                 
                 if isinstance(val, (tuple, list)) and len(val) == 2:
@@ -12211,7 +11988,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     if isinstance(val[1], pq.Quantity) and dt.check_time_units(val[1]):
                         self.epscatFitEndDoubleSpinBox.setValue(val[1].magnitude.flatten()[0])
                 
-                val = get_nested_value(self._data_.analysisoptions, ["Intervals", "Integration"])
+                val = get_nested_value(self._data_.analysisOptions, ["Intervals", "Integration"])
                 #print("Intervals Integration", val)
                 
                 if isinstance(val, (tuple, list)) and len(val) == 2:
@@ -12222,7 +11999,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                         self.epscatIntegralEndDoubleSpinBox.setValue(val[1].magnitude.flatten()[0])
                     
                 # Cursor window and F/S discrimination row
-                val = get_nested_value(self._data_.analysisoptions, ["Roi", "width"])
+                val = get_nested_value(self._data_.analysisOptions, ["Roi", "width"])
                 
                 if isinstance(val, int):
                     self.epscatCursorWindowSpinBox.setValue(val)
@@ -12230,7 +12007,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 else:
                     self.epscatCursorWindowSpinBox.setValue(10)
                     
-                val = get_nested_value(self._data_.analysisoptions, ["Discrimination", "PredicateValue"])
+                val = get_nested_value(self._data_.analysisOptions, ["Discrimination", "PredicateValue"])
                 
                 if isinstance(val, float):
                     self.fs_DiscriminantDoubleSpinBox.setValue(val)
@@ -12238,7 +12015,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 else:
                     self.fs_DiscriminantDoubleSpinBox.setValue(1.3)
                     
-                val = get_nested_value(self._data_.analysisoptions, ["Discrimination", "MinimumR2"])
+                val = get_nested_value(self._data_.analysisOptions, ["Discrimination", "MinimumR2"])
                 
                 if isinstance(val, float):
                     self.minR2SpinBox.setValue(val)
@@ -12246,17 +12023,17 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 else:
                     self.minR2SpinBox.setValue(0.5)
                     
-                val = get_nested_value(self._data_.analysisoptions, ["Discrimination", "BaseWindow"])
+                val = get_nested_value(self._data_.analysisOptions, ["Discrimination", "BaseWindow"])
                 
                 if val:
                     self.baseDiscriminationWindowDoubleSpinBox.setValue(val.magnitude.flatten()[0])
                 
-                val = get_nested_value(self._data_.analysisoptions, ["Discrimination", "PeakWindow"])
+                val = get_nested_value(self._data_.analysisOptions, ["Discrimination", "PeakWindow"])
                 
                 if val:
                     self.peakDiscriminationWindowDoubleSpinBox.setValue(val.magnitude.flatten()[0])
                 
-                val = get_nested_value(self._data_.analysisoptions, ["Discrimination", "Discr_2D"])
+                val = get_nested_value(self._data_.analysisOptions, ["Discrimination", "Discr_2D"])
                 
                 if val:
                     self.discriminate2DCheckBox.setCheckState(QtCore.Qt.Checked)
@@ -12264,7 +12041,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 else:
                     self.discriminate2DCheckBox.setCheckState(QtCore.Qt.Unchecked)
                     
-                val = get_nested_value(self._data_.analysisoptions, ["Discrimination", "First"])
+                val = get_nested_value(self._data_.analysisOptions, ["Discrimination", "First"])
                 
                 if val:
                     self.firstTriggerOnlyCheckBox.setCheckState(QtCore.Qt.Checked)
@@ -12272,7 +12049,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 else:
                     self.firstTriggerOnlyCheckBox.setCheckState(QtCore.Qt.Unchecked)
                     
-                val = get_nested_value(self._data_.analysisoptions, ["Discrimination", "WindowChoice"])
+                val = get_nested_value(self._data_.analysisOptions, ["Discrimination", "WindowChoice"])
                 
                 if val == "delays":
                     self.useIntervalsRadioButton.setChecked(True)
@@ -12283,13 +12060,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 elif val == "cursors":
                     self.useCursorsForDiscriminationRadioButton.setChecked(True)
                     
-                if "Fitting" not in self._data_.analysisoptions:
-                    self._data_.analysisoptions["Fitting"] = dict()
+                if "Fitting" not in self._data_.analysisOptions:
+                    self._data_.analysisOptions["Fitting"] = dict()
                     
-                if "Fit" not in self._data_.analysisoptions["Fitting"] or not isinstance(self._data_.analysisoptions["Fitting"]["Fit"], bool):
-                    self._data_.analysisoptions["Fitting"]["Fit"] = True
+                if "Fit" not in self._data_.analysisOptions["Fitting"] or not isinstance(self._data_.analysisOptions["Fitting"]["Fit"], bool):
+                    self._data_.analysisOptions["Fitting"]["Fit"] = True
                     
-                if self._data_.analysisoptions["Fitting"]["Fit"]:
+                if self._data_.analysisOptions["Fitting"]["Fit"]:
                     self.doFitCheckBox.setCheckState(QtCore.Qt.Checked)
                     
                 else:
@@ -12335,11 +12112,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 # etc...
                 #
             
-                val = get_nested_value(self._data_.analysisoptions, ["Fitting", "CoefficientNames"])
+                val = get_nested_value(self._data_.analysisOptions, ["Fitting", "CoefficientNames"])
                 
                 if isinstance(val, (tuple, list)) and all([isinstance(v, str) for v in val]):
                     
-                    nDecays = models.check_rise_decay_params(get_nested_value(self._data_.analysisoptions, ["Fitting", "Initial"])[0])
+                    nDecays = models.check_rise_decay_params(get_nested_value(self._data_.analysisOptions, ["Fitting", "Initial"])[0])
                     
                     #if nDecays > 0:
                         
@@ -12356,9 +12133,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     self.epscatComponentsTableWidget.setHorizontalHeaderLabels(columnLabels)
                     
                     
-                    init  = get_nested_value(self._data_.analysisoptions, ["Fitting", "Initial"])
-                    lower = get_nested_value(self._data_.analysisoptions, ["Fitting", "Lower"])
-                    upper = get_nested_value(self._data_.analysisoptions, ["Fitting", "Upper"])
+                    init  = get_nested_value(self._data_.analysisOptions, ["Fitting", "Initial"])
+                    lower = get_nested_value(self._data_.analysisOptions, ["Fitting", "Lower"])
+                    upper = get_nested_value(self._data_.analysisOptions, ["Fitting", "Upper"])
                     
                     self.epscatComponentsTableWidget.setRowCount(len(init) * 3)
                     
@@ -12445,30 +12222,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                   [w for w in self.scansblockviewers] + \
                   [w for w in self.sceneblockviewers]
               
-        print("LSCaTWindow _link_window_navigation_: %d windows" % len(viewers))
+        #print("LSCaTWindow _link_window_navigation_: %d windows" % len(viewers))
         for w in viewers:
             print(w.windowTitle())
         
         self.linkToViewers(*viewers)
         
-        #if len(self.sceneviewers) > 0 and len(self.scansviewers) > 0:
-            ## link the two together
-            #for win in self.sceneviewers:
-                #win.linkToViewers(*self.scansviewers)
-                #if len(self.profileviewers):
-                    #win.linkToViewers(*self.profileviewers)
-                    
-                #if len(self.ephysviewers):
-                    #win.linkToViewers(*self.ephysviewers)
-                
-            #for win in self.scansviewers:
-                #win.linkToViewers(*self.sceneviewers)
-                #if len(self.profileviewers):
-                    #win.linkToViewers(*self.profileviewers)
-                    
-                #if len(self.ephysviewers):
-                    #win.linkToViewers(*self.ephysviewers)
-                
     @safeWrapper
     def _parsedata_(self, newdata=None, varname=None):
         """Parses metainformation and then actually assigns the data to the _data_ attribute
@@ -12476,19 +12235,19 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if isinstance(newdata, ScanData):
             newdata._upgrade_API_()
             #print("LSCaTWindow _parsedata_ %s" % newdata.name)
-            default_options = epscatOptions()
+            default_options = scanDataOptions()
             
-            if "Discrimination" not in newdata.analysisoptions:
-                newdata.analysisoptions["Discrimination"] = collections.OrderedDict()
-                newdata.analysisoptions["Discrimination"].update(default_options["Discrimination"])
+            if "Discrimination" not in newdata.analysisOptions:
+                newdata.analysisOptions["Discrimination"] = collections.OrderedDict()
+                newdata.analysisOptions["Discrimination"].update(default_options["Discrimination"])
                         
-            if "2D" in newdata.analysisoptions["Discrimination"]:
-                newdata.analysisoptions["Discrimination"]["Discr_2D"] = newdata.analysisoptions["Discrimination"]["2D"]
-                newdata.analysisoptions["Discrimination"].pop("2D", None)
+            if "2D" in newdata.analysisOptions["Discrimination"]:
+                newdata.analysisOptions["Discrimination"]["Discr_2D"] = newdata.analysisOptions["Discrimination"]["2D"]
+                newdata.analysisOptions["Discrimination"].pop("2D", None)
 
-            if "data_2D" in newdata.analysisoptions["Discrimination"]:
-                newdata.analysisoptions["Discrimination"]["Discr_2D"] = newdata.analysisoptions["Discrimination"]["data_2D"]
-                newdata.analysisoptions["Discrimination"].pop("data_2D", None)
+            if "data_2D" in newdata.analysisOptions["Discrimination"]:
+                newdata.analysisOptions["Discrimination"]["Discr_2D"] = newdata.analysisOptions["Discrimination"]["data_2D"]
+                newdata.analysisOptions["Discrimination"].pop("data_2D", None)
                 
             if hasattr(newdata, "cell"):
                 newdata.cell = strutils.string_to_valid_identifier(newdata.cell)
@@ -12540,11 +12299,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if self._data_ is None:
             return
         
-        if len(self._data_.analysisoptions) == 0:
+        if len(self._data_.analysisOptions) == 0:
             warnings.warn("No analysis options in data yet")
             return
         
-        defaultRoiWidth = self._data_.analysisoptions["Roi"]["width"]
+        defaultRoiWidth = self._data_.analysisOptions["Roi"]["width"]
         
         profiles = self._data_.scanRegionScansProfiles
         
@@ -12561,9 +12320,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if frame < 0 or frame >= len(profiles.segments):
             raise ValueError("Invalid frame index specified: %d" % frame)
         
-        refChannelName = self._data_.analysisoptions["Channels"]["Reference"]
+        refChannelName = self._data_.analysisOptions["Channels"]["Reference"]
         
-        channel_ndx = neoutils.get_index_of_named_signal(profiles.segments[frame], refChannelName, stype=DataSignal)
+        channel_ndx = ephys.get_index_of_named_signal(profiles.segments[frame], refChannelName, stype=DataSignal)
         
         fitted_params, fitted_pcov, \
             rsquare, fitted_profile, \
@@ -12574,7 +12333,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             cursors = list()
             
             for (k, (x, w)) in enumerate(zip(fitted_params[1], fitted_params[2])):
-                #if self._data_.analysisoptions["Roi"]["auto"]:
+                #if self._data_.analysisOptions["Roi"]["auto"]:
                 if defaultRoiWidth == "auto":
                     cursors.append(pgui.Cursor(x = int(x), xwindow = w, name="r%d" % k, \
                         cursortype = pgui.GraphicsObjectType.vertical_cursor))
@@ -12755,7 +12514,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     def generateFilters(self):
         """Generates filter specifications in ScanData
         
-        Uses the specifications in data.analysisoptions to generate filter
+        Uses the specifications in data.analysisOptions to generate filter
         functions used for filtering (denoising) data.scene and data.scans.
         
         TODO 2019-10-12 14:19:22 this is a BAD design
@@ -12780,14 +12539,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if not isinstance(self._data_, ScanData):
             return
         
-        if len(self._data_.analysisoptions) == 0:
+        if len(self._data_.analysisOptions) == 0:
             return
         
-        if "Channels" not in self._data_.analysisoptions.keys():
+        if "Channels" not in self._data_.analysisOptions.keys():
             return
         
-        refChannel = self._data_.analysisoptions["Channels"]["Reference"]
-        indChannel = self._data_.analysisoptions["Channels"]["Indicator"]
+        refChannel = self._data_.analysisOptions["Channels"]["Reference"]
+        indChannel = self._data_.analysisOptions["Channels"]["Indicator"]
         
         currentSceneFilter = self.sceneFiltersComboBox.currentText()
         
@@ -12868,11 +12627,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if not isinstance(self._data_, ScanData):
             return
         
-        if self._data_.analysismode != ScanData.ScanDataAnalysisMode.frame:
-            raise NotImplementedError("%s analysis not yet supported" % self._data_.analysismode)
+        if self._data_.analysisMode != ScanData.ScanDataAnalysisMode.frame:
+            raise NotImplementedError("%s analysis not yet supported" % self._data_.analysisMode)
         
-        if self._data_.scantype != ScanData.ScanDataType.linescan:
-            raise NotImplementedError("%s not yet supported" % self._data_.scantype)
+        if self._data_.scanType != ScanData.ScanDataType.linescan:
+            raise NotImplementedError("%s not yet supported" % self._data_.scanType)
 
         self.generateScanRregionProfilesFromScans() 
         self.generateScanRegionProfilesFromScene() 
@@ -12893,11 +12652,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if not isinstance(self._data_, ScanData):
             return
         
-        if self._data_.analysismode != ScanData.ScanDataAnalysisMode.frame:
-            raise NotImplementedError("%s analysis not yet supported" % self._data_.analysismode)
+        if self._data_.analysisMode != ScanData.ScanDataAnalysisMode.frame:
+            raise NotImplementedError("%s analysis not yet supported" % self._data_.analysisMode)
         
-        if self._data_.scantype != ScanData.ScanDataType.linescan:
-            raise NotImplementedError("%s not yet supported" % self._data_.scantype)
+        if self._data_.scanType != ScanData.ScanDataType.linescan:
+            raise NotImplementedError("%s not yet supported" % self._data_.scanType)
         
         data = self._data_.scene
         target = self._data_.scanRegionSceneProfiles
@@ -12942,13 +12701,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     # ALL have the same number of frames -- checked in _parse_image_arrays_
                     #
                     
-                    if len(self._data_.analysisoptions) == 0 or \
-                        "Channels" not in self._data_.analysisoptions.keys() or \
-                            "Reference" not in self._data_.analysisoptions["Channels"] or \
-                                len(self._data_.analysisoptions["Channels"]["Reference"]) == 0:
+                    if len(self._data_.analysisOptions) == 0 or \
+                        "Channels" not in self._data_.analysisOptions.keys() or \
+                            "Reference" not in self._data_.analysisOptions["Channels"] or \
+                                len(self._data_.analysisOptions["Channels"]["Reference"]) == 0:
                                     raise RuntimeError("No reference channel is defined, or it has no name, in %s" % self._data_var_name_)
                     
-                    chNdx = self._data_.sceneChannelNames.index(self._data_.analysisoptions["Channels"]["Reference"])
+                    chNdx = self._data_.sceneChannelNames.index(self._data_.analysisOptions["Channels"]["Reference"])
                     
                     profiles = list()
                     
@@ -12980,11 +12739,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if not isinstance(self._data_, ScanData):
             return
         
-        if self._data_.analysismode != ScanData.ScanDataAnalysisMode.frame:
-            raise NotImplementedError("%s analysis not yet supported" % self._data_.analysismode)
+        if self._data_.analysisMode != ScanData.ScanDataAnalysisMode.frame:
+            raise NotImplementedError("%s analysis not yet supported" % self._data_.analysisMode)
         
-        if self._data_.scantype != ScanData.ScanDataType.linescan:
-            raise NotImplementedError("%s not yet supported" % self._data_.scantype)
+        if self._data_.scanType != ScanData.ScanDataType.linescan:
+            raise NotImplementedError("%s not yet supported" % self._data_.scanType)
 
         data = self._data_.scans
         target = self._data_.scanRegionSceneProfiles
@@ -13017,13 +12776,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 # ATTENTION: they only have a singleton channel axis, but they must 
                 # ALL have the same number of frames -- checked in _parse_image_arrays_
                 #
-                if len(self._data_.analysisoptions) == 0 or \
-                    "Channels" not in self._data_.analysisoptions or \
-                        "Reference" not in self._data_.analysisoptions["Channels"] or \
-                            len(self._data_.analysisoptions["Channels"]["Reference"]) == 0:
+                if len(self._data_.analysisOptions) == 0 or \
+                    "Channels" not in self._data_.analysisOptions or \
+                        "Reference" not in self._data_.analysisOptions["Channels"] or \
+                            len(self._data_.analysisOptions["Channels"]["Reference"]) == 0:
                                 raise RuntimeError("No reference channel is defined, or it has not been named, in %s" % self._data_var_name_)
                 
-                chNdx = self._data_.scansChannelNames.index(self._data_.analysisoptions["Channels"]["Reference"])
+                chNdx = self._data_.scansChannelNames.index(self._data_.analysisOptions["Channels"]["Reference"])
                 
                 #profiles = [[DataSignal(np.array(subarray.bindAxis(self.scansFrameAxis, k).mean(axis=1)), \
                                         #sampling_period = self.getAxisResolution(subarray.bindAxis(self.scansFrameAxis, k).axistags["x"]), \
@@ -13352,29 +13111,21 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #self.protocolTableWidget.itemChanged[QtWidgets.QTableWidgetItem].connect(self.slot_protocolTableEdited, type = QtCore.Qt.QueuedConnection)
         
     @safeWrapper
-    def setData(self, newdata = None, varname=None):
+    def setData(self, newdata = None, doc_title=None):
         """When newdata is None this resets everything to their defaults"""
+        self._clear_contents_()
         
         if isinstance(newdata, ScanData):
-            #print(newdata.name, varname)
-            if not isinstance(varname, str) or len(varname.strip()) == 0:
+            #print(newdata.name, doc_title)
+            if not isinstance(doc_title, str) or len(doc_title.strip()) == 0:
                 if isinstance(self._data_var_name_, str) and len(self._data_var_name_.strip()):
-                    varname = self._data_var_name_
+                    doc_title = self._data_var_name_
                     
                 else:
-                    varname = "ScanData"
+                    doc_title = "ScanData"
                     
-            self._parsedata_(newdata, varname)
+            self._parsedata_(newdata, doc_title)
             
-            #if isinstance(varname, str):
-                #self._parsedata_(newdata, varname)
-                
-            #elif isinstance(self._data_var_name_, str):
-                #self._parsedata_(newdata, self._data_var_name_)
-                #varname = self._data_var_name_
-                
-            #else:
-
             self._data_modifed_(False)
             
             self.generateFilters()
@@ -13386,7 +13137,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             # TODO in _parsedata_: when nothing is passed reset everything
             self._data_ = None
-            self._clear_contents_()
+            #self._clear_contents_()
             
     def closeEvent(self, evt):
         """Overrides ScipyenFrameViewer.closeEvent() for clean up.
@@ -15057,21 +14808,8 @@ def blankUncageArtifactInLineScans(data, time, width, bgstart, bgend, frame=0):
             imgIndex = imgp.imageIndexTuple(img, slicing)
             #print("blanking index", imgIndex)
             img[imgIndex] = val
-                #if img.ndims == 3:
-                    #val = img[imgIndex].mean()
-                    
-                #else:
-                    #val = img[:,bstart:bend].mean()
-            
-            #if img.ndims == 3:
-                #img[:,start:end,frame] = val
-            #else:
-                #img[:,start:end] = val
-        
         
         
 
-        
-        
     
     

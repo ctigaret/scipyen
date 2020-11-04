@@ -1,7 +1,7 @@
 import vigra
 import numpy as np
 import quantities as pq
-from core.axiscalibration import AxisCalibration
+from .axiscalibration import AxisCalibration
 
 def getFrameLayout(img, userFrameAxis=None):
     """Parses a vigra array to identify a reasonable axis defining "frames".

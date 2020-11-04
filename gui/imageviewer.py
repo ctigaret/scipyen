@@ -80,10 +80,10 @@ from core import utilities
 from core.utilities import safeWrapper
 from core import strutils as strutils
 from core import datatypes as dt
-from core import vigrautils as vu
-from core import axisutils
-from core.axisutils import axisTypeFlags, defaultAxisTypeName, defaultAxisTypeSymbol, defaultAxisTypeUnits
-from core import axiscalibration
+
+from imaging import (axisutils, axiscalibration, vigrautils as vu,)
+from imaging.axisutils import (axisTypeFlags, defaultAxisTypeName, 
+                               defaultAxisTypeSymbol, defaultAxisTypeUnits,)
 #from core import neo
 #from core import metaclass_solver
 #### END pict.core modules
@@ -1157,7 +1157,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             if isinstance(params, pgui.PlanarGraphics) and (isinstance(params.name, str) and len(params.name) > 0):
                 tryName = params.name
                 if tryName in rDict.keys():
-                    tryName = utilities.counterSuffix(tryName, [s for s in rDict.keys()])
+                    tryName = utilities.counter_suffix(tryName, [s for s in rDict.keys()])
                     
                 roiId = tryName
                 
@@ -1356,7 +1356,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             else:
                 tryName = cType.name
                 if tryName in cDict.keys():
-                    tryName = utilities.counterSuffix(tryName, [s for s in cDict.keys()])
+                    tryName = utilities.counter_suffix(tryName, [s for s in cDict.keys()])
                     
                 crsId = tryName
                 
@@ -2105,17 +2105,12 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         if not isinstance(value, str):
             raise TypeError("Expecting a str; got %s instead" % type(value).__name__)
         
-        #print("current rois: ", self.__rois__)
-        
         if len(self.__rois__):
             if value in self.__rois__.keys():
                 return self.__rois__[value]
             
             else:
                 roi_id_Label = [(r, rid, r.label) for (rid, r) in self.__rois__.items() if r.label == value]
-                #print("roi",  roi_id_Label[0])
-                #print("roi id %s" % rid)
-                #print("roi label " , roi_id_Label[0].label)
                 if len(roi_id_Label):
                     return [self.__rois__[i[0]] for i in roi_id_Label]
     
@@ -2123,9 +2118,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     # public methods
     ####
     
-    #def showImageLabel(self, val):
-        #self._imageNameLabel.setVisible(val)
-        
     @safeWrapper
     def cursor(self, value):
         """Returns the GraphicsObject cursor with specified ID or name (label) or None if this does not exist.
@@ -2141,12 +2133,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
             if value in self.__cursors__.keys():
                 return self.__cursors__[value]
-            
-            #else:
-                #crsId_Label = [(c, cid, c.name) for (cid, c) in self.__cursors__.items() if c.label == value]
-                
-                #if len(crsId_Label):
-                    #return [c[0] for c in crsId_Label]
             
     @safeWrapper
     def hasCursor(self, crsid):
@@ -2177,10 +2163,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def wheelEvent(self, evt):
         if evt.modifiers() and QtCore.Qt.ShiftModifier:
             step = 1
-            #if evt.modifiers() and QtCore.Qt.ControlModifier and QtCore.Qt.ShiftModifier:
-                #step = 10
-                
-            #print("wheel event angle delta x: ", evt.angleDelta().x(), " y: ", evt.angleDelta().y())
                 
             nDegrees = evt.angleDelta().y()*step/8
             
@@ -2189,50 +2171,38 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             zoomChange = nSteps * 0.1
             
             self.slot_relativeZoom(zoomChange)
-        #else:
         evt.accept()
 
     def timerEvent(self, evt):
         evt.ignore()
         
     def keyPressEvent(self, evt):
-        #print("keyPresEvent in GraphicsImageViewerWidget: ", evt)
         if evt.key() == QtCore.Qt.Key_Escape:
             self.__escape_pressed___ = True
             
-        #else:
-            #self.__escape_pressed___ = False
-            
         evt.accept()
-        #evt.ignore()
         
     @safeWrapper
     def mousePressEvent(self, evt):
-        #print("mousePressEvent in GraphicsImageViewerWidget: ", evt)
         self.__mouse_pressed___ = True
         
         if evt.button() == QtCore.Qt.LeftButton:
             self.__last_mouse_click_lmb__ = evt.pos()
-            #self.__escape_pressed___ = True
             
         elif evt.button() == QtCore.Qt.RightButton:
             self.__last_mouse_click_lmb__ = None
-            #self.__escape_pressed___ = True
         
         evt.accept()
     
     @safeWrapper
     def mouseReleaseEvent(self, evt):
-        #print("mouseReleaseEvent in GraphicsImageViewerWidget: ", evt)
         self.__mouse_pressed___ = True
         
         if evt.button() == QtCore.Qt.LeftButton:
             self.__last_mouse_click_lmb__ = evt.pos()
-            #self.__escape_pressed___ = True
             
         elif evt.button() == QtCore.Qt.RightButton:
             self.__last_mouse_click_lmb__ = None
-            #self.__escape_pressed___ = True
         
         evt.accept()
     
@@ -2242,33 +2212,10 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def view(self, a):
         if isinstance(a, QtGui.QPixmap):
             self.__scene__.rootImage = QtWidgets.QGraphicsPixmapItem(a)
-            #self.__scene__.setRootImage(QtWidgets.QGraphicsPixmapItem(a))
             
         elif isinstance(a, QtGui.QImage):
             self.__scene__.rootImage = QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap.fromImage(a))
-            #self.__scene__.setRootImage(QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap.fromImage(a)))
-            
-        else:
-            return
         
-        #print(a)
-        
-        #self._imageGraphicsView.ensureVisible(self.__scene__.getRootImage().boundingRect(),0,0)
-        
-        #print("scene Rect: ", self.__scene__.sceneRect())
-        #print("image bounding rect: ", self.__scene__.getRootImage().boundingRect())
-        
-        #if self.parentWidget() is None:
-            ##self.adjustSize()
-            #self.resize(self.__scene__.sceneRect().width(), self.__scene__.sceneRect().height())
-            ##self.setVisible(True)
-        ##else:
-            ##self.parentWidget().resize(self.__scene__.sceneRect().width(), self.__scene__.sceneRect().height())
-            
-        #self._imageGraphicsView.setGeometry(self.__scene__.sceneRect().toAlignedRect())
-        #self._imageGraphicsView.centerOn(QtCore.QPointF(self.__scene__.rootImage.boundingRect().left() ,self.__scene__.rootImage.boundingRect().top()))
-
-
     def interactiveZoom(self):
         self.__interactiveZoom__ = not self.__interactiveZoom__
     
@@ -2278,18 +2225,11 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def setTopLabelText(self, value):
         self._topLabel.setText(value)
         
-    #def setBottomLabelText(self, value):
-        #self._bottomLabel.setText(value)
-        
     def clearTopLabel(self):
         self._topLabel.clear()
         
-    #def clearBottomLabel(self):
-        #self._bottomLabel.clear()
-        
     def clearLabels(self):
         self.clearTopLabel()
-        #self.clearBottomLabel()
         
 class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     closeMe                 = pyqtSignal(int)
@@ -2330,6 +2270,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
 
         #self._configureGUI_()
         
+        self._image_width_ = 0
+        self._image_height_ = 0
         self.imageNormalize             = None
         self.imageGamma                 = None
         self.colorMap                   = None
@@ -2558,6 +2500,20 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         """A reference to the selected cursor
         """
         return self.viewer.selectedCursor
+    
+    @property
+    def imageWidth(self):
+        """Width of the displayed image (in pixels); read-only; 0 if no image
+        """
+        return self._image_width_
+    
+    @property
+    def imageHeight(self):
+        """Height of the displayed image (in pixels); read-only; 0 if no image
+        """
+        return self._image_height_
+    
+    
     
     ####
     # slots
@@ -3480,11 +3436,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
     @safeWrapper
     def displayFrame(self, channel_index = None):
-        #print("ImageViewer %s displayFrame()" % self.windowTitle())
-        #print("viewing frame along the %s axis " % self.frameAxisInfo)
-        #x = None
-        #y = None
-        
         if channel_index is None:
             channel_index = self._displayedChannel_
         
@@ -3527,8 +3478,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             # Y or X axis instead of the Z or T axis?)
             w = self._data_.shape[self._data_.axistags.index(self.widthAxisInfo.key)] # this is not neccessarily space!
             h = self._data_.shape[self._data_.axistags.index(self.heightAxisInfo.key)] # this is not neccessarily space!
-            # NOTE: 2017-07-24 09:03:38
-            # w and h are a convention here
+            
+            self._image_width_ = w
+            self._image_height_= h
             
             # NOTE: 2017-07-26 22:18:14
             # get calibrates axes sizes
@@ -3557,71 +3509,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 pass
             
         else:
-            #print("nothing to do ?")
             return # shouldn't really get here
         
         self.viewerWidget.setTopLabelText(shapeTxt)
         
-        #try:
-            #if isinstance(self._data_, vigra.VigraArray):
-                #self._currentFrameData_, _ = self._generate_frame_view_(channel_index) # this is an array view !
-                
-                #if self.colorMap is None:
-                    #self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self.imageNormalize))
-                    
-                #else:
-                    #if self._currentFrameData_.channels == 1:
-                        #if self._currentFrameData_.channelIndex < self._currentFrameData_.ndim:
-                            #self._currentFrameData_ = self._currentFrameData_.squeeze()
-                            
-                        #cFrame = self._applyColorTable_(self._currentFrameData_)
-                        
-                        #self.viewerWidget.view(cFrame.qimage(normalize = self.imageNormalize))
-                        
-                    #else: # don't apply color map to a multi-band frame data
-                        ##warnings.warn("Cannot apply color map to a multi-band image")
-                        #self._currentFrameData_ = self._currentFrameData_.squeeze().copy()
-                        #self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self.imageNormalize))
-            
-                ## TODO FIXME: what if we view a transposed array ???? (e.g. viewing it on
-                ## Y or X axis instead of the Z or T axis?)
-                #w = self._data_.shape[self._data_.axistags.index(self.widthAxisInfo.key)] # this is not neccessarily space!
-                #h = self._data_.shape[self._data_.axistags.index(self.heightAxisInfo.key)] # this is not neccessarily space!
-                ## NOTE: 2017-07-24 09:03:38
-                ## w and h are a convention here
-                
-                ## NOTE: 2017-07-26 22:18:14
-                ## get calibrates axes sizes
-                #cals = "(%s x %s)" % \
-                    #(strutils.print_scalar_quantity(vu.getCalibratedAxisSize(self._data_, self.widthAxisInfo.key)), \
-                        #strutils.print_scalar_quantity(vu.getCalibratedAxisSize(self._data_, self.heightAxisInfo.key)))
-        
-                #shapeTxt = "%s x %s: %d x %d %s" % \
-                    #(defaultAxisTypeName(self.widthAxisInfo), \
-                        #defaultAxisTypeName(self.heightAxisInfo), \
-                        #w, h, cals)
-                
-                #self.slot_displayColorBar(self.displayColorBarAction.isChecked())
-
-            #elif isinstance(self._data_, (QtGui.QImage, QtGui.QPixmap)):
-                ## NOTE 2018-09-14 11:45:13
-                ## TODO/FIXME adapt code to select channels from a Qimage is not allGray() or not isGrayscale()
-                #self.viewerWidget.view(self._data_)
-                
-                #w = self._data_.width()
-                #h = self._data_.height()
-                #shapeTxt = "W x H: %d x %d " % (w, h)
-                
-            #else:
-                ##print("nothing to do ?")
-                #return # shouldn't really get here
-            
-            #self.viewerWidget.setTopLabelText(shapeTxt)
-            
-        #except Exception as e:
-            #traceback.print_exc()
-            #self._currentFrameData_ = None
-            
     def _configureGUI_(self):
         self.setupUi(self)
         
@@ -4339,9 +4230,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._displayedChannel_ = "all"
         
     def view(self, image, doc_title=None, normalize=True, colortable=None, gamma=None,
-             frameAxis=None, displayChannel=None, frameIndex=None):
+             frameAxis=None, displayChannel=None, frameIndex=None, get_focus=True):
+        # NOTE: 2020-09-24 14:19:57
+        # this calls ancestor instance method ScipyenFrameViewer.setData(...)
         self.setData(image, doc_title=doc_title, normalize=normalize, colortable=colortable, gamma=gamma,
-                     frameAxis=frameAxis, frameIndex=None, displayChannel=displayChannel)
+                     frameAxis=frameAxis, frameIndex=None, displayChannel=displayChannel, get_focus=get_focus)
         
     def _set_data_(self, data, normalize=True, colortable = None, gamma = None, 
             frameAxis=None, frameIndex=None, 
@@ -4425,8 +4318,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         else:
             raise TypeError("First argument must be a VigraArray or a numpy.ndarray")
         
-        if kwargs.get("show", True):
-            self.activateWindow()
+        #if kwargs.get("show", True):
+            #self.activateWindow()
         
     def clear(self):
         """Clears all image data cursors and rois from this window

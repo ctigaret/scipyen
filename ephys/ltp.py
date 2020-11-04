@@ -1,4 +1,601 @@
 # -*- coding: utf-8 -*-
+"""
+The first aim in Scipyen's LTP analysis is to store minute-average synaptic 
+responses recorded before ("baseline") and after conditioning ("chase"), separately 
+for each of the pathways used in the experiment (see "Case 1" below).
+
+To achieve this, LTP generates two neo.Block objects - baseline and chase - 
+for each pathway. These blocks contain neo.Segments with minute-averaged data
+(analog signals). The steps required to construct these blocks depend on how the 
+data was acquired in Clampex, as explained below.
+
+Clampex saves the data as a collection of ABF files. Each file contains signals
+recorded for one trial, and upon loading in Scipyen yields a single neo.Block
+object.
+
+The Trial may contain a single Run. In this case, the neo.Block holds the data 
+recorded during that Run. 
+
+When a Trial is defined as having several Runs, Clampex averaged the run data so 
+that the neo.Block holds the average data from several Runs per Trial.
+
+Clampex Trial => one ABF file => neo.Block:
+        single Run      => neo.Block contains the Run data
+        several Runs    => neo.Block containes the data averaged across the Runs
+                            of the Trial
+                            
+Clampex Runs contain at least one sweep. In Scipyen, a sweep corresponds to one
+neo.Segment, and several Segments are collected in the Block's "segments" attribute
+(a list)
+    
+Clampex Sweep => neo.Segment contained in the Block's "segments" attribute.
+    
+The signals recorded in a sweep are stored as neo.AnalogSignal objects which are
+collected in the Segment's "analgosignals" attribute (a list).
+        
+The possible scenarios when using Clampex for recording are described here
+(see also Clampex Lab Bench example at the end of this documentation for signal 
+names and roles).
+
+Case 1. 
+======
+Recording of two independent synaptic pathways converging on the same
+post-synaptic cell (whole-cell recording) or in the same slice (field recording). 
+
+Synaptic responses are recorded through the same ANALOG IN channel, and can be
+EPSCs (in whole-cell voltage clamp) EPSPs (in whole-cell current clamp) or
+fEPSPs (in field recording).
+
+For whole-cell recordings, the same ANALOG OUT (corresponding to the same recording
+channel of the amplifier) is used to send command signals in order to:
+    - set the holding Vm (in voltage clampe) or Im (in current clamp)
+    - deliver depolarizing test pulses used to calculate Rs and Rin (in voltage clamp)
+        or hyperpolarizing current pulses used to calculate Rin (in current clamp)
+
+Test stimuli are delivered ALTERNATIVELY to each pathway, usually at low frequency
+(0.1 Hz, i.e., 1 test stimulus every 10 s on a given pathway). 
+
+To help distinguish between pathway-specific responses while placing an equal
+stimulation burden to both pathways, the test stimuli are interleaved, such that
+they are delivered to the tissue at equal intervals.
+
+This generates the following stimulation scheme, applied before and after
+conditioning:
+
+Stimulus        0                   1                   2   etc...
+
+Time (s)        0         5         10        15        20  NOTE: __ = 1s = one "sweep"
+
+Path 0          |___________________|___________________|_   NOTE: |_ = test stimulus
+
+Path 1          __________|___________________|___________
+
+
+This can be achieved in Clampex in three ways:
+
+Case 1.1
+--------
+Ideal protocol: each pathway is alternatively stimulated in interleaved
+sweeps => minute-averaged responses are saved on disk.
+
+Protocol file: AltStim2PathwaysAvgTwoChannels.pro - see Example Protocol below.
+
+Protocol defines ONE trial, to be run from a sequencer key which calls itself 
+with 10 s delay, in an infinite loop.
+
+Do NOT use Repeat mode in the acquisition toolbar, as this will start a trial 
+right after the end of the previous one.
+
+The Trial contains 6 runs (which automatically enables averaging of data from
+corresponding sweeps in 6 consecutive runs). There is a start-to-start interval
+of 10 s between runs in the same trial
+
+Each Run contains 2 sweeps (one per pathway) with alternative digital outputs.
+
+Data is saved as trial averages (each trial generates an average of 6 runs) => the
+disk files (*.abf) contain minute-by-minute average data, each with two sweeps:
+
+sweep 0  = the average of sweep 0 in all 6 runs/trial;
+sweep 1  = the average of sweep 1 in all 6 runs/trial.
+
+Upon loading in Scipyen, these files yield neo.Block objects (one from each file)
+with two segments each (corresponding to the sweeps described above). 
+
+These blocks need to be concatenated such that for each path there are two final 
+blocks: the "baseline" and the "chase" block (four final blocks in total).
+
+These blocks have sweeps from the same pathway, with each sweep holding
+minute-average data.
+
+Case 1.2
+-------- 
+Pathway stimulation in interleaved sweeps => sweep data is saved directly without
+averaging.
+
+The Protocol defines ONE Trial, to be run in an infinite loop from a sequenceer 
+key.
+
+The Trial contains a single run consisting of two sweeps as above. 
+
+Each ABF file contains un-averaged synaptic reponse data, and there should be 6 
+consecutive files per minute
+
+Loading these files in Scipyen yields a sequence of neo.Block objects with two
+segments each (containing individual pathway-specific responses as described 
+above).
+
+These need to be averaged using count=6 every=6, separately for baseline and 
+chase.
+
+Cases 1.1 and 1.2 cannot be distinguished based on the content of the ABF files.
+The distinction must be made in the LTP GUI dialog.
+
+
+Case 1.3
+--------
+Separate protocols for each  pathway; each pathway is alternatively stimulated,
+and responses are recorded as individual sweeps (1 sweep per file) without 
+averaging.
+
+The protocols are interleaved in an infinite loop using the sequencer (assign a 
+key to each protocol, then set the key for the first protocol to call the second
+procotol after a 5 s delay, and vice-versa).
+
+Each protocol defines a Trial with one Run containing one Sweep that stimulates 
+a specific pathway.
+
+Upon loading in Scipyen, the ABF files yield neo.Block objects each containing 
+one segment.
+
+In Scipyen, these blocks need to be assigned to a pathway, then averaged using 
+count=6, every=6, to generate one baseline and one chase block per pathway.
+
+
+To help in assigning the responses to their corresponding stimulated pathway, it
+is useful to record the digital outputs as well. This can be done by tee-ing the 
+digital OUT signal for each patwhay and feeding onto separate analog inputs of 
+the digitizer, then including these inputs in the protocol (make sure they are 
+defined in the lab bench, see signals 'Stim_0' and 'Stim_1' in the example Lab Bench
+configuration given below).
+
+
+NOTE: Minute-averaged data in each pathway could in principle, be also recorded 
+using consecutive trials of 6 runs for each pathwa in turny (ie., one minute for
+path 0, then next minute for path 1, then back to path 0, etc ). However, this 
+will stimulate the two paths unequally.
+
+
+NOTE TODO use the metadata stored in the ABF file to distinguish / "guess" which 
+of the Cases 1.1, 1.2. 1.3 are used, and to determine to which pathway the 
+signals belong.
+
+### BEGIN Boilerplate analysis code
+====================================
+
+1) Generate baseline and chase blocks for each pathway
+
+1.1) Case 1.1 - minute-averaged data is already saved => just concatenate the 
+blocks:
+
+path_0_baseline = neoutils.concatenate_blocks(getvars("base_avg_*"), segment=0, analog = [2,3,4])
+path_0_chase = neoutils.concatenate_blocks(getvars("chase_avg_*"), segment=0, analog = [2,3,4])
+
+path_1_baseline = neoutils.concatenate_blocks(getvars("base_avg_*"), segment=1, analog = [2,3,5])
+path_1_chase = neoutils.concatenate_blocks(getvars("chase_avg_*"), segment=1, analog = [2,3,5])
+
+
+
+1.2) Case 1.2 - pair of alternate sweeps (path 0 then path 1) saved per trial; 
+expecting 6 trials per minute (each with two sweeps); need to average the blocks
+(count = 6, every = 6) assuming that first segment in each block refers to the 
+same pathway (and the second one, to the other pathway).
+
+path_0_baseline = ephys.average_blocks("baseline_*", segment=0, count=6, every=6,
+                                        analog=[2,3], 
+                                        name="c03_3123_17b13_baseline_path_0")
+
+path_0_chase = ephys.average_blocks("chase_*", segment=0, count=6, every=6, 
+                                        analog=[2,3], 
+                                        name="c03_3123_17b13_chase_path_0")
+
+path_1_baseline = ephys.average_blocks("baseline_*", segment=1, count=6, every=6,
+                                        analog=[2,3], 
+                                        name="c03_3123_17b13_baseline_path_1")
+
+path_1_chase = ephys.average_blocks("chase_*", segment=1, count=6, every=6, 
+                                        analog=[2,3], 
+                                        name="c03_3123_17b13_chase_path_1")
+
+1.3) Case 1.3 - each ABF file is a block with a single segment corresponding to
+one pathway.
+
+2) Set up the parameters for constructing cursors
+
+cursors_0 = [0.05, 0.066, 0.15, 0.26, 0.275, 0.31, 0.325]
+labels = ["Rbase", "Rs", "Rin", "EPSC0Base", "EPSC0Peak", "EPSC1Base", "EPSC1Peak"]
+xwindow=0.005
+
+2.1) For Cases 1.1 and 1.2 the runs have two sweeps; the second sweep of each
+runs start 5 s later (see the Example Protocol below); therefore we create a 
+second collection of cursor times:
+
+NOTE: this may be circumvented by setting all signals to start at 0 in the 
+concatenated block (case 1.1) or averaged block (case 1.2), once they have been
+created, e.g. by calling ephys.set_relative_time_start()
+
+cursors_1 = [c + 5 for c in cursors_0] # call this ONLY it NOT calling set_relative_time_start()
+
+3) Display the block with the baseline or control data from one pathway in a 
+Signlaviewer
+
+4) Add cursors to SignalViewer window that displays the baseline or chase block
+for one pathway (pathway 0)
+
+4.1) Make sure no other cursors exist in the window: they may not be visible if
+outside the time base of the currently displayed segment (sweep).
+
+    * use the SignalViewer Menu "Cursors/Remove cursors/Remove all cursors"
+    
+    * or, in Scipyen's console, call:
+    
+        SignalViewer_0.removeCursors()
+    
+4.2) Call:
+
+SignalViewer_0.addCursors("v", *cursors_0, labels=labels, xwindow=xwindow)
+
+    NOTE: make sure the asterisk is there before cursors_0
+
+4.3) Use these cursors to create an Epoch named "LTP" and embedded in the 
+block's segments:
+
+4.3.1) Optionally, navigate through segments and adjust cursor positions.
+
+NOTE The cursor's X position cannot be set on a per-segment basis. Therefore,
+choose the optimal cursor position, allowing for some jitter in the synaptic
+responses.
+
+
+4.3.2) Use SignalViewer menu Cursors/Make Epochs in Data/From all cursors, OR
+in Scipiyen's console, call:
+    
+SignalViewer_0.cursorsToEpoch(name="LTP", embed=True, overwrite=True)
+
+Alternatively, to obtain a prompt for Epoch's name, call:
+    SignalViewer_0.slot_cursorsToEpochInData()
+
+    CAUTION: For LTP analysis the Epoch MUST be named "LTP".
+    
+    In the prompt dialog box:
+
+        * Name the epoch as "LTP"
+
+        * Un-check to option to embed in current segment only
+
+        * Check the option to remove all epochs
+
+5) proceed with the other pathway (pathway 1)
+    CAUTION: in experiments where data was acquired according to Case 1.1 or 1.2
+    the start time in every 2nd sweep in the run starts after the inter-sweep 
+    delay (e.g  5s) 
+    
+    See point (2.1) above
+    
+    In this case go to (4.1)
+
+ATTENTION: repeat the call in (4.2) but with cursors_1 if needed
+
+SignalViewer_0.addCursors("v", *cursors_1, labels=labels, xwindow=xwindow)
+
+In the experiments where all sweeps start at the same time in both pathways, you
+may use the set of LTP cursors that already exists in the SignalWindow
+
+6) Run the LTP analysis - this measures Rs, Rin , and the EPSC amplitudes;
+optionally, and when the test stimulus is a paired-pulse, also measures the 
+amplitude of the second EPSC and calculates paired-pulse ratio (PPR) - a 
+measure of paired pulse facilitation.
+
+c01_20i15_path_0 = ltp.analyse_LTP_in_pathway(path_0_base, path_0_chase, 0, 0,
+                                              is_test=True, signal_index_Vm=1, 
+                                              trigger_signal_index=2, 
+                                              basename="c01_20i15", 
+                                              normalize=True)
+                                              
+c01_20i15_path_1 = ltp.analyse_LTP_in_pathway(path_1_base, path_1_chase,1,0,is_test=True, signal_index_Vm=1, trigger_signal_index=2, basename="c01_20i15", normalize=True)
+c01_20i15_path_1 = ltp.analyse_LTP_in_pathway(path_1_base, path_1_chase,0,1,is_test=True, signal_index_Vm=1, trigger_signal_index=2, basename="c01_20i15", normalize=True)
+
+
+7) Obtain 5-min average EPSC waveforms, and plot to SVG:
+7.1) sweep averages
+
+E.g. considering the sweeps contain minute-average records:
+
+7.1.a) to average last 5 sweeps of pre-conditioning, the segment_index must be range(-1, -5, -1):
+
+path_0_baseline_averaged = ephys.average_segments_in_block(path_0_baseline, segment_index = range(-1, -5, -1))
+
+7.1.b) to average 30-35 min of sweeps of pos-conditioning, set the segment_index to
+range(30,36)
+
+path_1_chase_averaged = ephys.average_segments_in_block(path_1_chase, segment_index = range(30, 36))
+
+7.2) time slice holding the synaptic responses
+
+epscs = neoutils.get_time_slice(path_X_Y_average, t0, t1,analog_index=0)
+
+where:
+    t0 = 0.25 * pq.s, t1 = 0.4 * pq.s OR
+    t0 = 5.25 * pq.s, t1 = 5.4 * pq.s depending on which pathway is used (see 
+    point (2.1) above)
+
+epsc_0_base = neoutils.get_time_slice(path_0_baseline_averaged, 0.25*pq.s, 0.4*pq.s, analog_index = 0)
+epsc_0_chase = neoutils.get_time_slice(path_0_chase_averaged, 0.25*pq.s, 0.4*pq.s, analog_index = 0)
+epsc_1_base = neoutils.get_time_slice(path_1_baseline_averaged, 5.25*pq.s, 5.4*pq.s, analog_index = 0)
+epsc_1_chase = neoutils.get_time_slice(path_1_chase_averaged, 5.25*pq.s, 5.4*pq.s, analog_index = 0)
+
+7.3) remove the DC component (or at least bring signals to similar baseline)
+
+epsc_0_base.segments[0].analogsignals[0] -= epsc_0_base.segments[0].analogsignals[0].max()
+epsc_0_chase.segments[0].analogsignals[0] -= epsc_0_chase.segments[0].analogsignals[0].max()
+epsc_1_base.segments[0].analogsignals[0] -= epsc_1_base.segments[0].analogsignals[0].max()
+epsc_1_chase.segments[0].analogsignals[0] -= epsc_1_chase.segments[0].analogsignals[0].max()
+
+TODO: can do better than the example above: instead of offsetting the signals by their max(),
+offset them by the mean of a time slice BEFORE the stim artifact, e.g. the first 10 ms:
+
+epsc_0_base.segments[0].analogsignals[0] -= epsc_0_base.segments[0].analogsignals[0].time_slice(0.25*pq.s, 0.26*pq.s).mean()
+epsc_0_chase.segments[0].analogsignals[0] -= epsc_0_chase.segments[0].analogsignals[0].time_slice(0.25*pq.s, 0.26*pq.s).mean()
+epsc_1_base.segments[0].analogsignals[0] -= epsc_1_base.segments[0].analogsignals[0].time_slice(5.25*pq.s, 5.26*pq.s).mean()
+epsc_1_chase.segments[0].analogsignals[0] -= epsc_1_chase.segments[0].analogsignals[0].time_slice(5.25*pq.s, 5.26*pq.s).mean()
+
+
+7.4) plot with matplotlib
+
+x = epscs.segments[0].analogsignals[0].times
+y = epscs.segments[0].analogsignals[0].magnitude
+
+plt.plot(x,y)
+
+or, better (make sure the correct title is assigned ot Test or Control pathways)
+
+plots.plotNeoSignal(epsc_0_base.segments[0].analogsignals[0], label = "Pre-conditioning", ylabel="Membrane current (%s)" % epsc_0_base.segments[0].analogsignals[0].dimensionality, fig=Figure1, newPlot=True, color="black")
+plots.plotNeoSignal(epsc_0_chase.segments[0].analogsignals[0], label = "Post-conditioning", ylabel="Membrane current (%s)" % epsc_0_chase.segments[0].analogsignals[0].dimensionality, fig=Figure1, newPlot=False, color="#DD0000", panel_size = (2.5,1.5), title="Control")
+
+
+
+
+### END Boilerplate analysis code
+
+### BEGIN Example Clampex Lab Bench 
+### Lab Bench: ###
+Input Signals:
+=============
+    Digitizer channels      Signals(1)(2)   Signal units(3) Amplifier(4)        Use:
+    -----------------------------------------------------------------------------------------
+    Analog IN #0:           Im_prim_0       pA              Channel 0 Primary   V-clamp
+                            Vm_prim_0       mV                                  I-clamp
+                            IN 0
+                            
+    Analog IN #1:           Vm_sec_0        mV              Channel 0 Secondary V-clamp
+                            Im_sec_0        pA                                  I-clamp
+                            IN 1
+                            
+    Analog IN #2:           Im_prim_1       pA                                  V-clamp
+                            Vm_prim_1       mV                                  I-clamp
+                            IN 2
+                            
+    Analog IN #3:           Vm_sec_1        mV                                  V-clamp
+                            Im_sec_1        pA                                  I-clamp
+                            IN 3
+
+    Analog IN #5:           Stim_0                                              From digitizer DIG OUT 0
+    Analog IN #6:           Stim_1                                              From digitizer DIG OUT 1
+    
+Output Signals:
+===============
+    Digitizer channels      Signals                         Amplifier           Use:
+    ---------------------------------------------------------------------------------
+    Analog OUT #0           V_clamp_0       mV              Command in          V-clamp
+                            I_clamp_0       pA                                  I-clamp              
+                            OUT 0
+                            Cmd 0
+                            
+    Analog OUT #1           V_clamp_1                                           V-clamp
+                            I_clamp_1                                           I-clamp
+                            OUT 1
+                            Cmd 1
+                            
+    Analog OUT #2           OUT 2
+                            Cmd 2
+                            
+    Analog OUT #3           OUT 3   
+                            Cmd 3
+                            
+    Digital OUT channels
+    --------------------
+    set in the protocol
+    
+    
+    
+
+
+NOTE:
+(1) These are just labels; you may choose the appropriate one to understand the
+role that the corresponding digitizer channel has, in the protocol.
+
+
+(3) The scale should be set via telegraph, with the amplfier in the APPROPRIATE MODE
+    i.e., V-clamp OR I-clamp !!!
+    
+(4) the actual analog signal send to the digitizer channel depends on the configuration
+of the amplifier outputs, in the MultiClamp commander software
+
+The primary and secondary outputs are usually configured to feed analogsignals
+to the digitizer input(s) to which they are connected:
+
+Amplifier Channel 0
+    Voltage clamp:
+        Primary   output => membrane current   -> to digitizer Analog IN #0
+        Secondary output => membrane potential -> to digitizer Analog IN #1
+        
+        Command input <= command potential <- from digitizer Analog OUT #0
+        
+    Current clamp:
+        Primary   output => membrane potential -> to digitizer Analog IN #0
+        Secondary output => membrane current   -> to digitizer Analog IN #1
+        
+        Command input <= command current <- from digitizer Analog OUT #0
+
+Amplifier Channel 1
+    Voltage clamp:
+        Primary   output => membrane current   -> to digitizer Analog IN #2
+        Secondary output => membrane potential -> to digitizer Analog IN #3
+        
+        Command input <= command potential <- from digitizer Analog OUT #1
+        
+    Current clamp:
+        Primary   output => membrane potential -> to digitizer Analog IN #2
+        Secondary output => membrane current   -> to digitizer Analog IN #3
+        
+        Command input <= command current <- from digitizer Analog OUT #1
+
+### END Example Clampex Lab Bench
+
+### BEGIN Example protocol for case 1.1
+
+Protocol parameters (Edit Protocol dialog):
+
+Mode/rate:
+==========
+    Acquisition mode: episodic stimulation
+    ----------------
+
+    Trial hierarchy:
+    ----------------
+        Trial delay: 0 s
+        Runs/Trial: 6, with 10 s start-to-start interval between runs
+        Sweeps/run: 2, with  5 s start-to-start interva between sweeps
+        Each sweep:
+            1 s duration (50 k samples, for fast rate of 50 kHz)
+    
+Inputs: (Analog IN channels) - Digidata 1550 series supports 16 analog IN channels
+=======
+    ON  Channel #0: Im_prim_0
+    ON  Channel #1: Vm_sec_0
+    ON  Channel #2: Im_prim_1
+    ON  Channel #3: Vm_sec_1
+    OFF Channel #4: IN 4
+    ON  Channel #5: Stim_0
+    ON  Channel #6: Stim_1
+
+    ... all other channels from #7 to #15 are OFF
+
+Outputs: (Analog OUT channels) - Digidata 1550 series supports 4 analog OUT channels
+========
+    Channel #0: V_clamp_0 - all holding level 0 mV
+    Channel #1: V_clamp_1
+    Channel #2: Cmd 2
+    Channel #3: Cmd 3
+
+    Digital OUT holding pattern: 7 - 0 all unchecked 
+
+Trigger:
+=======
+    Start trial with: Immediate 
+    Trigger source: internal timer
+
+    Scope trigger: OFF
+
+    External Tags: OFF
+
+Statistics: 
+===========
+    Shape Statistics: OFF
+
+Comments: 
+=========
+    Comments: OFF
+
+Math: 
+=====
+Math Signal: OFF
+
+Waveform:
+========
+    Channel #0:
+    ----------
+        Waveform Analog OUT: V_clamp_0
+        
+        Analog Waveform: ON
+            Epochs
+            Intersweep holding level: Use holding
+            
+        Digital outputs: ON
+            Active high logic for digital trains: ON
+            Intersweep bit patters: Use holding.
+            
+        Epoch Table
+            Description                 A       B       C       D   
+            Type                        Step    Pulse   Step    Step
+            First level (mV)            0       5       0       0
+            Delta level (mV)            0       0       0       0
+            First duration (ms)         50      100     100     100
+            Delta duration (ms)         0       0       0       0
+            Digital bit pattern (#3-0)  0000    0000    0000    000*
+            Digital bit pattern (#7-4)  0000    0000    0000    0000
+            Train rate (Hz)                     20              20
+            Pulse width (ms)                    50              1
+                                                                Pulse count 2
+    Channel #1:
+    ===========
+        Waveform Analog OUT: V_clamp_1
+        Analog Waveform: ON
+            Epochs
+            Intersweep holding level: Use holding
+            
+        Digital outputs: OFF ("enabled on Channel #0.")
+        
+        Epoch Table
+            Description                 A       B       C       D   
+            Type                        Step    Pulse   Step    Step
+            First level (mV)            0       5       0       0
+            Delta level (mV)            0       0       0       0
+            First duration (ms)         50      100     100     100
+            Delta duration (ms)         0       0       0       0
+            Digital bit pattern (#3-0)  0000    0000    0000    00*0
+            Digital bit pattern (#7-4)  0000    0000    0000    0000
+            Train rate (Hz)                     20              20
+            Pulse width (ms)                    50              1
+                                                                Pulse count 2
+                                                                
+    Number of sweeps: 2 - Allocated time: 381.24 of 1000 ms
+    Alternate Waveforms: OFF
+    Alternate digital outputs: ON
+
+### END example protocol for case 1.1
+
+TODO 2020-10-20 21:45:35
+
+1) finalize ephys.ElectrophysiologyDataParser, to "guess" the Clampex protocol
+configuration from the ABF files (this metadata is stored in the "annotations"
+attribute of the neo.Block objects)
+2) GUI for LTP experiments - with fields to modify these parameters
+    This should generate the baseline and chase blocks, for the LTP experiments.
+    Choose between single- or dual pathway experiments.
+    Parse (and then adjust) conditioning protocol.
+    Prompt for cursor times
+    Perform the analysis of LTP parameters :
+    for V-clamp: Rs, Rin, EPSC0 amplitude, and optionally EPSC1 amplitude and PPR
+    for I-clamps: Rin, EPSP0 slope, and optionally EPSP1 slope & PPR
+    for field recordings: fEPSP0 slope, fibre volley amplitude, pop spike; 
+        optionally, the same for second fEPSP, and PPR
+        
+        
+    Adapt for data acquired using CED Signal 5.
+    
+    
+"""
+
 
 #### BEGIN core python modules
 import sys, traceback, inspect, numbers
@@ -26,13 +623,13 @@ from PyQt5.uic import loadUiType as __loadUiType__
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-import core.neoutils as neoutils
 import core.workspacefunctions as wf
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
-import core.datatypes as datatypes
+import core.datatypes as dt
 import core.plots as plots
 import core.models as models
+import core.triggerprotocols as tp
 
 #from core.patchneo import neo
 from core.utilities import safeWrapper
@@ -52,6 +649,8 @@ from gui.scipyenviewer import ScipyenViewer, ScipyenFrameViewer
 #### BEGIN pict.iolib modules
 import iolib.pictio as pio
 #### END pict.iolib modules
+
+import ephys.ephys as ephys
 
 LTPOptionsFile = os.path.join(os.path.dirname(__file__), "options", "LTPOptions.pkl")
 optionsDir     = os.path.join(os.path.dirname(__file__), "options")
@@ -632,7 +1231,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         
         runs_per_trial = protocol["lRunsPerTrial"]
         
-        inter_trial_interval = procotol["fTrialStartToStart"] * pq.s
+        inter_trial_interval = protocol["fTrialStartToStart"] * pq.s
         inter_run_interval = protocol["fRunStartToStart"] * pq.s
         inter_sweep_interval = protocol["fEpisodeStartToStart"] * pq.s
         
@@ -710,7 +1309,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         TODO add support for CED Signal files, etc.
         
         TODO Parse electrophysiology records meta information into a vendor-agnostic
-        data structure -- see core.neoutils module.
+        data structure -- see core.ephys module.
         """
         # list of neo.Blocks, each with a baseline trial
         # these may already contain minute-averages
@@ -919,7 +1518,7 @@ def generate_synaptic_plasticity_options(**kwargs) -> dict:
             with the following keys:
         
             "function": a cursor-based signal function as defined in the 
-                neoutils module, or membrane module
+                ephys module, or membrane module
             
                 function(signal, cursor0, cursor1,...,channel) -> Quantity
             
@@ -932,8 +1531,8 @@ def generate_synaptic_plasticity_options(**kwargs) -> dict:
                 directly in the workspace where ltp analysis is performed.
             
                 Examples: 
-                neoutils.cursors_chord_slope()
-                neoutils.cursors_difference()
+                ephys.cursors_chord_slope()
+                ephys.cursors_difference()
                 ephys.membrane.cursor_Rs_Rin()
             
             "cursors": list of (x, xwindow, label) triplets that specify
@@ -955,7 +1554,7 @@ def generate_synaptic_plasticity_options(**kwargs) -> dict:
             Has a similar structure to cursor_measures, but uses epoch-based
             measurement functions instead.
             
-            "function": epoch-based signal function as defined in the neoutils and
+            "function": epoch-based signal function as defined in the ephys and
                 membrane modules
                 
             "epoch": a single neo.Epoch (they can be serialized) or the tuple
@@ -963,7 +1562,7 @@ def generate_synaptic_plasticity_options(**kwargs) -> dict:
                 construct the Epoch at run time.
             
             Examples:
-            neoutils.epoch_average
+            ephys.epoch_average
         
         Using the examples above:
         
@@ -1044,7 +1643,7 @@ def generate_synaptic_plasticity_options(**kwargs) -> dict:
         
     else:
         LTPopts["Signals"] = kwargs.get("Signals",['Im_prim_1', 'Vm_sec_1'])
-        LTPopts["Cursors"] = {'Labels': ['Rbase','Rs','Rin','EPSC0base','EPSC0Peak','EPSC1base','EPSC1peak'],
+        LTPopts["Cursors"] = {'Labels': ['Rbase','Rs','Rin','EPSC0Base','EPSC0Peak','EPSC1Base','EPSC1peak'],
                               'Pathway0': [0.06, 0.06579859882206893, 0.16, 0.26, 0.273, 0.31, 0.32334583993039734], 
                               'Pathway1': [5.06, 5.065798598822069,   5.16, 5.26, 5.273, 5.31, 5.323345839930397], 
                               'Windows': [0.01, 0.003, 0.01, 0.01, 0.005, 0.01, 0.005]}
@@ -1222,6 +1821,8 @@ def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptio
             In turn the data is itself a dict with two fields: "Baseline" and "Chase"
             mapping onto the minute-by-minute average of the sweep data in the 
             respective pathway.
+            
+    DEPRECATED
     
     """
     from operator import attrgetter, itemgetter, methodcaller
@@ -1245,24 +1846,24 @@ def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptio
     #print(len(chase_blocks))
     
     if LTPOptions["Average"] is None:
-        baseline = [neoutils.concatenate_blocks(baseline_blocks,
-                                                segment_index = LTPOptions["Pathway0"],
-                                                signal_index = LTPOptions["Signals"],
+        baseline = [ephys.concatenate_blocks(baseline_blocks,
+                                                segment = LTPOptions["Pathway0"],
+                                                analog = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path0_baseline"),
-                    neoutils.concatenate_blocks(baseline_blocks,
-                                                segment_index = LTPOptions["Pathway1"],
-                                                signal_index = LTPOptions["Signals"],
+                    ephys.concatenate_blocks(baseline_blocks,
+                                                segment = LTPOptions["Pathway1"],
+                                                analog = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path1_baseline")]
     else:
-        baseline    = [neoutils.average_blocks(baseline_blocks,
-                                            segment_index = LTPOptions["Pathway0"],
-                                            signal_index = LTPOptions["Signals"],
+        baseline    = [ephys.average_blocks(baseline_blocks,
+                                            segment = LTPOptions["Pathway0"],
+                                            analog = LTPOptions["Signals"],
                                             count = LTPOptions["Average"]["Count"],
                                             every = LTPOptions["Average"]["Every"],
                                             name = result_name_prefix + "_path0_baseline"),
-                    neoutils.average_blocks(baseline_blocks,
-                                            segment_index = LTPOptions["Pathway1"],
-                                            signal_index = LTPOptions["Signals"],
+                    ephys.average_blocks(baseline_blocks,
+                                            segment = LTPOptions["Pathway1"],
+                                            analog = LTPOptions["Signals"],
                                             count = LTPOptions["Average"]["Count"], 
                                             every = LTPOptions["Average"]["Every"], 
                                             name = result_name_prefix + "_path1_baseline")]
@@ -1272,25 +1873,25 @@ def generate_minute_average_data_for_LTP(prefix_baseline, prefix_chase, LTPOptio
     
     
     if LTPOptions["Average"] is None:
-        chase   = [neoutils.concatenate_blocks(chase_blocks,
-                                                segment_index = LTPOptions["Pathway0"],
-                                                signal_index = LTPOptions["Signals"],
+        chase   = [ephys.concatenate_blocks(chase_blocks,
+                                                segment = LTPOptions["Pathway0"],
+                                                analog = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path0_chase"),
-                   neoutils.concatenate_blocks(chase_blocks,
-                                                segment_index = LTPOptions["Pathway1"],
-                                                signal_index = LTPOptions["Signals"],
+                   ephys.concatenate_blocks(chase_blocks,
+                                                segment = LTPOptions["Pathway1"],
+                                                analog = LTPOptions["Signals"],
                                                 name = result_name_prefix + "_path1_chase")]
         
     else:
-        chase   = [neoutils.average_blocks(chase_blocks,
-                                            segment_index = LTPOptions["Pathway0"], 
-                                            signal_index = LTPOptions["Signals"],
+        chase   = [ephys.average_blocks(chase_blocks,
+                                            segment = LTPOptions["Pathway0"], 
+                                            analog = LTPOptions["Signals"],
                                             count = LTPOptions["Average"]["Count"], 
                                             every = LTPOptions["Average"]["Every"],
                                             name = result_name_prefix + "_path0_chase"),
-                   neoutils.average_blocks(chase_blocks,
-                                            segment_index = LTPOptions["Pathway1"], 
-                                            signal_index = LTPOptions["Signals"],
+                   ephys.average_blocks(chase_blocks,
+                                            segment = LTPOptions["Pathway1"], 
+                                            analog = LTPOptions["Signals"],
                                             count = LTPOptions["Average"]["Count"], 
                                             every = LTPOptions["Average"]["Every"],
                                             name = result_name_prefix + "_path1_chase")]
@@ -1349,17 +1950,20 @@ def calculate_fEPSP(block:neo.Block,
     """
     
     if isinstance(signal_index, str):
-        singal_index = neoutils.get_index(block, signal_index)
+        singal_index = ephys.get_index(block, signal_index)
         
     for k, seg in enumerate(block.segments):
         pass
     
-def calculateRmEPSCsLTP(block: neo.Block, 
-                        signal_index_Im, 
-                        signal_index_Vm, 
-                        Vm = False, 
-                        epoch = None, 
-                        out_file=None) -> dict:
+def calculate_LTP_measures_in_block(block: neo.Block, 
+                                    signal_index_Im, 
+                                    signal_index_Vm = None, 
+                                    trigger_signal_index = None,
+                                    testVm = None, 
+                                    epoch = None, 
+                                    stim = None,
+                                    isi = None,
+                                    out_file=None) -> pd.DataFrame:
     """
     Calculates membrane Rin, Rs, and EPSC amplitudes in whole-cell voltage clamp.
     
@@ -1369,15 +1973,37 @@ def calculateRmEPSCsLTP(block: neo.Block,
         these signals must be found at the same indices in each segment's list
         of analogsignals, throughout the block.
     
-    epoch: a neo.Epoch; must have 5 or 7 intervals defined:
+    signal_index_Im: (str, int) Name or index of the Im signal
+    
+    signal_index_Vm: (str, int, None) Optional (default None).
+        Name or index of the Vm signal
+        
+    trigger_signal_index: (str, int, None) Optional (default None)
+    
+    Vm: (float, None) Optional (default None)
+        When a float, this is taken to be the actual amplitude of the depolarizing
+        VM test pulse. 
+        
+        When None, the amplitude of the test pulse is inferred from the Vm signal
+        (selected using the signal_index_Vm given above)
+        
+    epoch: neo.Epoch (optional, default None)
+        This must contain 5 or 7 intervals (Epochs) defined and named as follows:
         Rbase, Rs, Rin, EPSC0base, EPSC0peak (optionally, EPSC1base, EPSC1peak)
         
-    signal_index_Im: index of the Im signal
-    signal_index_Vm: index of the Vm signal (if Vm is False) else the detla Vm used in the Vmtest pulse
-    
-    Vm: boolean, optional( default it False); when True, then signal_index_Vm is taken to be the actul
-        amount of membrane voltage depolarization (in mV) used during the Vm test pulse
+        When None, then this epoch is supposed to exist (embedded) in every
+        segment of the block.
         
+        used in the Vm test pulse
+    
+        
+    Returns:
+    ---------
+    NOTE: 2020-09-30 14:56:00 API CHANGE
+    
+    A pandas DataFrame with the following columns:
+    Rs, Rin, DC, EPSC0, and optionally, EPSC1, PPR, and ISI
+    
     NOTE: 2017-04-29 22:41:16 API CHANGE
     Returns a dictionary with keys as follows:
     
@@ -1385,99 +2011,79 @@ def calculateRmEPSCsLTP(block: neo.Block,
     
     (Rs, Rin, DC, EPSC0, EPSC1, PPR) - if there are 7 intervals defined in the epoch
     
-    Where EPSC0 and EPSC1 anre EPSc amplitudes, and PPR is the paired-pulse ratio (EPSC1/EPSC0)
+    Where EPSC0 and EPSC1 are EPSc amplitudes, and PPR is the paired-pulse ratio (EPSC1/EPSC0)
     
     """
-    Irbase = np.ndarray((len(block.segments)))
-    Rs     = np.ndarray((len(block.segments)))
-    Rin    = np.ndarray((len(block.segments)))
-    EPSC0  = np.ndarray((len(block.segments)))
-    EPSC1  = np.ndarray((len(block.segments)))
+    Idc = list()
+    Rs     = list()
+    Rin    = list()
+    EPSC0  = list()
+    EPSC1  = list()
+    PPR    = list()
+    ISI    = list()
+    
     
     ui = None
     ri = None
     
     
     if isinstance(signal_index_Im, str):
-        signal_index_Im = neoutils.get_index(block, signal_index_Im)
+        signal_index_Im = ephys.get_index_of_named_signal(block, signal_index_Im)
     
     if isinstance(signal_index_Vm, str):
-        signal_index_Vm = neoutils.get_index(block, signal_index_Vm)
-        Vm = False
+        signal_index_Vm = ephys.get_index_of_named_signal(block, signal_index_Vm)
+        
+    if isinstance(trigger_signal_index, str):
+        trigger_signal_index = ephys.get_index_of_named_signal(block, trigger_signal_index)
         
     for (k, seg) in enumerate(block.segments):
-        (irbase, rs, rin, epsc0, epsc1) = _segment_measure_synaptic_plasticity_v_clamp_(seg, signal_index_Im, signal_index_Vm, Vm=Vm, epoch=epoch)
+        #print("segment %d" % k)
+        (irbase, rs, rin, epsc0, epsc1, ppr, isi_) = segment_synplast_params_v_clamp(seg, 
+                                                                                    signal_index_Im, 
+                                                                                    signal_index_Vm=signal_index_Vm, 
+                                                                                    trigger_signal_index=trigger_signal_index,
+                                                                                    testVm=testVm, 
+                                                                                    stim=stim,
+                                                                                    isi=isi,
+                                                                                    epoch=epoch)
         ui = irbase.units
         ri = rs.units
         
-        Irbase[k] = irbase
-        Rs[k]     = rs
-        Rin[k]    = rin
-        EPSC0[k]  = epsc0
-        EPSC1[k]  = epsc1
+        Idc.append(np.atleast_1d(irbase))
+        Rs.append(np.atleast_1d(rs))
+        Rin.append(np.atleast_1d(rin))
+        EPSC0.append(np.atleast_1d(epsc0))
+        EPSC1.append(np.atleast_1d(epsc1))
+        PPR.append(np.atleast_1d(ppr))
+        ISI.append(np.atleast_1d(isi_))
 
     ret = dict()
     
-    ret["Rs"] = Rs * ri
-    ret["Rin"] = Rin * ri
-    ret["DC"] = Irbase * ui
-    ret["EPSC0"] = EPSC0 * ui
+    ret["Rs"]       = np.concatenate(Rs) * Rs[0].units
+    #print("Rin", Rin)
+    ret["Rin"]      = np.concatenate(Rin) * Rin[0].units
+    ret["DC"]       = np.concatenate(Idc) * Idc[0].units
+    ret["EPSC0"]    = np.concatenate(EPSC0) * EPSC0[0].units
     
-    if all(EPSC1):
-        ret["EPSC1"] = EPSC1* ui
-        ret["PPR"] = ret["EPSC1"]/ ret["EPSC0"]
+    EPSC1_array     = np.concatenate(EPSC1) * EPSC1[0].units
+    PPR_array       = np.concatenate(PPR) # dimensionless
+    ISI_array       = np.concatenate(ISI) * ISI[0].units
+    
+    if not np.all(np.isnan(EPSC1_array)):
+        ret["EPSC1"] = EPSC1_array
+        ret["PPR"]   = PPR_array
+        ret["ISI"]   = ISI_array
         
+        
+    result = pd.DataFrame(ret)
+    
     if isinstance(out_file, str):
-        if all(EPSC1):
-            header = ["EPSC0", 
-                      "EPSC1", 
-                      "PPR", 
-                      "Rs", 
-                      "Rin", 
-                      "DC"]
-            
-            units = [str(ui), 
-                     str(ui), 
-                     str(ret["PPR"].units), 
-                     str((ret["Rs"]*1000).units), 
-                     str((ret["Rin"]*1000).units),
-                     str(ret["DC"].units)]
-            
-            out_array = np.concatenate((EPSC0[:,np.newaxis],
-                                        EPSC1[:,np.newaxis],
-                                        ret["PPR"].magnitude[:,np.newaxis],
-                                        (Rs*1000)[:,np.newaxis],
-                                        (Rin*1000)[:,np.newaxis],
-                                        Irbase[:,np.newaxis]), axis=1)
-            
-        else:
-            header = ["EPSC0", 
-                      "Rs", 
-                      "Rin", 
-                      "DC"]
-            
-            units = [str(ui), 
-                     str((ret["Rs"]*1000).units), 
-                     str((ret["Rin"]*1000).units),
-                     str(ret["DC"].units)]
-            
-            out_array = np.concatenate((EPSC0[:,np.newaxis],
-                                        (Rs*1000)[:,np.newaxis],
-                                        (Rin*1000)[:,np.newaxis],
-                                        Irbase[:,np.newaxis]), axis=1)
-            
-        header = np.array([header, units])
+        result.to_csv(out_file)
         
-        pio.writeCsv(out_array, out_file, header=header)
-        
-        
-    return ret
+    return result
 
-@safeWrapper
-def calculate_segment_Rs_Rin(segment: neo.Segment):
-    pass
 
-def _segment_measure_synaptic_plasticity_i_clamp_(s: neo.Segment, 
+def segment_synplast_params_i_clamp(s: neo.Segment, 
                                        signal_index: int, 
                                        epoch: typing.Optional[neo.Epoch]=None) -> np.ndarray:
     if epoch is None:
@@ -1507,177 +2113,523 @@ def _segment_measure_synaptic_plasticity_i_clamp_(s: neo.Segment,
         return chord_slopes
         
         
-def _segment_measure_synaptic_plasticity_v_clamp_(s: neo.Segment,
+def segment_synplast_params_v_clamp(s: neo.Segment,
                                        signal_index_Im: int,
-                                       signal_index_Vm: int, 
-                                       Vm: bool=False,
-                                       epoch: typing.Optional[neo.Epoch]=None) -> tuple:
+                                       signal_index_Vm: typing.Optional[int]=None,
+                                       trigger_signal_index: typing.Optional[int] = None,
+                                       testVm: typing.Union[float, pq.Quantity, None]=None,
+                                       epoch: typing.Optional[neo.Epoch]=None,
+                                       stim: typing.Optional[tp.TriggerEvent]=None,
+                                       isi:typing.Union[float, pq.Quantity, None]=None) -> tuple:
+    """
+    Calculates several signal measures in a synaptic plasticity experiment.
+    
+    See NOTE further below, for details about these parameters.
+    
+    Parameters:
+    ----------
+    s:neo.Segment
+        The segment must contain one analog signal with the recording of the
+        membrane current.
+        
+        Optionally, the segment may also contain:
+        
+        1) An analog signal containing the recorded membrane potential (in 
+            Axon amplifiers this is usually the secondary output of the recording
+            channel, in voltage-clamp configuration).
+        
+            When present, this is used to determine the amplitude of the 
+            depolarizing test pulse, which is used to calculate Rs and Rin.
+        
+            WARNING 
+            The function expects such a test pulse to be present in every sweep
+            (segment), delivered shortly after the sweep onset, and typically 
+            BEFORE the synaptic stimulus. This test pulse can also be delivered 
+            towards the end of the sweep, after the synaptic responses. 
+            
+            Rs and Rin are calculated based on three mandatory intervals ("Rbase",
+            "Rs" and "Rin") with their onset times set to fall before, and 
+            during the test pulse defined inside the epoch parameter (or embedded in 
+            the segment, see below).  The onset times for these intervals should
+            be within the test pulse.
+            
+            The test puIf a depolarizing test pulse is absent, the calculated
+        Rs and Rin values will make no sense.
+        
+        When absent, then the amplitude of such a test pulse MUST be given as a
+        separate parameter ("testVm") see below.
+        
+        1) a neo.Epoch named "LTP" (case-insensitive) with intervals as defined
+            in the NOTE further below - used to determine the regions of the 
+            membrane current signal where measurements are made.
+        
+            When such an Epoch is missing, then it must be supplied as an 
+            addtional parameter.
+        
+    signal_index_Im: int 
+        Index into the segment's "analogsignals" collection, for the signal
+        containing the membrane current.
+        
+    signal_index_Vm: int 
+        Optional (default is None).
+        Index into the segment's "analogsignals" collection, for the signal
+        containing the recorded membrane potential
+        
+        ATTENTION: Either signal_index_Vm, or Vm (see below) must be specified and
+            not None.
+        
+    trigger_signal_index: int
+        Optional (default is None)
+        Index of the signal containing the triggers for synaptic stimulation.
+        Useful to determine the time of the synaptic stimulus and the inter-stimulus
+        interval (when appropriate).
+    
+    testVm: scalar float or Python Quantity with units of membrane potential 
+        (V, mV, etc)
+        Optional (default is None).
+        The amplitude of the Vm test pulse.
+        
+        ATTENTION: Either signal_index_Vm, or Vm must be specified and not None.
+        
+    stim: TriggerEvent 
+        Optional, default is None.
+        
+        This must be a presynaptic trigger event (i.e. stim.event_type equals
+        TriggerEventType.presynaptic) with one or two elements, corresponding to
+        the first and, optionally, the second synaptic stimulus trigger.
+        
+        When present, it will be used to determine the inter-stimulsu interval.
+        
+        When absent, the interstimulus interval can be manually specified ("isi"
+        parameter, below) or detected from a trigger signal (specified using the
+        "trigger_signal_index" parameter, see above).
+        
+    epoch: neo.Epoch
+        Optional (default is None).
+        When present, indicates the segments of the membrane current signal 
+        where the measures are determined -- see NOTE, below, for details.
+        
+        ATTENTION: When None, the neo.Segment "s" is expected to contain a
+        neo.Epoch with intervals defined in the NOTE below.
+        
+    isi: scalar float or Python Quantity, or None.
+        Optional (default is None).
+        When None but either trigger_signal_index or stim parameters are specified
+        then inter-stimulius interval is determined from these.
+        
+        
+    Returns:
+    --------
+    
+    A tuple of scalars (Idc, Rs, Rin, EPSC0, EPSC1, PPR, ISI) where:
+    
+    Idc: scalar Quantity = the baseline (DC) current (measured at the Rbase epoch
+            interval, see below)
+    
+    Rs: scalar Quantity = Series (access) resistance
+    
+    Rin: scalar Quantity = Input resistance
+    
+    EPSC0: scalar Quantity = Amplitude of first synaptic response.
+    
+    EPSC1: scalar Quantity = Amplitude of second synaptic response in
+            paired-pulse experiments,
+            
+            or np.nan in the case of single-pulse experiments
+            
+            In either case the value has membrane current units.
+            
+    PPR: float scalar = Paired-pulse ratio (EPSC0 / EPSC1, for paired-pulse experiments)
+            or np.nan (single-pulse experiments)
+            
+    ISI: scalar Quantity;
+        This is either the value explicitly given in the "isi" parameter or it
+        is calculated from the "stim" parameter, or is determined from a trigger
+        signal specified with "trigger_signal_index".
+        
+        When neither "isi", "stim" or "trigger_signal_index" are specified, then
+        ISI is returned as NaN * time units associated with the membrane current
+        signal.
+        
+        
+    NOTE:
+    There are two groups of signal measures:
+    
+    a) Mandatory measures:
+        The series resistance (Rs), the input resistance (Rin), and the amplitude
+        of the (first) synaptic response (EPSC0)
+    
+    b) Optional measures - only for paired-pulse experiments:
+        The amplitude of the second synaptic response (EPSC1) and the paired-pulse
+        ratio (PPR = EPSC1/EPSC0)
+        
+    The distinction between single- and paired-pulse stimulation is obtained 
+    from the parameter "epoch", which must contain the following intervals or
+    regions of the Im signal:
+    
+    Interval        Mandatory/  Time onset                  Measurement:
+    #   label:      Optional:
+    ============================================================================
+    1   Rbase       Mandatory   Before the depolarizing     Baseline membrane current
+                                test pulse.                 to calculate Rs & Rin.
+                                                        
+    2   Rs          Mandatory   Just before the peak of     The capacitive current
+                                the capacitive current      at the onset of the
+                                and after the onset of      depolarizing test pulse.
+                                the depolarizing test       (to calculate series 
+                                pulse.                      resistance).
+                                                    
+    3   Rin         Mandatory   Towards the end of the      Steady-state current
+                                depolarizing pulse.         during the depilarizing
+                                                            tets pulse (to calculate
+                                                            input resistance).
+                                
+    4   EPSC0Base   Mandatory   Before the stimulus         Im baseline before  
+                                artifact of the first       the first synaptic
+                                presynaptic stimulus.       response (to calculate
+                                                            amplitude of the first 
+                                                            EPSC)
+                                
+        
+    5   EPSC0Peak   Mandatory   At the "peak" (or, rather   Peak of the (first)  
+                                "trough") of the first      EPSC (to calculate
+                                EPSC                        EPSC amplitude).
+                                
+    6   EPSC1Base   Optional    Before the stimulus         Im baseline before  
+                                artifact of the second      the second synaptic
+                                presynaptic stimulus.       response (to calculate
+                                                            amplitude of the 2nd 
+                                                            EPSC and PPR)
+        
+    7   EPSC1Peak   Optional    At the "peak" (or, rather   Peak of the 2nd  
+                                "trough") of the 2nd        EPSC (to calculate
+                                EPSC                        2nd EPSC amplitude
+                                                            and PPR).
+    
+    The labels are used to locate the appropriate signal regions for each 
+    measurement and are case-sensitive.
+    
+    Epochs with 5 intervals are considered to belong to a single-pulse experiment.
+    A paired-pulse experiment is represented by an epoch with 7 intervals.
+    
+    The intervals (and the epoch) can be constructed manually, or visually using
+    vertical cursors in Scipyen's SignalViewer. In the latter case, the cursors
+    should be labelled accordingly, then an epoch embedded in the segment can be 
+    generated with the appropriate menu function in SignalViewer window.
+    
+    
+    """
+    def __interval_index__(labels, label):
+        #print("__interval_index__ labels:", labels, "label:", label, "label type:", type(label))
+        if labels.size == 0:
+            raise ValueError("Expecting a non-empty labels array")
+        
+        if isinstance(label, str):
+            w = np.where(labels == label)[0]
+        elif isinstance(label, bytes):
+            w = np.where(labels == label.decode())[0]
+            
+        else:
+            raise TypeError("'label' expected to be str or bytes; got %s instead" % type(label).__name__)
+        
+        if w.size == 0:
+            raise IndexError("Interval %s not found" % label.decode())
+        
+        if w.size > 1:
+            warnings.warn("Several intervals named %s were found; will return the index of the first one and discard the rest" % label.decode())
+        
+        return int(w)
+        
+    mandatory_intervals = [b"Rbase", b"Rs", b"Rin", b"EPSC0Base", b"EPSC0Peak"]
+    optional_intervals = [b"EPSC1Base", b"EPSC1Peak"]
+    
     if epoch is None:
         if len(s.epochs) == 0:
-            raise ValueError("Segment has no epochs and no external epoch has been defined")
+            raise ValueError("Segment has no epochs, and no external epoch has been defined either")
         
-        epoch = s.epochs[0]
+        ltp_epochs = [e for e in s.epochs if (isinstance(e.name, str) and e.name.strip().lower() == "ltp")]
         
-        if len(epoch) != 5 and len(epoch) != 7:
-            raise ValueError("Epoch as supplied or taken from segment has incorrect length; expected to contain 5 or 7 intervals")
+        if len(ltp_epochs) == 0:
+            raise ValueError("Segment seems to have no LTP epoch defined, and no external epoch has been defined either")
         
-        t0 = epoch.times
-        t1 = epoch.times + epoch.durations
+        elif len(ltp_epochs) > 1:
+            warnings.warn("Theres eem to be more than one LTP epoch defined in the segment; only the FIRST one will be used")
+        
+        epoch = ltp_epochs[0]
+        
+    if epoch.size != 5 and epoch.size != 7:
+        raise ValueError("The LTP epoch (either supplied or embedded in the segment) has incorrect length; expected to contain 5 or 7 intervals")
     
-        Irbase = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[0], t1[0]))
-        
-        Irs    = np.max(s.analogsignals[signal_index_Im].time_slice(t0[1], t1[1])) 
-        
-        Irin   = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[2], t1[2]))
-        
-        if Vm:
-            Rs  = signal_index_Vm * pq.mV / (Irs - Irbase)
-            Rin = signal_index_Vm * pq.mV / (Irin - Irbase)
+    if epoch.labels.size == 0 or epoch.labels.size != epoch.size:
+        raise ValueError("Mismatch between epoch size and number of labels in the epoch")
+    
+    mandatory_intervals_ndx = [__interval_index__(epoch.labels, l) for l in mandatory_intervals]
+    optional_intervals_ndx = [__interval_index__(epoch.labels, l) for l in optional_intervals]
+    
+    # [Rbase, Rs, Rin, EPSC0Base, EPSC0Peak]
+    t = [(epoch.times[k], epoch.times[k] + epoch.durations[k]) for k in mandatory_intervals_ndx]
+    
+    #print("t", t)
+    
+    Idc    = np.mean(s.analogsignals[signal_index_Im].time_slice(t[0][0], t[0][1]))
+    
+    Irs    = np.max(s.analogsignals[signal_index_Im].time_slice(t[1][0], t[1][1])) 
+    
+    Irin   = np.mean(s.analogsignals[signal_index_Im].time_slice(t[2][0], t[2][1]))
+    
+    #print("Idc", Idc, "Irin", Irin, "Irs", Irs)
+    
+    #t0 = epoch.times # t0: [Rbase, Rs, Rin, EPSC0Base, EPSC0Peak, EPSC1Base, EPSC1Peak]
+    #t1 = epoch.times + epoch.durations
+
+    #Idc = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[0], t1[0]))
+    
+    #Irs    = np.max(s.analogsignals[signal_index_Im].time_slice(t0[1], t1[1])) 
+    
+    #Irin   = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[2], t1[2]))
+    
+    if signal_index_Vm is None:
+        if isinstance(testVm, numbers.Number):
+            testVm = testVm * pq.mV
+            
+        elif isinstance(testVm, pq.Quantity):
+            if not dt.units_convertible(testVm, pq.V):
+                raise TypeError("When a quantity, testVm must have voltage units; got %s instead" % testVm.dimensionality)
+            
+            if testVm.size != 1:
+                raise ValueError("testVm must be a scalar; got %s instead" % testVm)
             
         else:
-            Vbase = np.mean(s.analogsignals[signal_index_Vm].time_slice(t0[0], t1[0])) 
+            raise TypeError("When signal_index_Vm is None, testVm is expected to be specified as a scalar float or Python Quantity, ; got %s instead" % type(testVm).__name__)
 
-            Vin   = np.mean(s.analogsignals[signal_index_Vm].time_slice(t0[2], t1[2])) 
+    else:
+        # NOTE: 2020-09-30 09:56:30
+        # Vin - Vbase is the test pulse amplitude
+        Vbase = np.mean(s.analogsignals[signal_index_Vm].time_slice(t[0][0], t[0][1])) # where Idc is measured
+        #print("Vbase", Vbase)
 
-            Rs     = (Vin - Vbase) / (Irs - Irbase)
-            Rin    = (Vin - Vbase) / (Irin - Irbase)
-            
-        Iepsc0base = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[3], t1[3])) 
+        Vss   = np.mean(s.analogsignals[signal_index_Vm].time_slice(t[2][0], t[2][1])) # where Rin is calculated
+        #print("Vss", Vss)
         
-        Iepsc0peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[4], t1[4])) 
+        testVm  = Vss - Vbase
+
+    #print("testVm", testVm)
     
-        EPSC0 = Iepsc0peak - Iepsc0base
+    Rs     = (testVm / (Irs - Idc)).rescale(dt.Mohm)
+    Rin    = (testVm / (Irin - Idc)).rescale(dt.Mohm)
         
-        if len(epoch) == 7:
-            
-            Iepsc1base = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[5], t1[5])) 
-            
-            Iepsc1peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[6], t1[6])) 
-            
-            EPSC1 = Iepsc1peak - Iepsc1base
-            
-        else:
-            EPSC1 = None
-            
-            
+    #print("dIRs", (Irs-Idc), "dIRin", (Irin-Idc), "Rs", Rs, "Rin", Rin)
+        
+    Iepsc0base = np.mean(s.analogsignals[signal_index_Im].time_slice(t[3][0], t[3][1])) 
+    
+    Iepsc0peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t[4][0], t[4][1])) 
 
-    return (Irbase, Rs, Rin, EPSC0, EPSC1)
+    EPSC0 = Iepsc0peak - Iepsc0base
+    
+    if len(epoch) == 7 and len(optional_intervals_ndx) == 2:
+        
+        # [EPSC1Base, EPSC1Peak]
+        t = [(epoch.times[k], epoch.times[k] + epoch.durations[k]) for k in optional_intervals_ndx]
+        
+        Iepsc1base = np.mean(s.analogsignals[signal_index_Im].time_slice(t[0][0], t[0][1])) 
+        
+        Iepsc1peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t[1][0], t[1][1])) 
+        
+        #Iepsc1base = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[5], t1[5])) 
+        
+        #Iepsc1peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[6], t1[6])) 
+        
+        EPSC1 = Iepsc1peak - Iepsc1base
+        PPR = (EPSC1 / EPSC0).magnitude.flatten()[0] # because it's dimensionless
+        
+    else:
+        EPSC1 = np.nan * pq.mV
+        PPR = np.nan
+            
+    ISI = np.nan * s.analogsignals[signal_index_Im].times.units
+    
+    event = None
+    
+    if isinstance(isi, float):
+        warnings.warn("Inter-stimulus interval explicitly given: %s" % isi)
+        ISI = isi * s.analogsignals[signal_index_Im].times.units
+        
+    elif isinstance(isi, pq.Quantity):
+        if isi.size != 1:
+            raise ValueError("ISI given explicitly must be a scalar; got %s instead" % isi)
+            
+        if not dt.units_convertible(isi, s.analogsignals[signal_index_Im].times):
+            raise ValueError("ISI given explicitly has units %s which are incompatible with the time axis" % isi.units)
+            
+        warnings.warn("Inter-stimulus interval is explicitly given: %s" % isi)
+        
+        ISI = isi
+        
+    else:
+        if isinstance(stim, tp.TriggerEvent): # check for presyn stim event param
+            if stim.event_type != tp.TriggerEventType.presynaptic:
+                raise TypeError("'stim' expected to be a presynaptic TriggerEvent; got %s instead" % stim.event_type.name)
+            
+            if stim.size < 1 or stim.size > 2:
+                raise ValueError("'stim' expected to contain one or two triggers; got %s instead" % stim.size)
+            
+            event = stim
+            
+        elif len(s.events): # check for presyn stim event embedded in segment
+            ltp_events = [e for e in s.events if (e.event_type == tp.TriggerEventType.presynaptic and isinstance(e.name, str) and e.name.strip().lower() == "ltp")]
+            
+            if len(ltp_events):
+                if len(ltp_events)>1:
+                    warnings.warn("More than one LTP event array was found; taking the first and discarding the rest")
+                    
+                event = ltp_events[0]
+                    
+                
+        if event is None: # none of the above => try to determine from trigger signal if given
+            if isinstance(trigger_signal_index, (str)):
+                trigger_signal_index = ephys.get_index_of_named_signal(s, trigger_signal_index)
+                
+            elif isinstance(trigger_signal_index, int):
+                if trigger_signal_index < 0 or trigger_signal_index > len(s.analogsignals):
+                    raise ValueError("invalid index for trigger signal; expected  0 <= index < %s; got %d instead" % (len(s.analogsignals), trigger_signal_index))
+                
+                event = tp.detect_trigger_events(s.analogsignals[trigger_signal_index], "presynaptic", name="LTP")
+                
+            elif not isinstance(trigger_signal_index, (int, type(None))):
+                raise TypeError("trigger_signal_index expected to be a str, int or None; got %s instead" % type(trigger_signal_index).__name__)
+
+            
+        if isinstance(event, tp.TriggerEvent) and event.size == 2:
+            ISI = np.diff(event.times)[0]
+
+    return (Idc, Rs, Rin, EPSC0, EPSC1, PPR, ISI)
 
                  
-def analyzeLTPPathway(baseline_block:neo.Block, 
-                      chase_block:neo.Block, 
-                      LTPOptions:dict,
-                      signal_index_Im, 
-                      signal_index_Vm, 
-                      path_index,
-                      baseline_epoch=None, 
-                      chase_epoch = None,
-                      Vm = False,
-                      baseline_range=range(-5,-1),
-                      basename=None, 
-                      pathType=None,
-                      normalize=False,
-                      field=False):
+def analyse_LTP_in_pathway(baseline_block: neo.Block, 
+                           chase_block: neo.Block, 
+                           signal_index_Im: typing.Union[int, str], 
+                           path_index: int,
+                           baseline_range=range(-5,-1),
+                           signal_index_Vm: typing.Union[int, str]=None, 
+                           trigger_signal_index: typing.Union[int, str, None]=None,
+                           baseline_epoch:typing.Optional[neo.Epoch]=None, 
+                           chase_epoch:typing.Optional[neo.Epoch] = None,
+                           testVm:typing.Optional[typing.Union[float, pq.Quantity]] = None,
+                           stim:typing.Optional[tp.TriggerEvent] = None,
+                           isi:typing.Optional[typing.Union[float, pq.Quantity]] = None,
+                           basename:str=None, 
+                           normalize:bool=False,
+                           field:bool=False,
+                           is_test:bool = False,
+                           v_clamp:bool = True,
+                           out_file:typing.Optional[str]=None) -> pd.DataFrame:
     """
-    baseline_block
-    chase_block
-    path_index
-    signal_index_Im
-    signal_index_Vm
+    Parameters:
+    -----------
+    baseline_block: neo.Block with baseline (pre-induction) sweeps (segments)
+    chase_block: neo.Block with chase (post-induction) sweeps (segments)
+    signal_index_Im: int
+    signal_index_Vm: int or str
+    trigger_signal_index
+    path_index: 
+    baseline_range  = range(-5,-1)
     baseline_epoch  = None
     chase_epoch     = None
     Vm              = False
-    baseline_range  = range(-5,-1)
     basename        = None
+
     """
-    if field:
-        pass
+    # TODO 2020-10-26 09:18:18
+    # analysis of fEPSPs
+    # analysis of EPSPs (LTP experiments in I-clamp)
+    
+    #if field:
+        #pass
         
-    else:
-        baseline_result     = calculateRmEPSCsLTP(baseline_block, signal_index_Im = signal_index_Im, signal_index_Vm = signal_index_Vm, Vm = Vm, epoch = baseline_epoch)
-        chase_result        = calculateRmEPSCsLTP(chase_block,    signal_index_Im = signal_index_Im, signal_index_Vm = signal_index_Vm, Vm = Vm, epoch = chase_epoch)
+    #else:
+
+    baseline_result     = calculate_LTP_measures_in_block(baseline_block, 
+                                                          signal_index_Im = signal_index_Im, 
+                                                          signal_index_Vm = signal_index_Vm, 
+                                                          trigger_signal_index = trigger_signal_index,
+                                                          testVm = testVm, 
+                                                          epoch = baseline_epoch,
+                                                          stim = stim,
+                                                          isi = isi)
     
-    meanEPSC0baseline   = np.mean(baseline_result["EPSC0"][baseline_range])
+    chase_result        = calculate_LTP_measures_in_block(chase_block,    
+                                                            signal_index_Im = signal_index_Im, 
+                                                            signal_index_Vm = signal_index_Vm, 
+                                                            trigger_signal_index = trigger_signal_index,
+                                                            testVm = testVm, 
+                                                            epoch = chase_epoch,
+                                                            stim = stim,
+                                                            isi = isi)
+
+    result = pd.concat([baseline_result, chase_result],
+                       ignore_index = True, axis=0, sort=True)
     
-    if normalize:
-        baseEPSC0Norm       = baseline_result["EPSC0"]/meanEPSC0baseline
-        chaseEPSC0Norm      = chase_result["EPSC0"]/meanEPSC0baseline
+    # time index (minutes) relative to the first post-conditioning stimulus (set 
+    # to minute zero); this is stored as the index of the data frame
     
-    else:
-        baseEPSC0Norm       = baseline_result["EPSC0"]
-        chaseEPSC0Norm      = chase_result["EPSC0"]
+    result.index = range(-len(baseline_result), len(chase_result))
+    
+    if normalize: # augment with normalized values
+        meanEPSC0baseline   = np.mean(baseline_result["EPSC0"].iloc[baseline_range])
+        result["EPSC0Norm"] = result["EPSC0"] / meanEPSC0baseline
         
-    #baseline_times      = [seg.rec_datetime for seg in baseline_block.segments] # not used atm
-    
+        if not np.all(np.isnan(baseline_result["EPSC1"])):
+            meanEPSC1baseline = np.nanmean(baseline_result["EPSC1"].iloc[baseline_range])
+            result["EPSC1Norm"] = result["EPSC1"] / meanEPSC1baseline
+        
     if basename is None:
         basename = ""
         
-    if path_index is not None:
-        basename += "_path%d" % (path_index)
-        
-    if normalize:
-        header = ["Index_path_%d_%s"        % (path_index, pathType), \
-                  "EPSC0_norm_path_%d_%s"   % (path_index, pathType), \
-                  "PPR_path_%d_%s"          % (path_index, pathType), \
-                  "Rin_path_%d_%s"          % (path_index, pathType), \
-                  "RS_path_%d_%s"           % (path_index, pathType), \
-                  "DC_path_%d_%s"           % (path_index, pathType)]
+    name = "%s %s (%d)" % (basename, "Test" if is_test else "Control", path_index)
+    
+    if hasattr(result, "attr"):
+        result.attr["Name"] = name  #requires more recent Pandas
+    
+    if isinstance(out_file, str):
+        result.to_csv(out_file)
+    
+    return result
 
-    else:
-        header = ["Index_path_%d_%s"        % (path_index, pathType), \
-                  "EPSC0_path_%d_%s"        % (path_index, pathType), \
-                  "PPR_path_%d_%s"          % (path_index, pathType), \
-                  "Rin_path_%d_%s"          % (path_index, pathType), \
-                  "RS_path_%d_%s"           % (path_index, pathType), \
-                  "DC_path_%d_%s"           % (path_index, pathType)]
-        
-    units  = [" ",  str(baseEPSC0Norm.units), \
-                    str(baseline_result["PPR"].units), \
-                    str((baseline_result["Rin"]*1000).units), \
-                    str((baseline_result["Rs"]*1000).units), \
-                    str(baseline_result["DC"].units)]
+def LTP_analysis(path0_base:neo.Block, path0_chase:neo.Block, path0_options:dict,
+                 path1_base:typing.Optional[neo.Block]=None, 
+                 path1_chase:typing.Optional[neo.Block]=None, 
+                 path1_options:typing.Optional[dict]=None,
+                 basename:typing.Optional[str]=None):
+    """
+    path0_base: neo.Block with minute-averaged sweeps with synaptic responses
+            on pathway 0 before conditioning
+                
+    path0_chase: neo.Block with minute-average sweeps with synaptic reponses
+            on pathway 0 after conditioning
+                
+    path0_options: a mapping (dict-like) wiht the key/value items listed below
+            (these are passed directly as parameters to analyse_LTP_in_pathway):
+                
+            Im: int, str                    index of the Im signal
+            Vm: int, str, None              index of the Vm signal
+            DIG: int, str, None             index of the trigger signal
+            base_epoch: neo.Epoch, None
+            chase_epoch: neo.Epoxh, None
+            testVm: float, python Quantity, None
+            stim: TriggerEvent, None
+            isi: float, Quantity, None
+            normalize: bool
+            field: bool                     Vm must be a valid index
+            is_test: bool
+            v_clamp:bool
+            index: int
+            baseline_sweeps: iterable (sequence of ints, or range)
+                
     
-    header = np.array([header, units])
-    
-    #print(header)
-    #print(header.dtype)
-    
-    EPSC0NormOut_base = np.concatenate((np.arange(len(baseEPSC0Norm))[:,np.newaxis], \
-                                        baseEPSC0Norm[:,np.newaxis].magnitude), axis=1)
-    
-    EPSC0NormOut_chase = np.concatenate((np.arange(len(chaseEPSC0Norm))[:, np.newaxis] ,\
-                                        chaseEPSC0Norm[:,np.newaxis].magnitude), axis=1)
-    
-    EPSC0NormOut = np.concatenate((EPSC0NormOut_base, EPSC0NormOut_chase), axis=0)
-    
-    Rin_out = np.concatenate(((baseline_result["Rin"]*1000).magnitude, (chase_result["Rin"]*1000).magnitude))
-    
-    Rs_out = np.concatenate(((baseline_result["Rs"]*1000).magnitude, (chase_result["Rs"]*1000).magnitude))
-    
-    PPR_out = np.concatenate((baseline_result["PPR"].magnitude, chase_result["PPR"].magnitude))
-    
-    DC_out = np.concatenate((baseline_result["DC"].magnitude, chase_result["DC"].magnitude))
-    
-    Out_array = np.concatenate((EPSC0NormOut,   \
-                PPR_out[:,np.newaxis],          \
-                Rin_out[:,np.newaxis],          \
-                Rs_out[:, np.newaxis],          \
-                DC_out[:, np.newaxis]), axis=1)
-    
-    pio.writeCsv(Out_array, "%s_%s" % (basename, "result"), header=header)
-        
-    ret = dict()
-    
-    ret["%s_%s" % (basename, "baseline_result")]            = baseline_result
-    ret["%s_%s" % (basename, "chase_result")]               = chase_result
-    ret["%s_%s" % (basename, "baseline_EPSC0_mean")]        = meanEPSC0baseline
-    ret["%s_%s" % (basename, "baseline_EPSC0_normalized")]  = baseEPSC0Norm
-    ret["%s_%s" % (basename, "chase_EPSC0_normalized")]     = chaseEPSC0Norm
-    
-    return ret
+    """
 
     
-def LTP_analysis(mean_average_dict, LTPOptions, results_basename=None, normalize=False):
+def LTP_analysis_v0(mean_average_dict, LTPOptions, results_basename=None, normalize=False):
     """
     Arguments:
     ==========
@@ -1688,10 +2640,12 @@ def LTP_analysis(mean_average_dict, LTPOptions, results_basename=None, normalize
         
     Returns:
     
-    ret_test, ret_control - two dictionaries with results for test and control (as calculated by analyzeLTPPathway)
+    ret_test, ret_control - two dictionaries with results for test and control (as calculated by analyse_LTP_in_pathway)
     
     NOTE 1: The segments in the blocks inside mean_average_dict must have already been assigned epochs from cursors!
     NOTE 2: The "Test" and "Control" dictionaries in mean_average_dict must contain a field "Path" with the actual path index
+    
+    DEPRECATED
     """
     
     if results_basename is None:
@@ -1705,14 +2659,14 @@ def LTP_analysis(mean_average_dict, LTPOptions, results_basename=None, normalize
     elif not isinstance(results_basename, str):
         raise TypeError("results_basename parameter must be a str or None; for %s instead" % type(results_basename).__name__)
     
-    ret_test = analyzeLTPPathway(mean_average_dict["Test"]["Baseline"],
+    ret_test = analyse_LTP_in_pathway(mean_average_dict["Test"]["Baseline"],
                                  mean_average_dict["Test"]["Chase"], 0, 1, 
                                  mean_average_dict["Test"]["Path"], 
                                  basename=results_basename+"_test", 
                                  pathType="Test", 
                                  normalize=normalize)
     
-    ret_control = analyzeLTPPathway(mean_average_dict["Control"]["Baseline"], mean_average_dict["Control"]["Chase"], 0, 1, mean_average_dict["Control"]["Path"], \
+    ret_control = analyse_LTP_in_pathway(mean_average_dict["Control"]["Baseline"], mean_average_dict["Control"]["Chase"], 0, 1, mean_average_dict["Control"]["Path"], \
                                 basename=results_basename+"_control", pathType="Control", normalize=normalize)
     
     return (ret_test, ret_control)
@@ -1923,25 +2877,25 @@ def extract_sample_EPSPs(data,
         
         
         
-    average_test_base = neoutils.set_relative_time_start(neoutils.average_segments([data["Test"]["Baseline"].segments[ndx] for ndx in test_base_segments_ndx], 
+    average_test_base = ephys.set_relative_time_start(ephys.average_segments([data["Test"]["Baseline"].segments[ndx] for ndx in test_base_segments_ndx], 
                                                         signal_index = data["LTPOptions"]["Signals"][0])[0])
 
-    test_base = neoutils.set_relative_time_start(neoutils.get_time_slice(average_test_base, t0, t1))
+    test_base = ephys.set_relative_time_start(ephys.get_time_slice(average_test_base, t0, t1))
     
-    average_test_chase = neoutils.set_relative_time_start(neoutils.average_segments([data["Test"]["Chase"].segments[ndx] for ndx in test_chase_segments_ndx],
+    average_test_chase = ephys.set_relative_time_start(ephys.average_segments([data["Test"]["Chase"].segments[ndx] for ndx in test_chase_segments_ndx],
                                           signal_index = data["LTPOptions"]["Signals"][0])[0])
     
-    test_chase = neoutils.set_relative_time_start(neoutils.get_time_slice(average_test_chase, t0, t1))
+    test_chase = ephys.set_relative_time_start(ephys.get_time_slice(average_test_chase, t0, t1))
     
-    control_base_average = neoutils.set_relative_time_start(neoutils.average_segments([data["Control"]["Baseline"].segments[ndx] for ndx in control_base_segments_ndx],
+    control_base_average = ephys.set_relative_time_start(ephys.average_segments([data["Control"]["Baseline"].segments[ndx] for ndx in control_base_segments_ndx],
                                                             signal_index = data["LTPOptions"]["Signals"][0])[0])
     
-    control_base = neoutils.set_relative_time_start(neoutils.get_time_slice(control_base_average, t0, t1))
+    control_base = ephys.set_relative_time_start(ephys.get_time_slice(control_base_average, t0, t1))
     
-    control_chase_average = neoutils.set_relative_time_start(neoutils.average_segments([data["Control"]["Chase"].segments[ndx] for ndx in control_chase_segments_ndx],
+    control_chase_average = ephys.set_relative_time_start(ephys.average_segments([data["Control"]["Chase"].segments[ndx] for ndx in control_chase_segments_ndx],
                                           signal_index = data["LTPOptions"]["Signals"][0])[0])
     
-    control_chase = neoutils.set_relative_time_start(neoutils.get_time_slice(control_chase_average, t0, t1))
+    control_chase = ephys.set_relative_time_start(ephys.get_time_slice(control_chase_average, t0, t1))
     
     
     result = neo.Block(name = "%s_sample_traces" % data["name"])
@@ -1957,10 +2911,10 @@ def extract_sample_EPSPs(data,
     control_base.analogsignals[0] -= np.mean(control_base.analogsignals[0].time_slice(0.0002 * pq.s, 0.002 * pq.s))
     control_chase.analogsignals[0] -= np.mean(control_chase.analogsignals[0].time_slice(0.0002 * pq.s, 0.002 * pq.s))
     
-    test_traces = neoutils.concatenate_signals(test_base.analogsignals[0], test_chase.analogsignals[0], axis=1)
+    test_traces = ephys.concatenate_signals(test_base.analogsignals[0], test_chase.analogsignals[0], axis=1)
     test_traces.name = "Test"
     
-    control_traces = neoutils.concatenate_signals(control_base.analogsignals[0], control_chase.analogsignals[0], axis=1)
+    control_traces = ephys.concatenate_signals(control_base.analogsignals[0], control_chase.analogsignals[0], axis=1)
     control_traces.name= "Control"
     
     result_segment = neo.Segment()

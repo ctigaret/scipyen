@@ -7,7 +7,7 @@ TODO
 #### BEGIN core python modules
 from __future__ import print_function
 
-import os, warnings
+import os, warnings, types, traceback
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -15,7 +15,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from PyQt5.uic import loadUiType as __loadUiType__
 
-from pyqtgraph import DataTreeWidget
+from pyqtgraph import (DataTreeWidget, TableWidget, )
 import neo
 import numpy as np
 #### END 3rd party modules
@@ -23,11 +23,11 @@ import numpy as np
 #### BEGIN pict.core modules
 import core.datatypes as dt
 
-import core.axiscalibration
-from core.axiscalibration import AxisCalibration
+import imaging.axiscalibration
+from imaging.axiscalibration import AxisCalibration
 
-import core.scandata
-from core.scandata import (ScanData, AnalysisUnit)
+import imaging.scandata
+from imaging.scandata import (ScanData, AnalysisUnit)
 
 import core.triggerprotocols
 from core.triggerprotocols import (TriggerEvent, TriggerProtocol)
@@ -37,11 +37,13 @@ from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 
 from core import xmlutils, strutils
 
-from core.workspacefunctions import validateVarName
+from core.workspacefunctions import validate_varname
 
-from core.utilities import (get_nested_value, set_nested_value, counterSuffix, )
+from core.utilities import (get_nested_value, set_nested_value, counter_suffix, )
 
 from core.prog import (safeWrapper, safeGUIWrapper, )
+
+from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 
 #### END pict.core modules
 
@@ -51,6 +53,80 @@ from . import quickdialog
 from . import resources_rc
 #### END pict.gui modules
 
+class ScipyenTableWidget(TableWidget):
+    def __init__(self, *args, **kwds):
+        super().__init__(*args, **kwds)
+        
+    def iterFirstAxis(self, data):
+        """Avoid exceptions when data is a dimesionless array.
+        
+        In the original TableWidget from pyqtgraph this method fails when data 
+        is a dimesionless np.ndarray (i.e. with empty shape and ndim = 0).
+        
+        This kind of arrays unfortunately can occur when creating a numpy
+        array (either directly in the numpy library, os in the python Quantities
+        library):
+        
+        Example 1 - using python quantities:
+        ------------------------------------
+        
+        In: import quantities as pq
+        
+        In: a = 1*pq.s
+        
+        In: a
+        Out: array(1.)*s
+        
+        In: a.shape
+        Out: ()
+        
+        In: a.ndim
+        Out: 0
+        
+        In: a[0]
+        IndexError: too many indices for array: array is 0-dimensional, but 1 were indexed
+        
+        Example 2 - directly creating a numpy array:
+        --------------------------------------------
+        
+        In: b = np.array(1)
+        
+        In: b
+        Out: array(1)
+        
+        In: b.shape
+        Out: ()
+        
+        In: b.ndim
+        Out: 0
+        
+        In: b[0]
+        IndexError: too many indices for array: array is 0-dimensional, but 1 were indexed
+        
+        This will cause self.iterFirstAxis(a) to raise 
+        IndexError: tuple index out of range
+        
+        
+        HOWEVER, the value of the unique element of the array can be retrieved
+        by using its "take" method:
+        
+        In: a.take(0)
+        Out: 1.0
+        
+        In: b.take(0)
+        Out: 1
+
+        
+        """
+        
+        
+        if len(data.shape) == 0 or data.ndim ==0:
+            yield(data.take(0))
+            
+        else:
+            for i in range(data.shape[0]):
+                yield data[i]
+
 class InteractiveTreeWidget(DataTreeWidget):
     """Adds support for custom context menu to pyqtgraph.DataTreeWidget.
     """
@@ -58,7 +134,65 @@ class InteractiveTreeWidget(DataTreeWidget):
         super(InteractiveTreeWidget, self).__init__(*args, **kwargs)
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
     
+    def parse(self, data):
+        """
+        Given any python object, return:
+        * type
+        * a short string representation
+        * a dict of sub-objects to be parsed
+        * optional widget to display as sub-node
+        
+        NOTE: 2020-10-11 13:48:51
+        override superclass parse to use ScipyenTableWidget instead
+        
+        """
+        from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
+        from pyqtgraph.pgcollections import OrderedDict
+        from pyqtgraph.python2_3 import asUnicode
 
+        # defaults for all objects
+        typeStr = type(data).__name__
+        if typeStr == 'instance':
+            typeStr += ": " + data.__class__.__name__
+        widget = None
+        desc = ""
+        childs = {}
+        
+        # type-specific changes
+        if isinstance(data, dict):
+            desc = "length=%d" % len(data)
+            if isinstance(data, OrderedDict):
+                childs = data
+            else:
+                childs = OrderedDict(sorted(data.items()))
+        elif isinstance(data, (list, tuple)):
+            desc = "length=%d" % len(data)
+            childs = OrderedDict(enumerate(data))
+        elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
+            childs = OrderedDict([
+                ('data', data.view(np.ndarray)),
+                ('meta', data.infoCopy())
+            ])
+        elif isinstance(data, np.ndarray):
+            desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+            table = ScipyenTableWidget()
+            table.setData(data)
+            table.setMaximumHeight(200)
+            widget = table
+        elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
+            frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
+            #childs = OrderedDict([
+                #(i, {'file': child[0], 'line': child[1], 'function': child[2], 'code': child[3]})
+                #for i, child in enumerate(frames)])
+            #childs = OrderedDict([(i, ch) for i,ch in enumerate(frames)])
+            widget = QtGui.QPlainTextEdit(asUnicode('\n'.join(frames)))
+            widget.setMaximumHeight(200)
+            widget.setReadOnly(True)
+        else:
+            desc = asUnicode(data)
+        
+        return typeStr, desc, childs, widget
+        
 class DataViewer(ScipyenViewer): #, QtWidgets.QMainWindow):
     """Viewer for hierarchical collection types: (nested) dictionaries, lists, arrays
     Uses InteractiveTreeWidget which inherits from pyqtgraph DataTreeWidget 
@@ -110,9 +244,75 @@ class DataViewer(ScipyenViewer): #, QtWidgets.QMainWindow):
         
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
         
-    #def setData(self, data:object, *args, **kwargs):
-        #self._set_data_(data)
+    def _recursive_traverse_(self, x):
+        """Ensure np.ndarrays have at least 1D
+        ... in order to avoid errors from iterFirstAxis in TabelWidget
+        Possibly obsolete by the use of ScipyenTableWidget
+        """
+        from core.traitcontainers import DataBag
         
+        if isinstance(x, DataBag):
+            obs = object.__getattribute__(x, "__observer__")
+            ret = dict()
+            for key in x.traits().keys():
+                if key not in DataBagTraitsObserver.hidden_traits:
+                    ret[key] = self._recursive_traverse_(x[key])
+                    
+            return ret
+        
+        elif isinstance(x, (tuple, list)):
+            return [self._recursive_traverse_(v) for v in x]
+            
+        elif isinstance(x, np.ndarray):
+            if len(x.shape) == 0:
+                return np.atleast_1d(x)
+            
+            else:
+                return x
+            
+        elif isinstance(x, dict):
+            ret = dict()
+            for key in x.keys():
+                #print("key", key, "value:", x[key])
+                if isinstance(x[key], dict):
+                    ret[key] = self._recursive_traverse_(x[key])
+                    
+                elif isinstance(x[key], np.ndarray):
+                    if len(x[key].shape) == 0:
+                        ret[key] = np.atleast_1d(x[key])
+                        
+                elif isinstance(x[key], (tuple, list)):
+                    val = list()
+                    for v in x[key]:
+                        if isinstance(v, np.ndarray):
+                            if len(v.shape) == 0:
+                                val.append(np.atleast_1d(v))
+                                
+                            else:
+                                val.append(v)
+                                
+                                
+                        else:
+                            val.append(self._recursive_traverse_(v))
+                                
+                    if isinstance(x[key], tuple):
+                        ret[key] = tuple(val)
+                        
+                    else:
+                        ret[key] = val
+
+                else:
+                    ret[key] = self._recursive_traverse_(x[key])
+                    
+            return ret
+        
+        else:
+            if hasattr(x, "__dict__"):
+                return self._recursive_traverse_(getattr(x, "__dict__"))
+                
+            else:
+                return x # all builtin types lack __dict__
+            
     def _set_data_(self, data:object, *args, **kwargs):
         """
         Display new data
@@ -125,11 +325,31 @@ class DataViewer(ScipyenViewer): #, QtWidgets.QMainWindow):
         # Solutions to be implemented in the InteractiveTreeWidget in this module
         """
         #print(data)
+        #self._data_ = self._recursive_traverse_(data)
         
-        if not isinstance(data, (dict, tuple, list)):
-            # quick and dirty workaround for TODO 2019-09-14 10:16:03
-            #data = {"Type":type(data).__name__, "__dict__":data.__dict__}
-            data = {"Type":type(data), "__dict__":data.__dict__}
+        #self.treeWidget.setData(self._data_)
+        
+        #top_title = self._docTitle_ if (isinstance(self._docTitle_, str) and len(self._docTitle_.strip())) else "/"
+        
+        #if self.treeWidget.topLevelItemCount() == 1:
+            #self.treeWidget.topLevelItem(0).setText(0, top_title)
+            
+        #for k in range(self.treeWidget.topLevelItemCount()):
+            #self._collapseRecursive_(self.treeWidget.topLevelItem(k), collapseCurrent=False)
+            
+        #if kwargs.get("show", True):
+            #self.activateWindow()
+        
+        #if not isinstance(data, (dict, tuple, list)):
+            ## quick and dirty workaround for TODO 2019-09-14 10:16:03
+            ##data = {"Type":type(data).__name__, "__dict__":data.__dict__}
+            
+            #dd = self._recursive_traverse_(data.__dict__)
+            
+            #data = {"Type":type(data), "__dict__":dd}
+            
+        #elif isinstance(data, DataBag):
+            #data = self._recursive_traverse_(data)
         
         if data is not self._data_:
             self._data_ = data
@@ -237,7 +457,7 @@ class DataViewer(ScipyenViewer): #, QtWidgets.QMainWindow):
             
             for item in items:
                 item_path = self._get_path_for_item_(item)
-                path_element_strings = [item_path[0]]
+                path_element_strings = list() if item_path[0] in (os.path.sep, "/") else [item_path[0]]
                 
                 for ipath in item_path[1:]:
                     path_element_strings.append("['"+ipath+"']")
@@ -413,19 +633,19 @@ class DataViewer(ScipyenViewer): #, QtWidgets.QMainWindow):
                     namePrompt.setText(newVarName)
                     
                     if dlg.exec() == QtWidgets.QDialog.Accepted:
-                        newVarName = validateVarName(namePrompt.text(), self._scipyenWindow_.workspace)
+                        newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
                         
-                        self._scipyenWindow_._assignToWorkspace_(newVarName, values[0], from_console=False)
+                        self._scipyenWindow_.assignToWorkspace(newVarName, values[0], from_console=False)
                         
                         
                 else:
                     for name, full_path, value in zip(item_names, item_path_names, values):
                         if fullPathAsName:
-                            newVarName = validateVarName(full_path, self._scipyenWindow_.workspace)
+                            newVarName = validate_varname(full_path, self._scipyenWindow_.workspace)
                         else:
-                            newVarName = validateVarName(name, self._scipyenWindow_.workspace)
+                            newVarName = validate_varname(name, self._scipyenWindow_.workspace)
                             
-                        self._scipyenWindow_._assignToWorkspace_(newVarName, value, from_console=False)
+                        self._scipyenWindow_.assignToWorkspace(newVarName, value, from_console=False)
         
     def _collapseRecursive_(self, item, collapseCurrent=True):
         if item.childCount():

@@ -5,12 +5,16 @@ __all__ = ["neo"]
 
 from copy import deepcopy, copy
 import numpy as np
-import neo
 import quantities as pq
+
+import neo
 from neo.core.baseneo import BaseNeo, _check_annotations
-from . import axonrawio_patch as _axonrawio
-from . import neoepoch as neoepoch
-from . import neoevent as neoevent
+#from neo.rawio.baserawio import (BaseRawIO, _signal_channel_dtype, _unit_channel_dtype,
+                        #_event_channel_dtype)
+
+from core import axonrawio_patch as _axonrawio
+#from . import neoepoch as neoepoch
+#from . import neoevent as neoevent
 
 #neo.core.epoch.Epoch    = neoepoch.Epoch
 #neo.core.Epoch          = neoepoch.Epoch

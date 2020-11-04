@@ -12,7 +12,7 @@ from core.datatypes import (arbitrary_unit, pixel_unit,
                             unit_quantity_from_name_or_symbol,
                             )
 
-from core.axisutils import (axisTypeFlags, 
+from .axisutils import (axisTypeFlags, 
                             defaultAxisTypeName, defaultAxisTypeSymbol, 
                             defaultAxisTypeUnits,
                             axisTypeFromString,

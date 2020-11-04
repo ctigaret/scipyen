@@ -1,19 +1,18 @@
 # -*- coding: utf-8 -*-
 """Superclass for Scipyen viewer windows
 """
-from abc import ABC, ABCMeta, abstractmethod
+import typing, warnings
+#from abc import (ABC, ABCMeta, abstractmethod,)
+from abc import (abstractmethod,)
 
 from PyQt5 import QtCore, QtWidgets, QtGui
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 
 from core.utilities import safeWrapper
+from . import pictgui as pgui
+from .workspacegui import WorkspaceGuiMixin
 
-#print(__path__)
-
-#from .. import mainwindow.ScipyenWindow as ScipyenWindow
-#from  mainwindow import ScipyenWindow
-
-class ScipyenViewer(QtWidgets.QMainWindow):
+class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     """Base type for all Scipyen viewers.
     
     Includes common functionality for all viewer classes defined in Scypien.
@@ -151,10 +150,11 @@ class ScipyenViewer(QtWidgets.QMainWindow):
         """
         # should be set to True when the viewer is managed by another GUI inside Scipyen
         super().__init__(parent)
+        WorkspaceGuiMixin.__init__(self, parent=parent, pWin=pWin)
         
         self.settings = QtCore.QSettings()
 
-        self._scipyenWindow_ = None
+        #self._scipyenWindow_ = None
         
         self._docTitle_ = None
         self._winTitle_ = None # force auto-set in update_title()
@@ -174,12 +174,12 @@ class ScipyenViewer(QtWidgets.QMainWindow):
         else:
             self._ID_  = self.winId()
 
-        if isinstance(pWin, QtWidgets.QMainWindow) and type(pWin).__name__ == "ScipyenWindow":
-            self._scipyenWindow_  = pWin
+        #if isinstance(pWin, QtWidgets.QMainWindow) and type(pWin).__name__ == "ScipyenWindow":
+            #self._scipyenWindow_  = pWin
         
-        else:
-            if type(parent).__name__ == "ScipyenWindow":
-                self._scipyenWindow_   = parent
+        #else:
+            #if type(parent).__name__ == "ScipyenWindow":
+                #self._scipyenWindow_   = parent
         
         #if isinstance(varname, str) and len(varname.strip()):
             #self._data_var_name_ = varname
@@ -193,6 +193,8 @@ class ScipyenViewer(QtWidgets.QMainWindow):
             
         else:
             self.update_title(win_title = win_title, doc_title = doc_title)
+            
+        
             
     def update_title(self, doc_title: (str, type(None)) = None, 
                      win_title: (str, type(None)) = None,
@@ -247,7 +249,12 @@ class ScipyenViewer(QtWidgets.QMainWindow):
             if enforce or self._winTitle_ is None or (isinstance(self._winTitle_, str) and len(self._winTitle_.strip()) == 0): 
                 # auto-set viewer title ONLY if not already set, or enforce is True
                 if self._scipyenWindow_ is not None:
-                    currentViewer = self._scipyenWindow_.currentViewers[self.__class__]
+                    if self.__class__ in self._scipyenWindow_.currentViewers:
+                        currentViewer = self._scipyenWindow_.currentViewers[self.__class__]
+                        
+                    else:
+                        currentViewer = None
+                        
                     if currentViewer is None:
                         viewerVarName = []
                     else:
@@ -370,6 +377,10 @@ class ScipyenViewer(QtWidgets.QMainWindow):
         properties of the viewer based on the data passed to this function.
         """
         self.setData(data, doc_title=doc_title, *args, **kwargs)
+        
+    def _check_supports_parameter_type_(self, value):
+        return isinstance(value, self.supported_types) or any([t in type(value).mro() for t in self.supported_types])
+        
     
     def setData(self, *args, **kwargs):
         """Generic function to set the data to be displayed by this viewer.
@@ -386,55 +397,70 @@ class ScipyenViewer(QtWidgets.QMainWindow):
         data: a python object; its type depends of the types supported by
             the drived viewer class
             
-        doc_title: data name to be shown as part of the window title
-            
-            
+        doc_title: str = data name to be shown as part of the window title
+        
         Variadic named parameters (kwargs):
         ----------------------------------
-        show: bool (default: True); when True, make the window visible
+        get_focus: bool Optional default False; 
+            When True, the window will be given focus.
+            When False (the default) an already visible viewer window is kept as
+            is (e.g. behind other windows) - useful when the windowing system of 
+            the operating system does not implement a focus stealing mechanism.
+            
+            Subclasses can enforce their own behaviour by overriding this.
             
         """
-        if len(args):
-            data = args[0]
-            
-        else:
-            data  = None
         
-        show = kwargs.get("show", True)
+        # NOTE: 2020-09-25 10:35:34
+        # 
+        # This function does thw following:
+        #
+        # 1. delegates to _set_data_(...) -- which does nothing here and MUST be
+        #   overridden (see below).
+        #
+        # 2. sets up the window title
+        #
+        # 3. makes the window visible and optionally brings it into focus
+        #
+        # For a consistent behaviour, subclasses MUST define _set_data_() in order 
+        # to set up their own instance variables and data model according to 
+        # their deisgned functionality.
+        #
+        # Subclasses may also override this method if necessary, but then call
+        # super().setData(...) from within theis own setData()
+        #
+        # Of course, viewers 
+        
+        if not any([self._check_supports_parameter_type_(a) for a in args]):
+            raise TypeError("Expecting a %s; got %s instead" % (" ".join([s.__name__ for s in self.supported_types]), type(data).__name__))
+            
+        self._set_data_(*args, **kwargs)
+            
+        get_focus = kwargs.get("get_focus", False)
         
         doc_title = kwargs.get("doc_title", None)
         
-        data_mro = type(data).mro()
-        
-        if not isinstance(data, self.supported_types) or not any([t in type(data).mro() for t in self.supported_types]):
-            raise TypeError("Expecting a %s; got %s instead" % (" ".join([s.__name__ for s in self.supported_types]), type(data).__name__))
-        
+        # NOTE: 2020-09-25 10:28:59 make sure that the derived type handles
+        # doc_title appropriately - see e.g. SignalViewer
         if isinstance(doc_title, str) and len(doc_title.strip()):
-            self._docTitle_ = doc_title
-            
-        elif hasattr(data, "name") and isinstance(data.name, str) and len(data.name.strip()):
-            self._docTitle_ = data.name
+            self._docTitle_ = doc_title 
             
         else:
             self._docTitle_ = None
-            
-        #print("ScipyenViewer setData args", args)
-        #print("ScipyenViewer setData kwargs", kwargs)
-        
-        if len(args)>1:
-            self._set_data_(data, *args[1:], **kwargs)
-            
-        else:
-            self._set_data_(data, **kwargs)
         
         self.update_title(doc_title = doc_title, win_title=self._winTitle_)
         
-        if show:
+        if not self.isVisible():
             self.setVisible(True)
+        
+        if get_focus:
+            self.activateWindow()
             #self.show()
         
     @abstractmethod
     def _set_data_(self, data: object, *args, **kwargs):
+        """Must override in the subclass
+        """
         pass
     
     @property

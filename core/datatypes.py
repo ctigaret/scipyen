@@ -43,15 +43,15 @@ from . import xmlutils
 from . import strutils
 
 #import utilities
-from .utilities import counterSuffix, unique
+from .utilities import counter_suffix, unique
 from .prog import safeWrapper
 
-from .imageprocessing import *
+from imaging.imageprocessing import *
 
 #import patchneo
 #from .patchneo import neo
 
-#from . import neoutils
+#from . import ephys
 
 #### END pict.core.modules
 
@@ -113,27 +113,40 @@ from .imageprocessing import *
 # the case when a new axis is added (vigra.newaxis), which I must then immediately 
 # follow by calibrate(...) or something
 #   
-
-UnitTypes = collections.defaultdict(lambda: "NA", 
-                                    {"a":"axon", "b":"bouton", "c":"cell", 
-                                    "d":"dendrite", "e":"excitatory", 
-                                    "g":"granule",  "i":"inhibitory", 
-                                    "l":"stellate", "p":"pyramidal",  
-                                    "m":"microglia", "n":"interneuron", 
-                                    "s":"spine", "t":"terminal",
-                                    "y":"astrocyte"})
-                                    
-Genotypes = ["NA", "wt", "het", "hom"]
-
-
 NUMPY_NUMERIC_KINDS = set("buifc")
 NUMPY_STRING_KINDS = set("SU")
 
+UnitTypes = collections.defaultdict(lambda: "NA", 
+                                    {"a":"axon", "b":"bouton", "c":"cell", 
+                                     "d":"dendrite", "e":"excitatory", 
+                                     "g":"granule",  "i":"inhibitory", 
+                                     "l":"stellate", "p":"pyramidal",  
+                                     "m":"microglia", "n":"interneuron", 
+                                     "s":"spine", "t":"terminal",
+                                     "y":"astrocyte"})
+                                    
+Genotypes = ["NA", "wt", "het", "hom"]
+
+sipfx = ("yotta", "zetta", "exa", "peta", "tera", 
+       "giga", "mega", "kilo", "hecto", "deca", 
+       "deci", "centi", "milli", "micro", "nano",
+       "pico", "femto", "atto", "zepto", "yotto",)
+
+sisymb = ("Y", "Z", "E", "P", "T", "G", "M", "k", "h", "da",
+          "d", "c", "m", "mu", "n", "p", "f", "a", "z", "y",)
+
+exps = tuple([k for k in range(24,2,-3)] + [2,1,-1,-2] + [k for k in range(-3, -37, -3)])
+
+
+SI10Powers = dict([(p, dict([("exponent", e), ("symbol", s)])) for (p,e,s) in zip(sipfx, exps, sisymb)])
+
+
+
 #NOTE: do not confuse with pq.au which is one astronomical unit !!!
 arbitrary_unit = arbitraryUnit = ArbitraryUnit = pq.UnitQuantity('arbitrary unit', 1. * pq.dimensionless, symbol='a.u.')
-pixel_unit  = pixelUnit = PixelUnit = pq.UnitQuantity('pixel', 1. * pq.dimensionless, symbol='pixel')
+pixel_unit  = pixelUnit = PixelUnit = pixel = pq.UnitQuantity('pixel', 1. * pq.dimensionless, symbol='pixel')
 
-day_in_vitro = div = pq.UnitQuantity("day in vitro", 1 *pq.day, symbol = "div")
+day_in_vitro = div = pq.UnitQuantity("day in vitro", 1 * pq.day, symbol = "div")
 week_in_vitro = wiv = pq.UnitQuantity("week in vitro", 1 * pq.week, symbol = "wiv")
 
 postnatal_day = pnd = pq.UnitQuantity("postnatal day", 1 * pq.day, symbol = "pnd")
@@ -143,7 +156,6 @@ postnatal_month = pnm = pq.UnitQuantity("postnatal month", 1 * pq.month, symbol 
 embryonic_day = emd = pq.UnitQuantity("embryonic day", 1 * pq.day, symbol = "emd")
 embryonic_week = emw = pq.UnitQuantity("embryonic week", 1 * pq.week, symbol = "emw")
 embryonic_month = emm = pq.UnitQuantity("embryonic month", 1 * pq.month, symbol = "emm")
-
 
 # NOTE: 2017-07-21 16:05:38
 # a dimensionless unit for channel axis (when there are more than one channel in the data)
@@ -163,6 +175,42 @@ custom_unit_symbols[pixel_unit.symbol] = pixel_unit
 custom_unit_symbols[channel_unit.symbol] = channel_unit
 custom_unit_symbols[space_frequency_unit.symbol] = space_frequency_unit
 custom_unit_symbols[angle_frequency_unit.symbol] = angle_frequency_unit
+custom_unit_symbols[div.symbol] = div
+custom_unit_symbols[wiv.symbol] = wiv
+custom_unit_symbols[pnd.symbol] = pnd
+custom_unit_symbols[pnw.symbol] = pnw
+custom_unit_symbols[pnm.symbol] = pnm
+custom_unit_symbols[emd.symbol] = emd
+custom_unit_symbols[emw.symbol] = emw
+custom_unit_symbols[emm.symbol] = emm
+
+def make_scaled_unit_quantity(base_quantity, power):
+    if not isinstance(base_quantity, (pq.Quantity,pq.UnitQuantity)):
+        raise TypeError("base_quantity expected to be a UnitQuanitity or a Quantity; got %s instead" % type(base_quantity).__name__)
+    
+    if not isinstance(power, str):
+        raise TypeError("power expected to be a str; got %s instead" % type(power).__name__)
+    
+    if power not in SI10Powers.keys():
+        raise ValueError("Power %s is invalid" % power)
+    
+    name = "%s%s" % (power, base_quantity.units.dimensionality)
+    factor = pow(10, SI10Powers[power]["exponent"])
+    symbol = "%s%s" % (SI10Powers[power]["symbol"],base_quantity.units.symbol)
+    
+    return pq.UnitQuantity(name, factor * base_quantity, symbol=symbol)
+    
+kiloohm = kohm = make_scaled_unit_quantity(pq.ohm, "kilo")
+custom_unit_symbols[kohm.symbol] = kohm
+megaohm = Mohm = make_scaled_unit_quantity(pq.ohm, "mega")
+custom_unit_symbols[Mohm.symbol] = Mohm
+gigaohm = Gohm = make_scaled_unit_quantity(pq.ohm, "giga")
+custom_unit_symbols[Gohm.symbol] = Gohm
+
+#kiloohm = kohm = pq.UnitQuantity("kiloohm", 1e3 * pq.ohm, symbol="kohm")
+#megaohm = Mohm = pq.UnitQuantity("megaohm", 1e6 * pq.ohm, symbol="Mohm")
+#gigaohm = Gohm = pq.UnitQuantity("gigaohm", 1e9 * pq.ohm, symbol="Gohm")
+
 
 # some other useful units TODO
 
@@ -708,7 +756,32 @@ def units_convertible(x, y):
     return x._reference.dimensionality == y._reference.dimensionality
 
     
-       
+def categorize_data_frame_columns(data, *column_names, inplace=True):
+    """"""
+    if not isinstance(data, pd.DataFrame):
+        raise TypeError("Expecting a pandas.DataFrame; got %s instead" % type(data).__name__)
+    
+    if len(column_names) == 0:
+        raise TypeError("Expectign at least one column")
+    
+    if any([not isinstance(c, str) for c in column_names]):
+        raise TypeError("All column names expected to be strings")
+    
+    if any([c not in data.columns for c in column_names]):
+        raise ValueError("At least one of the specified columns does not exist in data")
+    
+    if inplace:
+        for c in column_names:
+            data[c] = pd.Categorical(data[c].astype("category"))
+            
+        return data
+            
+    else:
+        ret = data.copy()
+        for c in column_names:
+            ret[c] = pd.Categorical(data[c].astype("category"))
+            
+        return ret
 
 class UnitsStringValidator(QtGui.QValidator):
     def __init__(self, parent=None):

@@ -13,6 +13,8 @@ Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
 from __future__ import print_function
 
 import sys, os, traceback, inspect, numbers
+from collections import (namedtuple, OrderedDict, )
+
 import xml.parsers.expat
 import xml.etree
 import xml.etree.ElementTree as ET # the default parsers in here are from xml.parsers.expat,
@@ -26,13 +28,126 @@ import xml.dom.minidom
 
 # 2016-08-16 09:30:07
 # NOTE FIXME QtXml is not actively maintained anymore in Qt >= 5.5
-from PyQt5 import QtCore, QtWidgets, QtXmlPatterns, QtXml, QtGui
-from PyQt5.QtCore import pyqtSignal, pyqtSlot
+from PyQt5 import (QtCore, QtWidgets, QtXmlPatterns, QtXml, QtGui, )
+from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
 from PyQt5.uic import loadUiType as __loadUiType__
-#from collections import namedtuple, OrderedDict
 #from datatypes import DataBag
 # NOTE: use Python re instead of QRegExp
 import re
+
+HighlightingRule = namedtuple('HighlightingRule', ['pattern', 'format'])
+
+class XmlSyntaxHighlighter(QtGui.QSyntaxHighlighter):
+    '''
+    '''
+    def __init__(self, parent = None):
+        ''' Constructor
+        
+        Argument:
+        
+        parent = QtGui.QTextDocument; optional (default is None)
+        
+        '''
+        super().__init__(parent)
+        
+        self.highlightingRules = list()
+        
+        self.tagFormat = QtGui.QTextCharFormat()
+        self.tagFormat.setForeground(QtCore.Qt.darkBlue)
+        self.tagFormat.setFontWeight(QtGui.QFont.Bold)
+
+        # Tag format
+        
+        #rule = HighlightingRule(pattern=QtCore.QRegExp("(<[a-zA-Z:]+\\b|<\\?[a-zA-Z:]+\\b|\\?>|>|/>|</[a-zA-Z:]+>)"), format=self.tagFormat)
+        #rule = HighlightingRule(pattern="(<[a-zA-Z:]+\\b|<\\?[a-zA-Z:]+\\b|\\?>|>|/>|</[a-zA-Z:]+>)", format=self.tagFormat)
+        rule = HighlightingRule(pattern=re.compile("(<[a-zA-Z:]+\\b|<\\?[a-zA-Z:]+\\b|\\?>|>|/>|</[a-zA-Z:]+>)"), format=self.tagFormat)
+        self.highlightingRules.append(rule)
+        
+        
+        # Attribute format
+        self.attributeFormat = QtGui.QTextCharFormat()
+        self.attributeFormat.setForeground(QtCore.Qt.darkGreen)
+        
+        #rule = HighlightingRule(pattern=QtCore.QRegExp("[a-zA-Z:]+="), format=self.attributeFormat)
+        #rule = HighlightingRule(pattern="[a-zA-Z:]+=", format=self.attributeFormat)
+        rule = HighlightingRule(pattern=re.compile("[a-zA-Z:]+="), format=self.attributeFormat)
+        self.highlightingRules.append(rule)
+        
+        # Attribute content format
+        self.attributeContentFormat = QtGui.QTextCharFormat()
+        self.attributeContentFormat.setForeground(QtCore.Qt.red)
+        
+        #rule = HighlightingRule(pattern=QtCore.QRegExp("(\"[^\"]*\"|'[^']*')"), format=self.attributeContentFormat)
+        #rule = HighlightingRule(pattern="(\"[^\"]*\"|'[^']*')", format=self.attributeContentFormat)
+        rule = HighlightingRule(pattern=re.compile("(\"[^\"]*\"|'[^']*')"), format=self.attributeContentFormat)
+        self.highlightingRules.append(rule)
+        
+        # Comment format -- NOT appended to the list of highlighting rules
+        self.commentFormat = QtGui.QTextCharFormat()
+        self.commentFormat.setForeground(QtCore.Qt.lightGray)
+        self.commentFormat.setFontItalic(True)
+        
+        #self.commentStartExpression = QtCore.QRegExp("<!--")
+        #self.commentEndExpression = QtCore.QRegExp("-->")
+        
+        #self.commentStartExpression = "<!--"
+        #self.commentEndExpression = "-->"
+        
+        self.commentStartExpression = re.compile("<!--")
+        self.commentEndExpression = re.compile("-->")
+        
+        #self._defaultCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
+        
+    def highlightBlock(self, text):
+        ''' Applies highlighting rule to text block
+        '''
+        for rule in self.highlightingRules:
+            startIndex = 0
+            
+            while startIndex < len(text):
+                match = rule.pattern.search(text, startIndex)
+                if match:
+                    span = match.span()
+                    self.setFormat(span[0], span[1]-span[0], rule.format)
+                    startIndex = span[1]
+                else:
+                    break
+
+        self.setCurrentBlockState(0)
+        
+        startIndex = -1
+        endIndex = -1
+        commentLength = 0
+        
+        # check if we have a comment to highlight --  if so, then apply comment
+        # format highlighting
+        if self.previousBlockState() != -1:
+            match = self.commentStartExpression.search(text)
+            if match:
+                startIndex = match.start()
+                
+        while startIndex >= 0:
+            match = self.commentEndExpression.search(text, startIndex)
+            if match:
+                endIndex = match.start()
+            
+            if endIndex == -1:
+                self.setCurrentBlockState(1)
+                commentLength = len(text) - startIndex
+            else:
+                endNdx = match.end()
+                commentLength = endNdx - startIndex
+            
+            self.setFormat(startIndex, commentLength, commentFormat)
+            
+            match = self.commentStartExpression.search(text, startIndex + commentLength)
+            
+            if match:
+                startIndex = match.start()
+            else:
+                break
+            
+
 
 def attributesToDict(node):
     """Returns a dictionary with the attributes names/values
