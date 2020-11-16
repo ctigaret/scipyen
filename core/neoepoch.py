@@ -19,18 +19,12 @@ from neo.core.baseneo import BaseNeo, merge_annotations
 PY_VER = sys.version_info[0]
 
 # NOTE: apply the same technique as for analosignals so that pickling works
-def _new_Epoch(cls, times, durations=None, labels=None, units=None, \
+def _new_Epoch_v1(cls, times, durations=None, labels=None, units=None, \
                 name=None, description=None, file_origin=None, annotations=dict()):
     return cls(times=times, durations=durations, labels=labels, units=units, \
                 name=name, file_origin=file_origin, description=description, **annotations)
 
-def _new_epoch(cls, times, durations=None, labels=None, units=None, \
-                name=None, description=None, file_origin=None, annotations=dict()):
-    return cls(times=times, durations=durations, labels=labels, units=units, \
-                name=name, file_origin=file_origin, description=description, **annotations)
-
-
-class Epoch(BaseNeo, pq.Quantity):
+class Epoch_v1(BaseNeo, pq.Quantity):
     '''
     Array of epochs.
     
@@ -119,42 +113,11 @@ class Epoch(BaseNeo, pq.Quantity):
         obj.segment = None
         return obj
     
-    # NOTE: 2017-05-07 21:17:13
-    #def __getnewargs__(self):
-        #print("__getnewargs__")
-        #return times, durations, labels, units, name, description, file_origin, annotations
-
-    # NOTE: 2017-05-07 21:17:17
-    #def __getnewargs_ex__(self):
-        #print("__getnewargs_ex__")
-        #return times, durations, labels, units, name, description, file_origin, annotations, {"times" : times, "durations" : durations, "labels" : labels, "units" : units, "name" : name, "description" : description, "file_origin" : file_origin, "annotations" : annotations}
-
-    # NOTE: 2017-05-07 21:17:22
-    #def __getstate__(self):
-        #state = self.__dict__.copy()
-        #state["times"] = self.times
-        #return state
-    
-    # NOTE: 2017-05-07 21:17:30
-    #def __setstate__(self, state):
-        ##cls = self.__class__
-        #times = state.pop("times", None)
-        #print("times ", times)
-        #print("state ", state)
-        #obj = pq.Quantity.__new__(self.__class__, times, units = state["_dimensionality"])
-        #obj.durations = state["durations"]
-        #obj.labels = state["labels"]
-        #obj.segment = None
-        ##obj.__dict__.update(state)
-        ##self = obj.copy()
-        
-        #self.__array_finalize__(obj)
-        #self.__dict__.update(state)
-        
     # NOTE: 2017-05-07 21:59:31
     def __reduce__(self):
-        return _new_Epoch, (self.__class__, np.array(self), self.durations, self.labels, \
+        return _new_Epoch_v1, (self.__class__, np.array(self), self.durations, self.labels, \
                             self.units, self.name, self.description, self.file_origin)
+    
     
     def __init__(self, times=None, durations=None, labels=None, units=None,
                  name=None, description=None, file_origin=None, **annotations):

@@ -1875,6 +1875,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.__cursors__.clear()
         
         self.update(self._imageGraphicsView.childrenRegion())
+        
         self.scene.update(self.scene.sceneRect().x(), \
                           self.scene.sceneRect().y(), \
                           self.scene.sceneRect().width(), \
@@ -4555,9 +4556,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                                     labelShowsPosition  = labelShowsPosition,
                                                     parentWidget        = self)
             
-        elif isinstance(item, (int, pgui.GraphicsObjectType)) and \
-            item & pgui.GraphicsObjectType.allCursorTypes:
-            
+        elif isinstance(item, (int, pgui.GraphicsObjectType)) and item & pgui.GraphicsObjectType.allCursorTypes:
+            print("addGraphicsObject", item)
             obj = self.viewerWidget.createNewCursor(item, 
                                                     window              = window, 
                                                     radius              = radius, 
@@ -4572,6 +4572,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                                     parentWidget        = self)
         
         elif isinstance(item, pgui.PlanarGraphics):
+            print("addGraphicsObject pgui.PlanarGraphics", item)
             roiType = item.type
 
             if framesVisible is None:

@@ -2,7 +2,7 @@
 '''
 Various utilities
 '''
-import traceback, re, itertools, time, typing, warnings, numbers
+import traceback, re, itertools, time, typing, warnings, numbers, inspect
 from sys import getsizeof
 import numpy as np
 from numpy import ndarray
@@ -60,6 +60,8 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         #PyQt5 objects (maybe)
             
     from numbers import Number
+    
+    #print("summarize_object_properties", objname)
     
     result = dict(map(lambda x: (x, {"display":"", "tooltip":""}), standard_obj_summary_headers))
     
@@ -382,6 +384,47 @@ def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True) -> typi
     else:
         return None
     
+def index_of(seq, obj, key=None):
+    """Find the index of obj in the object sequence seq.
+    
+    Objetc finding can be based on the object's identity (by default) or by the 
+    value of a specific object attribute.
+    
+    For the latter case, 'key' must be a function - typically, a lambda function, 
+    which gives access (i.e. calls a "getter") on the object attribute; the 
+    attribute must support at least __eq__ (i.e. must be comparable)
+    
+    e.g. 
+    
+    index = index_of(seq, obj, key = lambda x: x.attribute)
+    
+    OR:
+    
+    index = index_of(seq, obj, key = lambda x: getattr(x, "something", None) etc
+    
+    
+    
+    Parameters:
+    ----------
+    seq: iterable
+    obj: any pyton object
+    key: function that accesses one of obj attributes; optional (default is None)
+    
+    Returns:
+    -------
+    
+    The integer index of obj in seq, or None if either obj is not found in seq,
+    or key(obj) is not satisfied.
+    
+    """
+    if obj in seq:
+        if key is None:
+            return seq.index(obj)
+        
+        elif inspect.isfunction(key):
+            lst = [key(o) for o in seq]
+            return lst.index(key(obj))
+    
 def yyMdd(now=None):
     import string, time
     if not isinstance(now, time.struct_time):
@@ -496,10 +539,6 @@ def get_nested_value(src, path):
             
             value = src[ndx]
             
-            #print("path", path)
-            #print("path[0]", path[0])
-            #print("value type", type(value).__name__)
-            
             if len(path) == 1:
                 return value
             
@@ -572,12 +611,19 @@ def sort_with_none(iterable, none_last = True):
     
     return sorted(iterable, key=lambda x: x if x is not None else noneph)
 
-def unique(seq):
+def unique(seq, key=None):
     """Returns a sequence of unique elements in sequence 'seq'.
     
     Parameters:
     -----------
     seq: an iterable sequence (tuple, list, range)
+    
+    key: predicate for uniqueness (optional, default is None)
+        Typically, this is an object returned by a lambda function
+        
+        e.g.
+        
+        unique(seq, lambda x: x._some_member_property_or_getter_function_)
     
     Returns:
     A sequence containing unique elements in 'seq'.
@@ -591,7 +637,11 @@ def unique(seq):
     
     seen = set()
     
-    return [x for x in seq if x not in seen and not seen.add(x) ]
+    if key is None:
+        return [x for x in seq if x not in seen and not seen.add(x)]
+    
+    else:
+        return [x for x in seq if key not in seen and not seen.add(key)]
 
 
 def __name_lookup__(container: typing.Sequence, name:str, 

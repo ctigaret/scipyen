@@ -3725,7 +3725,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
     defaultBinomialFilterOptions.scans.ind = DataBag()
     defaultBinomialFilterOptions.scans.ind.radius = 10
 
-    def __init__(self,*args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(**kwargs)
         
         #if type(pwin).__name__ != "ScipyenWindow":
@@ -3744,13 +3744,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         self._generic_work_idle_ = True
         
         #self._scipyenWindow_ = pwin
-        
-        
-        scandata = None
-        
-        if len(args):
-            if isinstance(args[0], ScanData):
-                scandata = args[0]
         
         self._data_ = None
         self._current_frame_scan_region_ = list() # so that its contents will be updated
@@ -3933,6 +3926,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         #self.appGUISettings["MainWindow"]["position"] = self.settings.value("LSCaTAnalysis/MainWindow_Position", None)
         #self.appGUISettings["MainWindow"]["state"] = self.settings.value("LSCaTAnalysis/MainWindow_State", None)
         
+        scandata = None
+        
+        if len(args):
+            if isinstance(args[0], ScanData):
+                scandata = args[0]
+                
+            if len(args) == 2 and (isinstance(args[1], str) and len(args[1].strip())):
+                self._data_var_name_ = args[1]
+                
         if isinstance(scandata, ScanData):
             self.setData(newdata = scandata)
         
@@ -7441,17 +7443,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         if self._data_ is None:
             return
         
-        ##QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-        #self.setCursor(QtCore.Qt.WaitCursor)
-        
-        #self._display_ephys_()
-        #self._display_epscats_()
-        
         for win in self.scansviewers + self.sceneviewers + self.ephysviewers + self.profileviewers + self.scansblockviewers + self.sceneblockviewers:
             win.displayFrame()
-            #print("window visible", win.isVisible())
-            #if not win.isVisible():
-                #win.show()
         
         self._display_graphics_overlays_()
         
@@ -9939,10 +9932,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         if val > 0:
             self._display_graphics_objects_(rois=True,  scene=True) 
                     
-            if len(self._data_.scanRegionScansProfiles) == 0:
+            if len(self._data_.scanRegionScansProfiles.segments) == 0:
                 self._data_.generateScanlineProfilesFromScans()
                 
-            if len(self._data_.scanRegionSceneProfiles) == 0:
+            if len(self._data_.scanRegionSceneProfiles.segments) == 0:
                 self._data_.generateScanlineProfilesFromScene()
                 
             self._display_scanline_profiles_()
@@ -11475,18 +11468,36 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         #print("_display_scan_region_ %s: %s" % (type(obj).__name__, obj))
         
         if len(self._data_.scene) and len(self.sceneviewers) and isinstance(obj, pgui.PlanarGraphics):
-            #print("_display_scan_region_ %s: %d frontends" % (type(obj).__name__, len(obj.frontends)))
+            print("_display_scan_region_ %s: %d frontends" % (type(obj).__name__, len(obj.frontends)))
 
             # see NOTE: 2018-09-25 22:19:58
             signalBlockers = [QtCore.QSignalBlocker(w) for w in self.sceneviewers]
             
             #print("scanRegion frontends", obj.frontends)
 
-            if len(obj.frontends) == 0:
-                for k, win in enumerate(self.sceneviewers):
-                    win.addGraphicsObject(obj, showLabel=False, 
-                                            movable=False, editable=False,
-                                            labelShowsPosition=False)
+            for k, win in enumerate(self.sceneviewers):
+                print(win.windowTitle())
+                if len(obj.frontends):
+                    for f in obj.frontends:
+                        if f.parentWidget is not win:
+                            win.addGraphicsObject(obj, showLabel=False, 
+                                                    movable=False, 
+                                                    editable=False,
+                                                    labelShowsPosition=False)
+                            
+                            
+                #win.addGraphicsObject(obj, showLabel=False, 
+                                        #movable=False, 
+                                        #editable=False,
+                                        #labelShowsPosition=False)
+                
+            #if len(obj.frontends) == 0:
+                #for k, win in enumerate(self.sceneviewers):
+                    #print(win.windowtitle())
+                    #win.addGraphicsObject(obj, showLabel=False, 
+                                          #movable=False, 
+                                          #editable=False,
+                                          #labelShowsPosition=False)
 
     @safeWrapper
     def _display_graphics_objects_(self, rois=True, scene=True):
@@ -12268,6 +12279,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             
             if isinstance(varname, str) and len(varname.strip()):
                 self._data_var_name_ = varname
+                
+            else:
+                self._data_var_name_ = newdata.name
             
         else:
             raise TypeError("Expecting a ScanData object or None; got %s instead" % type(newdata).__name__)
@@ -13118,7 +13132,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         if isinstance(newdata, ScanData):
             #print(newdata.name, doc_title)
             if not isinstance(doc_title, str) or len(doc_title.strip()) == 0:
-                if isinstance(self._data_var_name_, str) and len(self._data_var_name_.strip()):
+                if len(newdata.name.strip()):
+                    doc_title = newdata.name
+                    
+                elif isinstance(self._data_var_name_, str) and len(self._data_var_name_.strip()):
                     doc_title = self._data_var_name_
                     
                 else:
@@ -13137,6 +13154,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         else:
             # TODO in _parsedata_: when nothing is passed reset everything
             self._data_ = None
+            self._data_var_name_ = None
             #self._clear_contents_()
             
     def closeEvent(self, evt):

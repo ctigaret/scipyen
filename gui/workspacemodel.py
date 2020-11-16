@@ -272,7 +272,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
             #print("\npost_execute: new figs",new_mpl_figs)
             
-            new_vars = [item for item in self.shell.user_ns.items() if item[0] not in self.cached_vars.keys() and item[0] not in self.hidden_vars and not item[0].startswith("_")]
+            new_vars = dict([(i,v) for i, v in self.shell.user_ns.items() if i not in self.cached_vars.keys() and i not in self.hidden_vars and not i.startswith("_")])
             
             self.new_vars.update(new_vars)
             

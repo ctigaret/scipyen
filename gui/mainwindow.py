@@ -166,7 +166,6 @@ from jupyter_client.session import Message
 from core.prog import (timefunc, timeblock, processtimefunc, processtimeblock, Timer, 
                        safeWrapper, warn_with_traceback,)
 
-from core.utilities import safe_identity_test
 # NOTE: 2017-04-16 09:48:15 
 # these are also imported into the console in slot_initQtConsole(), so they are
 # available directly in the console
@@ -188,7 +187,7 @@ import core.strutils as strutils
 import core.data_analysis as anl
 from core.utilities import (summarize_object_properties,
                             standard_obj_summary_headers,
-                            safe_identity_test,
+                            safe_identity_test, unique, index_of,
                             )
 
 #import imaging.imageprocessing as imgp
@@ -393,6 +392,41 @@ class ScipyenMagics(Magics):
         """
         return local_ns
     
+    @line_magic
+    @needs_local_scope
+    def scipyen_debug(self, line, local_ns):
+        """Turn on/off debugging messages in Scipyen code
+        
+        Calls:
+        scipyen_debug => toggles scipyen debugging
+        
+        scipyen_debug "on", or scipyen_debug True -> turns debugging ON
+        
+        scipyen_debug "off", or scipyen_debug False -> turns debugging OFF
+        
+        any other argument turns debugging OFF
+        
+        For a programmatic way to access/set SCIPYEN_DEBUG, see
+        workspacefunctions.debug_scipyen()
+        
+        Returns:
+        -------
+        The new value of SCIPYEN_DEBUG in the user workspace
+        
+        """
+        if len(line.strip()):
+            if line.strip().lower() in ("on", "true", "off", "false"):
+                val = True if line.strip().lower() in ("on", "true") else False
+            
+            else:
+                val = False
+                
+            return debug_scipyen(val)
+        
+        else:
+            val = user_workspace().get("SCIPYEN_DEBUG", False)
+            return debug_scipyen(not val)
+            
     @line_magic
     @needs_local_scope
     def LSCaT(self, line, local_ns):
@@ -1995,7 +2029,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # __module_name__ is "pict" so we take all its contents into the kernel
             # namespace (they're just references to those objects)
             self.workspace = self.ipkernel.shell.user_ns
-            #self.workspace['mainWindow'] = self
+            
+            # NOTE: 2020-11-12 12:51:36
+            # used by %scipyen_debug line magic
+            self.workspace["SCIPYEN_DEBUG"] = False 
+            
             self.workspace['mainWindow'] = self
 
             # NOTE: 2016-03-20 20:50:42 -- WRONG!

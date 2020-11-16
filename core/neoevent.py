@@ -18,7 +18,7 @@ from neo.core.baseneo import BaseNeo, merge_annotations
 
 PY_VER = sys.version_info[0]
 
-def _new_event(cls, signal, times = None, labels=None, units=None, name=None, 
+def _new_Event_v1(cls, signal, times = None, labels=None, units=None, name=None, 
                file_origin=None, description=None, annotations=None, segment=None,
                *args, **kwargs):
     '''
@@ -37,7 +37,7 @@ def _new_event(cls, signal, times = None, labels=None, units=None, name=None,
     e.segment = segment
     return e
 
-class Event(BaseNeo, pq.Quantity):
+class Event_v1(BaseNeo, pq.Quantity):
     '''
     Array of events.
 
@@ -119,7 +119,7 @@ class Event(BaseNeo, pq.Quantity):
         Map the __new__ function onto _new_BaseAnalogSignal, so that pickle
         works
         '''
-        return _new_event, (self.__class__, self.times, np.array(self), self.labels, self.units,
+        return _new_Event_v1, (self.__class__, self.times, np.array(self), self.labels, self.units,
                             self.name, self.file_origin, self.description,
                             self.annotations, self.segment)
 

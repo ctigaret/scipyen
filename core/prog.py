@@ -11,6 +11,9 @@ from functools import singledispatch, update_wrapper, wraps
 from contextlib import (contextmanager, ContextDecorator,)
 
 import neo
+from . import patchneo
+from . import workspacefunctions
+from .workspacefunctions import debug_scipyen
 #from . import patchneo as patchneo
 #from . import neoevent as neoevent
 #from . import neoepoch as neoepoch
@@ -50,7 +53,7 @@ class NeoPatchCtx(ContextDecorator):
     #def _load_neo_patch_(self, *mnames):
         #for mname in mnames:
             #if mname not in sys.modules:
-                #spec = get_relocated_module(mname, scipyen_path = self.scipyen_path)
+                #spec = get_relocated_module_spec(mname, scipyen_path = self.scipyen_path)
                 #module = importlib.util.module_from_spec(spec)
                 #spec.loader.exec_module(module)
                 #sys.modules[mname] = module
@@ -135,25 +138,6 @@ class NeoPatchCtx(ContextDecorator):
 
         return False
     
-class ShimModule(ContextDecorator):
-    def __init__(self, modname):
-        self.modname=modname
-        self.spec = get_relocated_module(self.modname)
-        self.module=importlib.util.module_from_spec(self.spec)
-        #print("ShimModule.__init__: self.module =", self.module)
-        
-    def __enter__(self):
-        self.spec.loader.exec_module(self.module)
-        sys.modules[self.modname] = self.module
-        
-        return self
-    
-    def __exit__(self, *exc):
-        if self.modname in sys.modules:
-            del sys.modules[self.modname]
-        
-        return False
-
 class Timer(object):
     """Recipe 13.13 "Making a Stopwatch Timer" in Python Cookbook 3rd Ed. 2013
     """
@@ -193,39 +177,24 @@ class Timer(object):
         # for use as context manager
         self.stop()
         
-def needs_neo_patch(exc_info):
-    frame_summaries = traceback.extract_tb(exc_info[2])
-    frame_names = [f.name for f in frame_summaries]
-    #print("needs_neo_patch", frame_names)
-    
-    # check if needs our hacked neo stuff - for backward compatibility with 
-    # older versions of the neo package
-    return any([any([s in frn.lower() for frn in frame_names]) for s in ("neo", "event", "epoch", "analogsignalarray", "analogsignal", "irregularlysampledsignal")])
+# ### BEGIN module functions
 
-def load_patch_modules(top_path, *mnames):
-    ret = dict()
-    for mname in mnames:
-        #print("load_patch_modules: mname =", mname)
-        if mname not in sys.modules:
-            spec = get_relocated_module(mname, scipyen_path = top_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            ret[mname] = module
-            #print("load_patch_modules loaded %s" % mname, "__loader__ =", module.__loader__, "__name__ =", module.__name__)
-            
-        else:
-            # present in sys.modules, but has it been "loaded"?
-            #print("load_patch_modules sys.modules[%s].__loader__ =" % mname, sys.modules[mname].__loader__,
-                  #"sys.modules[%s].__name__ =",  sys.modules[mname].__name__)
-            
-            ret[mname] = sys.modules[mname]
-            
-            #spec.loader.exec_module(module)
-            #sys.modules[mname] = module
-            #ret.add(mname)
-            
-            
-    return ret
+def check_neo_patch(exc_info:tuple):
+    stack_summary = traceback.extract_tb(exc_info[2])
+    frame_names = [f.name for f in stack_summary]
+    
+    last_frame_summary = stack_summary[-1]
+    
+    obj_name = last_frame_summary.name
+    
+    #if any([s in last_frame_summary.name.lower() for s in  ("neo", "event", "epoch", "analogsignalarray", "analogsignal", "irregularlysampledsignal")]):
+    #if any([s in obj_name.lower() for s in  patchneo.patches.keys()]):
+        #module_name = inspect.getmodulename(last_frame_summary.filename)
+        
+    for key in patchneo.patches.keys():
+        if obj_name in key:
+            return (key, patchneo.patches[key])
+    
     
 def import_module(name, package=None):
     """An approximate implementation of import."""
@@ -242,7 +211,8 @@ def import_module(name, package=None):
         parent_module = import_module(parent_name)
         path = parent_module.__spec__.submodule_search_locations
         
-    print("import_module: path =", path)
+    if debug_scipyen():
+        print("import_module: path =", path)
         
     for finder in sys.meta_path:
         if hasattr(finder, "find_spec"):
@@ -261,10 +231,16 @@ def import_module(name, package=None):
         
     return module
 
-
+def import_relocated_module(mname):
+    spec = get_relocated_module_spec(mname)
     
-def get_relocated_module(mname, scipyen_path=None):
-        #print("get_relocated_module: modname =", mname)
+    if spec is not None:
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        sys.modules[mname] = module
+    
+def get_relocated_module_spec(mname, scipyen_path=None):
+        #print("get_relocated_module_spec: modname =", mname)
         
         if isinstance(scipyen_path, str) and os.path.isdir(scipyen_path):
             file_path = os.path.join(*(scipyen_path, "%s.py" % mname))
@@ -285,12 +261,33 @@ def get_relocated_module(mname, scipyen_path=None):
             
             file_path = os.path.join(*mloc[0].parts)
         
-        #print("get_relocated_module: file_path =", file_path)
+        #print("get_relocated_module_spec: file_path =", file_path)
         
-        return importlib.util.spec_from_file_location(mname, file_path)
+        if isinstance(file_path, str) and len(file_path):
+            return importlib.util.spec_from_file_location(mname, file_path)
         
+def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
+    log = file if hasattr(file, "write") else sys.stderr
+    traceback.print_stack(file=log)
+    log.write(warnings.formatwarning(message, category, filename, lineno, line))
+    
+# ### END module functions
 
-#### BEGIN Decorators
+# ### BEGIN Decorators
+
+def deprecated(f, *args, **kwargs):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        try:
+            warnings.warn("%s is deprecated" % f)
+            return f(*args, **kwargs)
+        
+        except Exception as e:
+            traceback.print_exc()
+            
+    return wrapper
+    
+    
 
 #NOTE: 2017-11-22 22:00:40 FIXME TODO
 # for pyqtSlots, place this AFTER the @pyqtSlot decorator
@@ -350,9 +347,9 @@ def processtimefunc(func):
         return r
     return wrapper
 
-#### END Decorators
+# ### END Decorators
 
-#### BEGIN Context managers
+# ### BEGIN Context managers
 
 @contextmanager
 def timeblock(label):
@@ -378,10 +375,5 @@ def processtimeblock(label):
         end = time.process_time()
         print("{} : {}".format(label, end-start))
 
-#### END Context managers
+# ### END Context managers
 
-def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
-    log = file if hasattr(file, "write") else sys.stderr
-    traceback.print_stack(file=log)
-    log.write(warnings.formatwarning(message, category, filename, lineno, line))
-    

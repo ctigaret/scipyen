@@ -2017,7 +2017,7 @@ class ScanData(object):
         
         # END comments
         
-        self.apiversion = (0,3) # MAJOR, MINOR
+        #self.apiversion = (0,3) # MAJOR, MINOR
         #print("ScanData.__init__ start")
         # user-defined (meta) data
         self._annotations_ = dict()
@@ -2236,15 +2236,21 @@ class ScanData(object):
             
             
             if hasattr(self, new_name):
-                if isinstance(getattr(self, new_name), attr_type):
+                value = getattr(self, new_name)
+                if isinstance(value, attr_type):
                     return
                 
-                else:
-                    setattr(self, new_name, default) # CAUTION
+                else:# CAUTION may wipe out attribute value!
+                    try:
+                        val = attr_type(value)
+                    except:
+                        val = default
+                        
+                    setattr(self, new_name, val) 
             
-            if hasattr(self, old_name):
+            elif hasattr(self, old_name):
                 value = getattr(self, old_name)
-                
+                # CAUTION may wipe out attribute value!
                 if not isinstance(value, attr_type):
                     try:
                         value = attr_type(value) # try casting
@@ -2252,30 +2258,26 @@ class ScanData(object):
                     except:
                         value = default
                         
+                delattr(self, old_name)
+                        
             else:
                 value = default
             
             #print("\tvalue", value)
             setattr(self, new_name, value)
             
-            if hasattr(self, old_name):
-                delattr(self, old_name)
-            
         def _remove_attribute_(name):
             if hasattr(self, name):
                 delattr(self, name)
         
-        if hasattr(self, "apiversion") and isinstance(self.apiversion, tuple) and len(self.apiversion)>=2 and all(isinstance(v, numbers.Number) for v in self.apiversion):
-            vernum = self.apiversion[0] + self.apiversion[1]/10
+        #if hasattr(self, "apiversion") and isinstance(self.apiversion, tuple) and len(self.apiversion)>=2 and all(isinstance(v, numbers.Number) for v in self.apiversion):
+            #vernum = self.apiversion[0] + self.apiversion[1]/10
             
-            class_vernum = ScanData.apiversion[0] + ScanData.apiversion[1]/10
+            #class_vernum = ScanData.apiversion[0] + ScanData.apiversion[1]/10
             
-            #print("ScanData._upgrade_API_", vernum)
-            if vernum >= class_vernum:
-                return
-            
-        
-            
+            #print("ScanData._upgrade_API_", vernum, class_vernum)
+            #if vernum >= class_vernum:
+                #return
             
         _upgrade_attribute_("__metadata__", "_metadata_", DataBag, DataBag(mutable_types=True, allow_none=True))
         _upgrade_attribute_("__name__", "_name_", str, "ScanData")
@@ -9870,6 +9872,14 @@ class ScanData(object):
     
     @property
     def name(self):
+        if not hasattr(self, "_name_"):
+            if hasattr(self, "__name__"):
+                self._name_ = self.__name__
+                delattr(self, "__name__")
+                
+            else:
+                self._name_ = ""
+        
         return self._name_
     
     @name.setter
@@ -9878,6 +9888,9 @@ class ScanData(object):
             raise TypeError("Expecting a str or None; got %s instead" % type(value).__name__)
         
         self._name_ = value
+        
+        if hasattr(self, "__name__"):
+            delattr(self, "__name__")
         
         self._modified_ = True
         
@@ -9890,6 +9903,14 @@ class ScanData(object):
         
         {"spine01": <pictgui.Cursor object at xxxx>}
         """   
+        if not hasattr(self, "_scenecursors_"):
+            if hasattr(self, "__scenecursors__"):
+                self._scenecursors_ = self.__scenecursors__
+                delattr(self, "__scenecursors__")
+                
+            else:
+                self._scenecursors_ = collections.OrderedDict()
+                
         return self._scenecursors_
     
     @property

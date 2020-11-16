@@ -12,24 +12,13 @@ from neo.core.baseneo import BaseNeo, _check_annotations
 #from neo.rawio.baserawio import (BaseRawIO, _signal_channel_dtype, _unit_channel_dtype,
                         #_event_channel_dtype)
 
-from core import axonrawio_patch as _axonrawio
-#from . import neoepoch as neoepoch
-#from . import neoevent as neoevent
+from core.axonrawio_patch import AxonRawIO_v1
+from core.neoevent import _new_Event_v1
+from core.neoepoch import _new_Epoch_v1
 
-#neo.core.epoch.Epoch    = neoepoch.Epoch
-#neo.core.Epoch          = neoepoch.Epoch
-#neo.Epoch               = neoepoch.Epoch
-##neo.io.axonio.Event     = _neoevent.Event
+#neo.io.axonio.AxonRawIO = _axonrawio.AxonRawIO_v1
 
-#neo.core.event.Event    = neoevent.Event
-#neo.core.Event          = neoevent.Event
-#neo.Event               = neoevent.Event
-#neo.io.axonio.Event     = neoevent.Event
-#neo.core.event._new_event = neoevent._new_event
-
-neo.io.axonio.AxonRawIO = _axonrawio.AxonRawIO
-
-def _normalize_array_annotations(value, length):
+def _normalize_array_annotations_v1(value, length):
     """Check consistency of array annotations
 
     Recursively check that value is either an array or list containing only "simple" types
@@ -47,7 +36,7 @@ def _normalize_array_annotations(value, length):
 
     """
     
-    print("_normalize_array_annotations value", value, "length", length)
+    print("_normalize_array_annotations_v1 value", value, "length", length)
 
     # First stage, resolve dict of annotations into single annotations
     if isinstance(value, dict):
@@ -55,7 +44,7 @@ def _normalize_array_annotations(value, length):
             if isinstance(value[key], dict):
                 raise ValueError("Nested dicts are not allowed as array annotations")
 
-            value[key] = _normalize_array_annotations(value[key], length)
+            value[key] = _normalize_array_annotations_v1(value[key], length)
 
     elif value is None:
         raise ValueError("Array annotations must not be None")
@@ -64,7 +53,7 @@ def _normalize_array_annotations(value, length):
     elif not isinstance(value, (list, np.ndarray)) or (
             isinstance(value, pq.Quantity) and value.shape == ()):
         _check_annotations(value)
-        value = _normalize_array_annotations(np.array([value]), length)
+        value = _normalize_array_annotations_v1(np.array([value]), length)
 
     # If array annotation, check for correct length, only single dimension and allowed data
     else:
@@ -246,13 +235,10 @@ def _new_IrregularlySampledSignal_v1(cls, times, signal, units=None, time_units=
     iss.channel_index = channel_index
     return iss
 
-#neo.core.analogsignal._new_AnalogSignalArray = _new_AnalogSignalArray
-
-#for m in neo.io.__dict__:
-    #if type(neo.io.__dict__[m]).__name__ == "module":
-        #if "Event" in neo.io.__dict__[m].__dict__:
-            #neo.io.__dict__[m].__dict__["Event"] = _neoevent.Event
             
-        #if "Epoch" in neo.io.__dict__[m].__dict__:
-            #neo.io.__dict__[m].__dict__["Epoch"] = _neoepoch.Epoch
-            
+patches = {"neo.io.axonio.AxonRawIO": AxonRawIO_v1,
+           "neo.core.analogsignal._new_AnalogSignalArray": _new_AnalogSignalArray_v1,
+           "neo.core.irregularlysampledsignal._new_IrregularlySampledSignal": _new_IrregularlySampledSignal_v1,
+           "neo.core.spiketrain._new_spiketrain": _new_spiketrain_v1,
+           "neo.core.epoch._new_epoch": _new_Epoch_v1,
+           "neo.core.event._new_event": _new_Event_v1}

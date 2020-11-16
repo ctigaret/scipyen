@@ -111,22 +111,6 @@ mpl_plot_functions["quiver"]                = Axes.quiver
 mpl_plot_functions["quiverkey"]             = Axes.quiverkey
 mpl_plot_functions["streamplot"]            = Axes.streamplot
 
-#def remove_na(arr):
-    #"""Helper method for removing NA values from array-like.
-    #NOTE: for ehatever reason, remove_na is not imported
-    #Parameters
-    #----------
-    #arr : array-like
-        #The array-like from which to remove NA values.
-
-    #Returns
-    #-------
-    #clean_arr : array-like
-        #The original array with NA values removed.
-
-    #"""
-    #return arr[pd.notnull(arr)]
-    
 class SB_CategoricalPlotter(sb.categorical._CategoricalPlotter):
     def categorical_order(self, values, order=None, skip=None):
         """Return a list of unique data values.
@@ -620,7 +604,7 @@ class SB_BarPlotter(SB_CategoricalStatPlotter):
     def __init__(self, x, y, hue, data, order, hue_order, skip,
                  estimator, ci, n_boot, units,
                  orient, color, palette, saturation, errcolor,
-                 errwidth, capsize, dodge):
+                 errwidth, capsize, dodge, bar_width):
         """Initialize the plotter."""
         self.dodge              = dodge
 
@@ -632,6 +616,9 @@ class SB_BarPlotter(SB_CategoricalStatPlotter):
                                  order, hue_order, skip, units)
         self.establish_colors(color, palette, saturation)
         self.estimate_statistic(estimator, ci, n_boot)
+        
+        if isinstance(bar_width, float):
+            self.width = bar_width # the seaborn default is 0.8
 
 
     def draw_bars(self, ax, kws):
@@ -1379,6 +1366,8 @@ def barplot_sb(*args, x=None, y=None, hue=None, data=None, order=None,
     Additional keyword parameters for barplot:
     --------------
     show_legend (True)
+    bar_width (0.8) - NOTE: this is aliased to "width"; if both width and bar_width
+            are supplied, bar_width takes precedence
         
     Additional keyword arguments controlling the appearance of the 
     overlaid stripplot. These are embedded in kwargs (default values in parantheses):
@@ -1425,17 +1414,7 @@ def barplot_sb(*args, x=None, y=None, hue=None, data=None, order=None,
     """
     if not isinstance(data, (pd.DataFrame, dict)):
         return
-    
-    plotter = SB_BarPlotter(x, y, hue, data, order, hue_order, skip,
-                          estimator, ci, n_boot, units,
-                          orient, color, palette, saturation,
-                          errcolor, errwidth, capsize, dodge)
 
-    if ax is None:
-        ax = plt.gca()
-        
-        
-        
     strip_jitter = kwargs.pop("strip_jitter", True)
     strip_size = kwargs.pop("strip_size", 5)
     strip_dodge = kwargs.pop("strip_dodge", dodge)
@@ -1448,6 +1427,28 @@ def barplot_sb(*args, x=None, y=None, hue=None, data=None, order=None,
     strip_order = kwargs.pop("strip_order", None)  # to allow only for the bar legend
     tick_length = kwargs.pop("tick_length", 4.5)
     tick_direction = kwargs.pop("tick_direction", "in")
+    bar_width = kwargs.pop("bar_width", None)
+    _width = kwargs.pop("width", None)
+    
+    if not isinstance(bar_width, float):
+        if isinstance(_width, float):
+            bar_width = _width
+        else:
+            bar_width = None
+            
+    else:
+        bar_width = None
+    
+    plotter = SB_BarPlotter(x, y, hue, data, order, hue_order, skip,
+                          estimator, ci, n_boot, units,
+                          orient, color, palette, saturation,
+                          errcolor, errwidth, capsize, dodge, bar_width)
+
+    if ax is None:
+        ax = plt.gca()
+        
+        
+        
 
     # NOTE: 2020-02-05 23:59:27
     # plots the bars

@@ -19,13 +19,56 @@ from operator import attrgetter, itemgetter, methodcaller
 
 from collections import OrderedDict, deque
 
-from .utilities import safeWrapper
 
 try:
     from reprlib import repr
 except ImportError:
     pass
 
+def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None) -> bool:
+    """Sets or gets the state of scipyen debugging.
+    
+    The state is a boolean variable SCIPYEN_DEBUG in the user namespace.
+    
+    When True, then specific "print" messages in the scipyen modules get executed
+    
+    Parameters:
+    -----------
+    arg: str, bool, optional (default is None)
+        When str, "on" (case-insensitive) turns debugging ON ; anything else
+            turns debugging OFF
+            
+        When bool, True turns debugging ON, False turns it OFF
+        
+        When None, the function returns the current state of SCIPYEN_DEBUG.
+        
+        NOTE this is deliberately different from the behaviour of the
+        'scipyen_debug' line magic which, whehn called without argument, toggles
+        the debugging state ON or OFF
+    
+    """
+    ns = user_workspace()
+    
+    if arg is None:
+        if "SCIPYEN_DEBUG" not in ns:
+            ns["SCIPYEN_DEBUG"] = False
+            
+        return ns["SCIPYEN_DEBUG"]
+    
+    if isinstance(arg, str):
+        val = arg.strip().lower() == "on"
+        ns["SCIPYEN_DEBUG"] = val
+        return ns["SCIPYEN_DEBUG"]
+    
+    elif isinstance(arg, bool):
+        ns["SCIPYEN_DEBUG"] = arg
+        return ns["SCIPYEN_DEBUG"]
+        
+    elif not isinstance(arg, bool):
+        raise TypeError("Expecting a str ('on' or 'off'), a bool, or None; got %s instead" % arg)
+    
+        
+        
 def total_size(o, handlers={}, verbose=False):
     """ Returns the approximate memory footprint an object and all of its contents.
 
@@ -447,7 +490,6 @@ def user_workspace() -> dict:
             return f[0].f_globals["mainWindow"].workspace
     
 
-#@safeWrapper
 def delvars(*args, glob=True, ws=None):
     """Delete variable named in *args from workspace ws
     CAUTION 

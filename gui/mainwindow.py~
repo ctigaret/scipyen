@@ -348,7 +348,7 @@ class ScipyenMagics(Magics):
         if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
             local_ns["mainWindow"].slot_pictQuit()
             
-        return line
+        #return line
     
     @line_magic
     @needs_local_scope
@@ -358,7 +358,7 @@ class ScipyenMagics(Magics):
         if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
             local_ns["mainWindow"].slot_pictQuit()
             
-        return line
+        #return line
     
     @line_magic
     @needs_local_scope
@@ -369,7 +369,7 @@ class ScipyenMagics(Magics):
         if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
             local_ns["mainWindow"]._init_ExternalIPython_()
             
-        return line
+        #return line
     
     @line_magic
     @needs_local_scope
@@ -380,7 +380,7 @@ class ScipyenMagics(Magics):
         if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
             local_ns["mainWindow"]._init_ExternalIPython_(new="neuron")
             
-        return line
+        #return line
     
     @line_magic
     @needs_local_scope
@@ -393,6 +393,41 @@ class ScipyenMagics(Magics):
         """
         return local_ns
     
+    @line_magic
+    @needs_local_scope
+    def scipyen_debug(self, line, local_ns):
+        """Turn on/off debugging messages in Scipyen code
+        
+        Calls:
+        scipyen_debug => toggles scipyen debugging
+        
+        scipyen_debug "on", or scipyen_debug True -> turns debugging ON
+        
+        scipyen_debug "off", or scipyen_debug False -> turns debugging OFF
+        
+        any other argument turns debugging OFF
+        
+        For a programmatic way to access/set SCIPYEN_DEBUG, see
+        workspacefunctions.debug_scipyen()
+        
+        Returns:
+        -------
+        The new value of SCIPYEN_DEBUG in the user workspace
+        
+        """
+        if len(line.strip()):
+            if line.strip().lower() in ("on", "true", "off", "false"):
+                val = True if line.strip().lower() in ("on", "true") else False
+            
+            else:
+                val = False
+                
+            return debug_scipyen(val)
+        
+        else:
+            val = user_workspace().get("SCIPYEN_DEBUG", False)
+            return debug_scipyen(not val)
+            
     @line_magic
     @needs_local_scope
     def LSCaT(self, line, local_ns):
@@ -1995,7 +2030,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # __module_name__ is "pict" so we take all its contents into the kernel
             # namespace (they're just references to those objects)
             self.workspace = self.ipkernel.shell.user_ns
-            #self.workspace['mainWindow'] = self
+            
+            # NOTE: 2020-11-12 12:51:36
+            # used by %scipyen_debug line magic
+            self.workspace["SCIPYEN_DEBUG"] = False 
+            
             self.workspace['mainWindow'] = self
 
             # NOTE: 2016-03-20 20:50:42 -- WRONG!

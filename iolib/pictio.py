@@ -42,10 +42,11 @@ from core import (xmlutils, strutils, datatypes, datasignal,
                   triggerprotocols, neoutils,)
 
 
-from core.prog import (ContextExecutor, NeoPatchCtx, ShimModule, 
-                       safeWrapper, needs_neo_patch,import_module,)
+from core.prog import (ContextExecutor, safeWrapper, check_neo_patch, 
+                       import_relocated_module)
 
-from core.workspacefunctions import (user_workspace, get_symbol_in_namespace,)
+from core.workspacefunctions import (user_workspace, assignin, debug_scipyen,
+                                     get_symbol_in_namespace,)
 
 from imaging import (axisutils, axiscalibration, scandata, )
 
@@ -170,7 +171,13 @@ class CustomUnpickler(pickle.Unpickler):
         
     """
     
-    def _find_relocate_(self, old_modname, symbol):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+    def load(self):
+        return super().load()
+    
+    def _find_module_for_symbol_(self, symbol, old_modname=None):
         """Deals with contingencies (a) and (b):
             "old" (original) module and the "new" module have been succesfully
             imported and are present in sys.modules
@@ -181,40 +188,143 @@ class CustomUnpickler(pickle.Unpickler):
         Returns the module that currently contains the symbol in symbol
             
         """
-        #print("search for %s in sys.modules", symbol)
-        # NOTE 2020-10-30 10:20:46
-        # this is to cover the case of nested classes, i.e. classes
-        # defined as class attrbutes - e.g. ScanData.ScanDataType
-        itemnames = symbol.split(".") # to cover the case of nested classes
         
-        # also make sure we don't end up with the "old" module, if that is still 
-        # around
-        containers = [k for k, v in sys.modules.items() if hasattr(v, itemnames[0]) and k != old_modname]
-        
-        if len(containers):
-            result = getattr(sys.modules[containers[0]], itemnames[0])
-            module = result.__module__
-            parent = module
-            # now go get the attribute that is being sought
-            for iname in itemnames[1:]:
-                if hasattr(result, iname):
-                    parent = ".".join([parent, result.__name__])
-                    result = getattr(result, iname)
-                    
+        def __test_containment__(item_names, modname, obj ):
+            direct = modname in item_names
+            
+            is_attribute = any([hasattr(obj, i) for i in item_names])
+            
+            is_scipyen = False
+            
+            if inspect.ismodule(obj):
+                if hasattr(obj, "__path__"): # obj is a package - maybe a namespace package
+                    if hasattr(obj, "__file__"):
+                        pth = obj.__file__
+                        
+                    else:
+                        pth = obj.__path__
+                        
+                        if isinstance(pth, list):
+                            if len(pth):
+                                pth = pth[0]
+                            else:
+                                pth = ""
+                                
+                        elif type(pth).__name__ == "_NamespacePath":
+                            pth = obj.__path__._path[0]
+                        
                 else:
-                    raise AttributeError("%s has no attribute named %s" % (result.__name__, iname))
+                    pth = getattr(obj, "__file__", "") # bulltin modules have no __file__ atribute
+            
+            else:
+                m = inspect.getmodule(obj)
                 
-            #print("find_class() found %s in %s\n" % (result.__name__, parent))
+                pth = getattr(m, "__file__", "")
+                
+            is_scipyen = "scipyen" in pth
+            
+            return (direct or is_attribute) and is_scipyen
+            
+        inames = symbol.split(".") # to cover the case of nested classes
         
-        else:
-            raise AttributeError("%s not found in sys.modules" % symbol)
+        #print("\tCustomUnpickler._find_module_for_symbol_(): itemnames = %s" % inames)
+        
+        #NOTE: 2020-11-12 11:30:25
+        # restrict the e=search for symbols & moduels in the scipyen tree, else
+        # we end up with classes imported from system packages when their name 
+        # is identical to that of classes found in system packages
+        #
+        # so let's try to import old_modname first:
+        
+        #import_relocated_module(old_modname) # this fails silently
+        
+        #loaded_containing_modules = [k for k,v in sys.modules.items() if k in inames or any([hasattr(v, i) for i in inames])]
+        loaded_containing_modules = [k for k,v in sys.modules.items() if __test_containment__(inames, k, v)]
+        
+        imported_modules = dict()
+        imported_classes = dict()
+        imported_functions = dict()
+        
+        result = None
+        
+        if len(loaded_containing_modules):
+        
+            for m in loaded_containing_modules:
+                mm = sys.modules[m]
                 
+                mdls = dict(inspect.getmembers(mm, inspect.ismodule))
+                clss = dict(inspect.getmembers(mm, inspect.isclass))
+                fncs = dict(inspect.getmembers(mm, inspect.isfunction or inspect.isgeneratorfunction or inspect.iscoroutinefunction))
+                
+                if inames[-1] in mdls:
+                    if inames[-1] in imported_modules:
+                        imported_modules[inames[-1]].append(mdls[inames[-1]])
+                        
+                    else:
+                        imported_modules[inames[-1]] = [mdls[inames[-1]]]
+                        
+                elif inames[-1] in clss:
+                    if inames[-1] in imported_classes:
+                        imported_classes[inames[-1]].append(clss[inames[-1]])
+                        
+                    else:
+                        imported_classes[inames[-1]] = [clss[inames[-1]]]
+                        
+                elif inames[-1] in fncs:
+                    if inames[-1] in imported_functions:
+                        imported_functions[inames[-1]].append(fncs[inames[-1]])
+                        
+                    else:
+                        imported_functions[inames[-1]] = [fncs[inames[-1]]]
+                        
+            if inames[-1] in imported_modules:
+                mods = imported_modules[inames[-1]]
+                result = mods[0]
+            
+            elif inames[-1] in imported_classes:
+                objs = imported_classes[inames[-1]]
+                
+                result = getattr(inspect.getmodule(objs[0]), inames[-1])
+                    
+            elif inames[-1] in imported_functions:
+                objs = imported_functions[inames[-1]]
+                result = getattr(inspect.getmodule(objs[0]), inames[-1])
+                
+            else:
+                for k, v in enumerate(inames[:-1]):
+                    obj = self._find_member_for_symbol_(v, inames[k+1])
+                    if obj is not None:
+                        result = obj
+                    
+            if debug_scipyen():
+                print("\tCustomUnpickler._find_module_for_symbol_() imported_modules", 
+                        imported_modules)
+                print("\tCustomUnpickler._find_module_for_symbol_() imported_classes",
+                        imported_classes)
+                print("\tCustomUnpickler._find_module_for_symbol_() imported_functions",
+                        imported_functions)
+            
+        if debug_scipyen():
+            result_module = None
+            if result is not None:
+                result_module = inspect.getmodule(result)
+                
+            if result_module is not None:
+                print("\tCustomUnpickler._find_module_for_symbol_() found", result, "in module", result_module)
+            else:
+                print("\tCustomUnpickler._find_module_for_symbol_() found", result)
+            
         return result
     
-    def find_class(self, modname, symbol):
-        #print("find_class():", "old module:", modname, "name", symbol)
+    def _find_member_for_symbol_(self, name, symbol):
+        parent = self._find_module_for_symbol_(name)
+        if parent is not None:
+            if hasattr(parent, symbol):
+                return getattr(parent, symbol)
         
-        #print("old module", modname, "is in sys.modules: ", modname in sys.modules)
+    
+    def find_class(self, modname, symbol):
+        #print("\n***CustomUnpickler.find_class(%s, %s)***\n" % (modname, symbol))
         
         try:
             # NOTE: 2020-10-30 14:54:16
@@ -224,17 +334,33 @@ class CustomUnpickler(pickle.Unpickler):
             # sys.modules i.e. it has successfully been imported;
             #
             
+                
             return super().find_class(modname, symbol)
         
         except Exception as e:
-            #print(type(e))
-            # if symbol symbol does not exist in the predicted modname 
-            # (the try statement has failed) 
             if isinstance(e, (AttributeError, ModuleNotFoundError)):
-                return self._find_relocate_(modname, symbol)
+                return self._find_module_for_symbol_(symbol, old_modname=modname)
                 
             else:
-                raise
+                try:
+                    #print("\tCustomUnpickler.find_class(): old module", modname, "for symbol", symbol, "is NOT in sys.modules")
+                    
+                    # NOTE: 2020-11-12 11:19:23
+                    # this fails silently, but when successful, the call below should
+                    # work
+                    import_relocated_module(modname)
+                    result = super().find_class(modname, symbol)
+                    if modname in sys.modules:
+                        sys.modules.pop(modname, None)
+                        
+                    return result
+                
+                except Exception as e1:
+                    traceback.print_exc()
+                    exc_info = sys.exc_info()
+                    #print("\t### CustomUnpickler.find_class(...) Exception: ###")
+                    #print("\t### exc_info: ###", exc_info)
+                    raise
         
 def __ndArray2csv__(data, writer):
     for l in data:
@@ -1044,17 +1170,20 @@ def importDataFrame(fileName):
     else:
         warnings.warn("Unsupported file type: %s" % fileType)
         
-def custom_unpickle(src:typing.Union[str, io.BufferedReader]) -> object:
+def custom_unpickle(src:typing.Union[str, io.BufferedReader]):#, 
+                    #exc_info:typing.Optional[typing.Tuple[typing.Any, ...]]=None) -> object:
     if isinstance(src, str):
         if os.path.isfile(src):
             with open(src, mode="rb") as fileSrc:
                 return CustomUnpickler(fileSrc).load()
+                #return CustomUnpickler(fileSrc, exc_info=exc_info).load()
             
         else:
             raise FileNotFoundError()
             
     elif isinstance(src, io.BufferedReader):
         return CustomUnpickler(src).load()
+        #return CustomUnpickler(src, exc_info=exc_info).load()
     
     else:
         raise TypeError("Expecting a str containing an exiting file name or a BufferedReader; got %s instead" % type(src).__name__)
@@ -1062,6 +1191,7 @@ def custom_unpickle(src:typing.Union[str, io.BufferedReader]) -> object:
     return ret
             
 def loadPickleFile(fileName):
+    from unittest import mock
     try:
         # NOTE: try pickle first - in  python3 this is fast (via cPickle)
         with open(fileName, mode="rb") as fileSrc:
@@ -1069,40 +1199,26 @@ def loadPickleFile(fileName):
             
     except Exception as e:
         try:
-            result = custom_unpickle(fileName)
+            result = custom_unpickle(fileName)#, exc_info=exc_info)
+            #result = custom_unpickle(fileName, exc_info=exc_info)
             
         except:
-            traceback.print_exc()
-            raise
-        #exc_info = sys.exc_info()
-        #if needs_neo_patch(exc_info):
-            ## FIXME 2020-10-29 16:45:20 - buggy
-            ## intention: load pickled neo data where some of the c'tors have been
-            ## "hacked" through the use of neoevent and neoepoch
-            ## problem: messes up the sys.modules
-            #with NeoPatchCtx():
-                #result = loadPickleFile(fileName)
-                
-        #elif isinstance(e, ModuleNotFoundError) and hasattr(e, "msg"):
-            ## NOTE: for data pickled with a different module layout
-            ## i.e. the module exists, but its location in scipyen tree has changed
-            #m = e.msg.split("No module named ")[1].replace("'", "")
-            #modname = m.split(".")[-1]
+            exc_info = sys.exc_info()
             
-            #with ShimModule(modname):
-                #result = loadPickleFile(fileName)
-                
-        #elif isinstance(e, AttributeError):
-            #print("loadPickleFile AttributeError")
-            #try:
-                #result = custom_unpickle(fileName)
-                
-            #except:
-                #raise
-                
-        #else:
-            #traceback.print_exc()
-            #raise e
+            possible_patch = check_neo_patch(exc_info)
+            
+            if isinstance(possible_patch, tuple) and len(possible_patch) == 2:
+                if debug_scipyen():
+                    print("\t### patching in neo ###\n")
+                try:
+                    with mock.patch(possible_patch[0], new=possible_patch[1]):
+                        result = loadPickleFile(fileName)
+                        
+                except Exception as e1:
+                    traceback.print_exc()
+                    raise e1
+            else:
+                raise e
         
     if type(result).__name__ in ("ScanData", "AnalysisUnit", "AxisCalibration", "PlanarGraphics"):
         #print("loaded", type(result))
