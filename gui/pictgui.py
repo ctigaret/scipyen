@@ -1994,7 +1994,7 @@ class PlanarGraphics(object):
         
         """
         #print("PlanarGraphics.position() for %s " % self)
-        return (self.x, self.y)
+        return (self.get("x"), self.get("y"))
     
     @position.setter
     def position(self, x):
@@ -2009,14 +2009,16 @@ class PlanarGraphics(object):
         else:
             raise TypeError("Expecting x,y a pair of real scalars, or just a Qt QPoint or QPointF")
 
-        self.x = x[0]
-        self.y = x[1]
+        self.set("x", x[0])
+        self.set("y", x[1])
         
         self.updateLinkedObjects()
         
     def translate(self, dx, dy):
-        self.x += dx
-        self.x += dy
+        self.set("x", self.get("x") + dx)
+        self.set("y", self.get("y") + dy)
+        #self.x += dx
+        #self.x += dy
         
     def point(self, frame=None):
         """Alias to qPoint()

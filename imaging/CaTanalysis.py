@@ -9521,7 +9521,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 self._selected_analysis_unit_ = None
                 self._selected_analysis_cursor_ = None
                 
-                cursors = sorted([c for c in self._data_.scansCursors.values() if c.type == obj.type and c.hasStateForFrame(self.currentFrame)], key = lambda x:x.x)
+                cursors = sorted([c for c in self._data_.scansCursors.values() if c.type == obj.type and c.hasStateForFrame(self.currentFrame)], key = lambda x:x.get("x"))
+                #cursors = sorted([c for c in self._data_.scansCursors.values() if c.type == obj.type and c.hasStateForFrame(self.currentFrame)], key = lambda x:x.x)
                 cursor_names = [c.name for c in cursors]
                 
                 unit_names = sorted([u.landmark.name for u in self._data_.analysisUnits])
@@ -11468,7 +11469,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         #print("_display_scan_region_ %s: %s" % (type(obj).__name__, obj))
         
         if len(self._data_.scene) and len(self.sceneviewers) and isinstance(obj, pgui.PlanarGraphics):
-            print("_display_scan_region_ %s: %d frontends" % (type(obj).__name__, len(obj.frontends)))
+            #print("LSCaT._display_scan_region_ %s: %d frontends" % (type(obj).__name__, len(obj.frontends)))
 
             # see NOTE: 2018-09-25 22:19:58
             signalBlockers = [QtCore.QSignalBlocker(w) for w in self.sceneviewers]
@@ -11476,29 +11477,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             #print("scanRegion frontends", obj.frontends)
 
             for k, win in enumerate(self.sceneviewers):
-                print(win.windowTitle())
+                #print("scene viewer: ",win.windowTitle())
                 if len(obj.frontends):
-                    for f in obj.frontends:
-                        if f.parentWidget is not win:
-                            win.addGraphicsObject(obj, showLabel=False, 
-                                                    movable=False, 
-                                                    editable=False,
-                                                    labelShowsPosition=False)
-                            
-                            
-                #win.addGraphicsObject(obj, showLabel=False, 
-                                        #movable=False, 
-                                        #editable=False,
-                                        #labelShowsPosition=False)
+                    obj.frontends.clear
                 
-            #if len(obj.frontends) == 0:
-                #for k, win in enumerate(self.sceneviewers):
-                    #print(win.windowtitle())
-                    #win.addGraphicsObject(obj, showLabel=False, 
-                                          #movable=False, 
-                                          #editable=False,
-                                          #labelShowsPosition=False)
-
+                win.addGraphicsObject(obj, showLabel=False, 
+                                        movable=False, 
+                                        editable=False,
+                                        labelShowsPosition=False)
+                        
     @safeWrapper
     def _display_graphics_objects_(self, rois=True, scene=True):
         """Displays a specified overlay type in a specific data subset.
@@ -11660,7 +11647,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
         cursorSpinBoxNdx = self.selectCursorSpinBox.value()
         
-        cursors = sorted([c for c in self._data_.scansCursors.values() if c.hasStateForFrame(self.currentFrame)], key=lambda x:x.x)
+        cursors = sorted([c for c in self._data_.scansCursors.values() if c.hasStateForFrame(self.currentFrame)], key=lambda x:x.get("x"))
+        #cursors = sorted([c for c in self._data_.scansCursors.values() if c.hasStateForFrame(self.currentFrame)], key=lambda x:x.x)
         
         #print("_update_analysis_unit_ui_fields_ %d cursors" % len(cursors))
         #print("_update_analysis_unit_ui_fields_ cursor names %s" % [c.name for c in cursors])
@@ -11700,10 +11688,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                     if cursor.currentFrame != self.currentFrame:
                         cursor.currentFrame = self.currentFrame
                         
-                    self.cursorXposDoubleSpinBox.setValue(cursor.x)
-                    self.cursorYposDoubleSpinBox.setValue(cursor.y)
-                    self.cursorXwindow.setValue(cursor.xwindow)
-                    self.cursorYwindow.setValue(cursor.ywindow)
+                    self.cursorXposDoubleSpinBox.setValue(cursor.get("x"))
+                    self.cursorYposDoubleSpinBox.setValue(cursor.get("y"))
+                    self.cursorXwindow.setValue(cursor.get("xwindow"))
+                    self.cursorYwindow.setValue(cursor.get("ywindow"))
+                    
+                    #self.cursorXposDoubleSpinBox.setValue(cursor.x)
+                    #self.cursorYposDoubleSpinBox.setValue(cursor.y)
+                    #self.cursorXwindow.setValue(cursor.xwindow)
+                    #self.cursorYwindow.setValue(cursor.ywindow)
                     
                     if unit is not None:
                         self.defineAnalysisUnitCheckBox.setCheckState(QtCore.Qt.Checked)

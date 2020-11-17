@@ -1032,9 +1032,14 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
 
         self._cursorContextMenuSourceId = None
         
+    @pyqtSlot()
     def buildROI(self):
-        """Interactively builds a new ROI.
+        """Interactively builds a new ROI (i.e. using the GUI).
         """
+        # NOTE: triggered by ImageViewer.newROIAction
+        # once the ROI is build, the ROI is set to emit signalROIConstructed
+        # which is connected to slot_newROIConstructed, which in turn emits
+        # signalRoiAdded (so that "sister" windows can be notified)
         #print("buildROI")
         params = None
         pos = QtCore.QPointF(0,0)
@@ -1069,7 +1074,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                      editable=True, frameVisibility=[], 
                      showLabel=True, labelShowsPosition=True,
                      autoSelect=False, parentWidget=None):
-        """
+        """Creates a ROI programmatically, or interactively
         """
         if self.__scene__.rootImage is None:
             return
@@ -1079,8 +1084,13 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 parentWidget = self.__image_viewer__
             else:
                 parentWidget = self
+                
+        #print("GraphicsImageViewerWidget.createNewRoi params", params, "roiType", roiType)
             
-        if roiType is None or params is None:
+        #if roiType is None or params is None:  # this would create an infinite loop
+                                                # because when either are None
+                                                # delegates to buildROI
+        if all([v is None for v in (params, roiType, )]):
             self.buildROI()
             
         rTypeStr = ""
@@ -1218,7 +1228,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                           self.scene.sceneRect().width(), \
                           self.scene.sceneRect().height())
         
-        self.signalRoiAdded.emit(roi.backend)
+        #self.signalRoiAdded.emit(roi.backend)
         
         return roi
         
@@ -1226,7 +1236,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                         editable=True, frame=None,  label=None, frameVisibility=[],
                         showLabel=True, labelShowsPosition = True, 
                         autoSelect=False, parentWidget = None):
-        """
+        """Creates a cursors, programmatically.
         
         cType: int or one of the pictgui.GraphicsObjectType cursor type enum values, 
             or a pictgui.Cursor object
@@ -1570,7 +1580,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         if cursor.__backend__.hasStateForFrame(cursor.currentFrame):
             cursor.show()
             
-        self.signalCursorAdded.emit(cursor.backend)
+        #self.signalCursorAdded.emit(cursor.backend)
         
         return cursor
     
@@ -1643,6 +1653,8 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
         self.selectedRoi = sender
         
+        self.signalRoiAdded.emit(sender.backend)
+            
     @pyqtSlot(object)
     @safeWrapper
     def slot_cursorChanged(self, obj):
@@ -1759,8 +1771,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             crsRemoveAction.triggered.connect(self.slot_removeRoi)
             cm.exec(pos)
 
-    
-            
     @pyqtSlot(str, bool)
     @safeWrapper
     def slot_setSelectedCursor(self, cId, sel):
@@ -1800,22 +1810,30 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @pyqtSlot()
     @safeWrapper
     def slot_newHorizontalCursor(self):
-        self.createNewCursor(pgui.GraphicsObjectType.horizontal_cursor)
-        
+        obj = self.createNewCursor(pgui.GraphicsObjectType.horizontal_cursor)
+        if obj is not None:
+            self.signalCursorAdded.emit(obj.backend)
+
     @pyqtSlot()
     @safeWrapper
     def slot_newPointCursor(self):
-        self.createNewCursor(pgui.GraphicsObjectType.point_cursor)
+        obj = self.createNewCursor(pgui.GraphicsObjectType.point_cursor)
+        if obj is not None:
+            self.signalCursorAdded.emit(obj.backend)
     
     @pyqtSlot()
     @safeWrapper
     def slot_newVerticalCursor(self):
-        self.createNewCursor(pgui.GraphicsObjectType.vertical_cursor)
+        obj = self.createNewCursor(pgui.GraphicsObjectType.vertical_cursor)
+        if obj is not None:
+            self.signalCursorAdded.emit(obj.backend)
     
     @pyqtSlot()
     @safeWrapper
     def slot_newCrosshairCursor(self):
-        self.createNewCursor(pgui.GraphicsObjectType.crosshair_cursor)
+        obj = self.createNewCursor(pgui.GraphicsObjectType.crosshair_cursor)
+        if obj is not None:
+            self.signalCursorAdded.emit(obj.backend)
     
     @pyqtSlot(str)
     @safeWrapper
@@ -3705,7 +3723,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.editRoiAction = self.editRoisMenu.addAction("Edit ROI...")
         self.editRoiAction.triggered.connect(self.viewerWidget.slot_editRoi)
         
-        
         self.removeRoisMenu = QtWidgets.QMenu("Remove ROIs")
         self.roisMenu.addMenu(self.removeRoisMenu)
         
@@ -4507,15 +4524,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._scaleBarLength_ = length
         self._scaleBarOrigin_ = origin
         
-        
-        
-        
-        
     def addGraphicsObject(self, item, pos=None, movable=True, editable=True, 
                           label=None, window=None, radius=None, 
                           frame=None, framesVisible=None,
                           showLabel=True, labelShowsPosition=True):
-        """Manually add a roi or a cursor to the underlying scene.
+        """Programmatically add a roi or a cursor to the underlying scene.
         
         Parameters:
         ===========
@@ -4535,6 +4548,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         ==================
         Passed to GraphicsObject constructor via GraphicsImageViewerWidget 
         createNewRoi() or createnewCursor() methods.
+        
+        NOTE: To manually add a roi or cursor in the window, use the window menu
         
         """
         
@@ -4557,7 +4572,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                                     parentWidget        = self)
             
         elif isinstance(item, (int, pgui.GraphicsObjectType)) and item & pgui.GraphicsObjectType.allCursorTypes:
-            print("addGraphicsObject", item)
+            #print("addGraphicsObject", item)
             obj = self.viewerWidget.createNewCursor(item, 
                                                     window              = window, 
                                                     radius              = radius, 
@@ -4572,14 +4587,14 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                                     parentWidget        = self)
         
         elif isinstance(item, pgui.PlanarGraphics):
-            print("addGraphicsObject", item)
+            #print("ImageViewer %s addGraphicsObject pgui.PlanarGraphics" % self.windowTitle(), item)
             roiType = item.type
 
             if framesVisible is None:
                 framesVisible = item.frameIndices
                 
             obj = self.viewerWidget.createNewRoi(params                 = item, 
-                                                 roiType                =  roiType, 
+                                                 roiType                = roiType, 
                                                  label                  = label, 
                                                  frame                  = frame, 
                                                  pos                    = pos,

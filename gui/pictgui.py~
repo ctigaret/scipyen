@@ -6848,7 +6848,7 @@ class Path(PlanarGraphics):
             return QtCore.QPointF()
 
         return QtCore.QPointF(position[0], position[1])
-            
+    
     @property
     def x(self):
         """The "x" coordinate of the current state of this path.
@@ -7283,7 +7283,7 @@ class Path(PlanarGraphics):
         return Path([o for o in map(lambda x: x.getObjectForFrame(frame), self) if o is not None])
     
     def getState(self, frame:typing.Optional[int]=None) -> typing.Optional[object]:
-        """Returns a list of states that are defined for the specified frame.
+        """Returns a list of states that defined for the specified frame.
         
         A state is defined for the specified frame if either:
         * its z_frame == frame
@@ -7295,10 +7295,12 @@ class Path(PlanarGraphics):
         if frame is None:
             frame = self._currentframe_
             
-        if len(self._objects_):
-            objects = [o for o in [o.getState(frame) for o in self._objects_] if o is not None]
+        return [o for o in [o.getState(frame) for o in self._objects_] if o is not None]
+    
+        #if len(self._objects_):
+            #objects = [o for o in [o.getState(frame) for o in self._objects_] if o is not None]
             
-            return Path(objects)
+            #return Path(objects)
                     
     def removeState(self, value):
         for o in self._objects_:
@@ -9791,8 +9793,13 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 
             elif self._objectType & GraphicsObjectType.allShapeTypes:
                 #non-cursor types
-                self.__backend__.set("x", value.x())
-                self.__backend__.set("y", value.y())
+                if isinstance(self.__backend__, Path): # use the x and y property setters
+                    self.__backend__.x = value.x()
+                    self.__backend__.y = value.y()
+                    
+                else:
+                    self.__backend__.set("x", value.x())
+                    self.__backend__.set("y", value.y())
                 
             self.__backend__.updateLinkedObjects()
 
