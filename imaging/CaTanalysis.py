@@ -245,12 +245,12 @@ def vCursor2ScanlineProjection(v, path, span=None):
             
         obj = p[obj_index]
         
-        x1, y1 = obj.x, obj.y
+        x1, y1 = obj.get("x"), obj.get("y")
         
         if obj_index  == 0:
             return (x1, y1) # assumes it is a Mmove
         
-        x0, y0 = p[obj_index-1].x, p[obj_index-1].y
+        x0, y0 = p[obj_index-1].get("x"), p[obj_index-1].get("y")
         
         rel_pos = value - cum_len[obj_index-1]
             
@@ -260,7 +260,10 @@ def vCursor2ScanlineProjection(v, path, span=None):
             t = np.zeros((8,))
             t[4:] = 1.
             
-            c = np.array([[x0, y0], [obj.c1x, obj.c1y], [obj.c2x, obj.c2y], [x1, y1]])
+            c = np.array([[x0, y0], 
+                          [obj.get("c1x"), obj.get("c1y")], 
+                          [obj.get("c2x"), obj.get("c2y")],
+                          [x1, y1]])
             
             spline = interpolate.BSpline(t, c, 3, extrapolate=True)
             
@@ -272,7 +275,9 @@ def vCursor2ScanlineProjection(v, path, span=None):
             t = np.zeros((6,))
             t[3:] = 1.
             
-            c = np.array([[x0,y0], [obj.cx, obj.cy], [x1, y1]])
+            c = np.array([[x0,y0], 
+                          [obj.get("cx"), obj.get("cy")], 
+                          [x1, y1]])
             
             spline = interpolate.BSpline(t, c, 2, extrapolate=True)
             
@@ -328,24 +333,24 @@ def vCursor2ScanlineProjection(v, path, span=None):
         # TODO find a way to get the real width of the linescan image served/scanned
         # by the vertical cursor "v"
         # as workaround, we introduce span as an optional parameter
-        span = v.width
+        span = v.get("width")
         
     
-    if v.x < 0:
+    if v.get("x") < 0:
         v_pos = 0
         
-    elif v.x >= span:
+    elif v.get("x") >= span:
         v_pos = span-1
         
     else:
-        v_pos = v.x
+        v_pos = v.get("x")
         
     if len(path) == 2: # linear interpolation between path's ends
-        dx = path[1].x - path[0].x
-        dy = path[1].y - path[0].y
+        dx = path[1].get("x") - path[0].get("x")
+        dy = path[1].get("y") - path[0].get("y")
         
-        ret_x = v_pos * dx / span + path[0].x
-        ret_y = v_pos * dy / span + path[0].y
+        ret_x = v_pos * dx / span + path[0].get("x")
+        ret_y = v_pos * dy / span + path[0].get("y")
         
     elif len(path) > 2:
         if any([any([p in o for p in ("cx", "cy", "c1x", "c1y", "c2x", "c2y")]) for o in path]): # there are Cubic and Quad states -> interpolate
@@ -357,8 +362,8 @@ def vCursor2ScanlineProjection(v, path, span=None):
             
         else: # assumes all have "x" and "y" attributes; if this is False, key errors & attribute erroes will be raised 
             if len(path) == int(span): # good chances this is 1 element per pixel in a scan row
-                ret_x = path[int(v_pos)].x
-                ret_y = path[int(v_pos)].y
+                ret_x = path[int(v_pos)].get("x")
+                ret_y = path[int(v_pos)].get("y")
                 
             else: # use interpolations
                 path_len, pe_len = pgui.curveLength(path)
@@ -368,8 +373,8 @@ def vCursor2ScanlineProjection(v, path, span=None):
                 ret_x, ret_y =  _project_on_path_(v_pos, path, cum_pe_len)
                 
     else: # len(path) is 1
-        ret_x = path[0].x
-        ret_y = path[0].y
+        ret_x = path[0].get("x")
+        ret_y = path[0].get("y")
     
     return (ret_x, ret_y)
 
@@ -412,7 +417,7 @@ def vCursorPos2ScanlineCoords(v, path, span=None):
         
         #print("_get_coords_for_proj_pos_on_path_ obj_index: %d, %s, %s" % (obj_index, type(obj).__name__, obj.type))
         
-        x1, y1 = obj.x, obj.y
+        x1, y1 = obj.get("x"), obj.get("y")
         
         if obj_index  == 0:
             if isinstance(obj, pgui.Move):
@@ -423,7 +428,7 @@ def vCursorPos2ScanlineCoords(v, path, span=None):
             rel_pos = value
         
         else:
-            x0, y0 = p[obj_index-1].x, p[obj_index-1].y
+            x0, y0 = p[obj_index-1].get("x"), p[obj_index-1].get("y")
             
             #print(" prev object: %s, %s" % (type(p[obj_index-1]).__name__, p[obj_index-1].type), (x0, y0))
             
@@ -503,122 +508,6 @@ def vCursorPos2ScanlineCoords(v, path, span=None):
                     
         return float(x), float(y)
     
-    #### BEGIN old code prev 2019-03-30 23:01:36
-    #"def" __get_projected_position_on_path_old__(value, crds):#, pathLength):
-        ## NOTE: 2018-08-19 10:26:18
-        ## get the Euclidean distance between successive vertices of 
-        ## the scanline path
-        #scanline_segment_lengths = list()
-        
-        ## the angle of each segment of the path, in the scene's coordinates frame
-        ## relative to the scene's x axis
-        #scanline_segment_angles = list()
-        
-        #for k, c in enumerate(crds[1:]):
-            #d = spatial.distance.euclidean(c, crds[k])
-            #dx = c[0]-crds[k][0]
-            #dy = c[1]-crds[k][1]
-            ##print("dx", dx)
-            ##print("dy", dy)
-            
-            #if dx == 0:
-                #if dy == 0:
-                    #a = 0
-                    
-                #else:
-                    #a = np.pi/2 if dy > 0 else np.pi * 3/2
-            
-            #else:
-                #a = np.arctan( dy /  dx ) # (By - Ay)/(Bx - Ax)
-            
-            #scanline_segment_lengths.append(d)
-            #scanline_segment_angles.append(a)
-            
-            
-        ## NOTE: 2018-08-19 10:26:26
-        ## cumulative sum of euclidean distances
-        #scanline_cumulative_length = np.cumsum(scanline_segment_lengths)
-        
-        ##print("scanline_cumulative_length", scanline_cumulative_length)
-        
-        ## NOTE: 2018-08-19 10:27:18
-        ## sum of Euclidean distances between successive points
-        ## effectively the "path length"
-        #scanline_path_length = scanline_cumulative_length[-1]
-        
-        ##print("scanline_path_length", scanline_path_length)
-        
-        #scanline_path_length_2_linescan_width_scale = span/scanline_path_length
-        
-        ## NOTE: 2018-08-20 10:03:32
-        ## cursor's x coordinate PROJECTED onto the scanline
-        #proj_vx = value / scanline_path_length_2_linescan_width_scale
-        ##print(proj_vx)
-        
-        ## locate the segment where the projected cursor position
-        ## falls
-        #ndxx = np.where([proj_vx <= v for v in scanline_cumulative_length])[0]
-        
-        ##print("ndxx", ndxx)
-        
-        ## NOTE: 2018-08-20 10:20:55
-        ## index of the scaline_segment where the projected cursor X coordinate falls
-        #if len(ndxx):
-            #scanline_segment_index = int(ndxx[0])
-            
-        #else:
-            #scanline_segment_index = 0
-            
-        ##print("scanline_segment_index", scanline_segment_index)
-            
-        ## the index of the (projected) segment where v.x maps onto;
-        ## if necessary, adjust the projected position along the
-        ## scanline to equal the euclidean distance from the beginning
-        ## of the CURRENT segment.
-        ## i.e., subtract the cumulative sum of the euclidean
-        ## lengths of segments UP TO the current one
-        ## NOTE: 2018-08-20 10:28:12
-        ## get the corresponding segment euclidean length and calculate
-        ## the coordinates in the scene axis system
-        ##if scanline_segment_index >= len(thisPath):
-        ##if scanline_segment_index >= pathLength:
-        #if scanline_segment_index >= len(crds):
-            ## theoretically the execution can never go through this branch
-            ##dx = currentPath[-1].x - currentPath[-2].x
-            ##dy = currentPath[-1].y - currentPath[-2].y
-            ##dx = thisPath[-1].x - thisPath[-2].x
-            ##dy = thisPath[-1].y - thisPath[-2].y
-            
-            #proj_vx = scanline_path_length - scanline_cumulative_length[-2]
-            #segment_angle = scanline_segment_angles[-1]
-            
-            ##proj_vx = proj_vx - scanline_cumulative_length[-2]
-            
-        #else:
-            ## if necessary, adjust the projected position along the
-            ## scanline to equal the euclidean distance from the beginning
-            ## of the CURRENT segment.
-            #if scanline_segment_index > 0:
-                #proj_vx = proj_vx - scanline_cumulative_length[scanline_segment_index-1]
-                
-            #segment_angle = scanline_segment_angles[scanline_segment_index]
-    
-        #ret_x_ = proj_vx * np.cos(segment_angle)
-        #ret_y_ = proj_vx * np.sin(segment_angle)
-        
-        #if scanline_segment_index > 0:
-            #ret_x_ += crds[scanline_segment_index-1][0]
-            #ret_y_ += crds[scanline_segment_index-1][1]
-            
-        #else:
-            #ret_x_ += crds[0][0]
-            #ret_y_ += crds[0][1]
-            
-        #return (ret_x_, ret_y_)
-    
-    #### END old code prev 2019-03-30 23:01:36
-    # -------
-    
     if not isinstance(v, pgui.Cursor):
         raise TypeError("Expecting a pictgui.Cursor for the first parameter; got %s instead" % type(v).__name__)
     
@@ -664,16 +553,16 @@ def vCursorPos2ScanlineCoords(v, path, span=None):
     
         return None, None
     
-    print("vCursorPos2ScanlineCoords span", span)
+    #print("vCursorPos2ScanlineCoords span", span)
     
-    if v.x < 0:
+    if v.get("x") < 0:
         v_pos = 0
         
-    elif v.x >= span:
+    elif v.get("x") >= span:
         v_pos = span-1
         
     else:
-        v_pos = v.x
+        v_pos = v.get("x")
         
     if all([isinstance(e, (pgui.Move, pgui.Line)) for e in currentPath]):
         # a line segment, a polyline or a polygon of line segments
@@ -684,11 +573,11 @@ def vCursorPos2ScanlineCoords(v, path, span=None):
             
             assert currentPath.type & (pgui.GraphicsObjectType.line | pgui.GraphicsObjectType.polyline)
             
-            dx = currentPath[1].x - currentPath[0].x
-            dy = currentPath[1].y - currentPath[0].y
+            dx = currentPath[1].get("x") - currentPath[0].get("x")
+            dy = currentPath[1].get("y") - currentPath[0].get("y")
             
-            ret_x = v_pos * dx / span + currentPath[0].x
-            ret_y = v_pos * dy / span + currentPath[0].y
+            ret_x = v_pos * dx / span + currentPath[0].get("x")
+            ret_y = v_pos * dy / span + currentPath[0].get("y")
                 
             #return ret_x, ret_y
         
@@ -716,8 +605,8 @@ def vCursorPos2ScanlineCoords(v, path, span=None):
             if len(currentPath) == int(span):
                 # case (a) -- straightforward
                 element = currentPath[int(v_pos)]
-                ret_x = element.x
-                ret_y = element.y
+                ret_x = element.get("x")
+                ret_y = element.get("y")
                 
             else:
                 # all other cases
@@ -729,139 +618,9 @@ def vCursorPos2ScanlineCoords(v, path, span=None):
                 ret_x, ret_y =  _get_coords_for_proj_pos_on_path_(v_pos, currentPath, cum_pe_len)
                 
         else: # len is 1 
-            ret_x = currentPath[0].x
-            ret_y = currentPath[0].y
+            ret_x = currentPath[0].get("x")
+            ret_y = currentPath[0].get("y")
         
-                #### BEGIN  old code
-                #coords = [[e.x, e.y] for e in currentPath]
-                ##print("coords", coords)
-                
-                #proj = int(v_pos * len(coords)/span)
-                
-                #if proj < 0:
-                    #return tuple(coords[0])
-                    
-                #elif proj >= len(coords):
-                    #return tuple(coords[-1])
-                    
-                #else:
-                    #return tuple(coords[proj])
-                    
-                #return (pr_obj.x, pr_obj.y)
-                    
-                
-                #return __get_projected_position_on_path__(v_pos, coords)#, len(currentPath))
-                
-                ## NOTE: 2018-08-19 10:26:18
-                ## get the Euclidean distance between successive vertices of 
-                ## the scanline path
-                #scanline_segment_lengths = list()
-                
-                ## the angle of each segment of the path, in the scene's coordinates frame
-                ## relative to the scene's x axis
-                #scanline_segment_angles = list()
-                
-                #for k, c in enumerate(coords[1:]):
-                    #d = spatial.distance.euclidean(c, coords[k])
-                    #dx = c[0]-coords[k][0]
-                    #dy = c[1]-coords[k][1]
-                    ##print("dx", dx)
-                    ##print("dy", dy)
-                    
-                    #if dx == 0:
-                        #if dy == 0:
-                            #a = 0
-                            
-                        #else:
-                            #a = np.pi/2 if dy > 0 else np.pi * 3/2
-                    
-                    #else:
-                        #a = np.arctan( dy /  dx ) # (By - Ay)/(Bx - Ax)
-                    
-                    #scanline_segment_lengths.append(d)
-                    #scanline_segment_angles.append(a)
-                    
-                    
-                ## NOTE: 2018-08-19 10:26:26
-                ## cumulative sum of euclidean distances
-                #scanline_cumulative_length = np.cumsum(scanline_segment_lengths)
-                
-                ##print("scanline_cumulative_length", scanline_cumulative_length)
-                
-                ## NOTE: 2018-08-19 10:27:18
-                ## sum of Euclidean distances between successive points
-                ## effectively the "path length"
-                #scanline_path_length = scanline_cumulative_length[-1]
-                
-                ##print("scanline_path_length", scanline_path_length)
-                
-                #scanline_path_length_2_linescan_width_scale = span/scanline_path_length
-                
-                ## NOTE: 2018-08-20 10:03:32
-                ## cursor's x coordinate PROJECTED onto the scanline
-                #proj_vx = v_pos / scanline_path_length_2_linescan_width_scale
-                ##print(proj_vx)
-                
-                ## locate the segment where the projected cursor position
-                ## falls
-                #ndxx = np.where([proj_vx <= val for val in scanline_cumulative_length])[0]
-                
-                ##print("ndxx", ndxx)
-                
-                ## NOTE: 2018-08-20 10:20:55
-                ## index of the scaline_segment where the projected cursor X coordinate falls
-                #if len(ndxx):
-                    #scanline_segment_index = int(ndxx[0])
-                    
-                #else:
-                    #scanline_segment_index = 0
-                    
-                ##print("scanline_segment_index", scanline_segment_index)
-                    
-                ## the index of the (projected) segment where v.x maps onto;
-                ## if necessary, adjust the projected position along the
-                ## scanline to equal the euclidean distance from the beginning
-                ## of the CURRENT segment.
-                ## i.e., subtract the cumulative sum of the euclidean
-                ## lengths of segments UP TO the current one
-                ## NOTE: 2018-08-20 10:28:12
-                ## get the corresponding segment euclidean length and calculate
-                ## the coordinates in the scene axis system
-                ##if scanline_segment_index >= len(thisPath):
-                #if scanline_segment_index >= len(currentPath):
-                    ## theoretically the execution can never go through this branch
-                    ##dx = currentPath[-1].x - currentPath[-2].x
-                    ##dy = currentPath[-1].y - currentPath[-2].y
-                    ##dx = thisPath[-1].x - thisPath[-2].x
-                    ##dy = thisPath[-1].y - thisPath[-2].y
-                    
-                    #proj_vx = scanline_path_length - scanline_cumulative_length[-2]
-                    #segment_angle = scanline_segment_angles[-1]
-                    
-                    ##proj_vx = proj_vx - scanline_cumulative_length[-2]
-                    
-                #else:
-                    ## if necessary, adjust the projected position along the
-                    ## scanline to equal the euclidean distance from the beginning
-                    ## of the CURRENT segment.
-                    #if scanline_segment_index > 0:
-                        #proj_vx = proj_vx - scanline_cumulative_length[scanline_segment_index-1]
-                        
-                    #segment_angle = scanline_segment_angles[scanline_segment_index]
-            
-                #ret_x = proj_vx * np.cos(segment_angle)
-                #ret_y = proj_vx * np.sin(segment_angle)
-                
-                #if scanline_segment_index > 0:
-                    #ret_x += coords[scanline_segment_index-1][0]
-                    #ret_y += coords[scanline_segment_index-1][1]
-                    
-                #else:
-                    #ret_x += coords[0][0]
-                    #ret_y += coords[0][1]
-                    
-                #### END old code
-                
     elif all([isinstance(e, (pgui.Move, pgui.Line, pgui.Cubic, pgui.Quad)) for e in currentPath]):
         # a more complex shape, composed of Move, Line, Cubic and/or Quad
         
@@ -8318,7 +8077,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             self.cursorYwindow.setEnabled(True)
             
             #cursors = sorted([c for c in self._data_.scansCursors.values()], key=lambda x: x.name)
-            cursors = sorted([c for c in self._data_.scansCursors.values() if c.hasStateForFrame(self.currentFrame)], key=lambda x: x.x)
+            cursors = sorted([c for c in self._data_.scansCursors.values() if c.hasStateForFrame(self.currentFrame)], key=lambda x: x.get("x"))
+            #cursors = sorted([c for c in self._data_.scansCursors.values() if c.hasStateForFrame(self.currentFrame)], key=lambda x: x.x)
             cursorNames = [c.name for c in cursors]
             
             selectedObj = cursors[index]

@@ -32,8 +32,10 @@ def _new_Event_v1(cls, signal, times = None, labels=None, units=None, name=None,
     if isinstance(annotations, dict) and "signal" in annotations:
         annotations.pop("signal", None)
     
-    e = Event(signal=signal, times=times, labels=labels, units=units, name=name, file_origin=file_origin,
+    e = cls(signal=signal, times=times, labels=labels, units=units, name=name, file_origin=file_origin,
                  description=description, **annotations)
+    #e = Event(signal=signal, times=times, labels=labels, units=units, name=name, file_origin=file_origin,
+                 #description=description, **annotations)
     e.segment = segment
     return e
 

@@ -1308,24 +1308,24 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             valx = np.floor(self.__scene__.rootImage.boundingRect().center().x())
             valy = np.floor(self.__scene__.rootImage.boundingRect().center().y())
             
-            if cType.xwindow is None:
-                cType.xwindow = window
+            if cType.get("xwindow") is None:
+                cType.set("xwindow", window)
     
-            if cType.ywindow is None:
-                cType.ywindow = window
+            if cType.get("ywindow") is None:
+                cType.set("ywindow", window)
                 
             if isinstance(pos, (tuple, list)) and \
                 len(pos) == 2 and all([isinstance(a, (numbers.Real, pq.Quantity)) for a in pos]):
-                cType.x = pos[0]
-                cType.y = pos[1]
+                cType.set("x", pos[0])
+                cType.set("y", pos[1])
             
             elif isinstance(pos, (QtCore.QPoint, QtCore.QPointF)):
-                cType.x = pos.x()
-                cType.y = pos.y()
+                cType.set("x", pos.x())
+                cType.set("y", pos.y())
         
             else:
                 # no pos specified -- unlikely but anyhow...
-                if cType.x is None or cType.y is None:
+                if cType.get("x") is None or cType.get("y") is None:
                     # just in case the PlanarGraphics object x or y are not set
                     if len(cDict) > 0:
                         # find a suitable position so we don't land on previous objects
@@ -1333,8 +1333,8 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                             cType.type & pgui.GraphicsObjectType.crosshair_cursor or \
                                 cType.type & pgui.GraphicsObjectType.point_cursor:
                             
-                            max_x = max([o.x for o in cDict.values()])
-                            min_x = min([o.x for o in cDict.values()])
+                            max_x = max([o.get("x") for o in cDict.values()])
+                            min_x = min([o.get("x") for o in cDict.values()])
                             
                             valx = (self.__scene__.rootImage.boundingRect().width() + max_x) / 2
                             
@@ -1342,23 +1342,23 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                             cType.type & pgui.GraphicsObjectType.crosshair_cursor or \
                                 cType.type & pgui.GraphicsObjectType.point_cursor:
                         
-                            max_y = max([o.y for o in cDict.values()])
+                            max_y = max([o.get("y") for o in cDict.values()])
                             valy = (self.__scene__.rootImage.boundingRect().height() + max_y) / 2
                             
-                    if cType.x is None:
-                        cType.x = valx
+                    if cType.get("x") is None:
+                        cType.set("x", valx)
                         
-                    if cType.y is None:
-                        cType.y = valy
+                    if cType.get("y") is None:
+                        cType.set("y", valy)
                     
-            if cType.width is None:
-                cType.width = self.__scene__.sceneRect().width()
+            if cType.get("width") is None:
+                cType.set("width", self.__scene__.sceneRect().width())
                 
-            if cType.height is None:
-                cType.height = self.__scene__.sceneRect().height()
+            if cType.get("height") is None:
+                cType.set("height", self.__scene__.sceneRect().height())
             
-            if cType.radius is None:
-                cType.radius = self.__cursorRadius__
+            if cType.get("radius") is None:
+                cType.set("radius", self.__cursorRadius__)
                 
             if isinstance(label, str) and len(label) > 0:
                 crsId = label
@@ -1507,14 +1507,14 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                             cType & pgui.GraphicsObjectType.crosshair_cursor or \
                                 cType & pgui.GraphicsObjectType.point_cursor:
                             
-                            max_x = max([o.x for o in cDict.values()])
+                            max_x = max([o.get("x") for o in cDict.values()])
                             valx = (self.__scene__.rootImage.boundingRect().width() + max_x) / 2
                             
                         if cType & pgui.GraphicsObjectType.horizontal_cursor or \
                             cType & pgui.GraphicsObjectType.crosshair_cursor or \
                                 cType & pgui.GraphicsObjectType.point_cursor:
                         
-                            max_y = max([o.y for o in cDict.values()])
+                            max_y = max([o.get("y") for o in cDict.values()])
                             valy = (self.__scene__.rootImage.boundingRect().height() + max_y) / 2
                             
                     point = QtCore.QPointF(valx, valy)

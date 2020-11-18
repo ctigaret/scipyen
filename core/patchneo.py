@@ -237,7 +237,7 @@ def _new_IrregularlySampledSignal_v1(cls, times, signal, units=None, time_units=
 
             
 patches = {"neo.io.axonio.AxonRawIO": AxonRawIO_v1,
-           "neo.core.analogsignal._new_AnalogSignalArray": _new_AnalogSignalArray_v1,
+           "neo.core.analogsignal._new_AnalogSignalArray": _new_AnalogSignalArray_v2,
            "neo.core.irregularlysampledsignal._new_IrregularlySampledSignal": _new_IrregularlySampledSignal_v1,
            "neo.core.spiketrain._new_spiketrain": _new_spiketrain_v1,
            "neo.core.epoch._new_epoch": _new_Epoch_v1,

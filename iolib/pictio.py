@@ -43,7 +43,7 @@ from core import (xmlutils, strutils, datatypes, datasignal,
 
 
 from core.prog import (ContextExecutor, safeWrapper, check_neo_patch, 
-                       import_relocated_module)
+                       identify_neo_patch,  import_relocated_module)
 
 from core.workspacefunctions import (user_workspace, assignin, debug_scipyen,
                                      get_symbol_in_namespace,)
@@ -227,7 +227,10 @@ class CustomUnpickler(pickle.Unpickler):
             
         inames = symbol.split(".") # to cover the case of nested classes
         
-        #print("\tCustomUnpickler._find_module_for_symbol_(): itemnames = %s" % inames)
+        if debug_scipyen():
+            print("\n\tCustomUnpickler._find_module_for_symbol_(%s, %s): itemnames = %s" % (symbol, old_modname, inames))
+        
+        
         
         #NOTE: 2020-11-12 11:30:25
         # restrict the e=search for symbols & moduels in the scipyen tree, else
@@ -236,9 +239,6 @@ class CustomUnpickler(pickle.Unpickler):
         #
         # so let's try to import old_modname first:
         
-        #import_relocated_module(old_modname) # this fails silently
-        
-        #loaded_containing_modules = [k for k,v in sys.modules.items() if k in inames or any([hasattr(v, i) for i in inames])]
         loaded_containing_modules = [k for k,v in sys.modules.items() if __test_containment__(inames, k, v)]
         
         imported_modules = dict()
@@ -248,7 +248,6 @@ class CustomUnpickler(pickle.Unpickler):
         result = None
         
         if len(loaded_containing_modules):
-        
             for m in loaded_containing_modules:
                 mm = sys.modules[m]
                 
@@ -297,34 +296,56 @@ class CustomUnpickler(pickle.Unpickler):
                         result = obj
                     
             if debug_scipyen():
-                print("\tCustomUnpickler._find_module_for_symbol_() imported_modules", 
-                        imported_modules)
-                print("\tCustomUnpickler._find_module_for_symbol_() imported_classes",
-                        imported_classes)
-                print("\tCustomUnpickler._find_module_for_symbol_() imported_functions",
-                        imported_functions)
+                print("\t\timported_modules", imported_modules)
+                print("\t\timported_classes",imported_classes)
+                print("\t\timported_functions",imported_functions)
             
         if debug_scipyen():
             result_module = None
             if result is not None:
                 result_module = inspect.getmodule(result)
                 
-            if result_module is not None:
-                print("\tCustomUnpickler._find_module_for_symbol_() found", result, "in module", result_module)
+                if result_module is not None:
+                    print("\t\t***FOUND***:", result,
+                        "in module:", result_module)
+                else:
+                    print("\t\t***FOUND***:", result)
+                    
             else:
-                print("\tCustomUnpickler._find_module_for_symbol_() found", result)
+                print("\t\t### NOT FOUND ###")
             
         return result
     
     def _find_member_for_symbol_(self, name, symbol):
+        if debug_scipyen():
+            print("\nCustomUnpickler._find_member_for_symbol_(%s, %s)\n" % (name, symbol))
+            
+        #possible_patch = identify_neo_patch(name)
+        #if isinstance(possible_patch, tuple) and len(possible_patch) == 2:
+            #if debug_scipyen():
+                #print("Possible_patch for:", name, "=", possible_patch)
+            #with mock.patch(possible_patch[0], new = possible_patch[1]):
+                #parent = self._find_module_for_symbol_(name)
+                #if parent is not None:
+                    #if hasattr(parent, symbol):
+                        #return getattr(parent, symbol)
+                
+        #else:
+            #parent = self._find_module_for_symbol_(name)
+            #if parent is not None:
+                #if hasattr(parent, symbol):
+                    #return getattr(parent, symbol)
+        
         parent = self._find_module_for_symbol_(name)
         if parent is not None:
             if hasattr(parent, symbol):
                 return getattr(parent, symbol)
-        
+    
     
     def find_class(self, modname, symbol):
-        #print("\n***CustomUnpickler.find_class(%s, %s)***\n" % (modname, symbol))
+        from unittest import mock
+        if debug_scipyen():
+            print("\n***CustomUnpickler.find_class(%s, %s)***\n" % (modname, symbol))
         
         try:
             # NOTE: 2020-10-30 14:54:16
@@ -334,12 +355,42 @@ class CustomUnpickler(pickle.Unpickler):
             # sys.modules i.e. it has successfully been imported;
             #
             
+            #  NOTE: forget about these modules: patch the original ones
+            if "neoevent" in modname:
+                modname = "neo.core.event"
                 
-            return super().find_class(modname, symbol)
+            elif "neoepoch" in modname:
+                modname = "neo.core.epoch"
+                
+            possible_patch = identify_neo_patch(symbol)
+            
+            if isinstance(possible_patch, tuple) and len(possible_patch)==2:
+                with mock.patch(possible_patch[0], new = possible_patch[1]):
+                    return super().find_class(modname, symbol)
+                
+            else:
+                return super().find_class(modname, symbol)
         
         except Exception as e:
+            if debug_scipyen():
+                print(type(e))
             if isinstance(e, (AttributeError, ModuleNotFoundError)):
-                return self._find_module_for_symbol_(symbol, old_modname=modname)
+                
+                #  NOTE: forget about these modules: patch the original ones
+                if "neoevent" in modname:
+                    modname = "neo.core.event"
+                    
+                elif "neoepoch" in modname:
+                    modname = "neo.core.epoch"
+                    
+                possible_patch = identify_neo_patch(symbol)
+                
+                if isinstance(possible_patch, tuple) and len(possible_patch)==2:
+                    with mock.patch(possible_patch[0], new = possible_patch[1]):
+                        return self._find_module_for_symbol_(symbol, old_modname=modname)
+                    
+                else:
+                    return self._find_module_for_symbol_(symbol, old_modname=modname)
                 
             else:
                 try:

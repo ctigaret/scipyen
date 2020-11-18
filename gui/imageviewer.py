@@ -1333,8 +1333,13 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                             cType.type & pgui.GraphicsObjectType.crosshair_cursor or \
                                 cType.type & pgui.GraphicsObjectType.point_cursor:
                             
-                            max_x = max([o.get("x") for o in cDict.values()])
-                            min_x = min([o.get("x") for o in cDict.values()])
+                            # NOTE: 2020-11-18 10:46:23
+                            # o is a GraphicsObject, not PlanarGraphicsObject!
+                            max_x = max([o.x for o in cDict.values()])
+                            min_x = min([o.x for o in cDict.values()])
+                            
+                            #max_x = max([o.get("x") for o in cDict.values()])
+                            #min_x = min([o.get("x") for o in cDict.values()])
                             
                             valx = (self.__scene__.rootImage.boundingRect().width() + max_x) / 2
                             
@@ -1342,7 +1347,10 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                             cType.type & pgui.GraphicsObjectType.crosshair_cursor or \
                                 cType.type & pgui.GraphicsObjectType.point_cursor:
                         
-                            max_y = max([o.get("y") for o in cDict.values()])
+                            # NOTE: 2020-11-18 10:46:23
+                            # o is a GraphicsObject, not PlanarGraphicsObject!
+                            max_y = max([o.y for o in cDict.values()])
+                            #max_y = max([o.get("y") for o in cDict.values()])
                             valy = (self.__scene__.rootImage.boundingRect().height() + max_y) / 2
                             
                     if cType.get("x") is None:

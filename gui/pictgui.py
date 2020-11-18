@@ -82,6 +82,19 @@ from core.workspacefunctions import debug_scipyen
 # for compatibility with more recent pickles
 PlanarGraphicsState = GraphicsState = DataBag 
 
+#def __pl_desc_fget__(obj, name):
+    #return obj.getState()[name]
+    
+#def __pl_desc_fset__(obj, name, value):
+    #obj.getState()[name] = value
+
+#def __pl_desc_fdel__(obj, name):
+    #del obj.getState()[name]
+
+
+    
+
+
 #import datatypes as dt
 #from datatypes import DataBag
 #import signalprocessing as sgp
@@ -327,7 +340,6 @@ class GuiWorkerSignals(QtCore.QObject):
     sig_error = pyqtSignal(tuple)
     signal_result = pyqtSignal(object)
     
-    
 class GuiWorker(QtCore.QRunnable):
     def __init__(self, fn, *args, **kwargs):
         super(GuiWorker, self).__init__()
@@ -457,7 +469,21 @@ class ProgressWorker(QtCore.QRunnable):
         finally:
             self.signals.signal_finished.emit()  # Done
             
-class PlanarGraphics(object):
+#class PlanarGraphicsMeta(type):
+    #def __new__(cls, name, bases, namespace, **kwargs):
+        ##print(cls, ": name =",name," bases =", bases,)
+        ##print(cls, ": name =",name," bases =", bases, " namespace =", namespace)
+        #result = type.__new__(cls, name, bases, dict(namespace))
+        #for d in result._planar_descriptors_:
+            #if d != "z_frame":
+                #def fget(obj): return obj.getState()[d]
+                #def fset(obj, value): obj.getState()[d] = value
+                #def fdel(obj): del obj.getStates()[d]
+                #setattr(result, d, property(fget=fget, fset=fset, fdel=fdel, doc="%s property" % d))
+    
+            
+#class PlanarGraphics(metaclass=PlanarGraphicsMeta):
+class PlanarGraphics():
     """Common ancestor of all planar graphic objects in Scipyen
     
     PlanarGraphics objects encapsulate two-dimensional geometric shapes to be 
@@ -891,6 +917,10 @@ class PlanarGraphics(object):
             ret.allow_none = True
                 
         else: # covers dict and common subclasses such as collections.OrderedDict, traitlets Bunch, mappings etc
+            if not all([isinstance(k, str) for k in src.keys()]):
+                src_ = dict((str(k), v) for k, v in src.items())
+                src = src_
+                
             ret = DataBag(src, mutable_types=True, allow_none=True)        
             #ret = PlanarGraphicsState(src)        
         
@@ -972,6 +1002,20 @@ class PlanarGraphics(object):
         
     # ### END static methods
     
+    #### BEGIN dynamic property auxiliary functions FIXME
+    def __pl_desc_fget__(self, obj, objtype=None, name=None):
+        print("__pl_desc_fget__ name", name)
+        state = self.getState()
+        print("__pl_desc_fget__ state", state)
+        return self.getState()[name]
+        
+    def __pl_desc_fset__(self, obj, value, name):
+        self.getState()[name] = value
+
+    def __pl_desc_fdel__(self, name):
+        del self.getState()[name]
+    #### END dynamic property auxiliary functions
+
     def _upgrade_API_(self):
         # NOTE: 2019-03-19 13:49:51
         # see TODO - make code more efficient 19c19.py
@@ -1053,7 +1097,7 @@ class PlanarGraphics(object):
         
         self._currentframe_ = currentframe
         
-        self._set_current_states_()
+        self._set_current_state_()
             
     def __init_from_state__(self, state:dict, frameindex:typing.Optional[typing.Iterable]=[], 
                             currentframe:int=0) -> None:
@@ -1064,7 +1108,7 @@ class PlanarGraphics(object):
             
         self._currentframe_ = currentframe
         
-        self._set_current_states_()
+        self._set_current_state_()
         
     def __init_from_state_sequence__(self, *states, frameindex:typing.Optional[typing.Iterable]=[], 
                                      currentframe:int=0) -> None:
@@ -1087,7 +1131,7 @@ class PlanarGraphics(object):
                 
             self._currentframe_ = currentframe
             
-            self._set_current_states_()
+            self._set_current_state_()
             
         else:
             raise TypeError("Expecting a sequence of state dict-like objects; got %s instead" % states)
@@ -1187,7 +1231,8 @@ class PlanarGraphics(object):
         # making sure this is ALWAYS a reference to one member of self._states_
         #self._currentstate_ = self.defaultState()
         
-        #### BEGIN set graphicstype
+        #### BEGIN check and set graphicstype
+        
         # normally this should be assigned by subclass __init__
         # but Cursor objects are special
         if not isinstance(graphicstype, (type(None), int, str, GraphicsObjectType)):
@@ -1219,9 +1264,10 @@ class PlanarGraphics(object):
         else:
             self._graphics_object_type_ = self.__class__._graphics_object_type_
             
-        #### END check the graphicstype
+        #### END check and set graphicstype
         
         #### BEGIN NOTE: 2019-03-21 11:51:22 check currentframe
+        
         if currentframe is None:
             currentframe = 0 # by default!
             
@@ -1233,7 +1279,6 @@ class PlanarGraphics(object):
             #raise ValueError("currentframe expected to be >=0; got %d instead" % currentframe)
         
         self._currentframe_ = currentframe
-        
         
         #### END check currentframe
         
@@ -1258,6 +1303,20 @@ class PlanarGraphics(object):
                 
         if not isinstance(self, Cursor):
             self._closed_ = closed
+            
+        #### BEGIN 2020-11-18 11:45:36 monkeypatch properties
+        for d in self.__class__._planar_descriptors_:
+            # NOTE: 2020-11-18 11:54:11
+            # also include z_frame
+            setattr(self.__class__, d, 
+                    property(self.__pl_desc_fget__,
+                             self.__pl_desc_fset__,
+                             self.__pl_desc_fdel__,
+                             d))
+                
+        #### END monkeypatch properties
+        
+        
                 
         
         # NOTE: 2018-01-12 16:18:37
@@ -1307,7 +1366,7 @@ class PlanarGraphics(object):
                     
                     self._states_ = self.__class__.copyConvertStates(*src._states_)
                     
-                    self._set_current_states_()
+                    self._set_current_state_()
                         
                     return # we're DONE here
                 
@@ -1356,7 +1415,7 @@ class PlanarGraphics(object):
                     self._graphics_object_type_ = GraphicsObjectType.text
                     
                     self._apply_frame_index_(frameindex)
-                    self._set_current_states_()
+                    self._set_current_state_()
                         
             else:# NOTE: many var-positional arguments
                 # these can be -- scalars: their number, order and 
@@ -1375,7 +1434,7 @@ class PlanarGraphics(object):
                 
                 self._currentframe_ = currentframe
             
-                self._set_current_states_()
+                self._set_current_state_()
                 
         else: # no var-positional parameters given
             if not isinstance(self, Path):
@@ -1385,7 +1444,7 @@ class PlanarGraphics(object):
             
                 self._apply_frame_index_(frameindex)
                 
-                self._set_current_states_()
+                self._set_current_state_()
 
                 if isinstance(self, Cursor):
                     if graphicstype is None:# or not graphicstype & GraphicsObjectType.allCursorTypes:
@@ -1942,25 +2001,40 @@ class PlanarGraphics(object):
                     #raise ValueError("Mismatch between the number of states (%d) and that of frame indices (%d)" % (len(self._states_), len(frameindex)))
         
             
-    def _set_current_states_(self):
-        if not isinstance(self._currentframe_, int) or self._currentframe_ <0 :
-            self._currentframe_ = 0
-            
-        frame = self._currentframe_
+    def _set_current_state_(self, frame:typing.Optional[int]=None):
+        # TODO FIXME - stay consistent with the three golden rules = there can be
+        # I.    at most ONE state with z_frame None
+        # II.   at most ONE state with z_frame < 0; when present, a maximum of ONE
+        #       extra state is allowed, for the frame with index -1 * z_frame - 1
+        # III.  any number of states with z_frame > = 0, but UNIQUE with respect to 
+        #       their z_frame values
+        # TODO To work as a cache (i.e. to avoid lengthy iterations especially for 
+        # Path objects) this should be called after the current frame has been
+        # changed, or after a state has been added/removed
+        
+        if not isinstance(frame, int):
+            if not isinstance(self._currentframe_, int) or self._currentframe_ <0 :
+                self._currentframe_ = 0
+                
+            frame = self._currentframe_
             
         # frames visible in all frames
         ubiquitous_states = [s for s in self._states_ if s.z_frame is None]
         
+        #if len(ubiquitous_states):
+            #self._currentstate_ = ubiquitous_states[0]
+            #return
+        
         # frames excluded from another frame (implicitly visible in this frame)
         # there may be more than one
-        excluded_states = [s for s in self._states_ if (isinstance(s.z_frame, int) and s.z_frame < 0 and -s.z_frame-1 != frame)]
+        fa_states = [s for s in self._states_ if (isinstance(s.z_frame, int) and s.z_frame < 0 and -s.z_frame-1 != frame)]
         
         # frame visible only in this frame - there should be only one, but we
         # do not check this
-        frame_states = [s for s in self._states_ if (isinstance(s.z_frame, int) and s.z_frame == frame)]
+        sf_states = [s for s in self._states_ if (isinstance(s.z_frame, int) and s.z_frame == frame)]
         
         # prioritize states visible in this frame over states invisible in another frame over ubiquitous states 
-        self._currentstates_ = frame_states + excluded_states + ubiquitous_states
+        self._currentstates_ = sf_states + fa_states + ubiquitous_states
         
             
     @property
@@ -2118,7 +2192,7 @@ class PlanarGraphics(object):
     #@property
     #def currentStates(self):
         #return self.getStates()
-        ##self._set_current_states_()
+        ##self._set_current_state_()
         ##return self._curentstates_
     
     @property
@@ -2133,9 +2207,9 @@ class PlanarGraphics(object):
         #states = self.currentStates
         #if len(states):
             #return states[0]
-        #self._set_current_states_()
+        #self._set_current_state_()
         #if len(self._currentstates_):
-            #return self._set_current_states_[0]
+            #return self._set_current_state_[0]
         
     @property
     def currentFrame(self):
@@ -2332,6 +2406,9 @@ class PlanarGraphics(object):
             ret = self.__class__(self)
         
         else:
+            if not hasattr(self, "_states_"):
+                # for old API there's nothing we can do here to rescue
+                self._states_ = [self.__class__.defaultState()]
             states = self._states_
             ret = self.__class__(states, 
                                 graphicstype=self._graphics_object_type_,
@@ -2693,8 +2770,8 @@ class PlanarGraphics(object):
                     
                 f.currentFrame = self.currentFrame
                 
-                x = self.x
-                y = self.y
+                x = self.get("x")
+                y = self.get("y")
                 
                 #print("updateFrontends: x, y: %s, %s" % (self.x, self.y))
                 
@@ -2724,7 +2801,7 @@ class PlanarGraphics(object):
             else:
                 f.setVisible(True)
                     
-            f.setPos(self.x, self.y) # also calls __drawObject__() and update()
+            f.setPos(self.get("x"), self.get("y")) # also calls __drawObject__() and update()
             
     def removeState(self, stateOrFrame):
         """Removes a state associated with a frame index or indices specified in "stateOrFrame".
@@ -3943,7 +4020,8 @@ class PlanarGraphics(object):
             
             else:
                 # for Move that begins a subpath
-                return spatial.distance.euclidean([self.x, self.y], [prev.x, prev.y])
+                return spatial.distance.euclidean([self.get("x"), self.get("y")],
+                                                  [prev.get("x"), prev.get("y")])
         
         elif isinstance(self, Path):
             if all([isinstance(e, (Move, Line, Cubic, Quad)) for e in self]):
@@ -3967,12 +4045,13 @@ class PlanarGraphics(object):
                 prev = Move(0., 0.)
         
             if isinstance(self, Line):
-                return spatial.distance.euclidean([self.x, self.y], [prev.x, prev.y])
+                return spatial.distance.euclidean([self.get("x"), self.get("y")], 
+                                                  [prev.get("x"), prev.get("y")])
             
             elif isinstance(self, Cubic):
                 # parametric spline: (x,y) = f(u)
-                self_xy = np.array([self.x, self.y])
-                prev_xy = np.array([prev.x, prev.y])
+                self_xy = np.array([self.get("x"), self.get("y")])
+                prev_xy = np.array([prev.get("x"), prev.get("y")])
                 
                 dx_dy = self_xy - prev_xy                      # prepare to "shift" the rectified spline
                                                                 # so that it starts at the previous point
@@ -3980,7 +4059,10 @@ class PlanarGraphics(object):
                 t = np.zeros((8,))
                 t[4:] = 1.
                 
-                c = np.array([[prev.x, prev.y], [self.c1x, self.c1y], [self.c2x, self.c2y], [self.x, self.y]])
+                c = np.array([[prev.get("x"), prev.get("y")],
+                              [self.get("c1x"), self.get("c1y")],
+                              [self.get("c2x"), self.get("c2y")], 
+                              [self.get("x"), self.get("y")]])
                 
                 spline = interpolate.BSpline(t, c, 3, extrapolate=True)
                 
@@ -4011,8 +4093,8 @@ class PlanarGraphics(object):
                 return spatial.distance.euclidean(prev_xy, rectified_xy)
                 
             elif isinstance(self, Quad):
-                self_xy = np.array([self.x, self.y])
-                prev_xy = np.array([prev.x, prev.y])
+                self_xy = np.array([self.get("x"), self.get("y")])
+                prev_xy = np.array([prev.get("x"), prev.get("y")])
 
                 dx_dy = self_xy - prev_xy                      # prepare to "shift" the rectified spline
                                                                 # so that it starts at the previous point
@@ -4020,7 +4102,9 @@ class PlanarGraphics(object):
                 t = np.zeros((6,))
                 t[3:] = 1.
                 
-                c = np.array([[prev.x, prev.y], [self.cx, self.cy], [self.x, self.y]])
+                c = np.array([[prev.get("x"), prev.get("y")],
+                              [self.get("cx"), self.get("cy")],
+                              [self.get("x"), self.get("y")]])
                 
                 spline = interpolate.BSpline(t, c, 2, extrapolate=True)
                 
@@ -4388,7 +4472,7 @@ class PlanarGraphics(object):
                     
                 else:                                                           # which is frame-linked
                     if state.z_frame in values:                                  # values already contain state's frame index
-                        new_frame_values = [f for f in values if f != self.z_frame]
+                        new_frame_values = [f for f in values if f != state.z_frame]
                         # we then replicate this state for ALL OTHER frames
                         
                         for f in new_frame_values:                              # loop does nothing if new_frame_values is empty 
@@ -4690,9 +4774,6 @@ class PlanarGraphics(object):
             #if value.__backend__ == self:
                 #self._frontend=value
                 
-
-    
-
 # NOTE: 2017-11-24 21:33:20
 # bring this up at module level - useful for other classes as well
 class GraphicsObjectType(IntEnum):
@@ -4783,25 +4864,6 @@ def __new_planar_graphic__(cls, states, name="", frameindex=[], currentframe=0, 
     name: the name (_ID_), a str
     
     """
-    #print("__new_planar_graphic__: cls = %s, name = %s, type = %s" %
-          #(cls.__name__, name, graphicstype))
-          
-    #print("_new_planar_graphic():")
-    #print("\tcls", cls)
-    #print("\tname", name)
-    #print("\tgraphicstype", graphicstype)
-    #print("\tlinked_objects", linked_objects)
-          
-    #if cls is Cursor:
-        #obj = cls(states, name=name, graphicstype=graphicstype, closed=closed, 
-                #currentframe=currentframe, frameindex=frameindex, 
-                #linked_objects=linked_objects)
-        
-    #else:
-        #obj = cls(states, name=name, graphicstype=graphicstype, closed=closed, 
-                #currentframe=currentframe, frameindex=frameindex, 
-                #linked_objects=linked_objects)
-        
     obj = cls(states, name=name, graphicstype=graphicstype, closed=closed, 
             currentframe=currentframe, frameindex=frameindex, 
             linked_objects=linked_objects)
@@ -4821,6 +4883,7 @@ _new_planar_graphic_ = __new_planar_graphic__
 
 #_new_planar_graphic = __new_planar_graphic__ # for backward compatiblity
 
+#class Move(PlanarGraphics, metaclass=PlanarGraphicsMeta):
 class Move(PlanarGraphics):
     """Starting path point with coordinates x and y (float type).
     
@@ -4886,6 +4949,7 @@ Start = Move
 
 Point = Move
                               
+#class Line(PlanarGraphics, metaclass=PlanarGraphicsMeta):
 class Line(PlanarGraphics):
     """End point of a linear path segment, with coordinates x and y (float type).
     
@@ -4936,6 +5000,7 @@ class Line(PlanarGraphics):
         return QtWidgets.QGraphicsLineItem(QtCore.QLineF(QtCore.QPointF(0,0),
                                                          QtCore.QPointF(state.x, state.y)))
 
+#class Cubic(PlanarGraphics, metaclass=PlanarGraphicsMeta):
 class Cubic(PlanarGraphics):
     """A cubic curve path segment
     
@@ -5085,6 +5150,7 @@ class Cubic(PlanarGraphics):
         
         #ret = QtWidgets.QGraphicsPathItem(self())
         
+#class Quad(PlanarGraphics, metaclass=PlanarGraphicsMeta):
 class Quad(PlanarGraphics):
     """A quadratic curve path segment.
     
@@ -5208,7 +5274,7 @@ class Quad(PlanarGraphics):
         
         return BSpline(t, c, 2, extrapolate=extrapolate)
         
-            
+#class Arc(PlanarGraphics, metaclass=PlanarGraphicsMeta):
 class Arc(PlanarGraphics):
     """Encapsulates parameters for QPainterPath.arcTo() function
     
@@ -5380,6 +5446,7 @@ class Arc(PlanarGraphics):
         
         self.updateFrontends()
         
+#class ArcMove(PlanarGraphics, metaclass=PlanarGraphicsMeta):
 class ArcMove(PlanarGraphics):
     """Encapsulates parameters for QPainterPath.arcMoveTo() function
 
@@ -5538,6 +5605,7 @@ class ArcMove(PlanarGraphics):
         
         self.updateFrontends()
         
+#class Ellipse(PlanarGraphics, metaclass=PlanarGraphicsMeta):
 class Ellipse(PlanarGraphics):
     """Encapsulates parameters for QPainterPath.addEllipse() function:
     
@@ -5670,6 +5738,7 @@ class Ellipse(PlanarGraphics):
         return QtWidgets.QGraphicsEllipseItem(QtCore.QRectF(state.x, state.y,
                                                             state.w, state.h))
 
+#class Rect(PlanarGraphics, metaclass=PlanarGraphicsMeta):
 class Rect(PlanarGraphics):
     """Encapsulates parameters for QPainterPath.addRect() function:
     
@@ -5859,7 +5928,6 @@ class Rect(PlanarGraphics):
             
         ret.currentFrame = self.currentFrame
             
-
 #NOTE: Only Move, Line and Cubic correspond to QPainterPath.Element 
 PathElements = (Move, Line, Cubic, Quad, Arc, ArcMove) # "tier 1" elements: primitives that can be called directly
 
@@ -5915,6 +5983,7 @@ def printQPainterPath(p):
     
     return "[" + ", ".join(s) + "]"
 
+#class Cursor(PlanarGraphics, metaclass=PlanarGraphicsMeta):
 class Cursor(PlanarGraphics):
     """Encapsulates the coordinates of a cursor:
     
@@ -6029,6 +6098,7 @@ class Cursor(PlanarGraphics):
                     ## on the other hand, parametric curves (Quad, Cubic) doe not have a closed form!!!
                     #euclid_lengths = [math.sqrt((e1.x -  e0.x) ** 2 + (e1.y - e0.y) ** 2) for (e0,e1) in zip(path[:-1], path[1:])]
                 
+#class Text(PlanarGraphics, metaclass=PlanarGraphicsMeta):
 class Text(PlanarGraphics):
     """PlanarGraphics object encapsulating a string.
     WARNING Incomplete API
@@ -6301,9 +6371,10 @@ class Path(PlanarGraphics):
                             
                             
                         if len(self._objects_):
-                            x = min([e.get("x") for e in self._objects_ if isinstance(e, PlanarGraphics)])
-                            
-                            y = min([e.get("y") for e in self._objects_ if isinstance(e, PlanarGraphics)])
+                            xx = [e.get("x") for e in self._objects_ if isinstance(e, PlanarGraphics)]
+                            x = min([x for x in xx if x is not None])
+                            yy = [e.get("y") for e in self._objects_ if isinstance(e, PlanarGraphics)]
+                            y = min([y for y in yy if y is not None])
 
                             self._position_ = (x,y)
                             
@@ -6320,8 +6391,11 @@ class Path(PlanarGraphics):
                             for a in args[1:]:
                                 self._objects_.append(Line(a[0], a[1], frameindex=frameindex, currentframe=currentframe))
                                 
-                        self._position_ = (min([o.get("x") for o in self]), 
-                                           min([o.get("y") for o in self]))
+                        xx = [o.get("x") for o in self if o is not None]
+                        yy = [o.get("y") for o in self if o is not None]
+                        
+                        self._position_ = (min([x for x in xx if x is not None]), 
+                                           min([y for y in yy if y is not None]))
                         
                         self._graphics_object_type_ = GraphicsObjectType.path
                         
@@ -6354,8 +6428,10 @@ class Path(PlanarGraphics):
                         else: # do not parse "curve to data" elements, for now
                             continue 
                         
-                    self._position_ = (min([o.get("x") for o in self]), 
-                                       min([o.get("y") for o in self]))
+                    xx = min([o.get("x") for o in self if o is not None])
+                    yy = min([o.get("y") for o in self if o is not None])
+                    self._position_ = (min([x for x in xx if x is not None]), 
+                                       min([y for y in yy if y is not None]))
                     self._graphics_object_type_ = GraphicsObjectType.path
                     
             else:
@@ -6399,8 +6475,12 @@ class Path(PlanarGraphics):
                             else:
                                 raise TypeError("When constructing a Path, var-positional parameters must be PlanarGraphics objects or tuples of coordinates")
                             
-                    self._position_ = (min([o.get("x") for o in self]), 
-                                       min([o.get("y") for o in self]))
+                    xx = min([o.get("x") for o in self if o is not None])
+                    yy = min([o.get("y") for o in self if o is not None])
+                    self._position_ = (min([x for x in xx if x is not None]), 
+                                       min([y for y in yy if y is not None]))
+                    #self._position_ = (min([o.get("x") for o in self]), 
+                                       #min([o.get("y") for o in self]))
                     
                     # NOTE: 2018-01-20 09:51:23
                     # make sure Path begins with a Move
@@ -6831,8 +6911,22 @@ class Path(PlanarGraphics):
     @property
     def position(self):
         if len(self._objects_):
-            x = min([e.get("x") for e in self._objects_])
-            y = min([e.get("y") for e in self._objects_])
+            #x = min([e.get("x") for e in self._objects_])
+            #y = min([e.get("y") for e in self._objects_])
+            xx = [e.get("x") for e in self._objects_ if e is not None]
+            if len(xx):
+                x = min([x for x in xx if x is not None])
+                
+            else:
+                x = 0
+                
+            yy = [e.get("y") for e in self._objects_ if e is not None]
+            
+            if len(yy):
+                y = min([y for y in yy if y is not None])
+                
+            else:
+                y = 0
             
         else:
             x = 0
@@ -7281,8 +7375,11 @@ class Path(PlanarGraphics):
         # this deliberately constructs a path containing graphics elements having
         # only a single state 
         # (if there are more than one visible state for this frame, the first 
-        # such state is retained, doscarding the rest)
-        return Path([o for o in map(lambda x: x.getObjectForFrame(frame), self) if o is not None])
+        # such state is retained, discarding the rest)
+        elements = [o for o in map(lambda x: x.getObjectForFrame(frame), self) if o is not None]
+        if len(elements):
+            return Path(elements)
+        #return Path([o for o in map(lambda x: x.getObjectForFrame(frame), self) if o is not None])
     
     def getState(self, frame:typing.Optional[int]=None) -> typing.Optional[object]:
         """Returns a list of states that defined for the specified frame.
@@ -11162,7 +11259,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         for c in self._linkedGraphicsObjects:
             if c != self.__backend__:
-                c.x = val
+                c.set("x", val)
+                #c.x = val
                 
                 for f in c.frontends:
                     if f != self:
@@ -11199,7 +11297,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 if len(self._linkedGraphicsObjects):
                     for c in self._linkedGraphicsObjects:
                         if c != self.__backend__:
-                            c.xwindow = val
+                            c.set("xwindow", val)
+                            #c.xwindow = val
                             
                             for f in c.frontends:
                                 if f != self:
@@ -11229,7 +11328,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         if len(self._linkedGraphicsObjects):
             for c in self._linkedGraphicsObjects:
                 if c != self.__backend__:
-                    c.y = val
+                    c.set("y", val)
+                    #c.y = val
                     
                     for f in c.frontends:
                         if f != self:
@@ -11265,7 +11365,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 if len(self._linkedGraphicsObjects):
                     for c in self._linkedGraphicsObjects:
                         if c != self.__backend__:
-                            c.ywindow = val
+                            c.set("ywindow", val)
+                            #c.ywindow = val
                             
                             for f in c.frontends:
                                 if f != self:
