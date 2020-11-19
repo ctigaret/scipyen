@@ -48,6 +48,8 @@ def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None) -> bool:
     
     """
     ns = user_workspace()
+    if not isinstance(ns, dict):
+        return False
     
     if arg is None:
         if "SCIPYEN_DEBUG" not in ns:
@@ -263,9 +265,9 @@ def getvarsbytype(vartype, ws=None):
     if ws is None:
         raise ValueError("No valid workspace has been specified or found")
         
-        #frames_list = inspect.getouterframes(inspect.currentframe())
+        #frame_records = inspect.getouterframes(inspect.currentframe())
         
-        #for (n,f) in enumerate(frames_list):
+        #for (n,f) in enumerate(frame_records):
             #if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within the IPython console
                 #ws = f[0].f_globals["mainWindow"].workspace
                 ##ws = f[0].f_globals
@@ -447,9 +449,9 @@ def assignin(variable, varname, ws=None):
     if ws is None:
         raise ValueError("No valid workspace has been specified or found")
         
-        #frames_list = inspect.getouterframes(inspect.currentframe())
-        ##print(frames_list)
-        #for (n,f) in enumerate(frames_list):
+        #frame_records = inspect.getouterframes(inspect.currentframe())
+        ##print(frame_records)
+        #for (n,f) in enumerate(frame_records):
             #if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within Scipyen's IPython console
                 #ws = f[0].f_globals["mainWindow"].workspace
                 ##ws = f[0].f_globals
@@ -484,8 +486,10 @@ def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None) -> li
 def user_workspace() -> dict:
     """Returns a reference to the user workspace (a.k.a user namespace)
     """
-    frames_list = inspect.getouterframes(inspect.currentframe())
-    for (n,f) in enumerate(frames_list):
+    frame_records = inspect.getouterframes(inspect.currentframe())
+    #frame_info = frame_records[0]
+    
+    for (n,f) in enumerate(frame_records):
         if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within Scipyen's IPython console
             return f[0].f_globals["mainWindow"].workspace
     
@@ -499,8 +503,8 @@ def delvars(*args, glob=True, ws=None):
     if ws is None:
         raise ValueError("No valid workspace has been specified or found")
         
-        #frames_list = inspect.getouterframes(inspect.currentframe())
-        #for (n,f) in enumerate(frames_list):
+        #frame_records = inspect.getouterframes(inspect.currentframe())
+        #for (n,f) in enumerate(frame_records):
             #if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within the IPython console
                 #ws = f[0].f_globals["mainWindow"].workspace
                 #break
@@ -641,8 +645,8 @@ def validate_varname(arg, ws=None):
     """
     
     if ws is None:
-        frames_list = inspect.getouterframes(inspect.currentframe())
-        for (n,f) in enumerate(frames_list):
+        frame_records = inspect.getouterframes(inspect.currentframe())
+        for (n,f) in enumerate(frame_records):
             if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within the IPython console
                 ws = f[0].f_globals["mainWindow"].workspace
                 break

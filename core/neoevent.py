@@ -18,7 +18,7 @@ from neo.core.baseneo import BaseNeo, merge_annotations
 
 PY_VER = sys.version_info[0]
 
-def _new_Event_v1(cls, signal, times = None, labels=None, units=None, name=None, 
+def _new_Event_v1(cls, signal, times=None, labels=None, units=None, name=None, 
                file_origin=None, description=None, annotations=None, segment=None,
                *args, **kwargs):
     '''
@@ -31,8 +31,40 @@ def _new_Event_v1(cls, signal, times = None, labels=None, units=None, name=None,
     # otherwise, unpickling _FAILS_
     if isinstance(annotations, dict) and "signal" in annotations:
         annotations.pop("signal", None)
+        
+    print("times", times)
+    print("labels", labels)
+        
+    if isinstance(times, np.ndarray):
+        if isinstance(labels, np.ndarray):
+            if labels.size != times.size:
+                pass
     
     e = cls(signal=signal, times=times, labels=labels, units=units, name=name, file_origin=file_origin,
+                 description=description, **annotations)
+    #e = Event(signal=signal, times=times, labels=labels, units=units, name=name, file_origin=file_origin,
+                 #description=description, **annotations)
+    e.segment = segment
+    return e
+
+def _new_Event_v2(cls, times=None, labels=None, units=None, name=None, 
+               file_origin=None, description=None, annotations=None, segment=None,
+               *args, **kwargs):
+    '''
+    A function to map Event.__new__ to function that does not do the unit checking.
+    This is needed for pickle to work with older pkl files. 
+    '''
+    # NOTE: 2017-12-07 23:19:51
+    # this avoids pumping signal twice when unpickling events embedded as members
+    # in neo.Segments
+    # otherwise, unpickling _FAILS_
+    if isinstance(annotations, dict) and "signal" in annotations:
+        annotations.pop("signal", None)
+        
+    #print("times", times)
+    #print("labels", labels)
+        
+    e = cls(times=times, labels=labels, units=units, name=name, file_origin=file_origin,
                  description=description, **annotations)
     #e = Event(signal=signal, times=times, labels=labels, units=units, name=name, file_origin=file_origin,
                  #description=description, **annotations)

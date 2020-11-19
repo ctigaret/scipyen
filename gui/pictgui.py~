@@ -82,25 +82,6 @@ from core.workspacefunctions import debug_scipyen
 # for compatibility with more recent pickles
 PlanarGraphicsState = GraphicsState = DataBag 
 
-#def __pl_desc_fget__(obj, name):
-    #return obj.getState()[name]
-    
-#def __pl_desc_fset__(obj, name, value):
-    #obj.getState()[name] = value
-
-#def __pl_desc_fdel__(obj, name):
-    #del obj.getState()[name]
-
-
-    
-
-
-#import datatypes as dt
-#from datatypes import DataBag
-#import signalprocessing as sgp
-
-#import imageviewer as iv
-#import utilities
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
@@ -895,12 +876,9 @@ class PlanarGraphics():
     @classmethod
     def copyConvertState(cls, src):
         """Use this to create a copy of a state generated from old API.
-        
-        If src does not have an attribute "z_frame" then it is given one, with
-        value as 
-        as None
-        
         """
+        #If src does not have an attribute "z_frame" then it is given one, with
+        #value None
         if not isinstance(src, dict):
             raise TypeError("Expecting a dict or derivative (e.g., DataBag, PlanarGraphics); got %s instead" % type(src).__name__)
         
@@ -912,7 +890,7 @@ class PlanarGraphics():
         
         if isinstance(src, DataBag):
             ret = src.copy()
-            # NOTE: make sure of these two:
+            # NOTE: make sure of these two are right:
             ret.mutable_types = True
             ret.allow_none = True
                 
@@ -922,18 +900,8 @@ class PlanarGraphics():
                 src = src_
                 
             ret = DataBag(src, mutable_types=True, allow_none=True)        
-            #ret = PlanarGraphicsState(src)        
         
-        #if isinstance(src, PlanarGraphicsState):
-            #ret = src.copy()
-            
-        #elif isinstance(src, DataBag):
-            #ret = PlanarGraphicsState(src)
-                
-        #else: # covers dict and common subclasses such as collections.OrderedDict, traitlets Bunch, mappings etc
-            #ret = PlanarGraphicsState(src)        
-        
-        # make sure it has a z_frame attribute
+        # now make sure it has a z_frame attribute
         if not hasattr(ret, "z_frame"):
             ret.z_frame = None
             
@@ -941,11 +909,9 @@ class PlanarGraphics():
               #[k for k in ret.keys()])
             
         # NOTE: 2020-11-01 14:25:30
-        # check that all mandatory descriptors are present in src
+        # finally check that all mandatory descriptors are present in src
         # z_frame was introduced later in development and it can be set to None
         # here
-        #if any([k not in keys for k in cls._planar_descriptors_]):
-            #raise ValueError("%s objects require the descriptors : %s but the following %s were supplied" % (cls.__name__, cls._planar_descriptors_, keys))
         # NOTE: 2020-11-02 07:49:33
         # old API bugs resulted in some of these NOT being saved, so instead of 
         # raising an exception, we attribute default values to the missing ones
@@ -1002,18 +968,6 @@ class PlanarGraphics():
         
     # ### END static methods
     
-    def __pl_desc_fget__(self, name):
-        print("__pl_desc_fget__ name", name)
-        state = self.getState()
-        print("__pl_desc_fget__ state", state)
-        return self.getState()[name]
-        
-    def __pl_desc_fset__(self, name, value):
-        self.getState()[name] = value
-
-    def __pl_desc_fdel__(self, name):
-        del self.getState()[name]
-
     def _upgrade_API_(self):
         # NOTE: 2019-03-19 13:49:51
         # see TODO - make code more efficient 19c19.py
@@ -1095,7 +1049,7 @@ class PlanarGraphics():
         
         self._currentframe_ = currentframe
         
-        self._set_current_state_()
+        self.setCurrentState()
             
     def __init_from_state__(self, state:dict, frameindex:typing.Optional[typing.Iterable]=[], 
                             currentframe:int=0) -> None:
@@ -1106,7 +1060,7 @@ class PlanarGraphics():
             
         self._currentframe_ = currentframe
         
-        self._set_current_state_()
+        self.setCurrentState()
         
     def __init_from_state_sequence__(self, *states, frameindex:typing.Optional[typing.Iterable]=[], 
                                      currentframe:int=0) -> None:
@@ -1129,11 +1083,11 @@ class PlanarGraphics():
                 
             self._currentframe_ = currentframe
             
-            self._set_current_state_()
+            self.setCurrentState()
             
         else:
             raise TypeError("Expecting a sequence of state dict-like objects; got %s instead" % states)
-                        
+        
     def __init__(self, *args, graphicstype=None, closed:bool=False, 
                  name:typing.Optional[str]=None, 
                  frameindex:typing.Optional[typing.Iterable]=[], 
@@ -1145,10 +1099,17 @@ class PlanarGraphics():
         *args: either:
         
             1) sequence of planar descriptors specific to the PlanarGraphics 
-                type, but WITHOUT z_frame (NOTE: this will be specified via
-                frameindex)
+                primitive type, but WITHOUT z_frame (specified via frameindex)
+                
+                The expected order is as specified in __class__._planar_descriptors_
+                
+            2) iterable of planar descriptors as above
             
-            2) a PlanarGraphics object (copy constructor); 
+            3) a sequence of PlanarGraphics objects - Path only
+            
+            4) iterable of PlanarGRaphics objects - Path only
+            
+            5) a PlanarGraphics object (copy constructor); 
             
         Named parameters: (common to all PlanarGraphics subclasses)
         ================
@@ -1230,37 +1191,61 @@ class PlanarGraphics():
         #self._currentstate_ = self.defaultState()
         
         #### BEGIN check and set graphicstype
-        
-        # normally this should be assigned by subclass __init__
-        # but Cursor objects are special
         if not isinstance(graphicstype, (type(None), int, str, GraphicsObjectType)):
             raise TypeError("graphicstype expected to be an int, a str, a pictgui.GraphicsObjectType, or None; got %s instead" % type(graphicstype).__name__)
-        
+                        
         if graphicstype is not None:
             if not isinstance(graphicstype, GraphicsObjectType): # by definition any GraphicsObjectType object is in GraphicsObjectType
                 # the only other acceptable types, beside NoneType and GraphicsObjectType are int and str, with conditions
                 if isinstance(graphicstype, str):
                     if graphicstype in [t.name for t in GraphicsObjectType]:
                         graphicstype = GraphicsObjectType[graphicstype] # => a GraphicsObjectType value
-                    
+                        
                     else:
-                        raise ValueError("Unknown graphics type name %s" % graphicstype)
+                        # try substrings
+                        grtypes = [t for t in GraphicsObjectType if graphicstype in t.name]
+                        
+                        if len(grtypes):
+                            if len(grtypes) > 1:
+                                raise ValueError("Ambiguous graphics type name %s" % graphicstype)
+                            
+                            graphicstype = grtypes[0]
+                            
+                        else:
+                            raise ValueError("Unknown graphics type name %s" % graphicstype)
                     
                 elif isinstance(graphicstype, int):
                     if graphicstype in [t.value for t in GraphicsObjectType]:
-                        graphicstype = [f for f in GraphicsObjectType if t.value == graphicstype][0] # => a GraphicsObjectType value
+                        grtypes = [t for t in GraphicsObjectType if t.value == graphicstype]
+                        
+                        if len(grtypes):
+                            if len(grtypes) > 1:
+                                raise ValueError("Ambiguous graphics type value %d" % graphicstype)
+                            
+                            graphicstype = grtypes[0]
+                            
+                        else:
+                            raise ValueError("Unknown graphics type value %d" % graphicstype)
                         
                     else:
                         raise ValueError("Unknown graphics type value %d" % graphicstype)
-                        
                     
                 else:
                     raise TypeError("Invalid graphics type; expecting a GraphicsObjectType type, name or value; got %s instead" % graphicstype)
                 
+            if isinstance(self, Cursor):
+                if graphicstype & GraphicsObjectType.allCursorTypes == 0:
+                    expected_cursor_types = ["%s (%d)" % (t.name, t.value) for t in GraphicsObjectType if "_cursor" in t.name.lower()]
+                    raise ValueError("For Cursor, 'graphicstype' is expected to be one of %s; got %s instead" % (expected_cursor_types,
+                                                                                                  graphicstype))
             self._graphics_object_type_ = graphicstype
             
         else:
-            self._graphics_object_type_ = self.__class__._graphics_object_type_
+            if isinstance(self, Cursor): # special treatment here
+                self._graphics_object_type_ = GraphicsObjectType.crosshair_cursor
+                    
+            else:
+                self._graphics_object_type_ = self.__class__._graphics_object_type_
             
         #### END check and set graphicstype
         
@@ -1280,16 +1265,6 @@ class PlanarGraphics():
         
         #### END check currentframe
         
-        if isinstance(self, Cursor):
-            if graphicstype is None:# or not graphicstype & GraphicsObjectType.allCursorTypes:
-                self._graphics_object_type_ = GraphicsObjectType.crosshair_cursor
-                
-            else:
-                self._graphics_object_type_ = graphicstype
-                
-        else:
-            self._graphics_object_type_ = graphicstype
-                        
         if isinstance(name, str) and len(name):
             self._ID_ = name
             
@@ -1302,20 +1277,6 @@ class PlanarGraphics():
         if not isinstance(self, Cursor):
             self._closed_ = closed
             
-        #### BEGIN 2020-11-18 11:45:36 monkeypatch properties
-        for d in self.__class__._planar_descriptors_:
-            # NOTE: 2020-11-18 11:54:11
-            # also include z_frame
-            setattr(self.__class__, d, 
-                    property(self.__pl_desc_fget__,
-                             self.__pl_desc_fset__,
-                             self.__pl_desc_fdel__,
-                             d))
-                
-        #### END monkeypatch properties
-        
-        
-                
         
         # NOTE: 2018-01-12 16:18:37
         # Path is itself a list of PlanarGraphics, each with their own common state
@@ -1326,12 +1287,7 @@ class PlanarGraphics():
         # ### BEGIN constructor code
         
         if len(args):
-            #print("PlanarGraphics.__init__ %s %s %s\n" % (self._ID_, self.__class__.__name__, self._graphics_object_type_.name))
-            
             if len(args) == 1:
-                #print("PlanarGraphics.__init__ %s %s from" % (self._ID_, self.__class__.__name__), type(args[0]).__name__, 
-                        #args[0])
-                
                 if isinstance(args[0], self.__class__): # COPY CONSTRUCTOR
                     # ### BEGIN copy c'tor
                     # also tries to fix historical inconsistencies in APIs
@@ -1339,7 +1295,7 @@ class PlanarGraphics():
                     # the same class as self
                     # ignores named parameters
                     # ATTENTION: does NOT copy object links!
-                    # ignores the following parameters:
+                    # CAUTION: ignores the following parameters:
                     #   graphicstype
                     #   closed
                     #   name
@@ -1364,7 +1320,7 @@ class PlanarGraphics():
                     
                     self._states_ = self.__class__.copyConvertStates(*src._states_)
                     
-                    self._set_current_state_()
+                    self.setCurrentState()
                         
                     return # we're DONE here
                 
@@ -1413,7 +1369,7 @@ class PlanarGraphics():
                     self._graphics_object_type_ = GraphicsObjectType.text
                     
                     self._apply_frame_index_(frameindex)
-                    self._set_current_state_()
+                    self.setCurrentState()
                         
             else:# NOTE: many var-positional arguments
                 # these can be -- scalars: their number, order and 
@@ -1432,7 +1388,7 @@ class PlanarGraphics():
                 
                 self._currentframe_ = currentframe
             
-                self._set_current_state_()
+                self.setCurrentState()
                 
         else: # no var-positional parameters given
             if not isinstance(self, Path):
@@ -1442,7 +1398,7 @@ class PlanarGraphics():
             
                 self._apply_frame_index_(frameindex)
                 
-                self._set_current_state_()
+                self.setCurrentState()
 
                 if isinstance(self, Cursor):
                     if graphicstype is None:# or not graphicstype & GraphicsObjectType.allCursorTypes:
@@ -1609,155 +1565,78 @@ class PlanarGraphics():
             path.lineTo(state.x, state.y) # x & y always in planar descriptors
         
         return path
-            
-    #@safeWrapper
-    #def __getattr__(self, name):
-        #"""low-level read access to this objects's attributes
-        #"""
-        ##if name in PlanarGraphics._required_attributes_:
-            ##return self.__dict__[name]
-            
-        ## NOTE: 2020-11-09 16:00:57
-        ## this call triggers infinite recursion!
-        ##states = self.getStates() # without frame parameter this returns the "current states"
-        ##states = object.__getattribute__(self,"_currentstates_")
+    
+    def __getattr__(self, name):
+        if name in self.__class__._planar_descriptors_:
+            state = self.getState()
+            return state[name]
         
-        #if name in self.__class__._planar_descriptors_:
-            #states = self._currentstates_
+        else:
+            return object.__getattribute__(self, name)
             
-            #if len(states):
-                #return states[0][name]
+    def __setattr__(self, name, value):
+        if name in self.__class__._planar_descriptors_:
+            state = self.getState()
+            state[name]=value
             
-            #else:
-                #return self.__class__.defaultState()[name]
+        else:
+            object.__setattr__(self, name, value)
             
-        #else:
-            #return self.__dict__[name]
-            
-        ##elif name in self.__dict__:
-            ##return self.__dict__[name]
-            
-        ##else:
-            ##raise AttributeError("%s objects do not have an attribute named '%s'" % (self.__class__.__name__, name))
-        ##try:
-            ###if name in PlanarGraphics._required_attributes_:
-                ###return self.__dict__[name]
-                
-            ### NOTE: 2020-11-09 16:00:57
-            ### this call triggers infinite recursion!
-            ###states = self.getStates() # without frame parameter this returns the "current states"
-            ###states = object.__getattribute__(self,"_currentstates_")
-            
-            ##if name in self.__class__._planar_descriptors_:
-                ##states = self._currentstates_
-                
-                ##if len(states):
-                    ##return states[0][name]
-                
-                ##else:
-                    ##return self.__class__.defaultState()[name]
-                
-            ##elif name in self.__dict__:
-                    ##return self.__dict__[name]
-                
-            ##else:
-                ##raise AttributeError("%s objects do not have an attribute named '%s'" % (self.__class__.__name__, name))
-            
-        ##except Exception as e:
-            ##print("in PlanarGraphics.__getattr__(...):")
-            ##traceback.print_exc()
-            ##raise e
+    def checkStates(self):
+        """Ensures consistency of the PlanarGraphcis states.
         
-    ##@safeWrapper
-    #def __setattr__(self, name, value):
-        #"""low-level write access to this object's attributes
-        #"""
-        ## NOTE: 2020-11-09 16:00:57
-        ## this call triggers infinite recursion!
-        ##states = self.getStates() # without frame parameter this returns the "current states"
-        ##states = object.__getattribute__(self, "_currentstates_")
+        A PlanarGraphics state can be:
         
-        #if name in self.__class__._planar_descriptors_:
-            #states = self._currentstates_
+        (a) ubiquitous:     its z_frame attribute is None
+            * the state is drawn in any frame of the data 
             
-            #if len(states):
-                #states[0].name = value
-                ##setattr(states[0], name, value)
+        (b) frame-avoiding: the z_frame attribute is an int and is < 0
+            * the state should be drawn in any frame EXCEPT the one which has
+              index equal to -1 * z_frame - 1 (if it exists)
             
-                #self.updateLinkedObjects() # TODO move this out of __setattr__; let the caller take care of this
-                    
-        #else:
-            #super().__setattr__(name, value)
+        (c) single-frame: the z_frame is an int >= 0
+            * the state shoould be drawn ONLY in the frame with index == z_frame
+              (if it exists)
             
-        #try:
-            ## NOTE: 2020-11-09 16:00:57
-            ## this call triggers infinite recursion!
-            ##states = self.getStates() # without frame parameter this returns the "current states"
-            ##states = object.__getattribute__(self, "_currentstates_")
+        The co-existence of the states in a PlanarGraphics object is governed by
+        three rules:
+        
+        Rule I. 
+        -------
+        An ubiquitous state is the ONLY state of the PlanarGraphics object.
+        
+            Corollaries:
             
-            #if name in self.__class__._planar_descriptors_:
-                #states = self._currentstates_
-                
-                #if len(states):
-                    #states[0].name = value
-                    ##setattr(states[0], name, value)
-                
-                    #self.updateLinkedObjects() # TODO move this out of __setattr__; let the caller take care of this
-                        
-            #else:
-                #super().__setattr__(name, value)
-                
-        #except Exception as e:
-            #print("in PlanarGraphics.__setattr__(...):")
-            #traceback.print_exc()
-            #raise
-                
-        
-        #try:
-            #if name in PlanarGraphics._required_attributes_:
-                #self.__dict__[name] = value
-                
-            #else:
-                ## NOTE: 2020-11-09 16:00:57
-                ## this call triggers infinite recursion!
-                ##states = self.getStates() # without frame parameter this returns the "current states"
-                ##states = object.__getattribute__(self, "_currentstates_")
-                #states = self._currentstates_
-                
-                #if name in self.__class__._planar_descriptors_:
-                    #if len(states):
-                        #states[0].name = value
-                        ##setattr(states[0], name, value)
-                    
-                        #self.updateLinkedObjects() # TODO move this out of __setattr__; let the caller take care of this
-                            
-                #else:
-                    #super().__setattr__(name, value)
-                
-        #except Exception as e:
-            #traceback.print_exc()
-            #raise e
+            * the PlanarGraphics object can have only one ubiquitous state, and
             
-    def _check_states_(self):
-        """Ensures consistency of states wrt z_frames
-        
-        The object can have:
-        
-        1) A single state with ubiquitous frame visibility (z_frame is None),
-        
-        OR
-        
-        2) One state ('A') with z_frame < 0 and at most another state ('B) with
-        z_frame >=0 such that:
-        
-            A.z_frame  == -1 * B.z_frame -1
+            * no other states co-exist with an ubiquitous state
             
-        OR:
+        Rule II. 
+        --------
+        A frame-avoiding state (fa_state) can co-exist with AT MOST one
+        single-frame state and the two states must satisfy:
         
-        3) Any number of states with z_frame >= 0 and UNIQUE values (i.e., NO
-        TWO states can have the same z_frame value)
+            fa_state.z_frame == -1 * sf_state.z_frame - 1
+            
+            where:
+                fa_state is the frame-avoiding state, and
+                sf_state is the single-frame state
         
-        There SHOULD BE exactly one one state for any given frame.
+            Corollaries:
+        
+            * there can be only one frame-avoiding state
+            
+            * a PlanarGraphics with a frame-avoding state can have at most two
+              states, and the other state is single-frame
+                
+            * the single-frame state is drawn in the frame "avoided" by the 
+              frame-avoding state
+              
+        Rule III. 
+        ---------
+        There can be any number of single-frame states.
+            * A PlanarGraphics object with more than two states can have ONLY
+              single-frame states.`
         
         Therefore, for any given frame, the ONLY state shown is determined as
         follows:
@@ -1782,74 +1661,53 @@ class PlanarGraphics():
         
         
         """
-        
         if len(self._states_):
+            # make sure the states conform to the planar descriptors
             states = [s for s in self._states_ if self.__class__.validateState(s)]
-            self._states_[:] = states[:]
             
-            ubiquitous_frame_states = [s for s in self._states_ if s.z_frame is None]
-            negative_frame_states   = [s for s in self._states_ if isinstance(s.z_frame, int) and s.z_frame < 0]
-            positive_frame_states   = [s for s in self._states_ if isinstance(s.z_frame, int) and s.z_frame >= 0]
+            # 1) check for the existence of ubiquitous states
+            ubiquitous_states = [s for s in states if s.z_frame is None]
             
-            # make sure all positive_frame_states have unique z_frame values
+            if len(ubiquitous_states):
+                # if there are several such states, keep the first, discard the rest (KF/DR)
+                self._states_[:] = [ubiquitous_states[0]]
             
-            if len(positive_frame_states):
-                positive_frame_states = unique(positive_frame_states, key=lambda x:x.z_frame)
-            
-            if len(ubiquitous_frame_states):
-                # make sure there is only one state with ubiquitous frame; choose
-                # the first from the list
-                self._states_[:] = [ubiquitous_frame_states[0]]
-                #return
-                        
-            elif len(negative_frame_states):
-                # there can be at most two states: one with negative z_frame
-                # (z_frame_a) and another with positive z_frame (z_frame_b) such
-                # that:
-                #
-                # z_frame_b == -1 * z_frame_a -1
-                
-                # make sure there is only state with negative frame; choose the
-                # first from the list
-                negative_frame_state = negative_frame_states[0]
-                
-                avoided_frame = -negative_frame_state.z_frame -1
-                
-                # find state visible in the avoided frame
-                states_for_avoided_frame = [s for s in positive_frame_states is s.z_frame == avoided_frame]
-                
-                if len(states_for_avoided_frame):
-                    # make sure there is only one; choose the first from the list
-                    state_visible_in_avoided_frame = states_for_avoided_frame[0]
-                    
-                    # max two states: one visible in all but frame X, and one
-                    # visible only in frame X
-                    self._states_[:] = [negative_frame_state, state_visible_in_avoided_frame]
-                    
-                else:
-                    # there is only one state visible in all but frame X
-                    self._states_[:] = [negative_frame_state]
-                    
-                    
             else:
-                # no negative frame states exist, no ubiquitous frame states exist
-                if len(positive_frame_states) == 0:
-                    # no state defined?
-                    self._states_[:] = [self.__class__.defaultState()]
+                # 2) check the existence of frame-avoiding states (fa) and of 
+                # single-frame states (sf) - make sure they are unique
+                fa_states = unique([s for s in states if s.z_frame <  0], key = lambda x: x.z_frame)
+                sf_states = unique([s for s in states if s.z_frame >= 0], key = lambda x: x.z_frame)
+                
+                # NOTE: by definition, an fa_state is INVISIBLE in a particular 
+                # frame index and VISIBLE in all others, therefore there can be 
+                # only one of these
+                if len(fa_states):
+                    if len(fa_states)>1:
+                        fa_states[:] = [fa_states[0]]
+                        
+                    # NOTE: when an fs_state is present, there can be at most 
+                    # one sf state, where:
+                    # sf_state.z_frame == -1 * fa_state.z_frame - 1
                     
-                else:
-                    self._states_[:] = positive_frame_states
+                    allowed_sf_states = list()
                     
-        else: # no states defined - make sure there is one!
-            self._states_ = [self.__class__.defaultState()]
-            
-        if len(self._states_):
-            self.sortStates(none_last=False)
+                    if len(sf_states):
+                        allowed_sf_states = [s for s in sf_states if s.z_frame == -fa_states[0].z_frame - 1]
+                        if len(allowed_sf_states) > 1:
+                            allowed_sf_states[:] = [allowed_sf_states[0]]
+                        
+                    self._states_[:] = fa_states + allowed_sf_states
+                
+                elif len(sf_states):
+                    self._states_[:] = sf_states
                     
     @classmethod
     def isStateVisible(cls, state:DataBag, frame:int) -> bool:
         """Checks if state is visible in frame.
         """
+        if not isinstance(state, DataBag):
+            raise TypeError("Expecting a DataBag; got %s instead" % type(state).__name__)
+
         if state.z_frame is None: # trivial: this is ALWAYS visible
             return True
         
@@ -1860,14 +1718,14 @@ class PlanarGraphics():
             # c) frame <  0, z_frame >= 0 and z_frame != -frame -1
             # d) frame <  0, z_frame <  0 and z_frame !=  frame
             
-            if frame >= 0:
+            if frame >= 0: # check visibility in real frame index
                 if state.z_frame >= 0:
                     return state.z_frame ==  frame      # (a)
                         
                 else:
                     return state.z_frame != -frame -1   # (b)
                 
-            else:
+            else: # check for frame avoidance
                 if state.z_frame >= 0:
                     return state.z_frame != -frame -1   # (c)
                 
@@ -1999,7 +1857,7 @@ class PlanarGraphics():
                     #raise ValueError("Mismatch between the number of states (%d) and that of frame indices (%d)" % (len(self._states_), len(frameindex)))
         
             
-    def _set_current_state_(self, frame:typing.Optional[int]=None):
+    def setCurrentState(self, frame:typing.Optional[int]=None):
         # TODO FIXME - stay consistent with the three golden rules = there can be
         # I.    at most ONE state with z_frame None
         # II.   at most ONE state with z_frame < 0; when present, a maximum of ONE
@@ -2190,7 +2048,7 @@ class PlanarGraphics():
     #@property
     #def currentStates(self):
         #return self.getStates()
-        ##self._set_current_state_()
+        ##self.setCurrentState()
         ##return self._curentstates_
     
     @property
@@ -2205,9 +2063,9 @@ class PlanarGraphics():
         #states = self.currentStates
         #if len(states):
             #return states[0]
-        #self._set_current_state_()
+        #self.setCurrentState()
         #if len(self._currentstates_):
-            #return self._set_current_state_[0]
+            #return self.setCurrentState[0]
         
     @property
     def currentFrame(self):
@@ -3080,7 +2938,9 @@ class PlanarGraphics():
         if frame < 0:
             raise ValueError("'frame' must be >= 0; got %d instead" % frame)
             
-        self._check_states_()
+        self.checkStates()
+        
+        #print("%s.getState(): states ="%self.__class__.__name__, self._states_)
             
         if len(self._states_) == 1: # trivial
             if self.__class__.isStateVisible(self._states_[0], frame):
@@ -3524,7 +3384,7 @@ class PlanarGraphics():
         # (I)   one ubquious state
         # (II)  one frame-avoding state and a single-frame state (for the avoided frame)
         # (III) many single-frame states
-        self._check_states_()
+        self.checkStates()
         
         # NOTE: 2020-11-13 13:02:19
         # allow frame to override state z_frame
@@ -3805,7 +3665,7 @@ class PlanarGraphics():
                         else:
                             self._states_[:] = [new_state]
                                 
-        self._check_states_()
+        self.checkStates()
         
     def getObjectForFrame(self, frame:typing.Optional[int]=None) -> typing.Optional[object]:
         """Returns a PlnaraGRaphics of the same type at self, for the specified frame.
@@ -3828,7 +3688,8 @@ class PlanarGraphics():
         if len(param.strip()) == 0:
             raise ValueError("Expecting a non-empty string")
         
-        if param not in [d for d in self.__class__._planar_descriptors_ if d != "z_frame"]:
+        #if param not in [d for d in self.__class__._planar_descriptors_ if d != "z_frame"]:
+        if param not in [d for d in self.__class__._planar_descriptors_]:
             raise KeyError("Planar descriptor %s not found in %s" % (param, self.__class__.__name__))
         
         state = self.getState(frame)
