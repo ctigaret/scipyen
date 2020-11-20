@@ -465,33 +465,65 @@ class ProgressWorker(QtCore.QRunnable):
             
 #class PlanarGraphics(metaclass=PlanarGraphicsMeta):
 class PlanarGraphics():
-    """Common ancestor of all planar graphic objects in Scipyen
+    """Ancestor for all planar graphic objects in Scipyen imaging.
     
     PlanarGraphics objects encapsulate two-dimensional geometric shapes to be 
-    used as landmarks (ROIs, and Cursors) on 2D images or frames. 
+    used as landmarks (ROIs, and Cursors) on 2D images or frames (in this context
+    a "frame" is a 2D "slice" of the data array along one of its axes; the axis 
+    along which the data is slices into frames can be any of the three axes of a
+    3D data; in contrast an "image" is a 2D data array with one frame). 
     
-    In this context, a "frame" represents a 2D "slice" of the data array along
-    one of its axes. An "image" is a 2D data array with one frame.
+    The PlanarGraphics can represent a primitive shape (see below), a Cursor 
+    (vertical, horizontal, crosshair, point), or a Path composed of primitive 
+    shapes and/or subpaths.
     
-    Each shape primitive (point, line, arc, ellipse, etc) is defined by a set of
-    numeric parameters (planar descriptors, e.g. position coordinates, width and
-    height of the bounding rectangle, angle).
+    The primitive shapes defined in this module are: Move or Point, Line, Arc, 
+    ArcMove, Cubic, Quad, Ellipse, Rectangle, emulating the QGraphicsObject 
+    primitives.
     
-    When used with 3D volumes, these parameters may vary from one data frame to 
-    another. Furthermore, the shape needs not be visible in all frames.
+    Planar graphics descriptors
+    ===========================
     
-    PlanarGraphics are displayed by painting a corresponding GraphicsObject 
-    ("frontend") over a data frame. The GraphicsObject objects "frontends" 
-    inherit from the Qt QGraphicsObject defined in the QGraphics framework of 
-    the Qt toolkit. 
+    The graphics primitives and Cursor objects are described / defined by a set 
+    of numeric parameters (or 'planar descriptors', e.g. position coordinates, 
+    width and height of the bounding rectangle, angle, etc.). 
     
-    All 2D geometric primitives defined in this module inherit from PlanarGraphics,
-    and are encapsulated in subclasses. A PlanarGraphics object also has a "type"
-    instance attribute (see GraphicsObjectType enum in this module); some 
-    PlanarGraphics classes support more than one GraphicsObjectType value (e.g. 
-    Cursor).
+    The planar descriptors thus define a 2D graphics primitive specific to the 
+    PlanarGraphics type and are listed in the "_planar_descriptors_" attribute.
+    
+    For example:
+        ("x", "y", "w", "h") define a Rectangle or an Ellipse, 
+        ("x", "y") define a Line, or a Move (see NOTE 2, below), 
+        ("x", "y", "cx", "cy") for a quadratic curve, etc.
+
+    See the documentation for the concrete shape and cursor types for details.
+    
+    The values for linear descriptors (position coordinates, and distances) are 
+    interpreted as data samples (i.e., pixels) relative to the top left sample of
+    the data frame : the pixel with (0,0) coordinates, or the "origin".
+    
+    Angular descriptor values are interpreted as radians, with 0 lying on the 
+    horizontal axis and positive values going counter-clockwise.
+    
+    All 2D geometric primitives defined in this module inherit from PlanarGraphics.
+    
+    A PlanarGraphics object also has a "type" instance attribute (see 
+    GraphicsObjectType enum in this module); some PlanarGraphics classes support
+    more than one GraphicsObjectType value (e.g. Cursor).
     
     See NOTE 1 "Sub-classing PlanarGraphics", below, for details.
+    
+    PlanarGraphics are displayed by painting a corresponding GraphicsObject 
+    ("frontend") over a data frame. The GraphicsObject "frontends" inherit from 
+    the Qt QGraphicsObject (defined in the QGraphics framework of the Qt toolkit). 
+    
+    A PlanarGraphics object is callable. Calling an object as a function generates
+    a QGraphics primitive for painting (i.e., displaying) the shape overlaid on
+    an image, in the GUI. 
+    
+    To make this correspondence more "natural", the planar descriptors emulate 
+    the parameters needed to construct a QGraphicsItem primitive (painter path element)
+    (see the examples given above)
     
     PlanarGraphics objects can be serialized, hence saved (pickled) alongside 
     other python data. 
@@ -501,31 +533,17 @@ class PlanarGraphics():
     Instead, they are created and managed by GUI code for the purpose of
     displaying PlanarGraphics objects.
     
-    The planar descriptors are a set of numeric parameters that define a 2D 
-    graphics primitive specific to the PlanarGraphics type and listed in the 
-    "_planar_descriptors_" attribute of the PlanarGraphics object. These
-    parameters emulate the parameters for constructing graphics primitives in 
-    the QGraphics framework of the Qt tookit.
+    The PlanarGraphics "state"
+    ==========================
     
-    For example:
-        ("x", "y", "w", "h") define a Rectangle or an Ellipse, 
-        ("x", "y") define a Line, or a Move (see NOTE 2, below), 
-        ("x", "y", "cx", "cy") for a quadratic curve, etc.
-
-    Linear descriptor values (position coordinates, and distances) are 
-    interpreted as data samples (i.e., pixels) relative to the top left sample of
-    the data frame : the pixell with (0,0) coordinates, or the "origin".
+    In order for the shapes and cursors to be used with 3D data volumes, the 
+    concrete values of their planar descriptors are allowed to vary from frame 
+    to frame by collecting them in so-called planar graphics "states".
     
-    Angular descriptor values are interpreted as radians, with 0 lying on the 
-    horizontal axis and positive values going counter-clockwise.
-    
-    The concrete values of the planar descriptors are contained in so-called
-    state objects. These values can be associated with a particular frame, a 
-    subset of frames, or all 2D frames in the data array.
-    
-    A state is a dictionary-like object (python type: traitcontainers.DataBag)
-    where the planar descriptors are accessed (and modified) by theie name, 
-    either as attributes, or as dict keys.
+    The "state" is an object with attributes named after the planar descriptors 
+    specific for the actual shape or cursor. They can be accessed and their values 
+    can be changed directly using attribute access ('dot' syntax), or "indexed"
+    access (item access syntax).
     
     For example,
     
@@ -534,187 +552,101 @@ class PlanarGraphics():
     or
                 state["x"] = 10
                 
+    In addition, a state contains a 'z_frame' attribute which is the frame index
+    (if any) where the state's concrete values of planar descriptors apply (and
+    therefore, the index of the frame where the PlanarGraphics is going to be 
+    painted):
+    
+    * when z_frame is None, the state applies to all available frames in the
+      data
+    
+    * when z_frame is an int: 
+        if z_frame >= 0 the state applies to the frame with index z_frame, if it
+            exists; this implies that data has at least z_frame + 1 frames
+            
+        if z_frame  < 0 the state applies to ALL frames EXCEPT the frame with
+            index -1 * z_frame - 1
+    
+    It follows that a PlanarGraphics state can be:
+    
+    (a) ubiquitous state: 
+        ---------------------
+        * its z_frame attribute is None and the state is drawn (i.e. is visible)
+            in any data frame
+        
+    (b) frame-avoiding state: 
+        ---------------------
+        * the z_frame attribute is an int and is < 0
+        * the state should be drawn in any frame EXCEPT the one which has
+            index equal to -1 * z_frame - 1 (if it exists)
+        
+    (c) single-frame state: 
+        --------------------
+        * the z_frame is an int >= 0
+        * the state is drawn ONLY in the frame with index == z_frame
+            (if it exists)
+        
+    The co-existence of states in a PlanarGraphics object is governed by the
+    rules:
+    
+    Rule I: One frame - one state
+    -----------------------------
+    Any frame can associate AT MOST one state.
+     
+    Rule II. Ubiquitous states
+    -----------------------------
+    An ubiquitous state is the ONLY state of a PlanarGraphics object.
+    
+        Corollaries:
+        
+        * the PlanarGraphics object can have only one ubiquitous state, and
+        
+        * no other states co-exist with an ubiquitous state
+        
+    Rule III. Frame-avoiding states
+    -------------------------------
+    A frame-avoiding state ('fa_state') can co-exist with AT MOST one
+    single-frame state ('sf_state') such that the two states satisfy:
+    
+        fa_state.z_frame == -1 * sf_state.z_frame - 1
+        
+        Corollaries:
+    
+        * there can be only one frame-avoiding state;
+        
+        * a PlanarGraphics with a frame-avoding state can have at most two
+            states, with the other state being a single-frame state;
+            
+        * the single-frame state is drawn in the frame "avoided" by the 
+            frame-avoding state;
+            
+    Rule IV. Single-frame states
+    ----------------------------
+    There can be any number of single-frame states.
+    
+        Corollary:
+        
+        * A PlanarGraphics object with more than two states can have ONLY
+            single-frame states.
+            
+        * By Rule I, all single_frame states have unique z_frame values
+    
+    When used with 3D volumes, these parameters may vary from one data frame to 
+    another. Furthermore, the shape needs not be visible in all frames.
+    
     By associating a "state" with data frames, a PlanarGraphics object can take
     different values of its planar descriptors in distinct data frames (this is
     somewhat similar to the "ROIs" in Image/J).
     
-    A state can be:
+    Paths
+    =====
     
-    (I)     ubiquitous = visible in all available frames in the data:
-    
-            state z_frame is None
-    
-    (II)    single-frame = visible only in a frame with the index given by
-            
-            state.z_frame, where state.z_frame >= 0
-    
-    (III)   frame-avoding = visible in ALL EXCEPT the frame with the index
-    
-            -1 * state.z_frame - 1, where state.z_frame < 0
-    
-    Such mechanism allows a PlanarGraphics object to change its position, size, etc 
-    across frames while still having the same graphics type (and Python type). 
-    
-    Moreover, a state can be visible in all but one particular frame, meaning that
-    a PlanarGraphics object may be visible only in a subset of the data frames.
-    
-    States are optionally associated with frames via their "z_frame" attribute.
-    
-    The z_frame attribute of a state object can be:
-        (1) an int that satisfies z_frame >= 0 and z_frame < number_of_frames
-        
-            In this case the graphics is displayed in the frame with the index 
-            equal to z_frame using the concrete descriptor values contained in 
-            that state.
-            
-        (2) an int where z_frame < 0
-        
-            In this case the graphics is NOT painted (i.e., it is hidden) in the 
-            frame with the index (-1) * z_frame -1, but is painted in all other
-            frames using the concrete values of the descriptors given by the state.
-            
-        (3) None
-        
-            In this case, the graphics is painted in all available frames, using 
-            the descriptor values in this state.
-            
-    Changing planar descriptor values in a state should come with the option to 
-        modify the state's association with a frame index:
-        If state.z_frame is an int >= 0:
-            * changing z_frame to None means the state "takes over"; alll other 
-                states are discarded
-                
-            * changing the SIGN of z_frame means the state "takes over" all other
-                states where z_frame >= 0 except for the state where
-                z_frame == frame_index
-                
-        If state.z_frame is an int < 0:
-            * changing the SIGN of z_frame >= 0 results in the state being assigned
-                to frame_index; the previous state for that frame index, if it
-                exists, will be discarded
-                
-            * changing z_frame to None means it will take over all other states 
-                (which will be discarded)
-                
-        If state.z_frame is None:
-            * chaning z_frame to an int >= 0:
-                state becomes associated with given frame_index;
-                all other frames have NO state.
-                
-            * chaning z_frame to an int < 0:
-                state becomes associated with all frames with index != -1*z_frame -1
-                
-                frame with index == -1 * z_frame -1 is left without state
-                
-            
-    It follows that a PlanarGraphics object:
-    
-        (a) may have a single state - which MAY be painted onto a specific data
-            frame (i.e. VISIBLE) depending on the z_frame value:
-            
-            (a.1) when z_frame is None, the geometry is painted with the same 
-                descriptor values in ALL available frames
-            
-            (a.2) when z_frame is an int >=0 above, the geometry 
-                is painted ONLY in the data frame with 
-                
-                    frame_index == z_frame
-            
-            (a.3) when z_frame is an int < 0, the geometry is painted in ALL 
-                available frames EXCEPT the frame with 
-            
-                    frame_index == (-1) * z_frame -1
-                
-        (b) can have several states; whether they are painted or not in a data
-            frame depends on their z_frame value as in (a)
-            
-        (c) may be painted (visible) only in a subset of frames: the graphics 
-            primitive will be INVISIBLE in those frames with indices NOT found 
-            among the z_frame values of the "states" of the object
-            
-        (d) is INVISIBLE in a frame if any of the following is True:
-        
-            (d.1) none of its states has a z_frame value equal to the frame's 
-                index - this also applies to the single-state with z_frame an int
-                
-            (d.2) it has a state where z_frame < 0 including
-            
-                (-1) * the frame's index - 1
-                
-        (e) is VISIBLE in a frame if any of the following is True:
-        
-            (e.1) has a single state with state.z_frame None
-            
-            (e.2) has multiple states and either:
-                (e.2.1) one state has z_frame == frame_index
-                
-                (e.2.2) has at least one state declared invisible in another 
-                    frame:
-                    
-                    z_frame < 0 and z_frame != (-1) * frame_index - 1
-                    
-        ATTENTION: Exclusive conditions:
-        
-        1) The PlanarGraphics can have only one state where z_frame is None.
-            This is the UNIQUE state of the PlanarGraphics object.
-            
-        2) When there are several states:
-            2.1) all states must have integer z_frame 
-            
-            2.2) there can be only one state with a negative z_frame, which is:
-                * INVISIBLE in frame_index == -1 * z_frame -1
-                * VISIBLE in any frame_index != -1 * z_frame -1
-                2.2.1) there can be only ONE aditional state with z_frame > 0
-                    which satisfies:
-                    
-                    additional_state.z_frame == -1 * state.z_frame
-                    
-                    i.e., it is VISIBLE in the frame that the negative z_frame
-                    state is invisible.
-                    
-                2.2.2) this emans that the PlanarGraphics object has at most TWO
-                    states in this case
-                    
-            
-        Points (a)-(d) imply that several states may be painted on the same data
-        frame.
-                
-        When a PlanarGraphics object with multiple states (typically,
-        constructed in the context of 3D data) is used with 2D data, all but one
-        one state become redundant. It is up to the code managing the 
-        PlanarGraphics object to decide which state to keep and what to do with 
-        the redundant ones.
-        
-            * decide which state should be retained for the (new) 2D data
-            
-                PlanarGraphics objects contain a reference to their "current 
-                state", defined as the state or states VISIBLE in the context of
-                the 3D data used; these can then be retained, and the others
-                discarded.
-        
-            * retain ALL the states in the hope of later use with 3D data of
-            the same shape as the data used when the PlanarGraphics object was 
-            created (thus likely to generate a large overhead)
-            
-    It is up to the GUI viewer code to determine when a PlanarGraphics should be
-    visible, and up to the code managing the PlanarGraphics to avoid having more
-    than one state in the same frame.
-
-    ATTENTION This mechanism has the potential to generate a huge overhead:
-    
-        * In the particular case where the shape has a different geometry in just
-        one frame, the PlanarGraphics object must contain a sequence of states 
-        with one state per frame, even if these states hold the same geometry in 
-        all but one frame.
-        
-        * If not properly managed, accumulation of "invisible" states can cause 
-        a large overhead.
-    
-    Paths:
         PlanarGraphics objects of different types can be "chained" together in a 
         list-like Path object, which supports iterable API.
     
-    Frontends:
+    Frontends
+    ========
+    
         A PlanarGraphics object can have more than one frontend, when the same
         shape is intended to be painted synchronously in several GUI viewers.
         
@@ -724,7 +656,9 @@ class PlanarGraphics():
         The viewers MUST display data arrays with the same shape, otherwise the 
         the behaviour is undefined.
         
-    Linked objects:
+    Linked objects
+    ==============
+    
         Linked PlanarGraphics are objects such that such that any changes in one
         object shape also bring about the same change in the linked objects shapes.
         
@@ -905,9 +839,6 @@ class PlanarGraphics():
         if not hasattr(ret, "z_frame"):
             ret.z_frame = None
             
-        #print("\tPlanarGraphics.copyConvertState for %s: ret keys ="% cls.__name__, 
-              #[k for k in ret.keys()])
-            
         # NOTE: 2020-11-01 14:25:30
         # finally check that all mandatory descriptors are present in src
         # z_frame was introduced later in development and it can be set to None
@@ -941,11 +872,6 @@ class PlanarGraphics():
         for key in extra_keys:
             ret.__delitem__(key)
             
-        
-        #print("\t%s.copyConvertState:\nsrc = %s"% (cls.__name__, type(src).__name__), 
-              #src, "\nret = %s"% type(ret).__name__, ret, "\n")
-        #print()
-        
         return ret
     
     @classmethod
@@ -1049,7 +975,9 @@ class PlanarGraphics():
         
         self._currentframe_ = currentframe
         
-        self.setCurrentState()
+        self.checkStates()
+        
+        #self.setCurrentState()
             
     def __init_from_state__(self, state:dict, frameindex:typing.Optional[typing.Iterable]=[], 
                             currentframe:int=0) -> None:
@@ -1060,7 +988,9 @@ class PlanarGraphics():
             
         self._currentframe_ = currentframe
         
-        self.setCurrentState()
+        self.checkStates()
+        
+        #self.setCurrentState()
         
     def __init_from_state_sequence__(self, *states, frameindex:typing.Optional[typing.Iterable]=[], 
                                      currentframe:int=0) -> None:
@@ -1083,7 +1013,9 @@ class PlanarGraphics():
                 
             self._currentframe_ = currentframe
             
-            self.setCurrentState()
+            self.checkStates()
+            
+            #self.setCurrentState()
             
         else:
             raise TypeError("Expecting a sequence of state dict-like objects; got %s instead" % states)
@@ -1107,7 +1039,7 @@ class PlanarGraphics():
             
             3) a sequence of PlanarGraphics objects - Path only
             
-            4) iterable of PlanarGRaphics objects - Path only
+            4) iterable of PlanarGraphics objects - Path only
             
             5) a PlanarGraphics object (copy constructor); 
             
@@ -1195,9 +1127,10 @@ class PlanarGraphics():
             raise TypeError("graphicstype expected to be an int, a str, a pictgui.GraphicsObjectType, or None; got %s instead" % type(graphicstype).__name__)
                         
         if graphicstype is not None:
-            if not isinstance(graphicstype, GraphicsObjectType): # by definition any GraphicsObjectType object is in GraphicsObjectType
-                # the only other acceptable types, beside NoneType and GraphicsObjectType are int and str, with conditions
+            if not isinstance(graphicstype, GraphicsObjectType): 
+                # get a GraphicsObjectType by its name (substring allowed) or value (int)
                 if isinstance(graphicstype, str):
+                    # get by name (substring allowed)
                     if graphicstype in [t.name for t in GraphicsObjectType]:
                         graphicstype = GraphicsObjectType[graphicstype] # => a GraphicsObjectType value
                         
@@ -1215,6 +1148,7 @@ class PlanarGraphics():
                             raise ValueError("Unknown graphics type name %s" % graphicstype)
                     
                 elif isinstance(graphicstype, int):
+                    # get by value (int)
                     if graphicstype in [t.value for t in GraphicsObjectType]:
                         grtypes = [t for t in GraphicsObjectType if t.value == graphicstype]
                         
@@ -1320,8 +1254,8 @@ class PlanarGraphics():
                     
                     self._states_ = self.__class__.copyConvertStates(*src._states_)
                     
-                    self.setCurrentState()
-                        
+                    self.checkStates()
+                    
                     return # we're DONE here
                 
                     # ### END copy c'tor
@@ -1369,7 +1303,8 @@ class PlanarGraphics():
                     self._graphics_object_type_ = GraphicsObjectType.text
                     
                     self._apply_frame_index_(frameindex)
-                    self.setCurrentState()
+                    self.checkStates()
+                    #self.setCurrentState()
                         
             else:# NOTE: many var-positional arguments
                 # these can be -- scalars: their number, order and 
@@ -1383,23 +1318,23 @@ class PlanarGraphics():
                     raise TypeError("Cannot use parametric constructor to initalise a Path")
                 
                 self.__init_from_descriptors__(*args)
+                self._currentframe_ = currentframe
                 
                 self._apply_frame_index_(frameindex)
                 
-                self._currentframe_ = currentframe
-            
-                self.setCurrentState()
                 
-        else: # no var-positional parameters given
+                self.checkStates()
+            
+        else: # no var-positional parameters given => plain (empty) PlanarGraphics
             if not isinstance(self, Path):
                 self._states_ = [self.__class__.defaultState()]
                 
                 self._currentframe_ = currentframe
             
+                self.checkStates()
                 self._apply_frame_index_(frameindex)
                 
-                self.setCurrentState()
-
+                
                 if isinstance(self, Cursor):
                     if graphicstype is None:# or not graphicstype & GraphicsObjectType.allCursorTypes:
                         self._graphics_object_type_ = GraphicsObjectType.crosshair_cursor
@@ -1583,7 +1518,7 @@ class PlanarGraphics():
             object.__setattr__(self, name, value)
             
     def checkStates(self):
-        """Ensures consistency of the PlanarGraphcis states.
+        """Ensures consistency of the PlanarGraphics states.
         
         A PlanarGraphics state can be:
         
@@ -1659,7 +1594,7 @@ class PlanarGraphics():
         
         3) Lowest priority in current frame: state where z_frame == frame_index
         
-        
+        NOTE: States are not sorted with respect to their z_frame value
         """
         if len(self._states_):
             # make sure the states conform to the planar descriptors
@@ -1755,9 +1690,14 @@ class PlanarGraphics():
                 
     def _apply_frame_index_(self, frameindex:typing.Optional[typing.Iterable]=[],
                             sort=False, none_last=True):
-        import math
+        """Reassigns the z_frame values 
+        """
+        import math, bisect
         
-        noneph = math.inf if none_last else -math.inf
+        # allows sorting by z_frames when None is amongst them
+        # NOTE: however that by RULE I a state where z_frame is None is THE ONLY
+        # state available
+        none_place_holder = math.inf if none_last else -math.inf
         
         # NOTE: 2020-11-01 21:16:37
         # allow the specification of an empty frameindex as None
@@ -1779,7 +1719,7 @@ class PlanarGraphics():
             frameindex = (unique(frameindex))
                       
         if sort:
-            frameindex = sorted(frameindex, key = lambda x: x if x is not None else noneph)
+            frameindex = sorted(frameindex, key = lambda x: x if x is not None else none_place_holder)
         
         # NOTE: 2020-11-01 16:07:37
         # check for absence of overlap between frame indices for visible and
@@ -1857,42 +1797,6 @@ class PlanarGraphics():
                     #raise ValueError("Mismatch between the number of states (%d) and that of frame indices (%d)" % (len(self._states_), len(frameindex)))
         
             
-    def setCurrentState(self, frame:typing.Optional[int]=None):
-        # TODO FIXME - stay consistent with the three golden rules = there can be
-        # I.    at most ONE state with z_frame None
-        # II.   at most ONE state with z_frame < 0; when present, a maximum of ONE
-        #       extra state is allowed, for the frame with index -1 * z_frame - 1
-        # III.  any number of states with z_frame > = 0, but UNIQUE with respect to 
-        #       their z_frame values
-        # TODO To work as a cache (i.e. to avoid lengthy iterations especially for 
-        # Path objects) this should be called after the current frame has been
-        # changed, or after a state has been added/removed
-        
-        if not isinstance(frame, int):
-            if not isinstance(self._currentframe_, int) or self._currentframe_ <0 :
-                self._currentframe_ = 0
-                
-            frame = self._currentframe_
-            
-        # frames visible in all frames
-        ubiquitous_states = [s for s in self._states_ if s.z_frame is None]
-        
-        #if len(ubiquitous_states):
-            #self._currentstate_ = ubiquitous_states[0]
-            #return
-        
-        # frames excluded from another frame (implicitly visible in this frame)
-        # there may be more than one
-        fa_states = [s for s in self._states_ if (isinstance(s.z_frame, int) and s.z_frame < 0 and -s.z_frame-1 != frame)]
-        
-        # frame visible only in this frame - there should be only one, but we
-        # do not check this
-        sf_states = [s for s in self._states_ if (isinstance(s.z_frame, int) and s.z_frame == frame)]
-        
-        # prioritize states visible in this frame over states invisible in another frame over ubiquitous states 
-        self._currentstates_ = sf_states + fa_states + ubiquitous_states
-        
-            
     @property
     def pos(self):
         """The position of this object as a Qt QPointF.
@@ -1924,7 +1828,8 @@ class PlanarGraphics():
         
         """
         #print("PlanarGraphics.position() for %s " % self)
-        return (self.get("x"), self.get("y"))
+        return (self.x, self.y)
+        #return (self.get("x"), self.get("y"))
     
     @position.setter
     def position(self, x):
@@ -1939,16 +1844,19 @@ class PlanarGraphics():
         else:
             raise TypeError("Expecting x,y a pair of real scalars, or just a Qt QPoint or QPointF")
 
-        self.set("x", x[0])
-        self.set("y", x[1])
+        self.x = x[0])
+        self.y = x[1])
+        
+        #self.set("x", x[0])
+        #self.set("y", x[1])
         
         self.updateLinkedObjects()
         
     def translate(self, dx, dy):
-        self.set("x", self.get("x") + dx)
-        self.set("y", self.get("y") + dy)
-        #self.x += dx
-        #self.x += dy
+        self.x += dx
+        self.x += dy
+        #self.set("x", self.get("x") + dx)
+        #self.set("y", self.get("y") + dy)
         
     def point(self, frame=None):
         """Alias to qPoint()
@@ -2042,15 +1950,6 @@ class PlanarGraphics():
     def clearObjectLinks(self):
         self._linked_objects_.clear()
     
-    #"def" queryFrames(self, container):
-        #if hasattr(container, "nFrames"
-        
-    #@property
-    #def currentStates(self):
-        #return self.getStates()
-        ##self.setCurrentState()
-        ##return self._curentstates_
-    
     @property
     def currentState(self):
         """Read-only.
@@ -2060,12 +1959,6 @@ class PlanarGraphics():
         
         """
         return self.getState()
-        #states = self.currentStates
-        #if len(states):
-            #return states[0]
-        #self.setCurrentState()
-        #if len(self._currentstates_):
-            #return self.setCurrentState[0]
         
     @property
     def currentFrame(self):
@@ -2117,8 +2010,7 @@ class PlanarGraphics():
         
     @property
     def states(self):
-        """The underlying list of states
-        
+        """The list of underlying states
         """
         return self._states_
     
@@ -2126,6 +2018,8 @@ class PlanarGraphics():
     def sortedStates(self):
         """A list of frame states, sorted by their z_frame attribute
         States where z_frame is None are placed at the end of the list.
+        
+        NOTE: Does not verify the states' z_frame conformance with the three rules
         """
         import math
 
@@ -2147,13 +2041,14 @@ class PlanarGraphics():
         with z_frame > 0 such that 
         
         state_A.z_frame == -1 * state_B.z_frame -1
+        NOTE: Does not verify the states' z_frame conformance with the three rules
         """
         import math
         
-        noneph = math.inf if none_last else -math.inf
+        none_place_holder = math.inf if none_last else -math.inf
         
         if len(self._states_) > 1:
-            states = sorted(self._states_, key = lambda x: x.z_frame if (isinstance(x.z_frame, int) and x.z_frame >= 0) else -x.z_frame-1 if (isinstance(x.z_frame, int) and x.z_frame < 0) else noneph)
+            states = sorted(self._states_, key = lambda x: x.z_frame if (isinstance(x.z_frame, int) and x.z_frame >= 0) else -x.z_frame-1 if (isinstance(x.z_frame, int) and x.z_frame < 0) else none_place_holder)
             self._states_[:] = states[:]
     
     @property
@@ -2265,6 +2160,7 @@ class PlanarGraphics():
             if not hasattr(self, "_states_"):
                 # for old API there's nothing we can do here to rescue
                 self._states_ = [self.__class__.defaultState()]
+                
             states = self._states_
             ret = self.__class__(states, 
                                 graphicstype=self._graphics_object_type_,
@@ -2894,19 +2790,93 @@ class PlanarGraphics():
         
     def indexOfStateWithFrame(self, state:typing.Optional[DataBag]=None, 
                            frame:typing.Optional[int]=None) -> typing.Optional[int]:
+        """Get the index of state in this object's list of states.
+        
+        Locates a state regardless of its visibility.
+        """
         if state is None:
-            state = self.getState(frame=frame)
+            state = self.getStateforFrame(frame_index=frame_index)
             
         return index_of(self._states_, state, key = lambda x: x.z_frame)
             
-    def getState(self, frame:typing.Optional[int]=None) -> typing.Optional[object]:
-        """Get a reference to the visible state associated with the specified frame index.
+    def indexOfState(self, state:typing.Optional[DataBag]=None, 
+                           frame_index:typing.Optional[int]=None) -> typing.Optional[int]:
+        """Get the index of a state in this object's list of states, subject to visibility.
+        
+        Parameters:
+        ===========
+        
+        state: DataBag (optional  default is None)
+        
+        frame_index: int >= 0 (optional , default is None)
+        
+        Returns:
+        =======
+        
+        An int: 
+            When state is None, this is the index of the state that is visible 
+            in frame_index.
+            
+            Otherwise, this is the index of the specified state, if it exists
+            in this object's states list.
+            
+        None: when the specified state was not found in this object's list of 
+            states, or when the specified state is None and the current frame 
+            does not have a visible state.
+            
+        """
+        if state is None:
+            state = self.getState(frame_index=frame_index)
+            
+        return index_of(self._states_, state, key = lambda x: x.z_frame)
+            
+    def getStateforFrame(self, frame_index:typing.Optional[int]=None) -> typing.Optional[object]:
+        """Access the state where z_frame == frame_index regardless state visibility.
+        
+        Parameters
+        ==========
+        
+        frame_index: None or an int;
+        
+            ATTENTION: Differences with self.getState():
+            
+                1. When frame_index is None the function tries to return the 
+                   state for which z_frame is None (if found)
+                
+                2. When an int, frame_index can also take negative values.
+        
+        Returns:
+        ========
+        A state (DataBag object) if found, or None.
+        
+        If there is an ubiquitous state, this will always be returned regardless
+        of the value of frame_index.
+        
+        Otherwise, returns the state with z_frame == frame_index, or None if 
+        no such state exists.
+        
+        """
+        if not isinstance(frame_index, (int, type(None))):
+            raise TypeError("'frame_index' expected to be an int or None; got %s instead" % type(frame_index).__name__)
+        
+        if len(self._states_) == 1 and self._states_[0].z_frame is None:
+            return self._states_[0]
+        
+        # states MUST be unique wrt their z_frame values
+        states = [s for s in self._states_ if s.z_frame == frame_index]
+        
+        if len(states):
+            return states[0]
+            
+    def getState(self, frame_index:typing.Optional[int]=None) -> typing.Optional[object]:
+        """Access the state that WOULD BE VISIBLE in the speficied frame_index with the specified index.
         TODO use as delegate for hasStateForFrame
         
         Parameters:
         ----------
-        frame: int or None; 
+        frame_index: int or None; 
             When None, return (a reference to) the state associated with self.currentFrame
+            ATTENTION: This is in contrast to self.getStateForFrame()
             
             When an int, it must be >= 0.
             
@@ -2915,39 +2885,44 @@ class PlanarGraphics():
         A DataBag object (state) which can be:
         
         * the unique state with ubiquitous visibility (i.e., has z_frame None)
-            - this will always be returned, regardless of the value of the 
-                'frame' parameter
+            - is such a state exists, it will be returned regardless of the 
+                value of the 'frame_index' parameter
                 
         OR:
             
-        * the state visible in 'frame'; this is either:
-            - the state with z_frame == frame
+        * the state visible in the frame_index with index specified by 'frame_index'; this 
+            state is either:
+            
+            - the state with z_frame == frame_index (i.e. the single-frame state for 
+                this frame_index)
             
             or
             
-            - the state explicitly invisible in another frame, i.e. with 
-                z_frame != -1 *` frame -1
+            - the state explicitly invisible in another frame_index (frame-avoiding), 
+                such that:
+                
+                z_frame != -1 *` frame_index -1
             
         """
-        if frame is None:
-            frame = self._currentframe_
+        if frame_index is None:
+            frame_index = self._currentframe_
             
-        if not isinstance(frame, int):
-            raise TypeError("'frame' expected to be an int; got %s instead" % type(frame).__name__)
+        if not isinstance(frame_index, int):
+            raise TypeError("'frame_index' expected to be an int; got %s instead" % type(frame_index).__name__)
             
-        if frame < 0:
-            raise ValueError("'frame' must be >= 0; got %d instead" % frame)
+        if frame_index < 0:
+            raise ValueError("'frame_index' must be >= 0; got %d instead" % frame_index)
             
         self.checkStates()
         
         #print("%s.getState(): states ="%self.__class__.__name__, self._states_)
             
         if len(self._states_) == 1: # trivial
-            if self.__class__.isStateVisible(self._states_[0], frame):
+            if self.__class__.isStateVisible(self._states_[0], frame_index):
                 return self._states_[0]
             
         elif len(self._states_) > 1:
-            visible_states = [s for s in self._states_ if self.__class__.isStateVisible(s, frame)]
+            visible_states = [s for s in self._states_ if self.__class__.isStateVisible(s, frame_index)]
             
             if len(visible_states):
                 return visible_states[0]
@@ -4189,7 +4164,7 @@ class PlanarGraphics():
         
     @property
     def frameIndices(self):
-        """A list of frame indices where frame-state associations occur.
+        """A list of frame indices for the PlanarGraphics state.
         
         For Path PlanarGraphics objects, all elements of the Path have either 
         the same frame-state associations, or all have a common state.
@@ -4221,19 +4196,66 @@ class PlanarGraphics():
         
         return [s.z_frame for s in self._states_]
         
-        ## NOTE: 2019-07-22 09:05:04
-        ## z_frame is None by default!
-        #if len(self._states_) == 1:
-            #return [self._states_[0].z_frame]
-        
-        #return sorted([s.z_frame for s in self._states_]) # this may be an empty list
-        
     @frameIndices.setter
     def frameIndices(self, values:typing.Optional[typing.Iterable]):
-        """FIXME Re-maps the frame indices in existing states as indicated by "values".
+        """FIXME Re-assigns the z_frame values in existing states.
         
+        Parameters:
+        ===========
+        values: The type of this parameter is one of the following:
+        
+            1) None
+            
+            2) a single int
+            
+            3) an iterable (e.g. tuple, list, range) with may:
+            3.a) be empty;
+            3.b) contain a single None element;
+            3.c) contain int elements such that:
+            3.c.1) all are >= 0, OR:
+            3.c.2) it has one element < 0 and at most one other element >= 0
+            
+            4) a dict with int keys mapped to int values 
+                (remaps old z_frame values to new z_frame values)
+            
+            The application of the new frame indices is subject to the three 
+            rules (see the class documentation)
+                    
+        dict mapping old_frame to new_frame (all numeric scalars)
+        
+            The keys (old frame indices) select which state will get a new values 
+            for its z_frame parameter.
+            
+        Effects:
+        ========
+        
+        1) When value is None, an empty iterable, or an interable with  a single
+         None element: 
+         
+            * the current state is set to be ubiquitous; all other states are
+            discarded.
+            
+            * if the current state was previously invisible 
+                (i.e., z_frame == -1 * current_frame - 1)
+        
+                then it will become visible
+        
+        2) When value is an int, or an interable with a single int element:
+            
+            if value >= 0 then the current state is set to be single-frame, 
+                visible at frame index given by value
+            
+            if value  < 0 then the curren state is set to be frame-avoiding,
+                visible in ALL frames EXCEPT the frame index -value - 1
+                
+        
+        or an int, the current state is set to be an
+        ubiquitous state (
+        
+        This may remove states, or duplicate states.
+            
         NOTE: 2020-11-02 08:54:48
-        The parameters 'values' must be an interable and should ideally have 
+        The parameters 'values' must be an iterable and should ideally have 
         (or yield) as many elements as there are states in the PlanarGraphics.
         
         If 'values' resolves to more frame indices than states, only the first
@@ -4253,33 +4275,6 @@ class PlanarGraphics():
         2) the "new" frame indices in "values" result in duplication of z_frame
         among existing states
         
-        Parameters:
-        ===========
-        values: One of:
-                1)  tuple or list or range
-                1.a) their iteration must generate int values
-                1.b) may be a sequence with all None elements
-                1.c) may be an empty sequence
-                    
-                2) a dict with int keys mapped to int values (old -> new frame index)
-                
-                3) a single int
-                
-                4) None
-                
-                Cases 1.b, 1.c, and 4 effectively remove the frame links of this object's states
-                    
-                Case 1 can expand or reduce the number of frame-linked states
-                
-                Case 2 operates atomically on states with links to specific frames
-                    does not remove states.
-                
-                Neither case remove state-frames!
-                    
-        dict mapping old_frame to new_frame (all numeric scalars)
-        
-            The keys (old frame indices) select which state will get a new values 
-            for its z_frame parameter.
         
         """
         import bisect
@@ -4292,7 +4287,7 @@ class PlanarGraphics():
         
         if isinstance(self, Path): # FIXME: this won't be reached because the method is overridden in Path
             for o in self._objects_:
-                o.frameIndices(value)
+                o.frameIndices = value
                 
             return
         
@@ -4307,17 +4302,22 @@ class PlanarGraphics():
             state.z_frame = None    # and make it ubiquitous
             self._states_[:] = [state]
                 
-        elif isinstance(values, (tuple, list, range)):                          # a list of frames was specified
-            if not all([isinstance(f, int) for f in values]):                   # check for int types
+        elif isinstance(values, (tuple, list, range)):
+            # a list of frames was specified
+            if not all([isinstance(f, int) for f in values]):
+                # check for int types
                 raise TypeError("new frame indices expected to be a sequence of int, or a dictionary with int keys; got %s instead" % values)
 
-            if any([f < 0 for f in values]):                                    # check for valid values
+            if any([f < 0 for f in values]):
+                # check for valid values
                 raise ValueError("new frame indices must be >= 0")
             
-            if len(set(values)) < len(values):                                  # check for uniqueness
+            if len(set(values)) < len(values):
+                # check for uniqueness
                 raise ValueError("duplicate new frame indices are not allowed")
                 
-            if len(self._states_) == 1:   # here there is a single state
+            if len(self._states_) == 1:
+                # here there is a single state
                 state = self._states_[0]
                 if state.z_frame is None: # which is ubiquitous
                     new_states = list()
@@ -4637,10 +4637,13 @@ class PlanarGraphics():
 # bring this up at module level - useful for other classes as well
 class GraphicsObjectType(IntEnum):
     """Enumeration of all supported graphical object types.
-    vertical_cursor     = 1     
-    horizontal_cursor   = 2     
-    crosshair_cursor    = 4     
-    point_cursor        = 8     
+    FIXME Complete the doc string
+    Type name             type value  QGraphicsItem               Planar Descriptors
+    ===============================================================================
+    vertical_cursor     = 1                                     x, y, width, height, xWin, yWin, radius
+    horizontal_cursor   = 2                                     x, y, width, height, xWin, yWin, radius
+    crosshair_cursor    = 4                                     x, y, width, height, xWin, yWin, radius
+    point_cursor        = 8                                     x, y, width, height, xWin, yWin, radius
     point               = 16    
     line                = 32    
     polyline            = 64
@@ -4687,7 +4690,7 @@ class GraphicsObjectType(IntEnum):
     cubic               = 2048
     arc                 = 4096
     arcmove             = 8192
-    path                = 16384 #Path
+    path                = 16384 # Path
     qtpath              = 32768 # QPainterPath
     text                = 65536 # QGraphicsSimpleTextItem               <=> str
     
