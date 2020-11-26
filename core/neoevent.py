@@ -58,11 +58,18 @@ def _new_Event_v2(cls, times=None, labels=None, units=None, name=None,
     # this avoids pumping signal twice when unpickling events embedded as members
     # in neo.Segments
     # otherwise, unpickling _FAILS_
-    if isinstance(annotations, dict) and "signal" in annotations:
+    if not isinstance(annotations, dict):
+        annotations = dict()
+        
+    if "signal" in annotations:
         annotations.pop("signal", None)
         
     #print("times", times)
     #print("labels", labels)
+    #print("units", units)
+    
+    if not isinstance(units, pq.Quantity):
+        units = pq.s
         
     e = cls(times=times, labels=labels, units=units, name=name, file_origin=file_origin,
                  description=description, **annotations)

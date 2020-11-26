@@ -1595,6 +1595,8 @@ class PlanarGraphics():
         3) Lowest priority in current frame: state where z_frame == frame_index
         
         NOTE: States are not sorted with respect to their z_frame value
+        
+        WARNING: This can be very expensive - only call it at construction
         """
         if len(self._states_):
             # make sure the states conform to the planar descriptors
@@ -1602,40 +1604,34 @@ class PlanarGraphics():
             
             # 1) check for the existence of ubiquitous states
             ubiquitous_states = [s for s in states if s.z_frame is None]
+            del ubiquitous_states[1:] # enforce singleton element - idiom works for empty lists too
             
             if len(ubiquitous_states):
-                # if there are several such states, keep the first, discard the rest (KF/DR)
-                self._states_[:] = [ubiquitous_states[0]]
+                # if ubiquitous state found make it the only state then return
+                self._states_[:] = ubiquitous_states
+                return
             
+            # 2) check the existence of frame-avoiding (fa) of single-frame (sf)
+            # states 
+            
+            # make sure they are unique in z_frame value
+            states = unique([s for s in states], key = lambda x: x.z_frame)
+
+            # 2.1) find fa states - if found, make sure there is only one
+            fa_states = [s for s in states if s.z_frame <  0]
+            del fa_states[1:] # enforce singleton element - idiom works for empty lists too
+            
+            # 2.2) find sf states
+            if len(fa_states):
+                # if a fa state exists, keep the only sf state which doesn't 
+                # conflict the fa frame in z_frame value (if found)
+                sf_states = [s for s in states if s.z_frame == -fa_states[0].z_frame -1]
+                
             else:
-                # 2) check the existence of frame-avoiding states (fa) and of 
-                # single-frame states (sf) - make sure they are unique
-                fa_states = unique([s for s in states if s.z_frame <  0], key = lambda x: x.z_frame)
-                sf_states = unique([s for s in states if s.z_frame >= 0], key = lambda x: x.z_frame)
+                sf_states = [s for s in states if s.z_frame >= 0]
                 
-                # NOTE: by definition, an fa_state is INVISIBLE in a particular 
-                # frame index and VISIBLE in all others, therefore there can be 
-                # only one of these
-                if len(fa_states):
-                    if len(fa_states)>1:
-                        fa_states[:] = [fa_states[0]]
-                        
-                    # NOTE: when an fs_state is present, there can be at most 
-                    # one sf state, where:
-                    # sf_state.z_frame == -1 * fa_state.z_frame - 1
-                    
-                    allowed_sf_states = list()
-                    
-                    if len(sf_states):
-                        allowed_sf_states = [s for s in sf_states if s.z_frame == -fa_states[0].z_frame - 1]
-                        if len(allowed_sf_states) > 1:
-                            allowed_sf_states[:] = [allowed_sf_states[0]]
-                        
-                    self._states_[:] = fa_states + allowed_sf_states
-                
-                elif len(sf_states):
-                    self._states_[:] = sf_states
-                    
+            self._states_[:] = fa_states + sf_states
+            
     @classmethod
     def isStateVisible(cls, state:DataBag, frame:int) -> bool:
         """Checks if state is visible in frame.
@@ -1844,8 +1840,8 @@ class PlanarGraphics():
         else:
             raise TypeError("Expecting x,y a pair of real scalars, or just a Qt QPoint or QPointF")
 
-        self.x = x[0])
-        self.y = x[1])
+        self.x = x[0]
+        self.y = x[1]
         
         #self.set("x", x[0])
         #self.set("y", x[1])
@@ -1892,13 +1888,6 @@ class PlanarGraphics():
         else:
             state = self.getState(frame)
                 
-            #if frame in self.frameIndices:
-                #state = self.getState(frame)
-                
-            #else:
-                #warnings.warn("%s.qPoints(): No state is associated with specified frame (%d)" % (self.__class__.__name__, frame), stacklevel=2)
-                #return [QtCore.QPointF()]
-        
         if state is None or len(state) == 0:
             warnings.warn("%s.qPoints(): Undefined state" % self.__class__.__name__, stacklevel=2)
             return [QtCore.QPointF()]
@@ -2869,7 +2858,7 @@ class PlanarGraphics():
             return states[0]
             
     def getState(self, frame_index:typing.Optional[int]=None) -> typing.Optional[object]:
-        """Access the state that WOULD BE VISIBLE in the speficied frame_index with the specified index.
+        """Access the state that WOULD BE VISIBLE in the specified frame_index with the specified index.
         TODO use as delegate for hasStateForFrame
         
         Parameters:
@@ -2913,7 +2902,7 @@ class PlanarGraphics():
         if frame_index < 0:
             raise ValueError("'frame_index' must be >= 0; got %d instead" % frame_index)
             
-        self.checkStates()
+        #self.checkStates() # may be too expensive - this must be called at the c'tor!
         
         #print("%s.getState(): states ="%self.__class__.__name__, self._states_)
             
@@ -4229,7 +4218,7 @@ class PlanarGraphics():
         Effects:
         ========
         
-        1) When value is None, an empty iterable, or an interable with  a single
+        1) When value is None, an empty iterable, or an iterable with a single
          None element: 
          
             * the current state is set to be ubiquitous; all other states are
@@ -4287,9 +4276,8 @@ class PlanarGraphics():
                 
             return
         
-        if values is None \
-            or (isinstance(values, (tuple, list, range, dict)) \
-                and (len(values)==0 or None in values)):                        
+        if values is None or (isinstance(values, (tuple, list, range, dict)) and \
+                              (len(values)==0 or None in values)): # trivial
             # remove any framelinks;
             # leave a single frameless state
             # remove the other states
@@ -4298,6 +4286,8 @@ class PlanarGraphics():
             state.z_frame = None    # and make it ubiquitous
             self._states_[:] = [state]
                 
+            return 
+        
         elif isinstance(values, (tuple, list, range)):
             # a list of frames was specified
             if not all([isinstance(f, int) for f in values]):
