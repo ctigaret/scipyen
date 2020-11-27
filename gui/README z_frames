@@ -1,0 +1,109 @@
+Logic for frame index assignment in a PlanarGraphics primitive
+---------------------------------------------------------------
+States of a PlanarGraphics:
+    a) ubiquitous: z_frame is None
+        visible in any frame available in the data
+        
+    b) frame-avoiding (fa): (int) z_frame < 0
+        visible in any frame available in the data EXCEPT the frame with index
+         -z_frame -1 (if such frame exists)
+         
+    c) single-frame (sf): (int) z_frame >= 0
+        ONLY visible in the frame with index == z_frame (if such frame exists)
+        
+Rules:
+    
+    I. One frame - one state:
+        
+        In any frame there cannot be more than one state visible
+        
+    II. Single ubiquitous state:
+        
+        If a PlanarGraphics has a ubiquitous state, then this is the ONLY state:
+        
+            self._states_ = [state]
+        
+    III. Coexistence of frame-avoiding and single-frame states.
+    
+        A PlanarGraphics primitive object can have only one frame-avoiding state:
+            
+            self._states_ = [fa_state]
+        
+        If a PlanarGraphics has a frame-avoiding state, then it can also have
+        AT MOST one single-frame state which is visible in the frame with the 
+        index avoided by the former, such that the following is True:
+            
+            sf_state.z_frame == -1 * fa_state.z_frame -1
+            
+        It follows that:
+        
+            self._states_ is [fa_state, sf_state]
+        
+
+    IV. Coexistence of single-frame states
+    
+        A PlanarGraphics primitive object can have any number of single-frame
+        states PROVIDED they have unique values for z_frames.
+        
+        If the frame with index state.z_frame is not present in the data, then
+        the state is NOT visible anywhere.
+        
+        
+Implementation of rules - changing z_frame value for a single state:
+    
+    * frameindex is either None, or an iterable:
+    
+        1. when None, the state with index ndx in self._states_ is made ubiquitous
+        
+            if state_index is given:
+            >>> self._states_[state_index].z_frame = None
+            >>> self._states_[:] = [self._states_[state_index]]
+        
+        2. when an iterable:
+            2.1 if empty, or contains at least ONE None element, case (1) applies
+    
+    a) need to know the index of the state in self._states_
+    if 
+    
+    1) initial : several single-frame states
+        z_frames: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 # sf_states
+    
+        1.1) current frame = x; 
+            there is a frame visible in frame x, and the index of this visible 
+                state in the states list is ndx:
+                    
+                    states[ndx].z_frame == x
+        
+        1.1.1) intended change: set the state that is visible in the current frame
+            to be visible in all BUT the current frame
+            
+            * this means:
+                    1.1.1.1) change states[ndx].z_frame from x to y, where:
+                        
+                            x = states[ndx].z_frame
+                    
+                            y = -x - 1
+                    
+                        >>> states[ndx].z_frame = y
+                
+                    remove all states where either:
+                            
+                        z_frame == y or z_frame  == -y-1 == x 
+                        
+                        (NOTE: since states[ndx] originally had z_frame = x second condition won't be met)
+                        
+                        >>> states[:] = [s for s in states if s.z_frame == y or s.z_frame == -y-1]
+                    
+        1.1.2) generalization: intended change: set an sf state to be avoiding some other frame index z
+                
+                a)  the index of the 
+                
+                x = state.z_frame
+                y = -z-1
+                
+                
+            
+                    
+    
+    
+    

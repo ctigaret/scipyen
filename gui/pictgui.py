@@ -1685,8 +1685,20 @@ class PlanarGraphics():
         #
                 
     def _apply_frame_index_(self, frameindex:typing.Optional[typing.Iterable]=[],
-                            sort=False, none_last=True):
-        """Reassigns the z_frame values 
+                            sort=False, none_last=False):
+        """Reassigns the z_frame values.
+        
+        Parameters:
+        ------------
+        
+        frameindex: iterable with int elements; optional , default is None
+            When None or and iterable that is either empty or contains at least
+            one None element, 
+        
+        sort: bool; optional, default is False
+        
+        none_last: bool; optional default is False
+        
         """
         import math, bisect
         
@@ -1700,7 +1712,7 @@ class PlanarGraphics():
         if frameindex is None:
             frameindex = list()
             
-        elif all([f is None for f in frameindex]): # another stupid bug
+        elif any([f is None for f in frameindex]): # another stupid bug
             frameindex = list()
             
         elif not isinstance(frameindex, (list, tuple, range)):
@@ -1711,8 +1723,7 @@ class PlanarGraphics():
         # unique also converts a range to a sequence of integers
         # sorted does nothing on lists from generated from range (for obvious
         # reasons)
-        if not any([v is None for v in frameindex]):
-            frameindex = (unique(frameindex))
+        frameindex = unique(frameindex)
                       
         if sort:
             frameindex = sorted(frameindex, key = lambda x: x if x is not None else none_place_holder)
@@ -1727,7 +1738,9 @@ class PlanarGraphics():
         # NOTE: frameindex may contain None, for the state that is meant to
         # be visible in all frames
         f_inv = [-v-1 for v in frameindex if isinstance(v, int) and v < 0]
+        
         f_ambiguous = [v for v in frameindex if v in f_inv]
+        
         if len(f_ambiguous):
             raise ValueError("The state visibility for the following frame indices is ambiguous: %s" % f_ambiguous)
         
@@ -4230,12 +4243,12 @@ class PlanarGraphics():
         
         2) When value is an int, or an interable with a single int element:
             
+            if value  < 0 then the current state is set to be frame-avoiding,
+                visible in ALL frames EXCEPT the frame index -value - 1
+                
             if value >= 0 then the current state is set to be single-frame, 
                 visible at frame index given by value
             
-            if value  < 0 then the curren state is set to be frame-avoiding,
-                visible in ALL frames EXCEPT the frame index -value - 1
-                
         
         This may remove states, or duplicate states.
             
@@ -4290,6 +4303,7 @@ class PlanarGraphics():
         
         elif isinstance(values, (tuple, list, range)):
             # a list of frames was specified
+            # this covers the following possibilities
             if not all([isinstance(f, int) for f in values]):
                 # check for int types
                 raise TypeError("new frame indices expected to be a sequence of int, or a dictionary with int keys; got %s instead" % values)
