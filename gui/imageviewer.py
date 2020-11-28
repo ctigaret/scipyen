@@ -109,6 +109,8 @@ mpl.rcParams['backend']='Qt5Agg'
 # NOTE: 2017-06-22 14:22:00 added custom color maps
 customcm.register_custom_colormaps()
 
+#cm.register_cmap(cmap = cm.cmap_d["gray"])
+
 
 colormaps = cm.cmap_d.copy() # now this has all mpl and custom colormaps
 

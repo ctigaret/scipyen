@@ -49,9 +49,32 @@ Rules:
         the state is NOT visible anywhere.
         
         
-Implementation of rules - changing z_frame value for a single state:
+Implementation of rules.
+
+1. Changing z_frame value for a single state:
+
+    Function example: setFrameForState()
+
+    Function parameters:
     
-    * frameindex is either None, or an iterable:
+    * state: a DataBag, an int, or None.
+        
+        DataBag: a state object
+        
+            must be found in self._states_ i.e., the call:
+        
+        >>> index_of(self._states_, state, key = lambda x: x.z_frame)
+        
+            does not return None, but an int >= 0 instead;
+            (this also implies state is a reference to an element of self._states_)
+        
+        int: the index of the state we wish to modify
+            must be >= 0 and < len(self._states_)
+            
+        None: assume we work on the state for the current frame (whether it is
+            visible or Not in the current frame)
+    
+    * frameindex is either None, or an int:
     
         1. when None, the state with index ndx in self._states_ is made ubiquitous
         
@@ -59,8 +82,13 @@ Implementation of rules - changing z_frame value for a single state:
             >>> self._states_[state_index].z_frame = None
             >>> self._states_[:] = [self._states_[state_index]]
         
-        2. when an iterable:
-            2.1 if empty, or contains at least ONE None element, case (1) applies
+        2. when an int:
+            if frameindex < 0:
+                
+            2.1 if empty or if it contains at least ONE None element, treat as
+                case (1)
+            
+            2.2 if not empty:
     
     a) need to know the index of the state in self._states_
     if 

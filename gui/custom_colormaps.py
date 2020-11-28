@@ -39,5 +39,7 @@ __green_fire_blue_data = {"red": [(0.0,0.0,0.0),
 CustomColorMaps = {"GreenFireBlue": __green_fire_blue_data}
 
 def register_custom_colormaps(lut=256):
+    #_cm.register_cmap(cmap = _cm.LinearSegmentedColormap(name=k, data=CustomColorMaps[k], lut=lut))
     for k in CustomColorMaps.keys():
-        _cm.register_cmap(name=k, data=CustomColorMaps[k], lut=lut)
+        _cm.register_cmap(cmap = _cm.LinearSegmentedColormap(name=k, data=CustomColorMaps[k], lut=lut))
+        #_cm.register_cmap(name=k, data=CustomColorMaps[k], lut=lut)
