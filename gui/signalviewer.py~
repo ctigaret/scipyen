@@ -139,7 +139,8 @@ from core.datatypes import (arraySlice, isColumnVector, isVector, normalized_ind
                             normalized_sample_index,)
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
-from core.triggerprotocols import (TriggerEvent, TriggerProtocol,)
+from core.triggerevent import (TriggerEvent, TriggerEventType,)
+from core.triggerprotocols import TriggerProtocol)
 from core.utilities import (unique, get_nested_value, set_nested_value,)
 from core.workspacefunctions import validate_varname
 
@@ -3279,7 +3280,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if embed:
             if isinstance(self.y, neo.Block):
                 if len(self.y.segments) == 0:
-                    warnings.warning("Plotted data is a neo.Block without segments")
+                    warnings.warn("Plotted data is a neo.Block without segments")
                     #return epoch
                 
                 elif len(self.y.segments) == 1:
@@ -3305,7 +3306,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             
             elif isinstance(self.y, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self.y]):
                 if len(self.y) == 0:
-                    warnings.warning("Plotted data is an empty sequence!")
+                    warnings.warn("Plotted data is an empty sequence!")
                     #return epoch
                 
                 elif len(self.y) == 1:
@@ -3337,7 +3338,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self.y.epochs.append(epoch)
                         
             else:
-                warnings.warning("Epochs can only be embeded in neo.Segment objects (either stand-alone, collected in a tuple or list, or inside a neo.Block)")
+                warnings.warn("Epochs can only be embeded in neo.Segment objects (either stand-alone, collected in a tuple or list, or inside a neo.Block)")
                 
             self.displayFrame()
                 
@@ -4840,7 +4841,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     brushes = cycle([epoch_brush])
                     
                 else:
-                    warnings.warning("Invalid brush specification %s" % epoch_brush)
+                    warnings.warn("Invalid brush specification %s" % epoch_brush)
                     brushes = cycle([None])
                     
             # NOTE: 2020-03-09 12:09:40
@@ -4871,7 +4872,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     #pens = cycle([epoch_pen])
                     
                 #else:
-                    #warnings.warning("Invalid pen specification %s" % epoch_pen)
+                    #warnings.warn("Invalid pen specification %s" % epoch_pen)
                     
             # figure out the visible X range
             minX = list()

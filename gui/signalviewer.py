@@ -139,7 +139,8 @@ from core.datatypes import (arraySlice, isColumnVector, isVector, normalized_ind
                             normalized_sample_index,)
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
-from core.triggerprotocols import (TriggerEvent, TriggerProtocol,)
+from core.triggerevent import (TriggerEvent, TriggerEventType,)
+from core.triggerprotocols import TriggerProtocol
 from core.utilities import (unique, get_nested_value, set_nested_value,)
 from core.workspacefunctions import validate_varname
 

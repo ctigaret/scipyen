@@ -3,6 +3,7 @@ import typing, warnings, os
 from PyQt5 import QtCore, QtWidgets, QtGui
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from core.utilities import safeWrapper
+from core.workspacefunctions import user_workspace
 
 
 class WorkspaceGuiMixin:
@@ -21,6 +22,10 @@ class WorkspaceGuiMixin:
         else:
             if isinstance(parent, QtWidgets.QMainWindow) and type(parent).__name__ == "ScipyenWindow":
                 self._scipyenWindow_   = parent
+                
+            else:
+                self._scipyenWindow_ = user_workspace()["mainWindow"]
+                
         
     @safeWrapper
     def importWorkspaceData(self, dataTypes:typing.Union[typing.Type[typing.Any], typing.Sequence[typing.Type[typing.Any]]],
@@ -113,19 +118,19 @@ class WorkspaceGuiMixin:
         
     @safeWrapper
     def criticalMessage(self, title, text, default=QtWidgets.QMessageBox.No):
-        QtWidgets.QMessageBox.critical(self, title=title, text=text)
+        QtWidgets.QMessageBox.critical(self, title, text)
         
     @safeWrapper
     def informationMessage(self, title, text, default=QtWidgets.QMessageBox.No):
-        QtWidgets.QMessageBox.information(self, title=title, text=text)
+        QtWidgets.QMessageBox.information(self, title, text)
         
     @safeWrapper
     def questionMessage(self, title, text, default=QtWidgets.QMessageBox.No):
-        QtWidgets.QMessageBox.question(self, title=title, text=text)
+        QtWidgets.QMessageBox.question(self, title, text)
         
     @safeWrapper
     def warningMessage(self, title, text, default=QtWidgets.QMessageBox.No):
-        QtWidgets.QMessageBox.warning(self, title=title, text=text)
+        QtWidgets.QMessageBox.warning(self, title, text)
         
     @safeWrapper
     def detailedMessage(self, title, text, detail="", msgType="Critical"):

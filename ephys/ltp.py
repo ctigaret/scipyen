@@ -630,6 +630,7 @@ import core.datatypes as dt
 import core.plots as plots
 import core.models as models
 import core.triggerprotocols as tp
+from core.triggerevent import (TriggerEvent, TriggerEventType,)
 
 #from core.patchneo import neo
 from core.utilities import safeWrapper
@@ -2119,7 +2120,7 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
                                        trigger_signal_index: typing.Optional[int] = None,
                                        testVm: typing.Union[float, pq.Quantity, None]=None,
                                        epoch: typing.Optional[neo.Epoch]=None,
-                                       stim: typing.Optional[tp.TriggerEvent]=None,
+                                       stim: typing.Optional[TriggerEvent]=None,
                                        isi:typing.Union[float, pq.Quantity, None]=None) -> tuple:
     """
     Calculates several signal measures in a synaptic plasticity experiment.
@@ -2466,8 +2467,8 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
         ISI = isi
         
     else:
-        if isinstance(stim, tp.TriggerEvent): # check for presyn stim event param
-            if stim.event_type != tp.TriggerEventType.presynaptic:
+        if isinstance(stim, TriggerEvent): # check for presyn stim event param
+            if stim.event_type != TriggerEventType.presynaptic:
                 raise TypeError("'stim' expected to be a presynaptic TriggerEvent; got %s instead" % stim.event_type.name)
             
             if stim.size < 1 or stim.size > 2:
@@ -2476,7 +2477,7 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
             event = stim
             
         elif len(s.events): # check for presyn stim event embedded in segment
-            ltp_events = [e for e in s.events if (e.event_type == tp.TriggerEventType.presynaptic and isinstance(e.name, str) and e.name.strip().lower() == "ltp")]
+            ltp_events = [e for e in s.events if (e.event_type == TriggerEventType.presynaptic and isinstance(e.name, str) and e.name.strip().lower() == "ltp")]
             
             if len(ltp_events):
                 if len(ltp_events)>1:
@@ -2499,7 +2500,7 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
                 raise TypeError("trigger_signal_index expected to be a str, int or None; got %s instead" % type(trigger_signal_index).__name__)
 
             
-        if isinstance(event, tp.TriggerEvent) and event.size == 2:
+        if isinstance(event, TriggerEvent) and event.size == 2:
             ISI = np.diff(event.times)[0]
 
     return (Idc, Rs, Rin, EPSC0, EPSC1, PPR, ISI)
@@ -2515,7 +2516,7 @@ def analyse_LTP_in_pathway(baseline_block: neo.Block,
                            baseline_epoch:typing.Optional[neo.Epoch]=None, 
                            chase_epoch:typing.Optional[neo.Epoch] = None,
                            testVm:typing.Optional[typing.Union[float, pq.Quantity]] = None,
-                           stim:typing.Optional[tp.TriggerEvent] = None,
+                           stim:typing.Optional[TriggerEvent] = None,
                            isi:typing.Optional[typing.Union[float, pq.Quantity]] = None,
                            basename:str=None, 
                            normalize:bool=False,

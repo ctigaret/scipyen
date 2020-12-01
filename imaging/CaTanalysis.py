@@ -165,13 +165,17 @@ import core.strutils as strutils
 import core.curvefitting as crvf
 import core.models as models
 import core.signalprocessing as sgp
+import core.neoutils as neoutils
 from core.workspacefunctions import validate_varname
 from core.utilities import (get_nested_value, set_nested_value, counter_suffix, )
 from core.prog import (safeWrapper, safeGUIWrapper, )
 #import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 #import core.triggerprotocols
-from core.triggerprotocols import (TriggerEvent, TriggerEventType, TriggerProtocol)
+from core.triggerevent import (TriggerEvent, TriggerEventType, )
+from core.triggerprotocols import (TriggerProtocol,
+                                   auto_detect_trigger_protocols,
+                                   parse_trigger_protocols)
 #from core.axisutils import (calibration, axisChannelName)
 import core.traitcontainers
 from core.traitcontainers import DataBag
@@ -245,12 +249,12 @@ def vCursor2ScanlineProjection(v, path, span=None):
             
         obj = p[obj_index]
         
-        x1, y1 = obj.get("x"), obj.get("y")
+        x1, y1 = obj.x, obj.y
         
         if obj_index  == 0:
             return (x1, y1) # assumes it is a Mmove
         
-        x0, y0 = p[obj_index-1].get("x"), p[obj_index-1].get("y")
+        x0, y0 = p[obj_index-1].x, p[obj_index-1].y
         
         rel_pos = value - cum_len[obj_index-1]
             
@@ -261,8 +265,8 @@ def vCursor2ScanlineProjection(v, path, span=None):
             t[4:] = 1.
             
             c = np.array([[x0, y0], 
-                          [obj.get("c1x"), obj.get("c1y")], 
-                          [obj.get("c2x"), obj.get("c2y")],
+                          [obj.c1x, obj.c1y], 
+                          [obj.c2x, obj.c2y],
                           [x1, y1]])
             
             spline = interpolate.BSpline(t, c, 3, extrapolate=True)
@@ -276,7 +280,7 @@ def vCursor2ScanlineProjection(v, path, span=None):
             t[3:] = 1.
             
             c = np.array([[x0,y0], 
-                          [obj.get("cx"), obj.get("cy")], 
+                          [obj.cx, obj.cy], 
                           [x1, y1]])
             
             spline = interpolate.BSpline(t, c, 2, extrapolate=True)
@@ -333,24 +337,24 @@ def vCursor2ScanlineProjection(v, path, span=None):
         # TODO find a way to get the real width of the linescan image served/scanned
         # by the vertical cursor "v"
         # as workaround, we introduce span as an optional parameter
-        span = v.get("width")
+        span = v.width
         
     
-    if v.get("x") < 0:
+    if v.x < 0:
         v_pos = 0
         
-    elif v.get("x") >= span:
+    elif v.x >= span:
         v_pos = span-1
         
     else:
-        v_pos = v.get("x")
+        v_pos = v.x
         
     if len(path) == 2: # linear interpolation between path's ends
-        dx = path[1].get("x") - path[0].get("x")
-        dy = path[1].get("y") - path[0].get("y")
+        dx = path[1].x - path[0].x
+        dy = path[1].y - path[0].y
         
-        ret_x = v_pos * dx / span + path[0].get("x")
-        ret_y = v_pos * dy / span + path[0].get("y")
+        ret_x = v_pos * dx / span + path[0].x
+        ret_y = v_pos * dy / span + path[0].y
         
     elif len(path) > 2:
         if any([any([p in o for p in ("cx", "cy", "c1x", "c1y", "c2x", "c2y")]) for o in path]): # there are Cubic and Quad states -> interpolate
@@ -362,8 +366,8 @@ def vCursor2ScanlineProjection(v, path, span=None):
             
         else: # assumes all have "x" and "y" attributes; if this is False, key errors & attribute erroes will be raised 
             if len(path) == int(span): # good chances this is 1 element per pixel in a scan row
-                ret_x = path[int(v_pos)].get("x")
-                ret_y = path[int(v_pos)].get("y")
+                ret_x = path[int(v_pos)].x
+                ret_y = path[int(v_pos)].y
                 
             else: # use interpolations
                 path_len, pe_len = pgui.curveLength(path)
@@ -373,8 +377,8 @@ def vCursor2ScanlineProjection(v, path, span=None):
                 ret_x, ret_y =  _project_on_path_(v_pos, path, cum_pe_len)
                 
     else: # len(path) is 1
-        ret_x = path[0].get("x")
-        ret_y = path[0].get("y")
+        ret_x = path[0].x
+        ret_y = path[0].y
     
     return (ret_x, ret_y)
 
@@ -417,7 +421,7 @@ def vCursorPos2ScanlineCoords(v, path, span=None):
         
         #print("_get_coords_for_proj_pos_on_path_ obj_index: %d, %s, %s" % (obj_index, type(obj).__name__, obj.type))
         
-        x1, y1 = obj.get("x"), obj.get("y")
+        x1, y1 = obj.x, obj.y
         
         if obj_index  == 0:
             if isinstance(obj, pgui.Move):
@@ -428,7 +432,7 @@ def vCursorPos2ScanlineCoords(v, path, span=None):
             rel_pos = value
         
         else:
-            x0, y0 = p[obj_index-1].get("x"), p[obj_index-1].get("y")
+            x0, y0 = p[obj_index-1].x, p[obj_index-1].y
             
             #print(" prev object: %s, %s" % (type(p[obj_index-1]).__name__, p[obj_index-1].type), (x0, y0))
             
@@ -555,14 +559,14 @@ def vCursorPos2ScanlineCoords(v, path, span=None):
     
     #print("vCursorPos2ScanlineCoords span", span)
     
-    if v.get("x") < 0:
+    if v.x < 0:
         v_pos = 0
         
-    elif v.get("x") >= span:
+    elif v.x >= span:
         v_pos = span-1
         
     else:
-        v_pos = v.get("x")
+        v_pos = v.x
         
     if all([isinstance(e, (pgui.Move, pgui.Line)) for e in currentPath]):
         # a line segment, a polyline or a polygon of line segments
@@ -573,11 +577,11 @@ def vCursorPos2ScanlineCoords(v, path, span=None):
             
             assert currentPath.type & (pgui.GraphicsObjectType.line | pgui.GraphicsObjectType.polyline)
             
-            dx = currentPath[1].get("x") - currentPath[0].get("x")
-            dy = currentPath[1].get("y") - currentPath[0].get("y")
+            dx = currentPath[1].x - currentPath[0].x
+            dy = currentPath[1].y - currentPath[0].y
             
-            ret_x = v_pos * dx / span + currentPath[0].get("x")
-            ret_y = v_pos * dy / span + currentPath[0].get("y")
+            ret_x = v_pos * dx / span + currentPath[0].x
+            ret_y = v_pos * dy / span + currentPath[0].y
                 
             #return ret_x, ret_y
         
@@ -605,8 +609,8 @@ def vCursorPos2ScanlineCoords(v, path, span=None):
             if len(currentPath) == int(span):
                 # case (a) -- straightforward
                 element = currentPath[int(v_pos)]
-                ret_x = element.get("x")
-                ret_y = element.get("y")
+                ret_x = element.x
+                ret_y = element.y
                 
             else:
                 # all other cases
@@ -618,8 +622,8 @@ def vCursorPos2ScanlineCoords(v, path, span=None):
                 ret_x, ret_y =  _get_coords_for_proj_pos_on_path_(v_pos, currentPath, cum_pe_len)
                 
         else: # len is 1 
-            ret_x = currentPath[0].get("x")
-            ret_y = currentPath[0].get("y")
+            ret_x = currentPath[0].x
+            ret_y = currentPath[0].y
         
     elif all([isinstance(e, (pgui.Move, pgui.Line, pgui.Cubic, pgui.Quad)) for e in currentPath]):
         # a more complex shape, composed of Move, Line, Cubic and/or Quad
@@ -5141,7 +5145,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                     
             if len(blocks) > 0:
                 if all([isinstance(b, neo.Block) for b in blocks]):
-                    ephysData = ephys.concatenate_blocks(*blocks)
+                    ephysData = neoutils.concatenate_blocks(*blocks)
+                    #ephysData = ephys.concatenate_blocks(*blocks)
                     
                 elif all([isinstance(b, neo.Segment) for b in blocks]):
                     ephysData = neo.Block()
@@ -5203,6 +5208,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             try:
                 dlg = quickdialog.QuickDialog(self, "Data name and trigger protocols for %s:" % tempDataVarName)
                 
+                #dlg.setModal(False) # NOTE: 2020-11-29 17:10:53 exec() will force it to modal
+                dlg.setSizeGripEnabled(True)
+                
                 namePrompt = quickdialog.StringInput(dlg, "Data name:")
                 
                 namePrompt.variable.setClearButtonEnabled(True)
@@ -5220,7 +5228,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 ephysNamePrompt.setText(os.path.splitext(os.path.basename(ephysFileNames[0]))[0])
                 
                 
-                tp, _  = ephys.parse_trigger_protocols(ephysData) # this may be an empty list
+                tp, _  = parse_trigger_protocols(ephysData) # this may be an empty list
         
                 if len(tp) == 0:
                     # will call dlg.exec() from within self._trigger_events_detection_gui_
@@ -5239,7 +5247,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                         imaging = trig_dlg_result[3]
                         epscatoptions = trig_dlg_result[4]
                     
-                        tp = ephys.auto_detect_trigger_protocols(ephysData, 
+                        tp = auto_detect_trigger_protocols(ephysData, 
                                                     presynaptic=presyn, 
                                                     postsynaptic=postsyn,
                                                     photostimulation=photo,
@@ -5248,12 +5256,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                         
                         ephys_preview.plot(ephysData)
                         
-                        lsdata.electrophysiology = ephys.neo_copy(ephysData)
+                        lsdata.electrophysiology = neoutils.neo_copy(ephysData)
                         lsdata.electrophysiology.name = ephysNamePrompt.text()
                 
                 else: # we still need to call dlg.exec()
                     if dlg.exec() == QtWidgets.QDialog.Accepted: # if rejected, do create lsdata w/o ephys
-                        lsdata.electrophysiology = ephys.neo_copy(ephysData) # just accept ephys data
+                        lsdata.electrophysiology = neoutils.neo_copy(ephysData) # just accept ephys data
                         lsdata.electrophysiology.name = ephysNamePrompt.text()
                         
                 if isinstance(tp, (tuple, list)) and len(tp) and len(lsdata.electrophysiology.segments):
@@ -5720,7 +5728,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                                                      defaultButton = QtWidgets.QMessageBox.Yes)
                 
                 if btn == QtWidgets.QMessageBox.Yes:
-                    ephysData = ephys.set_relative_time_start(ephys.neo_copy(ephysData), start_times[0])
+                    ephysData = ephys.set_relative_time_start(neoutils.neo_copy(ephysData), start_times[0])
                     
                 else:
                     return
@@ -5744,9 +5752,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                     
                     self._data_.analysisOptions["TriggerEventDetection"] = default_options["TriggerEventDetection"]
                 
-                self._data_.electrophysiology = ephys.neo_copy(ephysData)
+                self._data_.electrophysiology = neoutils.neo_copy(ephysData)
                 
-                tp, _ = ephys.parse_trigger_protocols(self._data_.electrophysiology)
+                tp, _ = parse_trigger_protocols(self._data_.electrophysiology)
                 
                 if len(tp) == 0:
                     OK, trig_dlg_result = self._trigger_events_detection_gui_(self._data_.analysisOptions,
@@ -5760,7 +5768,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                         imaging = trig_dlg_result[3]
                         options = trig_dlg_result[4]
                         
-                        tp, _ = ephys.auto_detect_trigger_protocols(self._data_.electrophysiology,
+                        tp, _ = auto_detect_trigger_protocols(self._data_.electrophysiology,
                                                 presynaptic=presyn,
                                                 postsynaptic=postsyn,
                                                 photostimulation=photo,
@@ -6009,7 +6017,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                                                      defaultButton = QtWidgets.QMessageBox.Yes)
                 
                 if btn == QtWidgets.QMessageBox.Yes:
-                    ephysData = ephys.set_relative_time_start(ephys.neo_copy(ephysData), start_times[0])
+                    ephysData = ephys.set_relative_time_start(neoutils.neo_copy(ephysData), start_times[0])
                     
                 else:
                     ephysData = None
@@ -6050,7 +6058,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 self._data_.electrophysiology = ephysData
                 self._display_ephys_()
                 
-                tp, _ = ephys.parse_trigger_protocols(self._data_.electrophysiology)
+                tp, _ = parse_trigger_protocols(self._data_.electrophysiology)
                 
                 if len(tp) == 0:
                     OK, trig_dlg_result = self._trigger_events_detection_gui_(self._data_.analysisOptions,
@@ -6064,7 +6072,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                         imaging = trig_dlg_result[3]
                         options = trig_dlg_result[4]
                         
-                        tp = ephys.auto_detect_trigger_protocols(self._data_.electrophysiology,
+                        tp = auto_detect_trigger_protocols(self._data_.electrophysiology,
                                                                         presynaptic=presyn,
                                                                         postsynaptic=postsyn,
                                                                         photostimulation=photo,
@@ -6639,7 +6647,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 imaging = trig_dlg_result[3]
                 options = trig_dlg_result[4]
             
-                tp = ephys.auto_detect_trigger_protocols(self._data_.electrophysiology, 
+                tp = auto_detect_trigger_protocols(self._data_.electrophysiology, 
                                                 presynaptic=presyn, 
                                                 postsynaptic=postsyn,
                                                 photostimulation=photo,
@@ -8077,7 +8085,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             self.cursorYwindow.setEnabled(True)
             
             #cursors = sorted([c for c in self._data_.scansCursors.values()], key=lambda x: x.name)
-            cursors = sorted([c for c in self._data_.scansCursors.values() if c.hasStateForFrame(self.currentFrame)], key=lambda x: x.get("x"))
+            cursors = sorted([c for c in self._data_.scansCursors.values() if c.hasStateForFrame(self.currentFrame)], key=lambda x: x.x)
             #cursors = sorted([c for c in self._data_.scansCursors.values() if c.hasStateForFrame(self.currentFrame)], key=lambda x: x.x)
             cursorNames = [c.name for c in cursors]
             
@@ -9281,7 +9289,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 self._selected_analysis_unit_ = None
                 self._selected_analysis_cursor_ = None
                 
-                cursors = sorted([c for c in self._data_.scansCursors.values() if c.type == obj.type and c.hasStateForFrame(self.currentFrame)], key = lambda x:x.get("x"))
+                cursors = sorted([c for c in self._data_.scansCursors.values() if c.type == obj.type and c.hasStateForFrame(self.currentFrame)], key = lambda x:x.x)
                 #cursors = sorted([c for c in self._data_.scansCursors.values() if c.type == obj.type and c.hasStateForFrame(self.currentFrame)], key = lambda x:x.x)
                 cursor_names = [c.name for c in cursors]
                 
@@ -11407,7 +11415,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
         cursorSpinBoxNdx = self.selectCursorSpinBox.value()
         
-        cursors = sorted([c for c in self._data_.scansCursors.values() if c.hasStateForFrame(self.currentFrame)], key=lambda x:x.get("x"))
+        cursors = sorted([c for c in self._data_.scansCursors.values() if c.hasStateForFrame(self.currentFrame)], key=lambda x:x.x)
         #cursors = sorted([c for c in self._data_.scansCursors.values() if c.hasStateForFrame(self.currentFrame)], key=lambda x:x.x)
         
         #print("_update_analysis_unit_ui_fields_ %d cursors" % len(cursors))
@@ -11448,10 +11456,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                     if cursor.currentFrame != self.currentFrame:
                         cursor.currentFrame = self.currentFrame
                         
-                    self.cursorXposDoubleSpinBox.setValue(cursor.get("x"))
-                    self.cursorYposDoubleSpinBox.setValue(cursor.get("y"))
-                    self.cursorXwindow.setValue(cursor.get("xwindow"))
-                    self.cursorYwindow.setValue(cursor.get("ywindow"))
+                    self.cursorXposDoubleSpinBox.setValue(cursor.x)
+                    self.cursorYposDoubleSpinBox.setValue(cursor.y)
+                    self.cursorXwindow.setValue(cursor.xwindow)
+                    self.cursorYwindow.setValue(cursor.ywindow)
                     
                     #self.cursorXposDoubleSpinBox.setValue(cursor.x)
                     #self.cursorYposDoubleSpinBox.setValue(cursor.y)

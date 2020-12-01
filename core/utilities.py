@@ -417,7 +417,7 @@ def index_of(seq, obj, key=None):
     or key(obj) is not satisfied.
     
     """
-    if obj in seq:
+    if obj in seq:# returns None if object not in seq
         if key is None:
             return seq.index(obj)
         

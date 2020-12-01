@@ -25,6 +25,8 @@ from core.triggerprotocols import TriggerProtocol
 import core.xmlutils as xmlutils
 import core.strutils as strutils
 import core.datatypes as dt
+from core.neoutils import (concatenate_blocks, concatenate_blocks2, 
+                           concatenate_signals,)
 
 #### END pict.core modules
 
@@ -45,6 +47,7 @@ from gui import resources_rc as resources_rc
 from gui import quickdialog as quickdialog
 from gui import pictgui as pgui
 from gui.workspacegui import WorkspaceGuiMixin
+import gui.signalviewer as sv
 #### END pict.gui modules
 
 from imaging import (imageprocessing as imgp, axisutils, axiscalibration,)
@@ -2180,6 +2183,8 @@ class PVScan(object):
     
     
 class PVImportDialog(__UI_PVImporterDialog__, __QDialog__):
+    """TODO
+    """
     def __init__(self, parent, currentdir, 
                  presyn_trigger_detect=None, 
                  postsyn_trigger_detect=None, 
@@ -2269,7 +2274,7 @@ class PVImportDialog(__UI_PVImporterDialog__, __QDialog__):
         
         self.pvXMLfileName          = None
         self.pvscan                 = None
-        self.scanDataOptions          = None
+        self.scanDataOptions        = None
         
         self.ephysdata              = None
         
@@ -2329,7 +2334,7 @@ class PVImportDialog(__UI_PVImporterDialog__, __QDialog__):
                     
             if len(blocks) > 0:
                 if all([isinstance(b, neo.Block) for b in blocks]):
-                    self.ephysData = ephys.concatenate_blocks(*blocks)
+                    self.ephysData = concatenate_blocks(*blocks)
                     
                 elif all([isinstance(b, neo.Segment) for b in blocks]):
                     self.ephysData = neo.Block()
@@ -2386,8 +2391,10 @@ class PVImportDialog(__UI_PVImporterDialog__, __QDialog__):
         
         
         
-    
-class PrairieViewImporter(__QDialog__, __UI_PrairieImporter, WorkspaceGuiMixin):
+# NOTE: 2020-11-30 23:45:00
+# place the mixin before other base classes so that it is initialized
+# then super(...).__init__ it
+class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, ):
     def __init__(self, 
                  name: typing.Optional[str] = None,
                  pvScanFileName: typing.Optional[str]=None, 
@@ -2396,6 +2403,7 @@ class PrairieViewImporter(__QDialog__, __UI_PrairieImporter, WorkspaceGuiMixin):
                  protocolFileName: typing.Optional[str]=None,
                  **kwargs): # parent, flags - see documentation for QDialog constructor in Qt Assistant
         
+        super(WorkspaceGuiMixin, self).__init__(**kwargs)
         super().__init__(**kwargs)
         
         self.scanData = None # the outcome: a ScanData object
@@ -2565,6 +2573,8 @@ class PrairieViewImporter(__QDialog__, __UI_PrairieImporter, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def _slot_chooseEphysFiles(self):
+        signalblockers =[QtCore.QSignalBlocker(w) for w in (self.ephysFileNameLineEdit,)]
+
         #targetDir = os.getcwd()
         caption = "Open Electrophysiology Data file(s) for %s" % self.scanDataVarName if (isinstance(self.scanDataVarName, str) and len(self.scanDataVarName.strip())) else "Open Electrophysiology Data file(s)"
         
@@ -2572,12 +2582,22 @@ class PrairieViewImporter(__QDialog__, __UI_PrairieImporter, WorkspaceGuiMixin):
         
         self.ephysFileNames, _ = self.chooseFile(caption=caption, fileFilter=fileFilter, single=False)
         
-        if self.loadEphys(self.ephysFileNames):
-            if isinstance(self.scanData, ScanData):
-                self.scanData.electrophysiology = self.ephys
-                
-            else:
-                self.generateScanData()
+        if len(self.ephysFileNames) == 1:
+            self.ephysFileNameLineEdit.setText(self.ephysFileNames[0])
+            
+        elif len(self.ephysFileNames) > 1:
+            self.ephysFileNameLineEdit.setText("<multiple files>")
+            
+        else:
+            self.ephysFileNameLineEdit.clear()
+            
+        if len(self.ephysFileNames):
+            if self.loadEphys(self.ephysFileNames):
+                if isinstance(self.scanData, ScanData):
+                    self.scanData.electrophysiology = self.ephys
+                    
+                else:
+                    self.generateScanData()
     
     @pyqtSlot()
     @safeWrapper
@@ -2771,7 +2791,7 @@ class PrairieViewImporter(__QDialog__, __UI_PrairieImporter, WorkspaceGuiMixin):
         if isinstance(self.scanData.electrophysiology, neo.Block) and len(self.scanData.electrophysiology.segments):
             ephys_preview = sv.SignalViewer(pWin = self._scipyenWindow_)
             ephys_preview.plot(self.ephys)
-            
+            # TODO call protocol dialog wizard
         
             
         
@@ -2811,8 +2831,6 @@ class PrairieViewImporter(__QDialog__, __UI_PrairieImporter, WorkspaceGuiMixin):
     
     @safeWrapper
     def loadEphys(self, fileNamesList):
-        signalblockers =[QtCore.QSignalBlocker(w) for w in (self.ephysFileNameLineEdit,)]
-    
         if len(fileNamesList):
             bad_files = [f for f in fileNamesList if not os.path.isfile(f)]
             if len(bad_files):
@@ -2821,7 +2839,7 @@ class PrairieViewImporter(__QDialog__, __UI_PrairieImporter, WorkspaceGuiMixin):
             
             blocks = list()
             
-            if all(["application/axon" in pio.getMimeAndFileType(f)[0] for f in fileNamesList]):
+            if all([any([s in pio.getMimeAndFileType(f)[0] for s in ("axon", "abf", "atf")]) for f in fileNamesList]):
                 # NOTE 2020-10-06 16:24:08
                 # this is simple: each axon file generates one block
                 blocks[:] = [pio.loadAxonFile(f) for f in fileNamesList]
@@ -2838,11 +2856,9 @@ class PrairieViewImporter(__QDialog__, __UI_PrairieImporter, WorkspaceGuiMixin):
                 self.errorMessage("PrairieView Importer - Electrophysiology files ", "Expecting Axon or Pickle files for electrophysiology")
                 return False
                     
-            ephysData = None
-            
             if len(blocks):
                 if all([isinstance(b, neo.Block) for b in blocks]):
-                    self.ephys = ephys.concatenate_blocks(*blocks)
+                    self.ephys = concatenate_blocks(*blocks)
                     
                     return True
                     

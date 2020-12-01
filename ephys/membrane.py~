@@ -55,7 +55,7 @@ import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 import core.triggerprotocols
 from core.triggerprotocols import (TriggerEvent, TriggerEventType, TriggerProtocol)
-import imaging.scandata
+#import imaging.scandata
 from imaging.scandata import ScanData
 
 from core.prog import safeWrapper

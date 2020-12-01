@@ -166,7 +166,6 @@ from jupyter_client.session import Message
 from core.prog import (timefunc, timeblock, processtimefunc, processtimeblock, Timer, 
                        safeWrapper, warn_with_traceback,)
 
-from core.utilities import safe_identity_test
 # NOTE: 2017-04-16 09:48:15 
 # these are also imported into the console in slot_initQtConsole(), so they are
 # available directly in the console
@@ -188,7 +187,7 @@ import core.strutils as strutils
 import core.data_analysis as anl
 from core.utilities import (summarize_object_properties,
                             standard_obj_summary_headers,
-                            safe_identity_test,
+                            safe_identity_test, unique, index_of,
                             )
 
 #import imaging.imageprocessing as imgp
@@ -214,9 +213,8 @@ from ephys import (ephys, ltp, membrane,)
 # pyqtgraph (aliased as pg; for efficient Qt-based plotting),
 # matplotlib (aliased as mpl; for versatile plotting)
 from core.traitcontainers import DataBag
-from core.triggerprotocols import (TriggerEvent, 
-                                   TriggerEventType, 
-                                   TriggerProtocol,)
+from core.triggerprotocols import TriggerProtocol
+from core.triggerevent import (TriggerEvent, TriggerEventType, )
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from imaging.axiscalibration import (AxisCalibration,)
@@ -1656,7 +1654,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.navNextDir                 = collections.deque()
         self.currentDir                 = None
         self.workspace                  = dict()
-        self._nonInteractiveVars_        = dict()
+        self._nonInteractiveVars_       = dict()
         self.console                    = None
         self.ipkernel                   = None
         self.shell                      = None
@@ -2067,11 +2065,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # this will have to be called as %exit line magic (i.e. automagic doesn't work)
             self.ipkernel.shell.register_magics(ScipyenMagics) 
             
+            # NOTE: 2020-11-29 15:57:08
+            # this imports current module in the user workspace as well
+            
             impcmd = ' '.join(['from', "".join(["gui.", __module_name__]), 'import *'])
             
             self.ipkernel.shell.run_cell(impcmd)
             
-            # hide the variables added to the workspace so far (e.g., ipkernel, console, shell)
+            # hide the variables added to the workspace so far (e.g., ipkernel,
+            # console, shell, and imported modules) so that they don't show in 
+            # the workspace browser (the tree view in the User variables pane)
+            # ATTENTION but there is a catch: this does NOT prevent the user from
+            # assigning a variable to a symbol bound to one of these variables
+            # -- effectively "overwriting" them.
+            
             self._nonInteractiveVars_.update([i for i in self.workspace.items()])
 
             # --------------------------
@@ -3302,7 +3309,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.applicationsMenu = QtWidgets.QMenu("Applications", self)
         self.menubar.insertMenu(self.menuHelp.menuAction(), self.applicationsMenu)
         
-        self.CaTAnalysisAction = QtWidgets.QAction("CaT Analysis", self)
+        self.CaTAnalysisAction = QtWidgets.QAction("LSCaT (CaT Analysis)", self)
         self.CaTAnalysisAction.triggered.connect(self.slot_launchCaTAnalysis)
         self.applicationsMenu.addAction(self.CaTAnalysisAction)
         

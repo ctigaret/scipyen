@@ -15,7 +15,7 @@ event handlers pre_execute() and post_execute().
 # filter/finder in workspace viewer
 #
 
-import traceback, typing
+import traceback, typing, inspect
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
@@ -191,8 +191,25 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.deleted_vars.clear()
         self.hidden_vars.clear()
         
+    def is_user_var(self, name, val):
+        """Checks binding of symbol (name) to a hidden variable.
+        """
+        # see NOTE 2020-11-29 16:29:01
+        if name in self.hidden_vars:
+            return val is not self.hidden_vars[name]
+        
+        return True
+            
     def pre_execute(self):
-        self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.hidden_vars and not item[0].startswith("_")])
+        """Callback from the jupyter interpreter/kernel before executing code
+        """
+        # see NOTE 2020-11-29 16:29:01 and NOTE: 2020-11-29 16:05:14
+        # checks if a new variable reassigns the binding to an already existing 
+        # symbol (previously bound to a hidden variable) - so that it can be 
+        # restored when user "deletes" it from the workspace
+        self.cached_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        
+        #print("pre_execute cached vars", self.cached_vars)
         
         self.modified_vars.clear()
         self.new_vars.clear()
@@ -222,42 +239,26 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # plt interface
             
             mpl_figs_in_pyplot = [plt.figure(i) for i in plt.get_fignums()] # a list of figure objects!!!
-            #mpl_figs_in_pyplot = plt._pylab_helpers.Gcf.figs # this maps int values to figure managers, not figure instances !!!
 
-            # TODO do not delete
-            #mpl_figs_in_user_ns = [item for item in self.user_ns.items() if isinstance(item[1], mpl.figure.Figure)]
-            ## NOTE that user_ns and cached vars may be different in post_execute
-            #mpl_figs_cached = [item for item in self.cached_vars.items() if isinstance(item[1], mpl.figure.Figure)]
-            
-            ## new figures created via pyplot interface - they're in pyplot Gcf, but not in cached, nor in user ns
-            #new_mpl_figs_via_plt = dict(map(lambda x: (x.number, x), [ x for x in mpl_figs_in_pyplot if item not in mpl_figs_cached.values() and item not in mpl_figs_in_user_ns.values()]))
-            
-            ## new figures created directly via matplotlib API (but still at the console)
-            ## they are present in user_ns (put there by your code), but not in cached vars, 
-            ## and not (yet) in Gcf; also it doesn't automatically  get a number (this seems
-            ## to be managed only via the pyplot interface)
-            #new_mpl_figs = [item for item in mpl_figs_in_user_ns if item[1] not in mpl_figs_cached.values() and item[1] not in mpl_figs_in_pyplot.values()]
-            
-            #if len(mpl_figs_in_pyplot):
-                #next_fig_num = max(plt.get_fignums()) + 1
-                
-            #else:
-                #next_fig_num = 1
-                
-            ## add these to Gcf
-            ##  note that figures created directly with mpl API don;t have a canvas yet (Backend)
-            #for fig in new_mpl_figs.values():
-                #fig.number = next_fig_num
-                #next_fig_num += 1
-                
-                
-            
-            #print("\npost_execute: figs in pyplot", mpl_figs_in_pyplot)
-            
             mpl_figs_in_ns = [item[1] for item in self.shell.user_ns.items() if isinstance(item[1], mpl.figure.Figure)]
+            
+            #print("post_execute cached vars", self.cached_vars)
             
             # 1) deleted variables -- present in cached vars but not in the user namespace anymore
             self.deleted_vars.update([item for item in self.cached_vars.items() if item[0] not in self.shell.user_ns])
+            
+            #print("post_execute deleted vars", self.deleted_vars)
+            
+            # NOTE: 2020-11-29 16:05:14 check if any of the deleted symbols need 
+            # to be rebound to their original variables in self.hidden_vars
+            # (see NOTE 2020-11-29 16:29:01 below)
+            # this also means we can NEVER remove these symbols from the user
+            # workspace (which may not be a bad idea, after all)
+            vars_to_restore = [k for k in self.deleted_vars.keys() if k in self.hidden_vars.keys()]
+            #print("post_execute vars_to_restore",vars_to_restore)
+            # restore the links between the deleted symbol and the original reference
+            for v in vars_to_restore:
+                self.shell.user_ns[v] = self.hidden_vars[v]
             
             deleted_mpl_figs = [item for item in mpl_figs_in_ns if item not in mpl_figs_in_pyplot]
             
@@ -272,9 +273,32 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
             #print("\npost_execute: new figs",new_mpl_figs)
             
-            new_vars = dict([(i,v) for i, v in self.shell.user_ns.items() if i not in self.cached_vars.keys() and i not in self.hidden_vars and not i.startswith("_")])
+            # NOTE 2020-11-29 16:29:01: 
+            # some variables may bear the same name as a loaded module;
+            # this is an easy mistake to make, e.g. by loading electrophysiology
+            # data and assigning it to a variable named "ephys" - a symbol which
+            # is already bound to the module ephys.ephys; the module is still 
+            # loaded in sys.module, and has a reference there, but it just becomes
+            # unaccessible to the user
+            #
+            # this happens at interpreter (kernel) level, which cannot prevent it
+            # from happening
+            #
+            # because the original symbol-object binding is contained in
+            # self.hidden_vars (even if hidden from user's view) we can restore
+            # it whem the new symbol-object binding has been removed by the user 
+            # (i.e., when user has called "del").
+            #
+            # NOTE: 2020-11-29 16:35:21:
+            # so here we show these new variables bound to an already existing
+            # symbol to faciliate user interaction, but thenn we restore them
+            # once the user has "deleted" the new binding (NOTE: 2020-11-29 16:05:14)
+            new_vars = dict([(i,v) for i, v in self.shell.user_ns.items() if i not in self.cached_vars.keys() and not i.startswith("_") and self.is_user_var(i,v)])
+            #new_vars = dict([(i,v) for i, v in self.shell.user_ns.items() if i not in self.cached_vars.keys() and i not in self.hidden_vars and not i.startswith("_")])
             
             self.new_vars.update(new_vars)
+            
+            #print("post_execute new_vars", self.new_vars)
             
             existing_vars = [item for item in self.shell.user_ns.items() if item[0] in self.cached_vars.keys()]
             
@@ -535,7 +559,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 
                 # variables created by code executed in the console
                 for item in self.new_vars.items(): # populated by post_execute
-                    if item[0] not in self.hidden_vars and not item[0].startswith("_"):
+                    # NOTE: 2020-11-29 16:39:18:
+                    # see NOTE 2020-11-29 16:29:01 and NOTE: 2020-11-29 16:35:21
+                    if self.is_user_var(item[0], item[1]) and not item[0].startswith("_"):
                         if item[0] not in displayed_vars_types:
                             self.addRowForVariable(item[0], item[1])
                         

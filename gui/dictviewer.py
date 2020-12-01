@@ -29,8 +29,8 @@ from imaging.axiscalibration import AxisCalibration
 import imaging.scandata
 from imaging.scandata import (ScanData, AnalysisUnit)
 
-import core.triggerprotocols
-from core.triggerprotocols import (TriggerEvent, TriggerProtocol)
+from core.triggerprotocols import TriggerProtocol
+from core.triggerevent import (TriggerEvent, TriggerEventType)
 
 import core.datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)

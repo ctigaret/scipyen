@@ -503,7 +503,7 @@ import pyqtgraph as pg
 from .prog import safeWrapper
 from .datatypes import  normalized_index
 from .datasignal import (DataSignal, IrregularlySampledDataSignal)
-#from .triggerprotocols import (TriggerEvent, TriggerEventType, TriggerProtocol)
+from .triggerevent import (TriggerEvent, TriggerEventType)
 
 from . import datatypes as dt
 from . import workspacefunctions
@@ -2597,7 +2597,7 @@ def neo_copy(src: typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Uni
                        file_origin=src.file_origin,
                        **src.annotations)
         
-    elif isinstance(src, neo.Epoch) or type(src).__name__ == "Epoch":
+    elif isinstance(src, neo.Epoch) or "Epoch" in type(src).__name__:
         ret = neo.Epoch(times=src.times, durations=src.durations, units=src.units,
                         labels=src.labels, name=src.name, description=src.description,
                         file_origin=src.file_origin, **src.annotations)
@@ -2605,7 +2605,7 @@ def neo_copy(src: typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Uni
         if hasattr(src, "array_annotations"): # because this was introduced in later neo versions
             ret.array_annotations = src.array_annotations
             
-    elif isinstance(src, neo.Event) or type(src).__name__ == "Event":
+    elif isinstance(src, neo.Event) or "Event" in type(src).__name__:
         ret = neo.Event(times = src.times, units=src.units, labels=src.labels,
                         name=src.name, description=src.description,
                         file_origin = src.file_origin, **src.annotations)
@@ -2642,8 +2642,11 @@ def upgrade_neo_api(x):
             if not all([isinstance(e, neo.Event) for e in x.events]):
                 ee = list()
                 for e in x.events:
-                    if type(e).__name__ == "TriggerEvent" or isinstance(e, neo.Event):
+                    if isinstance(e, (neo.Event, TriggerEvent)):
                         ee.append(e)
+                        
+                    #if type(e).__name__ == "TriggerEvent" or isinstance(e, neo.Event):
+                        #ee.append(e)
                         
                     elif type(e).__name__ == "Event": # neoevent.Event
                         ee.append(neo_copy(e))
@@ -3000,10 +3003,12 @@ def is_same_as(e1, e2, rtol = 1e-4, atol =  1e-4, equal_nan = True):
     """
     from . import datatypes as dt
 
-    if any([not isinstance(e, neo.Event) for e in (e1,e2)]):
+    if any([not isinstance(e, neo.Event) or "Event" not in type(e).__name__ for e in (e1,e2)]):
         return False
     
-    if all([isinstance(e, TriggerEvent) for e in (e1,e2)]):
+    # because importing triggerprotocols creates dependency loop
+    #if all([isinstance(e, TriggerEvent) for e in (e1,e2)]):
+    if all(["Event" in type(e).__name__ for e in (e1,e2)]):
         return e1.is_same_as(e2)
     
     compatible_units = e1.units == e2.units

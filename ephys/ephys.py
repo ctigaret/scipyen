@@ -215,7 +215,8 @@ import pyqtgraph as pg
 from core.prog import safeWrapper
 from core.datatypes import  normalized_index
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
-from core.triggerprotocols import (TriggerEvent, TriggerEventType, TriggerProtocol)
+from core.triggerevent import (TriggerEvent, TriggerEventType, )
+from core.triggerprotocols import TriggerProtocol
 
 from core import datatypes as dt
 from core import workspacefunctions

@@ -450,20 +450,6 @@ class ProgressWorker(QtCore.QRunnable):
         finally:
             self.signals.signal_finished.emit()  # Done
             
-#class PlanarGraphicsMeta(type):
-    #def __new__(cls, name, bases, namespace, **kwargs):
-        ##print(cls, ": name =",name," bases =", bases,)
-        ##print(cls, ": name =",name," bases =", bases, " namespace =", namespace)
-        #result = type.__new__(cls, name, bases, dict(namespace))
-        #for d in result._planar_descriptors_:
-            #if d != "z_frame":
-                #def fget(obj): return obj.getState()[d]
-                #def fset(obj, value): obj.getState()[d] = value
-                #def fdel(obj): del obj.getStates()[d]
-                #setattr(result, d, property(fget=fget, fset=fset, fdel=fdel, doc="%s property" % d))
-    
-            
-#class PlanarGraphics(metaclass=PlanarGraphicsMeta):
 class PlanarGraphics():
     """Ancestor for all planar graphic objects in Scipyen imaging.
     
@@ -956,19 +942,27 @@ class PlanarGraphics():
 
     def __init_from_descriptors__(self, *args, frameindex:typing.Optional[typing.Iterable]=[],
                                   currentframe:int=0) -> None:
+        
         # NOTE: 2020-11-01 13:42:42
         # keep z_frame out, as this is not expected in the constructor params
-        descriptors = [d for d in self.__class__._planar_descriptors_ if d != "z_frame"]
-        
-        if len(args) != len(descriptors):
-            raise ValueError("Expecting %d descriptors (without 'z_frame'); got %d instead" % (len(args), len(descriptors)))
-        
-        # NOTE: 2020-11-02 15:43:05
-        # z_frame is zet up below, using frameindex
-        #self._states_ = [PlanarGraphicsState(dict(zip(descriptors, args)))]
-        self._states_ = [DataBag(dict(zip(descriptors, args)), 
-                                 mutable_types=True, allow_none=True)]
-        
+        if len(args) == 1 and isinstance(args[0], str):
+            # constructs a Text planar graphics
+            state = DataBag({"text":args[0]},mutable_types=True,allow_none=True)
+            
+            # enforce this here
+            self._graphics_object_type_ = GraphicsObjectType.text
+            
+        else:
+            descriptors = [d for d in self.__class__._planar_descriptors_ if d != "z_frame"]
+            
+            if len(args) != len(descriptors):
+                raise ValueError("Expecting %d descriptors (without 'z_frame'); got %d instead" % (len(args), len(descriptors)))
+            
+            # NOTE: 2020-11-02 15:43:05
+            # z_frame is zet up below, using frameindex
+            self._states_ = [DataBag(dict(zip(descriptors, args)), 
+                                    mutable_types=True, allow_none=True)]
+            
         self._states_[0].z_frame = None
         
         self._apply_frame_index_(frameindex)
@@ -977,8 +971,6 @@ class PlanarGraphics():
         
         self.checkStates()
         
-        #self.setCurrentState()
-            
     def __init_from_state__(self, state:dict, frameindex:typing.Optional[typing.Iterable]=[], 
                             currentframe:int=0) -> None:
         # this also checks for descriptor consistency including z_frame
@@ -1077,8 +1069,6 @@ class PlanarGraphics():
             with the z_frame values set to the values of the indices contained
             in frameindex.
             
-            When *args specifi
-            
         currentFrame: int, default is None; only used when frameindex is not empty, 
             
             If given and not in the frameindex, the object will be "invisible"
@@ -1109,6 +1099,8 @@ class PlanarGraphics():
         self._linked_objects_ = dict() # PlanarGraphics: (partial, args, kwargs)
         
         self._frontends_ = list()
+        
+        self._states_ = list()
         
         self._currentstates_ = list()
         
@@ -1267,17 +1259,26 @@ class PlanarGraphics():
 
                     if all([isinstance(v, numbers.Real) for v in args[0]]):
                         # contruct from a sequence of planar descriptors
-                        # check that the appropriate number of descriptors are given
+                        # check that the appropriate number of descriptors are
+                        # given;
                         # needs frameindex, currentframe, name
+                        #
+                        # NOTE: 2020-11-30 16:38:45 about frameindex
+                        # this is one of the rare cases where we need to specify
+                        # frame indices to the primitive's contructor,
+                        # because __init_from_descriptors__ simply constructs a 
+                        # single state; 
+                        # therefore we have the chance here to ascribe 
+                        # frame-associations to the constructed state.
                         self.__init_from_descriptors__(*args[0], 
                                                        frameindex=frameindex,
                                                        currentframe=currentframe)
                         
                     elif all([isinstance(v, dict) for v in args[0]]):
                         # construct from a sequence of states; 
-                        # frameindex is ignored here, because these states SHOULD
-                        # themselves provide the frame indices where they are visible
-                        # i.e. the z_frame attribute
+                        # frameindex should be ignored here, because states' z_frame
+                        # attributes already provide the frame indices where they
+                        # are visible
                         # also applies when args[0] has only one state
                         self.__init_from_state_sequence__(*args[0],
                                                           frameindex=frameindex,
@@ -1288,23 +1289,14 @@ class PlanarGraphics():
                         raise TypeError("Expecting a sequence of planar descriptors or states")
                     
                 elif isinstance(args[0], dict): # construct from a state
+                    # see NOTE: 2020-11-30 16:38:45 about frameindex
                     self.__init_from_state__(args[0], frameindex=frameindex, 
                                              currentframe=currentframe)
                     
                 elif isinstance(args[0], str): # text PlanarGraphics
-                    # PlanarGraphics of type "text"
-                    state = PlanarGraphicsState()
-
-                    self._currentframe_ = currentframe
-            
-                    state.text = args[0]
-                    state.z_frame = None
-                    
-                    self._graphics_object_type_ = GraphicsObjectType.text
-                    
-                    self._apply_frame_index_(frameindex)
-                    self.checkStates()
-                    #self.setCurrentState()
+                    # see NOTE: 2020-11-30 16:38:45 about frameindex
+                    self.__init_from_descriptors__(*args, frameindex=frameindex,
+                                                   currentframe=currentframe)
                         
             else:# NOTE: many var-positional arguments
                 # these can be -- scalars: their number, order and 
@@ -1317,13 +1309,8 @@ class PlanarGraphics():
                 if isinstance(self, Path):
                     raise TypeError("Cannot use parametric constructor to initalise a Path")
                 
-                self.__init_from_descriptors__(*args)
-                self._currentframe_ = currentframe
-                
-                self._apply_frame_index_(frameindex)
-                
-                
-                self.checkStates()
+                self.__init_from_descriptors__(*args, frameindex=frameindex,
+                                               currentframe=currentframe)
             
         else: # no var-positional parameters given => plain (empty) PlanarGraphics
             if not isinstance(self, Path):
@@ -1412,7 +1399,7 @@ class PlanarGraphics():
                 
             states_str = "\n\t".join(states_str)
                 
-        return "%s:\n states: %s\n current frame: %s" % (self.__repr__(),
+        return "%s:\n states:\n %s\n current frame: %s" % (self.__repr__(),
                                                          states_str,
                                                          self.currentFrame)
             #framestr = "frames %s" % ([ -1 if s.z_frame is None else int(s.z_frame) for s in self._states_])
@@ -1483,17 +1470,10 @@ class PlanarGraphics():
         else:
             s = [self._qt_path_composition_call_+"("]
         
-            
-        #shape_descriptors = [d for d in self._planar_descriptors_ if d != "z_frame"]
-
-        #s += [",".join(["%f" % getattr(state, a) for a in self.shapeDescriptors])]
         s += [",".join(["%f" % state[a] for a in self.shapeDescriptors])]
 
         s += [")"]
-        
-        #cmd = "".join(s)
-        #print("cmd %s" % cmd )
-        
+
         eval("path."+"".join(s))
         
         if closePath:
@@ -1504,7 +1484,8 @@ class PlanarGraphics():
     def __getattr__(self, name):
         if name in self.__class__._planar_descriptors_:
             state = self.getState()
-            return state[name]
+            if isinstance(state, DataBag):
+                return state[name]
         
         else:
             return object.__getattribute__(self, name)
@@ -1512,7 +1493,8 @@ class PlanarGraphics():
     def __setattr__(self, name, value):
         if name in self.__class__._planar_descriptors_:
             state = self.getState()
-            state[name]=value
+            if isinstance(state, DataBag):
+                state[name]=value
             
         else:
             object.__setattr__(self, name, value)
@@ -1649,7 +1631,7 @@ class PlanarGraphics():
             # c) frame <  0, z_frame >= 0 and z_frame != -frame -1
             # d) frame <  0, z_frame <  0 and z_frame !=  frame
             
-            if frame >= 0: # check visibility in real frame index
+            if frame >= 0: # check visibility in frame 
                 if state.z_frame >= 0:
                     return state.z_frame ==  frame      # (a)
                         
@@ -1667,31 +1649,17 @@ class PlanarGraphics():
             return False # shouldn't reach here
             
                     
-    def setFrameVisibility(self, ndx):
-        pass
-        # do something like:
-        # get current state (i.e. state associated with current frame)
-        #
-        # if current state has z_frame None: (this should be the ONLY state)
-        #   if ndx is None or the str "all" -> return (do nothing)
-        #   if ndx is an int >= 0:
-        #       set z_frame to ndx -> will have ONE state visible ONLY in ndx
-        #   if ndx is an int < 0:
-        #       set z_frame to ndx -> will have ONE state visible in all but 
-        #       -1 * ndx -1
-        #
-        #
-        # if current state has z_frame an int >= 0:
-        #
-                
     def _apply_frame_index_(self, frameindex:typing.Optional[typing.Iterable]=[],
                             sort=False, none_last=False):
         """Reassigns the z_frame values.
+        Use with CAUTION
         
         Parameters:
         ------------
         
         frameindex: iterable with int elements; optional , default is None
+            When None or and iterable that is either empty or contains at least
+            one None element, 
         
         sort: bool; optional, default is False
         
@@ -1721,8 +1689,7 @@ class PlanarGraphics():
         # unique also converts a range to a sequence of integers
         # sorted does nothing on lists from generated from range (for obvious
         # reasons)
-        if not any([v is None for v in frameindex]):
-            frameindex = (unique(frameindex))
+        frameindex = unique(frameindex)
                       
         if sort:
             frameindex = sorted(frameindex, key = lambda x: x if x is not None else none_place_holder)
@@ -1737,7 +1704,9 @@ class PlanarGraphics():
         # NOTE: frameindex may contain None, for the state that is meant to
         # be visible in all frames
         f_inv = [-v-1 for v in frameindex if isinstance(v, int) and v < 0]
+        
         f_ambiguous = [v for v in frameindex if v in f_inv]
+        
         if len(f_ambiguous):
             raise ValueError("The state visibility for the following frame indices is ambiguous: %s" % f_ambiguous)
         
@@ -1835,7 +1804,6 @@ class PlanarGraphics():
         """
         #print("PlanarGraphics.position() for %s " % self)
         return (self.x, self.y)
-        #return (self.get("x"), self.get("y"))
     
     @position.setter
     def position(self, x):
@@ -1853,16 +1821,11 @@ class PlanarGraphics():
         self.x = x[0]
         self.y = x[1]
         
-        #self.set("x", x[0])
-        #self.set("y", x[1])
-        
         self.updateLinkedObjects()
         
     def translate(self, dx, dy):
         self.x += dx
         self.x += dy
-        #self.set("x", self.get("x") + dx)
-        #self.set("y", self.get("y") + dy)
         
     def point(self, frame=None):
         """Alias to qPoint()
@@ -2496,15 +2459,10 @@ class PlanarGraphics():
         
         for f in self._frontends_:
             if f:
-                #print( "\t updating frontend %s (%s)" % (f.name, f.type))
-                #print("frontend", f)
                 sigBlock = QtCore.QSignalBlocker(f)
-                #print("PlanarGraphics.updateFrontends() frontend current name: ", f.name)
                 if f.name != self.name: # check to avoid recurrence
                     old_name = f.name
                     f.name = self.name
-                    #print("PlanarGraphics.updateFrontends() frontend new name: ", f.name)
-                    #print("PlanarGraphics.updateFrontends() frontend parentWidget: ", f.parentwidget)
                     viewer = None
                     
                     if type(f.parentwidget).__name__ == "ImageViewer":
@@ -2514,17 +2472,13 @@ class PlanarGraphics():
                         
                     if viewer is not None and hasattr(viewer, "_graphicsObjects"):
                         objDict = viewer._graphicsObjects[f.objectType]
-                        #print(objDict)
                         old_f = objDict.pop(old_name, None)
                         objDict[self.name] = f
-                        #objDict[self.name] = f
                     
                 f.currentFrame = self.currentFrame
                 
-                x = self.get("x")
-                y = self.get("y")
-                
-                #print("updateFrontends: x, y: %s, %s" % (self.x, self.y))
+                x = self.x
+                y = self.y
                 
                 if x is not None and y is not None:
                     super(GraphicsObject, f).setPos(x, y)
@@ -2539,11 +2493,7 @@ class PlanarGraphics():
         To avoid infinite recursion, do not calling this function from __setattr__()
         
         """
-        #self.__locked__ = True
-        
         if len(self._frontends_) and f in self._frontends_:
-            #sigBlock = QtCore.QSignalBlocker(f)
-            
             f._currentframe_ = self.currentFrame
             
             if len(self.frameIndices):
@@ -2552,7 +2502,7 @@ class PlanarGraphics():
             else:
                 f.setVisible(True)
                     
-            f.setPos(self.get("x"), self.get("y")) # also calls __drawObject__() and update()
+            f.setPos(self.x, self.y) # also calls __drawObject__() and update()
             
     def removeState(self, stateOrFrame):
         """Removes a state associated with a frame index or indices specified in "stateOrFrame".
@@ -2787,469 +2737,431 @@ class PlanarGraphics():
         
         return QtWidgets.QGraphicsPathItem(self(path=None, frame=frame, closed=self.closed)) # by default, the most generic case
         
-    def indexOfStateWithFrame(self, state:typing.Optional[DataBag]=None, 
-                           frame:typing.Optional[int]=None) -> typing.Optional[int]:
-        """Get the index of state in this object's list of states.
-        
-        Locates a state regardless of its visibility.
-        """
-        if state is None:
-            state = self.getStateforFrame(frame_index=frame_index)
-            
-        return index_of(self._states_, state, key = lambda x: x.z_frame)
-            
-    def indexOfState(self, state:typing.Optional[DataBag]=None, 
-                           frame_index:typing.Optional[int]=None) -> typing.Optional[int]:
-        """Get the index of a state in this object's list of states, subject to visibility.
+    def stateIndex(self, state:typing.Optional[DataBag]=None, 
+                           z_frame:typing.Optional[int]=None,
+                           visible_only:bool=False) -> typing.Optional[int]:
+        """Get the index of a state in this object's internal list of states.
         
         Parameters:
         ===========
         
-        state: DataBag (optional  default is None)
+        state: DataBag (optional, default is None)
+
+        z_frame: int (optional, default is None)
         
-        frame_index: int >= 0 (optional , default is None)
-        
+        visible_only: bool (optional, default is False)
+            
         Returns:
         =======
         
-        An int: 
-            When state is None, this is the index of the state that is visible 
-            in frame_index.
+        An int or None.
+        
+        If 'state' is a DataBag which exists in the internal list of states,
+            returns the index of the state in the list, else returns None.
             
-            Otherwise, this is the index of the specified state, if it exists
-            in this object's states list.
+        If 'state' is None:
+            * if 'z_frame' is None, returns the index of the current state
+            in the internal list
             
-        None: when the specified state was not found in this object's list of 
-            states, or when the specified state is None and the current frame 
-            does not have a visible state.
+            * if 'z_frame' is an int:
+        
+                * if 'z_frame' < 0 returns the index of the frame-avoiding
+                    state with state.z_frame == z_frame, if found, or None.
+                
+                * if 'z_frame' >= 0
+                
+                    * if visible_only is False (default) returns the index of the
+                        single-frame state where state.z_frame == z_frame or None.
+                    
+                    * if visible_only is True:
+                        if there is a single-frame state where 
+                        state.z_frame == z_frame, returns its index (as above)
+                        
+                        otherwise, if there is a frame-avoding state visible in
+                        the frame with index z_frame (i.e., the state where
+                        state.z_frame != -z_frame - 1), returns its index;
+                        
+                        otherwise, return None
+                        
+        NOTE: For any given frame index there can be only one state visible in 
+        that frame.
+        
+        A state where state.z_frame is None is always visibile and is the ONLY 
+        state state in the internal list, hence its index is always 0 (zero), 
+        if it exists in the internal states list.
+        
+        
+        
+        Calls:
+        =====
+        
+        stateIndex() -> the index of the current state
+        
+        stateIndex(state) -> the index of the 'state', or None if 'state' is 
+            not present in the internal list of states
+        
+        stateIndex(z_frame=-1) -> index of the frame-avoding state with 
+            state.z_frame == z_frame, or None if such state is not found.
+            
+        stateIndex(z_frame=1) -> index of the single-frame state where
+            state.z_frame == 1, if found, or None.
+            
+        stateIndex(z_frame=1, visible_only=True) -> index of the 
+            single-frame state with state.z_frame == 1 if found, OR
+            
+            index of the frame-avoiding state with state.z_frame != -2 if found, 
+            
+            OR None
             
         """
         if state is None:
-            state = self.getState(frame_index=frame_index)
-            
+            state = self.getState(z_frame=z_frame, return_visible=visible_only)
+                        
         return index_of(self._states_, state, key = lambda x: x.z_frame)
             
-    def getStateforFrame(self, frame_index:typing.Optional[int]=None) -> typing.Optional[object]:
-        """Access the state where z_frame == frame_index regardless state visibility.
-        
-        Parameters
-        ==========
-        
-        frame_index: None or an int;
-        
-            ATTENTION: Differences with self.getState():
             
-                1. When frame_index is None the function tries to return the 
-                   state for which z_frame is None (if found)
-                
-                2. When an int, frame_index can also take negative values.
+    def getState(self, z_frame:typing.Optional[int]=None,
+                 return_visible:bool=True) -> typing.Optional[object]:
+        """Access the state according to their z_frame value.
         
-        Returns:
-        ========
-        A state (DataBag object) if found, or None.
-        
-        If there is an ubiquitous state, this will always be returned regardless
-        of the value of frame_index.
-        
-        Otherwise, returns the state with z_frame == frame_index, or None if 
-        no such state exists.
-        
-        """
-        if not isinstance(frame_index, (int, type(None))):
-            raise TypeError("'frame_index' expected to be an int or None; got %s instead" % type(frame_index).__name__)
-        
-        if len(self._states_) == 1 and self._states_[0].z_frame is None:
-            return self._states_[0]
-        
-        # states MUST be unique wrt their z_frame values
-        states = [s for s in self._states_ if s.z_frame == frame_index]
-        
-        if len(states):
-            return states[0]
-            
-    def getState(self, frame_index:typing.Optional[int]=None) -> typing.Optional[object]:
-        """Access the state that WOULD BE VISIBLE in the specified frame_index with the specified index.
         TODO use as delegate for hasStateForFrame
         
         Parameters:
         ----------
-        frame_index: int or None; 
-            When None, return (a reference to) the state associated with self.currentFrame
-            ATTENTION: This is in contrast to self.getStateForFrame()
+        z_frame: int, None (default) 
+            ATTENTION: When z_frame is None, then it will automatically use 
+            the current frame.
             
-            When an int, it must be >= 0.
+        return_visible: bool, optional (default is True):
+            When True, returns the state that is visible in the specified frame 
+            index, regardless of its state.z_frame value (i.e. state.z_frame can
+            be either None, z_frame, or any int < 0 and != -z_frame - 1).
+            
+            When False, returns the state which has state.z_frame == z_frame, or 
+            None if no state exists with state.z_frame == z_frame.
             
         Returns:
         -------
-        A DataBag object (state) which can be:
         
-        * the unique state with ubiquitous visibility (i.e., has z_frame None)
+        A DataBag object (state) or None
+        
+        The DataBag object can be:
+        
+        * the unique state with ubiquitous visibility (i.e., state.z_frame is None)
             - is such a state exists, it will be returned regardless of the 
-                value of the 'frame_index' parameter
+                value of the 'z_frame' parameter, as it is the only state 
+                available
                 
-        OR:
+        * the non-ubiquitous state that is visible in the frame with the index 
+            specified by 'z_frame'; this state is either:
             
-        * the state visible in the frame_index with index specified by 'frame_index'; this 
-            state is either:
-            
-            - the state with z_frame == frame_index (i.e. the single-frame state for 
-                this frame_index)
+            - a single-frame state with state.z_frame == z_frame if it exists,
             
             or
             
-            - the state explicitly invisible in another frame_index (frame-avoiding), 
-                such that:
+            - the frame-avoiding state that would be visible in this frame, i.e.:
                 
-                z_frame != -1 *` frame_index -1
+                state.z_frame != -1 * z_frame -1
             
-        """
-        if frame_index is None:
-            frame_index = self._currentframe_
-            
-        if not isinstance(frame_index, int):
-            raise TypeError("'frame_index' expected to be an int; got %s instead" % type(frame_index).__name__)
-            
-        if frame_index < 0:
-            raise ValueError("'frame_index' must be >= 0; got %d instead" % frame_index)
-            
-        #self.checkStates() # may be too expensive - this must be called at the c'tor!
+        NOTE: It does not make sense to query for a state where 
+        state.z_frame is None, since such a state, if it exists, is the only 
+        state allowed.
         
-        #print("%s.getState(): states ="%self.__class__.__name__, self._states_)
+        Hence, getState() called with z_frame having any acceptable value
+        (either int or None) and return_visible=True (the default) will always
+        return the ubiquitous state if it exists.
+        
+        
             
-        if len(self._states_) == 1: # trivial
-            if self.__class__.isStateVisible(self._states_[0], frame_index):
-                return self._states_[0]
+        Examples:
+        ========
+        1. self.getState() -> the state visible in the current frame, if existing,
+            otherwise None
             
-        elif len(self._states_) > 1:
-            visible_states = [s for s in self._states_ if self.__class__.isStateVisible(s, frame_index)]
+            The returned state's z_frame attribute is either
+                None or an int >= 0 and equal to current_frame, or an int < 0
+                and != -current_frame - 1
+                
+        2. self.getState(return_visible=False) -> the state where
+            state.z_frame == current_frame
+            
+            or None if such a state does not exist.
+            
+            ATTENTION:
+            In this case the function returns None even if there exists an
+            ubiquitous state, or a frame-avoiding state that would be visible in 
+            the frame with index z_frame.
+            
+        3. self.getState(z_frame=-3) -> the state 
+        """
+        if z_frame is None:
+            z_frame = self._currentframe_
+            
+        if not isinstance(z_frame, int):
+            raise TypeError("'z_frame' expected to be an int; got %s instead" % type(z_frame).__name__)
+            
+        if return_visible:
+            visible_states = [s for s in self._states_ if self.__class__.isStateVisible(s, z_frame)]
             
             if len(visible_states):
                 return visible_states[0]
             
-    def setFrameForState(self, state:DataBag, new_frame:typing.Optional[int]=None,
-                         nFrames:typing.Optional[int]=None):
+        else:
+            states = [s for s in self._states_ if s.z_frame == z_frame]
+            
+            if len(states):
+                return states[0]
+            
+    def setFrameIndex(self, state:typing.Optional[typing.Union[DataBag, int]]=None, 
+                      new_frame:typing.Optional[int]=None,
+                      check_visible:bool=True,
+                      nFrames:typing.Optional[int]=None):
         """Sets the z_frame of an EXISTING state to a new value.
         
         Does nothing if the state does not exist in self.states
         
+        Parameters:
+        ----------
+        state: DataBag or None
+            when a DataBag, it must exist in the internal states list
+            
+            when None, the function operates on the current (visible) state.
+                If there is no visible state in the current frame, then returns.
+                To avoid this, make sure a DataBag is pased as state parameter
+                
+        new_frame: int or None
+            When None, set the z_frame value of the state to None:
+                effectively, the state becomes ubiquitous
+                
+            Otherwise, set the z_frame value to the value of new_frame.
+                If new_frame is < 0 the state becomes frame-avoiding; otherwise
+                it becomes a single-frame state.
+                
+            To set the z_frame value to the current frame just pass 
+            self.currentFrame here
+            
+        check_visible:bool, optional (default is True)
+            Used when state is None; when True, operate on the state visible in
+            the current frame; otherwise, operate in the state where
+            z_frame == current frame, if it exists
+                    
+        NOTE: Might want to call self.checkStates() after executing this function.
+        Since checkStates can be expensive the decision to call it is left to 
+        the user.
         """
-        
-        if state not in self._states_: # state not found in self._states_ => quit
-            warnings.warn("The state %d does not exist for this object" % state)
+        if state is None:
+            if new_frame == self._currentframe_:
+                return # no change needed here
+            
+            state = self.getState(return_visible=check_visible)
+            if state is None: #no state found for current frame -> bye
+                warnings.warn("There is no %sstate for frame %d", ("visible " if check_visible else "", self._currentframe_))
+                return
+            
+        if isinstance(state, DataBag):
+            if state not in self._states_: # state not found in self._states_ => quit
+                warnings.warn("The state %d does not exist for this object" % state)
+                return
+            
+        if state.z_frame == new_frame: # avoid stupid actions
             return
         
-        frndx = [s.z_frame for s in self._states_ if isinstance(s.z_frame, int) and s.z_frame >=0 ]
+        # index of state to be modified, in the internal list
+        state_ndx = self.stateIndex(state, visible_only = check_visible) 
         
-        avoided_frames = [-s.z_frame-1 for s in self._states_ if isinstance(s.z_frame, int) and s.z_frame < 0]
-        
-        if any([len(v)>0 for v in (frndx, avoided_frames)]):
-            if new_frame is None:
-                max_frame = max(frndx + avoided_frames)
-            else:
-                max_frame = max(frndx + avoided_frames + [new_frame])
-                
-        else:
-            if new_frame is None:
-                max_frame = 0 # irrelevant for ubiquitous state
-                
-            else:
-                max_frame = new_frame
-            
         if new_frame is None:
-            # the state is set to become ubiquitous; 
-            # therefore all other states must be discarded
-            state.z_frame = None
+            # make state ubiquitous; discard all other states
+            state.z_frame = new_frame
             self._states_[:] = [state]
+            return
             
-        elif isinstance(new_frame, int): # a new frame is assigned to state
-            if new_frame >= 0: # state set to become a single-frame state, while:
-                if state.z_frame is None: # initially it is an ubiquitous state
-                    # this should be the ONLY state
-                    state.z_frame = new_frame # done
-                    # also make sure there is not gremlin state left behind
-                    self._states_[:] = [state]
+        elif isinstance(new_frame, int):
+            if new_frame >= 0:
+                # state is to become a single-frame state
+                # is there a state visible at new_frame?
+                old_state = self.getState(new_frame)
+                
+                # old_state, if found, is either ubiquitous, frame-avoding or single-frame
+                
+                if old_state is not None:
+                    if old_state.z_frame is None:
+                        # old_state is ubiquitous => make it single-frame for new_frame
+                        # incidentally, here old_state is state itself
+                        state.z_frame = new_frame
+                        self._states_[:] = [state]
+                        return
                     
-                else: # initially is either a single-frame or frame-avoiding
-                    if state.z_frame >= 0: # state is initially a single-frame state
-                        # check to see if there is another state visible at new frame
-                        # this can be a frame-avoiding state (avoiding a different frame)
-                        # or just another single-frame state
+                    elif old_state.z_frame >= 0:
+                        # old_state is single-frame state - will have to be
+                        # removed
                         #
-                        # if there is one, THAT state needs to be discarded and 
-                        # replaced with the (modified) state
-                        # 
-                        # since there is only one copy of the state to be modified,
-                        # we just change its z_frame value
-                        
-                        # 1) search for existing single-frame state at new frame
-                        old_state = self.__class__.findStateWithZFrame(self._states_, new_frame)
-                        
-                        if old_state is None: # found no existing single-frame state at new_frame
-                            # check if there is a frame-avoiding state that is 
-                            # visible in new_frame
-                            sa = [o for o in self._states_ if o.z_frame < 0]
-                            
-                            if len(sa): # found a frame-avoiding state 
-                                # NOTE: theoretically there should be only one
-                                fa_state = sa[0]
-                                
-                                avoided_frame = -fa_state.z_frame - 1
-                                
-                                #if fa_state.z_frame == -new_frame - 1:
-                                if avoided_frame == new_frame:
-                                    # fa_state avoids the new_frame which we want
-                                    # to attach to the state to be modified 
-                                    #
-                                    # This is OK: self._states_ should only have two
-                                    # states: the fa_state (unmodifed) that avoids
-                                    # new frame, and the (now modified) state which 
-                                    # is linked to new frame - no clash here.
-                                    #
-                                    # NOTE: HOWEVER: this contingency should only
-                                    # when the state to be modified, which is a 
-                                    # single-frame state, is already linked to 
-                                    # the acoided frame (otherwise it could NOT
-                                    # have existed in self._states_)
-                                    # 
-                                    # So, this branch only gets executed when
-                                    # state.z_frame already equals new_frame (i.e.
-                                    # it changes nothing, except for consolidating
-                                    # the one frame - one visible state rule)
-                                    #
-                                    state.z_frame = new_frame
-                                    self._states_ = [fa_state, state] # done
-                                    
-                                else: # frame_clash
-                                    # this is the most likely to happen;
-                                    # the state is initially linked to the frame
-                                    # avoided by fs_state (otherwise it would not
-                                    # have existed in self._states_); new_frame 
-                                    # is one of the  frames where fa_state is visible.
-                                    # 
-                                    # Therefore we replicate fa_state to generate
-                                    # a set of single-state frames visible in all 
-                                    # frames EXCEPT new frame and its originally 
-                                    # avoided frame (which may or may not have 
-                                    # an associated state)
-                                    #
-                                    
-                                    coverted_states = list()
-                                    
-                                    # Is there a state at the avoided frame?
-                                    other_state = self.__class__.findStateWithZFrame(self._states_,
-                                                                                     avoided_frame)
-                                    
-                                    if other_state is not None: # state found at avoided_frame
-                                        converted_states.append(other_state)
-                                    
-                                    if isinstance(nFrames, int):
-                                        if nFrames <= max_frames:
-                                            nFrames = max_frames + 1
-                                            
-                                    else:
-                                        nFrames = max_frames + 1
-                                        
-                                    # replicate fa_state to a set of single-frame
-                                    # states visible everywhere except the avoided_frame
-                                    for k in range(nFrames):
-                                        if k not in (avoided_frame, new_frame):
-                                            s = fa_state.copy()
-                                            s.z_frame = k
-                                            converted_states.append(s)
-                                            
-                                    state.z_frame = new_frame
-                                    converted_states.append(state)
-                                    self._states_[:] = converted_states[:]
-                                
-                            else: # no frame-avoding state found
-                                # just set the state's z_frame to new_frame and we're done
-                                # self._states_ still hold only ONE reference to 
-                                # state
-                                state.z_frame = new_frame # done
-                                        
-                        else: # a single-frame state at new_frame is found:
-                            # discard the old state at new frame
-                            # replace that state with this state
-                            # this effectively means we get rid of the (old)
-                            # state that exists at new frame, ending up with one
-                            # one state less than before.
-                            
-                            # NOTE: since both state and old_state are single-frame states
-                            # technicaly self._states_ should contain NO
-                            # frame-avoiding or ubiquitous states
-                            old_ndx = index_of(self._states_, old_state, key = lambda x: x.z_frame)
-                            ndx = index_of(self._states_, state, key = lambda x: x.z_frame)
-                            
-                            # where was the state argument located?
-                            #initial_ndx = index_of(self._states_, state, key = lambda x: x.z_frame)
-                            
-                            state.z_frame = new_frame # set this NOW, and not before to avoid messing up the index_of result
-                            
-                            # now replace the old state
-                            if old_ndx is not None: # NOTE: having found an old_state, this is technically always True
-                                self._states_[old_ndx] = state
-                                # remove the reference to the modifed state from
-                                # the previous location to avoid storing two
-                                # references to the same object
-                                if ndx is not None: # NOTE: since state belongs ot self._states_ this is technically always True
-                                    self._states_.pop([ndx])
-                                
-                    else: # state is initially a frame-avoiding state
-                        # by rule (II) there can be at most one other state which
-                        # is single-frame and linked to the frame initially 
-                        # avoided by state
+                        # if state is currently frame-avoiding, then old_state
+                        # is single-frame; after this, self._states_ ends up 
+                        # with just the modified state
                         #
+                        # if state is single-frame, self._states_ ends up with
+                        # one less state
+                        ndx = self.stateIndex(old_state)
+                        del self._states_[ndx]
+                        state.z_frame = new_frame # now state is single-frame
+                        return
                         
-                        avoided_frame = -state.z_frame - 1
-                        
-                        
-                        # two things can happen:
-                        # a) new_frame is the frame being avoided
-                        # b) new_frame is the frame where state is already visible
-                        #
-                        if new_frame == avoided_frame: # new_frame is the avoided frame
-                            if isinstance(nFrames, int) and nFrames <= max_frames:
-                                nFrames = max_frames + 1
-                                
+                    elif old_state.z_frame < 0:
+                        # old_state a frame-avoiding state be visible at new-frame;
+                        # by rule II, state is the only other state 
+                        # present and is single-frame, unless old_state is state
+                        if state.z_frame < 0:
+                            # this must be the same as old_state; since this is
+                            # also the only frame visible at new_frame make it 
+                            # single-frame at new frame and consequently, the only
+                            # state present
+                            state.z_frame = new_frame
+                            self._states_[:] = [state]
+                            return
+                        else: # state is currently single-frame
+                            # state is single-frame and wants to become visible
+                            # where the old (frame-avoiding) state was visible
+                            # therefore we create single-frame copies of the old
+                            # state that are visible in all the other frames 
+                            # EXCEPT the frame it was originally avoiding, AND 
+                            # the new frame
+                            old_avoided_frame = -old_state.z_frame  - 1
+                            
+                            max_frame = max([old_avoided_frame, new_frame])
+                            
+                            if isinstance(nFrames, int):
+                                if nFrames <= max_frame:
+                                    nFrames = max_frame + 1
+                                    
                             else:
-                                nFrames = max_frames + 1
+                                nFrames = max_frame + 1
                                 
-                            converted_states = list()
+                            new_states = list()
                             
-                            # check if there already is a visible state at the avoided_frame
-                            old_state = self.__class__.findStateWithZFrame(self._states_, new_frame)
-                            
-                            if old_state is None: # no single-frame state exists at the avoided frame
-                                # by rule (II) then state is expected to be the ONLY
-                                # state in self._states_
-                                # Therefore we need to replicate state such that
-                                # it becomes visible in all frames including the
-                                # new_frame.
-                                #
-                                # It is tempting to set its z_frame to None, but 
-                                # this is not what is being asked here
-                                
-                                for k in range(nFrames):
-                                    if k != new_frame: # new_frame IS avoided_frame
-                                        s = state.copy()
-                                        s.z_frame = k
-                                        converted_states.append(s)
-                                        
-                            else: # there already is an old state at new frame
-                                # this needs replacing => we end up with one 
-                                # state less than initially
-                                for k in range(nFrames):
-                                    s = state.copy()
+                            for k in range(nFrames):
+                                # copy old state to single-frame states visible
+                                # in all BUT the originally avoided frame and the
+                                # new frame
+                                if k not in (old_avoided_frame, new_frame):
+                                    s = old_state.copy()
                                     s.z_frame = k
-                                    converted_states.append(s)
-                                        
+                                    new_states.append(s)
+                                
+                            # now update the state
                             state.z_frame = new_frame
-                            converted_states.append(state)
-                            
-                            self._states_[:] = converted_states[:]
-                            
-                        else: # new_frame is one of the frames where state was
-                            # initially visible; since state is frame_avoiding
-                            # there should be no other state associated with 
-                            # new frame;
-                            # but there might be a state associated with the 
-                            # avoided frame
-                            
-                            if isinstance(nFrames, int) and nFrames <= max_frames:
-                                nFrames = max_frames + 1
-                                
-                            else:
-                                nFrames = max_frames + 1
-                                
-                            old_state = self.__class__.findStateWithZFrame(self._states_, avoided_frame)
-                            
-                            converted_states = list()
+                            new_states.append(state)
+                            # and replace the states list
+                            self._states_[:] = new_states
+                            return
                         
-                            if old_state is not None:
-                                converted_states.append(old_state)
-                                
-                                for k in range(nFrames):
-                                    if k not in (avoided_frame, new_frame):
-                                        s = state.copy()
-                                        s.z_frame = k
-                                        converted_states.append(s)
-                                
-                            else:
-                                for k in range(nFrames):
-                                    if k != avoided_frame:
-                                        s = state.copy()
-                                        s.z_frame = k
-                                        converted_states.append(s)
-                                
-                            state.z_frame = new_frame
-                            converted_states.append(state)
+                else: # there is no state visible at new_frame
+                    # NOTE: 2020-11-30 16:26:11
+                    # remember new_frame is >= 0 here and that the following
+                    # cases fall under the branch above:
+                    # either state.z_frame is None
+                    # or state.z_frame < 0 and state.z_frame == -new_frame - 1
+                    
+                    # therefore:
+                    state.z_frame = new_frame
+                    return
+                    #### BEGIN NOTE 2020-11-30 16:06:59: 
+                    # The logic for this is justifed as follows:
+                    #if state.z_frame < 0:
+                        ## state is originally frame-avoiding and by implication
+                        ## in this branch of code is the only state
+                        ##
+                        ## simply assign new_frame to state.z_frame and this will
+                        ## become the only single-frame state in the object
+                        ## (by implication the othee frames will be stateless)
+                        #state.z_frame = new_frame
+                        #return
+                        
+                        ## let avoided_frame = -state.z_frame - 1
+                        ##
+                        ##if new_frame == avoided_frame:
+                            ## state wants to be visible in the frame it currently
+                            ## avoids.
+                            ## since there is no other state visible, we simply
+                            ## turn this state from a frame-avoiding into
+                            ## a single-frame state; is will still be the only 
+                            ## state available to the object
+                        
+                        ##else:
+                            ## state wants to be visible in a frame where it 
+                            ## already was visible; so this situation should have
+                            ## come up in the above branch; nevertheless, we are
+                            ## transforming the state into a single-frame state;
                             
-                            self._states_[:] = converted_states[:]
-                            
-            else: # state is to become a frame_avoiding state # TODO
-                if state.z_frame is None: # state is initially an ubiquitous state
-                    # hence it should be unique
-                    # we just set its frame to the new value and we're done
+                    #else: # state is single-frame
+                        ## since no other state is visible at the target new_frame
+                        ## we just simply change its z_frame value to new_frame
+                    #### END NOTE 2020-11-30 16:06:59: 
+                        
+                    
+                    
+            else: # new_frame < 0
+                # state is to become a frame-avoiding state
+                # if there is a state that is visible in the newly avoided frame
+                # then keep it
+                avoided_frame = -new_frame - 1
+                old_state_ndx = self.stateIndex(avoided_frame)
+                
+                if old_state_ndx is not None:
+                    # old_state is visible at the frame to be avoided
+                    old_state = self._states_[old_state_ndx]
+                
+                    if old_state is state:
+                        # if we turn state into a frame-avoding state, there 
+                        # can be at most one extra single-frame state that was
+                        # visible in the frame to be avoided; but here, this 
+                        # extra state is the state itself, so once we turned it
+                        # into a frame-avoding state, it remaines the only
+                        # state available to the object
+                        
+                        state.z_frame = new_frame
+                        self._states_[:] = [state]
+                        return
+                
+                    #### BEGIN NOTE: 2020-11-30 16:24:02
+                    #if old_state.z_frame >= 0:
+                        ## single-frame state that is visible at the frame to be 
+                        ## avoided by state; keep it and discard everything else
+                        #state.z_frame = new_frame
+                        #self._states_[:] = [state, old_state]
+                        #return
+                        
+                    #else: 
+                        ## old_state is a frame-avoiding state that is visible at
+                        ## frame to be avoided therefore we need to make it
+                        ## a single-frame state there
+                        #old_state.z_frame = avoided_frame
+                        ## then turn state into a frame-avoding state visible 
+                        ## anywhere but avoided_frame
+                        #state.z_frame = new_frame
+                        ## and keep both state and old_state
+                        #self._states_[:] = [state, old_state]
+                        #return
+                    #### END NOTE: 2020-11-30 16:24:02
+                    
+                    # collapsing the above NOTE: 2020-11-30 16:24:02 - see above
+                    # for justification of logic
+                    if old_state.z_frame < 0:
+                        old_state.z_frame = avoided_frame
+                        
+                    state.z_frame = new_frame
+                    self._states_[:] = [state, old_state]
+                    return
+                
+                else: # no state is visible at the avoided frame
+                    # since the state is turned into a frame-avoiding state, it
+                    # should take over all the other visible states elsewhere
                     state.z_frame = new_frame
                     self._states_[:] = [state]
-                    
-                elif state.z_frame >= 0: # state is initially a single-frame state
-                    # check if there is a frame-avoiding state
-                    fa_states = [s for s in self._states_ if s.z_frame < 0]
-                    
-                    if len(fa_states):
-                        fa_state = fa_states[0]
-                        
-                        # technically state is initially the only single-frame state
-                        ndx = index_of(self._states_, state, key = lambda x: x.z_frame)
-                        
-                        if ndx is not None: # remove this state
-                            self._states_.pop([ndx])
-                            
-                        # we now want state to replace the fa_state
-                        old_ndx = index_of(self._states_, fa_state, key = lambda x: x.z_frame)
-                        
-                        if old_ndx is not None:
-                            state.z_frame = new_frame
-                            self._states_[old_ndx] = state
-                            
-                    else: # no frame-avoiding states
-                        # figure out which frame will be avoided
-                        avoided_frame = -new_frame - 1
-                        
-                        # is there an old state at the avoided frame?
-                        old_state = self.__class__.findStateWithZFrame(self._states_, avoided_frame)
-                        
-                        state.z_frame = new_frame
-                        
-                        if old_state is not None: # ther already is a state there
-                            self._states_[:] = [state, old_state]
-                            
-                        else: # no state at the (new) avoided frame
-                            # therefore, our state will become the only one
-                            # (frame-avoiding at new_frame, visible elsewhere)
-                            self._states_[:] = [state]
-                        
-                else: #state is initally a frame-avoiding state
-                    # check if the new avoided frame is the same as its old
-                    # avoided frame; if they are, then there's nothing to do
-                    if state.z_frame != new_frame:
-                        # even if there is an old state at the previously 
-                        # avoided frame, changing this state z_frame to 
-                        # a new avoided frame will overwrite the visible state
-                        # elsewhere
-                        old_avoided_frame = -state.z_frame - 1
-                        old_state = self.__class__.findStateWithZFrame(self._states_, old_avoided_frame)
-                        
-                        if old_state is not None:
-                            ndx = index_of(self._states_, old_state, key = lambda x: x.z_frame)
-                            
-                            if ndx is not None:
-                                self._states_.pop([ndx])
-                                
-                        state.z_frame = new_frame
-                        
-                        self._states_[:] = [state]
+                    return
+            
+        else:
+            raise TypeError("new_frame expected to be an int or None; got %sinstead" % type(new_frame).__name__)
+        
                 
     def setState(self, state:DataBag, frame:typing.Optional[int], nFrames:typing.Optional[int]=None):
         """Sets/adds a state
@@ -3356,8 +3268,9 @@ class PlanarGraphics():
         # make sure they're consistent and sorted:
         # either:
         # (I)   one ubquious state
-        # (II)  one frame-avoding state and a single-frame state (for the avoided frame)
-        # (III) many single-frame states
+        # (II)  one frame-avoding state and maximum a single-frame state 
+        #       (visible in the avoided frame)
+        # (III) any number of single-frame states
         self.checkStates()
         
         # NOTE: 2020-11-13 13:02:19
@@ -3653,40 +3566,40 @@ class PlanarGraphics():
         """
         return self.__class__(self.getState(frame))
     
-    def get(self, param:str, frame:typing.Optional[int]=None) -> typing.Any:
-        """Accessor (getter) for a planar descriptor.
-        """
-        if not isinstance(param, str):
-            raise TypeError("Expecting a str; got %s instead" % type(param).__name__)
+    #def get(self, param:str, frame:typing.Optional[int]=None) -> typing.Any:
+        #"""Accessor (getter) for a planar descriptor.
+        #"""
+        #if not isinstance(param, str):
+            #raise TypeError("Expecting a str; got %s instead" % type(param).__name__)
         
-        if len(param.strip()) == 0:
-            raise ValueError("Expecting a non-empty string")
+        #if len(param.strip()) == 0:
+            #raise ValueError("Expecting a non-empty string")
+        
+        ##if param not in [d for d in self.__class__._planar_descriptors_ if d != "z_frame"]:
+        #if param not in [d for d in self.__class__._planar_descriptors_]:
+            #raise KeyError("Planar descriptor %s not found in %s" % (param, self.__class__.__name__))
+        
+        #state = self.getState(frame)
+        
+        #if state is not None:
+            #return state[param]
+        
+    #def set(self, param:str, value:typing.Any, frame:typing.Optional[int]=None) -> typing.Any:
+        #"""Accessor (setter) for a planar descriptor.
+        #"""
+        #if not isinstance(param, str):
+            #raise TypeError("Expecting a str; got %s instead" % type(param).__name__)
+        
+        #if len(param.strip()) == 0:
+            #raise ValueError("Expecting a non-empty string")
         
         #if param not in [d for d in self.__class__._planar_descriptors_ if d != "z_frame"]:
-        if param not in [d for d in self.__class__._planar_descriptors_]:
-            raise KeyError("Planar descriptor %s not found in %s" % (param, self.__class__.__name__))
+            #raise KeyError("Planar descriptor %s not found in %s" % (param, self.__class__.__name__))
         
-        state = self.getState(frame)
+        #state = self.getState(frame)
         
-        if state is not None:
-            return state[param]
-        
-    def set(self, param:str, value:typing.Any, frame:typing.Optional[int]=None) -> typing.Any:
-        """Accessor (setter) for a planar descriptor.
-        """
-        if not isinstance(param, str):
-            raise TypeError("Expecting a str; got %s instead" % type(param).__name__)
-        
-        if len(param.strip()) == 0:
-            raise ValueError("Expecting a non-empty string")
-        
-        if param not in [d for d in self.__class__._planar_descriptors_ if d != "z_frame"]:
-            raise KeyError("Planar descriptor %s not found in %s" % (param, self.__class__.__name__))
-        
-        state = self.getState(frame)
-        
-        if state is not None:
-            state[param] = value
+        #if state is not None:
+            #state[param] = value
         
     
     @staticmethod
@@ -3853,8 +3766,8 @@ class PlanarGraphics():
             
             else:
                 # for Move that begins a subpath
-                return spatial.distance.euclidean([self.get("x"), self.get("y")],
-                                                  [prev.get("x"), prev.get("y")])
+                return spatial.distance.euclidean([self.x, self.y],
+                                                  [prev.x, prev.y])
         
         elif isinstance(self, Path):
             if all([isinstance(e, (Move, Line, Cubic, Quad)) for e in self]):
@@ -3878,13 +3791,13 @@ class PlanarGraphics():
                 prev = Move(0., 0.)
         
             if isinstance(self, Line):
-                return spatial.distance.euclidean([self.get("x"), self.get("y")], 
-                                                  [prev.get("x"), prev.get("y")])
+                return spatial.distance.euclidean([self.x, self.y], 
+                                                  [prev.x, prev.y])
             
             elif isinstance(self, Cubic):
                 # parametric spline: (x,y) = f(u)
-                self_xy = np.array([self.get("x"), self.get("y")])
-                prev_xy = np.array([prev.get("x"), prev.get("y")])
+                self_xy = np.array([self.x, self.y])
+                prev_xy = np.array([prev.x, prev.y])
                 
                 dx_dy = self_xy - prev_xy                      # prepare to "shift" the rectified spline
                                                                 # so that it starts at the previous point
@@ -3892,10 +3805,10 @@ class PlanarGraphics():
                 t = np.zeros((8,))
                 t[4:] = 1.
                 
-                c = np.array([[prev.get("x"), prev.get("y")],
-                              [self.get("c1x"), self.get("c1y")],
-                              [self.get("c2x"), self.get("c2y")], 
-                              [self.get("x"), self.get("y")]])
+                c = np.array([[prev.x, prev.y],
+                              [self.c1x, self.c1y],
+                              [self.c2x, self.c2y], 
+                              [self.x, self.y]])
                 
                 spline = interpolate.BSpline(t, c, 3, extrapolate=True)
                 
@@ -3926,8 +3839,8 @@ class PlanarGraphics():
                 return spatial.distance.euclidean(prev_xy, rectified_xy)
                 
             elif isinstance(self, Quad):
-                self_xy = np.array([self.get("x"), self.get("y")])
-                prev_xy = np.array([prev.get("x"), prev.get("y")])
+                self_xy = np.array([self.x, self.y])
+                prev_xy = np.array([prev.x, prev.y])
 
                 dx_dy = self_xy - prev_xy                      # prepare to "shift" the rectified spline
                                                                 # so that it starts at the previous point
@@ -3935,9 +3848,9 @@ class PlanarGraphics():
                 t = np.zeros((6,))
                 t[3:] = 1.
                 
-                c = np.array([[prev.get("x"), prev.get("y")],
-                              [self.get("cx"), self.get("cy")],
-                              [self.get("x"), self.get("y")]])
+                c = np.array([[prev.x, prev.y],
+                              [self.cx, self.cy],
+                              [self.x, self.y]])
                 
                 spline = interpolate.BSpline(t, c, 2, extrapolate=True)
                 
@@ -6230,10 +6143,8 @@ class Path(PlanarGraphics):
                             
                             
                         if len(self._objects_):
-                            xx = [e.get("x") for e in self._objects_ if isinstance(e, PlanarGraphics)]
-                            x = min([x for x in xx if x is not None])
-                            yy = [e.get("y") for e in self._objects_ if isinstance(e, PlanarGraphics)]
-                            y = min([y for y in yy if y is not None])
+                            x = min([e.x for e in self._objects_ if isinstance(e, PlanarGraphics)])
+                            y = min([e.y for e in self._objects_ if isinstance(e, PlanarGraphics)])
 
                             self._position_ = (x,y)
                             
@@ -6250,11 +6161,10 @@ class Path(PlanarGraphics):
                             for a in args[1:]:
                                 self._objects_.append(Line(a[0], a[1], frameindex=frameindex, currentframe=currentframe))
                                 
-                        xx = [o.get("x") for o in self if o is not None]
-                        yy = [o.get("y") for o in self if o is not None]
+                        x = min([o.x for o in self if o is not None])
+                        y = min([o.y for o in self if o is not None])
                         
-                        self._position_ = (min([x for x in xx if x is not None]), 
-                                           min([y for y in yy if y is not None]))
+                        self._position_ = (x,y)
                         
                         self._graphics_object_type_ = GraphicsObjectType.path
                         
@@ -6262,13 +6172,13 @@ class Path(PlanarGraphics):
                     for k in range(args[0].elementCount()):
                         if args[0].elementAt(k).type == QtGui.QPainterPath.MoveToElement:
                             element = args[0].elementAt(k)
-                            self._objects_.append(Move(element.get("x"), element.get("y"), 
+                            self._objects_.append(Move(element.x, element.y, 
                                                        frameindex=frameindex, 
                                                        currentframe=currentframe))
                             
                         elif args[0].elementAt(k).type == QtGui.QPainterPath.LineToElement:
                             element = args[0].elementAt(k)
-                            self._objects_.append(Line(element.get("x"), element.get("y"),
+                            self._objects_.append(Line(element.x, element.y,
                                                        frameindex=frameindex, 
                                                        currentframe=currentframe))
                             
@@ -6278,19 +6188,18 @@ class Path(PlanarGraphics):
                             c2 = args[0].elementAt(k+2)     # 1st control point
                             # NOTE: do not delete -- keep for reference
                             #self.append(Cubic(x=c1.x, y=c1.y, c1x=c2.x, c1y=c2.y, c2x=element.x, c2y=element.y, frameindex=frameindex, currentframe=currentframe))
-                            self._objects_.append(Cubic(c1.get("x"), c1.get("y"), 
-                                                        c2.get("x"), c2.get("y"), 
-                                                        element.get("x"), element.get("y"), 
+                            self._objects_.append(Cubic(c1.x, c1.y, 
+                                                        c2.x, c2.y, 
+                                                        element.x, element.y, 
                                                         frameindex=frameindex, 
                                                         currentframe=currentframe))
                             
                         else: # do not parse "curve to data" elements, for now
                             continue 
                         
-                    xx = min([o.get("x") for o in self if o is not None])
-                    yy = min([o.get("y") for o in self if o is not None])
-                    self._position_ = (min([x for x in xx if x is not None]), 
-                                       min([y for y in yy if y is not None]))
+                    x = min([o.x for o in self if o is not None])
+                    y = min([o.y for o in self if o is not None])
+                    self._position_ = (x,y)
                     self._graphics_object_type_ = GraphicsObjectType.path
                     
             else:
@@ -6334,13 +6243,10 @@ class Path(PlanarGraphics):
                             else:
                                 raise TypeError("When constructing a Path, var-positional parameters must be PlanarGraphics objects or tuples of coordinates")
                             
-                    xx = min([o.get("x") for o in self if o is not None])
-                    yy = min([o.get("y") for o in self if o is not None])
-                    self._position_ = (min([x for x in xx if x is not None]), 
-                                       min([y for y in yy if y is not None]))
-                    #self._position_ = (min([o.get("x") for o in self]), 
-                                       #min([o.get("y") for o in self]))
-                    
+                    x = min([o.x for o in self if o is not None])
+                    y = min([o.y for o in self if o is not None])
+                    self._position_ = (x,y)
+
                     # NOTE: 2018-01-20 09:51:23
                     # make sure Path begins with a Move
                     if not isinstance(self._objects_[0], Move):
@@ -6440,8 +6346,8 @@ class Path(PlanarGraphics):
                     state = self.getState(frame)
                     
                 if state and len(state):
-                    path.lineTo(self._objects_[0].get("x"), 
-                                self._objects_[0].get("y")) 
+                    path.lineTo(self._objects_[0].x, 
+                                self._objects_[0].y) 
                 
         return path
             
@@ -6449,7 +6355,10 @@ class Path(PlanarGraphics):
         super().__setattr__(name, value)
         
     def __getattr__(self, name):
-        return super().__getattr__(name)
+        try:
+            return object.__getattribute__(self, name)
+        except:
+            return super().__getattr__(name)
             
     def __setitem__(self, key, value):
         if not isinstance(value, PlanarGraphics):
@@ -6592,26 +6501,26 @@ class Path(PlanarGraphics):
             states = self.getState(self.currentFrame)
             
             for s in states:
-                s.set("x", s.get("x") + dx)
-                s.set("y", s.get("y") + dy)
+                s.x += dx
+                s.y += dy
                 
                 if "cx" in s.__class__._planar_descriptors_:
-                    s.set("cx", s.get("cx") + dx)
+                    s.cx += dx
                     
                 if "c1x" in s.__class__._planar_descriptors_:
-                    s.set("c1x", s.get("c1x") + dx)
+                    s.c1x += dx
                     
                 if "c2x" in s.__class__._planar_descriptors_:
-                    s.set("c2x", s.get("c2x") + dx)
+                    s.c2x += dx
                 
                 if "cy" in s.__class__._planar_descriptors_:
-                    s.set("cy", s.get("cy") + dy)
+                    s.y += dy
                     
                 if "c1y" in s.__class__._planar_descriptors_:
-                    s.set("c1y", s.get("c1y") + dy)
+                    s.c1y += dy
                     
                 if "c2y" in s.__class__._planar_descriptors_:
-                    s.set("c2y", s.get("c2y") + dy)
+                    s.c2y += dy
                 
     def index(self, other, *where):
         if not isinstance(other, PlanarGraphics):
@@ -6769,29 +6678,7 @@ class Path(PlanarGraphics):
     
     @property
     def position(self):
-        if len(self._objects_):
-            #x = min([e.get("x") for e in self._objects_])
-            #y = min([e.get("y") for e in self._objects_])
-            xx = [e.get("x") for e in self._objects_ if e is not None]
-            if len(xx):
-                x = min([x for x in xx if x is not None])
-                
-            else:
-                x = 0
-                
-            yy = [e.get("y") for e in self._objects_ if e is not None]
-            
-            if len(yy):
-                y = min([y for y in yy if y is not None])
-                
-            else:
-                y = 0
-            
-        else:
-            x = 0
-            y = 0
-        
-        self._position_ = (x,y)
+        self._position_ = (self.x, self.y)
         
         return self._position_
             
@@ -6816,10 +6703,9 @@ class Path(PlanarGraphics):
         """
         if len(self._objects_):
             states = self.getState(self.currentFrame)
-            #states = [s for s in self.asPath(self.currentFrame) if s is not None]
             
             if len(states):
-                x = min([s.get("x") for s in states])
+                x = min([s.x for s in states])
                 
             else:
                 x = 0
@@ -6834,26 +6720,25 @@ class Path(PlanarGraphics):
         if len(self._objects_):
             states = self.getState(self.currentFrame)
             if len(states):
-                old_x = min([s.get("x") for s in states])
+                old_x = min([s.x for s in states])
                 
                 delta_x = value - old_x
-                
                 
                 # NOTE: 2018-01-20 22:30:22
                 # shift all elements horizontally, by the distance between
                 # current x coordinate and value
                 #NOTE: 2019-03-28 14:37:22 make sure ALL points in a spline are translated
                 for s in states:
-                    s.set("x", s.get("x") + delta_x)
+                    s.x += delta_x
                     
                     if "cx" in s.__class__._planar_descriptors_:
-                        s.set("cx", s.get("cx") + delta_x)
+                        s.cx += delta_x
                         
                     if "c1x" in s.__class__._planar_descriptors_:
-                        s.set("c1x", s.get("c1x") + delta_x)
+                        s.c1x += delta_x
                         
                     if "c2x" in s.__class__._planar_descriptors_:
-                        s.set("c2x", s.get("c2x") + delta_x)
+                        s.c2x += delta_x
                     
         # this is a tuple !
         self._position_ = (value, self._position_[1]) # (x=value, y)
@@ -6872,7 +6757,7 @@ class Path(PlanarGraphics):
             states = self.getState(self.currentFrame)
             #states = [s for s in self.asPath(self.currentFrame) if s is not None]
             if len(states):
-                y = min([s.get("y") for s in states])
+                y = min([s.y for s in states])
                 
             else:
                 y = 0
@@ -6890,7 +6775,7 @@ class Path(PlanarGraphics):
             #states = [s for s in self.asPath(self.currentFrame) if s is not None]
             
             if len(states):
-                old_y = min([s.get("y") for s in states])
+                old_y = min([s.y for s in states])
                 delta_y = value - old_y
         
                 # NOTE: 2018-01-20 22:33:12
@@ -6898,16 +6783,16 @@ class Path(PlanarGraphics):
                 # current y coordinate and value
                 
                 for s in states:
-                    s.set("y", s.get("y") + delta_y)
+                    s.y += delta_y
                     
                     if "cy" in s.__class__._planar_descriptors_:
-                        s.set("cy", s.get("cy") + delta_y)
+                        s.cy += delta_y
                         
                     if "c1y" in s.__class__._planar_descriptors_:
-                        s.set("c1y", s.get("c1y") + delta_y)
+                        s.c1v += delta_y
                         
                     if "c2y" in s.__class__._planar_descriptors_:
-                        s.set("c2y", s.get("c2y") + delta_y)
+                        s.c2y += delta_y
                     
         # this is a tuple!
         self._position_ = (self._position_[0], value) # (x, y=value)
@@ -7159,12 +7044,12 @@ class Path(PlanarGraphics):
             raise TypeError("value expected to be a boolean; got %s instead" % type(value).__name__)
         
         if value:
-            self.append(Line(self._objects_[0].get("x"), 
-                             self._objects_[0].get("y")))
+            self.append(Line(self._objects_[0].x, 
+                             self._objects_[0].y))
             
         else:
             # remove last element (break-up path)
-            if self._objects_[-1].get("x") == self._objects_[0].get("x") and self._objects_[-1].get("y") == self._objects_[0].get("y"):
+            if self._objects_[-1].x == self._objects_[0].x and self._objects_[-1].y == self._objects_[0].y:
                 del self._objects_[-1]
                 
         self._closed_ = value
@@ -7355,21 +7240,21 @@ class Path(PlanarGraphics):
         for k in range(p.elementCount()): # does not parse CurveToDataElement objects
             if p.elementAt(k).type == QtGui.QPainterPath.MoveToElement:
                 element = p.elementAt(k)
-                self.append(Move(element.get("x"), element.get("y"), 
+                self.append(Move(element.x, element.y, 
                                  frameindex=frameindex, currentframe=currentframe))
                 
             elif p.elementAt(k).type == QtGui.QPainterPath.LineToElement:
                 element = p.elementAt(k)
-                self.append(Line(element.get("x"), element.get("y"), 
+                self.append(Line(element.x, element.y, 
                                  frameindex=frameindex, currentframe=currentframe))
                 
             elif p.elementAt(k).type == QtGui.QPainterPath.CurveToElement:
                 element = p.elementAt(k)
                 c1 = p.elementAt(k+1)
                 c2 = p.elementAt(k+2)
-                self.append(Cubic(x=c1.get("x"), y=c1.get("y"), 
-                                  c1x=c2.get("x"), c1y=c2.get("y"), 
-                                  c2x=element.get("x"), c2y=element.get("y"), 
+                self.append(Cubic(x=c1.x, y=c1.y, 
+                                  c1x=c2.x, c1y=c2.y, 
+                                  c2x=element.x, c2y=element.y, 
                                   frameindex=frameindex, currentframe=currentframe))
                 
             #else: # do not parse curve to data elements
@@ -8801,10 +8686,10 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             return
         
         if isinstance(self.__backend__, (Ellipse, Rect)):
-            self.__cachedPath__ = Path(Move(self.__backend__.get("x"), 
-                                            self.__backend__.get("y")),
-                                       Line(self.__backend__.get("x") + self.__backend__.get("w"),
-                                            self.__backend__.get("y") + self.__backend__.get("h")))
+            self.__cachedPath__ = Path(Move(self.__backend__.x, 
+                                            self.__backend__.y),
+                                       Line(self.__backend__.x + self.__backend__.w,
+                                            self.__backend__.y + self.__backend__.h))
                                     
         elif isinstance(self.__backend__, Path):
             if self.__backend__.hasStateForFrame(self._currentframe_):
@@ -9064,11 +8949,11 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 path.addPath(self.mapFromScene(self.__backend__()))
                 
                 if self._objectType == GraphicsObjectType.line:
-                    p0 = self.mapFromScene(QtCore.QPointF(self.__backend__[0].get("x"), 
-                                                          self.__backend__[0].get("y")))
+                    p0 = self.mapFromScene(QtCore.QPointF(self.__backend__[0].x, 
+                                                          self.__backend__[0].y))
                     
-                    p1 = self.mapFromScene(QtCore.QPointF(self.__backend__[1].get("x"), 
-                                                          self.__backend__[1].get("y")))
+                    p1 = self.mapFromScene(QtCore.QPointF(self.__backend__[1].x, 
+                                                          self.__backend__[1].y))
                     
                     path.addRect(QtCore.QRectF(p0,p1))
                     
@@ -9081,8 +8966,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         
                     if len(self.__cachedPath__) > 1:
                         for k, element in enumerate(self.__cachedPath__):
-                            pt = self.mapFromScene(QtCore.QPointF(element.get("x"), 
-                                                                  element.get("y")))
+                            pt = self.mapFromScene(QtCore.QPointF(element.x, 
+                                                                  element.y))
                             
                             path.addEllipse(pt, self._pointSize, self._pointSize)
 
@@ -9247,24 +9132,24 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 if self._objectType == GraphicsObjectType.vertical_cursor:
                     lines = [self._vline, self._hwbar]
                     
-                    labelPos = self.mapFromScene(QtCore.QPointF(self.__backend__.get("x") - self._labelRect.width()/2, 
+                    labelPos = self.mapFromScene(QtCore.QPointF(self.__backend__.x - self._labelRect.width()/2, 
                                                                 self._labelRect.height()))
 
                 elif self._objectType == GraphicsObjectType.horizontal_cursor:
                     lines = [self._hline, self._vwbar]
-                    labelPos = self.mapFromScene(QtCore.QPointF(0, self.__backend__.get("height")/2 - self._labelRect.height()/2))
+                    labelPos = self.mapFromScene(QtCore.QPointF(0, self.__backend__.height/2 - self._labelRect.height()/2))
 
                 elif self._objectType == GraphicsObjectType.crosshair_cursor:
                     lines = [self._vline, self._hline]
-                    labelPos = self.mapFromScene(QtCore.QPointF(self.__backend__.get("x")  - self._labelRect.width()/2,
+                    labelPos = self.mapFromScene(QtCore.QPointF(self.__backend__.x  - self._labelRect.width()/2,
                                                                 self._labelRect.height()))
                     
                     rects = [self._wrect]
                         
                 else: # point cursor
                     rects = [self._crect]
-                    labelPos = self.mapFromScene(QtCore.QPointF(self.__backend__.get("x") - self._labelRect.width()/2,
-                                                                self.__backend__.get("y") - self._labelRect.height()))
+                    labelPos = self.mapFromScene(QtCore.QPointF(self.__backend__.x - self._labelRect.width()/2,
+                                                                self.__backend__.y - self._labelRect.height()))
 
                 if lines is not None:
                     painter.drawLines(lines)
@@ -9331,8 +9216,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     painter.setBrush(self._controlPointBrush)
                     
                     for k, element in enumerate(self.__cachedPath__):
-                        painter.drawEllipse(element.get("x") - self._pointSize,
-                                            element.get("y") - self._pointSize,
+                        painter.drawEllipse(element.x - self._pointSize,
+                                            elementy - self._pointSize,
                                             self._pointSize * 2., 
                                             self._pointSize * 2.)
                         
@@ -9461,29 +9346,29 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     #if self.__cachedPath__ is not None and len(self.__cachedPath__):
                     if self.__backend__ is not None:
                         if self._objectType == GraphicsObjectType.ellipse:
-                            r_ = self.mapRectFromScene(self.__backend__.get("x"),
-                                                       self.__backend__.get("y"),
-                                                       self.__backend__.get("w"),
-                                                       self.__backend__.het("h"))
+                            r_ = self.mapRectFromScene(self.__backend__.x,
+                                                       self.__backend__.y,
+                                                       self.__backend__.w,
+                                                       self.__backend__.h)
                             
                             painter.drawEllipse(r_)
 
                         elif self._objectType == GraphicsObjectType.rectangle:
-                            r_ = self.mapRectFromScene(self.__backend__.get("x"),
-                                                       self.__backend__.get("y"),
-                                                       self.__backend__.get("w"),
-                                                       self.__backend__.get("h"))
+                            r_ = self.mapRectFromScene(self.__backend__.x,
+                                                       self.__backend__.y,
+                                                       self.__backend__.w,
+                                                       self.__backend__.h)
                             
                             painter.drawRect(r_)
                                                                             
                         elif self._objectType == GraphicsObjectType.point:
-                            p_ = self.mapFromScene(self.__backend__.get("x"),
-                                                   self.__backend__.get("y"))
+                            p_ = self.mapFromScene(self.__backend__.x,
+                                                   self.__backend__.y)
                             
-                            r_ = self.mapRectFromScene(self.__backend__.get("x"),
-                                                       self.__backend__.get("y"),
-                                                       self.__backend__.get("w"),
-                                                       self.__backend__.get("h"))
+                            r_ = self.mapRectFromScene(self.__backend__.x,
+                                                       self.__backend__.y,
+                                                       self.__backend__.w,
+                                                       self.__backend__.h)
                             
                             painter.drawPoint(p_)
 
@@ -9511,8 +9396,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             if self.objectType & GraphicsObjectType.path:
                                 for k, element in enumerate(self.__cachedPath__):
                                     if isinstance(element, Quad):
-                                        pt = self.mapFromScene(QtCore.QPointF(element.get("x"), element.get("y")))
-                                        cp = self.mapFromScene(QtCore.QPointF(element.get("cx"), element.get("cy")))
+                                        pt = self.mapFromScene(QtCore.QPointF(element.x, element.y))
+                                        cp = self.mapFromScene(QtCore.QPointF(element.cx, element.cy))
                                         
                                         painter.drawEllipse(cp.x() - self._pointSize, \
                                                             cp.y() - self._pointSize, \
@@ -9526,9 +9411,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                         painter.drawLine(cp, pt)
                                         
                                     elif isinstance(element, Cubic):
-                                        pt  = self.mapFromScene(QtCore.QPointF(element.get("x"), element.get("y")))
-                                        cp1 = self.mapFromScene(QtCore.QPointF(element.get("c1x"), element.get("c1y")))
-                                        cp2 = self.mapFromScene(QtCore.QPointF(element.get("c2x"), element.get("c2y")))
+                                        pt  = self.mapFromScene(QtCore.QPointF(element.x, element.y))
+                                        cp1 = self.mapFromScene(QtCore.QPointF(element.c1x, element.c1y))
+                                        cp2 = self.mapFromScene(QtCore.QPointF(element.c2x, element.c2y))
                                         
                                         painter.drawEllipse(cp1, self._pointSize, self._pointSize)
                                         
@@ -9543,16 +9428,16 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                         
                                     else:
                                         
-                                        pt = self.mapFromScene(QtCore.QPointF(element.get("x"), element.get("y")))
+                                        pt = self.mapFromScene(QtCore.QPointF(element.x, element.y))
                                         
                                         painter.drawEllipse(pt, self._pointSize, self._pointSize)
                                         
                             elif self._objectType & (GraphicsObjectType.rectangle | GraphicsObjectType.ellipse):
-                                p0 = self.mapFromScene(QtCore.QPointF(self.__cachedPath__[0].get("x"), 
-                                                                      self.__cachedPath__[0].get("y")))
+                                p0 = self.mapFromScene(QtCore.QPointF(self.__cachedPath__[0].x, 
+                                                                      self.__cachedPath__[0].y))
                                 
-                                p1 = self.mapFromScene(QtCore.QPointF(self.__cachedPath__[1].get("x"),
-                                                                      self.__cachedPath__[1].get("y")))
+                                p1 = self.mapFromScene(QtCore.QPointF(self.__cachedPath__[1].x,
+                                                                      self.__cachedPath__[1].y))
                                     
                                 painter.drawEllipse(p0, self._pointSize, self._pointSize)
                                 painter.drawLine(p0,p1)
@@ -9560,7 +9445,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                     
                             else:
                                 for k, element in enumerate(self.__cachedPath__):
-                                    pt = self.mapFromScene(QtCore.QPointF(element.get("x"), element.get("y")))
+                                    pt = self.mapFromScene(QtCore.QPointF(element.x, element.y))
                                     
                                     painter.drawEllipse(pt, self._pointSize, self._pointSize)
                                     
@@ -9694,8 +9579,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     if newPos.x() < 0:
                         newPos.setX(0.0)
                         
-                    elif newPos.x() > self.__backend__.get("width"):
-                        newPos.setX(self.__backend__.get("width"))
+                    elif newPos.x() > self.__backend__.width:
+                        newPos.setX(self.__backend__.width)
 
                 # horizontal cursors
                 elif self._objectType == GraphicsObjectType.horizontal_cursor:
@@ -9707,47 +9592,47 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     if newPos.y() < 0:
                         newPos.setY(0.0)
                         
-                    elif newPos.y() > self.__backend__.get("height"):
-                        newPos.setY(self.__backend__.get("height"))
+                    elif newPos.y() > self.__backend__.height:
+                        newPos.setY(self.__backend__.height)
 
                 # crosshair cursors
                 elif self._objectType == GraphicsObjectType.crosshair_cursor:
                     if newPos.x() <= 0.0:
                         newPos.setX(0.0)
                         
-                    if newPos.x() > self.__backend__.get("width"):
-                        newPos.setX(self.__backend__.get("width"))
+                    if newPos.x() > self.__backend__.width:
+                        newPos.setX(self.__backend__.width)
 
                     if newPos.y() <= 0.0:
                         newPos.setY(0.0)
                         
-                    if newPos.y() > self.__backend__.get("height"):
-                        newPos.setY(self.__backend__.get("height"))
+                    if newPos.y() > self.__backend__.height:
+                        newPos.setY(self.__backend__.height)
                         
-                    self._deltaPos = (newPos - QtCore.QPointF(self.__backend__.get("x"), 
-                                                              self.__backend__.get("y")))
+                    self._deltaPos = (newPos - QtCore.QPointF(self.__backend__.x, 
+                                                              self.__backend__.y))
                     
                 else: # point cursors
                     if newPos.x() <= 0.0:
                         newPos.setX(0.0)
                         
-                    if newPos.x() > self.__backend__.get("width"):
-                        newPos.setX(self.__backend__.get("width"))
+                    if newPos.x() > self.__backend__.width:
+                        newPos.setX(self.__backend__.width)
 
                     if newPos.y() <= 0.0:
                         newPos.setY(0.0)
                         
-                    if newPos.y() > self.__backend__.get("height"):
-                        newPos.setY(self.__backend__.get("height"))
+                    if newPos.y() > self.__backend__.height:
+                        newPos.setY(self.__backend__.height)
                         
-                    self._deltaPos = (newPos - QtCore.QPointF(self.__backend__.get("x"),
-                                                              self.__backend__.get("y")))
+                    self._deltaPos = (newPos - QtCore.QPointF(self.__backend__.x,
+                                                              self.__backend__.y))
                     
                 # NOTE: 2018-01-18 15:44:28
                 # CAUTION value is already in scene coordinates, so no mapping needed
                 # here; 
-                self.__backend__.set("x", newPos.x())
-                self.__backend__.set("y", newPos.y())
+                self.__backend__.x = newPos.x()
+                self.__backend__.y = newPos.y()
                 
             elif self._objectType & GraphicsObjectType.allShapeTypes:
                 #non-cursor types
@@ -9756,8 +9641,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     self.__backend__.y = value.y()
                     
                 else:
-                    self.__backend__.set("x", value.x())
-                    self.__backend__.set("y", value.y())
+                    self.__backend__.x = value.x()
+                    self.__backend__.y = value.y()
                 
             self.__backend__.updateLinkedObjects()
 
@@ -10010,7 +9895,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             for k, p in enumerate(self.__cachedPath__):
                 if isinstance(p, Quad):
                     d = QtCore.QLineF(evt.pos(), self.mapFromScene(p.point())).length() # d = length of line between event pos and point pos
-                    dc1 = QtCore.QLineF(evt.pos(), self.mapFromScene(QtCore.QPointF(p.get("cx"), p.get("cy")))).length()
+                    dc1 = QtCore.QLineF(evt.pos(), self.mapFromScene(QtCore.QPointF(p.cx, p.cy))).length()
 
                     self._c_shape_point = -1
                     
@@ -10028,8 +9913,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
 
                 elif isinstance(p, Cubic):
                     d = QtCore.QLineF(evt.pos(), self.mapFromScene(p.point())).length() # d = length of line between event pos and point pos
-                    dc1 = QtCore.QLineF(evt.pos(), self.mapFromScene(QtCore.QPointF(p.get("c1x"), p.get("c1y")))).length()
-                    dc2 = QtCore.QLineF(evt.pos(), self.mapFromScene(QtCore.QPointF(p.get("c2x"), p.get("c2y")))).length()
+                    dc1 = QtCore.QLineF(evt.pos(), self.mapFromScene(QtCore.QPointF(p.c1x, p.c1y))).length()
+                    dc2 = QtCore.QLineF(evt.pos(), self.mapFromScene(QtCore.QPointF(p.c2x, p.c2y))).length()
                     #print("Cubic")
                     
                     self._c_shape_point = -1
@@ -10145,12 +10030,12 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         
                     elif isinstance(self.__cachedPath__[-1], Quad):
                         q = self.__cachedPath__[-1]
-                        self.__cachedPath__[-1] = Quad(q.get("x1"), q.get("y1"), 
+                        self.__cachedPath__[-1] = Quad(q.x1, q.y1, 
                                                        evt.pos().x(), evt.pos().y())
                         
                     elif isinstance(self.__cachedPath__[-1], Cubic): # because the path may have been "normalized"
                         c = self.__cachedPath__[-1]
-                        self.__cachedPath__[-1] = Quad(c.get("x"), c.get("y"), c.get("x1"), c.get("y1"), 
+                        self.__cachedPath__[-1] = Quad(c.x, c.y, c.x1, c.y1, 
                                                        evt.pos().x(), evt.pos().y())
                     
                 
@@ -10189,26 +10074,26 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 elif isinstance(element, Quad):
                     if self._c_activeControlPoint == 0:
                         self.__cachedPath__[self._c_activePoint] = Quad(cx=epos.x(), cy=epos.y(),
-                                                                        x=element.get("x"), y=element.get("y"),)
+                                                                        x=element.x, y=element.y,)
                         
                     else:
-                        self.__cachedPath__[self._c_activePoint] = Quad(cx=element.get("cx"), cy=element.get("cy"),
+                        self.__cachedPath__[self._c_activePoint] = Quad(cx=element.cx, cy=element.cy,
                                                                         x=epos.x(), y=epos.y())
                     
                 elif isinstance(element, Cubic):
                     if self._c_activeControlPoint == 0:
                         self.__cachedPath__[self._c_activePoint] = Cubic(c1x=epos.x(), c1y=epos.y(),
-                                                                         c2x=element.get("c2x"), c2y=element.get("c2y"),
-                                                                         x=element.get("x"), y=element.get("y"),)
+                                                                         c2x=element.c2x, c2y=element.c2y,
+                                                                         x=element.x, y=element.y,)
                         
                     elif self._c_activeControlPoint == 1:
-                        self.__cachedPath__[self._c_activePoint] = Cubic(c1x=element.get("c1x"), c1y=element.get("c1y"),
+                        self.__cachedPath__[self._c_activePoint] = Cubic(c1x=element.c1x, c1y=element.c1y,
                                                                          c2x=epos.x(), c2y=epos.y(),
-                                                                         x=element.get("x"), y=element.get("y"))
+                                                                         x=element.x, y=element.y)
                         
                     else:
-                        self.__cachedPath__[self._c_activePoint] = Cubic(c1x=element.get("c1x"), c1y=element.get("c1y"),
-                                                                         c2x=element.get("c2x"), c2y=element.get("c2y"),
+                        self.__cachedPath__[self._c_activePoint] = Cubic(c1x=element.c1x, c1y=element.c1y,
+                                                                         c2x=element.c2x, c2y=element.c2y,
                                                                          x=epos.x(), y=epos.y())
                         
                 if self.__backend__ is not None:
@@ -10610,8 +10495,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     
                     newX = self.pos().x() + moveX
                     
-                    if newX > self.__backend__.get("width")-1:
-                        moveX = self.__backend__.get("width")-1 - self.pos().x()
+                    if newX > self.__backend__.width-1:
+                        moveX = self.__backend__.width-1 - self.pos().x()
                     
                     self.moveBy(moveX, 0.0)
                         
@@ -10646,8 +10531,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         
                     newY = self.pos().y() + moveY
                     
-                    if newY > self.__backend__.get("height")-1:
-                        moveY = self.__backend__.get("height")-1 - self.pos().y
+                    if newY > self.__backend__.height-1:
+                        moveY = self.__backend__.height-1 - self.pos().y
                         
                     self.moveBy(0.0, moveY)
                         
@@ -10655,17 +10540,17 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     y = self.pos().y()
                     self.setPos(0, y)
                     
-                elif self.pos().x() > self.__backend__.get("width")-1:
+                elif self.pos().x() > self.__backend__.width-1:
                     y = self.pos().y()
-                    self.setPos(self.__backend__.get("width")-1, y)
+                    self.setPos(self.__backend__.width-1, y)
                     
                 if self.pos().y() < 0:
                     x = self.pos().x()
                     self.setPos(x, 0)
                     
-                elif self.pos().y() > self.__backend__.get("height")-1:
+                elif self.pos().y() > self.__backend__.height-1:
                     x = self.pos().x()
-                    self.setPos(x, self.__backend__.get("height")-1)
+                    self.setPos(x, self.__backend__.height-1)
                     
             else:
                 if evt.key() == QtCore.Qt.Key_Right:
@@ -10700,17 +10585,17 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     y = self.pos().y()
                     self.setPos(0, y)
                     
-                elif self.pos().x() > self.__backend__.get("width")-1:
+                elif self.pos().x() > self.__backend__.width-1:
                     y = self.pos().y()
-                    self.setPos(self.__backend__.get("width")-1, y)
+                    self.setPos(self.__backend__.width-1, y)
                     
                 if self.pos().y() < 0:
                     x = self.pos().x()
                     self.setPos(x, 0)
                     
-                elif self.pos().y() > self.__backend__.get("height")-1:
+                elif self.pos().y() > self.__backend__.height-1:
                     x = self.pos().x()
-                    self.setPos(x, self.__backend__.get("height")-1)
+                    self.setPos(x, self.__backend__.height-1)
                     
         else:
             # non-cursor types
@@ -10896,21 +10781,21 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         # TODO code for all non-Cursor types!
         if isinstance(self.__backend__, (Ellipse, Rect)) and len(self.__cachedPath__) >= 2:
             if self.hasStateDescriptor:
-                self.__backend__.set("x", self.__cachedPath__[0].get("x"))
+                self.__backend__.x = self.__cachedPath__[0].x
                 
-                self.__backend__.set("y", self.__cachedPath__[0].get("y"))
+                self.__backend__.y = self.__cachedPath__[0].y
                 
-                self.__backend__.set("w", self.__cachedPath__[1].get("x") - self.__cachedPath__[0].get("x"))
+                self.__backend__.w = self.__cachedPath__[1].x - self.__cachedPath__[0].x
                 
-                self.__backend__.set("h", self.__cachedPath__[1].get("y") - self.__cachedPath__[0].get("y"))
+                self.__backend__.h = self.__cachedPath__[1].y - self.__cachedPath__[0].y
                 
                 self.__backend__.updateLinkedObjects()
                 
         elif isinstance(self.__backend__, Path):
             try:
                 for k, element in enumerate(self.__cachedPath__):
-                    self.__backend__[k].set("x", element.get("x"))
-                    self.__backend__[k].set("y", element.get("y"))
+                    self.__backend__[k].x = element.x
+                    self.__backend__[k].y = element.y
                     
                 self.__backend__.updateLinkedObjects()
                     
@@ -11118,8 +11003,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         for c in self._linkedGraphicsObjects:
             if c != self.__backend__:
-                c.set("x", val)
-                #c.x = val
+                c.x = val
                 
                 for f in c.frontends:
                     if f != self:
@@ -11156,8 +11040,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 if len(self._linkedGraphicsObjects):
                     for c in self._linkedGraphicsObjects:
                         if c != self.__backend__:
-                            c.set("xwindow", val)
-                            #c.xwindow = val
+                            c.xwindow = val
                             
                             for f in c.frontends:
                                 if f != self:
@@ -11187,8 +11070,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         if len(self._linkedGraphicsObjects):
             for c in self._linkedGraphicsObjects:
                 if c != self.__backend__:
-                    c.set("y", val)
-                    #c.y = val
+                    c.y = val
                     
                     for f in c.frontends:
                         if f != self:
@@ -11224,8 +11106,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 if len(self._linkedGraphicsObjects):
                     for c in self._linkedGraphicsObjects:
                         if c != self.__backend__:
-                            c.set("ywindow", val)
-                            #c.ywindow = val
+                            c.ywindow = val
                             
                             for f in c.frontends:
                                 if f != self:

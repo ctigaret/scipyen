@@ -34,13 +34,13 @@ import core.datatypes as dt
 import core.strutils as strutils
 from core.strutils import string_to_float
 
-from core.utilities import safeWrapper, unique
+from core.utilities import (safeWrapper, unique,)
 
-import core.triggerprotocols
-from core.triggerprotocols import TriggerEvent, TriggerProtocol
+from core.triggerprotocols import TriggerProtocol
+from core.triggerprotocols import (TriggerEvent, TriggerEventType,)
 
 import core.datasignal
-from core.datasignal import DataSignal, IrregularlySampledDataSignal
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 
 #### END pict.core modules
 

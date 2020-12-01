@@ -64,10 +64,12 @@ import vigra
 import matplotlib as mpl
 from matplotlib import cm, colors
 
-try:
-    import cmocean # some cool palettes/luts
-except:
-    pass
+# NOTE 2020-11-28 10:03:15
+# taken care of when importing customcm, below
+#try:
+    #import cmocean # some cool palettes/luts
+#except:
+    #pass
 
 from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
@@ -97,7 +99,10 @@ from .scipyenviewer import ScipyenViewer, ScipyenFrameViewer
 
 from . import signalviewer as sv
 from . import pictgui as pgui
-from . import custom_colormaps as customcm
+
+# NOTE 2020-11-28 10:04:05
+# this should automatically import our custom colormaps AND ocean colormaps if found
+from . import custom_colormaps as customcm 
 from . import quickdialog
 #### END pict.gui modules
 
@@ -105,23 +110,26 @@ mpl.rcParams['backend']='Qt5Agg'
 
 #__viewer_info__ = {"alias": "iv", "class": "ImageViewer"}
 
-
+# NOTE 2020-11-28 10:05:40 
+# takes care of custom colormaps and supersedes the NOTE below:
 # NOTE: 2017-06-22 14:22:00 added custom color maps
-customcm.register_custom_colormaps()
+#customcm.register_custom_colormaps()
 
 #cm.register_cmap(cmap = cm.cmap_d["gray"])
 
 
-colormaps = cm.cmap_d.copy() # now this has all mpl and custom colormaps
+#colormaps = cm.cmap_d.copy() # now this has all mpl and custom colormaps
+#none_colormap = cm.get_cmap(name="gray") # now this has all mpl and custom colormaps
+#cm.register_cmap(name="None", cmap=none_colormap)
 
 # NOTE: 2019-03-26 09:54:59
 # add a "None" colormap NOW (actually, map it to "gray")
-colormaps["None"] = cm.cmap_d["gray"]
+#colormaps["None"] = cm.cmap_d["gray"]
 
-try:
-    colormaps.update(cmocean.cm.cmap_d)
-except:
-    pass
+#try:
+    #colormaps.update(cmocean.cm.cmap_d)
+#except:
+    #pass
 
 #colormapnames = [n for n in colormaps.keys()]
 #colormapnames.sort()
@@ -1310,24 +1318,24 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             valx = np.floor(self.__scene__.rootImage.boundingRect().center().x())
             valy = np.floor(self.__scene__.rootImage.boundingRect().center().y())
             
-            if cType.get("xwindow") is None:
-                cType.set("xwindow", window)
+            if cType.xwindow is None:
+                cType.xwindow = window
     
-            if cType.get("ywindow") is None:
-                cType.set("ywindow", window)
+            if cType.ywindow is None:
+                cType.ywindow = window
                 
             if isinstance(pos, (tuple, list)) and \
                 len(pos) == 2 and all([isinstance(a, (numbers.Real, pq.Quantity)) for a in pos]):
-                cType.set("x", pos[0])
-                cType.set("y", pos[1])
+                cType.x = pos[0]
+                cType.y = pos[1]
             
             elif isinstance(pos, (QtCore.QPoint, QtCore.QPointF)):
-                cType.set("x", pos.x())
-                cType.set("y", pos.y())
+                cType.x = pos.x()
+                cType.y = pos.y()
         
             else:
                 # no pos specified -- unlikely but anyhow...
-                if cType.get("x") is None or cType.get("y") is None:
+                if cType.x is None or cType.y is None:
                     # just in case the PlanarGraphics object x or y are not set
                     if len(cDict) > 0:
                         # find a suitable position so we don't land on previous objects
@@ -1340,9 +1348,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                             max_x = max([o.x for o in cDict.values()])
                             min_x = min([o.x for o in cDict.values()])
                             
-                            #max_x = max([o.get("x") for o in cDict.values()])
-                            #min_x = min([o.get("x") for o in cDict.values()])
-                            
                             valx = (self.__scene__.rootImage.boundingRect().width() + max_x) / 2
                             
                         if cType.type & pgui.GraphicsObjectType.horizontal_cursor or \
@@ -1352,23 +1357,22 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                             # NOTE: 2020-11-18 10:46:23
                             # o is a GraphicsObject, not PlanarGraphicsObject!
                             max_y = max([o.y for o in cDict.values()])
-                            #max_y = max([o.get("y") for o in cDict.values()])
                             valy = (self.__scene__.rootImage.boundingRect().height() + max_y) / 2
                             
-                    if cType.get("x") is None:
-                        cType.set("x", valx)
+                    if cType.x is None:
+                        cType.x = valx
                         
-                    if cType.get("y") is None:
-                        cType.set("y", valy)
+                    if cType.y is None:
+                        cType.y = valy
                     
-            if cType.get("width") is None:
-                cType.set("width", self.__scene__.sceneRect().width())
+            if cType.width is None:
+                cType.width = self.__scene__.sceneRect().width()
                 
-            if cType.get("height") is None:
-                cType.set("height", self.__scene__.sceneRect().height())
+            if cType.height is None:
+                cType.height = self.__scene__.sceneRect().height()
             
-            if cType.get("radius") is None:
-                cType.set("radius", self.__cursorRadius__)
+            if cType.radius is None:
+                cType.radius = self.__cursorRadius__
                 
             if isinstance(label, str) and len(label) > 0:
                 crsId = label
@@ -1517,14 +1521,14 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                             cType & pgui.GraphicsObjectType.crosshair_cursor or \
                                 cType & pgui.GraphicsObjectType.point_cursor:
                             
-                            max_x = max([o.get("x") for o in cDict.values()])
+                            max_x = max([o.x for o in cDict.values()])
                             valx = (self.__scene__.rootImage.boundingRect().width() + max_x) / 2
                             
                         if cType & pgui.GraphicsObjectType.horizontal_cursor or \
                             cType & pgui.GraphicsObjectType.crosshair_cursor or \
                                 cType & pgui.GraphicsObjectType.point_cursor:
                         
-                            max_y = max([o.get("y") for o in cDict.values()])
+                            max_y = max([o.y for o in cDict.values()])
                             valy = (self.__scene__.rootImage.boundingRect().height() + max_y) / 2
                             
                     point = QtCore.QPointF(valx, valy)
@@ -3773,7 +3777,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     @pyqtSlot(str)
     @safeWrapper
     def slot_testColorMap(self, item):
-        self.colorMap = colormaps.get(item, None)
+        # NOTE 2020-11-28 10:19:07
+        # upgrade to matplotlib 3.x
+        if item in cm._cmap_registry:
+            self.colorMap = cm.get_cmap(name=item, lut=256)
+        else:
+            self.colorMap = cm.get_cmap("None", lut=256)
+        #self.colorMap = colormaps.get(item, None)
         self.displayFrame()
           
     @pyqtSlot()
@@ -3784,7 +3794,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.prevColorMap = self.colorMap # cache the current colorMap
         
-        colormapnames = sorted([n for n in colormaps.keys()])
+        # NOTE 2020-11-28 10:19:07
+        # upgrade to matplotlib 3.x
+        colormapnames = sorted([n for n in cm._cmap_registry.keys()])
+        #colormapnames = sorted([n for n in colormaps.keys()])
         
         if isinstance(self.colorMap, colors.Colormap):
             d = pgui.ItemsListDialog(self, itemsList=colormapnames, title="Select color map", preSelected=self.colorMap.name)
@@ -4391,8 +4404,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.viewerWidget.clear()
         
     def setColorMap(self, value):
-        if isinstance(value, str):
-            self.colorMap = colormaps.get(value, None)
+        if isinstance(value, str) and value in cm._cmap_registry:
+            self.colorMap = cm.get_cmap(value)
+            #self.colorMap = colormaps.get(value, None)
             
         elif isinstance(value, colors.Colormap):
                 self.colorMap = value

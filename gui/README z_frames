@@ -49,11 +49,54 @@ Rules:
         the state is NOT visible anywhere.
         
         
-Implementation of rules.
+Implementation of rules - changing frame indices (pseudo-code)
 
-1. Changing z_frame value for a single state:
+Scenario 1. Changing z_frame value for a single state, to a ""new_frame_index""
+    
+    Should be implemented by a function which takes two parameters (arguments):
+        "state":  a DataBag or an int index into self._states_
+        "new_frame_index": None or an int;
+        
+        The state parameter:
+            * if a DataBag it must be found in self._states_
+            * if an int it must be 0 <= state < len(self._states_)
 
-    Function example: setFrameForState()
+        
+        if new_frame_index is None:
+            the state becomes ubiquitous
+            all other states are discarded
+        
+        elif isinstance(new_frame_index , int):
+            if new_frame_index < 0:
+                the state becomes frame-avoiding 
+                all other states are discarded EXCEPT the single-frame state that
+                    would be visible in the frame with index 
+                    -1 * "new_frame_index" - 1 if such a state exists.
+                
+            if new_frame_index >= 0:
+                the state becomes single-frame
+                
+                - if there is another single-frame state visible in the frame with
+                index "new_frame_index", it is discarded (i.e. replaced by the
+                state that underwent the change in z_frame)
+                
+                - if there is a frame-avoiding state fa_state invisible in the 
+                frame with index "new_frame_index", i.e.
+                    fa_state.z_frame == -new_frame_index - 1
+                    
+                    then the fa_state is left in place
+                
+                - if there is a frame-avoiding state fa_state that is visible
+                in the frame with index "new_frame_index", i.e.
+                    
+                    fa_state.z_frame != -new_frame_index - 1
+                
+                    then it is COPIED to generate single-frame states visible in
+                    all frames where the original fa_state would have been visible
+                    EXCEPT the frame with index "new_frame_index"
+    
+
+    Function example: PlanarGraphics.setFrameIndex(state, new_frame)
 
     Function parameters:
     

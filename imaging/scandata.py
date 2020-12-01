@@ -18,9 +18,11 @@ from core.datatypes import (UnitTypes,Genotypes, arbitrary_unit, pixel_unit,
                             embryonic_day, embryonic_week, embryonic_month,
                             )
 
+from core.triggerevent import (TriggerEvent, TriggerEventType,)
 
-from core.triggerprotocols import (TriggerEvent, TriggerEventType, TriggerProtocol,
-                                   embed_trigger_protocol, embed_trigger_event,)
+from core.triggerprotocols import (TriggerProtocol,
+                                   embed_trigger_protocol, 
+                                   embed_trigger_event,)
 from ephys import ephys
 
 from imaging.vigrautils import getFrameLayout
@@ -2021,6 +2023,7 @@ class ScanData(object):
         #print("ScanData.__init__ start")
         # user-defined (meta) data
         self._annotations_ = dict()
+        self._metadata_ = None
         
         # NOTE: 2019-01-16 15:16:17
         # enable storage of custom unit type and genotype with ScanData
@@ -2849,7 +2852,6 @@ class ScanData(object):
         
         if isinstance(value, DataBag) and hasattr(value, "type"):
             if value.type == "PVScan":
-                #if value.sequences[0].sequence.sequencetype == PrairieView.PVSequenceType.Linescan:
                 if value.sequences[0].attributes.sequencetype == PVSequenceType.Linescan:
                     self._analysismode_ = ScanData.ScanDataAnalysisMode.frame
                     self._scandatatype_ = ScanData.ScanDataType.linescan
@@ -2857,9 +2859,9 @@ class ScanData(object):
                     #print("ScanData._parse_metadata_() build roi as Path")
                     roi = pgui.Path(*value.sequences[0].definition.coordinates)
                     
-                    if all([isinstance(e, (pgui.Move, pgui.Line)) for e in roi]):
-                        #print("ScanData._parse_metadata_() simplifying Path")
-                        roi = pgui.simplifyPath(roi)
+                    #if all([isinstance(e, (pgui.Move, pgui.Line)) for e in roi]):
+                        ##print("ScanData._parse_metadata_() simplifying Path")
+                        #roi = pgui.simplifyPath(roi)
                     
                     if roi.type.name in ("line", "polyline", "arc", "quad", "cubic") or\
                         (roi.type.name == "path" and not roi.closed): 
@@ -2868,9 +2870,13 @@ class ScanData(object):
                     else:
                         roi.name = "scan"
                         
+                    # NOTE: 2020-11-30 10:02:35:
+                    # no need for this: the scann region should be the same in
+                    # all frames when scandata is imported
+                    #roi.frameIndices = [f for f in range(self.sceneFrames)]
                     self._scan_region_ = roi
                         
-                    roi.frameIndices = [f for f in range(self.sceneFrames)]
+                    #self._scan_region_.frameIndices = [f for f in range(self.sceneFrames)]
                     
             else: # TODO parse ScanImage data structures as well
                 # see NOTE: 2017-11-19 22:27:30 _analysismode_ and _scandatatype_
@@ -6828,7 +6834,7 @@ class ScanData(object):
         # add the trigger protocols:
         #if len(result._electrophysiology_.segments):
             #for p in protocol_list:
-                #ephys.embed_trigger_protocol(p, result._electrophysiology_)
+                #embed_trigger_protocol(p, result._electrophysiology_)
             
         # NOTE: 2018-06-17 16:24:30
         # adopt trigger protocols - do I still need this ?
@@ -7784,15 +7790,15 @@ class ScanData(object):
             for p in self._trigger_protocols_:
                 #print("ScanData.adoptTriggerProtocols:", p.name)
                 rev_p = p.reverseAcquisition(copy=True)
-                ephys.embed_trigger_protocol(p, 
+                embed_trigger_protocol(p, 
                                                 self._electrophysiology_,
                                                 clearTriggers=True)
                 
-                ephys.embed_trigger_protocol(rev_p, 
+                embed_trigger_protocol(rev_p, 
                                                 self._scans_block_,
                                                 clearTriggers=True)
                 
-                ephys.embed_trigger_protocol(rev_p, 
+                embed_trigger_protocol(rev_p, 
                                                 self._scene_block_,
                                                 clearTriggers=True)
                 
@@ -7818,16 +7824,16 @@ class ScanData(object):
                     
                     if imaging_source: # adopting protocol from a scans or scene block
                         # store ref to reversed acquisition of original
-                        ephys.embed_trigger_protocol(reversedProtocol,
+                        embed_trigger_protocol(reversedProtocol,
                                                         self._electrophysiology_,
                                                         clearTriggers=True)
                         
                         # store copy of original
-                        ephys.embed_trigger_protocol(protocol,
+                        embed_trigger_protocol(protocol,
                                                         self._scans_block_,
                                                         clearTriggers=True)
                         
-                        ephys.embed_trigger_protocol(protocol,
+                        embed_trigger_protocol(protocol,
                                                         self._scene_block_,
                                                         clearTriggers=True)
                         
@@ -7835,17 +7841,17 @@ class ScanData(object):
                         
                     else: # adopting protocol from an ephys block
                         # store ref to original
-                        ephys.embed_trigger_protocol(protocol,
+                        embed_trigger_protocol(protocol,
                                                         self._electrophysiology_,
                                                         clearTriggers=True)
                         
                         # store ref to reverse acquisition copy of origiinal
-                        ephys.embed_trigger_protocol(reversedProtocol,
+                        embed_trigger_protocol(reversedProtocol,
                                                         self._scans_block_,
                                                         clearTriggers=True)
                         
                         # store ref to reverse acquisition copy of original
-                        ephys.embed_trigger_protocol(reversedProtocol,
+                        embed_trigger_protocol(reversedProtocol,
                                                         self._scene_block_,
                                                         clearTriggers=True)
                         
@@ -7901,15 +7907,15 @@ class ScanData(object):
         # in imaging block we store COPIES of protocol events with reversed acquisition!
         rev_p = protocol.reverseAcquisition(copy=True)
         
-        ephys.embed_trigger_protocol(protocol,
+        embed_trigger_protocol(protocol,
                                         self._electrophysiology_,
                                         clearEvents=False)
         
-        ephys.embed_trigger_protocol(rev_p,
+        embed_trigger_protocol(rev_p,
                                         self._scans_block_,
                                         clearEvents=False)
         
-        ephys.embed_trigger_protocol(rev_p,
+        embed_trigger_protocol(rev_p,
                                         self._scene_block_,
                                         clearEvents=False)
         
@@ -8861,17 +8867,17 @@ class ScanData(object):
             for p in self._trigger_protocols_:
                 rev_p = p.reverseAcquisition(copy=True)
                 
-                ephys.embed_trigger_protocol(p,
+                embed_trigger_protocol(p,
                                                 self._electrophysiology_,
                                                 clearTriggers=True,
                                                 clearEvents=False)
                 
-                ephys.embed_trigger_protocol(rev_p,
+                embed_trigger_protocol(rev_p,
                                                 self._scans_block_,
                                                 clearTriggers=True,
                                                 clearEvents=False)
                 
-                ephys.embed_trigger_protocol(rev_p,
+                embed_trigger_protocol(rev_p,
                                                 self._scene_block_,
                                                 clearTriggers=True,
                                                 clearEvents=False)
@@ -9818,13 +9824,13 @@ class ScanData(object):
                 for p in self._trigger_protocols_:
                     rev_p = p.reverseAcquisition(copy=True)
                     
-                    ephys.embed_trigger_protocol(p, self._electrophysiology_,
+                    embed_trigger_protocol(p, self._electrophysiology_,
                                                  clearEvents=False)
                     
-                    ephys.embed_trigger_protocol(rev_p, self._scans_block_,
+                    embed_trigger_protocol(rev_p, self._scans_block_,
                                                  clearEvents=False)
                     
-                    ephys.embed_trigger_protocol(rev_p, self._scene_block_,
+                    embed_trigger_protocol(rev_p, self._scene_block_,
                                                  clearEvents=False)
             
                 
