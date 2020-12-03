@@ -2182,10 +2182,10 @@ class PVScan(object):
         return "\n".join(ret)
     
     
-class PVImportDialog(__UI_PVImporterDialog__, __QDialog__):
+class PVImportDialog(WorkspaceGuiMixin, __UI_PVImporterDialog__, __QDialog__):
     """TODO
     """
-    def __init__(self, parent, currentdir, 
+    def __init__(self, currentdir=None, 
                  presyn_trigger_detect=None, 
                  postsyn_trigger_detect=None, 
                  photo_trigger_detect=None, 
@@ -2193,14 +2193,14 @@ class PVImportDialog(__UI_PVImporterDialog__, __QDialog__):
                  name=None,
                  pvdata_name=None, 
                  ephys_name=None, 
-                 options=None):
-        super().__init__(self, parent)
-        
-        if not isinstance(parent, QtWidgets, QWidget):
-            raise TypeError("parent expected to be a QWidget; got %s instead" % type(parent).__name__)
+                 options=None, 
+                 **kwargs):
+        super(WorkspaceGuiMixin, self).__init__(**kwargs)
+        super().__init__(self, **kwargs)
         
         if not isinstance(currentdir, str):
-            raise TypeError("currentdir expected to be a string; got %s instead" % type(currentdir).__name__)
+            currentdir = os.getcwd()
+            #raise TypeError("currentdir expected to be a string; got %s instead" % type(currentdir).__name__)
         
         if not os.path.exists(currentdir) or not os.path.isdir(currentdir) or not os.access(currentdir, os.R_OK):
             raise ValueError("%s is not a readable directory" % currentdir)
@@ -2269,7 +2269,7 @@ class PVImportDialog(__UI_PVImporterDialog__, __QDialog__):
         self.ephysFilesFilter       = ";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)"])
         
         self.name                   = name
-        self.pvdata_name            = data_name
+        self.pvdata_name            = pvdata_name
         self._ephys_name            = ephys_name
         
         self.pvXMLfileName          = None
@@ -2279,6 +2279,7 @@ class PVImportDialog(__UI_PVImporterDialog__, __QDialog__):
         self.ephysdata              = None
         
         self.scandata               = None
+        self.__configure_UI__()
         
     def __configure_UI__(self):
         self.setupUi(self)

@@ -6061,6 +6061,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 tp, _ = parse_trigger_protocols(self._data_.electrophysiology)
                 
                 if len(tp) == 0:
+                    # NOTE: 2020-12-03 12:51:46:
+                    # passing a simple dialog here; this will be supplemented 
+                    # with trigger protocol detection fields in _trigger_events_detection_gui_
                     OK, trig_dlg_result = self._trigger_events_detection_gui_(self._data_.analysisOptions,
                                                                                 ephysStart, ephysEnd,
                                                                                 dlg=dlg)
