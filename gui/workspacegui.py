@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-import typing, warnings, os
+import typing, warnings, os, inspect
 from PyQt5 import QtCore, QtWidgets, QtGui
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
+#from traitlets.config import SingletonConfigurable
 from core.utilities import safeWrapper
 from core.workspacefunctions import user_workspace
-
 
 class WorkspaceGuiMixin:
     """Mixin class for windows that need to be aware of Scipyen's main workspace.
@@ -13,8 +13,21 @@ class WorkspaceGuiMixin:
     """
     
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
-                 pWin: (QtWidgets.QMainWindow, type(None))= None ):
+                 pWin: (QtWidgets.QMainWindow, type(None))= None , title=""):
         self._scipyenWindow_ = None
+        
+        # NOTE: 2020-12-05 21:12:43:
+        # user_workspace(does NOT work here unless this is called by a 
+        # constructor executed in the Scipyen console (so that the user workspace
+        # is contained in the outermost frame))
+        #ws = user_workspace()
+        #print(ws)
+        
+        #exec_frame = inspect.currentframe()
+        #print("currentframe:\n", "\t\n".join([k for k in exec_frame.f_globals.keys()]))
+        #frame_records = inspect.getouterframes(exec_frame)
+        #for (n,f) in enumerate(frame_records):
+            #print("\n*** Exec frame %d:\n" % n, "\t\n".join([k for k in f[0].f_globals.keys()]))
         
         if isinstance(pWin, QtWidgets.QMainWindow) and type(pWin).__name__ == "ScipyenWindow":
             self._scipyenWindow_  = pWin
@@ -24,7 +37,24 @@ class WorkspaceGuiMixin:
                 self._scipyenWindow_   = parent
                 
             else:
-                self._scipyenWindow_ = user_workspace()["mainWindow"]
+                # NOTE: 2020-12-05 21:24:45
+                # this successfully returns the user workspace ONLY when the 
+                # constructor is invoked (directly or indirectly) from within
+                # the console; otherwise, it is None
+                ws = user_workspace()
+                if ws is not None:
+                    self._scipyenWindow_ = ws["mainWindow"]
+                    
+                else:
+                    frame_records = inspect.getouterframes(inspect.currentframe())
+                    for (n,f) in enumerate(frame_records):
+                        if "ScipyenWindow" in f[0].f_globals:
+                            self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"].instance()
+                            break
+                    
+                
+        if isinstance(title, str) and len(title.strip()):
+            self.setWindowTitle(title)
                 
         
     @safeWrapper

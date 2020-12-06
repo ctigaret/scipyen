@@ -500,6 +500,7 @@ def delvars(*args, glob=True, ws=None):
     """
     if ws is None:
         ws = user_workspace()
+        
     if ws is None:
         raise ValueError("No valid workspace has been specified or found")
         

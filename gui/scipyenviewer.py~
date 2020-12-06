@@ -5,8 +5,8 @@ import typing, warnings
 #from abc import (ABC, ABCMeta, abstractmethod,)
 from abc import (abstractmethod,)
 
-from PyQt5 import QtCore, QtWidgets, QtGui
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
+from PyQt5 import (QtCore, QtWidgets, QtGui,)
+from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 
 from core.utilities import safeWrapper
 from . import pictgui as pgui
@@ -150,7 +150,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """
         # should be set to True when the viewer is managed by another GUI inside Scipyen
         super().__init__(parent)
-        WorkspaceGuiMixin.__init__(self, parent=parent, pWin=pWin)
+        super(WorkspaceGuiMixin, self).__init__(parent=parent, pWin=pWin)
+        #WorkspaceGuiMixin.__init__(self, parent=parent, pWin=pWin)
         
         self.settings = QtCore.QSettings()
 

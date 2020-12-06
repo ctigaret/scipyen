@@ -166,6 +166,9 @@ import core.curvefitting as crvf
 import core.models as models
 import core.signalprocessing as sgp
 import core.neoutils as neoutils
+
+from core.datatypes import (arbitrary_unit, check_time_units, units_convertible, 
+                            unit_quantity_from_name_or_symbol, UnitTypes)
 from core.workspacefunctions import validate_varname
 from core.utilities import (get_nested_value, set_nested_value, counter_suffix, )
 from core.prog import (safeWrapper, safeGUIWrapper, )
@@ -204,6 +207,7 @@ from .imageprocessing import *
 from . import scandata
 from .scandata import (ScanData, AnalysisUnit, check_apiversion, scanDataOptions)
 from . import axisutils
+from .axisutils import dimEnum
 from .axiscalibration import (AxisCalibration, calibration, axisChannelName,)
 #### END imaging modules
 
@@ -1054,16 +1058,6 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
     units = cal.getUnits(lsdata.scans[0].axistags["t"])
     origin = cal.getOrigin(lsdata.scans[0].axistags["t"])
     resolution = cal.getResolution(lsdata.scans[0].axistags["t"])
-    #if isinstance(lsdata.scans[0], dt.PictArray):
-        #units = lsdata.scans[0].axiscalibration.getUnits(lsdata.scans[0].axistags["t"])
-        #origin = lsdata.scans[0].axiscalibration.getOrigin(lsdata.scans[0].axistags["t"])
-        #resolution = lsdata.scans[0].axiscalibration.getResolution(lsdata.scans[0].axistags["t"])
-        
-    #else:
-        #cal = AxisCalibration(lsdata.scans[0].axistags["t"])
-        #units = cal.getUnits(lsdata.scans[0].axistags["t"])
-        #origin = cal.getOrigin(lsdata.scans[0].axistags["t"])
-        #resolution = cal.getResolution(lsdata.scans[0].axistags["t"])
     
     f0TimeRange = lsdata.analysisOptions["Intervals"]["F0"]
     
@@ -1095,7 +1089,7 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
     epscat = computeLSCaT(roiRange, f0Range, 
                           ca_data, 
                           ref_data = ref_data,
-                          name=epscatname, units=dt.arbitrary_unit,
+                          name=epscatname, units=arbitrary_unit,
                           detrend=detrend)
         
     # NOTE: 2018-08-03 10:04:57
@@ -1917,17 +1911,6 @@ def computeLSCaT(roiRange, f0Range, ca_data, ref_data=None, detrend=False,
     tunits = tcal.getUnits(ca_data.axistags["t"])
     torigin = tcal.getOrigin(ca_data.axistags["t"])
     tresolution = tcal.getResolution(ca_data.axistags["t"])
-    
-    #if isinstance(ca_data, dt.PictArray):
-        #tunits = ca_data.axiscalibration.getUnits(ca_data.axistags["t"])
-        #torigin = ca_data.axiscalibration.getOrigin(ca_data.axistags["t"])
-        #tresolution = ca_data.axiscalibration.getResolution(ca_data.axistags["t"])
-        
-    #else:
-        #tcal = AxisCalibration(ca_data.axistags["t"])
-        #tunits = tcal.getUnits(ca_data.axistags["t"])
-        #torigin = tcal.getOrigin(ca_data.axistags["t"])
-        #tresolution = tcal.getResolution(ca_data.axistags["t"])
     
     # NOTE: 2018-01-28 08:54:41
     # ATTENTION: VigraArrays are indexed with x first !
@@ -4115,7 +4098,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         self.fieldLineEdit.undoAvailable = True
         #self.fieldLineEdit.setValidator(strutils.QRNameValidator())
         
-        unit_types = sorted([v for v in dt.UnitTypes.values()])
+        unit_types = sorted([v for v in UnitTypes.values()])
         unit_types.insert(0, "unknown")
         
         self.unitTypeComboBox.setEditable(True)
@@ -6596,31 +6579,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         elif value == QtCore.Qt.Checked:
             self._data_.analysisOptions["Fitting"]["Fit"] = True
             
-    #@pyqtSlot(bool)
-    #@safeWrapper
-    #def slot_togglePlotLongEPSCaTFit(self, value):
-        #if self._data_ is None:
-            #return
-        
-        #if value:
-            #pass
-        #else:
-            #pass
-        
-        
-    #@pyqtSlot(int)
-    #@safeWrapper
-    #"def" slot_toggleEPScaTComponentsFit(self, value):
-        #if self._data_ is None:
-            #return
-        
-        #if value == QtCore.Qt.Unchecked:
-            #self._data_.analysisOptions["Fitting"]["FitComponents"] = False
-            
-        #elif value == QtCore.Qt.Checked:
-            #self._data_.analysisOptions["Fitting"]["FitComponents"] = True
-        
-        
     @pyqtSlot()
     @safeWrapper
     def slot_detectTriggers(self):
@@ -6982,7 +6940,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                         
                     #print("slot_protocolTableEdited: %s evt_times"% type(evt_times).__name__, evt_times)
                     
-                    event = dt.TriggerEvent(times=evt_times*pq.s, event_type = "presynaptic", labels="epsp")#, name="epsp")
+                    event = TriggerEvent(times=evt_times*pq.s, event_type = "presynaptic", labels="epsp")#, name="epsp")
                     protocol.presynaptic = event
                 
             elif col == 2: # postsynaptic events
@@ -6998,7 +6956,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                     elif isinstance(v, numbers.Number):
                         evt_times = np.array([v])
                         
-                    event = dt.TriggerEvent(times=evt_times*pq.s, event_type = "postsynaptic", labels="ap")#, name="ap")
+                    event = TriggerEvent(times=evt_times*pq.s, event_type = "postsynaptic", labels="ap")#, name="ap")
                     protocol.postsynaptic = event
                 
             elif col == 3: # photostimulation events
@@ -7014,7 +6972,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                     elif isinstance(v, numbers.Number):
                         evt_times = np.array([v])
                         
-                    event = dt.TriggerEvent(times=evt_times*pq.s, event_type = "photostimulation", labels="photo")#, name="photo")
+                    event = TriggerEvent(times=evt_times*pq.s, event_type = "photostimulation", labels="photo")#, name="photo")
                     protocol.photostimulation = event
                 
             elif col == 4: # imaging delay 
@@ -7029,7 +6987,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                     # TODO add imaging events columns in the table
                     protocol.imagingDelay = eval(value) * pq.s
 
-                event = dt.TriggerEvent(times = protocol.imagingDelay, event_type = "imaging_frame", labels="imaging")
+                event = TriggerEvent(times = protocol.imagingDelay, event_type = "imaging_frame", labels="imaging")
                 protocol.acquisition=event
                 
             elif col == 5: # frame index
@@ -8708,9 +8666,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         try:
             value_string, unit_string = newage.split()
             value = eval(value_string)
-            units = dt.unit_quantity_from_name_or_symbol(unit_string)
+            units = unit_quantity_from_name_or_symbol(unit_string)
             
-            if not dt.check_time_units(u):
+            if not check_time_units(u):
                 raise TypeError("cannot resolve string %s a python time quantity" % newage)
             
             age = value * units
@@ -10793,14 +10751,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         presynaptic_channel = options["TriggerEventDetection"]["Presynaptic"]["Channel"]
         
         if isinstance(options["TriggerEventDetection"]["Presynaptic"]["DetectionBegin"], pq.Quantity) \
-            and dt.units_convertible(options["TriggerEventDetection"]["Presynaptic"]["DetectionBegin"].units, pq.s):
+            and units_convertible(options["TriggerEventDetection"]["Presynaptic"]["DetectionBegin"].units, pq.s):
             presynaptic_trigger_begin = options["TriggerEventDetection"]["Presynaptic"]["DetectionBegin"].magnitude.flatten()[0]
             
         else:
             presynaptic_trigger_begin = 0
             
         if isinstance(options["TriggerEventDetection"]["Presynaptic"]["DetectionEnd"], pq.Quantity) \
-            and dt.units_convertible(options["TriggerEventDetection"]["Presynaptic"]["DetectionEnd"], pq.s):
+            and units_convertible(options["TriggerEventDetection"]["Presynaptic"]["DetectionEnd"], pq.s):
             presynaptic_trigger_end = options["TriggerEventDetection"]["Presynaptic"]["DetectionEnd"].magnitude.flatten()[0]
             
         else:
@@ -10814,14 +10772,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         postsynaptic_channel = options["TriggerEventDetection"]["Postsynaptic"]["Channel"]
         
         if isinstance(options["TriggerEventDetection"]["Postsynaptic"]["DetectionBegin"], pq.Quantity) \
-            and dt.units_convertible(options["TriggerEventDetection"]["Postsynaptic"]["DetectionBegin"], pq.s):
+            and units_convertible(options["TriggerEventDetection"]["Postsynaptic"]["DetectionBegin"], pq.s):
             postsynaptic_trigger_begin = options["TriggerEventDetection"]["Postsynaptic"]["DetectionBegin"].magnitude.flatten()[0]
             
         else:
             postsynaptic_trigger_begin = 0
             
         if isinstance(options["TriggerEventDetection"]["Postsynaptic"]["DetectionEnd"], pq.Quantity) \
-            and dt.units_convertible(options["TriggerEventDetection"]["Postsynaptic"]["DetectionEnd"], pq.s):
+            and units_convertible(options["TriggerEventDetection"]["Postsynaptic"]["DetectionEnd"], pq.s):
             postsynaptic_trigger_end = options["TriggerEventDetection"]["Postsynaptic"]["DetectionEnd"].magnitude.flatten()[0]
             
         else:
@@ -10836,14 +10794,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         photostimulation_channel = options["TriggerEventDetection"]["Photostimulation"]["Channel"]
         
         if isinstance(options["TriggerEventDetection"]["Photostimulation"]["DetectionBegin"], pq.Quantity) \
-            and dt.units_convertible(options["TriggerEventDetection"]["Photostimulation"]["DetectionBegin"], pq.s):
+            and units_convertible(options["TriggerEventDetection"]["Photostimulation"]["DetectionBegin"], pq.s):
             photostimulation_trigger_begin = options["TriggerEventDetection"]["Photostimulation"]["DetectionBegin"].magnitude.flatten()[0]
             
         else:
             photostimulation_trigger_begin = 0
             
         if isinstance(options["TriggerEventDetection"]["Photostimulation"]["DetectionEnd"], pq.Quantity) \
-            and dt.units_convertible(options["TriggerEventDetection"]["Photostimulation"]["DetectionEnd"], pq.s):
+            and units_convertible(options["TriggerEventDetection"]["Photostimulation"]["DetectionEnd"], pq.s):
             photostimulation_trigger_end = options["TriggerEventDetection"]["Photostimulation"]["DetectionEnd"].magnitude.flatten()[0]
             
         else:
@@ -10858,14 +10816,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         imaging_frame_channel = options["TriggerEventDetection"]["Imaging frame trigger"]["Channel"]
         
         if isinstance(options["TriggerEventDetection"]["Imaging frame trigger"]["DetectionBegin"], pq.Quantity) \
-            and dt.units_convertible(options["TriggerEventDetection"]["Imaging frame trigger"]["DetectionBegin"], pq.s):
+            and units_convertible(options["TriggerEventDetection"]["Imaging frame trigger"]["DetectionBegin"], pq.s):
             imaging_frame_trigger_begin = options["TriggerEventDetection"]["Imaging frame trigger"]["DetectionBegin"].magnitude.flatten()[0]
             
         else:
             imaging_frame_trigger_begin = ephys_start
             
         if isinstance(options["TriggerEventDetection"]["Imaging frame trigger"]["DetectionEnd"], pq.Quantity) \
-            and dt.units_convertible(options["TriggerEventDetection"]["Imaging frame trigger"]["DetectionEnd"], pq.s):
+            and units_convertible(options["TriggerEventDetection"]["Imaging frame trigger"]["DetectionEnd"], pq.s):
             imaging_frame_trigger_end = options["TriggerEventDetection"]["Imaging frame trigger"]["DetectionEnd"].magnitude.flatten()[0]
             
         else:
@@ -11480,7 +11438,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                             
                         else:
                             self.defineAnalysisUnitCheckBox.setCheckState(QtCore.Qt.Unchecked)
-                            unit_type = dt.UnitTypes[cursor.name[0]]
+                            unit_type = UnitTypes[cursor.name[0]]
                     
                     unit_type_index = self.unitTypeComboBox.findText(unit_type)
                 
@@ -11737,40 +11695,40 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 val = get_nested_value(self._data_.analysisOptions, ["Intervals", "DarkCurrent"])
                 
                 if isinstance(val, (tuple, list)) and len(val) == 2:
-                    if isinstance(val[0], pq.Quantity) and dt.check_time_units(val[0]):
+                    if isinstance(val[0], pq.Quantity) and check_time_units(val[0]):
                         self.epscatDarkCurrentBeginDoubleSpinBox.setValue(val[0].magnitude.flatten()[0])
                         
-                    if isinstance(val[1], pq.Quantity) and dt.check_time_units(val[1]):
+                    if isinstance(val[1], pq.Quantity) and check_time_units(val[1]):
                         self.espcatDarkCurrentEndDoubleSpinBox.setValue(val[1].magnitude.flatten()[0])
                         
                 val = get_nested_value(self._data_.analysisOptions, ["Intervals", "F0"])
                 #print("Intervals F0", val)
 
                 if isinstance(val, (tuple, list)) and len(val) == 2:
-                    if isinstance(val[0], pq.Quantity) and dt.check_time_units(val[0]):
+                    if isinstance(val[0], pq.Quantity) and check_time_units(val[0]):
                         self.epscatF0BeginDoubleSpinBox.setValue(val[0].magnitude.flatten()[0])
                         
-                    if isinstance(val[1], pq.Quantity) and dt.check_time_units(val[1]):
+                    if isinstance(val[1], pq.Quantity) and check_time_units(val[1]):
                         self.epscatF0EndDoubleSpinBox.setValue(val[1].magnitude.flatten()[0])
                     
                 val = get_nested_value(self._data_.analysisOptions, ["Intervals", "Fit"])
                 #print("Intervals Fit", val)
                 
                 if isinstance(val, (tuple, list)) and len(val) == 2:
-                    if isinstance(val[0], pq.Quantity) and dt.check_time_units(val[0]):
+                    if isinstance(val[0], pq.Quantity) and check_time_units(val[0]):
                         self.epscatFitBeginDoubleSpinBox.setValue(val[0].magnitude.flatten()[0])
                         
-                    if isinstance(val[1], pq.Quantity) and dt.check_time_units(val[1]):
+                    if isinstance(val[1], pq.Quantity) and check_time_units(val[1]):
                         self.epscatFitEndDoubleSpinBox.setValue(val[1].magnitude.flatten()[0])
                 
                 val = get_nested_value(self._data_.analysisOptions, ["Intervals", "Integration"])
                 #print("Intervals Integration", val)
                 
                 if isinstance(val, (tuple, list)) and len(val) == 2:
-                    if isinstance(val[0], pq.Quantity) and dt.check_time_units(val[0]):
+                    if isinstance(val[0], pq.Quantity) and check_time_units(val[0]):
                         self.epscatIntegralBeginDoubleSpinBox.setValue(val[0].magnitude.flatten()[0])
                 
-                    if isinstance(val[1], pq.Quantity) and dt.check_time_units(val[1]):
+                    if isinstance(val[1], pq.Quantity) and check_time_units(val[1]):
                         self.epscatIntegralEndDoubleSpinBox.setValue(val[1].magnitude.flatten()[0])
                     
                 # Cursor window and F/S discrimination row
@@ -12465,8 +12423,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                                                 sampling_period=vu.getAxisResolution(img.axistags["x"]), \
                                                 name="%s" % axisChannelName(subarray.axistags["c"], j), \
                                                 index = j) \
-                                            for j, img in dt.dimEnum(subarray, "c")] \
-                                    for k, subarray in dt.dimEnum(data[0], self._data_.sceneFrameAxis)] \
+                                            for j, img in dimEnum(subarray, "c")] \
+                                    for k, subarray in dimEnum(data[0], self._data_.sceneFrameAxis)] \
                     
                     # NOTE: we want all channels from same frame to go into segment
                     # corresponding to frame
@@ -12543,8 +12501,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                                         sampling_period = vu.getAxisResolution(img.axistags["x"]), \
                                         name="%s" % axisChannelName(subarray.axistags["c"], j), \
                                         index = j) \
-                                    for j, img in dt.dimEnum(subarray, "c")] \
-                                for k, subarray in dt.dimEnum(data[0], self._data_.scansFrameAxis)]
+                                    for j, img in dimEnum(subarray, "c")] \
+                                for k, subarray in dimEnum(data[0], self._data_.scansFrameAxis)]
 
                 for k in range(data[0].shape[data[0].axistags.index(self._data_.scansFrameAxis)]):
                     target.segments[k].analogsignals[:] = profiles[k]
@@ -14517,9 +14475,9 @@ def collectMeansAcrossCells(data, protocol):
 
 
 def correctUnitType(data):
-    #unit_types = sorted([v for v in dt.UnitTypes.values()])
+    #unit_types = sorted([v for v in UnitTypes.values()])
     
-    unit_types = pd.Series([dt.UnitTypes[x[0]] for x in data.Unit]).astype("category")
+    unit_types = pd.Series([UnitTypes[x[0]] for x in data.Unit]).astype("category")
     
     data.Unit_Type = pd.Categorical(unit_types)
         

@@ -774,6 +774,8 @@ def categorize_data_frame_columns(data, *column_names, inplace=True):
         for c in column_names:
             data[c] = pd.Categorical(data[c].astype("category"))
             
+        return data
+            
     else:
         ret = data.copy()
         for c in column_names:

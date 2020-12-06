@@ -69,6 +69,7 @@ def main():
 
         #import pudb
         mainWindow = mainwindow.ScipyenWindow(app)
+        #mainWindow = mainwindow.ScipyenWindow.initialize(app)
         
         mainWindow.show()
         
