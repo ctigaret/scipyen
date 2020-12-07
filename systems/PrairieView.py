@@ -15,7 +15,6 @@ import numpy as np
 import quantities as pq
 import neo
 import vigra
-#import vigra.pyqt.quickdialog as quickdialog
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -44,7 +43,8 @@ from PyQt5.uic import loadUiType as __loadUiType__
 from gui import resources_rc as resources_rc
 #from gui import pyqtSignal as pyqtSignal
 #from gui import pyqtSlot as pyqtSlot
-from gui import quickdialog as quickdialog
+from gui.quickdialog import QuickDialog
+from gui.triggerdetectgui import TriggerDetectWidget
 from gui import pictgui as pgui
 from gui.workspacegui import WorkspaceGuiMixin
 import gui.signalviewer as sv
@@ -2792,6 +2792,10 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         if isinstance(self.scanData.electrophysiology, neo.Block) and len(self.scanData.electrophysiology.segments):
             ephys_preview = sv.SignalViewer(pWin = self._scipyenWindow_)
             ephys_preview.plot(self.ephys)
+            
+            dlg = QuickDialog(self, "Detect Trigger Events")
+            event_detector_widget = TriggerDetectWidget(parent = dlg) 
+            dlg.addWidget(event_detector_widget)
             # TODO call protocol dialog wizard
         
             

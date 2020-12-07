@@ -768,7 +768,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         
         self._current_frame_index_      = 0 
         self._number_of_frames_         = 1 # determined from the data
-        self.rameIndex                  = range(self._number_of_frames_)
+        self.frameIndex                  = range(self._number_of_frames_)
         #self._linkedViewers_            = list()
         
         # These two should hold a reference to the actual QSlider and QSpinBox

@@ -1348,8 +1348,6 @@ class VTH(object):
 class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
-    #startPluginLoad = pyqtSignal()
-    
     workspaceChanged = pyqtSignal()
     
     _instance = None
@@ -1357,28 +1355,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @classmethod
     def initialized(cls):
         return hasattr(cls, "_instance" and isinstance(cls._instance, cls))
-        #return hasattr(cls, "_instance" and cls._instance is not None) # traitlets way
-    
-    #@classmethod
-    #def clear_instance(cls):
-        #if not cls.initialized():
-            #return
-        
-        #if isinstance(cls._instance, cls):
-            #cls._instance = None
-            
-    #@classmethod
-    #def initialize(cls, *args, **kwargs):
-        #""" See traitlets.config.configurable.SingletonConfigurable for logic
-        #"""
-        #if cls._instance is None:
-            #cls._instance = cls(args, **kwargs)
-            
-        #if isinstance(cls._instance, cls):
-            #return cls._instance
-        
-        #else:
-            #raise MultipleInstanceError("Multiple insatnces of %s are being created" % cls.__name__)
         
     @classmethod
     def instance(cls):
@@ -1670,9 +1646,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
     #@processtimefunc
     def __init__(self, app, parent=None):
-        #super(ScipyenWindow, self).__init__(parent)
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: python3 way
-        #print("ScipyenWindow __init__")
         self.app                        = app
         self.recentFiles                = collections.OrderedDict()
         self.recentDirectories          = collections.deque()

@@ -1322,7 +1322,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 cType.xwindow = window
     
             if cType.ywindow is None:
-                cType.ywindow = window)
+                cType.ywindow = window
                 
             if isinstance(pos, (tuple, list)) and \
                 len(pos) == 2 and all([isinstance(a, (numbers.Real, pq.Quantity)) for a in pos]):

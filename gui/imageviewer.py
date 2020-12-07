@@ -2301,8 +2301,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                  *args, **kwargs):
         super().__init__(data=data, parent=parent, pWin=pWin, ID=ID, win_title=win_title, doc_title=doc_title, frame=frame, *args, *kwargs)
 
-        #self._configureGUI_()
-        
         self._image_width_ = 0
         self._image_height_ = 0
         self.imageNormalize             = None

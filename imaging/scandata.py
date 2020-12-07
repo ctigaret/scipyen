@@ -67,8 +67,9 @@ class ScanDataOptions(DataBag):
                          use_casting=use_casting,
                          allow_none=allow_none)
         
+    @property
     def defaults(self):
-        return ScanDataOptions(self.__defaults__)
+        return ScanDataOptions(self.__defaults__())
     
     def __defaults__(self, detection_predicate=1.3, roi_width = 10, roi_auto_width=False,
                     reference="Ch1", indicator="Ch2", 

@@ -150,8 +150,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """
         # should be set to True when the viewer is managed by another GUI inside Scipyen
         super().__init__(parent)
-        super(WorkspaceGuiMixin, self).__init__(parent=parent, pWin=pWin)
-        #WorkspaceGuiMixin.__init__(self, parent=parent, pWin=pWin)
+        #super(WorkspaceGuiMixin, self).__init__(parent=parent, pWin=pWin)
+        WorkspaceGuiMixin.__init__(self, parent=parent, pWin=pWin)
         
         self.settings = QtCore.QSettings()
 

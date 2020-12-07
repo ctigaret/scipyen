@@ -4,7 +4,7 @@ from numbers import (Number, Real,)
 
 from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-from PyQt5.uic import loadUiType as __loadUiType__
+from PyQt5.uic import loadUiType
 
 
 import quantities as pq
@@ -14,18 +14,17 @@ from core.datatypes import (arbitrary_unit, check_time_units, units_convertible,
 from core.traitcontainers import DataBag
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.triggerprotocols import TriggerProtocol
-from gui.workspacegui import WorkspaceGuiMixin
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-Ui_TriggerDetect, _QWidget_ = __loadUiType__(os.path.join(__module_path__, "triggerdetect.ui"))
+Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "triggerdetect.ui"), from_imports=True, import_from="gui")
 
-class TriggerDetectWidget(QtWidgets.QWidget, Ui_TriggerDetect):
+class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     """
     """
     
-    def _init__(self, parent=None, presyn=None, postsyn=None, photo=None, imaging=None,
-                ephys_start=None, ephys_end=None):
+    def __init__(self, parent=None, presyn=None, postsyn=None, photo=None, 
+                imaging=None,  ephys_start=None, ephys_end=None):
         """
         Named parameters:
         -----------------
@@ -46,13 +45,12 @@ class TriggerDetectWidget(QtWidgets.QWidget, Ui_TriggerDetect):
             (e.g. pq.s)
             
         """
-        super()._init__(parent)
-        self.setupUi(self)
+        super().__init__(parent)
+        self._configureGUI_()
 
         self.signalStart = ephys_start
-        self.signalStop  = ephys_stop
+        self.signalStop  = ephys_end
         
-        self._configure_UI_()
         
         self.setValues("pre", presyn)
         
@@ -62,19 +60,19 @@ class TriggerDetectWidget(QtWidgets.QWidget, Ui_TriggerDetect):
         
         self.setValues("imaging", imaging)
         
-    def _configure_UI_(self):
+    def _configureGUI_(self):
+        self.setupUi(self)
+        self.presynNameLineEdit.redoAvailable=True
+        self.presynNameLineEdit.undoAvailable=True
         
-        self.presynNameLineEdit.variable.redoAvailable=True
-        self.presynNameLineEdit.variable.undoAvailable=True
+        self.postsynNameLineEdit.redoAvailable=True
+        self.postsynNameLineEdit.undoAvailable=True
         
-        self.postsynNameLineEdit.variable.redoAvailable=True
-        self.postsynNameLineEdit.variable.undoAvailable=True
+        self.photoNameLineEdit.redoAvailable=True
+        self.photoNameLineEdit.undoAvailable=True
         
-        self.photoNameLineEdit.variable.redoAvailable=True
-        self.photoNameLineEdit.variable.undoAvailable=True
-        
-        self.imagingNameLineEdit.variable.redoAvailable=True
-        self.imagingNameLineEdit.variable.undoAvailable=True
+        self.imagingNameLineEdit.redoAvailable=True
+        self.imagingNameLineEdit.undoAvailable=True
         
         #self.presynChannelSpinBox.valueChanged.connect(self.slot_channelValueChanged)
         #self.postsynChannelSpinBox.valueChanged.connect(self.slot_channelValueChanged)
@@ -94,30 +92,30 @@ class TriggerDetectWidget(QtWidgets.QWidget, Ui_TriggerDetect):
         if target == "pre":
             groupBox        = self.presynGroupBox
             channelWidget   = self.presynChannelSpinBox
+            nameWidget      = self.presynNameLineEdit
             startWidget     = self.presynStartDoubleSpinBox
             stopWidget      = self.presynStopDoubleSpinBox
-            nameWidget      = self.presynNameLineEdit
             
         elif target == "post":
             groupBox        = self.postsynGroupBox
-            channeWidget    = self.postsynChannelSpinBox
+            channelWidget   = self.postsynChannelSpinBox
+            nameWidget      = self.postsynNameLineEdit
             startWidget     = self.postsynStartDoubleSpinBox
             stopWidget      = self.postsynStopDoubleSpinBox
-            nameWidget      = self.postsynNameLineEdit
             
         elif target == "photo":
             groupBox        = self.photoGroupBox
-            stopWidget      = self.photoStopDoubleSpinBox
+            nameWidget      = self.photoNameLineEdit
             channelWidget   = self.photoChannelSpinBox
             startWidget     = self.photoStartDoubleSpinBox
-            nameWidget      = self.photoNameLineEdit
+            stopWidget      = self.photoStopDoubleSpinBox
             
         elif target == "imaging":
             groupBox        = self.imagingGroupBox
             channelWidget   = self.imagingChannelSpinBox
+            nameWidget      = self.imagingNameLineEdit
             startWidget     = self.imagingStartDoubleSpinBox
             stopWidget      = self.imagingStopDoubleSpinBox
-            nameWidget      = self.imagingNameLineEdit
             
         else:
             warnings.warn("Unknown options targeted")
