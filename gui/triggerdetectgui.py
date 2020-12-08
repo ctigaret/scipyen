@@ -246,9 +246,52 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     def hasImagingFrameTrigger(self):
         return self.imagingGroupBox.isChecked()
     
-    
     @property
-    def presynapticTrigger(self):
+    def presyn(self):
+        if self.presynGroupBox.isChecked():
+            return (self.presynChannelSpinBox.value(),
+                    self.presynNameLineEdit.text(),
+                    (self.presynStartDoubleSpinBox.value() * pq.s,
+                     self.presynStopDoubleSpinBox.value() * pq.s,),
+                    )
+        
+        return ()
+            
+    @property
+    def postsyn(self):
+        if self.postsynGroupBox.isChecked():
+            return (self.postsynChannelSpinBox.value(),
+                    self.postsynNameLineEdit.text(),
+                    (self.postsynStartDoubleSpinBox.value() * pq.s,
+                     self.postsynStopDoubleSpinBox.value() * pq.s,),
+                    )
+                    
+        return ()
+        
+    @property
+    def photo(self):
+        if self.photoGroupBox.isChecked():
+            return (self.photoChannelSpinBox.value(),
+                    self.photoNameLineEdit.text(),
+                    (self.photoStartDoubleSpinBox.value() * pq.s,
+                     self.photoStopDoubleSpinBox.value() * pq.s,),
+                    )
+                    
+        return ()
+        
+    @property
+    def imaging(self):
+        if self.imagingGroupBox.isChecked():
+            return (self.imagingChannelSpinBox.value(),
+                    self.imagingNameLineEdit.text(),
+                    (self.imagingStartDoubleSpinBox.value() * pq.s,
+                     self.imagingStopDoubleSpinBox.value() * pq.s,),
+                    )
+                    
+        return ()
+                
+    @property
+    def presynapticOptions(self):
         if self.presynGroupBox.isChecked():
             return DataBag({"Channel": self.presynChannelSpinBox.value(),
                             "DetectionBegin": self.presynStartDoubleSpinBox.value() * pq.s,
@@ -257,7 +300,7 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
             
         
     @property
-    def postsynapticTrigger(self):
+    def postsynapticOptions(self):
         if self.postsynGroupBox.isChecked():
             return DataBag({"Channel": self.postsynChannelSpinBox.value(),
                            "DetectionBegin": self.postsynStartDoubleSpinBox.value() * pq.s,
@@ -265,7 +308,7 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
                            "Name": self.postsynNameLineEdit.text()})
         
     @property
-    def photostimulationTrigger(self):
+    def photostimulationOptions(self):
         if self.photoGroupBox.isChecked():
             return DataBag({"Channel": self.photoChannelSpinBox.value(),
                             "DetectionBegin": self.photoStartDoubleSpinBox.value() * pq.s,
@@ -273,7 +316,7 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
                             "Name": self.photoNameLineEdit.text()})
         
     @property
-    def imagingFrameTrigger(self):
+    def imagingFrameOptions(self):
         if self.imagingGroupBox.isChecked():
             return DataBag({"Channel": self.imagingChannelSpinBox.value(),
                             "DetectionBegin": self.imagingStartDoubleSpinBox.value() * pq.s,

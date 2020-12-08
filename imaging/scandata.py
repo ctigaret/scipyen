@@ -1,4 +1,4 @@
-import enum, collections, numbers
+import enum, collections, numbers, configparser
 import numpy as np
 import quantities as pq
 import neo
@@ -165,10 +165,10 @@ class ScanDataOptions(DataBag):
         ret["Intervals"]["F0"] = [f0_begin, f0_end] # start, end both quantities
         ret["Intervals"]["Fit"] = [fit_begin, fit_end] # start, end both quantities
         ret["Intervals"]["Integration"] = [int_begin, int_end] # start, end, both quantities; 
+        ret["Intervals"]["Peak"] = [peak_begin, peak_end] #  start, end both quantities
         
         ret["AmplitudeMethod"] = "direct" # one of "direct" or "levels"
         
-        ret["Intervals"]["Peak"] = [peak_begin, peak_end] #  start, end both quantities
         
         
         # Fitting model parameters
@@ -219,13 +219,13 @@ class ScanDataOptions(DataBag):
         ret["TriggerEventDetection"]["Photostimulation"]["DetectEvents"] = False
         ret["TriggerEventDetection"]["Photostimulation"]["Name"] = "uepsp"
         
-        #ret["TriggerEventDetection"]["Photostimulation"] = collections.OrderedDict()
-        ret["TriggerEventDetection"]["Photostimulation"] = DataBag()
-        ret["TriggerEventDetection"]["Photostimulation"]["Channel"] = 0
-        ret["TriggerEventDetection"]["Photostimulation"]["DetectionBegin"] = 0 * pq.s
-        ret["TriggerEventDetection"]["Photostimulation"]["DetectionEnd"] = 0 * pq.s
-        ret["TriggerEventDetection"]["Photostimulation"]["DetectEvents"] = False
-        ret["TriggerEventDetection"]["Photostimulation"]["Name"] = "uepsp"
+        ##ret["TriggerEventDetection"]["Photostimulation"] = collections.OrderedDict()
+        #ret["TriggerEventDetection"]["Photostimulation"] = DataBag()
+        #ret["TriggerEventDetection"]["Photostimulation"]["Channel"] = 0
+        #ret["TriggerEventDetection"]["Photostimulation"]["DetectionBegin"] = 0 * pq.s
+        #ret["TriggerEventDetection"]["Photostimulation"]["DetectionEnd"] = 0 * pq.s
+        #ret["TriggerEventDetection"]["Photostimulation"]["DetectEvents"] = False
+        #ret["TriggerEventDetection"]["Photostimulation"]["Name"] = "uepsp"
         
         #ret["TriggerEventDetection"]["Imaging frame trigger"] = collections.OrderedDict()
         ret["TriggerEventDetection"]["Imaging frame trigger"] = DataBag()

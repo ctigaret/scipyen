@@ -1,0 +1,111 @@
+Scipyen uses the QtCore.QSettings framework to store various GUI options 
+
+By default, on UN*X, these options are stored using native format saved in the 
+configuration file (the "conf" file):
+    
+    $HOME/.config/Scipyen/Scipyen.conf
+    
+Although this is an ASCII file it does contain binary (byte) data (serialized Qt
+objects( and therefore it should NOT be modifed in using text editors.
+
+A configuration editor GUI is planned.
+
+In the "conf" file, options are grouped according to the Scipyen's GUI component 
+to which they pertain.
+
+Options for "functional" components (e.g. Ca transient analysis, event detection,
+synaptic plasticity) are stored IN SEPARATE "INI" FILES that are operated using
+python's configparser module.
+These are ASCII files located in the same directory as Scipyen.conf and CAN BE 
+EDITED by hand using a text editor.
+
+When a configuration editor will be available, it will allow editing those options
+as well.
+
+Values for options representing time variables are considered to be given in 
+units that depend on their context. For example, event detection intervals are 
+considered as seconds; date-time variables follow the conventional UN*X format
+(TODO: explain this).
+
+Either QSettings or python's configparser frameworks DO NOT support dictionaries
+nested beyond one level (top level: group; 1st level = options within group)
+
+Options for scandata (see scandata.py from line 95 onwards):
+    Group:          Option:             Value:      Default:        Meaning/Role:
+    -----------------------------------------------------------------------------
+    Channels        Reference           str         None            Channel name (or dye name)
+                    Indicator           str         None            
+                    Bleed_ref_ind       float       0               fraction of reference signal that bleeds into indicator channel
+                    Bleed_ind_ref       float       0               fraction of indicator signal that bleeds into reference channel
+
+    IndicatorCalibration
+                    Kd                  float
+                    Fmin                float
+                    Fmax                float
+                    
+    DiscriminationFunction          a function that takes a numpy array and returns a scalar
+                    Function            str                         Literal function representation e.g. "np.linalg.norm"
+                    ... any number of key/value pairs with additional named parameters for the function
+                        key = argument name (str) 
+                        value = default value (POD type or None)
+                        
+                    e.g.: {"Function": "np.linalg.norm", "axis" : None, "ord" : None}
+                        
+    Discrimination
+                    BaseWindow          float                       as pq.s
+                    PeakWindow          float                       as pq.s
+                    2D                  bool
+                    WindowChoice        str             one of "delays", "triggers", "cursors"
+                                                        
+                    First               bool            True: discriminate on the first EPSCaT (when multiple EPScaTs present)
+                                                        False: discriminate on ALL EPSCaTs and return the overall result
+                                                    
+                    Predicate           str             Must evaluate to a binary comparison expression - best written as 
+                                                        a lambda function
+                                                        e.g. "lambda x,y: x >= y"
+                                                        
+                    PredicateFunc       str             Literal for a function taking two scalars and returning a scalar
+                                                        e.g. "lambda x,y : x/y"
+                                                        
+                    PredicateValue      float
+                    
+    NOTE: Discrimination works as follows:
+            1. calculate l2-norm of the array on the peak window (applies DiscriminationFunction) --> "x"
+            2. calculate l2-norm of the array on the base window --> "y"
+            3. apply PredicateFunc x/y --> result
+            4. apply Predicate result >= PredicateValue --> bool result (True/False)
+                    
+
+TODO:
+        Explicitly specify groups in the QSettings "conf" file
+        Incorporate/merge the INI files (see above) with the QSettings framework 
+        (Scipyen "conf" file)
+            pros: 
+                one config file instead of many different ones
+                once a configuration editor is available, its contents can be
+                    edited in a "safe" way
+                can store serialized Qt objects (e.g. rectangle for window size,
+                    etc)
+            cons: 
+                cannot edit by hand
+                "conf" file will grow in time - is this a problem?
+                not portable
+                no easy way to / cannot store serialized python objects such as
+                python Quantity objects
+                
+            alternatives to explore: JSON files?
+            
+        Using INI files:
+            pros:
+                all plain text files => can be edited by hand (also a disadvantage)
+                portable
+                
+            cons:
+                may grow very large if used for multiple components
+                cannot store python objects such as Quantity objects
+                (all option values are strings)
+                
+
+    
+
+

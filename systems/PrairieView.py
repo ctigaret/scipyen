@@ -2796,6 +2796,9 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             dlg = QuickDialog(self, "Detect Trigger Events")
             event_detector_widget = TriggerDetectWidget(parent = dlg) 
             dlg.addWidget(event_detector_widget)
+            dlg.setWindowModality(QtCore.Qt.WindowModal)
+            if dlg.exec() == QtWidgets.QDialog.Accepted:
+                presyn=
             # TODO call protocol dialog wizard
         
             

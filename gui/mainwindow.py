@@ -43,7 +43,6 @@ import traceback, keyword, inspect, weakref, itertools, typing, functools
 from pprint import pprint
 from copy import copy, deepcopy
 import collections
-from traitlets.config import MultipleInstanceError
 #from collections import ChainMap
 
 from importlib import reload # I use this all too often !
