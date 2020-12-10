@@ -30,50 +30,133 @@ considered as seconds; date-time variables follow the conventional UN*X format
 Either QSettings or python's configparser frameworks DO NOT support dictionaries
 nested beyond one level (top level: group; 1st level = options within group)
 
-Options for scandata (see scandata.py from line 95 onwards):
-    Group:          Option:             Value:      Default:        Meaning/Role:
-    -----------------------------------------------------------------------------
-    Channels        Reference           str         None            Channel name (or dye name)
-                    Indicator           str         None            
-                    Bleed_ref_ind       float       0               fraction of reference signal that bleeds into indicator channel
-                    Bleed_ind_ref       float       0               fraction of indicator signal that bleeds into reference channel
+Options for scandata (to adapt scandata.py from line 95 onwards) - to go into
+a NEW class ScanDataOptions2.
 
-    IndicatorCalibration
-                    Kd                  float
-                    Fmin                float
-                    Fmax                float
-                    
-    DiscriminationFunction          a function that takes a numpy array and returns a scalar
-                    Function            str                         Literal function representation e.g. "np.linalg.norm"
-                    ... any number of key/value pairs with additional named parameters for the function
-                        key = argument name (str) 
-                        value = default value (POD type or None)
-                        
-                    e.g.: {"Function": "np.linalg.norm", "axis" : None, "ord" : None}
-                        
-    Discrimination
-                    BaseWindow          float                       as pq.s
-                    PeakWindow          float                       as pq.s
-                    2D                  bool
-                    WindowChoice        str             one of "delays", "triggers", "cursors"
-                                                        
-                    First               bool            True: discriminate on the first EPSCaT (when multiple EPScaTs present)
-                                                        False: discriminate on ALL EPSCaTs and return the overall result
+Must be flattened to max one level of nesting, e.g.
+    # no nesting:
+        Option1 = value
+        Option2 = value
+        etc.
+        
+    # one level nesting
+    Group1
+        Option1 = value
+        Option2 = value
+    Group2
+        Option3 = value
+        Option4 = value
+    etc
+    
+Group:          Option:             Value:      Default:        Meaning/Role:
+-----------------------------------------------------------------------------
+Channels        Reference           str         None            Channel name (or dye name)
+                Indicator           str         None            
+                Bleed_ref_ind       float       0               fraction of reference signal that bleeds into indicator channel
+                Bleed_ind_ref       float       0               fraction of indicator signal that bleeds into reference channel
+
+IndicatorCalibration
+                Kd                  float
+                Fmin                float
+                Fmax                float
+                
+LineScanUnitSelection   
+    NOTE: 
+        The analysis unit corresponds to region of the cell - e.g. spine or 
+dendritic segment - intersected by the scanline during a sequence of line scans; 
+the data aqcuired durign such sequence is a line scans image, with space on the 
+horizontal axis time on the vertical axis (an XT image).
+        
+        Since the scanline can intersect several structures, individual 
+structured are identified (and assigned to separate analysis units) with the 
+help of vertical cursors (PlanarGraphics) in the line scans image, that pass 
+through the centre of each analysis unit.
+    
+        The "width" here defined the lateral span of the regions corresponding 
+to the unit, centered on the vertical cursor (effectively, the width of the unit 
+region in the  line scans image). It must be specified as a dimensionless number 
+(float, meaning pixels) or as a Python Quantity with units compatible with the 
+space axis units (if axis is calibrated)
+        
+                width               float           Width of the region defining an analysis unit in a line scans image
                                                     
-                    Predicate           str             Must evaluate to a binary comparison expression - best written as 
-                                                        a lambda function
-                                                        e.g. "lambda x,y: x >= y"
+LineScanSignalAnalysis                                  General line scan signal analysis methods
+            NOTE: The float values below are taken to represent seconds; when 
+            values are Python Quantity objects, their units must be compabitle 
+            with the signal's time axis units.
+            None objects are replaced with the signal's t_start or t_stop as necessary, 
+            when the option is used.
+                                
+                AmplitudeMethod     str                     "direct" or "levels"
+                
+                DarkCurrentBegin    float, Quantity or None start/stop of dark current window
+                DarkCurrentEnd      float, Quantity or None 
+                
+                F0Begin             float, Quantity or None start/stop of F0 window (i.e., "baseline" signal)
+                F0End               float, Quantity or None
+                
+                PeakBegin           float, Quantity or None start/stop of the signal region where a peak transient is expected
+                PeakEnd             float, Quantity or None
+                
                                                         
-                    PredicateFunc       str             Literal for a function taking two scalars and returning a scalar
-                                                        e.g. "lambda x,y : x/y"
-                                                        
-                    PredicateValue      float
+LineScanSignalDiscrimination
+    NOTE: Signal discrimination works as follows: 
+        1. determine the peak window coordinates:
+            
+        1. calculate l2-norm of the array on the peak window
+            sig_window = signal.time_slice(p_begin, p_end)
+            call "Function" (sig_window, **kwargs) --> "x"
+            NOTE kwargs are any number of key/value pairs specified as further 
+            optons here; these options will be embedded in the scandata object
+            but it should also be possible to save them separately; 
+            Allow (in GUI) to save them as defaults.
+            
+        2. calculate l2-norm of the array on the base window --> "y" 
+            base_window = signal.time_slice()
+        3. call "PredicateFunc"(x,y) --> result 
+        4. pass result to "Predicate" >= "PredicateValue" --> bool result (True/False)
                     
-    NOTE: Discrimination works as follows:
-            1. calculate l2-norm of the array on the peak window (applies DiscriminationFunction) --> "x"
-            2. calculate l2-norm of the array on the base window --> "y"
-            3. apply PredicateFunc x/y --> result
-            4. apply Predicate result >= PredicateValue --> bool result (True/False)
+                BaseWindow          float                       as pq.s
+                PeakWindow          float                       as pq.s
+                2D                  bool
+                WindowChoice        str             one of "delays", "triggers", "cursors"
+                                                    
+                First               bool            True: discriminate on the first EPSCaT (when multiple EPScaTs present)
+                                                    False: discriminate on ALL EPSCaTs and return the overall result
+                                                
+                Predicate           str             Must evaluate to a binary comparison expression - best written as 
+                                                    a lambda function
+                                                    e.g. "lambda x,y: x >= y"
+                                                    
+                PredicateFunc       str             Literal for a function taking two scalars and returning a scalar
+                                                    e.g. "lambda x,y : x/y"
+                                                    
+                PredicateValue      float
+                
+                Function            str                 a function that takes a numpy array and returns a scalar
+                
+                ... any number of key/value pairs with additional named parameters for the function
+                    key = argument name (str) 
+                    value = default value (POD type or None)
+                
+                e.g.: {"Function": "np.linalg.norm", "axis" : None, "ord" : None}
+                
+LineScanSignalFitting
+            NOTE: The float values below are taken to represent seconds; when 
+            values are Python Quantity objects, their units must be compabitle 
+            with the signal's time axis units.
+                                
+                Fit                 bool                    whether to fit the signal
+                
+                FitBegin            float, Quantity or None start/stop of the signal region to be fitted
+                FitEnd              float, Quantity or None
+                
+                IntegrationBegin    float, Quantity or None start/stop of the signal region to be integrated
+                IntegrationEnd      float, Quantity or None
+                
+                FirComponents
+                
+
                     
 
 TODO:
