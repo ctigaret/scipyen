@@ -2798,7 +2798,8 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             dlg.addWidget(event_detector_widget)
             dlg.setWindowModality(QtCore.Qt.WindowModal)
             if dlg.exec() == QtWidgets.QDialog.Accepted:
-                presyn=
+                pass
+                #presyn=
             # TODO call protocol dialog wizard
         
             
