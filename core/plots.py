@@ -30,7 +30,7 @@ import quantities as pq
 import vigra
 import pandas as pd
 import seaborn as sb
-from seaborn.categorical import string_types
+from seaborn.external.six import string_types
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -344,9 +344,9 @@ class SB_CategoricalPlotter(sb.categorical._CategoricalPlotter):
                 units = data.get(units, units)
 
             # Validate the inputs
-            for input in [x, y, hue, units]:
-                if isinstance(input, string_types):
-                    err = "Could not interpret input '{}'".format(input)
+            for var in [x, y, hue, units]:
+                if isinstance(var, string_types):
+                    err = "Could not interpret input '{}'".format(var)
                     raise ValueError(err)
 
             # Figure out the plotting orientation
@@ -680,7 +680,6 @@ class SB_PointPlotter(SB_CategoricalStatPlotter):
                  estimator, ci, n_boot, units,
                  markers, linestyles, dodge, join, scale,
                  orient, color, palette, errwidth=None, capsize=None):
-        from seaborn.external.six import string_types
         """Initialize the plotter."""
         self.establish_variables(x, y, hue, data, orient,
                                  order, hue_order, units)
