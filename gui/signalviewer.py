@@ -3473,7 +3473,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 warngins.warn("I need something to plot")
                 return
             
-        if isinstance(y, neo.basesignal.BaseNeo):
+        if isinstance(y, neo.baseneo.BaseNeo):
             self.globalAnnotations = {type(y).__name__ : y.annotations}
         
         if isinstance(y, neo.core.Block):

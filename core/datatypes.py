@@ -28,7 +28,6 @@ import numpy as np
 import numpy.matlib as mlib
 import pandas as pd
 import quantities as pq
-import xarray as xa
 import vigra
 import neo
 from neo.core import baseneo

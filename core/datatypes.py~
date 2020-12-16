@@ -398,7 +398,8 @@ def is_string(array):
     return np.asarray(array).dtype.kind in NUMPY_STRING_KINDS
 
 def is_numeric_string(array):
-    
+    """Determines of the argumen is a string array that can be parsed as numeric.
+    """
     return is_string(array) and not np.isnan(np.genfromtxt(value)).any()
         
 

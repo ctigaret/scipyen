@@ -28,7 +28,7 @@ import scipy.io as sio
 import quantities as pq
 import numpy as np
 import pandas as pd
-import xarray as xa
+#import xarray as xa
 import h5py
 import vigra
 import neo
@@ -74,7 +74,7 @@ except Exception as e:
     Mime = None
 
 # NOTE: 2019-04-21 18:34:08 
-# somewhat reductant but I found that the Mime module in pyxdg distributed with
+# somewhat redundant but I found that the Mime module in pyxdg distributed with
 # openSUSE does not do is_plain_text(), or get_type2()
 # so also use the binding to libmagic here
 # ATTENTION: for Windows you need DLLs for libmagic installed separately

@@ -8,7 +8,8 @@
 #from __future__ import print_function
 #from __future__ import absolute_import # for python 2.5
 import faulthandler
-import sys, os, atexit, re, inspect, gc, sip, io, traceback
+#import sys, os, atexit, re, inspect, gc, sip, io, traceback
+import sys, os, atexit, re, inspect, gc, io, traceback
 
 #import warnings
 
@@ -54,13 +55,18 @@ def main():
     import gui.mainwindow as mainwindow
     faulthandler.enable()
 
-    sip.setdestroyonexit(True)
+    #sip.setdestroyonexit(True)
 
     try:
         #sip.setdestroyonexit(False)
         QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+        library_paths = QtCore.QCoreApplication.libraryPaths()
+        #library_paths.insert(0,'/usr/lib64/qt5/plugins')
+        library_paths.append('/usr/lib64/qt5/plugins')
+        library_paths = QtCore.QCoreApplication.setLibraryPaths(library_paths)
         app = QtWidgets.QApplication(sys.argv)
-        app.setStyle(MyProxyStyle())
+        app.setStyle(QtWidgets.QStyleFactory.create("Breeze"))
+        #app.setStyle(MyProxyStyle())
         
         app.setOrganizationName("Scipyen")
         app.setApplicationName("Scipyen")
