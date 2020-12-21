@@ -1,6 +1,5 @@
 
-1. make sure you have all required dependencies installed - that is, development
-packages for:
+1. required dependencies (including their development packages:
     zlib
     tiff
     jpeg
@@ -16,7 +15,8 @@ packages for:
     boost-threads
     boost-timer
     
-NOTE: Thse are installed system-wide (i.e. not just in scipyen virtual environment)
+NOTE: These are installed system-wide (i.e. not just in scipyen virtual environment)
+TODO: Contemplate installing these inside the virtual environment
     
 The following steps must be made with with scipyen-virtualenv activated, i.e., 
 the X terminal prompt should look something like: 

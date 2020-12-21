@@ -150,12 +150,18 @@ def _new_AnalogSignalArray_v2(cls, signal, units=None, dtype=None, copy=True, t_
         annotations = deepcopy(array_annotations)
         array_annotations = None
     
-    #if annotations is None:
-        #annotations = {}
+    if annotations is None:
+        annotations = dict()
+    elif isinstance(annotations, neo.ChannelIndex):
+        channel_index = annotations
+        annotations =dict()
+        
         
     #if array_annotations is None:
         #array_annotations = dict()
         
+    #print(type(annotations))
+    
     obj = cls(signal=signal, units=units, dtype=dtype, copy=copy,
             t_start=t_start, sampling_rate=sampling_rate,
             sampling_period=sampling_period, name=name,

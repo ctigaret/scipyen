@@ -60,39 +60,84 @@ defeats the purpose of using a virtual environment.
     Package         Dependencies                
                     (installed alongside)
     --------------------------------------------
-        pyqt5       
-        sip         toml                        
-        jupyter     ipython, traitlets, zmq,...
-        qtconsole
-        pyqtgraph
-        pywavelets
-        matplotlib
-        numpy
-        quantities
-        neo
-        scipy
-        sympy       mpmath
-        pandas      pytz
-        seaborn  
-        statsmodels patsy
-        pingouin    scikit-learn
-        researchpy
-        h5py
-        nose                                    
-        sphinx      (...)                       
-        vigra -- DO NOT INSTALL USING PIP; 
-              -- build and install vigra manually, instead -- see README vigra
-              -- in this directory
-        qimage2ndarray
-        imreg_dft                               
-        xarray  
-        pyxdg
-        pythod-magic -- Python interface to the libmagic file type identification library
+    pyqt5       
+    sip         toml                        
+    numpy
+    matplotlib
+    scipy
+    sympy       mpmath
+    cmocean     (for nice colormaps)
+    
+    jupyter     zipp, typing-extensions, ipython-genutils, decorator, traitlets,
+                pyrsistent, importlib-metadata, attrs, wcwidth, tornado, pyzmq,
+                ptyprocess, parso, jupyter-core, jsonschema, webencodings, pygments,
+                pycparser, prompt-toolkit, pickleshare, pexpect, nest-asyncio, 
+                nbformat, MarkupSafe, jupyter-client, jedi, backcall, async-generator, 
+                testpath, pandocfilters, nbclient, mistune, jupyterlab-pygments, 
+                jinja2, ipython, entrypoints, defusedxml, cffi, bleach, terminado,
+                Send2Trash, prometheus-client, nbconvert, ipykernel, argon2-cffi, 
+                notebook, widgetsnbextension, qtpy, qtconsole, jupyter-console, 
+                ipywidgets
+                
+    quantities
+    pandas      pytz
+    neo
+    pyqtgraph
+    seaborn  
+    statsmodels patsy
+    pingouin    urllib3, idna, chardet, certifi, xarray, threadpoolctl, 
+                requests, littleutils, joblib, tabulate, scikit-learn, 
+                pandas-flavor, outdated
+    pywavelets
+    researchpy
+    h5py        required for vigra
+    nose        required for vigra                            
+    sphinx      required for vigra    also installs:
+                sphinxcontrib-serializinghtml, sphinxcontrib-qthelp, 
+                sphinxcontrib-jsmath, sphinxcontrib-htmlhelp, sphinxcontrib-devhelp, 
+                sphinxcontrib-applehelp, snowballstemmer, imagesize, docutils, 
+                babel, alabaster
+    qimage2ndarray
+    imreg_dft                               
+    xarray  (installed by pingouin)
+    pyxdg
+    python-magic -- Python interface to the libmagic file type identification library
+    vigra -- DO NOT INSTALL USING PIP; 
+            -- build and install vigra manually, instead -- see README vigra
+            -- in this directory
+    
+    
         
+ 2.3 build and install vigra --  see also README vigra in this directory for
+ a list of prerequisites and cmake options
+    NOTE: build vigra with the virtual python environment activated (as for Qt5)
+     * this will automatically select the local python interpreter
+     
+    In the virtual environment (see README inside the virtual environment directory):
+        * with the environment activated, cd to the src directory inside the environment 
+        directory tree, then clone vigra git repo:
+            
+            cd src
+            git clone https://github.com/ukoethe/vigra.git
+            
+        * make an out-of-source build directory for vigra
+            mkdir vigra-build
+            generate makefiles using cmake (or cmake-gui)
+            make
+            make install
+            
+    TODO: some vigra dependencies, notably boost-python, might have to be built
+    against the local python (i.e. local to the virtual environment).
+    
+    There is no need for that if the system-wide boost is build against the same
+    python version. However, this cannot be ported to another machine unless the
+    system-wide and the virtual environment match those used here.
+    
+    
+    
+    
         
-        
- 2.3 build and install vigra --  see READMe vigra in this directory
- 
+    
     * using cmake, make sure you point to installation directories located INSIDE
     scpiyen-virtualenv directory tree
 
