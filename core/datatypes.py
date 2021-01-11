@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 ''' Utilities for generic and numpy array-based data types such as quantities
-
+Changelog:
+2021-01-06 14:35:30 gained module-level constants:
+RELATIVE_TOLERANCE
+ABSOLUTE_TOLERANCE
+EQUALS_NAN
 
 '''
 
@@ -9,7 +13,7 @@ from __future__ import print_function
 #### BEGIN core python modules
 import collections 
 import datetime
-from enum import Enum, IntEnum
+from enum import (Enum, IntEnum,)
 import inspect
 import numbers
 import sys
@@ -18,22 +22,20 @@ import traceback
 import typing
 import warnings
 import weakref
-from copy import deepcopy, copy
+from copy import (deepcopy, copy,)
 
 #### END core python modules
 
 #### BEGIN 3rd party modules
-from PyQt5 import QtGui, QtCore, QtWidgets
+from PyQt5 import (QtGui, QtCore, QtWidgets,)
 import numpy as np
 import numpy.matlib as mlib
 import pandas as pd
 import quantities as pq
 import vigra
 import neo
-from neo.core import baseneo
-from neo.core import basesignal
-from neo.core import container
-from neo.core.dataobject import DataObject, ArrayDict
+from neo.core import (baseneo, basesignal, container,)
+from neo.core.dataobject import (DataObject, ArrayDict,)
 #### END 3rd party modules
 
 #### BEGIN pict.core.modules
@@ -41,8 +43,7 @@ from neo.core.dataobject import DataObject, ArrayDict
 from . import xmlutils
 from . import strutils
 
-#import utilities
-from .utilities import counter_suffix, unique
+from .utilities import (counter_suffix, unique, )
 from .prog import safeWrapper
 
 from imaging.imageprocessing import *
@@ -139,7 +140,9 @@ exps = tuple([k for k in range(24,2,-3)] + [2,1,-1,-2] + [k for k in range(-3, -
 
 SI10Powers = dict([(p, dict([("exponent", e), ("symbol", s)])) for (p,e,s) in zip(sipfx, exps, sisymb)])
 
-
+RELATIVE_TOLERANCE = 1e-4
+ABSOLUTE_TOLERANCE = 1e-4
+EQUAL_NAN = True
 
 #NOTE: do not confuse with pq.au which is one astronomical unit !!!
 arbitrary_unit = arbitraryUnit = ArbitraryUnit = pq.UnitQuantity('arbitrary unit', 1. * pq.dimensionless, symbol='a.u.')
@@ -199,6 +202,8 @@ def make_scaled_unit_quantity(base_quantity, power):
     
     return pq.UnitQuantity(name, factor * base_quantity, symbol=symbol)
     
+# NOTE: the string argument refers to the prefix to be prepended to the original
+# unit string
 kiloohm = kohm = make_scaled_unit_quantity(pq.ohm, "kilo")
 custom_unit_symbols[kohm.symbol] = kohm
 megaohm = Mohm = make_scaled_unit_quantity(pq.ohm, "mega")
@@ -206,17 +211,8 @@ custom_unit_symbols[Mohm.symbol] = Mohm
 gigaohm = Gohm = make_scaled_unit_quantity(pq.ohm, "giga")
 custom_unit_symbols[Gohm.symbol] = Gohm
 
-#kiloohm = kohm = pq.UnitQuantity("kiloohm", 1e3 * pq.ohm, symbol="kohm")
-#megaohm = Mohm = pq.UnitQuantity("megaohm", 1e6 * pq.ohm, symbol="Mohm")
-#gigaohm = Gohm = pq.UnitQuantity("gigaohm", 1e9 * pq.ohm, symbol="Gohm")
-
-
 # some other useful units TODO
 
-#relative_tolerance = 1e-4
-#absolute_tolerance = 1e-4
-#equal_nan = True
-    
 def isVector(x):
     """Returns True if x is a numpy array encapsulating a vector.
     
@@ -806,6 +802,23 @@ class IndicatorCalibration(object):
         self.Kd = Kd
         self.Fmin = Fmin
         self.Fmax = Fmax
+        
+#class EnumMixin(object):
+    #@classmethod
+    #def names(cls):
+        #for e in cls:
+            #yield e.name
+            
+    #@classmethod
+    #def values(cls):
+        #for e in cls:
+            #yield e.value
+            
+            
+    #@classmethod
+    #def items(cls):
+        #for e in cls:
+            #yield e
         
         
 #class PictArray(vigra.VigraArray):

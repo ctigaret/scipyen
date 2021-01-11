@@ -5,3 +5,6 @@ __pycache__
 *.old
 *.pyc
 *.py~
+
+# Ignore dynaconf secret files
+.secrets.*

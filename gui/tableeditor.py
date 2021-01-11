@@ -32,7 +32,7 @@ import matplotlib.mlab as mlb
 import core.datatypes as dt
 
 import core.strutils as strutils
-from core.strutils import string_to_float
+from core.strutils import str2float
 
 from core.utilities import (safeWrapper, unique,)
 
@@ -657,15 +657,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             else:
                 return QtCore.QVariant()
                 
-            #if role == QtCore.Qt.DisplayRole:
             if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole):
                 return QtCore.QVariant("%s" % ret)
-            
-            #if role == QtCore.Qt.EditRole:
-                #return QtCore.QVariant("%s" % ret)
-            
-            #elif role == QtCore.Qt.AccessibleTextRole:
-                #return QtCore.QVariant("%s" % ret)
             
             elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                 return QtCore.QVariant(ret_type)
@@ -831,7 +824,7 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
                  pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
                  *args, **kwargs) -> None:
-        super().__init__(data=data, parent=parent, pWin=pWin, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs) # calls _configureGUI_ and loadSettings
+        super().__init__(data=data, parent=parent, pWin=pWin, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs) # calls _configureUI_ and loadSettings
 
         self.selectedColumnIndex      = None
         self.selectedRowIndex         = None
@@ -872,7 +865,7 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
     def _slot_use_mpl_toggled_(self, value):
         self._use_matplotlib_ = value
             
-    def _configureGUI_(self):
+    def _configureUI_(self):
         """Initializes and configures the GUI elements.
         """
         # NOTE: 2019-01-12 12:21:34
@@ -1121,7 +1114,7 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
         nan = np.nan
         
         for l in model_index_list:
-            column_data = np.array([string_to_float("%s" % self._dataModel_.__getModelData__(ndx.row(), ndx.column()).value()) for ndx in l], dtype="float64")
+            column_data = np.array([str2float("%s" % self._dataModel_.__getModelData__(ndx.row(), ndx.column()).value()) for ndx in l], dtype="float64")
             
             data.append(column_data)
             

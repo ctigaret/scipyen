@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>757</width>
-    <height>774</height>
+    <height>776</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -476,8 +476,7 @@
                     <string/>
                    </property>
                    <property name="icon">
-                    <iconset resource="../gui/resources/resources.qrc">
-                     <normaloff>:/images/document-import_multiple.svg</normaloff>:/images/document-import_multiple.svg</iconset>
+                    <iconset theme="document-import"/>
                    </property>
                   </widget>
                  </item>
@@ -511,8 +510,7 @@
                     <string/>
                    </property>
                    <property name="icon">
-                    <iconset resource="../gui/resources/resources.qrc">
-                     <normaloff>:/images/document-export_multiple.svg</normaloff>:/images/document-export_multiple.svg</iconset>
+                    <iconset theme="document-export"/>
                    </property>
                   </widget>
                  </item>
@@ -546,8 +544,7 @@
                     <string/>
                    </property>
                    <property name="icon">
-                    <iconset resource="../gui/resources/resources.qrc">
-                     <normaloff>:/images/remove.svg</normaloff>:/images/remove.svg</iconset>
+                    <iconset theme="remove"/>
                    </property>
                   </widget>
                  </item>
@@ -581,8 +578,7 @@
                     <string/>
                    </property>
                    <property name="icon">
-                    <iconset resource="../gui/resources/resources.qrc">
-                     <normaloff>:/images/remove_multiple.svg</normaloff>:/images/remove_multiple.svg</iconset>
+                    <iconset theme="edit-delete"/>
                    </property>
                   </widget>
                  </item>
@@ -3794,9 +3790,7 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionImportUnits">
    <property name="icon">
-    <iconset>
-     <normalon>:/images/document-import_multiple.svg</normalon>
-    </iconset>
+    <iconset theme="document-import"/>
    </property>
    <property name="text">
     <string>Import Units</string>
@@ -3807,9 +3801,7 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionAdd_unit">
    <property name="icon">
-    <iconset>
-     <normalon>:/images/add.svg</normalon>
-    </iconset>
+    <iconset theme="cursor-cross"/>
    </property>
    <property name="text">
     <string>Add unit</string>
@@ -3820,9 +3812,7 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionRemove_unit">
    <property name="icon">
-    <iconset>
-     <normalon>:/images/remove.svg</normalon>
-    </iconset>
+    <iconset theme="remove"/>
    </property>
    <property name="text">
     <string>Remove unit</string>
@@ -3842,8 +3832,7 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionDeleteAllAnalysisUnits">
    <property name="icon">
-    <iconset resource="../gui/resources/resources.qrc">
-     <normaloff>:/images/remove_many.svg</normaloff>:/images/remove_many.svg</iconset>
+    <iconset theme="edit-delete"/>
    </property>
    <property name="text">
     <string>DeleteAllAnalysisUnits</string>
@@ -3854,8 +3843,7 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionRemoveSpecifiedUnits">
    <property name="icon">
-    <iconset resource="../gui/resources/resources.qrc">
-     <normaloff>:/images/remove_many_specified.svg</normaloff>:/images/remove_many_specified.svg</iconset>
+    <iconset theme="edit-delete-remove"/>
    </property>
    <property name="text">
     <string>RemoveSpecifiedUnits</string>
@@ -3866,8 +3854,7 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionSetup_Vertical_Cursors_In_Frame">
    <property name="icon">
-    <iconset resource="../gui/resources/resources.qrc">
-     <normaloff>:/images/tools-wizard.svg</normaloff>:/images/tools-wizard.svg</iconset>
+    <iconset theme="tools-wizard"/>
    </property>
    <property name="text">
     <string>Setup</string>
@@ -3878,8 +3865,7 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionSetup_Vertical_Cursors_in_All_Frames">
    <property name="icon">
-    <iconset resource="../gui/resources/resources.qrc">
-     <normaloff>:/images/tools-wizard_multiple.svg</normaloff>:/images/tools-wizard_multiple.svg</iconset>
+    <iconset theme="tools-wizard"/>
    </property>
    <property name="text">
     <string>Setup In Specific Frames</string>
@@ -3890,8 +3876,7 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionToolbarOpenFile">
    <property name="icon">
-    <iconset resource="../gui/resources/resources.qrc">
-     <normaloff>:/images/document-open.svg</normaloff>:/images/document-open.svg</iconset>
+    <iconset theme="document-open"/>
    </property>
    <property name="text">
     <string>Open</string>
@@ -3902,8 +3887,7 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionToolbarDataLoad">
    <property name="icon">
-    <iconset resource="../gui/resources/resources.qrc">
-     <normaloff>:/images/document-import-from-workspace.svg</normaloff>:/images/document-import-from-workspace.svg</iconset>
+    <iconset theme="document-import"/>
    </property>
    <property name="text">
     <string>Load</string>
@@ -3914,8 +3898,7 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionToolbarSaveData">
    <property name="icon">
-    <iconset resource="../gui/resources/resources.qrc">
-     <normaloff>:/images/document-save-as.svg</normaloff>:/images/document-save-as.svg</iconset>
+    <iconset theme="document-save-as"/>
    </property>
    <property name="text">
     <string>Save</string>
@@ -3926,8 +3909,7 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionToolbarCopyToWorkspace">
    <property name="icon">
-    <iconset resource="../gui/resources/resources.qrc">
-     <normaloff>:/images/document-export-to-workspace.svg</normaloff>:/images/document-export-to-workspace.svg</iconset>
+    <iconset theme="document-export"/>
    </property>
    <property name="text">
     <string>Copy to workspace</string>

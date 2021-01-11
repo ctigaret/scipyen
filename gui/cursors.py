@@ -1,4 +1,6 @@
-
+# -*- coding: utf-8 -*-
+"""Pyqtgraph-based cursors for signal viewers
+"""
 import collections, enum, numbers
 
 from PyQt5 import (QtCore, QtGui, QtWidgets,) 

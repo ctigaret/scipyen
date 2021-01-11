@@ -74,7 +74,8 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 #### BEGIN pict.core modules
 from core.traitcontainers import DataBag
-from core.prog import (safeWrapper, deprecated,)
+from core.prog import (safeWrapper, deprecated,
+                       timefunc, processtimefunc,)
 from core.utilities import (unique, index_of,)
 from core.workspacefunctions import debug_scipyen
 
@@ -4636,6 +4637,15 @@ def __new_planar_graphic__(cls, states, name="", frameindex=[], currentframe=0, 
     name: the name (_ID_), a str
     
     """
+    #print("__new_planar_graphic__: cls", cls)
+    
+    # NOTE: 2020-12-23 15:11:49 TODO/FIXME:
+    # a design flaw in pictio.CustomUnpickler can return matplotlib.widgets.Cursor
+    # when finding pictgui.Cursor
+    # until we fix that flaw in pictio, let's compensate for it here
+    if "Cursor" in cls.__name__:
+        cls = Cursor
+        
     obj = cls(states, name=name, graphicstype=graphicstype, closed=closed, 
             currentframe=currentframe, frameindex=frameindex, 
             linked_objects=linked_objects)
@@ -5755,7 +5765,6 @@ def printQPainterPath(p):
     
     return "[" + ", ".join(s) + "]"
 
-#class Cursor(PlanarGraphics, metaclass=PlanarGraphicsMeta):
 class Cursor(PlanarGraphics):
     """Encapsulates the coordinates of a cursor:
     
@@ -9056,8 +9065,12 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
 
         self.update()
         
-    #@safeWrapper
     def paint(self, painter, styleOption, widget):
+        self.timed_paint(painter, styleOption, widget)
+        
+    #@safeWrapper
+    @timefunc
+    def timed_paint(self, painter, styleOption, widget):
         """Does the actual painting of the item.
         Also called by super().update() & scene.update()
         """

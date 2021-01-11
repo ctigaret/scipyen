@@ -1,13 +1,21 @@
 # -*- coding: utf-8 -*-
 """TriggerEvent class
+
+Changelog:
+2021-01-06 14:34:02 tolerances and equal_nan moved to datatypes module, 
+    as module contants
+
 """
-import enum, numbers, warnings
-from copy import deepcopy, copy
+import warnings
+from enum import IntEnum
+from numbers import (Number, Real,)
+from copy import (deepcopy, copy,)
 import numpy as np
 import quantities as pq
 import neo
 from neo.core.dataobject import (DataObject, ArrayDict,)
-from core.datatypes import (check_time_units, is_string,)
+from core.datatypes import (check_time_units, is_string, 
+                            RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
 
 def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None, 
                file_origin=None, description=None, event_type=None,
@@ -23,9 +31,8 @@ def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None,
     e.segment=segment
     
     return e
-    
 
-class TriggerEventType(enum.IntEnum):
+class TriggerEventType(IntEnum):#, EnumMixin):
     """Convenience enum type for trigger event types.
     
     Types are defined as follows:
@@ -61,6 +68,33 @@ class TriggerEventType(enum.IntEnum):
     
     acquisition         = imaging | sweep # 56
     
+    @staticmethod
+    def names():
+        """Iterate through the names in TriggerEventType enumeration.
+        """
+        for t in TriggerEventType:
+            yield t.name
+    
+    @staticmethod
+    def values():
+        """Iterate through the int values of TriggerEventType enumeration.
+        """
+        for t in TriggerEventType:
+            yield t.value
+        
+    @staticmethod
+    def types():
+        """Iterate through the elements of TriggerEventType enumeration.
+        Useful to quickly remember what the members of this enum are (with their
+        names and values).
+        
+        A TriggerEventType enum member is by definition a member 
+        of TriggerEventType enum and an instance of TriggerEventType.
+        
+        """
+        for t in TriggerEventType:
+            yield t
+        
 class TriggerEvent(DataObject):
     """Trigger event.
     
@@ -134,9 +168,9 @@ class TriggerEvent(DataObject):
     _quantity_attr = 'times'
     _necessary_attrs = (('times', pq.Quantity, 1), ('labels', np.ndarray, 1, np.dtype('S')), ("__event_type__", TriggerEventType, TriggerEventType.presynaptic))
 
-    relative_tolerance = 1e-4
-    absolute_tolerance = 1e-4
-    equal_nan = True
+    #relative_tolerance = 1e-4
+    #absolute_tolerance = 1e-4
+    #equal_nan = True
     
     @staticmethod
     def defaultLabel(event_type):
@@ -205,7 +239,7 @@ class TriggerEvent(DataObject):
             
         if isinstance(value, (tuple, list)):
             # value is a sequence of...
-            if all([isinstance(v, numbers.Number) for v in value]): # plain numbers
+            if all([isinstance(v, Number) for v in value]): # plain numbers
                 times = np.array(value) * units
                 
             elif all([isinstance(v, pq.Quantity) and check_time_units(v) for v in value]): # python quantities
@@ -246,7 +280,7 @@ class TriggerEvent(DataObject):
             else:
                 raise TypeError("When a sequence, the value must contain elements of the same type, either number scalars or python quantities with time units")
                     
-        elif isinstance(value, numbers.Number):
+        elif isinstance(value, Number):
             times = np.array([value]) * units # create a dimensioned array
             
         elif isinstance(value, pq.Quantity):
@@ -307,9 +341,34 @@ class TriggerEvent(DataObject):
             labels = np.array([], dtype='S')
             
         else:
-            labels = np.array(labels)
-            if labels.size != times.size and labels.size:
-                warnings.warn("Labels array has different length to times")
+            if isinstance(labels, str):
+                labels = np.array([labels] * times.size)
+            elif isinstance(labels, (tuple, list)):
+                if not all([isinstance(l, str) for l in labels]):
+                    raise TypeError("When ''labels' is a sequence, all elements must be str")
+                
+                if len(labels) < times.size:
+                    labels += [labels[-1]] * (times.size - len(labels))
+                    
+                elif len(labels) > times.size:
+                    labels = labels[:times.size]
+                    
+                labels = np.array(labels)
+                
+            elif isinstance(labels, np.ndarray):
+                if not is_string(labels):
+                    raise TypeError("When 'labels' is a numpy array, it must contain strings")
+                
+                if labels.size < times.size:
+                    labels = np.append(labels, [labels[-1]] * (times.size - labels-size))
+                elif labels.size > times.size:
+                    labels = labels[:times.size]
+                    
+            else:
+                raise TypeError("'labels' must be either a str, a sequence of str or a numpy array of strings; got %s instead" % type(labels).__name__)
+                    
+            #if labels.size != times.size and labels.size:
+                #warnings.warn("Size of 'labels' array (%d) is different from that of the 'times' array (%d)" % (labels.size, times.size))
                 #raise ValueError("Labels array has different length to times")
             
         if units is None:
@@ -587,7 +646,7 @@ class TriggerEvent(DataObject):
         else:
             ret = self
             
-        if isinstance(value, numbers.Real):
+        if isinstance(value, Real):
             value = value * ret.times.units
             
         elif isinstance(value, pq.Quantity):
@@ -833,9 +892,8 @@ class TriggerEvent(DataObject):
         """
         return self.view(pq.Quantity)
     
-    def is_same_as(self, other, rtol = relative_tolerance, 
-                   atol =  absolute_tolerance, 
-                   equal_nan = equal_nan):
+    def is_same_as(self, other, rtol = RELATIVE_TOLERANCE, atol =  ABSOLUTE_TOLERANCE, 
+                   equal_nan = EQUAL_NAN):
         """Work around standard equality test
         Compares event type, time stamps, labels and name.
         
@@ -879,25 +937,18 @@ class TriggerEvent(DataObject):
                     
             result &= compatible_units
             
-        if result:
-            result &= other.times.flatten().size == self.times.flatten().size
-        
-        if result:
-            result &= np.all(np.isclose(other.times.magnitude, self.times.magnitude,
-                                     rtol=rtol, atol=atol, equal_nan=equal_nan))
-        
+        if result: 
+            result &= other.flatten().size == self.flatten().size
+            
         if result: 
             result &= np.all(np.isclose(other.magnitude, self.magnitude, 
-                                     rtol=rtol, atol=atol, equal_nan=equal_nan))
+                                        rtol=rtol, atol=atol, equal_nan=equal_nan))
+        
+        if result:
+            result &= other.labels.size == self.labels.size
             
         if result:
-            result &= other.labels.flatten().size == self.labels.flatten().size
-            
-        if result:
-            result &= other.labels.shape == self.labels.shape
-            
-        if result:
-            result &= np.all(other.labels.flatten() == self.labels.flatten)
+            result &= np.all(other.labels.flatten() == self.labels.flatten())
             
         if result:
             result &= other.name == self.name

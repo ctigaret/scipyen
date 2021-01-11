@@ -1963,7 +1963,7 @@ def resultsToCsv(data, filebasename=None):
     
     if filebasename is None:
         if data.name is not None and len(data.name) > 0:
-            filebasename = strutils.string_to_valid_identifier(data.name)
+            filebasename = strutils.str2symbol(data.name)
             
         else:
             cframe = inspect.getouterframes(inspect.currentframe())[1][0]
@@ -1972,14 +1972,14 @@ def resultsToCsv(data, filebasename=None):
                 for (k, v) in cframe.f_globals.items():
                     if not type(v).__name__ in ("module", "type", "function", "builtin_function_or_method"):
                         if v is data and not k.startswith("_"):
-                            filebasename = strutils.string_to_valid_identifier(k)
+                            filebasename = strutils.str2symbol(k)
                             
             finally:
                 del(cframe)
                 filebasename = "data"
                 
     else:
-        filebasename = strutils.string_to_valid_identifier(filebasename)
+        filebasename = strutils.str2symbol(filebasename)
                 
     (name,extn) = os.path.splitext(filebasename)
     

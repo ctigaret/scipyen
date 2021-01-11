@@ -2724,19 +2724,19 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
                     # at the end
                     sig_result = collections.OrderedDict()
                     
-                    genotype = strutils.string_to_valid_identifier(analysis_unit.genotype)
-                    #genotype = strutils.string_to_R_identifier(analysis_unit.genotype)
+                    genotype = strutils.str2symbol(analysis_unit.genotype)
+                    #genotype = strutils.str2R(analysis_unit.genotype)
                     
                     if "na" in genotype.lower():
-                        genotype = strutils.string_to_valid_identifier(scandata.genotype)
-                        #genotype = strutils.string_to_R_identifier(scandata.genotype)
+                        genotype = strutils.str2symbol(scandata.genotype)
+                        #genotype = strutils.str2R(scandata.genotype)
                         
-                    gender = strutils.string_to_valid_identifier(analysis_unit.gender)
-                    #gender = strutils.string_to_R_identifier(analysis_unit.gender)
+                    gender = strutils.str2symbol(analysis_unit.gender)
+                    #gender = strutils.str2R(analysis_unit.gender)
                     
                     if "na" in gender.lower():
-                        gender = strutils.string_to_valid_identifier(scandata.gender)
-                        #gender = strutils.string_to_R_identifier(scandata.gender)
+                        gender = strutils.str2symbol(scandata.gender)
+                        #gender = strutils.str2R(scandata.gender)
                     
                     age = analysis_unit.age
                     
@@ -2744,21 +2744,21 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
                         age = scandata.age
                     
                     sig_result["Genotype"]  = genotype
-                    sig_result["Data"]      = strutils.string_to_valid_identifier(scandata.name)
-                    #sig_result["Data"]      = strutils.string_to_R_identifier(scandata.name)
-                    sig_result["Source"]    = strutils.string_to_valid_identifier(analysis_unit.sourceID)
-                    #sig_result["Source"]    = strutils.string_to_R_identifier(analysis_unit.sourceID)
+                    sig_result["Data"]      = strutils.str2symbol(scandata.name)
+                    #sig_result["Data"]      = strutils.str2R(scandata.name)
+                    sig_result["Source"]    = strutils.str2symbol(analysis_unit.sourceID)
+                    #sig_result["Source"]    = strutils.str2R(analysis_unit.sourceID)
                     sig_result["Gender"]    = gender
                     sig_result["Age"]       = age
-                    sig_result["Cell"]      = strutils.string_to_valid_identifier(analysis_unit.cell)
-                    sig_result["Field"]     = strutils.string_to_valid_identifier(analysis_unit.field)
-                    sig_result["Unit"]      = strutils.string_to_valid_identifier(analysis_unit.name)
-                    sig_result["Unit_Type"] = strutils.string_to_valid_identifier(analysis_unit.type)
+                    sig_result["Cell"]      = strutils.str2symbol(analysis_unit.cell)
+                    sig_result["Field"]     = strutils.str2symbol(analysis_unit.field)
+                    sig_result["Unit"]      = strutils.str2symbol(analysis_unit.name)
+                    sig_result["Unit_Type"] = strutils.str2symbol(analysis_unit.type)
                     
-                    #sig_result["Cell"]      = strutils.string_to_R_identifier(analysis_unit.cell)
-                    #sig_result["Field"]     = strutils.string_to_R_identifier(analysis_unit.field)
-                    #sig_result["Unit"]      = strutils.string_to_R_identifier(analysis_unit.name)
-                    #sig_result["Unit_Type"] = strutils.string_to_R_identifier(analysis_unit.type)
+                    #sig_result["Cell"]      = strutils.str2R(analysis_unit.cell)
+                    #sig_result["Field"]     = strutils.str2R(analysis_unit.field)
+                    #sig_result["Unit"]      = strutils.str2R(analysis_unit.name)
+                    #sig_result["Unit_Type"] = strutils.str2R(analysis_unit.type)
                         
                     if "Distance_From_Soma" not in analysis_unit.descriptors:
                         analysis_unit.descriptors["Distance_From_Soma"] = np.nan
@@ -2804,7 +2804,7 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
                         analysis_unit.descriptors["Dendrite_Width"] = np.nan
                     
                     for descriptor in sorted([d for d in analysis_unit.descriptors]):
-                        descriptor = strutils.string_to_valid_identifier(descriptor)
+                        descriptor = strutils.str2symbol(descriptor)
                         sig_result[descriptor] = analysis_unit.getDescriptor(descriptor)
                         
                     sig_result["Protocol"]  = protocol.name
@@ -2872,7 +2872,7 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
                             if "Coefficients" in sig_annots["FitResult"]:
                                 if "CoefficientNames" in sig_annots["FitResult"]:
                                     for k, p in enumerate(sig_annots["FitResult"]["CoefficientNames"]):
-                                        coefName = strutils.string_to_valid_identifier(p)
+                                        coefName = strutils.str2symbol(p)
                                         sig_result["Fit_EPSCaT_%d_%s" % (i, coefName)] = float(sig_annots["FitResult"]["Coefficients"][i][k])
                                     
                                 else:
@@ -3812,7 +3812,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         else:
             self.actionPlot_long_fits.setChecked(plot_long_fits)
             
-    def _configureGUI_(self):
+    def _configureUI_(self):
         self.setupUi(self)
         
         # NOTE: 2018-05-21 15:32:17
@@ -5025,7 +5025,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
         tempDataVarName = os.path.splitext(os.path.basename(pvXMLfileName))[0]
         
-        lsdata_varname = strutils.string_to_valid_identifier(tempDataVarName)
+        lsdata_varname = strutils.str2symbol(tempDataVarName)
         
         try:
             pvScan = PrairieView.PVScan(pio.loadXMLFile(pvXMLfileName))
@@ -5292,7 +5292,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 return
             
 
-        var_name = strutils.string_to_valid_identifier(lsdata_varname)
+        var_name = strutils.str2symbol(lsdata_varname)
         self._scipyenWindow_.assignToWorkspace(var_name, lsdata)
         
         self.setData(lsdata, var_name)
@@ -5381,7 +5381,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 bname = "scandata"
                 
             else:
-                bname = strutils.string_to_valid_identifier(obj.name)
+                bname = strutils.str2symbol(obj.name)
             
             newVarName = validate_varname(bname, self._scipyenWindow_.workspace)
             
@@ -5728,7 +5728,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 ephysNamePrompt.variable.redoAvailable=True
                 ephysNamePrompt.variable.undoAvailable=True
                 
-                ephysNamePrompt.setText(strutils.string_to_valid_identifier(ephys_varname))
+                ephysNamePrompt.setText(strutils.str2symbol(ephys_varname))
                 
                 if "TriggerEventDetection" not in self._data_.analysisOptions:
                     default_options = scanDataOptions()
@@ -5751,7 +5751,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                         imaging = trig_dlg_result[3]
                         options = trig_dlg_result[4]
                         
-                        tp, _ = auto_detect_trigger_protocols(self._data_.electrophysiology,
+                        tp = auto_detect_trigger_protocols(self._data_.electrophysiology,
                                                 presynaptic=presyn,
                                                 postsynaptic=postsyn,
                                                 photostimulation=photo,
@@ -6806,11 +6806,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
         newProtocol = TriggerProtocol()
         
-        segments_with_protocol = list()
+        segments_with_protocol = [p.segments for p in self._data_.triggerProtocols]
         
-        for p in self._data_.triggerProtocols:
-            segments_with_protocol += p.segmentIndices()
-            
         data_segments = [k for k in range(self._data_.scansFrames)]
         
         if all([s in segments_with_protocol for s in data_segments]):
@@ -7007,7 +7004,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
 
             #print("slot_protocolTableEdited", protocol)
             
-            self._data_.embedTriggerEvents(protocol) 
+            #self._data_.embedTriggerEvents(protocol) 
             self._data_.embedTriggerEvents(protocol, to_imaging=False)
             #ephys.embed_trigger_protocol(protocol, self._data_.electrophysiology, clearTriggers=True)
             
@@ -7261,7 +7258,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             
             self.statusBar().showMessage("Collecting analysis units ...")
             
-            scandata_units_dict = dict([(strutils.string_to_valid_identifier("%s_%s_%s" % (cell, field, u.name)), u) \
+            scandata_units_dict = dict([(strutils.str2symbol("%s_%s_%s" % (cell, field, u.name)), u) \
                                         for u in scandata.extractAnalysisUnits(simple_name=True)])
             
             averaged_scandata_units = dict()
@@ -7274,7 +7271,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                     scandata = self._scipyenWindow_.workspace[name]
                     
                     if scandata.cell == cell and scandata.field == field:
-                        unit_data_dict = dict([(strutils.string_to_valid_identifier("%s_%s_%s" % (cell, field, u.name)), u) \
+                        unit_data_dict = dict([(strutils.str2symbol("%s_%s_%s" % (cell, field, u.name)), u) \
                             for u in scandata.extractAnalysisUnits(simple_name=True)])
                         
                         for unit_key in unit_data_dict:
@@ -7289,7 +7286,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                         
                 for key in scandata_units_dict.keys():
                     # canonic name
-                    scandata_units_dict[key].name = strutils.string_to_valid_identifier("%s_%s_%s" % (cell, field, scandata_units_dict[key].name))
+                    scandata_units_dict[key].name = strutils.str2symbol("%s_%s_%s" % (cell, field, scandata_units_dict[key].name))
                     
                     analyseLSData(scandata_units_dict[key])
                     
@@ -7512,7 +7509,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         try:
             for name in selected_names:
                 lsdata = self._scipyenWindow_.workspace[name]
-                #filename = "%s.csv" % strutils.string_to_valid_identifier(lsdata.name)
+                #filename = "%s.csv" % strutils.str2symbol(lsdata.name)
 
                 # NOTE: 2018-11-25 01:40:51
                 # give up on report in text form; use pandas DataFrame directly/exclusively
@@ -7623,7 +7620,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             # NOTE: do all come from the same cell?
             
             if (result.Cell == result.Cell[0]).all():
-                var_name = strutils.string_to_valid_identifier("%s_collated_analysis_result" % result.Cell[0])
+                var_name = strutils.str2symbol("%s_collated_analysis_result" % result.Cell[0])
                 
             else:
                 var_name = "collated_analysis_result"
@@ -7646,14 +7643,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             exportCsvPrompt.setChecked(False)
             
             if dlg.exec() == QtWidgets.QDialog.Accepted:
-                newVarName = strutils.string_to_valid_identifier(namePrompt.text()) # allow user to overwrite variables if so wished
+                newVarName = strutils.str2symbol(namePrompt.text()) # allow user to overwrite variables if so wished
                 
                 write_to_csv = exportCsvPrompt.selection()
                 
                 self._scipyenWindow_.assignToWorkspace(newVarName, result)
                 
                 if write_to_csv:
-                    namelist = [strutils.string_to_valid_identifier(newVarName)]
+                    namelist = [strutils.str2symbol(newVarName)]
 
                     targetDir = self._scipyenWindow_.currentDir
                     
@@ -7738,8 +7735,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         if self._data_ is None:
             return
 
-        namelist = [strutils.string_to_valid_identifier(self._data_.name)]
-        #namelist = [strutils.string_to_valid_identifier(self._data_.name)]
+        namelist = [strutils.str2symbol(self._data_.name)]
+        #namelist = [strutils.str2symbol(self._data_.name)]
         
         if self._selected_analysis_unit_ is not None:
             namelist.append("_%s" % self._selected_analysis_unit_.name)
@@ -7908,7 +7905,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         elif result == -1:
             return
         
-        var_name = strutils.string_to_valid_identifier(result.name)
+        var_name = strutils.str2symbol(result.name)
         
         if var_name in self._scipyenWindow_.workspace.keys():
             dlg = quickdialog.QuickDialog(self, "Assign to workspace")
@@ -7964,14 +7961,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             if isinstance(result, (tuple, list)):
                 if len(result):
                     for r in result:
-                        self._scipyenWindow_.workspace[strutils.string_to_valid_identifier(r.name)] = r
+                        self._scipyenWindow_.workspace[strutils.str2symbol(r.name)] = r
             
                 self._scipyenWindow_.slot_updateWorkspaceTable(False)
                 
                 self.statusBar().showMessage("Done!")
                 
             elif isinstance(result, ScanData):
-                self._scipyenWindow_.workspace[strutils.string_to_valid_identifier(result.name)] = result
+                self._scipyenWindow_.workspace[strutils.str2symbol(result.name)] = result
                 
                 self._scipyenWindow_.slot_updateWorkspaceTable(False)
                 
@@ -8602,7 +8599,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         if self._data_ is None:
             return
         
-        newname = strutils.string_to_valid_identifier(self.sourceIDLineEdit.text())
+        newname = strutils.str2symbol(self.sourceIDLineEdit.text())
         
         #print("newname")
         
@@ -8684,7 +8681,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         if self._data_ is None:
             return
         
-        newname = strutils.string_to_valid_identifier(self.cellLineEdit.text())
+        newname = strutils.str2symbol(self.cellLineEdit.text())
         
         if len(newname.strip()) == 0:
             self._data_.cell = "NA"
@@ -8731,7 +8728,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         if self._data_ is None:
             return
         
-        newname = strutils.string_to_valid_identifier(self.fieldLineEdit.text())
+        newname = strutils.str2symbol(self.fieldLineEdit.text())
         
         if len(newname.strip()) == 0:
             self._data_.field = "NA"
@@ -8769,7 +8766,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.selectCursorSpinBox, self.analysisUnitNameLineEdit, self.defineAnalysisUnitCheckBox)]
         
-        newName = strutils.string_to_valid_identifier(self.analysisUnitNameLineEdit.text())
+        newName = strutils.str2symbol(self.analysisUnitNameLineEdit.text())
         
         if len(newName.strip()) == 0:
             return
@@ -9878,7 +9875,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         if self._data_ is None:
             return
         
-        value = strutils.string_to_valid_identifier(self.scanDataNameLineEdit.text())
+        value = strutils.str2symbol(self.scanDataNameLineEdit.text())
         
         if len(value.strip()) == 0:
             return
@@ -11532,7 +11529,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         if self._data_ is not None:
             if self._data_var_name_ is None:
                 if hasattr(self._data_, "name") and self._data_.name is not None:
-                    self._data_var_name_ = strutils.string_to_valid_identifier(self._data_.name)
+                    self._data_var_name_ = strutils.str2symbol(self._data_.name)
                     
                 else:
                     self._data_var_name_ = ""
@@ -11983,13 +11980,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 newdata.analysisOptions["Discrimination"].pop("data_2D", None)
                 
             if hasattr(newdata, "cell"):
-                newdata.cell = strutils.string_to_valid_identifier(newdata.cell)
+                newdata.cell = strutils.str2symbol(newdata.cell)
                 
             else:
                 newdata.cell = "NA"
                 
             if hasattr(newdata, "field"):
-                newdata.field = strutils.string_to_valid_identifier(newdata.field)
+                newdata.field = strutils.str2symbol(newdata.field)
                 
             else:
                 newdata.field = "NA"
@@ -13799,7 +13796,7 @@ def categoriseNumericalData(data, parameter, values, name, inplace=True):
     if not isinstance(name, str):
         raise TypeError("name expected to be a str; got %s instead" % type(name).__name__)
     
-    name = strutils.string_to_valid_identifier(name)
+    name = strutils.str2symbol(name)
     
     categories = ["%d-%d" % (values[k-1], values[k]) for k in range(1, len(values))]
     

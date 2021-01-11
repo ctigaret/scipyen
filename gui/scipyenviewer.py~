@@ -46,7 +46,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         attribute "_data_", but this mechanism can be superceded in the derived
         type.
     
-    _configureGUI_() -- configures specific GUI widgets and menus
+    _configureUI_() -- configures specific GUI widgets and menus
         
          ATTENTION: If the viewer inherits Qt widgets and actions defined in a
         QtDesigner *.ui file (loaded with PyQt5.uic.loadUiType()) then this function
@@ -185,7 +185,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #if isinstance(varname, str) and len(varname.strip()):
             #self._data_var_name_ = varname
             
-        self._configureGUI_()
+        self._configureUI_()
         
         self.loadSettings()
             
@@ -289,7 +289,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             self.setWindowTitle(self._winTitle_)
 
     @abstractmethod
-    def _configureGUI_(self):
+    def _configureUI_(self):
         """Custom GUI initialization.
         Abstract method, it must be implemented in the derived :class:.
         
@@ -701,7 +701,7 @@ class ScipyenFrameViewer(ScipyenViewer):
     1) Subclasses of ScipyenFrameViewer should define at least one of two QWidgets 
     (a QSlider and a QSpinBox) used for frame navigation.
     
-    In the implementation of _configureGUI_() these widgets should then be 
+    In the implementation of _configureUI_() these widgets should then be 
     aliased to self._frames_slider_ and self._frames_spinner_, respectively, to 
     allow for synchronization of frame navigation, e.g.:
     
@@ -720,7 +720,8 @@ class ScipyenFrameViewer(ScipyenViewer):
     ImageViewer, SignalViewer, LSCaTWindow.
     """
     
-    # signal emitted when the viewer displays 
+    # signal emitted when the viewer displays a data frame; value:int = the
+    # index of the frame in the data
     frameChanged            = pyqtSignal(int, name="frameChanged")
     
     def __init__(self, data: (object, type(None)) = None, 
@@ -768,7 +769,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         
         self._current_frame_index_      = 0 
         self._number_of_frames_         = 1 # determined from the data
-        self.rameIndex                  = range(self._number_of_frames_)
+        self.frameIndex                  = range(self._number_of_frames_)
         #self._linkedViewers_            = list()
         
         # These two should hold a reference to the actual QSlider and QSpinBox
@@ -971,7 +972,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         """Drives frame navigation from the GUI.
         
         The valueChanged signal of the widget used to select the index of the 
-        displayed data frame should be connected to this slot in _configureGUI_()
+        displayed data frame should be connected to this slot in _configureUI_()
         
         NOTE: the subclass can override this function.
         """

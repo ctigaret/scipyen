@@ -52,7 +52,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     modelContentsChanged = pyqtSignal(name = "modelContentsChanged")
     windowVariableDeleted = pyqtSignal(int, name="windowVariableDeleted")
     
-    def __init__(self, shell, hidden_vars=dict(), parent=None):
+    def __init__(self, shell, user_ns_hidden=dict(), parent=None):
         #from core.utilities import standard_obj_summary_headers
         super(WorkspaceModel, self).__init__(parent)
         #self.abbrevs = {'IPython.core.macro.Macro' : 'Macro'}
@@ -68,7 +68,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.modified_vars = dict()
         self.new_vars = dict()
         self.deleted_vars = dict()
-        self.hidden_vars = dict(hidden_vars)
+        self.user_ns_hidden = dict(user_ns_hidden)
     
         
         # NOTE: 2017-09-22 21:33:47
@@ -84,7 +84,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # currently used GUI palette - VERY low priority!
         #self.foreign_kernel_palette = list(sb.color_palette("pastel", 1))
         
-        self.foreign_namespaces = DataBag()
+        self.foreign_namespaces = DataBag(allow_none=True, mutable_types=True)
         self.foreign_namespaces.observe(self._foreign_namespaces_count_changed_, names="length")
             
     def _foreign_namespaces_count_changed_(self, change):
@@ -97,16 +97,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         pass
         
     def __reset_variable_dictionaries__(self):
-        self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.hidden_vars and not item[0].startswith("_")])
+        self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.user_ns_hidden and not item[0].startswith("_")])
         self.modified_vars.clear()
         self.new_vars.clear()
         self.deleted_vars.clear()
         
     def remove_foreign_namespace(self, txt):
         #print("workspaceModel to remove %s namespace" % txt)
-        #if txt in self.foreign_namespaces:
         self.clear_foreign_namespace_display(txt, remove=True)
-        #self.foreign_namespaces.pop(txt, None)
             
     def clear_foreign_namespace_display(self, txt, remove=False):
         #print("workspaceModel to clear %s namespace" % txt)
@@ -137,22 +135,24 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     
     def update_foreign_namespace(self, name, val):
         #print("WorkspaceModel.update_foreign_namespace name %s" % name)
-        #print("name", name)
-        user_ns_shown = set()
+        user_ns_shown_varnames = set()
         
         if isinstance(val, dict):
-            user_ns_shown = val.get("user_ns", set())
+            user_ns_shown_varnames = val.get("user_ns", set())
             
         elif isinstance(val, (list, set, tuple)):
-            user_ns_shown = set([k for k in val])
+            user_ns_shown_varnames = set([k for k in val])
             
         else:
             raise TypeError("val expected to be a dict or a list; got %s instead" % type(val).__name__)
                             
-        first_run = name not in self.foreign_namespaces
+        #first_run = name not in self.foreign_namespaces
         
-        if len(user_ns_shown):
-            if first_run:
+        #print("WorkspaceModel.update_foreign_namespace user_ns_shown_varnames", user_ns_shown_varnames)
+        
+        if len(user_ns_shown_varnames):
+            #print("\t%s in foreign_namespaces" % name, name in self.foreign_namespaces)
+            if name not in self.foreign_namespaces:
                 # special treatment for objects loaded from NEURON at kernel 
                 # initialization time (see extipyutils_client 
                 # nrn_ipython_initialization_cmd and the 
@@ -161,21 +161,26 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 current = set()
                 
                 for v in ("h", "ms", "mV",):
-                    if v in user_ns_shown:
+                    if v in user_ns_shown_varnames:
                         current.add(v)
-                        user_ns_shown.remove(v)
+                        user_ns_shown_varnames.remove(v)
                 
                 # will trigger _foreign_namespaces_count_changed_ which at the 
                 # moment, does nothing
-                self.foreign_namespaces[name] = {"initial": user_ns_shown,
+                self.foreign_namespaces[name] = {"initial": user_ns_shown_varnames,
                                                  "current": current}
                 
             else:    
-                removed_items = self.foreign_namespaces[name]["current"] - user_ns_shown
-                for vname in removed_items:
-                    self.removeRowForVariable(vname, ns = name.replace("_", " "))
+                #print("\tupdate_foreign_namespace: foreign namespaces:", self.foreign_namespaces)
+                #print("\tself.foreign_namespaces[name]['current']", self.foreign_namespaces[name]["current"])
                 
-                added_items = user_ns_shown - self.foreign_namespaces[name]["current"]
+                removed_items = self.foreign_namespaces[name]["current"] - user_ns_shown_varnames
+                #print("\tremoved_items", removed_items)
+                for vname in removed_items:
+                    self.removeRowForVariable(vname, ns = name)
+                    #self.removeRowForVariable(vname, ns = name.replace("_", " "))
+                
+                added_items = user_ns_shown_varnames - self.foreign_namespaces[name]["current"]
                 
                 self.foreign_namespaces[name]["current"] -= removed_items
                 
@@ -189,14 +194,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.modified_vars.clear()
         self.new_vars.clear()
         self.deleted_vars.clear()
-        self.hidden_vars.clear()
+        self.user_ns_hidden.clear()
         
     def is_user_var(self, name, val):
         """Checks binding of symbol (name) to a hidden variable.
         """
         # see NOTE 2020-11-29 16:29:01
-        if name in self.hidden_vars:
-            return val is not self.hidden_vars[name]
+        if name in self.user_ns_hidden:
+            return val is not self.user_ns_hidden[name]
         
         return True
             
@@ -250,15 +255,15 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             #print("post_execute deleted vars", self.deleted_vars)
             
             # NOTE: 2020-11-29 16:05:14 check if any of the deleted symbols need 
-            # to be rebound to their original variables in self.hidden_vars
+            # to be rebound to their original variables in self.user_ns_hidden
             # (see NOTE 2020-11-29 16:29:01 below)
             # this also means we can NEVER remove these symbols from the user
             # workspace (which may not be a bad idea, after all)
-            vars_to_restore = [k for k in self.deleted_vars.keys() if k in self.hidden_vars.keys()]
+            vars_to_restore = [k for k in self.deleted_vars.keys() if k in self.user_ns_hidden.keys()]
             #print("post_execute vars_to_restore",vars_to_restore)
             # restore the links between the deleted symbol and the original reference
             for v in vars_to_restore:
-                self.shell.user_ns[v] = self.hidden_vars[v]
+                self.shell.user_ns[v] = self.user_ns_hidden[v]
             
             deleted_mpl_figs = [item for item in mpl_figs_in_ns if item not in mpl_figs_in_pyplot]
             
@@ -285,7 +290,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # from happening
             #
             # because the original symbol-object binding is contained in
-            # self.hidden_vars (even if hidden from user's view) we can restore
+            # self.user_ns_hidden (even if hidden from user's view) we can restore
             # it whem the new symbol-object binding has been removed by the user 
             # (i.e., when user has called "del").
             #
@@ -294,7 +299,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # symbol to faciliate user interaction, but thenn we restore them
             # once the user has "deleted" the new binding (NOTE: 2020-11-29 16:05:14)
             new_vars = dict([(i,v) for i, v in self.shell.user_ns.items() if i not in self.cached_vars.keys() and not i.startswith("_") and self.is_user_var(i,v)])
-            #new_vars = dict([(i,v) for i, v in self.shell.user_ns.items() if i not in self.cached_vars.keys() and i not in self.hidden_vars and not i.startswith("_")])
+            #new_vars = dict([(i,v) for i, v in self.shell.user_ns.items() if i not in self.cached_vars.keys() and i not in self.user_ns_hidden and not i.startswith("_")])
             
             self.new_vars.update(new_vars)
             
@@ -569,7 +574,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                             if item[0] in self.cached_vars and not safe_identity_test(item[1], self.cached_vars[item[0]]):
                                 self.updateRowForVariable(item[0], item[1])
                                 
-                self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.hidden_vars and not item[0].startswith("_")])
+                self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.user_ns_hidden and not item[0].startswith("_")])
                 self.deleted_vars.clear()
                 self.new_vars.clear()
                 
@@ -624,7 +629,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                             #print("what to do with", item[0])
                        
                 # is this still needed !?!
-                self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.hidden_vars and not item[0].startswith("_")])
+                self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.user_ns_hidden and not item[0].startswith("_")])
 
         except Exception as e:
             print("\n\n***Exception in updateTable: ***\n")

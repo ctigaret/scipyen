@@ -20,7 +20,7 @@ from .traitutils import (trait_from_type, transform_link, is_trait,
                         EventHandler,Int, Bool, All, is_trait, observe)
 
 from .prog import safeWrapper
-from .strutils import string_to_valid_identifier
+from .strutils import str2symbol
 
 class DataBagTraitsObserver(HasTraits):
     # ATTENTION THESE ARE CLASS ATTRIBUTES!

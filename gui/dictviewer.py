@@ -118,8 +118,6 @@ class ScipyenTableWidget(TableWidget):
 
         
         """
-        
-        
         if len(data.shape) == 0 or data.ndim ==0:
             yield(data.take(0))
             
@@ -220,7 +218,7 @@ class DataViewer(ScipyenViewer): #, QtWidgets.QMainWindow):
                  *args, **kwargs) -> None:
         super().__init__(data=data, parent=parent, pWin=pWin, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs)
         
-    def _configureGUI_(self):
+    def _configureUI_(self):
         #self.treeWidget = DataTreeWidget(parent = self)
         self.treeWidget = InteractiveTreeWidget(parent = self)
         
@@ -399,7 +397,7 @@ class DataViewer(ScipyenViewer): #, QtWidgets.QMainWindow):
         
         obj = get_nested_value(self._data_, item_path[1:]) # because 1st item is the insivible root name
         
-        #objname = strutils.string_to_valid_identifier(item_path[-1])
+        #objname = strutils.str2symbol(item_path[-1])
         objname = " > ".join(item_path)
         
         newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
@@ -557,7 +555,7 @@ class DataViewer(ScipyenViewer): #, QtWidgets.QMainWindow):
             if len(values):
                 if len(values) == 1:
                     obj = values[0]
-                    #objname = strutils.string_to_valid_identifier(item_paths[-1])
+                    #objname = strutils.str2symbol(item_paths[-1])
                     newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
         
                     objname = " \u3009".join(full_item_paths[0])
@@ -622,9 +620,9 @@ class DataViewer(ScipyenViewer): #, QtWidgets.QMainWindow):
                     namePrompt = quickdialog.StringInput(dlg, "Data name:")
                     
                     if fullPathAsName:
-                        newVarName = strutils.string_to_valid_identifier(item_path_names[0])
+                        newVarName = strutils.str2symbol(item_path_names[0])
                     else:
-                        newVarName = strutils.string_to_valid_identifier(item_names[0])
+                        newVarName = strutils.str2symbol(item_names[0])
                     
                     namePrompt.variable.setClearButtonEnabled(True)
                     namePrompt.variable.redoAvailable=True

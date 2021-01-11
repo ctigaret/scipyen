@@ -845,8 +845,8 @@ class PlanarGraphics():
                     ret[key] = src[key] 
                     
                 else:
-                    warnings.warn("%s.copyConvertState: The descriptor %s was not supplied; it will be assigned a default value" % (cls.__name__, key),
-                                stacklevel=3)
+                    #warnings.warn("%s.copyConvertState: The descriptor %s was not supplied; it will be assigned a default value" % (cls.__name__, key),
+                                #stacklevel=3)
                     if key == "z_frame":
                         ret.z_frame = None
                     else:
@@ -4637,6 +4637,15 @@ def __new_planar_graphic__(cls, states, name="", frameindex=[], currentframe=0, 
     name: the name (_ID_), a str
     
     """
+    #print("__new_planar_graphic__: cls", cls)
+    
+    # NOTE: 2020-12-23 15:11:49 TODO/FIXME:
+    # a design flaw in pictio.CustomUnpickler can return matplotlib.widgets.Cursor
+    # when finding pictgui.Cursor
+    # until we fix that flaw in pictio, let's compensate for it here
+    if "Cursor" in cls.__name__:
+        cls = Cursor
+        
     obj = cls(states, name=name, graphicstype=graphicstype, closed=closed, 
             currentframe=currentframe, frameindex=frameindex, 
             linked_objects=linked_objects)
@@ -5756,7 +5765,6 @@ def printQPainterPath(p):
     
     return "[" + ", ".join(s) + "]"
 
-#class Cursor(PlanarGraphics, metaclass=PlanarGraphicsMeta):
 class Cursor(PlanarGraphics):
     """Encapsulates the coordinates of a cursor:
     

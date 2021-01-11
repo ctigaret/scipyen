@@ -51,7 +51,9 @@ from importlib import reload # I use this all too often !
 
 #### BEGIN 3rd party modules
 
-#### BEGIN numerics: signal/image , maths, statistics, data visualization
+import confuse
+
+#### BEGIN numerics & data visualization
 import numpy as np
 import pywt # wavelets
 import scipy
@@ -75,7 +77,7 @@ import sklearn as sk # machine learning, also nice plot_* functionality
 
 import seaborn as sb # statistical data visualization
 
-
+#print("mainwindow.py __name__ =", __name__)
 
 #### BEGIN migration to pyqtgraph -- setup global parameters
 # NOTE: 2019-01-24 21:40:45
@@ -115,14 +117,6 @@ plt.ion()
 
 #### END matplotlib modules
 
-# NOTE: 2019-01-24 21:40:45
-##### BEGIN migration to pyqtgraph -- setup global parameters
-#pg.Qt.lib = "PyQt5" # pre-empt the use of PyQt5
-## TODO make this peristent  user-modifiable configuration
-#pg.setConfigOptions(background="w", foreground="k", editorCommand="kwrite")
-##pg.setConfigOptions(editorCommand="kwrite")
-
-#### END migration to pyqtgraph -- setup global parameters
 
 import quantities as pq
 import xarray as xa
@@ -134,7 +128,7 @@ import vigra
 
 import neo
 
-#### END numerics: signal/image , maths, statistics, data visualization
+#### END numerics & data visualization
 
 #### BEGIN PyQt5 modules
 
@@ -163,14 +157,14 @@ from jupyter_client.session import Message
 #### BEGIN pict.core modules
 
 #import core.prog as prog
-from core.prog import (timefunc, timeblock, processtimefunc, processtimeblock, Timer, 
-                       safeWrapper, warn_with_traceback,)
+from core.prog import (timefunc, timeblock, processtimefunc, processtimeblock,
+                       Timer, safeWrapper, warn_with_traceback,)
 
 # NOTE: 2017-04-16 09:48:15 
 # these are also imported into the console in slot_initQtConsole(), so they are
 # available directly in the console
 from core.workspacefunctions import * 
-
+from core import scipyen_config as scipyenconf
 from core import plots as plots
 from core import datatypes as dt
 from core import neoutils
@@ -194,6 +188,8 @@ from core.utilities import (summarize_object_properties,
 from imaging import (imageprocessing as imgp, imgsim,)
 
 from ephys import (ephys, ltp, membrane,)
+
+#from .. import config
 
 # NOTE: 2020-09-28 11:37:25
 # ### BEGIN
@@ -248,6 +244,9 @@ from . import gui_viewers
 from .workspacegui import WorkspaceGuiMixin
 
 from .workspacemodel import WorkspaceModel
+
+# qtconsole.styles and pygments.styles, respectively:
+from gui.consoles import styles, pstyles 
 
 #### END pict.gui modules
 
@@ -739,7 +738,7 @@ class WindowManager(__QMainWindow__):
             workspace_win_varname = "Figure%d" % win.number
             
         else:
-            workspace_win_varname = strutils.string_to_valid_identifier(win.winTitle)
+            workspace_win_varname = strutils.str2symbol(win.winTitle)
             
         self.workspace[workspace_win_varname] = win
         
@@ -866,7 +865,7 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
     def __init__(self, parent=None):
         super(ScriptManagerWindow, self).__init__(parent)
         self.setupUi(self)
-        self._configureGUI_()
+        self._configureUI_()
         
         self.scriptsTable.customContextMenuRequested[QtCore.QPoint].connect(self.slot_customContextMenuRequested)
         self.scriptsTable.cellDoubleClicked[int, int].connect(self.slot_cellDoubleClick)
@@ -880,7 +879,7 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
         self.acceptDrops = True
         self.scriptsTable.acceptDrops = True
         
-    def _configureGUI_(self):
+    def _configureUI_(self):
         addScript = self.menuScripts.addAction("Add scripts...")
         addScript.triggered.connect(self.slot_addScripts)
         #pass
@@ -1644,7 +1643,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         return sw_f
 
     #@processtimefunc
-    def __init__(self, app, parent=None):
+    def __init__(self, app, settings=None, parent=None):
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: python3 way
         self.app                        = app
         self.recentFiles                = collections.OrderedDict()
@@ -1666,11 +1665,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.ipkernel                   = None
         self.shell                      = None
         self.historyAccessor            = None
+        
         #self.scipyenEditor              = "kwrite"
         
         self.external_console           = None
         
         #pg.setConfigOptions(editorCommand=self.scipyenEditor)
+        
+        #self._default_scipyen_settings_ = defaults
+        self._scipyen_settings_         = settings
+        
+        # NOTE: 2021-01-10 16:26:18
+        # read must be called ONLY ONCE
+        if isinstance(self._scipyen_settings_, confuse.LazyConfig) and not self._scipyen_settings_._materialized:
+            self._scipyen_settings_.read()
         
         self._temp_python_filename_   = None # cached file name for python source (for loading or running)
         
@@ -1680,11 +1688,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self._copy_varnames_separator_ = " "
         
+        self._setup_console_pygments_()
+        
         self.setupUi(self)
         
         #self._defaultCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
         
-        self.scriptsManager             = ScriptManagerWindow(parent=self)
+        self.scriptsManager = ScriptManagerWindow(parent=self)
         self.scriptsManager.signal_executeScript[str].connect(self._slot_runPythonScriptFromManager)
         self.scriptsManager.signal_importScript[str].connect(self._slot_importPythonScriptFromManager)
         self.scriptsManager.signal_pasteScript[str].connect(self._slot_pastePythonScriptFromManager)
@@ -1712,14 +1722,19 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         # NOTE: 2020-10-22 13:30:54
         # self._nonInteractiveVars_ is updated in _init_QtConsole_()
-        self.workspaceModel.hidden_vars.update(self._nonInteractiveVars_)
+        self.workspaceModel.user_ns_hidden.update(self._nonInteractiveVars_)
+        self.user_ns_hidden = self.workspaceModel.user_ns_hidden
         
         self.shell.events.register("pre_execute", self.workspaceModel.pre_execute)
         self.shell.events.register("post_execute", self.workspaceModel.post_execute)
         
         self.workspaceModel.windowVariableDeleted[int].connect(self.slot_windowVariableDeleted)
         
-        self._configureGUI_()
+        # NOTE: 2021-01-06 17:22:45
+        # a lot of things happen up to here which depend on an initialized bare-bones
+        # UI; hence setupui must be called early (where it is right now), and
+        # _configureUI_ must be called NOW
+        self._configureUI_()
         
         self._load_settings_()
         
@@ -1764,6 +1779,23 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.__class__._instance = self
         
+    #@property
+    #def scipyenDefaultSettings(self):
+        #return self._default_scipyen_settings_
+    
+    #@scipyenDefaultSettings.setter
+    #def scipyenDefaultSettings(self, value):
+        #self._default_scipyen_settings_ = value
+        #self.workspace["scipyen_defaults"] = self._default_scipyen_settings_
+        
+    @property
+    def scipyenSettings(self):
+        return self._scipyen_settings_
+    
+    @scipyenSettings.setter
+    def scipyenSettings(self, value):
+        self._scipyen_settings_ = value
+        self.workspace["scipyen_settings"] = self._scipyen_settings_
         
     @pyqtSlot()
     @safeWrapper
@@ -1814,10 +1846,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         from core.extipyutils_client import nrn_ipython_initialization_cmd
         
+        #print("_init_ExternalIPython_ new", new)
+        
         if not isinstance(self.external_console, consoles.ExternalIPython):
+            #print("\tno external console yet")
             self.external_console = consoles.ExternalIPython.launch()
             self.workspace["external_console"] = self.external_console
-            self.workspaceModel.hidden_vars.update({"external_console":self.external_console})
+            self.workspaceModel.user_ns_hidden.update({"external_console":self.external_console})
             #self.external_console.window.sig_kernel_count_changed[int].connect(self._slot_remote_kernel_count_changed)
             
             if isinstance(new, str) and new == "neuron":
@@ -1832,26 +1867,37 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
         else:
             frontend_factory = None
-            
+            #print("\texternal console exists")
             if self.external_console.window.active_frontend is None:
+                #print("\t* no active frontend")
                 # console instance exists but does not have an active frontend anymore
                 if (self.external_console.kernel_manager is not None):
-                    self.external_console.kernel_manager.shutdown_kernel()
+                    #print("\t\t kernel manager exists")
+                    # kill the current (existing) kernel
+                    try:
+                        self.external_console.kernel_manager.shutdown_kernel(now=True, restart=False)
+                    except Exception as e:
+                        traceback.print_exc()
                     
                 frontend_factory = self.external_console.window.create_tab_with_new_frontend
                 
                 if isinstance(new, str):
                     if new == "connection":
+                        # will ask for an existing kernel
                         frontend_factory = self.external_console.window.create_tab_with_existing_kernel
+                        
                     elif new == "neuron":
                         from functools import partial
                         frontend_factory = partial(self.external_console.window.create_new_tab_with_new_kernel_and_execute,
                                                    nrn_ipython_initialization_cmd,
                                                    silent=True, store_history=False)
                                                    
+                    else: # str is "" as per default
+                        frontend_factory = self.external_console.window.create_tab_with_new_frontend
             else:
+                #print("\t* active frontend exists")
                 if isinstance(new, str):
-                    if new == "master":
+                    if new == "master" or len(new.strip()) == 0:
                         frontend_factory = self.external_console.window.create_tab_with_new_frontend
                         
                     elif new == "slave":
@@ -1865,6 +1911,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         frontend_factory = partial(self.external_console.window.create_new_tab_with_new_kernel_and_execute,
                                                    nrn_ipython_initialization_cmd,
                                                    silent=True, store_history=False)
+
                         
             if frontend_factory is not None:
                 frontend_factory()
@@ -1883,19 +1930,72 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
     @safeWrapper
     def _init_QtConsole_(self):
-        """Creates a QtConsole instance for running an IPython interactive shell.
+        """Starts an interactive IPython shell with a QtConsole frontend.
         
-        The IPython kernel is an InProcess kernel (i.e. "embedded") because the
-        main event loop is run by QApplication (PyQt5)
+        The shell runs an embedded ("InProcess") IPython kernel with an event 
+        loop run by the Scipyen QApplication instance (PyQt5).
         
-        After console initialization the main application (mainWindow) will gain
-        a "shell" and a "ipkernel"; both variables will be re-initialized upon 
-        calling this method.
+        The shell's namespace becomes the user's workspace where the user data
+        is temporarily assigned to symbols, and its contents are listed
+        in the "User Variables" tab. 
         
-        HOWEVER, the IPython event handlers supplied by the workspace model
-        will have to be registered with the ipkernel's shell manually afterwards,
-        and BEFORE  any other methods calling a code to be executed within the 
-        ipkernel is called (e.g. via ipkernel.shell.run_cell(...)).
+        The user data consists of objects that are either loaded from files, 
+        generated from statements typed at the command line (in the shell) or by
+        code run via the GUI (under certain circumstances), and modules loaded
+        manually by the user via 'import' statements.
+        
+        In addition, the user's workspace contains 'hidden' data: objects and
+        modules that were, respectively, created and imported during Scipyen
+        startup, plus volatile variables (symbols starting with underscore). 
+        These are 'hidden' from the workspace viewer ('User Variables' tab) but
+        can be revealed witht h e 'dir()' command in the shell.
+        
+        Scipyen's main window can be accessed from the shell directly as 
+        "mainWindow".
+        
+        NOTE: Important objects in the user workspace:
+        The workspace also contains the following objects:
+        
+        Symbol      Reference (is bound) to:                    Other references
+        ========================================================================
+        mainWindow  Scipyen main application window
+        
+        console     The console window                          mainWindow.console
+        
+        shell       The interactive IPython shell               mainWindow.shell
+        
+        ipkernel    The InProcess kernel backend of the shell   mainWindow.ipkernel
+        
+        scipyen_defaults                                    
+                    The confuse.LazyConfig object with the      mainWindow.scipyenDefaultSettings
+                    Scipyen package default non-gui options
+                    (located in scipyen top directory)
+                    
+        scipyen_settings
+                    The confuse.LazyConfig object with custom
+                    non-gui configuration for Scipyen saved in
+                    'config_dir'/config.yaml.
+                    On machines runninx Linux, 'config_dir' is
+                    $HOME/.config/Scipyen
+        
+        
+        
+        The console, the shell and the kernel are accessbile directly from the 
+        command line as the "console", "shell" and "ipkernel" symbols, and as 
+        Scipyen's main window attributes with the same names ("mainWindow.shell",
+        "mainWindow.console" and "mainwindow.ipkernel").
+        
+        
+        . These are
+        references to the console,
+        
+        The shell and the kernel are bound, respetively to the "shell" and 
+        "ipkernel" attributes of Scipyen's main window ("mainWindow" object in 
+        the shell's namespace). 
+        
+        The Scipyen's user workspace is the same as the shell's namespace
+        (self.ipkernel.shell.user_ns)
+        The shell namespace is the same as the user's workspace.
         """
 
         # creates a Qt console with an embedded ipython kernel
@@ -2043,12 +2143,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.workspace["SCIPYEN_DEBUG"] = False 
             
             self.workspace['mainWindow'] = self
+            #self.workspace["scipyenDefaultSettings"] = self.scipyenDefaultSettings
 
             # NOTE: 2016-03-20 20:50:42 -- WRONG!
             # get_ipython() returns an instance of the interactive shell, NOT the kernel
             self.workspace['ipkernel'] = self.ipkernel
             self.workspace['console'] = self.console # useful for testing functionality; remove upon release
             self.workspace["shell"] = self.shell # alias to self.ipkernel.shell
+            #self.workspace["scipyen_defaults"] = self._default_scipyen_settings_
+            self.workspace["scipyen_settings"] = self._scipyen_settings_
             
             #print("exit" in self.ipkernel.shell.user_ns)
             
@@ -3054,7 +3157,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 return
             self.external_console = None
             self.workspace["external_console"] = None
-            self.workspaceModel.hidden_vars["external_console"] = None
+            self.workspaceModel.user_ns_hidden["external_console"] = None
             #self.slot_updateWorkspaceTable(False)
             
         if self.console is not None:
@@ -3149,7 +3252,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.settings.endGroup()
             
         self.settings.endGroup()
-          
+        
+    def _setup_console_pygments_(self):
+        from qtconsole.jupyter_widget import JupyterWidget
+        settings = QtCore.QSettings()
+        custom_pygment = settings.value("Console/Scheme", None)
+        custom_colors = settings.value("Console/Colors", "")
+        
+        if custom_pygment:
+            JupyterWidget.style_sheet = consoles.styles.sheet_from_template(custom_pygment,
+                                                                   custom_colors)
+            
+            JupyterWidget.syntax_style = custom_pygment
+        
+        
     #@processtimefunc
     def _load_settings_(self):
         self.settings                   = QtCore.QSettings("Scipyen", "Scipyen")
@@ -3297,7 +3413,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.settings.endGroup()
     
     #@processtimefunc
-    def _configureGUI_(self):
+    def _configureUI_(self):
         ''' Collect file menu actions & submenus that are built in the UI file. This should be 
             done before loading the plugins.
         '''
@@ -3453,9 +3569,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.setWindowTitle("Scipyen")
         
         self.newViewersMenu = QtWidgets.QMenu("Create New", self)
-        self.menuViewers.addMenu(self.newViewersMenu)
         for v in gui_viewers:
             self.newViewersMenu.addAction(v.__name__, self.slot_newViewerMenuAction)
+        self.menuViewers.addMenu(self.newViewersMenu)
+        
+        # add new viewers menu as toolbar action, too
+        self.newViewersAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("window-new"), "New Viewer")
+        self.newViewersAction.setMenu(self.newViewersMenu)
+        tb = [w for w in self.newViewersAction.associatedWidgets() if w is not self.newViewersAction.parentWidget() and isinstance(w, QtWidgets.QToolButton)]
+        
+        for w in tb:
+            w.setPopupMode(QtWidgets.QToolButton.InstantPopup)
             
         #### BEGIN do not delete: action for presenting a list of viewer types to choose from
         #self.menuViewer.addSeparator()
@@ -4628,7 +4752,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
             # NOTE: 2017-06-21 15:59:41
             # fix insane file names 
-            bName = strutils.string_to_valid_identifier(bName)
+            bName = strutils.str2symbol(bName)
             
             #print("loadDiskFile", fName)
             #print("to assign to ", bName)
@@ -5047,16 +5171,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def _slot_ext_krn_restart(self, txt):
         #print("mainWindow: _slot_ext_krn_restart %s" % txt)
-        from core.extipyutils_client import (cmd_foreign_shell_ns_listing,
-                                             )
+        from core.extipyutils_client import cmd_foreign_shell_ns_listing
+        
         signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
-        self.workspaceModel.remove_foreign_namespace(txt)
+        #self.workspaceModel.remove_foreign_namespace(txt)
+        
         self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=txt.replace("_", " ")))
         
     @pyqtSlot()
     @safeWrapper
     def _slot_copyToExternalWS(self):
-        from core.extipyutils_client import (cmd_copy_to_foreign, )
+        from core.extipyutils_client import cmd_copy_to_foreign
         # get the model indices of the selected workspace model items
         indexList = [i for i in self.workspaceView.selectedIndexes() if i.column() == 0]
         if len(indexList) == 0:
@@ -5074,8 +5199,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def _slot_copyFromExternalWS(self):
-        from core.utilities import (standard_obj_summary_headers, )
-        from core.extipyutils_client import (cmd_copies_from_foreign, )
+        from core.utilities import standard_obj_summary_headers
+        from core.extipyutils_client import cmd_copies_from_foreign
         
         # get the model indices of the selected workspace model items
         indexList = [i for i in self.workspaceView.selectedIndexes() if i.column() == 0]
@@ -5093,15 +5218,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 self.external_console.execute(cmd_copies_from_foreign(*varnames),
                                               where = wsname)
     
-        
     @pyqtSlot(object)
     @safeWrapper
     def _slot_ext_krn_shell_chnl_msg_recvd(self, msg):
         # TODO 2020-07-13 00:45:57
         # when the kernel first comes alive get initial ns listing, store in
-        # workspace model, filterout names of hidden vars in the list, such as 
-        # those in user_ns_hidden
-        # if any remains, then populate workspace table (call updateFromExternal())
+        # workspace model, filter out names of hidden vars in the list;
+        # if any remains, populate workspace table (call updateFromExternal())
         # then after each execute_reply get a new dir() listing and compare
         # with the stored; any new var -> call props and populate in workspace table
         # (call updateFromExternal())
@@ -5127,17 +5250,21 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # b.append(1000) # a is unchanged
         # a.a = b -> notifies
         #
-        from core.extipyutils_client import (unpack_data_recvd_on_shell_chnl, 
+        from core.extipyutils_client import (unpack_shell_channel_data, 
                                              cmds_get_foreign_data_props,
                                              cmd_foreign_shell_ns_listing,
                                              )
         # TODO 2020-07-09 23:19:59
         #### BEGIN get rid of this once done developing
-        #varname = strutils.string_to_valid_identifier("_".join([msg["header"]["msg_type"], msg["header"]["session"]]))
+        #varname = strutils.str2symbol("_".join([msg["header"]["msg_type"], msg["header"]["session"]]))
         #session_id = msg["header"]["session"]
         #self.workspace[varname] = msg
         #self.workspaceModel.updateTable(from_console=False)
         #### END get rid of this once done developing
+        
+        #print("_slot_ext_krn_shell_chnl_msg_recvd")
+        #print("\ttab:", msg["tab"], "\n\ttype:", msg["msg_type"], "\n\tstatus:", msg["content"]["status"])
+        #print("\tuser_expressions:", msg["content"].get("user_expressions", {}))
         
         if self.external_console.window.tab_widget.count() == 0:
             # only listen to kernels that have a frontend 
@@ -5145,11 +5272,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         if msg["msg_type"] == "execute_reply":
             #print("mainWindow: kernel sent execute_reply %s" % msg["tab"])
-            vardict = unpack_data_recvd_on_shell_chnl(msg)
+            vardict = unpack_shell_channel_data(msg)
             
             #print("mainWindow: %s len(vardict)" % msg["tab"], len(vardict))
             
-            if isinstance(vardict, dict) and len(vardict):
+            if len(vardict):
                 prop_dicts = dict([(key, val) for key, val in vardict.items() if key.startswith("properties_of_")])
                 
                 ns_listings = dict([(key, val) for key, val in vardict.items() if key.startswith("ns_listing_of_")])
@@ -5179,31 +5306,25 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     #print("mainwindow: %s len(ns_listings)" % msg["tab"], len(ns_listings))
                     for key, val in ns_listings.items():
                         ns_name = key.replace("ns_listing_of_","").replace(" ", "_")
-                        if isinstance(val, dict):
-                            self.workspaceModel.update_foreign_namespace(ns_name, val)
-                            if ns_name in self.workspaceModel.foreign_namespaces:
-                                for varname in self.workspaceModel.foreign_namespaces[ns_name]["current"]:
-                                    self.external_console.execute(cmds_get_foreign_data_props(varname, namespace=msg["tab"]),
-                                                                    where = msg["tab"])
+                        if ns_name == msg["tab"]:
+                            if isinstance(val, dict):
+                                self.workspaceModel.update_foreign_namespace(ns_name, val)
+                                if ns_name in self.workspaceModel.foreign_namespaces:
+                                    for varname in self.workspaceModel.foreign_namespaces[ns_name]["current"]:
+                                        self.external_console.execute(cmds_get_foreign_data_props(varname, namespace=msg["tab"].replace(" ", "_")),
+                                                                        where = msg["tab"])
                             
-            #else:
-                ## listen here for possible changes in the remote user_ns?
-                #self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["tab"]),
-                                              #where = msg["tab"])
-                ##pass
-                
         elif msg["msg_type"] == "kernel_info_reply":
             #print("mainWindow: kernel sent kernel_info_reply")
             # usually sent when right after the kernel started - we use this as
             # a signal that the kernel has been started, by which we trigger
             # an initial directory listing.
             #pass
-            self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["tab"]))
+            self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["tab"].replace(" ", "_")))
             
         elif msg["msg_type"] == "is_complete_reply":
             #print("mainWindow: kernel sent is_complete_reply")
-            #pass
-            self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["tab"]),
+            self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["tab"].replace(" ", "_")),
                                           where = msg["tab"])
             
                     
@@ -5215,7 +5336,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         import importlib.util
         import sys
         
-        moduleName = strutils.string_to_valid_identifier(os.path.splitext(fileName)[0])
+        moduleName = strutils.str2symbol(os.path.splitext(fileName)[0])
         
         spec = importlib.util.spec_from_file_location(moduleName, fileName)
         module = importlib.util.module_from_spec(spec)

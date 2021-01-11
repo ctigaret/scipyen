@@ -314,9 +314,9 @@ class AxesCalibrationDialog(QDialog, Ui_AxisCalibrationDialog):
         self.resolution     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
         self.description    = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
         
-        self._configureGUI_()
+        self._configureUI_()
         
-    def _configureGUI_(self):
+    def _configureUI_(self):
         self.setupUi(self)
         
         self.setWindowTitle("Calibrate axes")
@@ -683,7 +683,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     
     def __init__(self, img=None, parent=None, imageViewer=None):
         super(GraphicsImageViewerWidget, self).__init__(parent=parent)
-        self._configureGUI_()
+        self._configureUI_()
         
         self.__zoomVal__ = 1.0
         self._minZoom__ = 0.1
@@ -772,7 +772,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     # private methods
     ####
     
-    def _configureGUI_(self):
+    def _configureUI_(self):
         self.setupUi(self)
         self._imageGraphicsView.setViewportUpdateMode(QtWidgets.QGraphicsView.FullViewportUpdate)
         self._imageGraphicsView.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
@@ -3516,8 +3516,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             # NOTE: 2017-07-26 22:18:14
             # get calibrates axes sizes
             cals = "(%s x %s)" % \
-                (strutils.print_scalar_quantity(vu.getCalibratedAxisSize(self._data_, self.widthAxisInfo.key)), \
-                    strutils.print_scalar_quantity(vu.getCalibratedAxisSize(self._data_, self.heightAxisInfo.key)))
+                (strutils.quantity2str(vu.getCalibratedAxisSize(self._data_, self.widthAxisInfo.key)), \
+                    strutils.quantity2str(vu.getCalibratedAxisSize(self._data_, self.heightAxisInfo.key)))
     
             shapeTxt = "%s x %s: %d x %d %s" % \
                 (defaultAxisTypeName(self.widthAxisInfo), \
@@ -3544,7 +3544,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.viewerWidget.setTopLabelText(shapeTxt)
         
-    def _configureGUI_(self):
+    def _configureUI_(self):
         self.setupUi(self)
         
         #self.setWindowTitle("Image Viewer")
@@ -3962,7 +3962,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                         valstr)
                                     
                             else: # self.frameAxisInfo is a tuple
-                                sz_cz = ", ".join(["%s: %s" % (ax.key, strutils.print_scalar_quantity(axiscalibration.AxisCalibration(ax).getCalibratedAxisCoordinate(self._current_frame_index_, ax.key))) for ax in self.frameAxisInfo])
+                                sz_cz = ", ".join(["%s: %s" % (ax.key, strutils.quantity2str(axiscalibration.AxisCalibration(ax).getCalibratedAxisCoordinate(self._current_frame_index_, ax.key))) for ax in self.frameAxisInfo])
                                 
                                 if isinstance(val, float):
                                     coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s)> %s" % \

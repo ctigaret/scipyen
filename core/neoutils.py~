@@ -483,11 +483,11 @@ import datetime
 import collections
 import numbers
 import inspect
-import itertools
+from itertools import chain
 import functools
 import warnings
 import typing
-from enum import Enum, IntEnum
+from enum import (Enum, IntEnum,)
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -501,11 +501,13 @@ import pyqtgraph as pg
 #### BEGIN pict.core modules
 #from . import plots
 from .prog import safeWrapper
-from .datatypes import  normalized_index
-from .datasignal import (DataSignal, IrregularlySampledDataSignal)
-from .triggerevent import (TriggerEvent, TriggerEventType)
+from .datatypes import (normalized_index, units_convertible, check_time_units, 
+                        is_string, 
+                        RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
 
-from . import datatypes as dt
+from .datasignal import (DataSignal, IrregularlySampledDataSignal,)
+from .triggerevent import (TriggerEvent, TriggerEventType,)
+
 from . import workspacefunctions
 from . import signalprocessing as sigp
 from . import utilities
@@ -684,8 +686,6 @@ def get_signal_names_indices(data: typing.Union[neo.Segment, typing.Sequence],
             used only when data is a neo.Segment (as it may contain either of the above)
     
     """
-    from . import datatypes as dt
-    
     if isinstance(data, neo.Segment):
         if analog:
             if not hasattr(data, "analogsignals"):
@@ -700,7 +700,7 @@ def get_signal_names_indices(data: typing.Union[neo.Segment, typing.Sequence],
             signals = data.irregularlysampledsignals
         
     elif isinstance(data, (tuple, list)):
-        if all([isinstance(s, (neo.AnalogSignal, DataSignal, neo.IrregularlySampledSignal)) for s in data]):
+        if all([isinstance(s, (neo.AnalogSignal, DataSignal, neo.IrregularlySampledSignal, IrregularlySampledDataSignal)) for s in data]):
             signals = data
             
         else:
@@ -1265,8 +1265,6 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
     
     Such signals will be skipped / missed!
     """
-    from . import datatypes as dt
-    
     signal_collection = "%ss" % stype.__name__.lower()
     
     if signal_collection == "datasignals":
@@ -1488,8 +1486,6 @@ def get_time_slice(data, t0, t1=None, window=0, \
     From neo version 0.8.0 segments also support time_slicing
     
     """
-    from . import datatypes as dt
-    
     # get_time_slice (1) check for t1 first
     
     if isinstance(t1, pq.Quantity):
@@ -1773,8 +1769,6 @@ def concatenate_signals(*args, axis=1, ignore_domain = False, ignore_units=False
         When True, will skip checks for units compatibilty among signals.
     
     """
-    from . import datatypes as dt
-    
     if len(args) == 1:
         if isinstance(args[0], (tuple, list)):
             signals = args[0]
@@ -1814,7 +1808,7 @@ def concatenate_signals(*args, axis=1, ignore_domain = False, ignore_units=False
                 raise ValueError("To concatenate signals on 2nd dimension they must have identical domain units ")
             
         if not ignore_units:
-            if not all([dt.units_convertible(sig.units, signals[0].units) for sig in signals[1:]]):
+            if not all([units_convertible(sig.units, signals[0].units) for sig in signals[1:]]):
                 warnings.warn("There are signals with non-convertible units; this may become an error in the future")
             
         if ignore_domain:
@@ -2645,18 +2639,16 @@ def upgrade_neo_api(x):
                     if isinstance(e, (neo.Event, TriggerEvent)):
                         ee.append(e)
                         
-                    #if type(e).__name__ == "TriggerEvent" or isinstance(e, neo.Event):
-                        #ee.append(e)
-                        
-                    elif type(e).__name__ == "Event": # neoevent.Event
+                    elif type(e).__name__ == "Event": # neoevent.Event avatar
                         ee.append(neo_copy(e))
+                        
                     else:
                         warnings.warn("Wrong element type (%s) in events; skipped" % type(e))
                     
                 x.events.clear()
                 x.events[:] = ee[:]
                 
-                warnings.warn("Events have been upgraded to newer API; data should be saved")
+                #warnings.warn("Events have been upgraded to newer API; data should be saved")
             
     elif isinstance(x, neo.Block):
         for s in x.segments:
@@ -2672,10 +2664,7 @@ def upgrade_neo_api(x):
 def merge_signal_channels(*args, name=""):
     """Returns an analog signal containing merged channels of the analog signals in args
     """
-    from . import datatypes as dt
-    
     def __internal_merge__(*signals):
-        from . import datatypes as dt
         sigs = [s.magnitude for s in signals]
         ret_sig = signals[0].__class__(np.concatenate(sigs, axis=1), 
                                        units = signals[0].units,
@@ -2697,45 +2686,131 @@ def merge_signal_channels(*args, name=""):
         raise ValueError("All signals must have the same sampling period")
     
     return __internal_merge__(*args)
+
+def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence]) -> list:
+    """Returns a list of neo.Events embedded in data.
+    
+    Useful as a cache of events in neo data.
+    
+    Variadic Parameters:
+    ====================
+    
+    *src: neo.Block, neo.Segment, sequence (tuple, list) of neo.Block, sequence  
+        (tuple, list) of neo.Segment, or None
         
-def clear_events(src, triggersOnly=False, triggerType=None):
+    Returns:
+    =======
+    A nested list with one element per src's Segments, with each element being
+    a reference to the Segment's 'events' attribute (itself a list).
+    
+    The list has two nesting levels when src is a sequence of neo.Block, and one
+    nesting level in all other cases, except for empty lists.
+    
+    
+    Type of src:                Nesting levels of the returned list:
+    --------------------------------------------------------------------------
+    Sequence of neo.Block       2   e.g., [block_index[segment_index[events]]]
+    
+    neo.Block, 
+    sequence of neo.Segments    1   e.g., [segment_index[events]]
+    
+    neo.Segment                 1   i.e., [[events]]
+    
+    None                        0   i.e., []
+    
+    May return an empty list, or a list with empty elements.
+    
+    """
+    if len(src) == 1:
+        if isinstance(src[0], neo.Block):
+            return [s.events for s in src[0].segments]
+        
+        elif isinstance(src[0], neo.Segment):
+            return [src[0].events]
+    
+        elif isinstance(src[0], (tuple, list)):
+            if all([isinstance(v, neo.Block) for v in src[0]]):
+                return [[s.events for s in b.segments] for b in src[0]]
+            
+            elif all([isinstance(v, neo.Segment) for v in src[0]]):
+                return [v.segments for v in src[0]]
+            
+            else:
+                raise TypeError("Expecting a sequence of neo.Block or neo.Segment")
+            
+        elif src[0] is None:
+            return []
+            
+        else:
+            raise TypeError("Unexpected parameter type %s" % type(src[0]).__name__)
+        
+    elif len(src) > 1:
+        if all([isinstance(v, neo.Block) for v in src]):
+            return [[s.events for s in b.segments] for b in src]
+        
+        elif all([isinstance(v, neo.Segment) for v in src]):
+            return [v.segments for v in src[0]]
+        
+        else:
+            raise TypeError("Expecting a sequence of neo.Block or neo.Segment")
+        
+    else:
+        return list()
+        
+def clear_events(src:typing.Union[neo.Block, neo.Segment, typing.Sequence], triggersOnly:bool=False, triggerType=None):
     """Shorthand for clearing neo.Event objects embedded in src.
     
     This includes TriggerEvent objects!
     
     e.g. [s.events.clear() for s in src.segments] where src is a neo.Block
     
+    NOTE: To remove a specific event, use remove_events.
+    
+    See also: remove_events
+    
     Parameters:
     ===========
     
-    src: a neo.Block, or a neo.Segment, or a list of neo.Segment objects
+    src: a neo.Block, or a neo.Segment, or a sequence (tuple, list) whith
+        elements of the same type, either neo.Segment or neo.Block.
     
     Keyword parameters:
     ==================
     
-    triggersOnly: boolean, default is False
+    triggersOnly: bool, default is False
         When True, only removes datatypes.TriggerEvent objects (these inherit neo.Event)
+        
+        Ignored when triggerType is not None.
     
-    triggerType: None (default) or a valid datatypes.TriggerEventType
+    triggerType: None (default) or:
+        * a valid triggerevent.TriggerEventType
+        * a str that is a valid TriggerEventType name (see triggerevent.TriggerEventType)
+        * an int that is a valid TriggerEventType value
+        * a sequence (tuple, list) of elements having one of the types listed above
+            (type mixing is NOT allowed)
     
-        When a TriggerEventType, only TriggerEvent objects of the specified type will be
-        removed (triggersOnly will be implied to be True)
-    
-    
+        Specifies what type of trigger events are to be removed.
+        
+        When not None, non-trigger events are left in place.
+        
     """
     from .triggerprotocols import (TriggerEvent, TriggerEventType,)
 
     if isinstance(src, neo.Block):
         target = src.segments
-        #[s.events.clear() for s in src.segments];
-        
-    elif isinstance(src, (tuple, list)) and all([isinstance(s, neo.Segment) for s in src]):
-        target = src
-        #[s.events.clear() for s in src]
         
     elif isinstance(src, neo.Segment):
         target = [src]
-        #src.events.clear()
+        
+    elif isinstance(src, (tuple, list)):
+        if all([isinstance(x, neo.Segment) for x in src]):
+            target = src
+            
+        elif all([isinstance(x, neo.Block) for x in src]):
+            target = chain(*[x.segments for x in src])
+            
+        else:
+            raise TypeError("Expecting a sequence of neo.Block or neo.Segments (no type mixing)")
         
     else:
         raise TypeError("Expecting a neo.Block, a neo.Segment or a sequence of neo.Segment objects; got %s instead" % type(src).__name__)
@@ -2744,14 +2819,48 @@ def clear_events(src, triggersOnly=False, triggerType=None):
         all_events_ndx = range(len(s.events))
         
         trigs = []
-        
+        # if triggerType has been specified, remove only trigger events of those
+        # types
         if isinstance(triggerType, TriggerEventType):
             trigs = [(endx, e) for (endx, e) in enumerate(s.events) if isinstance(e, TriggerEvent) and e.type & triggerType]
             
+        elif isinstance(triggerType, str):
+            if triggerType in TriggerEventType.names():
+                trigs = [(endx, e) for (endx, e) in enumerate(s.events) if isinstance(e, TriggerEvent) and e.type & TriggerEventType[triggerType]]
+                
+            else:
+                raise ValueError("Unknown trigger event type %s" % triggerType)
+            
+        elif isinstance(triggerType, int):
+            if triggerType in TriggerEventType.values():
+                trigs = [(endx, e) for (endx, e) in enumerate(s.events) if isinstance(e, TriggerEvent) and e.type & TriggerEventType(triggerType)]
+                
+            else:
+                raise ValueError("Unknown trigger event type %d" % triggerType)
+                
+        elif isinstance(triggerType, (tuple, list)):
+            if all([isinstance(t, TriggerEventType) for t in triggerType]):
+                ttypes = triggerType
+                
+            elif all([isinstance(t, str) and t in TriggerEventType.names() for t in triggerType]):
+                ttypes = [TriggerEventType[t] for t in triggerType]
+                
+            elif all([isinstance(t, int) and t in TriggerEventType.values() for t in triggerType]):
+                ttypes = [TriggerEventType(t) for t in triggerType]
+                
+            else:
+                raise TypeError("Invalid 'triggerType' parameter %s" % triggerType)
+            
+            trigs = [(endx, e) for (endx, e) in enumerate(s.events) if isinstance(e, TriggerEvent) and e.type in ttypes]
+            
         elif triggersOnly:
+            # remove all trigger events regardless of their type as triggerType
+            # had not been specified
             trigs = [(endx, e) for (endx, e) in enumerate(s.events) if isinstance(e, TriggerEvent)]
+            
 
         if len(trigs):
+            #selective removal of trigger events, optionally of specified type(s)
             (endx, evs) = zip(*trigs)
             
             keep_events = [s.events[k] for k in all_events_ndx if k not in endx]
@@ -2794,7 +2903,7 @@ def get_non_empty_epochs(sequence:(tuple, list)):
     return [e for e in sequence if len(e)]
     
 def remove_events(event, segment, byLabel=True):
-    """Removes an event from the neo.Segment "segment"
+    """Removes a specific event from the neo.Segment "segment"
     
     Parameters:
     ==========
@@ -2815,7 +2924,10 @@ def remove_events(event, segment, byLabel=True):
             the "event" parameter, if such events are found in the segment.
             
         When a TriggerEventType, _ALL_ TriggerEvent objects of this type will be
-        removed, if found.
+        removed, if found - NOTE: This is similar to calling clear_events with
+        specific triggerType parameter.
+        
+        See also: clear_events
             
     Keyword parameters:
     ==================
@@ -2827,8 +2939,6 @@ def remove_events(event, segment, byLabel=True):
         Otherwise, _ALL_ events with name given by "event" parameter will be removed,
             if found.
     """
-    from . import datatypes as dt
-
     if not isinstance(segment, neo.Segment):
         raise TypeError("segment expected to be a neo.Segment; got %s instead" % type(segment).__name__)
     
@@ -2887,100 +2997,8 @@ def remove_events(event, segment, byLabel=True):
         raise TypeError("event expected to be a neo.Event, an int, a str or a datatypes.TriggerEventType; got %s instead" % type(event).__name__)
     
         
-#def embed_trigger_event(event, segment, clearSimilarEvents=True, clearTriggerEvents=True, clearAllEvents=False):
-    #"""
-    #Embeds the neo.Event object event in the neo.Segment object segment.
-    
-    #In the segment's events list, the event is stored by reference.
-    
-    #WARNING: one could easily append events with identical time stamps!
-        #While this is NOT recommended, it cannot be easily prevented.
-        
-        #To add time stamps to a TriggerEvent, create a new TriggerEvent object
-        #by calling use TriggerEvent.append_times() or TriggerEvent.merge() then 
-        #embed it here.
-        
-        #To add time stamps to a generic neo.Event, create a new Event by calling
-        #Event.merge() then embed it here.
-        
-        #To remove time stamps ise numpy array indecing on the event.
-        
-        #See datatypes.TriggerEvent for details.
-    
-    #Parameters:
-    #===========
-    
-    #event: a neo.Event, or a datatypes.TriggerEvent
-    
-    #segment: a neo.Segment
-    
-    #Named parameters:
-    #===================
-    
-    #clearSimilarEvents: boolean, default is True: 
-        #When True, existing neo.Event objects with saame time stamps, labels,
-            #units and name as those of the parameter "event" will be removed. 
-            #In case of TriggerEvent objects the comparison also considers the 
-            #event type.
-            
-        #NOTE: 2019-03-16 12:06:14
-        #When "event" is a TriggerEvent, this will clear ONLY the pre-exising
-        #TriggerEvent objects of the same type as "event" 
-        #(see datatypes.TriggerEventType for details)
-        
-    #clearTriggerEvents: boolean, default is True
-        #when True, clear ALL existing TriggerEvent objects
-        
-        #NOTE: 2019-03-16 12:06:07
-        #to clear ONLY existing TriggerEvent objects with the same type
-            #as the "event" (when "event" is also a TriggerEvent) 
-            #set clearSimilarEvents to True; see NOTE: 2019-03-16 12:06:14
-    
-    #clearAllEvents: boolean, default is False:
-        #When True, clear ANY existing event in the segment.
-        
-    #Returns:
-    #=======
-    #A reference to the segment.
-    
-    #"""
-    #from . import datatypes as dt
-    
-    #if not isinstance(event, (neo.Event, TriggerEvent)):
-        #raise TypeError("event expected to be a neo.Event; got %s instead" % type(event).__name__)
-    
-    #if not isinstance(segment, neo.Segment):
-        #raise TypeError("segment expected to be a neo.Segment; got %s instead" % type(segment).__name__)
-    
-    #if clearAllEvents:
-        #segment.events.clear()
-        
-    #else:
-        #all_events_ndx = range(len(segment.events))
-        #evs = []
-    
-        #if clearSimilarEvents:
-            #evs = [(k,e) for (k,e) in enumerate(segment.events) if is_same_as(event, e)]
-            
-        #elif clearTriggerEvents:
-            #evs = [(k,e) for (k,e) in enumerate(segment.events) if isinstance(e, TriggerEvent)]
-            
-        #if len(evs):
-            #(evndx, events) = zip(*evs)
-            
-            #keep_events = [segment.events[k] for k in all_events_ndx if k not in evndx]
-            
-            #segment.events[:] = keep_events
-            
-    #segment.events.append(event)
-    
-    #return segment
-            
-            
-
-
 def is_same_as(e1, e2, rtol = 1e-4, atol =  1e-4, equal_nan = True):
-    """Returns True if the neo.Events e1 ans e2 have identical time stamps, units, labels and names.
+    """Returns True if the neo.Events e1 and e2 have identical time stamps, units, labels and names.
     
     In addition, if e1 and e2 are datatype.TriggerEvents, checks if they have the 
     same type.
@@ -3001,15 +3019,11 @@ def is_same_as(e1, e2, rtol = 1e-4, atol =  1e-4, equal_nan = True):
     equal_nan: boolean default is True (see numpy.isclose())
     
     """
-    from . import datatypes as dt
-
-    if any([not isinstance(e, neo.Event) or "Event" not in type(e).__name__ for e in (e1,e2)]):
+    if any([not isinstance(e, (neo.Event, TriggerEvent)) or "Event" not in type(e).__name__ for e in (e1,e2)]):
         return False
     
-    # because importing triggerprotocols creates dependency loop
-    #if all([isinstance(e, TriggerEvent) for e in (e1,e2)]):
-    if all(["Event" in type(e).__name__ for e in (e1,e2)]):
-        return e1.is_same_as(e2)
+    if all([isinstance(e, TriggerEvent) for e in (e1,e2)]):
+`        return e1.is_same_as(e2)
     
     compatible_units = e1.units == e2.units
     
@@ -3130,8 +3144,6 @@ def lookup(signal, value, channel=0, rtol=1e-05, atol=1e-08, equal_nan = False, 
     indices where domain <= upper limit and those where domain >= lower limit.
     
     """
-    from . import datatypes as dt
-    
     if not isinstance(signal, (neo.AnalogSignal, neo.IrregularlySampledSignal, 
                              DataSignal, IrregularlySampledDataSignal)):
         raise TypeError("signal expected to be a signal; got %s instead" % type(signal).__name__)
@@ -3290,9 +3302,6 @@ def inverse_lookup(signal, value, channel=0, rtol=1e-05, atol=1e-08, equal_nan =
     details).
     
     """
-    
-    from . import datatypes as dt
-    
     if not isinstance(signal, (neo.AnalogSignal, neo.IrregularlySampledSignal, 
                              DataSignal, IrregularlySampledDataSignal)):
         raise TypeError("signal expected to be a signal; got %s instead" % type(signal).__name__)

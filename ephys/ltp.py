@@ -1035,7 +1035,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         
         self._ltpOptions_ = dict()
         
-    def _configureGUI_(self):
+    def _configureUI_(self):
         self.setupUi(self)
         
         self.actionOpenExperimentFile.triggered.connect(self.slot_openExperimentFile)

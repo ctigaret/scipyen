@@ -48,7 +48,7 @@
      <x>0</x>
      <y>0</y>
      <width>1115</width>
-     <height>28</height>
+     <height>29</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -303,14 +303,14 @@ NOTE: you can click anywhere in the row to select</string>
        <attribute name="headerCascadingSectionResizes">
         <bool>true</bool>
        </attribute>
+       <attribute name="headerMinimumSectionSize">
+        <number>100</number>
+       </attribute>
        <attribute name="headerDefaultSectionSize">
         <number>100</number>
        </attribute>
        <attribute name="headerHighlightSections">
         <bool>true</bool>
-       </attribute>
-       <attribute name="headerMinimumSectionSize">
-        <number>100</number>
        </attribute>
        <attribute name="headerShowSortIndicator" stdset="0">
         <bool>false</bool>
@@ -458,9 +458,7 @@ NOTE: you can click anywhere in the row to select</string>
           <string/>
          </property>
          <property name="icon">
-          <iconset resource="resources/resources.qrc">
-           <normaloff>:/images/view-filter.svg</normaloff>
-           <normalon>:/images/view-filter.svg</normalon>:/images/view-filter.svg</iconset>
+          <iconset theme="view-filter"/>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -579,14 +577,14 @@ NOTE: you can click anywhere in the row to select</string>
          <attribute name="headerCascadingSectionResizes">
           <bool>true</bool>
          </attribute>
+         <attribute name="headerMinimumSectionSize">
+          <number>100</number>
+         </attribute>
          <attribute name="headerDefaultSectionSize">
           <number>100</number>
          </attribute>
          <attribute name="headerHighlightSections">
           <bool>true</bool>
-         </attribute>
-         <attribute name="headerMinimumSectionSize">
-          <number>100</number>
          </attribute>
          <attribute name="headerShowSortIndicator" stdset="0">
           <bool>true</bool>
@@ -638,8 +636,7 @@ NOTE: you can click anywhere in the row to select</string>
              <string/>
             </property>
             <property name="icon">
-             <iconset resource="resources/resources.qrc">
-              <normaloff>:/images/window-close.svg</normaloff>:/images/window-close.svg</iconset>
+             <iconset theme="window-close"/>
             </property>
             <property name="autoRaise">
              <bool>true</bool>

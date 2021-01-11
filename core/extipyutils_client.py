@@ -431,7 +431,7 @@ def cmd_copy_from_foreign(varname:str, as_call=True) -> typing.Union[ForeignCall
     
     Once captured in the "execute_reply" message, the variable can be deserialized
     in Scipyen's workspace, by passing the received "execute_reply" message to the 
-    using unpack_data_recvd_on_shell_chnl() function.
+    using unpack_shell_channel_data() function.
     
     If as_call is True:
         A ForeignCall object with user_expression set to the dict as explained above.
@@ -442,7 +442,7 @@ def cmd_copy_from_foreign(varname:str, as_call=True) -> typing.Union[ForeignCall
     
     To fetch several variables use cmd_copies_from_foreign().
     
-    See also unpack_data_recvd_on_shell_chnl.
+    See also unpack_shell_channel_data.
     
     For details about messaging in Jupyter see:
     
@@ -495,14 +495,14 @@ def cmd_copies_from_foreign(*args, as_call=True) -> typing.Union[ForeignCall, di
     The fetched variables are shuttled back into client code in serialized form 
     (pickled str bytes) via the "execute_reply" shell channel message. From there
     variables are recovered by passing the "execute_reply" message to the 
-    unpack_data_recvd_on_shell_chnl() function.
+    unpack_shell_channel_data() function.
     
     When as_call is true (default):
         A ForeignCall with the user_expressions set to the dict with structure
         as explained above.
     
     
-    See also unpack_data_recvd_on_shell_chnl.
+    See also unpack_shell_channel_data.
     
     For details about messaging in Jupyter see:
     
@@ -558,20 +558,12 @@ def cmd_copy_to_foreign(dataname, data:typing.Any) -> str:
     exec_calls.append(ForeignCall(code = "del f"))
     
     return exec_calls
-    #unpickler_cmd = "".join([__unpickled_data__, "=", "pickle.loads(eval(str(", pickle_str, ")))"])
-    #assigner_cmd = "".join
-    
-    #if as_call:
-        #return {"code":cmd, "silent":True, "store_history":False, "user_expressions":None}
-    
-    #return cmd
-    
     
 def cmd_foreign_namespace_listing(namespace:str="Internal", as_call=True) -> dict:
     """Creates a user_expression containing the variable names in a foreign namespace.
     """
     
-    expr = {"ns_listing_of_%s" % namespace : "dir()"}
+    expr = {"ns_listing_of_%s" % namespace.replace(" ", "_") : "dir()"}
     
     if as_call:
         return ForeignCall(user_expressions = expr)
@@ -586,22 +578,9 @@ def cmd_foreign_shell_ns_listing(namespace:str="Internal", as_call=True) -> dict
     
     # NOTE 2020-07-29 22:51:02: WRONG: the value of "ns_listing_of_%s" % namespace
     # must be a str
-    #expr = {"ns_listing_of_%s" % namespace : {"user_ns":"[k for k in get_ipython().user_ns.keys()",
-                                              #"user_ns_hidden": "[k for k in get_ipython().user_ns_hidden.keys()]"}}
-    
     ue1 = "{'user_ns':set([k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys() and not inspect.ismodule(get_ipython().user_ns[k]) and not k.startswith('_') ])}"
-    #ue1 = ["{'user_ns':'[k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys() and not k.startswith(",
-           #'"_"',
-           #")]'}"]
-    #ue1 = "{'user_ns':'[k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys()]'}"
-    #ue2 = "'user_ns_hidden': '[k for k in get_ipython().user_ns_hidden.keys()]'}"
     
-    
-    #expr = {"ns_listing_of_%s" % namespace : "".join([ue1, ue2])}
-    #expr = {"ns_listing_of_%s" % namespace : "".join(ue1)}
-    expr = {"ns_listing_of_%s" % namespace : ue1}
-    
-    #expr = {"ns_listing_of_%s" % namespace : "get_ipython().user_ns"}
+    expr = {"ns_listing_of_%s" % namespace.replace(" ", "_") : ue1}
     
     if as_call:
         return ForeignCall(user_expressions = expr)
@@ -611,7 +590,7 @@ def cmd_foreign_shell_ns_listing(namespace:str="Internal", as_call=True) -> dict
 #### END call generators
 
 
-def unpack_data_recvd_on_shell_chnl(msg:dict) -> dict:
+def unpack_shell_channel_data(msg:dict) -> dict:
     """Extracts data shuttled from the remote kernel via " execute_reply" message.
     
     The data are present as text/plain mime type data in the received execute_reply

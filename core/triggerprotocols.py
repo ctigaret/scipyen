@@ -30,8 +30,11 @@ TriggerEventType -> now defined in core.triggerevent
 TriggerProtocol
 
 """
-import enum, numbers, warnings
-from copy import deepcopy, copy
+import typing, warnings
+from itertools import chain
+from copy import (deepcopy, copy,)
+from numbers import (Number, Real,)
+from functools import partial
 import numpy as np
 import quantities as pq
 import neo
@@ -40,16 +43,1135 @@ import neo
 #from neo.core import container
 from neo.core.dataobject import (DataObject, ArrayDict,)
 
-from core.datatypes import (check_time_units, is_string,)
+from core.datatypes import (check_time_units, is_string, 
+                            RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
 from core.neoutils import (get_index_of_named_signal, remove_events, clear_events,
                            is_same_as)
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal, )
-
-from core import prog
 from core.prog import safeWrapper
-
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
+from core.traitcontainers import DataBag
+
+#### BEGIN module-level default options
+DEFAULTS = DataBag()
+DEFAULTS["Presynaptic"] = DataBag()
+DEFAULTS["Presynaptic"]["Channel"] = 0
+DEFAULTS["Presynaptic"]["DetectEvents"] = False
+DEFAULTS["Presynaptic"]["DetectionBegin"] = 0 * pq.s
+DEFAULTS["Presynaptic"]["DetectionEnd"] = 1 * pq.s
+DEFAULTS["Presynaptic"]["Name"] = "epsp"
+
+DEFAULTS["Postsynaptic"] = DataBag()
+DEFAULTS["Postsynaptic"]["Channel"] = 0
+DEFAULTS["Postsynaptic"]["DetectEvents"] = False
+DEFAULTS["Postsynaptic"]["DetectionBegin"] = 0 * pq.s
+DEFAULTS["Postsynaptic"]["DetectionEnd"] = 1 * pq.s
+DEFAULTS["Postsynaptic"]["Name"] = "bAP"
+
+DEFAULTS["Photostimulation"] = DataBag()
+DEFAULTS["Photostimulation"]["Channel"] = 0
+DEFAULTS["Photostimulation"]["DetectEvents"] = False
+DEFAULTS["Photostimulation"]["DetectionBegin"] = 0 * pq.s
+DEFAULTS["Photostimulation"]["DetectionEnd"] = 1 * pq.s
+DEFAULTS["Photostimulation"]["Name"] = "uepsp"
+
+DEFAULTS["ImagingFrameTrigger"] = DataBag()
+DEFAULTS["ImagingFrameTrigger"]["Channel"] = 0
+DEFAULTS["ImagingFrameTrigger"]["DetectEvents"] = False
+DEFAULTS["ImagingFrameTrigger"]["DetectionBegin"] = 0 * pq.s
+DEFAULTS["ImagingFrameTrigger"]["DetectionEnd"] = 1 * pq.s
+DEFAULTS["ImagingFrameTrigger"]["Name"] = "imaging"
+
+#### END module-level default options
     
+#### BEGIN Module-level functions
+
+@safeWrapper
+def auto_define_trigger_events(src, event_type, analog_index, 
+                               times=None, label=None, name=None, 
+                               use_lo_hi=True, time_slice=None, 
+                               clear = False,
+                               clearSimilarEvents=True, 
+                               clearTriggerEvents=True, 
+                               clearAllEvents=False):
+    """Constructs TriggerEvent objects from events detected in analog signals.
+    
+    TriggerEvent objects are constructed using either time stamps given as
+    function parameters, or using events detected based on trigger-like waveforms
+    in the analog signals in src.
+    
+    Trigger-like (or TTL-like) waveforms are upward ("up") or downward 
+    ("down") rectangular deflections, or pulses, in the signal. A train of 
+    TTL-like pulses represents a train of events.
+    
+    Event detection is done by searching for TTL-like waveforms in specific 
+    neo.AnalogSignal objects contained in src, and specified by the 'analog_index'
+    parameter.
+    
+    If found, the time stamps of the TTL-like waveforms (relative to the 
+    time start of the signal) are used to construct TriggerEvent objects. These 
+    will be stored in the 'events' attribute of the neo.Segment objects in src.
+    
+    TriggerEvent objects emulate a neo.Event: they contain 1D arrays of time 
+    values (python Quantity), 1D arraty of strings (labels), and a name.
+    
+    In addition, they have a TriggerEventType attribute to distinguish between
+    presynaptic, postsynaptic, photostimulation and image acquisition 
+    trigger events.
+    
+    Calls detect_trigger_events()
+    
+    See also: TriggerEvent and TriggerEventType in triggerevent module.
+    
+    Parameters:
+    ===========
+    
+    src: a neo.Block, a neo.Segment, or a list of neo.Segment objects
+    
+    event_type: a str that specifies the type of trigger event e.g.:
+                'acquisition',
+                'frame'
+                'imaging',
+                'imaging_frame',
+                'imaging_line',
+                'line'
+                'photostimulation',
+                'postsynaptic',
+                'presynaptic',
+                'sweep',
+                'user'
+                
+            or a valid TriggerEventType enum type, e.g. TriggerEventType.presynaptic
+    
+    analog_index:   specified which signal to use for event detection; can be one of:
+    
+                    int (index of the signal array in the data analogsignals)
+                        assumes that _ALL_ segments in "src" have the desired analogsignal
+                        at the same position in the analogsignals array
+    
+                    str (name of the analogsignal to use for detection) -- must
+                        resolve to a valid analogsignal index in _ALL_ segments in 
+                        "src"
+                    
+                    a sequence of int (index of the signal), one per segment in src 
+
+    (see also detect_trigger_events(), TriggerEventType)
+    
+    Named parameters:
+    =================
+    times: either None, or a python quantity array with time units
+    
+        When "times" is None (the default) the function attempts to detect 
+        trigger events by searching for TTL-like pulses in the analogsignal 
+        specified by analog_index. The actual waveform search is performed by
+        the detect_trigger_events() function in this module.
+        
+        Otherwise, the values in the "times" array will be used to define the 
+        trigger events.
+        
+    label: common prefix for the individual trigger event label in the event array
+            (see also detect_trigger_events())
+    
+    name: name for the trigger event array 
+            (see also detect_trigger_events())
+    
+    use_lo_hi: boolean, (default is True);  
+        when True, use the rising transition to detect the event time stamp
+            ("up" logic, see also detect_trigger_events())
+        
+    time_slice: pq.Quantity tuple (t_start, t_stop) or None.
+        When detecting events (see below) the time_slice can specify which part of  
+        a signal can be used for automatic event detection.
+        
+        When time_slice is None this indicates that the events are to be detected 
+        from the entire signal.
+        
+        The elements need to be Python Quantity objects compatible with the domain
+        of the signal. For AnalogSignal, this is time (usually, pq.s)
+        
+    NOTE: The following parameters are passed directly to embed_trigger_event
+    
+    clear: see auto_detect_trigger_protocols; passed to embed_trigger_event
+    
+    Returns:
+    ========
+    The src parameter (a reference)
+    
+    Side effects:
+        Creates and appends TriggerEvent objects to the segments in src
+    """
+    if isinstance(src, neo.Block):
+        data = src.segments
+        
+    elif isinstance(src, (tuple, list)):
+        if all([isinstance(o, neo.Segment) for o in src]):
+            data = src
+            
+        elif all([isinstance(o, neo.Block) for o in src]):
+            data = chain(*[b.segments for b in src])
+            
+        else:
+            raise TypeError("Expecting a sequence of neo.Block or neo.Segment objects")
+        
+    elif isinstance(src, neo.Segment):
+        data = [src]
+        
+    else:
+        raise TypeError("src expected to be a neo.Block, neo.Segment or a sequence of neo.Block or neo.Segment objects; got %s instead" % type(src).__name__)
+    
+    if isinstance(times, pq.Quantity):
+        if not check_time_units(times):  # event times passed at function call -- no detection is performed
+            raise TypeError("times expected to have time units; it has %s instead" % times.units)
+
+        for segment in data: # construct events, store them in segments
+            event = TriggerEvent(times=times, units=times.units,
+                                    event_type=event_type, labels=label, 
+                                    name=name)
+            
+            embed_trigger_event(event, segment, clear=clear)
+            
+    elif times is None: #  no event times specified =>
+        # auto-detect trigger events from signal given by analog_index
+        if isinstance(analog_index, str):
+            # signal specified by name
+            analog_index = get_index_of_named_signal(data, analog_index)
+            
+        if isinstance(analog_index, (tuple, list)):
+            if all(isinstance(s, (int, str)) for s in analog_index):
+                if len(analog_index) != len(data):
+                    raise TypeError("When a list of int, analog_index must have as many elements as segments in src (%d); instead it has %d" % (len(data), len(analog_index)))
+                
+                for (s, ndx) in zip(data, analog_index):
+                    if isinstance(ndx, str):
+                        sndx = get_index_of_named_signal(s, ndx, silent=True)
+                        
+                    else:
+                        sndx = ndx
+                        
+                    if sndx in range(len(s.analogsignals)):
+                        if isinstance(time_slice, (tuple, list)) \
+                            and all([isinstance(t, pq.Quantity) and check_time_units(t) for t in time_slice]) \
+                                and len(time_slice) == 2:
+                            event = detect_trigger_events(s.analogsignals[sndx].time_slice(time_slice[0], time_slice[1]), 
+                                                        event_type=event_type, 
+                                                        use_lo_hi=use_lo_hi, 
+                                                        label=label, name=name)
+                            
+                        else:
+                            event = detect_trigger_events(s.analogsignals[sndx], 
+                                                        event_type=event_type, 
+                                                        use_lo_hi=use_lo_hi, 
+                                                        label=label, name=name)
+                            
+                        embed_trigger_event(event, s, clear=clear)
+                        
+                    else:
+                        raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (ndx, len(s.analogsignals)))
+
+        elif isinstance(analog_index, int):
+            for s in data:
+                if analog_index in range(len(s.analogsignals)):
+                    if isinstance(time_slice, (tuple, list)) \
+                        and all([isinstance(t, pq.Quantity) and check_time_units(t) for t in time_slice]) \
+                            and len(time_slice) == 2:
+                        event = detect_trigger_events(s.analogsignals[analog_index].time_slice(time_slice[0], time_slice[1]), 
+                                                      event_type=event_type, 
+                                                      use_lo_hi=use_lo_hi, 
+                                                      label=label, name=name)
+                        
+                    else:
+                        event = detect_trigger_events(s.analogsignals[analog_index], 
+                                                      event_type=event_type, 
+                                                      use_lo_hi=use_lo_hi, 
+                                                      label=label, name=name)
+                        
+                    embed_trigger_event(event, s, clear=clear)
+                    
+                else:
+                    raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (analog_index, len(s.analogsignals)))
+                
+        else:
+            raise RuntimeError("Invalid signal index %s" % str(analog_index))
+
+    else:
+        raise TypeError("times expected to be a python Quantity array with time units, or None")
+                
+                
+    return src
+
+@safeWrapper
+def detect_trigger_events(x, event_type, use_lo_hi=True, label=None, name=None):
+    """Creates a datatypes.TriggerEvent object (array) of specified type.
+    
+    Calls detect_trigger_times(x) to detect the time stamps.
+    
+    Parameters:
+    ===========
+    
+    x: neo.AnalogSsignal
+    
+    event_type: a datatypes.TriggerEventType enum value or datatypes.TriggerEventType name (str)
+    
+    Named parameters:
+    ================
+    use_lo_hi: boolean, optional (default is True): 
+    
+        The datatypes.TriggerEvent objects will be created from low -> high 
+        state transition times when "use_lo_hi" is True, otherwise from the 
+        high -> low state transition times.
+            
+    label: str, optional (default None): the labels for the events in the 
+        datatypes.TriggerEvent array
+    
+    name: str, optional (default  None): the name of the generated 
+        datatypes.TriggerEvent array
+    
+    Returns:
+    ========
+    
+    A datatypes.TriggerEvent object (essentially an array of time stamps)
+    
+    """
+    if not isinstance(x, (neo.AnalogSignal, DataSignal, np.ndarray)):
+        raise TypeError("Expecting a neo.AnalogSignal, or a datatypes.DataSignal, or a np.ndarray as first parameter; got %s instead" % type(x).__name__)
+    
+    if isinstance(event_type, str):
+        if event_type in list(TriggerEventType.__members__.keys()):
+            event_type = TriggerEventType[event_type]
+            
+        else:
+            raise (ValueError("unknown trigger event type: %s; expecting one of %s" % event_type, " ".join(list([TriggerEventType.__members__.keys()]))))
+        
+    elif not isinstance(event_type, TriggerEventType):
+        raise TypeError("'event_type' expected to be a datatypes.TriggerEventType enum value, or a str in datatypes.TriggerEventType enum; got %s instead" % type(event_type).__name__)
+
+    if label is not None and not isinstance(label, str):
+        raise TypeError("'label' parameter expected to be a str or None; got %s instead" % type(label).__name__)
+    
+    if name is not None and not isinstance(name, str):
+        raise TypeError("'name' parameter expected to be a str or None; got %s instead" % type(name).__name__)
+    
+    if not isinstance(use_lo_hi, bool):
+        raise TypeError("'use_lo_hi' parameter expected to be a boolean; got %s instead" % type(use_lo_hi).__name__)
+    
+    [lo_hi, hi_lo] = detect_trigger_times(x)
+    
+    if use_lo_hi:
+        times = lo_hi
+        
+    else:
+        times = hi_lo
+        
+    trig = TriggerEvent(times=times, units=x.times.units, event_type=event_type, labels=label, name=name)
+    
+    if name is None:
+        if label is not None:
+            trig.name = "%d%s" % (trig.times.size, label)
+            
+        else:
+            if np.all(trig.labels == trig.labels[0]):
+                trig.name = "%d%s" % (trig.times.size, label)
+                
+            else:
+                trig.name = "%dtriggers" % trig.times.size
+                
+    return trig
+    
+    
+@safeWrapper
+def detect_trigger_times(x):
+    """Detect and returns the time stamps of rectangular pulse waveforms in a neo.AnalogSignal
+    
+    The signal must undergo at least one transition between two distinct states 
+    ("low" and "high").
+    
+    The function is useful in detecting the ACTUAL time of a trigger (be it 
+    "emulated" in the ADC command current/voltage or in the digital output "DIG") 
+    when this differs from what was intended in the protocol (e.g. in Clampex)
+    """
+    from scipy import cluster
+    from scipy import signal
+    
+    if not isinstance(x, neo.AnalogSignal):
+        raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % type(x).__name__)
+    
+    # WARNING: algorithm fails for noisy signls with no TTL waveform!
+    cbook, dist = cluster.vq.kmeans(x, 2)
+    
+    code, cdist = cluster.vq.vq(x, sorted(cbook))
+    
+    diffcode = np.diff(code)
+    
+    ndx_lo_hi = np.where(diffcode ==  1)[0].flatten() # transitions from low to high
+    ndx_hi_lo = np.where(diffcode == -1)[0].flatten() # hi -> lo transitions
+    
+    if ndx_lo_hi.size:
+        times_lo_hi = [x.times[k] for k in ndx_lo_hi]
+        
+    else:
+        times_lo_hi = None
+        
+    if ndx_hi_lo.size:
+        times_hi_lo = [x.times[k] for k in ndx_hi_lo]
+        
+    else:
+        times_hi_lo = None
+        
+    return times_lo_hi, times_hi_lo
+
+
+def remove_trigger_protocol(protocol, block):
+    """Removes embedded trigger events associated with a specified trigger protocol
+    """
+    if not isinstance(protocol, TriggerProtocol):
+        raise TypeError("'protocol' expected to be a TriggerProtocol; got %s instead" % type(protocol).__name__)
+    
+    if not isinstance(block, neo.Block):
+        raise TypeError("'block' was expected to be a neo.Block; got % instead" % type(block).__name__)
+    
+    if len(protocol.segmentIndices()) > 0:
+        protocol_segments = protocol.segmentIndices()
+        
+    else:
+        protocol_segments = range(len(block.segments))
+        
+    for k in protocol_segments:
+        if k >= len(block.segments):
+            warnings.warn("skipping segment index %d of protocol %s because it points outside the list of segments with %d elements" % (k, protocol.name, len(block.segments)), 
+                          RuntimeWarning)
+            continue
+        
+        if k < 0:
+            warnings.warn("skipping negative segment index %d in protocol %s" % (k, protocol.name), RuntimeWarning)
+            continue
+        
+        for event in protocol.events:
+            remove_events(event, block.segments[k])
+        
+        block.segments[k].annotations.pop("trigger_protocol", None)
+                
+def modify_trigger_protocol(protocol, block):
+    """
+    Uses the events in the protocol to add TriggerEvents or modify exiting ones,
+    in the segment indices specified by this protocol's segment indices.
+    """
+    if not isinstance(protocol, TriggerProtocol):
+        raise TypeError("'value' expected to be a TriggerProtocol; got %s instead" % type(value).__name__)
+    
+    if not isinstance(block, neo.Block):
+        raise TypeError("'block' was expected to be a neo.Block; got % instead" % type(block).__name__)
+    
+    if len(protocol.segmentIndices()) > 0:
+        protocol_segments = protocol.segmentIndices()
+        
+    else:
+        protocol_segments = range(len(block.segments))
+        
+    for k in protocol_segments:
+        if k >= len(block.segments):
+            warnings.warn("skipping segment index %d of protocol %s because it points outside the list of segments with %d elements" % (k, protocol.name, len(block.segments)), 
+                          RuntimeWarning)
+            continue
+        
+        if k < 0:
+            warnings.warn("skipping negative segment index %d in protocol %s" % (k, protocol.name), RuntimeWarning)
+            continue
+        
+        # check if the segment has any events of the type found in the protocol
+        # remove them and add the protocol's events instead
+        # NOTE: ONE segment -- ONE protocol at all times.
+        if isinstance(protocol.presynaptic, TriggerEvent) and protocol.presynaptic.event_type == TriggerEventType.presynaptic:
+            presynaptic_events = [e for e in block.segments[k].events if isinstance(e, TriggerEvent) and e.event_type == TriggerEventType.presynaptic]
+            
+            for event in presynaptic_events:
+                # should contain AT MOST ONE event object
+                block.segments[k].events.remove(event)
+                
+            block.segments[k].events.append(protocol.presynaptic)
+                
+        if isinstance(protocol.postsynaptic, TriggerEvent) and protocol.postsynaptic.event_type == TriggerEventType.postsynaptic:
+            postsynaptic_events = [e for e in block.segments[k].events if isinstance(e, TriggerEvent) and e.event_type == TriggerEventType.postsynaptic]
+            
+            for event in postsynaptic_events:
+                block.segments[k].events.remove(event)
+                
+            block.segments[k].events.append(protocol.postsynaptic)
+            
+            
+        if isinstance(protocol.photostimulation, TriggerEvent) and protocol.photostimulation.event_type == TriggerEventType.photostimulation:
+            photostimulation_events = [e for e in block.segments[k].events if isinstance(e, TriggerEvent) and e.event_type == TriggerEventType.photostimulation]
+            
+            for event in photostimulation_events:
+                block.segments[k].events.remove(event)
+                
+            block.segments[k].event.append(protocol.photostimulation)
+            
+        if len(protocol.acquisition):
+            for event in protocol.acquisition:
+                existing_events = [e for e in block.segments[k].events if isinstance(e, TriggerEvent) and e.event_type == event.event_type]
+                
+                for e in existing_events:
+                    block.segments[k].events.remove(e)
+                    
+                block.segments[k].events.append(event)
+                
+        if isinstance(protocol.name, str) and len(protocol.name.strip()) > 0:
+            pr_name = protocol.name
+            
+        else:
+            pr_name = "unnamed_protocol"
+            
+        block.segments[k].annotations["trigger_protocol"] = pr_name
+
+
+def embed_trigger_event(event, segment, clear=False): 
+    """
+    Embeds the neo.Event object event in the neo.Segment object segment.
+    
+    In the segment's events list, the event is stored by reference.
+    
+    WARNING: one could easily append events with identical time stamps!
+        While this is NOT recommended and it can be easily prevented by setting
+        the "clear" parameer to "same", in which case the new trigger events
+        will replace the old ones
+        
+        To add time stamps to a TriggerEvent, create a new TriggerEvent object
+        by calling use TriggerEvent.append_times() or TriggerEvent.merge() then 
+        embed it here.
+        
+        To add time stamps to a generic neo.Event, create a new Event by calling
+        Event.merge() then embed it here.
+        
+        To remove time stamps use numpy array indexing on the event.
+        
+        See datatypes.TriggerEvent for details.
+    
+    Parameters:
+    ===========
+    
+    event: a neo.Event, or a datatypes.TriggerEvent
+    
+    segment: a neo.Segment
+    
+    Named parameters:
+    ===================
+    clear: bool, str, TriggerEventType or sequence (tuple, list) - specifies
+        the removal of existing events (if any) before embedding the new events.
+        
+        see auto_detect_trigger_protocols
+    
+    Returns:
+    =======
+    A reference to the segment.
+    
+    """
+    if not isinstance(event, (neo.Event, TriggerEvent)):
+        raise TypeError("event expected to be a neo.Event; got %s instead" % type(event).__name__)
+    
+    if not isinstance(segment, neo.Segment):
+        raise TypeError("segment expected to be a neo.Segment; got %s instead" % type(segment).__name__)
+    
+    if isinstance(clear, bool) and clear:
+        clear_events(segment)
+        
+    elif isinstance(clear, str):
+        if clear == "all":
+            clear_events(segment)
+            
+        elif clear == "triggers":
+            clear_events(segment, triggersOnly=True)
+            
+        elif clear == "same":
+            all_events_ndx = range(len(segment.events))
+            evs = [(k,e) for (k,e) in enumerate(segment.events) if (isinstance(e, TriggerEvent) and e.is_same_as(event))]
+            
+            if len(evs):
+                (evndx, events) = zip(*evs)
+                
+                keep_events = [segment.events[k] for k in all_events_ndx if k not in evndx]
+                
+                segment.events[:] = keep_events
+                
+        elif clear in TriggerEventType.names():
+            clear_events(segment, triggerType=TriggerEventType[clear])
+            
+        else:
+            raise ValueError("Cannot understand 'clear' parameter %s", clear)
+        
+    elif isinstance(clear, (TriggerEventType, tuple, list)):
+        clear_events(segment, triggerType = clear) # see NOTE: 2021-01-06 12:38:32
+        
+    segment.events.append(event)
+    
+    return segment
+            
+        
+@safeWrapper
+def embed_trigger_protocol(protocol, target, useProtocolSegments=True, clearTriggers=True, clearEvents=False):
+    """ Embeds TriggerEvent objects found in the TriggerProtocol 'protocol', 
+    in the segments of 'target'.
+    
+    Inside the target, trigger event objects are stored by reference!
+    
+    Parameters:
+    ==========
+    protocol: a dataypes.TriggerProtocol object
+    
+    target: a neo.Block, neo.Segment or a sequence of neo.Segment objects
+    
+    Keyword parameters:
+    ==================
+    
+    useProtocolSegments: boolean, default True: use the segments indices given by the protocol
+        to embed only in those segments in the "target"
+        
+        when False, "target" is expected to be a sequence of neo.Segments as long as
+        the protocol's segmentIndices
+        
+        this is ignored when "target" is a neo.Block or a neo.Segment
+    
+    clearTriggers: boolean, default True; when True, existing TriggerEvent obects will be removed
+    
+    clearEvents: boolean, default False; when True, clear _ALL_ existing neo.Event objects
+        (including TriggerEvents!)
+    
+    CAUTION: This will wipe out existing trigger events in those segments
+    indicated by the 'segmentIndices' attribute of 'protocol'.
+    """
+    # check if there are synaptic events already in the scans data target:
+    # each segment can hold at most one TriggerEvent object of each 
+    # type (pre-, post-, photo-);
+    # NOTE: a TriggerEvent actually holds an ARRAY of time points
+    
+    if not isinstance(protocol, TriggerProtocol):
+        raise TypeError("'protocol' expected to be a TriggerProtocol; got %s instead" % type(protocol).__name__)
+    
+    if not isinstance(target, (neo.Block, neo.Segment)):
+        raise TypeError("'target' was expected to be a neo.Block or neo.Segment; got %s instead" % type(target).__name__)
+    
+    if isinstance(target, neo.Block):
+        segments = target.segments
+        
+        if len(protocol.segmentIndices()) > 0:
+            value_segments = [i for i in protocol.segmentIndices() if i in range(len(segments))]
+            value_segments = protocol.segmentIndices()
+            
+        else:
+            value_segments = range(len(segments))
+            
+        if len(value_segments) == 0:
+            warnings.warn("No suitable segment index found in protocol %s with %s, given %d segments in for %s %s" % (protocol.name, protocol.segmentIndices(), len(segments), type(target).__name__, target.name))
+            return
+        
+        
+    elif isinstance(target, (tuple, list)) and all([isinstance(s, neo.Segment) for s in target]):
+        segments = target
+        if not useProtocolSegments:
+            if len(segments) != len(protocol.segmentIndices):
+                raise ValueError("useProtocolSegments is False, but target has %d segments whereas protocol indicates %d segments" % (len(segments), len(protocol.segmentIndices())))
+            
+            value_segments = range(len(segments))
+            
+        else:
+            # the list of segments 
+            if len(protocol.segmentIndices()) > 0:
+                value_segments = [i for i in protocol.segmentIndices() if i in range(len(segments))]
+                value_segments = protocol.segmentIndices()
+                
+            else:
+                value_segments = range(len(segments))
+            
+        if len(value_segments) == 0:
+            warnings.warn("No suitable segment index found in protocol %s with %s, given %d segments in for %s %s" % (protocol.name, protocol.segmentIndices(), len(segments), type(target).__name__, target.name))
+            return
+        
+    elif isinstance(target, neo.Segment):
+        segments = [target]
+        value_segments = [0]
+    
+    if len(value_segments) == 0:
+        warnings.warn("No suitable segment index found in protocol %s with %s, given %d segments in for %s %s" % (protocol.name, protocol.segmentIndices(), len(segments), type(target).__name__, target.name))
+        return
+        
+    for k in value_segments: 
+        if clearTriggers:
+            trigs = [(evndx, ev) for (evndx, ev) in enumerate(segments[k].events) if isinstance(ev, TriggerEvent)]
+
+            if len(trigs): # TriggerEvent objects found in segment
+                (trigndx, trigevs) = zip(*trigs)
+                
+                all_events_ndx = range(len(segments[k].events))
+                
+                keep_events = [segments[k].events[i] for i in all_events_ndx if i not in trigndx]
+                
+                segments[k].events[:] = keep_events
+                
+        elif clearEvents:
+            segments[k].events.clear()
+            
+        # now go and append events contained in protocol
+        
+        if isinstance(protocol.acquisition, (tuple, list)) and len(protocol.acquisition):
+            # for old API
+            segments[k].events.append(protocol.acquisition[0]) # only ONE acquisition event per protocol!
+                
+        elif isinstance(protocol.acquisition, TriggerEvent):
+            segments[k].events.append(protocol.acquisition)
+                
+        if protocol.presynaptic is not None:
+                segments[k].events.append(protocol.presynaptic)
+            
+        if protocol.postsynaptic is not None:
+                segments[k].events.append(protocol.postsynaptic)
+            
+        if protocol.photostimulation is not None:
+                segments[k].events.append(protocol.photostimulation)
+                                
+        if isinstance(protocol.name, str) and len(protocol.name.strip()) > 0:
+            pr_name = protocol.name
+            segments[k].name = protocol.name
+            
+        else:
+            pr_name = "unnamed_protocol"
+            
+        segments[k].annotations["trigger_protocol"] = pr_name
+
+
+@safeWrapper
+def parse_trigger_protocols(src):
+    """Constructs a list of TriggerProtocol objects from embeded TriggerEvent objects.
+    
+    "src" may be a neo.Segment, neo.Block, a sequence of neo.Segment, or a
+    sequence of neo.Block.
+    
+    Parameters:
+    ==========
+    "src": neo.Block with a non-empty segments list, or 
+           neo.Segment, or
+           sequence (tuple, list) of neo.Block
+           sequence (sutple, list) of neo.Segment
+        
+    Returns:
+    =======
+    Tuple (protocols_list, src)
+        
+    ATTENTION: this constructs TriggerProtocol objects with default names.
+    Usually this is NOT what you want but their names can be changed to a more 
+    meaningful value after their creation.
+    
+    Individual TriggerEvent objects can be manually appended to the events 
+        list of each neo.Segment.
+    
+    Alternatively, the function detect_trigger_times() can help generate 
+    TriggerEvent objects from specific neo.AnalogSignal arrays containing 
+    trigger-like data (i.e., signals with transitions between a low and 
+    a high state, e.g. rectangular pulses, or step functions).
+    
+    Returns an empty list if no trigger events were found.
+    
+    NOTE: each segment in "src" can have at most ONE protocol
+    
+    NOTE: each protocol can have at most one event for each event type in 
+        presynaptic, postsynaptic, and photostimulation
+    
+    NOTE: each event object CAN contain more than one time stamp  (i.e. a 
+        pq.Quantity array -- which in fact derives from np.ndarray)
+    
+    NOTE: several segments CAN have the same protocol!
+    
+    Once generated, the TriggerProtocol objects should be stored somewhere, for 
+    example in the "annotations" dictoinary of the block or segment so that they
+    won't have to be recreated (especially when their names/event time stamps
+    will have been customized at later stages)
+    
+    CAUTION: The TriggerEvent objects in the protocols are COPIES of those found
+        in "src". This means that any permissible modification brought to the 
+        events in the TriggerProtocol is NOT reflected in the events of the source
+        "src".
+        
+        To enable this, call embed_trigger_protocol() by using:
+            each protocol in the result list
+            "src" as target
+            clearTriggers parameter set to True
+    
+        NOTE: Permissible modifications to TriggerEvents are changes to their 
+            labels, names, and units. These will be reflected in the embedded
+            events when they are stored by reference.
+        
+            Event time stamps can only be changed by creating an new TriggerEvent.
+            To reflect time stamp changes in the "src" events, call remove_events()
+            then embed_trigger_event() for the particular event and neo.Segment 
+            in "src".
+            
+        
+    """
+    def __compose_protocol__(events, protocol_list, index = None):
+        """
+        events: a list of TriggerEvent objects
+        
+        protocol: TriggerProtocol or None (default); 
+            When a trigger protocol, just update it (especially the segment indices)
+            else: create a new TriggerProtocol
+            
+        index: int or None (default): index of segment in the collection; will
+            be appended to the protocol's segment indices
+            
+            When None the protocol's segment indices will not be changed
+        
+        """
+        pr_names = []
+        pr_first = []
+            
+        imaq_names = []
+        imaq_first = []
+        
+        protocol = TriggerProtocol() # name = protocol_name)
+        
+        for e in events:
+            if e.event_type == TriggerEventType.presynaptic:
+                if protocol.presynaptic is None:
+                    protocol.presynaptic = e
+                    
+                    pr_names.append(e.name)
+                    pr_first.append(e.times.flatten()[0])
+                    
+            elif e.event_type == TriggerEventType.postsynaptic:
+                if protocol.postsynaptic is None:
+                    protocol.postsynaptic = e
+
+                    pr_names.append(e.name)
+                    pr_first.append(e.times.flatten()[0])
+                        
+            elif e.event_type == TriggerEventType.photostimulation:
+                if protocol.photostimulation is None:
+                    protocol.photostimulation = e
+
+                    pr_names.append(e.name)
+                    pr_first.append(e.times.flatten()[0])
+                    
+            elif e.event_type & TriggerEventType.acquisition:
+                # NOTE: only ONE acquisition trigger event per segment!
+                if isinstance(protocol.acquisition, (tuple, list)) and len(protocol.acquisition) == 0: # or e not in protocol.acquisition:
+                    protocol.acquisition[:] = [e]
+                    
+                else:
+                    protocol.acquisition = e
+
+                imaq_names.append(e.name)
+                imaq_first.append(e.times.flatten()[0])
+                
+                if e.event_type == TriggerEventType.imaging_frame:
+                    protocol.imagingDelay = e.times.flatten()[0]
+                
+        # NOTE 2017-12-16 10:08:20 DISCARD empty protocols
+        if len(protocol) > 0: 
+            # assign names differently if only imaging events are present
+            if len(pr_first) > 0 and len(pr_first) == len(pr_names):
+                plist = [(k, t,name) for k, (t, name) in enumerate(zip(pr_first, pr_names))]
+                
+                plist.sort()
+                
+                pr_names = [name_ for k, p, name_ in plist]
+                
+            elif len(imaq_names) > 0 and len(imaq_first) == len(imaq_names):
+                plist = [(k,t,name) for k, (t,name) in enumerate(zip(imaq_first, imaq_names))]
+                plist.sort()
+                
+                pr_names = [name_ for k, p, name_ in plist]
+                    
+            protocol.name = " ".join(pr_names)
+            
+            if isinstance(index, Real):
+                protocol.segmentIndex = int(index)
+                
+            if len(protocol_list) == 0:
+                protocol_list.append(protocol)
+                
+            else:
+                pp = [p_ for p_ in protocol_list if p_.hasSameEvents(protocol) and p_.imagingDelay == protocol.imagingDelay]
+                
+                if len(pp):
+                    for p_ in pp:
+                        p_.updateSegmentIndex(protocol.segmentIndices())
+                        print("p_", p_)
+                        
+                else:
+                    protocol_list.append(protocol)
+        
+    protocols = list()
+    
+    if isinstance(src, neo.Block):
+        # NOTE: 2019-03-14 22:01:20
+        # trigs is a sequence of tuples: (index, sequence of TriggerEvent objects)
+        # segments without events are skipped
+        # segment events that are NOT TriggerEvent objects are skipped
+        trigs = [ (k, [e for e in s.events if isinstance(e, TriggerEvent)]) \
+                        for k,s in enumerate(src.segments) if len(s.events)]
+        
+        if len(trigs) == 0:
+            return protocols, src
+        
+        for (index, events) in trigs:
+            __compose_protocol__(events, protocols, index=index)
+            
+        if len(protocols):
+            for p in protocols:
+                for s in p.segmentIndices():
+                    src.segments[s].annotations["trigger_protocol"] = p.name
+        
+    elif isinstance(src, neo.Segment):
+        trigs = [e for e in src.events if isinstance(e, TriggerEvent)]
+        
+        if len(trigs) == 0:
+            return protocols, src
+        
+        __compose_protocol__(trigs, protocols, index=0)
+        
+        if len(protocols):
+            src.annotations["trigger_protocol"] = protocols[0].name
+                
+    elif isinstance(src, (tuple, list)):
+        if all([isinstance(v, neo.Segment) for v in src]):
+            trigs = [ (k, [e for e in s.events if isinstance(e, TriggerEvent)]) \
+                            for k,s in enumerate(src) if len(s.events)]
+            
+        elif all([isinstance(v, neo.Block) for v in src]):
+            # NOTE: 2021-01-04 11:13:46:
+            # detect/define trigger protocols in a list of neo.Blocks:
+            # (ATTENTION: theblocks are NOT concatenated, therefore the segment
+            # indices of the detected/defined protocols are inside each Block!)
+            
+            # sequence-block-segment indexing array 
+            sqbksg = np.array([(q, *kg) for q, kg in enumerate(enumerate(chain(*((k for k in range(len(b.segments))) for b in src))))])
+            
+            trigs = [(sqbksg[k,2], [e for e in src[sqbksg[k,1]].segments[sqbksg[k,2]].events if isinstance(e, TriggerEvent)]) for k in sqbksg[:,0]]
+            
+        else:
+            raise TypeError("Expecting a sequence of neo.Block or neo.Segment objects")
+        
+        # TODO: FIXME check/dump src return
+        
+        if len(trigs) == 0:
+            return protocols, src
+        
+        for (index, events) in trigs:
+            __compose_protocol__(events, protocols, index)
+            
+        if len(protocols):
+            for p in protocols:
+                for f in p.segmentIndices():
+                    src[f].annotations["trigger_protocol"] = p.name
+                
+    else:
+        raise TypeError("src expected to be a neo.Block, neo.Segment, or a sequence of neo.Segment objects; got %s instead" % type(src).__name__)
+            
+    return protocols, src
+
+def auto_detect_trigger_protocols(data: neo.Block, 
+                               presynaptic:tuple=(), 
+                               postsynaptic:tuple=(),
+                               photostimulation:tuple=(),
+                               imaging:tuple=(),
+                               clear:typing.Union[bool, str, tuple]=False,
+                               up=True, protocols=True):
+    
+    """Determines the set of trigger protocols in a neo.Block by searching for 
+    trigger waveforms in the analogsignals contained in data.
+    
+    Time stamps of the detected trigger protocols will then be used to construct
+    TriggerEvent objects according to which of the keyword parameters below
+    have been specified.
+    
+    Positional parameters:
+    =====================
+    
+    data: a neo.Block, neo.Segment, or sequence (tuple, list) of either neo.Block
+        or neo.Segment objects.
+            
+    Named parameters:
+    =================
+    
+    presynaptic, postsynaptic, photostimulation, imaging:
+    
+        Each is a tuple with 0 (default), two or three elements
+        
+            (signal_index, label, (t_start, t_stop))
+        
+        that specify parameters for the detection of pre-, postsynaptic, 
+        photostimulation or imaging (trigger) event types, respectively. 
+        
+        Their values are passed along to the auto_define_trigger_events,
+        detect_trigger_events, and detect_trigger_times functions.
+
+        When empty, no events of the specified type will be constructed.
+        
+        The tuple elements are as follows:
+        ---------------------------------
+        
+        signal_index: int = the index of the analog signal in a Segment's 
+            'analogsignals' attribute, where the trigger-like waveforms were
+            recorded.
+            
+            A trigger-like waveform is a rectangular pulse, or a train
+            of rectangular pulses with polarity (upward or downward) specified 
+            by the 'up' parameter, which emulate a TTL signal.
+            
+            Currently, thei functions supports only the "up" logic i.e., 
+            upward-going TTL-like waveforms.
+            
+        
+        label: str = a label to be assigned to the detected event
+        
+        (t_start, t_stop): pair of python Quantity objects defining a time slice
+            or interval, of the signal, where the events are to be detected.
+            
+            This is optional. When given, the search for TTL-like waveforms 
+            is restricted to the time interval between t_start and t_stop 
+            (t_start is included in the interval). 
+            
+            Otherwise, by default, TTL-like waveforms are searched along the 
+            entire duration of the signal.
+            
+            Recommended for signals that contain additional waveforms or are too 
+            noisy.
+        
+    clear: bool, str, TriggerEventType or sequence (tuple, list) - specifies
+        the removal of existing events (if any) before detecting TriggerEvents.
+        ATTENTION: The event removal is done on ALL data segments.
+        
+        Optional (default is False).
+        
+        When False (default), the detected trigger event arrays will be appended
+        to the list of neo.Event objects in the data segments. This list is the 
+        'events' attribute of the neo.Segment objects.
+        
+        When True, all events will be removed before detecting trigger events.
+        
+        When a str, the allowed values are (WARNING: case-sensitive, and no 
+                    spurious spaces):
+            "all"       => same effect as when 'clear' is True
+            
+            "triggers"  => remove all existing TriggerEvents regardless of their 
+                            TriggerEventType; other neo.Event objects are retained.
+                            
+            "same"      => remove trigger events that have values identical to  
+                            the ones of the newly-created evets here; the
+                            identity test checks for the length and values of the
+                            time stamps, and the values of the event labels.
+                            
+            a valid TriggerEventType string (e.g. "presynaptic", "postsynaptic",
+                etc., see triggerevent.TriggerEventType for details)
+                        => remove only trigger event of the specified type
+                
+        When a sequence, its elements may be (type mixing is not allwed):
+            * str = valid TriggerEventType strings as described above
+            * TriggerEventType values
+                NOTE: TriggerEventType is an enum.IntEnum;
+                see triggerevent.TriggerEventType for details
+                
+    up:bool, optional (default is True). Specifies the direction of TTL-like 
+        waveforms
+        When True, TTL-like waveforms are expected to follow an "up" logic 
+        (i.e., they are low-to-high, or upwards deflections).
+        
+    protocols:bool, default is True
+        When True, the function also constructs and returns a list of 
+        TriggerProtocol objects.
+        
+        When False, the function only detects (and embeds) trigger events in the
+        data. TriggerProtocol objects can then be parsed from the data by
+        calling parse_trigger_protocols() at a separate stage.
+                
+    Returns:
+    =======
+    A list of trigger protocols
+        
+    """
+    # NOTE: 2021-01-06 11:28:23 NEW: introduced "up" parameter - to use the
+    # ability to detect negative pulses ("down" logic); 
+            
+    #print("auto_detect_trigger_protocols: presynaptic", presynaptic)
+    #print("auto_detect_trigger_protocols: postsynaptic", postsynaptic)
+    #print("auto_detect_trigger_protocols: photostimulation", photostimulation)
+    #print("auto_detect_trigger_protocols: imaging", imaging)
+    
+        
+    # NOTE: 2021-01-06 13:54:58
+    # any admissible value of 'clear' except for "same" is used here; then, the
+    # call to auto_define_trigger_events() below gets 'clear' as either False
+    # (if 'clear' has been used here) or as "same", which instructs the 
+    # auto_define_trigger_events() function to, respectively, do nothing or to
+    # remove existing triggers when they have identical parameters as the 
+    # newly-created ones.
+    if isinstance(clear, bool) and clear:
+        clear_events(data)
+        clear = False
+
+    elif isinstance(clear, (TriggerEventType, tuple, list)):
+        # NOTE: 2021-01-06 12:38:32
+        # specifying triggerType implies triggersOnly is True
+        clear_events(data, triggerType = clear)
+        # also, clear_events raises error if clear is a non compliant sequence
+        clear = False
+        
+    elif isinstance(clear, str):
+        if clear == "all":
+            clear_events(data)
+            clear = False
+            
+        elif clear == "triggers":
+            clear_events(data, triggersOnly = True)
+            clear = False
+            
+        elif clear in TriggerEventType.names():
+            # see NOTE: 2021-01-06 12:38:32
+            clear_events(data, triggerType=TriggerEventType[clear])
+            clear = False
+            
+        elif clear != "same":
+            clear = False
+            
+    # collect trigger parameter tuples in a mapping, to iterate
+    tpars = {"presynaptic": presynaptic,
+             "postsynaptic": postsynaptic,
+             "photostimulation":photostimulation,
+             "imaging":imaging}
+    
+    # NOTE: 2019-03-14 21:43:21
+    # depending on the length of the tuple in the keyword parameters
+    # we detect events in the whole signal or we limit detetion to a defined 
+    # time-slice of the signal
+    
+    # iterate through trigger parameter tuples - example given here for one loop
+    # to be explicit:
+    #### if len(presynaptic) >= 2:
+    ####    pfun = partial(auto_define_trigger_events, event_type = "presynaptic", 
+    ####               analog_index = presynaptic[0], label = presynaptic[1], 
+    ####               use_lo_hi=up, clear=clear)
+        
+    ####    if len(presynaptic) == 3:
+    ####        pfun(data, time_slice = presynaptic[2])
+    ####    else:
+    ####        pfun(data)
+    
+    for p_name, p_tuple in tpars.items():
+        if len(tpars[p_name]) >= 2:
+            pfun = partial(auto_define_trigger_events, event_type = p_name, 
+                        analog_index = p_tuple[0], label = p_tuple[1], 
+                        use_lo_hi=up, clear=clear)
+            
+            if len(p_tuple) == 3:
+                pfun(data, time_slice = p_tuple[2])
+                
+            else:
+                pfun(data)
+                
+    if protocols:
+        tp, _ = parse_trigger_protocols(data)
+        return tp
+
+#### END Module-level functions
+        
 class TriggerProtocol(object):
     """Encapsulates an experimental stimulation protocol (i.e., "triggers").
     
@@ -181,8 +1303,7 @@ class TriggerProtocol(object):
         self.__photostimulation__   = None
         self.__acquisition__        = None # forTriggerEventTypes imaging_frame, imaging_line, segment
         self.__segment_index__      = []
-        #self.__imaging_delay__      = 0 * pq.s # NOTE: this IS NOT A TriggerEvent  !!!
-        self.__imaging_delay__      = None#0 * pq.s # NOTE: this IS NOT A TriggerEvent  !!!
+        self.__imaging_delay__      = None #0 * pq.s # NOTE: this IS NOT A TriggerEvent  !!!
         self.__user_events__        = []
         self.__protocol_name__      = "protocol"
         
@@ -489,9 +1610,9 @@ class TriggerProtocol(object):
     
     @safeWrapper
     def hasSameEvents(self, other, 
-                      rtol = TriggerEvent.relative_tolerance, 
-                      atol = TriggerEvent.absolute_tolerance, 
-                      equal_nan = TriggerEvent.equal_nan):
+                      rtol = RELATIVE_TOLERANCE, 
+                      atol = ABSOLUTE_TOLERANCE, 
+                      equal_nan = EQUAL_NAN):
         """Compares pre-, post- and photo- events with those from other TriggerProtocol.
         
         NOTE: 2018-06-07 22:42:04
@@ -616,7 +1737,10 @@ class TriggerProtocol(object):
     @property
     def acquisition(self):
         """The acquisition event
+        Thus is pretty ambiguous: acquisition of what!?
         """
+        # NOTE: 2020-12-31 17:29:19
+        # TODO: flag for deprecation
         return self.getEvent(TriggerEventType.acquisition)
         ## NOTE: 2019-03-15 18:10:19
         ## upgrade to new API
@@ -788,16 +1912,7 @@ class TriggerProtocol(object):
     @postsynaptic.setter
     def postsynaptic(self, value):
         self.setEvent(TriggerEventType.postsynaptic, value)
-        #if value is None:
-            #self.__postsynaptic__ = value
-            
-        #elif isinstance(value, TriggerEvent):
-            #self.__postsynaptic__ = value.copy()
-            #self.__postsynaptic__.event_type = TriggerEventType.postsynaptic
-                    
-        #else:
-            #raise TypeError("Expecting a TriggerEvent or None; got %s instead" % type(value).__name__)
-        
+
     @property
     def photostimulation(self):
         return self.getEvent(TriggerEventType.photostimulation)
@@ -805,15 +1920,6 @@ class TriggerProtocol(object):
     @photostimulation.setter
     def photostimulation(self, value):
         self.setEvent(TriggerEventType.photostimulation, value)
-        #if value is None:
-            #self.__photostimulation__ = value
-        
-        #elif isinstance(value, TriggerEvent):
-            #self.__photostimulation__ = value.copy()
-            #self.__photostimulation__.event_type = TriggerEventType.photostimulation
-                
-        #else:
-            #raise TypeError("Expecting a TriggerEvent or None; got %s instead" % type(value).__name__)
         
     @property
     def imagingDelay(self):
@@ -871,21 +1977,18 @@ class TriggerProtocol(object):
         """Pass None to clear acquisition events
         """
         self.__acquisition__ = value
-        #self.__set_acquisition_event__(value)
         
     @property
     def imagingLineTrigger(self):
         """Returns an imaging_line trigger event, if any
         """
         return self.__acquisition__
-        #return self.__get_acquisition_event__(TriggerEventType.imaging_line)
     
     @imagingLineTrigger.setter
     def imagingLineTrigger(self, value):
         """Pass None to clear acquisition events
         """
         self.__acquisition__ = value
-        #self.__set_acquisition_event__(value)
 
     @property
     def sweep(self):
@@ -1121,1228 +2224,3 @@ class TriggerProtocol(object):
             return self.__segment_index__
         
 
-#### BEGIN Module-level functions
-
-@safeWrapper
-def auto_define_trigger_events(src, analog_index, event_type, 
-                               times=None, label=None, name=None, 
-                               use_lo_hi=True, time_slice=None, 
-                               clearSimilarEvents=True, clearTriggerEvents=True, 
-                               clearAllEvents=False):
-    """Populates the events lists for the segments in src with TriggerEvent objects.
-    
-    Searches for trigger waveforms in signals specified by analog_index, to define
-    TriggerEvent objects.
-    
-    A TriggerEvent is an array of time values and will be added to the events list
-    of the neo.Segment objects in src.
-    
-    Calls detect_trigger_events()
-    
-    Parameters:
-    ===========
-    
-    src: a neo.Block, a neo.Segment, or a list of neo.Segment objects
-    
-    analog_index:   specified which signal to use for event detection; can be one of:
-    
-                    int (index of the signal array in the data analogsignals)
-                        assumes that _ALL_ segments in "src" have the desired analogsignal
-                        at the same position in the analogsignals array
-    
-                    str (name of the analogsignal to use for detection) -- must
-                        resolve to a valid analogsignal index in _ALL_ segments in 
-                        "src"
-                    
-                    a sequence of int (index of the signal), one per segment in src 
-
-    event_type: a str that specifies the type of trigger event e.g.:
-                'acquisition',
-                'frame'
-                'imaging',
-                'imaging_frame',
-                'imaging_line',
-                'line'
-                'photostimulation',
-                'postsynaptic',
-                'presynaptic',
-                'sweep',
-                'user'
-                
-            or a valid datatypes.TriggerEventType enum type, e.g. TriggerEventType.presynaptic
-    
-    (see detect_trigger_events(), datatypes.TriggerEventType)
-    
-    Named parameters:
-    =================
-    times: either None, or a python quantity array with time units
-    
-        When "times" is None (the default) the function calls detect_trigger_events() 
-        on the analogsignal specified by analog_index in src, to detect trigger 
-        events. The specified analogsignal must therefore contain trigger waveforms 
-        (typically, rectangular pulses).
-        
-        Otherwise, the values in the "times" array will be used to define the 
-        trigger events.
-        
-    label: common prefix for the individual trigger event label in the event array
-            (see also detect_trigger_events())
-    
-    name: name for the trigger event array 
-            (see also detect_trigger_events())
-    
-    use_lo_hi: boolean, (default is True);  
-        when True, use the rising transition to detect the event time 
-            (see also detect_trigger_events())
-        
-    time_slice: pq.Quantity tuple (t_start, t_stop) or None.
-        When detecting events (see below) the time_slice can specify which part of  
-        a signal can be used for automatic event detection.
-        
-        When time_slice is None this indicates that the events are to be detected 
-        from the entire signal.
-        
-        The elements need to be Python Quantity objects compatible with the domain
-        of the signal. For AnalogSignal, this is time (usually, pq.s)
-        
-    NOTE: The following parameters are passed directly to embed_trigger_event
-    
-    clearSimilarEvents: boolean, default is True: 
-        When True, existing neo.Event objects with saame time stamps, labels,
-            units and name as those of the parameter "event" will be removed. 
-            In case of TriggerEvent objects the comparison also considers the 
-            event type.
-            
-        NOTE: 2019-03-16 12:06:14
-        When "event" is a TriggerEvent, this will clear ONLY the pre-exising
-        TriggerEvent objects of the same type as "event" 
-        (see datatypes.TriggerEventType for details)
-        
-    clearTriggerEvents: boolean, default is True
-        when True, clear ALL existing TriggerEvent objects
-        
-        NOTE: 2019-03-16 12:06:07
-        to clear ONLY existing TriggerEvent objects with the same type
-            as the "event" (when "event" is also a TriggerEvent) 
-            set clearSimilarEvents to True; see NOTE: 2019-03-16 12:06:14
-    
-    clearAllEvents: boolean, default is False:
-        When True, clear ANY existing event in the segment.
-        
-    Returns:
-    ========
-    The src parameter (a reference)
-    
-    Side effects:
-        Creates and appends TriggerEvent objects to the segments in src
-    """
-    from . import datatypes as dt
-    
-    if isinstance(src, neo.Block):
-        data = src.segments
-        
-    elif isinstance(src, (tuple, list)) and all([isinstance(s, neo.Segment) for s in src]):
-        data = src
-        
-    elif isinstance(src, neo.Segment):
-        data = [src]
-        
-    else:
-        raise TypeError("src expected to be a neo.Block, neo.Segment or a sequence of neo.Segment objects; got %s instead" % type(src).__name__)
-    
-    if isinstance(times, pq.Quantity):
-        if not check_time_units(times):  # event times passed at function call -- no detection is performed
-            raise TypeError("times expected to have time units; it has %s instead" % times.units)
-
-        for segment in data: # construct eventss, store them in segments
-            event = TriggerEvent(times=times, units=times.units,
-                                    event_type=event_type, labels=label, 
-                                    name=name)
-            
-            embed_trigger_event(event, segment,
-                                clearTriggerEvents = clearTriggerEvents,
-                                clearSimilarEvents = clearSimilarEvents,
-                                clearAllEvents = clearAllEvents)
-            
-    elif times is None: #  no event times specified =>
-        # auto-detect trigger events from signal given by analog_index
-        if isinstance(analog_index, str):
-            # signal specified by name
-            analog_index = get_index_of_named_signal(data, analog_index)
-            
-        if isinstance(analog_index, (tuple, list)):
-            if all(isinstance(s, (int, str)) for s in analog_index):
-                if len(analog_index) != len(data):
-                    raise TypeError("When a list of int, analog_index must have as many elements as segments in src (%d); instead it has %d" % (len(data), len(analog_index)))
-                
-                for (s, ndx) in zip(data, analog_index):
-                    if isinstance(ndx, str):
-                        sndx = get_index_of_named_signal(s, ndx, silent=True)
-                        
-                    else:
-                        sndx = ndx
-                        
-                    if sndx in range(len(s.analogsignals)):
-                        if isinstance(time_slice, (tuple, list)) \
-                            and all([isinstance(t, pq.Quantity) and check_time_units(t) for t in time_slice]) \
-                                and len(time_slice) == 2:
-                            event = detect_trigger_events(s.analogsignals[sndx].time_slice(time_slice[0], time_slice[1]), 
-                                                        event_type=event_type, 
-                                                        use_lo_hi=use_lo_hi, 
-                                                        label=label, name=name)
-                            
-                        else:
-                            event = detect_trigger_events(s.analogsignals[sndx], 
-                                                        event_type=event_type, 
-                                                        use_lo_hi=use_lo_hi, 
-                                                        label=label, name=name)
-                            
-                        embed_trigger_event(event, s, 
-                                            clearTriggerEvents = clearTriggerEvents,
-                                            clearSimilarEvents = clearSimilarEvents,
-                                            clearAllEvents = clearAllEvents)
-                        
-                    else:
-                        raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (ndx, len(s.analogsignals)))
-
-        elif isinstance(analog_index, int):
-            for s in data:
-                if analog_index in range(len(s.analogsignals)):
-                    if isinstance(time_slice, (tuple, list)) \
-                        and all([isinstance(t, pq.Quantity) and check_time_units(t) for t in time_slice]) \
-                            and len(time_slice) == 2:
-                        event = detect_trigger_events(s.analogsignals[analog_index].time_slice(time_slice[0], time_slice[1]), 
-                                                      event_type=event_type, 
-                                                      use_lo_hi=use_lo_hi, 
-                                                      label=label, name=name)
-                        
-                    else:
-                        event = detect_trigger_events(s.analogsignals[analog_index], 
-                                                      event_type=event_type, 
-                                                      use_lo_hi=use_lo_hi, 
-                                                      label=label, name=name)
-                        
-                    embed_trigger_event(event, s, 
-                                        clearTriggerEvents = clearTriggerEvents,
-                                        clearSimilarEvents = clearSimilarEvents,
-                                        clearAllEvents = clearAllEvents)
-                    
-                else:
-                    raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (analog_index, len(s.analogsignals)))
-                
-        else:
-            raise RuntimeError("Invalid signal index %s" % str(analog_index))
-
-    else:
-        raise TypeError("times expected to be a python Quantity array with time units, or None")
-                
-                
-    return src
-
-@safeWrapper
-def detect_trigger_events(x, event_type, use_lo_hi=True, label=None, name=None):
-    """Creates a datatypes.TriggerEvent object (array) of specified type.
-    
-    Calls detect_trigger_times(x) to detect the time stamps.
-    
-    Parameters:
-    ===========
-    
-    x: neo.AnalogSsignal
-    
-    event_type: a datatypes.TriggerEventType enum value or datatypes.TriggerEventType name (str)
-    
-    Named parameters:
-    ================
-    use_lo_hi: boolean, optional (default is True): 
-    
-        The datatypes.TriggerEvent objects will be created from low -> high 
-        state transition times when "use_lo_hi" is True, otherwise from the 
-        high -> low state transition times.
-            
-    label: str, optional (default None): the labels for the events in the 
-        datatypes.TriggerEvent array
-    
-    name: str, optional (default  None): the name of the generated 
-        datatypes.TriggerEvent array
-    
-    Returns:
-    ========
-    
-    A datatypes.TriggerEvent object (essentially an array of time stamps)
-    
-    """
-    if not isinstance(x, (neo.AnalogSignal, DataSignal, np.ndarray)):
-        raise TypeError("Expecting a neo.AnalogSignal, or a datatypes.DataSignal, or a np.ndarray as first parameter; got %s instead" % type(x).__name__)
-    
-    if isinstance(event_type, str):
-        if event_type in list(TriggerEventType.__members__.keys()):
-            event_type = TriggerEventType[event_type]
-            
-        else:
-            raise (ValueError("unknown trigger event type: %s; expecting one of %s" % event_type, " ".join(list([TriggerEventType.__members__.keys()]))))
-        
-    elif not isinstance(event_type, TriggerEventType):
-        raise TypeError("'event_type' expected to be a datatypes.TriggerEventType enum value, or a str in datatypes.TriggerEventType enum; got %s instead" % type(event_type).__name__)
-
-    if label is not None and not isinstance(label, str):
-        raise TypeError("'label' parameter expected to be a str or None; got %s instead" % type(label).__name__)
-    
-    if name is not None and not isinstance(name, str):
-        raise TypeError("'name' parameter expected to be a str or None; got %s instead" % type(name).__name__)
-    
-    if not isinstance(use_lo_hi, bool):
-        raise TypeError("'use_lo_hi' parameter expected to be a boolean; got %s instead" % type(use_lo_hi).__name__)
-    
-    [lo_hi, hi_lo] = detect_trigger_times(x)
-    
-    if use_lo_hi:
-        times = lo_hi
-        
-    else:
-        times = hi_lo
-        
-    trig = TriggerEvent(times=times, units=x.times.units, event_type=event_type, labels=label, name=name)
-    
-    if name is None:
-        if label is not None:
-            trig.name = "%d%s" % (trig.times.size, label)
-            
-        else:
-            if np.all(trig.labels == trig.labels[0]):
-                trig.name = "%d%s" % (trig.times.size, label)
-                
-            else:
-                trig.name = "%dtriggers" % trig.times.size
-                
-    
-    return trig
-    
-    
-@safeWrapper
-def detect_trigger_times(x):
-    """Detect and returns the time stamps of rectangular pulse waveforms in a neo.AnalogSignal
-    
-    The signal must undergo at least one transition between two distinct states 
-    ("low" and "high").
-    
-    The function is useful in detecting the ACTUAL time of a trigger (be it 
-    "emulated" in the ADC command current/voltage or in the digital output "DIG") 
-    when this differs from what was intended in the protocol (e.g. in Clampex)
-    """
-    from scipy import cluster
-    from scipy import signal
-    
-    #flt = signal.firwin()
-    
-    if not isinstance(x, neo.AnalogSignal):
-        raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % type(x).__name__)
-    
-    # WARNING: algorithm fails for noisy signls with no TTL waveform!
-    cbook, dist = cluster.vq.kmeans(x, 2)
-    
-    #print("code_book: ", cbook)
-    
-    #print("sorted code book: ", sorted(cbook))
-    
-    code, cdist = cluster.vq.vq(x, sorted(cbook))
-    
-    diffcode = np.diff(code)
-    
-    ndx_lo_hi = np.where(diffcode ==  1)[0].flatten() # transitions from low to high
-    ndx_hi_lo = np.where(diffcode == -1)[0].flatten() # hi -> lo transitions
-    
-    if ndx_lo_hi.size:
-        times_lo_hi = [x.times[k] for k in ndx_lo_hi]
-        
-    else:
-        times_lo_hi = None
-        
-    if ndx_hi_lo.size:
-        times_hi_lo = [x.times[k] for k in ndx_hi_lo]
-        
-    else:
-        times_hi_lo = None
-        
-    return times_lo_hi, times_hi_lo
-
-
-def remove_trigger_protocol(protocol, block):
-    """Removes embedded trigger events associated with a specified trigger protocol
-    """
-    if not isinstance(protocol, TriggerProtocol):
-        raise TypeError("'protocol' expected to be a TriggerProtocol; got %s instead" % type(protocol).__name__)
-    
-    if not isinstance(block, neo.Block):
-        raise TypeError("'block' was expected to be a neo.Block; got % instead" % type(block).__name__)
-    
-    if len(protocol.segmentIndices()) > 0:
-        protocol_segments = protocol.segmentIndices()
-        
-    else:
-        protocol_segments = range(len(block.segments))
-        
-    for k in protocol_segments:
-        if k >= len(block.segments):
-            warnings.warn("skipping segment index %d of protocol %s because it points outside the list of segments with %d elements" % (k, protocol.name, len(block.segments)), 
-                          RuntimeWarning)
-            continue
-        
-        if k < 0:
-            warnings.warn("skipping negative segment index %d in protocol %s" % (k, protocol.name), RuntimeWarning)
-            continue
-        
-        for event in protocol.events:
-            remove_events(event, block.segments[k])
-        
-        block.segments[k].annotations.pop("trigger_protocol", None)
-                
-def modify_trigger_protocol(protocol, block):
-    """
-    Uses the events in the protocol to add TriggerEvents or modify exiting ones,
-    in the segment indices specified by this protocol's segment indices.
-    """
-    if not isinstance(protocol, TriggerProtocol):
-        raise TypeError("'value' expected to be a TriggerProtocol; got %s instead" % type(value).__name__)
-    
-    if not isinstance(block, neo.Block):
-        raise TypeError("'block' was expected to be a neo.Block; got % instead" % type(block).__name__)
-    
-    if len(protocol.segmentIndices()) > 0:
-        protocol_segments = protocol.segmentIndices()
-        
-    else:
-        protocol_segments = range(len(block.segments))
-        
-    for k in protocol_segments:
-        if k >= len(block.segments):
-            warnings.warn("skipping segment index %d of protocol %s because it points outside the list of segments with %d elements" % (k, protocol.name, len(block.segments)), 
-                          RuntimeWarning)
-            continue
-        
-        if k < 0:
-            warnings.warn("skipping negative segment index %d in protocol %s" % (k, protocol.name), RuntimeWarning)
-            continue
-        
-        # check if the segment has any events of the type found in the protocol
-        # remove them and add the protocol's events instead
-        # NOTE: ONE segment -- ONE protocol at all times.
-        if isinstance(protocol.presynaptic, TriggerEvent) and protocol.presynaptic.event_type == TriggerEventType.presynaptic:
-            presynaptic_events = [e for e in block.segments[k].events if isinstance(e, TriggerEvent) and e.event_type == TriggerEventType.presynaptic]
-            
-            for event in presynaptic_events:
-                # should contain AT MOST ONE event object
-                block.segments[k].events.remove(event)
-                
-            block.segments[k].events.append(protocol.presynaptic)
-                
-        if isinstance(protocol.postsynaptic, TriggerEvent) and protocol.postsynaptic.event_type == TriggerEventType.postsynaptic:
-            postsynaptic_events = [e for e in block.segments[k].events if isinstance(e, TriggerEvent) and e.event_type == TriggerEventType.postsynaptic]
-            
-            for event in postsynaptic_events:
-                block.segments[k].events.remove(event)
-                
-            block.segments[k].events.append(protocol.postsynaptic)
-            
-            
-        if isinstance(protocol.photostimulation, TriggerEvent) and protocol.photostimulation.event_type == TriggerEventType.photostimulation:
-            photostimulation_events = [e for e in block.segments[k].events if isinstance(e, TriggerEvent) and e.event_type == TriggerEventType.photostimulation]
-            
-            for event in photostimulation_events:
-                block.segments[k].events.remove(event)
-                
-            block.segments[k].event.append(protocol.photostimulation)
-            
-        if len(protocol.acquisition):
-            for event in protocol.acquisition:
-                existing_events = [e for e in block.segments[k].events if isinstance(e, TriggerEvent) and e.event_type == event.event_type]
-                
-                for e in existing_events:
-                    block.segments[k].events.remove(e)
-                    
-                block.segments[k].events.append(event)
-                
-        if isinstance(protocol.name, str) and len(protocol.name.strip()) > 0:
-            pr_name = protocol.name
-            
-        else:
-            pr_name = "unnamed_protocol"
-            
-        block.segments[k].annotations["trigger_protocol"] = pr_name
-
-
-def embed_trigger_event(event, segment, clearSimilarEvents=True, clearTriggerEvents=True, clearAllEvents=False):
-    """
-    Embeds the neo.Event object event in the neo.Segment object segment.
-    
-    In the segment's events list, the event is stored by reference.
-    
-    WARNING: one could easily append events with identical time stamps!
-        While this is NOT recommended, it cannot be easily prevented.
-        
-        To add time stamps to a TriggerEvent, create a new TriggerEvent object
-        by calling use TriggerEvent.append_times() or TriggerEvent.merge() then 
-        embed it here.
-        
-        To add time stamps to a generic neo.Event, create a new Event by calling
-        Event.merge() then embed it here.
-        
-        To remove time stamps ise numpy array indecing on the event.
-        
-        See datatypes.TriggerEvent for details.
-    
-    Parameters:
-    ===========
-    
-    event: a neo.Event, or a datatypes.TriggerEvent
-    
-    segment: a neo.Segment
-    
-    Named parameters:
-    ===================
-    
-    clearSimilarEvents: boolean, default is True: 
-        When True, existing neo.Event objects with saame time stamps, labels,
-            units and name as those of the parameter "event" will be removed. 
-            In case of TriggerEvent objects the comparison also considers the 
-            event type.
-            
-        NOTE: 2019-03-16 12:06:14
-        When "event" is a TriggerEvent, this will clear ONLY the pre-exising
-        TriggerEvent objects of the same type as "event" 
-        (see datatypes.TriggerEventType for details)
-        
-    clearTriggerEvents: boolean, default is True
-        when True, clear ALL existing TriggerEvent objects
-        
-        NOTE: 2019-03-16 12:06:07
-        to clear ONLY existing TriggerEvent objects with the same type
-            as the "event" (when "event" is also a TriggerEvent) 
-            set clearSimilarEvents to True; see NOTE: 2019-03-16 12:06:14
-    
-    clearAllEvents: boolean, default is False:
-        When True, clear ANY existing event in the segment.
-        
-    Returns:
-    =======
-    A reference to the segment.
-    
-    """
-    if not isinstance(event, (neo.Event, TriggerEvent)):
-        raise TypeError("event expected to be a neo.Event; got %s instead" % type(event).__name__)
-    
-    if not isinstance(segment, neo.Segment):
-        raise TypeError("segment expected to be a neo.Segment; got %s instead" % type(segment).__name__)
-    
-    if clearAllEvents:
-        segment.events.clear()
-        
-    else:
-        all_events_ndx = range(len(segment.events))
-        evs = []
-    
-        if clearSimilarEvents:
-            evs = [(k,e) for (k,e) in enumerate(segment.events) if is_same_as(event, e)]
-            
-        elif clearTriggerEvents:
-            evs = [(k,e) for (k,e) in enumerate(segment.events) if isinstance(e, TriggerEvent)]
-            
-        if len(evs):
-            (evndx, events) = zip(*evs)
-            
-            keep_events = [segment.events[k] for k in all_events_ndx if k not in evndx]
-            
-            segment.events[:] = keep_events
-            
-    segment.events.append(event)
-    
-    return segment
-            
-        
-@safeWrapper
-def embed_trigger_protocol(protocol, target, useProtocolSegments=True, clearTriggers=True, clearEvents=False):
-    """ Embeds TriggerEvent objects found in the TriggerProtocol 'protocol', 
-    in the segments of 'target'.
-    
-    Inside the target, trigger event objects are stored by reference!
-    
-    Parameters:
-    ==========
-    protocol: a dataypes.TriggerProtocol object
-    
-    target: a neo.Block, neo.Segment or a sequence of neo.Segment objects
-    
-    Keyword parameters:
-    ==================
-    
-    useProtocolSegments: boolean, default True: use the segments indices given by the protocol
-        to embed only in those segments in the "target"
-        
-        when False, "target" is expected to be a sequence of neo.Segments as long as
-        the protocol's segmentIndices
-        
-        this is ignored when "target" is a neo.Block or a neo.Segment
-    
-    clearTriggers: boolean, default True; when True, existing TriggerEvent obects will be removed
-    
-    clearEvents: boolean, default False; when True, clear _ALL_ existing neo.Event objects
-        (including TriggerEvents!)
-    
-    CAUTION: This will wipe out existing trigger events in those segments
-    indicated by the 'segmentIndices' attribute of 'protocol'.
-    """
-    # check if there are synaptic events already in the scans data target:
-    # each segment can hold at most one TriggerEvent object of each 
-    # type (pre-, post-, photo-);
-    # NOTE: a TriggerEvent actually holds an ARRAY of time points
-    
-    if not isinstance(protocol, TriggerProtocol):
-        raise TypeError("'protocol' expected to be a TriggerProtocol; got %s instead" % type(protocol).__name__)
-    
-    if not isinstance(target, (neo.Block, neo.Segment)):
-        raise TypeError("'target' was expected to be a neo.Block or neo.Segment; got %s instead" % type(target).__name__)
-    
-    if isinstance(target, neo.Block):
-        segments = target.segments
-        
-        if len(protocol.segmentIndices()) > 0:
-            value_segments = [i for i in protocol.segmentIndices() if i in range(len(segments))]
-            value_segments = protocol.segmentIndices()
-            
-        else:
-            value_segments = range(len(segments))
-            
-        if len(value_segments) == 0:
-            warnings.warn("No suitable segment index found in protocol %s with %s, given %d segments in for %s %s" % (protocol.name, protocol.segmentIndices(), len(segments), type(target).__name__, target.name))
-            return
-        
-        
-    elif isinstance(target, (tuple, list)) and all([isinstance(s, neo.Segment) for s in target]):
-        segments = target
-        if not useProtocolSegments:
-            if len(segments) != len(protocol.segmentIndices):
-                raise ValueError("useProtocolSegments is False, but target has %d segments whereas protocol indicates %d segments" % (len(segments), len(protocol.segmentIndices())))
-            
-            value_segments = range(len(segments))
-            
-        else:
-            # the list of segments 
-            if len(protocol.segmentIndices()) > 0:
-                value_segments = [i for i in protocol.segmentIndices() if i in range(len(segments))]
-                value_segments = protocol.segmentIndices()
-                
-            else:
-                value_segments = range(len(segments))
-            
-        if len(value_segments) == 0:
-            warnings.warn("No suitable segment index found in protocol %s with %s, given %d segments in for %s %s" % (protocol.name, protocol.segmentIndices(), len(segments), type(target).__name__, target.name))
-            return
-        
-    elif isinstance(target, neo.Segment):
-        segments = [target]
-        value_segments = [0]
-    
-    if len(value_segments) == 0:
-        warnings.warn("No suitable segment index found in protocol %s with %s, given %d segments in for %s %s" % (protocol.name, protocol.segmentIndices(), len(segments), type(target).__name__, target.name))
-        return
-        
-    #print("embed_trigger_protocol: value_segments ", value_segments, " target segments: %d" % len(target.segments))
-        
-    for k in value_segments: 
-        if clearTriggers:
-            trigs = [(evndx, ev) for (evndx, ev) in enumerate(segments[k].events) if isinstance(ev, TriggerEvent)]
-
-            if len(trigs): # TriggerEvent objects found in segment
-                (trigndx, trigevs) = zip(*trigs)
-                
-                all_events_ndx = range(len(segments[k].events))
-                
-                keep_events = [segments[k].events[i] for i in all_events_ndx if i not in trigndx]
-                
-                segments[k].events[:] = keep_events
-                
-        elif clearEvents:
-            segments[k].events.clear()
-            
-        # now go and append events contained in protocol
-        
-        #print("embed_trigger_protocol: in %s (segment %d): protocol.name %s; acquisition: %s" % (target.name, k, protocol.name, protocol.acquisition))
-        
-        if isinstance(protocol.acquisition, (tuple, list)) and len(protocol.acquisition):
-            # for old API
-            segments[k].events.append(protocol.acquisition[0]) # only ONE acquisition event per protocol!
-                
-        elif isinstance(protocol.acquisition, TriggerEvent):
-            segments[k].events.append(protocol.acquisition)
-                
-        if protocol.presynaptic is not None:
-                segments[k].events.append(protocol.presynaptic)
-            
-        if protocol.postsynaptic is not None:
-                segments[k].events.append(protocol.postsynaptic)
-            
-        if protocol.photostimulation is not None:
-                segments[k].events.append(protocol.photostimulation)
-                                
-        if isinstance(protocol.name, str) and len(protocol.name.strip()) > 0:
-            pr_name = protocol.name
-            segments[k].name = protocol.name
-            
-        else:
-            pr_name = "unnamed_protocol"
-            
-        segments[k].annotations["trigger_protocol"] = pr_name
-
-
-@safeWrapper
-def parse_trigger_protocols(src):
-    """Constructs a list of TriggerProtocol objects using embeded TriggerEvent objects.
-    
-    "src" may be a neo.Segment, or a neo.Block (see below).
-    
-    Parameters:
-    ==========
-    "src" can be a neo.Block with a non-empty segments list, or 
-        a list of neo.Segments, or just a neo.Segment
-        
-    Returns:
-    =======
-    A list of protocols
-    src
-        
-    ATTENTION: this constructs TriggerProtocol objects with default names.
-    Usually this is NOT what you want !!!
-    
-    Individual TriggerEvent objects can be manually appended to the events 
-        list of each neo.Segment.
-    
-    Alternatively, the function detect_trigger_times() in "ephys" module can 
-    help generate TriggerEvent objects from particular neo.AnalogSignal arrays
-    containing recorded trigger-like data (with transitions between a low and 
-    a high state, e.g. rectangular pulses, or step functions).
-    
-    Returns an empty list if no trigger events were found.
-    
-    NOTE: each segment in "src" can have at most ONE protocol
-    
-    NOTE: each protocol can have at most one event for each event type in 
-        presynaptic, postsynaptic, and photostimulation
-    
-    NOTE: each event object CAN contain more than one time stamp  (i.e. a 
-        pq.Quantity array -- which in fact derives from np.ndarray)
-    
-    NOTE: several segments CAN have the same protocol!
-    
-    Once generated, the TriggerProtocol objects should be stored somewhere, for 
-    example in the "annotations" dictoinary of the block or segment so that they
-    won't have to be recreated (especially when their names/event time stamps
-    will have been customized at later stages)
-    
-    CAUTION: The TriggerEvent objects in the protocols are COPIES of those found
-        in "src". This means that any permissible modification brought to the 
-        events in the TriggerProtocol is NOT reflected in the events of the source
-        "src".
-        
-        To enable this, call embed_trigger_protocol() by using:
-            each protocol in the result list
-            "src" as target
-            clearTriggers parameter set to True
-    
-        NOTE: Permissible modifications to TriggerEvents are changes to their 
-            labels, names, and units. These will be reflected in the embedded
-            events when they are stored by reference.
-        
-            Event time stamps can only be changed by creating an new TriggerEvent.
-            To reflect time stamp changes in the "src" events, call remove_events()
-            then embed_trigger_event() for the particular event and neo.Segment 
-            in "src".
-            
-        
-    """
-    def __compose_protocol__(events, protocol_list, index = None):
-        """
-        events: a list of TriggerEvent objects
-        
-        protocol: TriggerProtocol or None (default); 
-            when a trigger protocol, just update it (especially the segment indices)
-            else: create a new TriggerProtocol
-            
-        segment_index: int or None (default): index of segment in the collection; will
-            be appended to the protocol's segment indices
-            
-            When None the protocol's segment indices will not be changed
-        
-        """
-        pr_names = []
-        pr_first = []
-            
-        imaq_names = []
-        imaq_first = []
-        
-        protocol = TriggerProtocol() # name = protocol_name)
-        
-        for e in events:
-            if e.event_type == TriggerEventType.presynaptic:
-                if protocol.presynaptic is None:
-                    protocol.presynaptic = e
-                    
-                    pr_names.append(e.name)
-                    pr_first.append(e.times.flatten()[0])
-                    
-                else:
-                    warnings.warn("skipping presynaptic event array %s as protocol %s has already got one (%s)" % (e, protocol.name, protocol.presynaptic))
-                    
-            elif e.event_type == TriggerEventType.postsynaptic:
-                if protocol.postsynaptic is None:
-                    protocol.postsynaptic = e
-
-                    pr_names.append(e.name)
-                    pr_first.append(e.times.flatten()[0])
-                        
-                    
-                else:
-                    warnings.warn("skipping postsynaptic event array %s as protocol %s has already got one (%s)" % (e, protocol.name, protocol.postsynaptic))
-                    
-            elif e.event_type == TriggerEventType.photostimulation:
-                if protocol.photostimulation is None:
-                    protocol.photostimulation = e
-
-                    pr_names.append(e.name)
-                    pr_first.append(e.times.flatten()[0])
-                    
-                else:
-                    warnings.warn("skipping photostimulation event array %s as protocol %s has already got one (%s)" % (e, protocol.name, protocol.photostimulation))
-                    
-            elif e.event_type & TriggerEventType.acquisition:
-                # NOTE: only ONE acquisition trigger event per segment!
-                if isinstance(protocol.acquisition, (tuple, list)) and len(protocol.acquisition) == 0: # or e not in protocol.acquisition:
-                    protocol.acquisition[:] = [e]
-                    
-                else:
-                    protocol.acquisition = e
-
-                imaq_names.append(e.name)
-                imaq_first.append(e.times.flatten()[0])
-                
-                if e.event_type == TriggerEventType.imaging_frame:
-                    protocol.imagingDelay = e.times.flatten()[0]
-                
-        # NOTE 2017-12-16 10:08:20 DISCARD empty protocols
-        if len(protocol) > 0: 
-            # assign names differently if only imaging events are present
-            if len(pr_first) > 0 and len(pr_first) == len(pr_names):
-                plist = [(k, t,name) for k, (t, name) in enumerate(zip(pr_first, pr_names))]
-                
-                plist.sort()
-                
-                pr_names = [name_ for k, p, name_ in plist]
-                
-            elif len(imaq_names) > 0 and len(imaq_first) == len(imaq_names):
-                plist = [(k,t,name) for k, (t,name) in enumerate(zip(imaq_first, imaq_names))]
-                plist.sort()
-                
-                pr_names = [name_ for k, p, name_ in plist]
-                    
-            protocol.name = " ".join(pr_names)
-            
-            if isinstance(index, int):
-                protocol.__segment_index__ = [index]
-            
-            if len(protocol_list) == 0:
-                protocol_list.append(protocol)
-                
-            else:
-                pp = [p_ for p_ in protocol_list if p_.hasSameEvents(protocol) and p_.imagingDelay == protocol.imagingDelay]
-                
-                if len(pp):
-                    for p_ in pp:
-                        p_.updateSegmentIndex(protocol.segmentIndices())
-                        
-                else:
-                    protocol_list.append(protocol)
-        
-    protocols = list()
-    
-    if isinstance(src, neo.Block):
-        # NOTE: 2019-03-14 22:01:20
-        # trigs is a sequence of tuples: (index, sequence of TriggerEvent objects)
-        # segments without events are skipped
-        # segment events that are NOT TriggerEvent objects are skipped
-        trigs = [ (k, [e for e in s.events if isinstance(e, TriggerEvent)]) \
-                        for k,s in enumerate(src.segments) if len(s.events)]
-        
-        if len(trigs) == 0:
-            return protocols, src
-        
-        for (index, events) in trigs:
-            __compose_protocol__(events, protocols, index=index)
-            
-        if len(protocols):
-            for p in protocols:
-                for s in p.segmentIndices():
-                    src.segments[s].annotations["trigger_protocol"] = p.name
-        
-    elif isinstance(src, neo.Segment):
-        trigs = [e for e in src.events if isinstance(e, TriggerEvent)]
-        
-        if len(trigs) == 0:
-            return protocols, src
-        
-        __compose_protocol__(trigs, protocols, index=0)
-        
-        if len(protocols):
-            src.annotations["trigger_protocol"] = protocols[0].name
-                
-    elif isinstance(src, (tuple, list) and all([isinstance(v, neo.Segment) for v in src])):
-        trigs = [ (k, [e for e in s.events if isinstance(e, TriggerEvent)]) \
-                        for k,s in enumerate(src) if len(s.events)]
-        
-        if len(trigs) == 0:
-            return protocols, src
-        
-        for (index, events) in trigs:
-            __compose_protocol__(events, protocols, index)
-            
-        if len(protocols):
-            for p in protocols:
-                for f in p.segmentIndices():
-                    src[f].annotations["trigger_protocol"] = p.name
-                
-    else:
-        raise TypeError("src expected to be a neo.Block, neo.Segment, or a sequence of neo.Segment objects; got %s instead" % type(src).__name__)
-            
-    return protocols, src
-
-def auto_detect_trigger_protocols(data: neo.Block, 
-                               presynaptic:tuple=(), 
-                               postsynaptic:tuple=(),
-                               photostimulation:tuple=(),
-                               imaging:tuple=(),
-                               clear:bool=False):
-    
-    """Determines the set of trigger protocols in a neo.Block by searching for 
-    trigger waveforms in the analogsignals contained in data.
-    
-    Time stamps of the detected trigger protocols will then be used to construct
-    TriggerEvent objects according to which of the keyword parameters below
-    have been specified.
-    
-    Positional parameters:
-    =====================
-    
-    data:   a neo.Block object
-            
-    Named parameters:
-    =================
-    
-    presynaptic, postsynaptic, photostimulation, imaging:
-    
-        each is a tuple with 0 (default), two or three elements that specify 
-        parameters for the detection of pre-, post-synaptic, photo-stimulation
-        or imaging (trigger) event types, respectively.
-        
-        First element (int): the index of the analog signal in the electrophysiology 
-            block segments, containing the trigger signal (usually a square pulse, 
-            or a train of square pulses)
-        
-        Second element (str): a label to be assigned to the detected event
-        
-        Third (optional) element:  a tuple of two python Quantity objects defining
-            a time slice within the signal, used for the detection of the events.
-            
-            This is recommended in case the trigger signal contains other 
-            waveforms in addition to the trigger waveform.
-            In this case, the trigger waveform will be searched/analysed within
-            the signal regions between these two time points (right-open interval).
-            
-        When empty, no events of the corresponding type will be constructed.
-        
-    clear: bool (default False)
-        When False (default), detected event arrays will be appended.
-        
-        When True, old events will be cleared from data.electrophysiology
-        
-    Returns:
-    =======
-    A list of trigger protocols
-        
-    """
-    if not isinstance(data, neo.Block):
-        raise TypeError("Expecting a neo.Block; got %s instead" % type(data).__name__)
-    
-    
-    if not isinstance(clear, bool):
-        raise TypeError("clear parameter expected to be a boolean; got %s instead" % type(clear).__name__)
-        
-    target = data
-    #print("auto_detect_trigger_protocols: presynaptic", presynaptic)
-    #print("auto_detect_trigger_protocols: postsynaptic", postsynaptic)
-    #print("auto_detect_trigger_protocols: photostimulation", photostimulation)
-    #print("auto_detect_trigger_protocols: imaging", imaging)
-        
-    if clear:
-        clear_events(target)
-    
-    # NOTE: 2019-03-14 21:43:21
-    # depending on the length of the keword parameters (see the docstring)
-    # we detect events in the whole signal or we limit detetion to a defined 
-    # time-slice of the signal
-    
-    if len(presynaptic) == 2:
-        auto_define_trigger_events(target, presynaptic[0], "presynaptic", label=presynaptic[1])
-        
-    elif len(presynaptic) == 3:
-        auto_define_trigger_events(target, presynaptic[0], "presynaptic", label=presynaptic[1], time_slice = presynaptic[2])
-        
-    if len(postsynaptic) == 2:
-        auto_define_trigger_events(target, postsynaptic[0], "postsynaptic", label = postsynaptic[1])
-        
-    elif len(postsynaptic) == 3:
-        auto_define_trigger_events(target, postsynaptic[0], "postsynaptic", label = postsynaptic[1], time_slice = postsynaptic[2])
-        
-    if len(photostimulation) == 2:
-        auto_define_trigger_events(target, photostimulation[0], "photostimulation", label=photostimulation[1])
-        
-    elif len(photostimulation) == 3:
-        auto_define_trigger_events(target, photostimulation[0], "photostimulation", label=photostimulation[1], time_slice = photostimulation[2])
-        
-    if len(imaging) == 2:
-        auto_define_trigger_events(target, imaging[0], "frame", label = imaging[1])
-        
-    elif len(imaging) == 3:
-        auto_define_trigger_events(target, imaging[0], "frame", label = imaging[1], time_slice = imaging[2])
-        
-    tp, _ = parse_trigger_protocols(target)
-    
-    return tp
-
-        
-
-@safeWrapper
-def auto_define_trigger_events(src, analog_index, event_type, 
-                               times=None, label=None, name=None, 
-                               use_lo_hi=True, time_slice=None, 
-                               clearSimilarEvents=True, clearTriggerEvents=True, 
-                               clearAllEvents=False):
-    """Populates the events lists for the segments in src with TriggerEvent objects.
-    
-    Searches for trigger waveforms in signals specified by analog_index, to define
-    TriggerEvent objects.
-    
-    A TriggerEvent is an array of time values and will be added to the events list
-    of the neo.Segment objects in src.
-    
-    Calls detect_trigger_events()
-    
-    Parameters:
-    ===========
-    
-    src: a neo.Block, a neo.Segment, or a list of neo.Segment objects
-    
-    analog_index:   specified which signal to use for event detection; can be one of:
-    
-                    int (index of the signal array in the data analogsignals)
-                        assumes that _ALL_ segments in "src" have the desired analogsignal
-                        at the same position in the analogsignals array
-    
-                    str (name of the analogsignal to use for detection) -- must
-                        resolve to a valid analogsignal index in _ALL_ segments in 
-                        "src"
-                    
-                    a sequence of int (index of the signal), one per segment in src 
-
-    event_type: a str that specifies the type of trigger event e.g.:
-                'acquisition',
-                'frame'
-                'imaging',
-                'imaging_frame',
-                'imaging_line',
-                'line'
-                'photostimulation',
-                'postsynaptic',
-                'presynaptic',
-                'sweep',
-                'user'
-                
-            or a valid datatypes.TriggerEventType enum type, e.g. TriggerEventType.presynaptic
-    
-    (see detect_trigger_events(), datatypes.TriggerEventType)
-    
-    Named parameters:
-    =================
-    times: either None, or a python quantity array with time units
-    
-        When "times" is None (the default) the function calls detect_trigger_events() 
-        on the analogsignal specified by analog_index in src, to detect trigger 
-        events. The specified analogsignal must therefore contain trigger waveforms 
-        (typically, rectangular pulses).
-        
-        Otherwise, the values in the "times" array will be used to define the 
-        trigger events.
-        
-    label: common prefix for the individual trigger event label in the event array
-            (see also detect_trigger_events())
-    
-    name: name for the trigger event array 
-            (see also detect_trigger_events())
-    
-    use_lo_hi: boolean, (default is True);  
-        when True, use the rising transition to detect the event time 
-            (see also detect_trigger_events())
-        
-    time_slice: pq.Quantity tuple (t_start, t_stop) or None.
-        When detecting events (see below) the time_slice can specify which part of  
-        a signal can be used for automatic event detection.
-        
-        When time_slice is None this indicates that the events are to be detected 
-        from the entire signal.
-        
-        The elements need to be Python Quantity objects compatible with the domain
-        of the signal. For AnalogSignal, this is time (usually, pq.s)
-        
-    NOTE: The following parameters are passed directly to embed_trigger_event
-    
-    clearSimilarEvents: boolean, default is True: 
-        When True, existing neo.Event objects with saame time stamps, labels,
-            units and name as those of the parameter "event" will be removed. 
-            In case of TriggerEvent objects the comparison also considers the 
-            event type.
-            
-        NOTE: 2019-03-16 12:06:14
-        When "event" is a TriggerEvent, this will clear ONLY the pre-exising
-        TriggerEvent objects of the same type as "event" 
-        (see datatypes.TriggerEventType for details)
-        
-    clearTriggerEvents: boolean, default is True
-        when True, clear ALL existing TriggerEvent objects
-        
-        NOTE: 2019-03-16 12:06:07
-        to clear ONLY existing TriggerEvent objects with the same type
-            as the "event" (when "event" is also a TriggerEvent) 
-            set clearSimilarEvents to True; see NOTE: 2019-03-16 12:06:14
-    
-    clearAllEvents: boolean, default is False:
-        When True, clear ANY existing event in the segment.
-        
-    Returns:
-    ========
-    The src parameter (a reference)
-    
-    Side effects:
-        Creates and appends TriggerEvent objects to the segments in src
-    """
-    if isinstance(src, neo.Block):
-        data = src.segments
-        
-    elif isinstance(src, (tuple, list)) and all([isinstance(s, neo.Segment) for s in src]):
-        data = src
-        
-    elif isinstance(src, neo.Segment):
-        data = [src]
-        
-    else:
-        raise TypeError("src expected to be a neo.Block, neo.Segment or a sequence of neo.Segment objects; got %s instead" % type(src).__name__)
-    
-    if isinstance(times, pq.Quantity):
-        if not check_time_units(times):  # event times passed at function call -- no detection is performed
-            raise TypeError("times expected to have time units; it has %s instead" % times.units)
-
-        for segment in data: # construct eventss, store them in segments
-            event = TriggerEvent(times=times, units=times.units,
-                                    event_type=event_type, labels=label, 
-                                    name=name)
-            
-            embed_trigger_event(event, segment,
-                                clearTriggerEvents = clearTriggerEvents,
-                                clearSimilarEvents = clearSimilarEvents,
-                                clearAllEvents = clearAllEvents)
-            
-    elif times is None: #  no event times specified =>
-        # auto-detect trigger events from signal given by analog_index
-        if isinstance(analog_index, str):
-            # signal specified by name
-            analog_index = get_index_of_named_signal(data, analog_index)
-            
-        if isinstance(analog_index, (tuple, list)):
-            if all(isinstance(s, (int, str)) for s in analog_index):
-                if len(analog_index) != len(data):
-                    raise TypeError("When a list of int, analog_index must have as many elements as segments in src (%d); instead it has %d" % (len(data), len(analog_index)))
-                
-                for (s, ndx) in zip(data, analog_index):
-                    if isinstance(ndx, str):
-                        sndx = get_index_of_named_signal(s, ndx, silent=True)
-                        
-                    else:
-                        sndx = ndx
-                        
-                    if sndx in range(len(s.analogsignals)):
-                        if isinstance(time_slice, (tuple, list)) \
-                            and all([isinstance(t, pq.Quantity) and check_time_units(t) for t in time_slice]) \
-                                and len(time_slice) == 2:
-                            # NOTE: 2020-11-29 20:51:12:
-                            # because these are RELATIVE to the signal_start!
-                            if time_slice[0] < s.analogsignals[sndx].t_start:
-                                tslice = [t + s.analogsignals[analog_index].t_start for t in time_slice]
-                            else:
-                                tslice = [t for t in time_slice]
-                                
-                            event = detect_trigger_events(s.analogsignals[sndx].time_slice(tslice[0], tslice[1]), 
-                                                        event_type=event_type, 
-                                                        use_lo_hi=use_lo_hi, 
-                                                        label=label, name=name)
-                            
-                        else:
-                            event = detect_trigger_events(s.analogsignals[sndx], 
-                                                        event_type=event_type, 
-                                                        use_lo_hi=use_lo_hi, 
-                                                        label=label, name=name)
-                            
-                        embed_trigger_event(event, s, 
-                                            clearTriggerEvents = clearTriggerEvents,
-                                            clearSimilarEvents = clearSimilarEvents,
-                                            clearAllEvents = clearAllEvents)
-                        
-                    else:
-                        raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (ndx, len(s.analogsignals)))
-
-        elif isinstance(analog_index, int):
-            for s in data:
-                if analog_index in range(len(s.analogsignals)):
-                    if isinstance(time_slice, (tuple, list)) \
-                        and all([isinstance(t, pq.Quantity) and check_time_units(t) for t in time_slice]) \
-                            and len(time_slice) == 2:
-                        # NOTE: 2020-11-29 20:51:12:
-                        # because these are RELATIVE to the signal_start!
-                        if time_slice[0] < s.analogsignals[analog_index].t_start:
-                            tslice = [t + s.analogsignals[analog_index].t_start for t in time_slice]
-                            
-                        else:
-                            tslice = [t for t in time_slice]
-                            
-                        event = detect_trigger_events(s.analogsignals[analog_index].time_slice(tslice[0], tslice[1]), 
-                                                      event_type=event_type, 
-                                                      use_lo_hi=use_lo_hi, 
-                                                      label=label, name=name)
-                        
-                    else:
-                        event = detect_trigger_events(s.analogsignals[analog_index], 
-                                                      event_type=event_type, 
-                                                      use_lo_hi=use_lo_hi, 
-                                                      label=label, name=name)
-                        
-                    embed_trigger_event(event, s, 
-                                        clearTriggerEvents = clearTriggerEvents,
-                                        clearSimilarEvents = clearSimilarEvents,
-                                        clearAllEvents = clearAllEvents)
-                    
-                else:
-                    raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (analog_index, len(s.analogsignals)))
-                
-        else:
-            raise RuntimeError("Invalid signal index %s" % str(analog_index))
-
-    else:
-        raise TypeError("times expected to be a python Quantity array with time units, or None")
-                
-                
-    return src

@@ -1,7 +1,16 @@
 Scipyen uses the QtCore.QSettings framework to store various GUI options 
 
-By default, on UN*X, these options are stored using native format saved in the 
-configuration file (the "conf" file):
+I. GUI Options
+===============
+
+These options concern properties of the GUI items in Scipyen (positions and 
+sizes of windows, list of recently opened files, recently visited directories, 
+search filters, etc.). This also includes the scrollbar position in Scipyen's 
+IPython consoles, and the style and color in the internal console (and indirectly
+those of the external IPython consoles).
+
+These options are stored using the Qt5 QSettings framework (via PyQt5) in the 
+configuration file (the "conf" file); on Linux, this is:
     
     $HOME/.config/Scipyen/Scipyen.conf
     
@@ -9,6 +18,32 @@ Although this is an ASCII file it does contain binary (byte) data (serialized Qt
 objects( and therefore it should NOT be modifed in using text editors.
 
 A configuration editor GUI is planned.
+
+II. Non-GUI options
+===================
+
+These options contain default and last-used parameter run-time values for various
+Scipyen non-gui components (e.g. options for ScanData, trigger event detection,
+scandata analysis options, numeric analysis, etc.).
+
+These are stored in YAML files and loaded/saved using python confuse package.
+
+III. IPython configuration options
+==================================
+These options relate specifically to the IPython consoles used in Scipyen and
+are handled using IPython's %config magic, from inside the IPython console.
+
+Thusm, they are independent from the option categories mentioned above.
+
+IV. Jupyter console configuration
+=================================
+These include pygments for code highlighting and styles (e.g. cascading style 
+sheets).
+
+Handles by Jupyter's own configuration system, but GUI options interfere with 
+those.
+
+
 
 In the "conf" file, options are grouped according to the Scipyen's GUI component 
 to which they pertain.
@@ -159,34 +194,6 @@ LineScanSignalFitting
 
                     
 
-TODO:
-        Explicitly specify groups in the QSettings "conf" file
-        Incorporate/merge the INI files (see above) with the QSettings framework 
-        (Scipyen "conf" file)
-            pros: 
-                one config file instead of many different ones
-                once a configuration editor is available, its contents can be
-                    edited in a "safe" way
-                can store serialized Qt objects (e.g. rectangle for window size,
-                    etc)
-            cons: 
-                cannot edit by hand
-                "conf" file will grow in time - is this a problem?
-                not portable
-                no easy way to / cannot store serialized python objects such as
-                python Quantity objects
-                
-            alternatives to explore: JSON files?
-            
-        Using INI files:
-            pros:
-                all plain text files => can be edited by hand (also a disadvantage)
-                portable
-                
-            cons:
-                may grow very large if used for multiple components
-                cannot store python objects such as Quantity objects
-                (all option values are strings)
                 
 
     

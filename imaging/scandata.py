@@ -22,11 +22,26 @@ from core.triggerevent import (TriggerEvent, TriggerEventType,)
 
 from core.triggerprotocols import (TriggerProtocol,
                                    embed_trigger_protocol, 
-                                   embed_trigger_event,)
-from ephys import ephys
+                                   embed_trigger_event,
+                                   parse_trigger_protocols,
+                                   remove_trigger_protocol,)
+
+from core.neoutils import (clear_events, get_index_of_named_signal, neo_copy,)
+from ephys.ephys import (average_segments, )
 
 from imaging.vigrautils import getFrameLayout
 from imaging.axiscalibration import AxisCalibration
+
+DEFAULTS = DataBag()
+DEFAULTS["Name"] = "ScanDataOptions"
+DEFAULTS["Channels"] = DataBag()
+DEFAULTS["Channels"]["Reference"] = "ref"
+DEFAULTS["Channels"]["Indicator"] = "ind"
+DEFAULTS["Channels"]["Bleed"] = DataBag()
+DEFAULTS["Channels"]["Bleed"]["Ref2Ind"] = 0.
+DEFAULTS["Channels"]["Bleed"]["Ind2Ref"] = 0.
+
+
 
 class ScanDataOptions(DataBag):
     def __init__(self, detection_predicate=1.3, roi_width = 10, roi_auto_width=False,
@@ -133,7 +148,9 @@ class ScanDataOptions(DataBag):
         ##ret["Discrimination"]["Peak"] = {"np.linalg.norm":{"axis":None, "ord":None}, "window": 0.05 * pq.s} 
         
         #ret["Discrimination"]["Function"] = {"np.linalg.norm":{"axis":None, "ord":None}}
-        ret["Discrimination"]["Function"] = DataBag({"np.linalg.norm":{"axis":None, "ord":None}})
+        ret["Discrimination"]["Function"] = DataBag({"function":"np.linalg.norm",
+                                                     "args": (),
+                                                     "kwargs": {"axis":None, "ord":None}})
         ret["Discrimination"]["BaseWindow"] = 0.05 * pq.s
         ret["Discrimination"]["PeakWindow"] = 0.05 * pq.s
         ret["Discrimination"]["Discr_2D"] = False
@@ -514,8 +531,8 @@ class AnalysisUnit(object):
                 raise ValueError("unit_type cannot be an empty string and cannot contain only blanks")
             
             if unit_type not in ("unknown", "NA"):
-                self._unit_type_ = strutils.string_to_valid_identifier(unit_type)
-                #self._unit_type_ = strutils.string_to_R_identifier(unit_type)
+                self._unit_type_ = strutils.str2symbol(unit_type)
+                #self._unit_type_ = strutils.str2R(unit_type)
                 
             else:
                 self._unit_type_  = unit_type
@@ -538,8 +555,8 @@ class AnalysisUnit(object):
             self._cell_ = "NA"
         
         elif isinstance(cell, str):
-            self._cell_ = strutils.string_to_valid_identifier(cell)
-            #self._cell_ = strutils.string_to_R_identifier(cell)
+            self._cell_ = strutils.str2symbol(cell)
+            #self._cell_ = strutils.str2R(cell)
             
         else:
             raise TypeError("cell expected to be a str or None; got %s instead" % type(cell).__name__)
@@ -548,8 +565,8 @@ class AnalysisUnit(object):
             self._field_ = "NA"
                 
         elif isinstance(field, str):
-            self._field_ = strutils.string_to_valid_identifier(field)
-            #self._field_ = strutils.string_to_R_identifier(field)
+            self._field_ = strutils.str2symbol(field)
+            #self._field_ = strutils.str2R(field)
             
         else:
             raise TypeError("field expected to be a str or None; got %s instead" % type(field).__name__)
@@ -800,14 +817,14 @@ class AnalysisUnit(object):
                                 (f, self.name, self.parent.name), RuntimeWarning)
                         
                         if self.landmark is None:
-                            signal_index = ephys.get_index_of_named_signal(self.parent.sceneBlock.segments[f], self.name, silent=True)
+                            signal_index = get_index_of_named_signal(self.parent.sceneBlock.segments[f], self.name, silent=True)
                             
                             if signal_index is None:
                                 raise RuntimeError("Analysis unit %s on entire scan data %s does not appear to have been analysed for frame %d" %\
                                     (self.name, self.parent.name, f))
                             
                         else:
-                            signal_index = ephys.get_index_of_named_signal(self.parent.sceneBlock.segments[f], self.landmark.name, silent=True)
+                            signal_index = get_index_of_named_signal(self.parent.sceneBlock.segments[f], self.landmark.name, silent=True)
                         
                             if signal_index is None:
                                 raise RuntimeError("Analysis unit %s on landmark %s in scan data %s does not appear to have been analysed for frame %d" %\
@@ -821,14 +838,14 @@ class AnalysisUnit(object):
                                 (f, self.name, self.parent.name))
                         
                         if self.landmark is None:
-                            signal_index = ephys.get_index_of_named_signal(self.parent.scansBlock.segments[f], self.name, silent=True)
+                            signal_index = get_index_of_named_signal(self.parent.scansBlock.segments[f], self.name, silent=True)
                             
                             if signal_index is None:
                                 raise RuntimeError("Analysis unit %s on entire scan data %s does not appear to have been analysed for frame %d" %\
                                     (self.name, self.parent.name, f))
                             
                         else:
-                            signal_index = ephys.get_index_of_named_signal(self.parent.scansBlock.segments[f], self.landmark.name, silent=True)
+                            signal_index = get_index_of_named_signal(self.parent.scansBlock.segments[f], self.landmark.name, silent=True)
                         
                             if signal_index is None:
                                 raise RuntimeError("Analysis unit %s on landmark %s in scan data %s does not appear to have been analysed for frame %d" %\
@@ -855,14 +872,14 @@ class AnalysisUnit(object):
                             (f, self.name, self.parent.name))
                     
                     if self.landmark is None:
-                        signal_index = ephys.get_index_of_named_signal(self.parent.sceneBlock.segments[f], self.name, silent=True)
+                        signal_index = get_index_of_named_signal(self.parent.sceneBlock.segments[f], self.name, silent=True)
                         
                         if signal_index is None:
                             raise RuntimeError("Analysis unit %s on entire scan data %s does not appear to have been analysed for frame %d" %\
                                 (self.name, self.parent.name, f))
                         
                     else:
-                        signal_index = ephys.get_index_of_named_signal(self.parent.sceneBlock.segments[f], self.landmark.name, silent=True)
+                        signal_index = get_index_of_named_signal(self.parent.sceneBlock.segments[f], self.landmark.name, silent=True)
                     
                         if signal_index is None:
                             raise RuntimeError("Analysis unit %s on landmark %s in scan data %s does not appear to have been analysed for frame %d" %\
@@ -876,14 +893,14 @@ class AnalysisUnit(object):
                             (f, self.name, self.parent.name))
                     
                     if self.landmark is None:
-                        signal_index = ephys.get_index_of_named_signal(self.parent.scansBlock.segments[f], self.name, silent=True)
+                        signal_index = get_index_of_named_signal(self.parent.scansBlock.segments[f], self.name, silent=True)
                         
                         if signal_index is None:
                             raise RuntimeError("Analysis unit %s on entire scan data %s does not appear to have been analysed for frame %d" %\
                                 (self.name, self.parent.name, f))
                         
                     else:
-                        signal_index = ephys.get_index_of_named_signal(self.parent.scansBlock.segments[f], self.landmark.name, silent=True)
+                        signal_index = get_index_of_named_signal(self.parent.scansBlock.segments[f], self.landmark.name, silent=True)
                     
                         if signal_index is None:
                             raise RuntimeError("Analysis unit %s on landmark %s in scan data %s does not appear to have been analysed for frame %d" %\
@@ -1274,8 +1291,8 @@ class AnalysisUnit(object):
                 self._field_ = "NA"
                 
             else:
-                self._field_ = strutils.string_to_valid_identifier(value)
-                #self._field_ = strutils.string_to_R_identifier(value)
+                self._field_ = strutils.str2symbol(value)
+                #self._field_ = strutils.str2R(value)
             
         elif value is None:
             self._field_ = "NA"
@@ -1472,7 +1489,7 @@ class AnalysisUnit(object):
                 if not isinstance(item[0], str):
                     raise TypeError("Expecting a dict or a DataBag with string keys only")
                 
-                v[strutils.string_to_valid_identifier(item[0])] = item[0]
+                v[strutils.str2symbol(item[0])] = item[0]
                 
             self._descriptors_ = v
             
@@ -2462,7 +2479,7 @@ class ScanData(object):
                     # associated analysis data
                     segments = data_block.segments
                     for seg in segments:
-                        stale_signal_index = ephys.get_index_of_named_signal(seg, u.name, silent=True)
+                        stale_signal_index = get_index_of_named_signal(seg, u.name, silent=True)
                         if isinstance(stale_signal_index, (tuple, list)):
                             for ndx in stale_signal_index:
                                 if ndx is not None:
@@ -2490,7 +2507,7 @@ class ScanData(object):
                         # => we remove this unit and its associated analysis data
                         segments = data_block.segments
                         for seg in segments:
-                            stale_signal_index = ephys.get_index_of_named_signal(seg, u.name, silent=True)
+                            stale_signal_index = get_index_of_named_signal(seg, u.name, silent=True)
                             if isinstance(stale_signal_index, (tuple, list)):
                                 for ndx in stale_signal_index:
                                     if ndx is not None:
@@ -2947,7 +2964,21 @@ class ScanData(object):
     @safeWrapper
     def _parse_electrophysiology_(self, value):
         """Checks for consistency between frames and segments, then assigns
-        value to self._electrophysiology_
+        value to self._electrophysiology_.
+        
+        Use case 1: When value is a neo.Block, the assignment is by reference.
+        
+        Use case 2: When value is a sequence of segments, the 'segments' 
+        attribute (a list) of self._electrophysiology_ is populated with the new
+        segments - hence it will store references to the new segments.
+        
+        WARNING Because self._electrophysiology_ is a 'reference' to a neo.Block
+        object possibly present somewhere else, use case 2 will also modify the
+        original neo.Block object. The only way to circumvent this effect (short
+        of storing a deep copy of the neo.Block here) is to delete the original
+        e.g. by using the 'del' statement. In python, the 'del' statement does
+        NOT remove the obkect itself from memory; instead it breaks the link between the
+        object and its symbol in a given namespace.
         
         ATTENTION Does NOT read trigger events from value. These are handled
         separately.
@@ -2960,7 +2991,6 @@ class ScanData(object):
         if self._scans_frames_ == 0:
             return
             
-        
         if isinstance(value, neo.Block): 
             if len(value.segments) != self._scans_frames_:
                 if len(value.segments) == 1:
@@ -2970,7 +3000,7 @@ class ScanData(object):
                         % (self._scans_frames_, len(value.segments)), RuntimeWarning)
                     return
             
-            self._electrophysiology_ = value
+            self._electrophysiology_ = value # assigns reference
             
         elif isinstance(value, (tuple, list)) and all([isinstance(v, neo.Segment) for v in value]):
             # set it up from a sequence of neo.Segments
@@ -3013,6 +3043,8 @@ class ScanData(object):
         else:
             raise TypeError("Expecting one of: a neo.Block, a sequence of neo.Segment objects, a neo.Segment or None; got %s instead" % (type(value).__name__))
         
+        # NOTE: the statement below does nothing, as the "src" is the actual
+        # electrophysiology data mebedded here
         self.adoptTriggerProtocols(self.electrophysiology)
 
     def _concatenate_image_data_(self, other, scene=True, pad_value=None):
@@ -3263,7 +3295,7 @@ class ScanData(object):
         # deepcopy "slices" the events into quantities
         # if it is a reference, any modifications in the copy will also touch the
         # original !
-        ephys = ephys.neo_copy(self.electrophysiology)
+        ephys = neo_copy(self.electrophysiology)
         
         analysisOptions = copy.deepcopy(self.analysisOptions)
         
@@ -3284,11 +3316,11 @@ class ScanData(object):
         result._scans_filters_ = copy.deepcopy(self._scans_filters_)
         
         # neo.Block does not have a copy() method so we need to use our own
-        result._scene_block_ = ephys.neo_copy(self._scene_block_)
-        result._scans_block_ = ephys.neo_copy(self._scans_block_)
+        result._scene_block_ = neo_copy(self._scene_block_)
+        result._scans_block_ = neo_copy(self._scans_block_)
         
-        result._scan_region_scans_profiles_ = ephys.neo_copy(self._scan_region_scans_profiles_)
-        result._scan_region_scene_profiles_ = ephys.neo_copy(self._scan_region_scene_profiles_)
+        result._scan_region_scans_profiles_ = neo_copy(self._scan_region_scans_profiles_)
+        result._scan_region_scene_profiles_ = neo_copy(self._scan_region_scene_profiles_)
         
         #result._scan_region_scans_profiles_ = copy.deepcopy(self._scan_region_scans_profiles_)
         #result._scan_region_scene_profiles_ = copy.deepcopy(self._scan_region_scene_profiles_)
@@ -4386,10 +4418,10 @@ class ScanData(object):
                 result._scans_block_.segments.append(neo.Segment())
         else:
             if len(source._scans_block_.segments) > source.scansFrames:
-                result._scans_block_.segments += [ephys.neo_copy(s) for s in source._scans_block_.segments[0:source.scansFrames]]
+                result._scans_block_.segments += [neo_copy(s) for s in source._scans_block_.segments[0:source.scansFrames]]
                 
             else:
-                result._scans_block_.segments += [ephys.neo_copy(s) for s in source._scans_block_.segments]
+                result._scans_block_.segments += [neo_copy(s) for s in source._scans_block_.segments]
                 
                 new_scans_frames = original_scans_frames + source.scansFrames
                 #print("ScanData.concatenate: current scans frames %d" % result.scansFrames)
@@ -4415,10 +4447,10 @@ class ScanData(object):
                 
         else:
             if len(source._scene_block_.segments) > source.sceneFrames:
-                result._scene_block_.segments += [ephys.neo_copy(s) for s in source._scene_block_.segments[0:source.sceneFrames]]
+                result._scene_block_.segments += [neo_copy(s) for s in source._scene_block_.segments[0:source.sceneFrames]]
                 
             else:
-                result._scene_block_.segments += [ephys.neo_copy(s) for s in source._scene_block_.segments]
+                result._scene_block_.segments += [neo_copy(s) for s in source._scene_block_.segments]
                 
                 new_scene_frames = original_scene_frames + source.sceneFrames
                 
@@ -4435,7 +4467,7 @@ class ScanData(object):
         
         #### BEGIN 7) concatenate electrophysiology
         if len(source._electrophysiology_.segments):
-            result._electrophysiology_.segments += [ephys.neo_copy(s) for s in source._electrophysiology_.segments]
+            result._electrophysiology_.segments += [neo_copy(s) for s in source._electrophysiology_.segments]
             
         else:
             # fill up with empty segments
@@ -4969,23 +5001,23 @@ class ScanData(object):
         #print("ScanData.removeAnalysisUnit: ", unit.name)
         
         for segment in self.scansBlock.segments:
-            signal_index = ephys.get_index_of_named_signal(segment, unit.name, stype=(neo.AnalogSignal, DataSignal), silent=True)
+            signal_index = get_index_of_named_signal(segment, unit.name, stype=(neo.AnalogSignal, DataSignal), silent=True)
             
             if signal_index is not None:
                 del segment.analogsignals[signal_index]
             
-            signal_index = ephys.get_index_of_named_signal(segment, unit.name, stype=neo.IrregularlySampledSignal, silent=True)
+            signal_index = get_index_of_named_signal(segment, unit.name, stype=neo.IrregularlySampledSignal, silent=True)
             
             if signal_index is not None:
                 del segment.irregularlysampledsignals[signal_index]
             
         for segment in self.sceneBlock.segments:
-            signal_index = ephys.get_index_of_named_signal(segment, unit.name, stype=(neo.AnalogSignal, DataSignal), silent=True)
+            signal_index = get_index_of_named_signal(segment, unit.name, stype=(neo.AnalogSignal, DataSignal), silent=True)
             
             if signal_index is not None:
                 del segment.analogsignals[signal_index]
         
-            signal_index = ephys.get_index_of_named_signal(segment, unit.name, stype=neo.IrregularlySampledSignal, silent=True)
+            signal_index = get_index_of_named_signal(segment, unit.name, stype=neo.IrregularlySampledSignal, silent=True)
             
             if signal_index is not None:
                 del segment.irregularlysampledsignals[signal_index]
@@ -4999,7 +5031,7 @@ class ScanData(object):
                     
     def _remove_data_signal_from_block_(self, src, name):
         for segment in src:
-            signal_index = ephys.get_index_of_named_signal(segment, name, stype=(neo.AnalogSignal, DataSignal), silent=True)
+            signal_index = get_index_of_named_signal(segment, name, stype=(neo.AnalogSignal, DataSignal), silent=True)
             if signal_index is not None:
                 del segment.analogsignals[signal_index]
         
@@ -5740,7 +5772,7 @@ class ScanData(object):
                 if average:
                     # NOTE: 2018-06-15 09:59:21
                     # "segments" here is a list even if it has only one segment!
-                    segments = ephys.average_segments([ephys.neo_copy(self.electrophysiology.segments[f]) for f in kprotocol_frames])
+                    segments = average_segments([neo_copy(self.electrophysiology.segments[f]) for f in kprotocol_frames])
                     
                     if len(segments) > 1:
                         raise RuntimeError("averaging segments for protocol %s yielded in electrophysiology block more than one segment!" % current_protocol.name)
@@ -5755,7 +5787,7 @@ class ScanData(object):
                         
                         
                 else:
-                    segments = [ephys.neo_copy(self.electrophysiology.segments[f]) for f in kprotocol_frames]
+                    segments = [neo_copy(self.electrophysiology.segments[f]) for f in kprotocol_frames]
                     
                     for kseg, seg in enumerate(segments):
                         seg.name = current_protocol.name
@@ -5781,17 +5813,17 @@ class ScanData(object):
                 # we therefore should FIRST extract the analogsignal (if found)
                 # into a new set of segments and average these if necessary
                 
-                segments = [ephys.neo_copy(self.scansBlock.segments[f]) for f in kprotocol_frames]
+                segments = [neo_copy(self.scansBlock.segments[f]) for f in kprotocol_frames]
                 
                 segments = list()
                 
                 for f in kprotocol_frames:
-                    seg = ephys.neo_copy(self.scansBlock.segments[f])
+                    seg = neo_copy(self.scansBlock.segments[f])
                     
                     signals = seg.analogsignals
                     
                     if analysis_unit.landmark is not None and len(signals) > 1:
-                        keep_signal_ndx = ephys.get_index_of_named_signal(seg, analysis_unit.landmark.name, silent=True)
+                        keep_signal_ndx = get_index_of_named_signal(seg, analysis_unit.landmark.name, silent=True)
                     
                         if keep_signal_ndx is not None:
                             # epscat found for this analysis unit
@@ -5810,7 +5842,7 @@ class ScanData(object):
                         segments.append(seg)
                             
                 if average:
-                    segments = ephys.average_segments(segments)
+                    segments = average_segments(segments)
                     
                     if len(segments) > 1:
                         raise RuntimeError("averaging segments for protocol %s in scans block yielded more than one segment!" % current_protocol.name)
@@ -5847,7 +5879,7 @@ class ScanData(object):
                 
             if len(self.sceneBlock.segments):
                 if average:
-                    segments = ephys.average_segments([ephys.neo_copy(self.sceneBlock.segments[f]) for f in kprotocol_frames])
+                    segments = average_segments([neo_copy(self.sceneBlock.segments[f]) for f in kprotocol_frames])
                     
                     if len(segments) > 1:
                         raise RuntimeError("averaging segments for protocol %s in scene block yielded more than one segment!" % current_protocol.name)
@@ -5858,7 +5890,7 @@ class ScanData(object):
                             # the association is based on name: landmark name is also
                             # the name of the signal
                             signals = seg.analogsignals
-                            keep_signal_ndx = ephys.get_index_of_named_signal(seg, analysis_unit.landmark.name, silent=True)
+                            keep_signal_ndx = get_index_of_named_signal(seg, analysis_unit.landmark.name, silent=True)
                             
                             if keep_signal_ndx is not None:
                                 signal = signals[keep_signal_ndx]
@@ -5872,7 +5904,7 @@ class ScanData(object):
                         seg.index = kprotocol
                     
                 else:
-                    segments = [ephys.neo_copy(self.sceneBlock.segments[f]) for f in kprotocol_frames]
+                    segments = [neo_copy(self.sceneBlock.segments[f]) for f in kprotocol_frames]
                     
                     for kseg, seg in enumerate(segments):
                         if analysis_unit.landmark is not None:
@@ -5880,7 +5912,7 @@ class ScanData(object):
                             # the association is based on name: landmark name is also
                             # the name of the signal
                             signals = seg.analogsignals
-                            keep_signal_ndx = ephys.get_index_of_named_signal(seg, analysis_unit.landmark.name, silent=True)
+                            keep_signal_ndx = get_index_of_named_signal(seg, analysis_unit.landmark.name, silent=True)
                             
                             if keep_signal_ndx is not None:
                                 signal = signals[keep_signal_ndx]
@@ -5915,7 +5947,7 @@ class ScanData(object):
             if len(self.scanRegionScansProfiles.segments) > 0:
                 if average:
                     try:
-                        segments = ephys.average_segments([ephys.neo_copy(self.scanRegionScansProfiles.segments[f]) for f in kprotocol_frames])
+                        segments = average_segments([neo_copy(self.scanRegionScansProfiles.segments[f]) for f in kprotocol_frames])
                         
                     except:
                         segments = []
@@ -5932,7 +5964,7 @@ class ScanData(object):
                         seg.index = kprotocol
                     
                 else:
-                    segments = [ephys.neo_copy(self.scanRegionScansProfiles.segments[f]) for f in kprotocol_frames]
+                    segments = [neo_copy(self.scanRegionScansProfiles.segments[f]) for f in kprotocol_frames]
                     
                     for kseg, seg in enumerate(segments):
                         seg.name  = current_protocol.name
@@ -5949,7 +5981,7 @@ class ScanData(object):
             #### BEGIN copy scan region profile in scene data
             if len(self.scanRegionSceneProfiles.segments) > 0:
                 if average:
-                    segments = ephys.average_segments([ephys.neo_copy(self.scanRegionSceneProfiles.segments[f]) for f in kprotocol_frames])
+                    segments = average_segments([neo_copy(self.scanRegionSceneProfiles.segments[f]) for f in kprotocol_frames])
                     
                     if len(segments) > 1:
                         raise RuntimeError("averaging segments for protocol %s in scene block yielded more than one segment!" % current_protocol.name)
@@ -5963,7 +5995,7 @@ class ScanData(object):
                         seg.index = kprotocol
                     
                 else:
-                    segments = [ephys.neo_copy(self.scanRegionSceneProfiles.segments[f]) for f in kprotocol_frames]
+                    segments = [neo_copy(self.scanRegionSceneProfiles.segments[f]) for f in kprotocol_frames]
                     
                     for kseg, seg in enumerate(segments):
                         seg.name  = current_protocol.name
@@ -7442,27 +7474,39 @@ class ScanData(object):
             self, self.electrophysiology, etc). The code does not verify if
             "src" is a deep data copy of any part or whole of this ScanData.
         
-        imaging_source: boolean (default False)
+        imaging_source: boolean (default False) - sets the sign of the imaging delay
+            Used only when src is a neo.Block.
         
-            If src is NOT a ScanData object:
+            When src is a neo.Block, this may contain electrophysiology data, or
+            imaging data (e.g. 1D signals derived from 2D imaging data, etc).
             
             When imaging_source is True src is interpreted as a block containing
             imaging signals (e.g. a scansBlock); otherwise, src is interpreted as
             containing electrophysiology signals.
             
+            This distinction arises from the fact that in most cases there is a
+            non-zero delay between the start of imaging data acquisition and that
+            of electrophysiology data. 
+            
+            Therefore, any trigger event occuring during the experiment will have
+            different times in electrophysiology and the imaging data, with the 
+            difference being  stored in the "imagingDelay" attribute of the protocol. When an
+            event is copied from one type of data to another this delay must be
+            be compensated.
+            
             CAUTION: This matters because the actual event times for electrophysiology
                 and imaging signals blocks need to be adjusted according to
                 the delay between electrophysiology and imaging acquisition times.
                 
-            In ths case protocols are "parsed" and costructed based on the 
-            TriggerEvent objects fodun in src.
+            In this case protocols are "parsed" and costructed based on the 
+            TriggerEvent objects found in src.
                 
             If src is a ScanData object: the protocols in the ScanData object
             list will be COPIED over to self.
             
         WARNING: Overwrites self._trigger_protocols_ !!!
         
-        CAUTION: Does nothing if the neo.Block object has no trigger protocols
+        CAUTION: Does nothing if the neo.Block src object has no trigger protocols
         
         """
         # NOTE: 2017-12-20 21:35:55
@@ -7470,6 +7514,7 @@ class ScanData(object):
         # embedded into the _scans_block_ segments
         
         if isinstance(src, ScanData):
+            # adopts trigger protocols contained in ScanData 'src'
             if src is self:
                 return
             
@@ -7485,6 +7530,7 @@ class ScanData(object):
             for p in self._trigger_protocols_:
                 #print("ScanData.adoptTriggerProtocols:", p.name)
                 rev_p = p.reverseAcquisition(copy=True)
+                
                 embed_trigger_protocol(p, 
                                                 self._electrophysiology_,
                                                 clearTriggers=True)
@@ -7499,21 +7545,28 @@ class ScanData(object):
                 
         else:
             if isinstance(src, neo.Block):
+                # NOTE 2020-12-30 17:29:40: 
+                # do nothing if the 'srouce' if the same as the detination
                 if src in (self._electrophysiology_, self._scans_block_, self._scene_block_):
                     # do not run if the source is in this data
                     return
                 
-            src_protocols, _ = ephys.parse_trigger_protocols(src) # creates NEW  protocols
+            # from here on, 'src' is neither of this data's own blocks (electrophysiology,
+            # scans or scene blocks)
+            
+            # create a list of protocols based on the trigger events embedded in src
+            src_protocols, _ = parse_trigger_protocols(src) 
                 
             self._trigger_protocols_.clear()
-            
-            #ephys.clear_events(target)
             
             if len(src_protocols):
                 for protocol in src_protocols:
                     # NOTE: 2019-03-16 21:56:11
-                    # in the electrophysiology block, protocol events are stored by reference
-                    # in imaging block we store COPIES of protocol events with reverseAcquisition!
+                    # the electrophysiology block stores trigger events by reference
+                    # the imaging block stores COPIES of trigger events where
+                    # the timings for the imaging event have ben 'reversed'
+                    # (i.e., if imaging event was delayed in electrophysiology,
+                    # it is set to be at time 0 in the imaging)
                     
                     reversedProtocol = protocol.reverseAcquisition(copy=True)
                     
@@ -7560,9 +7613,9 @@ class ScanData(object):
     def clearTriggerProtocols(self):
         self._trigger_protocols_.clear()
         
-        ephys.clear_events(self._electrophysiology_,   triggersOnly = True)
-        ephys.clear_events(self._scans_block_,         triggersOnly = True)
-        ephys.clear_events(self._scene_block_,         triggersOnly = True)
+        clear_events(self._electrophysiology_,   triggersOnly = True)
+        clear_events(self._scans_block_,         triggersOnly = True)
+        clear_events(self._scene_block_,         triggersOnly = True)
         
     @safeWrapper
     def addTriggerProtocol(self, protocol, sort=False):
@@ -7657,9 +7710,9 @@ class ScanData(object):
         
         rev_p = protocol.reverseAcquisition(copy=True)
         
-        ephys.remove_trigger_protocol(protocol, self._electrophysiology_)
-        ephys.remove_trigger_protocol(rev_p, self._scans_block_)
-        ephys.remove_trigger_protocol(rev_p, self._scene_block_)
+        remove_trigger_protocol(protocol, self._electrophysiology_)
+        remove_trigger_protocol(rev_p, self._scans_block_)
+        remove_trigger_protocol(rev_p, self._scene_block_)
         
         del self._trigger_protocols_[protocolNdx]
         
@@ -7873,14 +7926,14 @@ class ScanData(object):
             if value in irreg_sig_names:
                 raise ValueError("A signal named '%s' already exists in scansBlock segment %d" % (value, ks))
             
-            sig_ndx = ephys.get_index_of_named_signal(segment, u_name, silent=True)
+            sig_ndx = get_index_of_named_signal(segment, u_name, silent=True)
             
             #print("ScanData.renameAnalysisUnit: sig_ndx %d in segment %d" % (sig_ndx, ks))
             
             if sig_ndx is not None:
                 segment.analogsignals[sig_ndx].name = value
             
-            irreg_sig_ndx = ephys.get_index_of_named_signal(segment, u_name, stype=neo.IrregularlySampledSignal, silent=True)
+            irreg_sig_ndx = get_index_of_named_signal(segment, u_name, stype=neo.IrregularlySampledSignal, silent=True)
             
             if irreg_sig_ndx is not None:
                 segment.irregularlysampledsignals[irreg_sig_ndx].name = value
@@ -7895,12 +7948,12 @@ class ScanData(object):
             if value in irreg_sig_names:
                 raise ValueError("A signal named '%s' already exists in scansBlock segment %d" % (value, ks))
             
-            sig_ndx = ephys.get_index_of_named_signal(segment, analysis_unit.name, silent=True)
+            sig_ndx = get_index_of_named_signal(segment, analysis_unit.name, silent=True)
             
             if sig_ndx is not None:
                 segment.analogsignals[sig_ndx].name = value
             
-            irreg_sig_ndx = ephys.get_index_of_named_signal(segment, analysis_unit.name, stype=neo.IrregularlySampledSignal, silent=True)
+            irreg_sig_ndx = get_index_of_named_signal(segment, analysis_unit.name, stype=neo.IrregularlySampledSignal, silent=True)
             
             if irreg_sig_ndx is not None:
                 segment.irregularlysampledsignals[irreg_sig_ndx].name = value
@@ -9168,11 +9221,11 @@ class ScanData(object):
         if len(frame_ndx) > 1:
             # NOTE: 2018-01-30 23:11:10 no averaging needed when there's only one segment!
             events = self.electrophysiology.segments[frame_ndx[0]].events
-            avg_segment = ephys.average_segments([self.electrophysiology.segments[f] for f in frame_ndx])
+            avg_segment = average_segments([self.electrophysiology.segments[f] for f in frame_ndx])
             avg_segment[0].events[:] = events
             
         else:
-            avg_segment = ephys.average_segments(self.electrophysiology.segments)
+            avg_segment = average_segments(self.electrophysiology.segments)
             avg_segment[0].events[:] = self.electrophysiology.segments[0].events[:]
             
         result.electrophysiology.segments[:] = avg_segment
@@ -9180,10 +9233,10 @@ class ScanData(object):
         result.scansBlock.segments.clear()
         
         if len(frame_ndx) > 1:
-            avg_segment = ephys.average_segments([self.scansBlock.segments[f] for f in frame_ndx])
+            avg_segment = average_segments([self.scansBlock.segments[f] for f in frame_ndx])
             
         else:
-            avg_segment = ephys.average_segments(self.scansBlock.segments)
+            avg_segment = average_segments(self.scansBlock.segments)
             
         result.scansBlock.segments[:] = avg_segment # NOTE: events will be assigned below
 
@@ -9215,8 +9268,8 @@ class ScanData(object):
                 genotype = "NA"
                 
             else:
-                genotype = strutils.string_to_valid_identifier(value)
-                #genotype = strutils.string_to_R_identifier(value)
+                genotype = strutils.str2symbol(value)
+                #genotype = strutils.str2R(value)
                 
         elif value is None:
             genotype = "NA"
@@ -9292,8 +9345,8 @@ class ScanData(object):
                 sourceID = "NA"
                 
             else:
-                sourceID = strutils.string_to_valid_identifier(value)
-                #sourceID = strutils.string_to_R_identifier(value)
+                sourceID = strutils.str2symbol(value)
+                #sourceID = strutils.str2R(value)
                 
         elif value is None:
             sourceID = "NA"
@@ -9334,8 +9387,8 @@ class ScanData(object):
                 cell = "NA"
                 
             else:
-                cell = strutils.string_to_valid_identifier(value)
-                #cell = strutils.string_to_R_identifier(value)
+                cell = strutils.str2symbol(value)
+                #cell = strutils.str2R(value)
                 
         elif value is None:
             cell = "NA"
@@ -9373,8 +9426,8 @@ class ScanData(object):
                 field = "NA"
                 
             else:
-                field = strutils.string_to_valid_identifier(value)
-                #field = strutils.string_to_R_identifier(value)
+                field = strutils.str2symbol(value)
+                #field = strutils.str2R(value)
                 
         elif value is None:
             field = "NA"
@@ -10327,7 +10380,7 @@ def __set_valid_key_names__(obj):
                     __set_valid_key_names__(value)
                 
                 obj.pop(item[0], None)
-                obj[strutils.string_to_valid_identifier(item[0])] = value
+                obj[strutils.str2symbol(item[0])] = value
             
     
     elif hasattr(obj, "annotations"):
@@ -10337,7 +10390,7 @@ def __set_valid_key_names__(obj):
     elif isinstance(obj, (tuple, list)):
         for k, o in enumerate(obj):
             if isinstance(o, str):
-                obj[k] = strutils.string_to_valid_identifier(o)
+                obj[k] = strutils.str2symbol(o)
 
 def check_apiversion(data):
     if isinstance(data, (AxisCalibration, AnalysisUnit, ScanData)):

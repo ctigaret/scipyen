@@ -132,7 +132,7 @@
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
    <property name="windowTitle">
-    <string>&amp;User variables</string>
+    <string>&amp;User Variables</string>
    </property>
    <attribute name="dockWidgetArea">
     <number>8</number>
@@ -248,7 +248,7 @@ NOTE: you can click anywhere in the row to select</string>
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
    <property name="windowTitle">
-    <string>&amp;Command history</string>
+    <string>&amp;Command History</string>
    </property>
    <attribute name="dockWidgetArea">
     <number>8</number>
@@ -457,9 +457,8 @@ NOTE: you can click anywhere in the row to select</string>
           <string/>
          </property>
          <property name="icon">
-          <iconset resource="resources/resources.qrc">
-           <normaloff>:/images/view-filter.svg</normaloff>
-           <normalon>:/images/view-filter.svg</normalon>:/images/view-filter.svg</iconset>
+          <iconset theme="view-filter">
+           <normaloff>.</normaloff>.</iconset>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -637,8 +636,8 @@ NOTE: you can click anywhere in the row to select</string>
              <string/>
             </property>
             <property name="icon">
-             <iconset resource="resources/resources.qrc">
-              <normaloff>:/images/window-close.svg</normaloff>:/images/window-close.svg</iconset>
+             <iconset theme="window-close">
+              <normaloff>.</normaloff>.</iconset>
             </property>
             <property name="autoRaise">
              <bool>true</bool>
@@ -687,6 +686,20 @@ NOTE: you can click anywhere in the row to select</string>
      </item>
     </layout>
    </widget>
+  </widget>
+  <widget class="QToolBar" name="toolBar">
+   <property name="windowTitle">
+    <string>toolBar</string>
+   </property>
+   <property name="toolButtonStyle">
+    <enum>Qt::ToolButtonFollowStyle</enum>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
   </widget>
   <action name="actionSave">
    <property name="text">

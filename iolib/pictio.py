@@ -14,8 +14,8 @@ from __future__ import print_function
 
 import inspect, keyword, os, sys, traceback, typing, warnings, io, importlib
 # import  threading
-import concurrent.futures
 import pickle, pickletools, copyreg, csv, numbers, mimetypes
+import concurrent.futures
 import collections
 #from functools import singledispatch
 #from contextlib import (contextmanager,
@@ -32,6 +32,7 @@ import pandas as pd
 import h5py
 import vigra
 import neo
+import confuse # for programmatic read/write of non-gui settings
 from PyQt5 import QtCore, QtGui, QtWidgets
 #### END 3rd party modules
 
@@ -230,8 +231,6 @@ class CustomUnpickler(pickle.Unpickler):
         if debug_scipyen():
             print("\n\tCustomUnpickler._find_module_for_symbol_(%s, %s): itemnames = %s" % (symbol, old_modname, inames))
         
-        
-        
         #NOTE: 2020-11-12 11:30:25
         # restrict the e=search for symbols & moduels in the scipyen tree, else
         # we end up with classes imported from system packages when their name 
@@ -313,6 +312,8 @@ class CustomUnpickler(pickle.Unpickler):
                     
             else:
                 print("\t\t### NOT FOUND ###")
+                
+        #print("resukt:", result)
             
         return result
     
@@ -343,7 +344,13 @@ class CustomUnpickler(pickle.Unpickler):
     
     
     def find_class(self, modname, symbol):
+        # FIXME 2020-12-23 15:12:15
+        # finding relocated classes can be confused by classes with same name but
+        # defined in different packages - best example is for pictgui.Cursor being
+        # confused with matplotlib.widgets.Cursor (hence the latter is returned
+        # in lieu of the former) - see also NOTE: 2020-12-23 15:11:49 in pictgui.py
         from unittest import mock
+        #print("\n***CustomUnpickler.find_class(%s, %s)***\n" % (modname, symbol))
         if debug_scipyen():
             print("\n***CustomUnpickler.find_class(%s, %s)***\n" % (modname, symbol))
         
@@ -372,6 +379,7 @@ class CustomUnpickler(pickle.Unpickler):
                 return super().find_class(modname, symbol)
         
         except Exception as e:
+            #print(type(e))
             if debug_scipyen():
                 print(type(e))
             if isinstance(e, (AttributeError, ModuleNotFoundError)):
@@ -1128,13 +1136,61 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
     
     #return result
 
-def loadAxonFile(fileName:str) -> neo.Block:
+def loadAxonFile(fileName:str, create_group_across_segment:typing.Union[bool, dict]=False,
+                 signal_group_mode:typing.Optional[str]="split-all") -> neo.Block:
     """Loads a binary Axon file (*.abf).
     
     Parameters:
     -----------
     
     fileName : str; a fully qualified path & file name
+    
+    create_group_across_segment: bool or dict (optional, default is False)
+        Controls grouping like signal types.
+        
+        Propagated to neo 0.9.0 neo.io.axonio.AxonIO
+        
+        If True :
+        * Create a neo.Group to group AnalogSignal segments
+        * Create a neo.Group to group SpikeTrain across segments
+        * Create a neo.Group to group Event across segments
+        * Create a neo.Group to group Epoch across segments
+        
+        With a dict the behavior can be controlled more finely
+        create_group_across_segment = { 'AnalogSignal': True, 'SpikeTrain': False, ...}
+
+        When False (default): no grouping occurs.
+        
+        
+    signal_group_mode: str (optional, default is "split-all")
+        Possible values:
+            None - default behaviour according to the IO type
+            "split-all" - each channel gives an AnalogSignal
+            "group-by-same-units" - all channels sharing same quantity units are
+                grouped in a 2D Analogsignal.
+            
+        Controls grouping of channels in the ABF file into AnalogSignal.
+        
+        Propagated to neo 0.9.0 neo.io.axonio.AxonIO.
+        
+        Since version 0.9.0, channels are, by default, grouped in "ChannelView"
+        objects. While this is seemingly OK for tetrode recordings, it breaks
+        the "one channel per signal" view of "traditional" in vitro or ex vivo 
+        recordings such as those obtained with Axon, or CED, software.
+        
+        The 'signal_group_mode' parameter allows to control this behaviour, with
+        its default value of "split-all" being conducive of the traditional
+        "one channel per signal" view.
+        
+        When None, this is supposed to get a default value that depends on the 
+        specific IO object; however, this default seems inappropriate for Axon
+        files where the "split-all" (allowing for one channel per signal) might
+        be expected.
+        
+        Should the user NOT wish to enforce this "traditional" behaviour, then 
+        the signal_group_mode should be given one of the other values, i.e.
+            None --> to revert to the current default behaviour
+            "group-by-same-units"
     
     Returns:
     ---------
@@ -1162,7 +1218,10 @@ def loadAxonFile(fileName:str) -> neo.Block:
     try:
         axonIO = neo.io.AxonIO(filename=fileName)
         
-        data = axonIO.read_block()
+        # NOTE: 2020-12-23 17:33:36
+        # adapt to the neo 0.9.0 API
+        data = axonIO.read_block(signal_group_mode=signal_group_mode)
+        #data = axonIO.read_block()
         
         if isinstance(data, list) and len(data) == 1:
             data = data[0]
@@ -1249,6 +1308,7 @@ def loadPickleFile(fileName):
             result = pickle.load(fileSrc)
             
     except Exception as e:
+        traceback.print_exc()
         try:
             result = custom_unpickle(fileName)#, exc_info=exc_info)
             #result = custom_unpickle(fileName, exc_info=exc_info)
@@ -1324,7 +1384,7 @@ def signal_to_atf(data, fileName=None):
             for (k,v) in cframe.f_globals.items():
                 if not type(v).__name__ in ("module","type", "function", "builtin_function_or_method"):
                     if v is data and not k.startswith("_"):
-                        fileName = strutils.string_to_valid_identifier(k)
+                        fileName = strutils.str2symbol(k)
                         #print(fileName)
                     #print(type(v).__name__)
         finally:
@@ -1443,7 +1503,7 @@ def segment_to_atf(segment, fileName=None,
             for (k,v) in cframe.f_globals.items():
                 if not type(v).__name__ in ("module","type", "function", "builtin_function_or_method"):
                     if v is data and not k.startswith("_"):
-                        fileName = strutils.string_to_valid_identifier(k)
+                        fileName = strutils.str2symbol(k)
 
         finally:
             del(cframe)
@@ -1537,7 +1597,7 @@ def writeCsv(data, fileName=None, header=None):
             for (k,v) in cframe.f_globals.items():
                 if not type(v).__name__ in ("module","type", "function", "builtin_function_or_method"):
                     if v is data and not k.startswith("_"):
-                        fileName = strutils.string_to_valid_identifier(k)
+                        fileName = strutils.str2symbol(k)
                         #print(fileName)
                     #print(type(v).__name__)
         finally:
@@ -1617,8 +1677,8 @@ def writeCsv(data, fileName=None, header=None):
                 raise TypeError("Unexpected data type for header; should have been a list or tuple with %d element or a np.ndarray with %d columns and %s dtype; instead I've got %s" %(data.shape[1], data.shape[1], "<U10", type(header).__name__))
             
         else:
-            headerlist = ["Time", strutils.string_to_valid_identifier(data.name)] if isinstance(data, neo.IrregularlySampledSignal) else [strutils.string_to_valid_identifier(data.domain_name), 
-                                                                                                                                            strutils.string_to_valid_identifier(data.name)]
+            headerlist = ["Time", strutils.str2symbol(data.name)] if isinstance(data, neo.IrregularlySampledSignal) else [strutils.str2symbol(data.domain_name), 
+                                                                                                                                            strutils.str2symbol(data.name)]
             
         csvfile = open(fileName, "w", newline="")
         writer = csv.writer(csvfile, delimiter="\t")
@@ -2010,6 +2070,25 @@ def export_to_hdf5(obj, filenameOrGroup, name=None):
     
 
     f.close()
+    
+@safeWrapper
+def save_settings(config:confuse.Configuration, source:str="all", filename:str=None, package_default:bool=False) -> bool:
+    """Saves Scipyen non-gui configuration options to an yaml file.
+    """
+    if not isinstance(config, confuse.Configuration):
+        return False
+    
+    if not isinstance(source, str):
+        raise TypeError("'source' expected to be a str; got %s instead" % type(source).__name__)
+    
+    if package_default:
+        defsrc = [s for s in config.sources if s.default]
+        if filename is None:
+    if source.lower().strip() == "all":
+        
+    
+    return True
+    
 
 @safeWrapper
 def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None, 

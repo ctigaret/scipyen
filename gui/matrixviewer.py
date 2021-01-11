@@ -31,7 +31,7 @@ class MatrixViewer(ScipyenViewer):
                  *args, **kwargs) -> None:
         super().__init__(data=data, parent=parent, pWin=pWin, win_title=win_title, doc_title=doc_title, ID=ID, *args, **kwargs)
         
-    def _configureGUI_(self):
+    def _configureUI_(self):
         self.fileMenu = self.menuBar().addMenu("&File")
         self.fileMenu.addAction("&Save As...", self.saveAsFile, "Ctrl+Sift+S")
         

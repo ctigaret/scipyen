@@ -411,7 +411,7 @@ class XMLViewer(ScipyenViewer):
 
         self.processNS = processNameSpaces
         
-    def _configureGUI_(self):
+    def _configureUI_(self):
         self.fileMenu = self.menuBar().addMenu("&File")
         self.fileMenu.addAction("&Save As...", self.saveAsFile, "Ctrl+Shift+S")
         
