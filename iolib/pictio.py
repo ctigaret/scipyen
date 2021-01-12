@@ -2084,7 +2084,9 @@ def save_settings(config:confuse.Configuration, source:str="all", filename:str=N
     if package_default:
         defsrc = [s for s in config.sources if s.default]
         if filename is None:
+            pass
     if source.lower().strip() == "all":
+        pass
         
     
     return True
