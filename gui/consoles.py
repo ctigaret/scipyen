@@ -1035,7 +1035,8 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         """Apply scrollbar position saved in settings ('ExternalConsole/ScrollBarPosition')
         """
         if widget and getattr(widget, "_control", None):
-            widget._control.setLayoutDirection(self.window.scrollBarPosition)
+            widget._control.setLayoutDirection(self.window.getScrollBarPosition())
+            #widget._control.setLayoutDirection(self.window.scrollBarPosition)
             #widget._control.setLayoutDirection(self.window._layout_direction_)
     
     def init_qt_elements(self):
@@ -1286,13 +1287,13 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
     
     @property
     def scrollBarPosition(self):
-        return self.window.scrollBarPosition
-        #return self.window.getScrollBarPosition()
+        #return self.window.scrollBarPosition
+        return self.window.getScrollBarPosition()
     
     @scrollBarPosition.setter
     def scrollBarPosition(self, value):
-        self.window.scrollBarPosition = value
-        #self.window.setScrollBarPosition(value)
+        #self.window.scrollBarPosition = value
+        self.window.setScrollBarPosition(value)
     
     #### END some useful properties
     
