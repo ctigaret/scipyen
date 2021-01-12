@@ -241,37 +241,9 @@ class ExternalConsoleWindow(MainWindow):
         self.resize(winSize)
         self.setAcceptDrops(True)
         self.setScrollBarPosition(self._layout_direction_)
+        #self.scrollBarPosition = self._layout_direction_
         
-    #def getScrollBarPosition(self, widget=None):
-        #if widget is None:
-            #widget = self.active_frontend
-            #if widget is None:
-                #widget = self.tab_widget.widget(0)
-                
-        #if getattr(widget, "_control", None):
-            #return widget._control.layoutDirection()
-        
-        ##return QtCore.Qt.LeftToRight
-        #return self._layout_direction_
-    
-    #def setScrollBarPosition(self, layout:typing.Union[int, str]):
-        ##print("ExternalConsoleWindow.setScrollBarPosition(%s)" % layout )
-        #if isinstance(layout, str):
-            #if layout.lower().strip() in ("right", "r"):
-                #layout = QtCore.Qt.LeftToRight
-            #elif layout.lower().strip() in ("left", "l"):
-                #layout = QtCore.Qt.RightToLeft
-            #else :
-                #layout = QtCore.Qt.LayoutDirectionAuto
-                
-        #for k in range(self.tab_widget.count()):
-            #if hasattr(self.tab_widget.widget(k), "_control"):
-                #self.tab_widget.widget(k)._control.setLayoutDirection(layout)
-                
-        #self._layout_direction_ = layout
-        
-    @property
-    def scrollBarPosition(self):
+    def getScrollBarPosition(self, widget=None):
         if widget is None:
             widget = self.active_frontend
             if widget is None:
@@ -283,8 +255,7 @@ class ExternalConsoleWindow(MainWindow):
         #return QtCore.Qt.LeftToRight
         return self._layout_direction_
     
-    @scrollBarPosition.setter
-    def scrollBarPosition(self, value):
+    def setScrollBarPosition(self, layout:typing.Union[int, str]):
         if isinstance(layout, str):
             if layout.lower().strip() in ("right", "r"):
                 layout = QtCore.Qt.LeftToRight
@@ -298,6 +269,41 @@ class ExternalConsoleWindow(MainWindow):
                 self.tab_widget.widget(k)._control.setLayoutDirection(layout)
                 
         self._layout_direction_ = layout
+        
+    #@property
+    #def scrollBarPosition(self):
+        #widget = self.active_frontend
+        #if widget is None:
+            #widget = self.tab_widget.widget(0)
+        ##if widget is None:
+            ##widget = self.active_frontend
+            ##if widget is None:
+                ##widget = self.tab_widget.widget(0)
+                
+        #if getattr(widget, "_control", None):
+            #return widget._control.layoutDirection()
+        
+        ##return QtCore.Qt.LeftToRight
+        #return self._layout_direction_
+    
+    #@scrollBarPosition.setter
+    #def scrollBarPosition(self, value:typing.Union[int, str]):
+        #if isinstance(value, str):
+            #if value.lower().strip() in ("right", "r"):
+                #layout = QtCore.Qt.LeftToRight
+            #elif value.lower().strip() in ("left", "l"):
+                #layout = QtCore.Qt.RightToLeft
+            #else :
+                #layout = QtCore.Qt.LayoutDirectionAuto
+                
+        #elif isinstance(value, int):
+            #layout = value
+                
+        #for k in range(self.tab_widget.count()):
+            #if hasattr(self.tab_widget.widget(k), "_control"):
+                #self.tab_widget.widget(k)._control.setLayoutDirection(layout)
+                
+        #self._layout_direction_ = layout
         
     @safeWrapper
     def _save_settings_(self):
