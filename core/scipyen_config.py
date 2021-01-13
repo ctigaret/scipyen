@@ -26,7 +26,7 @@
 
 #import base64
 #import os
-import typing
+import inspect, typing
 import confuse
 
 from .traitcontainers import DataBag
@@ -77,10 +77,31 @@ class FunctionConfiguration(ScipyenConfiguration):
     Instances of FunctionConfiguration are designed to store function calls
         The only requirement is that the function name is a symbol present in the 
         caller namespace.
+        
     
     """
     leaf_parameters = ("name", "args", "kwargs")
     def __init__(self, *args, **kwargs):
+        """Constructs a FunctionConfiguration object.
+        Examples:
+        1. To create a function configuration for the linear algebra function 
+        "norm" (numpy package) either one of the next three calls creates the
+        same:
+        
+        fconf  = FunctionConfiguration(name="np.linalg.norm", kwargs={"axis":0,"ord":2})
+        fconf1 = FunctionConfiguration("np.linalg.norm", axis=0, ord=2)
+        fconf2 = FunctionConfiguration("np.linalg.norm", **{"axis":0,"ord":2})
+        
+        Result:
+        
+        {'args': (), 'kwargs': {'axis': 0, 'ord': 2}, 'name': 'np.linalg.norm'}
+        
+        NOTE: The thirs call must explicitly "unwind" the last dictionary, 
+        otherwise it will be interpreted as one of the function's arguments (as 
+        if the function secified by 'name' would have expected a dict)
+
+        """
+        fname=""
         fargs = ()
         fkwargs = {}
         if len(args):
@@ -94,32 +115,27 @@ class FunctionConfiguration(ScipyenConfiguration):
             else:
                 raise TypeError("First argument must be a str; got %s instead" % type(args[0]).__name__)
             
-            if len(args) > 1:
-                if isinstance(args[1], (tuple, list)):
-                    if len(args[1]):
-                        fargs = tuple(args[1])
-                        
-                else:
-                    raise TypeError("Second argument must be tuple or list; got %s instead" % type(args[1]).__name__)
+            if len(args) > 1: # store the rest of the arguments in the fargs
+                fargs = args[1:]
                 
-            if len(args) > 2:
-                if isinstance(args[2], dict):
-                    if len(args[2]):
-                        fkwargs = args[2]
-                        
-                else:
-                    raise TypeError("Third argument must be a mapping")
+        fname = kwargs.pop("name", fname)
+        fargs = kwargs.pop("args", fargs)
+        fkwargs = kwargs.pop("kwargs", fkwargs)
+        
+        if len(kwargs):
+            fkwargs.update(kwargs)
+        
+        if not isinstance(fname, str):
+            raise TypeError("'name' must be a str; got %s instead" % type(fname).__name__)
+        
+        if len(fname.strip()) == 0:
+            raise ValueError("'name' cannot be empty")
+        
+        #kwargs["name"] = fname
+        #kwargs["args"] = fargs
+        #kwargs["kwargs"] = fkwargs
                     
-        if "name" not in kwargs:
-            kwargs["name"] = fname
-            
-        if "args" not in kwargs:
-            kwargs["args"] = fargs
-            
-        if "kwargs" not in kwargs:
-            kwargs["kwargs"] =fkwargs
-                    
-        super().__init__(**kwargs)
+        super().__init__(name=fname, args=fargs, kwargs=fkwargs)
         
 
 def create_option(option_name:str, option_value:typing.Any, parent:DataBag=None) -> DataBag:

@@ -1675,6 +1675,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #self._default_scipyen_settings_ = defaults
         self._scipyen_settings_         = settings
         
+        # NOTE: 2021-01-10 16:26:18
+        # read must be called ONLY ONCE
+        if isinstance(self._scipyen_settings_, confuse.LazyConfig) and not self._scipyen_settings_._materialized:
+            self._scipyen_settings_.read()
+        
         self._temp_python_filename_   = None # cached file name for python source (for loading or running)
         
         self._save_settings_guard_ = False
@@ -3571,7 +3576,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # add new viewers menu as toolbar action, too
         self.newViewersAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("window-new"), "New Viewer")
         self.newViewersAction.setMenu(self.newViewersMenu)
-        tb = [w for w in self.newViewersAction.associatedWidgets() if w is not self.newViewersAction.parentWidget() and isinstance(w, QtWidgets.QToolButton)]
+        self.consolesAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("utilities-terminal"), "Consoles")
+        self.consolesAction.setMenu(self.menuConsoles) # this one is defined in the ui file mainwindow.ui
+        self.scriptsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("dialog-scripts"), "Scripts")
+        self.scriptsAction.setMenu(self.menuScripts)
+        self.applicationsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("homerun"), "Applications")
+        self.applicationsAction.setMenu(self.applicationsMenu)
+        
+        tbactions = (self.newViewersAction, self.consolesAction, self.scriptsAction, self.applicationsAction)
+        tw = (w for w in itertools.chain(*(a.associatedWidgets() for a in tbactions)) if w is not self.toolBar)
         
         for w in tb:
             w.setPopupMode(QtWidgets.QToolButton.InstantPopup)

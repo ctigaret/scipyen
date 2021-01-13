@@ -3576,9 +3576,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # add new viewers menu as toolbar action, too
         self.newViewersAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("window-new"), "New Viewer")
         self.newViewersAction.setMenu(self.newViewersMenu)
-        tb = [w for w in self.newViewersAction.associatedWidgets() if w is not self.newViewersAction.parentWidget() and isinstance(w, QtWidgets.QToolButton)]
+        self.consolesAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("utilities-terminal"), "Consoles")
+        self.consolesAction.setMenu(self.menuConsoles) # this one is defined in the ui file mainwindow.ui
+        self.scriptsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("dialog-scripts"), "Scripts")
+        self.scriptsAction.setMenu(self.menuScripts)
+        self.applicationsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("homerun"), "Applications")
+        self.applicationsAction.setMenu(self.applicationsMenu)
         
-        for w in tb:
+        tbactions = (self.newViewersAction, self.consolesAction, self.scriptsAction, self.applicationsAction)
+        tw = (w for w in itertools.chain(*(a.associatedWidgets() for a in tbactions)) if w is not self.toolBar)
+        
+        for w in tw:
             w.setPopupMode(QtWidgets.QToolButton.InstantPopup)
             
         #### BEGIN do not delete: action for presenting a list of viewer types to choose from

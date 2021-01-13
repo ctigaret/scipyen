@@ -2072,21 +2072,69 @@ def export_to_hdf5(obj, filenameOrGroup, name=None):
     f.close()
     
 @safeWrapper
-def save_settings(config:confuse.Configuration, source:str="all", filename:str=None, package_default:bool=False) -> bool:
+def save_settings(config:confuse.Configuration, filename:typing.Optional[str]=None, 
+                  full:bool=True, redact:bool=False, as_default:bool=False) -> bool:
     """Saves Scipyen non-gui configuration options to an yaml file.
+    Settings are saved implicitly to the config.yaml file located in the 
+    application configuration directory and stored in the 'filename' attribute
+    of the first configuration source.
+    
+    What can be dumped (below, 'default' refers to the 'package default' settings
+    stored in config_default.yaml located in scipyen directory):
+    
+    1) all settings even if they are no different from the defaults - useful to
+    genereate/update the default settings when 'as_default' is True
+    
+    2) only settings that are different from the defaults 
+    WARNING specifying 'as_default' True will overwrite the default settings.
+    
+    3) of either (1) or (2) the redacted settings may be left out
+    
+    Named parameters:
+    ================
+    config: a confuse.Configuration object
+    filename: str or None (default).
+        When present, specifies the file where the configuration will be dumped.
+        Otherwise, the configuration is saved to the user's config.yaml file, or
+        to the config_default.yaml file located in scipyen directory
+        
+    full: bool - When True (default) dump as in case (1) above
+    
+    redact: bool - When False (default) the redacted settings are left out 
+        (i.e., not dumped)
+        
+    as_default:bool. - When False (default) the settings will be dumped to the
+        file specified by filename, or to the cnfig.yaml file in the application
+        configuration directory
+        
+    
+    
     """
     if not isinstance(config, confuse.Configuration):
         return False
     
-    if not isinstance(source, str):
-        raise TypeError("'source' expected to be a str; got %s instead" % type(source).__name__)
+    defsrc = [s for s in config.sources if s.default]
+    src = [s for s in config.sources if not s.default]
+    dumped = ""
     
-    if package_default:
-        defsrc = [s for s in config.sources if s.default]
-        if filename is None:
-            pass
-    if source.lower().strip() == "all":
-        pass
+    if filename is None or (isinstance(filename, str) and len(filename.strip()) == 0):
+        if as_default:
+            filename = defsrc[-1].filename
+            
+        else:
+            
+            filename = src[-1].filename
+            
+    else:
+        (fn, ext) = os.path.splitext(filename)
+        if ext != ".yaml":
+            filename = "".join([fn, "yaml"])
+            
+    dumped = config.dump(full=full, redact=redact)
+
+    if len(dumped):
+        with open(filename, "wt") as yamlfile:
+            yamlfile.write(dumped)
         
     
     return True
