@@ -2072,8 +2072,9 @@ def export_to_hdf5(obj, filenameOrGroup, name=None):
     f.close()
     
 @safeWrapper
-def save_settings(config:confuse.Configuration, filename:typing.Optional[str]=None, 
-                  full:bool=True, redact:bool=False, as_default:bool=False) -> bool:
+def save_settings(config:typing.Optional[confuse.Configuration]=None, filename:typing.Optional[str]=None, 
+                  full:bool=True, redact:bool=False, as_default:bool=False,
+                  default_only:bool=False) -> bool:
     """Saves Scipyen non-gui configuration options to an yaml file.
     Settings are saved implicitly to the config.yaml file located in the 
     application configuration directory and stored in the 'filename' attribute
@@ -2092,51 +2093,89 @@ def save_settings(config:confuse.Configuration, filename:typing.Optional[str]=No
     
     Named parameters:
     ================
-    config: a confuse.Configuration object
-    filename: str or None (default).
-        When present, specifies the file where the configuration will be dumped.
-        Otherwise, the configuration is saved to the user's config.yaml file, or
-        to the config_default.yaml file located in scipyen directory
+    config: a confuse.ConfigView object, or None (default)
         
-    full: bool - When True (default) dump as in case (1) above
+        When None, this defaults to the 'scipyen_settings' in the user workspace.
+        
+        Otherwise, this can be a confuse.Configuration (or confuse.LazyConfig) 
+        object, or a confuse.SubView (the latter is useful to dump a subset of 
+        configuration settings to a local file).
     
-    redact: bool - When False (default) the redacted settings are left out 
+    filename: str or None (default).
+        Specifies the file where the configuration will be dumped. An '.yaml'
+        extension will be added to the file if not present.
+        
+        When None (the default) the configuration settings are saved to 
+        the user's 'config.yaml' file, or to the config_default.yaml file located
+        in scipyen directory if 'as_default' is True
+        
+    full: bool
+        When True (default) dump as in case (1) above
+    
+    redact: bool
+        When False (default) the redacted settings are left out 
         (i.e., not dumped)
         
-    as_default:bool. - When False (default) the settings will be dumped to the
-        file specified by filename, or to the cnfig.yaml file in the application
+    as_default:bool. 
+        When False (default) the settings will be dumped to the file specified 
+        by 'filename', or to the 'config_default.yaml' file in the application
         configuration directory
         
-    
+    default_only:bool, default is False
+        When True, only the package default values will be saved to the 
+        config_default.yaml. The 'full' and 'as_default' parameters are ignored.
     
     """
-    if not isinstance(config, confuse.Configuration):
+    if config is None:
+        user_ns = user_workspace()
+        config = user_ns["scipyen_settings"]
+        
+    if not isinstance(config, confuse.ConfigView):
         return False
     
-    defsrc = [s for s in config.sources if s.default]
-    src = [s for s in config.sources if not s.default]
-    dumped = ""
+    defsrc = [s for s in config.sources if s.default] # default source
+    src = [s for s in config.sources if not s.default] # non-default sources
+    out = ""
+    
+    if default_only:
+        as_default = True # force saving to the package default
     
     if filename is None or (isinstance(filename, str) and len(filename.strip()) == 0):
         if as_default:
             filename = defsrc[-1].filename
-            
         else:
-            
             filename = src[-1].filename
-            
     else:
         (fn, ext) = os.path.splitext(filename)
         if ext != ".yaml":
-            filename = "".join([fn, "yaml"])
+            filename = ".".join([fn, "yaml"])
             
-    dumped = config.dump(full=full, redact=redact)
-
-    if len(dumped):
-        with open(filename, "wt") as yamlfile:
-            yamlfile.write(dumped)
+    if isinstance(config, confuse.Configuration): # Configuration and LazyConfig
+        out = config.dump(full=full, redact=redact)
         
-    
+    else:
+        if full:
+            out = config.flatten(redact=redact)
+        else: # exclude defaults
+            temp_root = confuse.RootView(src)
+            temp_root.redactions = config.redactions
+            out = temp_root.flatten(redact=redact)
+
+    #NOTE: 2021-01-13 17:23:36
+    # allow the use of empty output - effectively this wipes out the yaml file
+    # NOTE: 2021-01-13 17:25:25
+    # because of this, we allow here a GUI dialog (QMessageBox) warning the user
+    # to the possiblity of wiping out the config_default.yaml file!
+    if len(out) == 0:
+        txt = "The configuration file %s is about to be cleared. Do you wish to continue?" % filename
+        ret = QtWidgets.QMessageBox.warning(None,"Scipyen configuration",txt)
+        
+        if ret != QtWidgets.QMessageBox.OK:
+            return False
+        
+    with open(filename, "wt") as yamlfile:
+        yamlfile.write(out)
+        
     return True
     
 
