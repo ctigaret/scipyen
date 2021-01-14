@@ -1,3 +1,4 @@
+import os
 import neuron
 from neuron import h, rxd, units, nrn
 from neuron.units import ms, mV

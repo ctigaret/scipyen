@@ -1798,6 +1798,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.workspace["scipyen_settings"] = self._scipyen_settings_
         
     @pyqtSlot()
+    def slot_launchExternalConnectIPythonKernel(self):
+        pass
+        
+    @pyqtSlot()
     @safeWrapper
     def slot_launchExternalIPython(self):
         self._init_ExternalIPython_()

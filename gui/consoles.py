@@ -50,6 +50,7 @@ from traitlets.config.application import catch_config_error
 from traitlets import (
     Dict, Unicode, CBool, Any
 )
+from jupyter_core.paths import jupyter_runtime_dir
 
 from qtconsole import styles as styles
 from qtconsole import __version__
@@ -338,15 +339,22 @@ class ExternalConsoleWindow(MainWindow):
                                                      "Connection file (*.json)")
         if not connection_file:
             return
+        
         widget = self.connection_frontend_factory(connection_file)
         name = "external {}".format(self.next_external_kernel_id)
         self.add_tab_with_frontend(widget, name=name)
         self.sig_kernel_count_changed.emit(self._kernel_counter + self._external_kernel_counter)
         
+        return widget.kernel_client
+        
     def create_new_tab_with_orphan_kernel(self, km, kc):
         widget=self.new_frontend_orphan_kernel_factory(km, kc)
         self.add_tab_with_frontend(widget)
         
+    def create_tab_with_existing_kernel_and_execute(self, code=None, **kwargs):
+        kc = self.create_tab_with_existing_kernel()
+        if kc:
+            kc.execute(code = code, **kwargs)
 
     def create_new_tab_with_new_kernel_and_execute(self, code=None, **kwargs):
         """create a new frontend and attach it to a new tab"""
@@ -602,7 +610,8 @@ class ExternalConsoleWindow(MainWindow):
         #frontend.kernel_client.iopub_channel.
         
         frontend.kernel_client.shell_channel.message_received.connect(self.slot_kernel_shell_chnl_msg_recvd)
-        frontend.kernel_manager.kernel_restarted.connect(self.slot_kernel_restarted)
+        if frontend.kernel_manager:
+            frontend.kernel_manager.kernel_restarted.connect(self.slot_kernel_restarted)
         
 
     def closeEvent(self, event):
@@ -679,6 +688,8 @@ class ExternalConsoleWindow(MainWindow):
         # widgets to exit
         if closing_widget is None:
             return
+        
+        closing_tab_text = self.tab_widget.tabText(tab).replace(" ", "_")
 
         #get a list of all slave widgets on the same kernel.
         slave_tabs = self.find_slave_widgets(closing_widget)
@@ -686,6 +697,7 @@ class ExternalConsoleWindow(MainWindow):
         keepkernel = None #Use the prompt by default
         if hasattr(closing_widget,'_keep_kernel_on_exit'): #set by exit magic
             keepkernel = closing_widget._keep_kernel_on_exit
+            print("keepkernel", keepkernel)
             # If signal sent by exit magic (_keep_kernel_on_exit, exist and not None)
             # we set local slave tabs._hidden to True to avoid prompting for kernel
             # restart when they get the signal. and then "forward" the 'exit'
@@ -693,12 +705,17 @@ class ExternalConsoleWindow(MainWindow):
             if keepkernel is not None:
                 for tab in slave_tabs:
                     tab._hidden = True
+                    
                 if closing_widget in slave_tabs: # closing a slave tab
                     try :
                         master_tab = self.find_master_tab(closing_widget)
-                        master_tab_ndx = self.tab_widget.indexOf(master_tab).replace(" ", "_")
-                        master_tab.execute('exit')
-                        self.sig_kernel_exit.emit(self.tab_widget.tabText(master_ndx))
+                        if master_tab:
+                            master_tab_ndx = self.tab_widget.indexOf(master_tab)#.replace(" ", "_")
+                            master_tab.execute('exit')
+                            self.sig_kernel_exit.emit(self.tab_widget.tabText(master_ndx))
+                            
+                        else:
+                            self.tab_widget.removeTab(tab)
                     except AttributeError:
                         self.log.info("Master already closed or not local, closing only current tab")
                         self.tab_widget.removeTab(tab)
@@ -707,7 +724,6 @@ class ExternalConsoleWindow(MainWindow):
 
         kernel_client = closing_widget.kernel_client
         kernel_manager = closing_widget.kernel_manager
-        closing_tab_text = self.tab_widget.tabText(tab).replace(" ", "_")
 
         if keepkernel is None and not closing_widget._confirm_exit:
             # don't prompt, just terminate the kernel if we own it
