@@ -1328,9 +1328,12 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
             kernel  client.
             
             Otherwise, it allows to specifiy a kernel client to execute the code,
-            either directly (i.e passing the kernel client here) or indirectly
+            either directly (i.e passing the kernel client here), indirectly
             by passing its frontend (RichJupyterWidget) or by looking it up 
             using the tab's index (int) or name (str).
+            
+            If where is the special string "all" (lowercase) then the command
+            will be executed in all running kernels.
             
         **kwargs: additional keyword arguments to kernel_client.execute() as 
                 detailed below.
@@ -1553,11 +1556,33 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
             client = frontend.kernel_client
             
         elif isinstance(where, str):
-            frontend = self.window.get_frontend(where.replace("_", " "))
-            if frontend is None:
-                return
-            
-            client = frontend.kernel_client
+            if where == "all":
+                fronends = [self.window.get_frontend(k) for k in self.window.tab_widget.count()]
+                clients = [f.kernel_client for f in frontends]
+                
+                if len(clients):
+                    if len(code) == 1:
+                        return [_exec_call_(code[0], c_, **kwargs) for c_ in clients]
+                    
+                    else:
+                        ret = []
+                        for client in clients:
+                            c_ret = []
+                            for call in code:
+                                res = _exec_call_(call, client, **kwargs)
+                                if isinstance(res, str):
+                                    c_ret.append(res)
+                                elif isinstance(res, list):
+                                    c_ret += res
+                            if len(c_ret):
+                                ret += c_ret
+                        return ret
+            else:
+                frontend = self.window.get_frontend(where.replace("_", " "))
+                if frontend is None:
+                    return
+                
+                client = frontend.kernel_client
             
         elif isinstance(where, QtKernelClient):
             client = where
@@ -1581,7 +1606,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
                 if isinstance(res, str):
                     ret.append(res)
                     
-                elif isinstance*(res, list):
+                elif isinstance(res, list):
                     ret += res
                     
             return ret

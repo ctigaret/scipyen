@@ -77,6 +77,13 @@ __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 nrn_ipython_initialization_file = os.path.join(os.path.dirname(__module_path__),"neuron_python", "nrn_ipython.py")
 nrn_ipython_initialization_cmd = "".join(["run -i -n ", nrn_ipython_initialization_file, " 'gui'"])
 
+# NOTE: 2021-01-14 12:12:11
+# the last two lines in the init_commands make these two modules available for 
+# importing in the "remote" kernel
+# TODO: 2021-01-14 12:18:45
+# figure out how to use Qt5 Agg in the external ipython (mpl.use("Qt5Agg") crashes
+# the kernel when a mpl figure is shown)
+# for now stick with inline figures
 init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, importlib",
                  "import traceback, keyword, inspect, itertools, functools, collections",
                  "import signal, pickle, json, csv",
@@ -87,14 +94,42 @@ init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, impo
                  "from importlib import reload",
                  "from pprint import pprint",
                  "import matplotlib as mpl",
+                 "mpl.rcParams['savefig.format'] = 'svg'",
+                 "mpl.rcParams['xtick.direction'] = 'in'",
+                 "mpl.rcParams['ytick.direction'] = 'in'",
                  "from matplotlib import pyplot as plt",
                  "from matplotlib import cm",
+                 "import matplotlib.mlab as mlb",
                  "".join(["sys.path.insert(2, '", os.path.dirname(__module_path__), "')"]),
                  "from core import extipyutils_host as hostutils",
                  
                  #"from IPython.lib.deepreload import reload as dreload",
                  #"sys.path=['" + sys.path[0] +"'] + sys.path",
                  ]
+
+#init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, importlib",
+                 #"import traceback, keyword, inspect, itertools, functools, collections",
+                 #"import signal, pickle, json, csv",
+                 #"import numpy as np",
+                 #"import scipy",
+                 #"import pandas as pd",
+                 #"import seaborn as sb",
+                 #"from importlib import reload",
+                 #"from pprint import pprint",
+                 #"import matplotlib as mpl",
+                 #"mpl.use('Qt5Agg')",
+                 #"mpl.rcParams['savefig.format'] = 'svg'",
+                 #"mpl.rcParams['xtick.direction'] = 'in'",
+                 #"mpl.rcParams['ytick.direction'] = 'in'",
+                 #"from matplotlib import pyplot as plt",
+                 #"from matplotlib import cm",
+                 #"import matplotlib.mlab as mlb",
+                 #"".join(["sys.path.insert(2, '", os.path.dirname(__module_path__), "')"]),
+                 #"from core import extipyutils_host as hostutils",
+                 
+                 ##"from IPython.lib.deepreload import reload as dreload",
+                 ##"sys.path=['" + sys.path[0] +"'] + sys.path",
+                 #]
 
 
 

@@ -12,8 +12,8 @@ start_gui = "gui" in sys.argv
 
 if start_gui:
     from neuron import gui
-
     h.load_file("stdrun.hoc")
+    print("loaded stdrun.hoc")
 
 sessions = [i for i in sys.argv if "ses" in os.path.splitext(i)[1]]
 
@@ -37,6 +37,7 @@ hocs = [i for i in sys.argv if "hoc" in os.path.splitext(i)[1]]
 
 for hoc_file in hocs:
     h.load_file(hoc_file)
+    print("loaded hoc file %s" % hoc_file)
     
 del(sessions, hocs, start_gui)
 

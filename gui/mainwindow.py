@@ -4294,6 +4294,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if self.ipkernel is not None and self.shell is not None and self.console is not None:
                 self.console.execute(''.join(["cd '", targetDir, "'"]), hidden=True)
                 
+            if self.external_console:
+                self.external_console.execute("".join(["os.chdir('", targetDir,"')"]))
+                
             self._setRecentDirectory_(targetDir)
             self.fileSystemModel.setRootPath(targetDir)
             self.fileSystemTreeView.scrollTo(self.fileSystemModel.index(targetDir))
