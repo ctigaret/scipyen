@@ -657,7 +657,7 @@ class ExternalConsoleWindow(MainWindow):
             #self.sig_will_close.emit()
             event.accept()
         
-    def close_tab(self,current_tab):
+    def close_tab(self,tab):
         """ Called when you need to try to close a tab.
 
         It takes the number of the tab to be closed as argument, or a reference
@@ -666,9 +666,9 @@ class ExternalConsoleWindow(MainWindow):
 
         # let's be sure "tab" and "closing widget" are respectively the index
         # of the tab to close and a reference to the frontend to close
-        if type(current_tab) is not int :
-            current_tab = self.tab_widget.indexOf(current_tab)
-        closing_widget=self.tab_widget.widget(current_tab)
+        if type(tab) is not int :
+            tab = self.tab_widget.indexOf(tab)
+        closing_widget=self.tab_widget.widget(tab)
 
 
         # when trying to be closed, widget might re-send a request to be
@@ -701,13 +701,13 @@ class ExternalConsoleWindow(MainWindow):
                         self.sig_kernel_exit.emit(self.tab_widget.tabText(master_ndx))
                     except AttributeError:
                         self.log.info("Master already closed or not local, closing only current tab")
-                        self.tab_widget.removeTab(current_tab)
+                        self.tab_widget.removeTab(tab)
                     self.update_tab_bar_visibility()
                     return
 
         kernel_client = closing_widget.kernel_client
         kernel_manager = closing_widget.kernel_manager
-        closing_tab_text = self.tab_widget.tabText(current_tab).replace(" ", "_")
+        closing_tab_text = self.tab_widget.tabText(tab).replace(" ", "_")
 
         if keepkernel is None and not closing_widget._confirm_exit:
             # don't prompt, just terminate the kernel if we own it
@@ -720,7 +720,7 @@ class ExternalConsoleWindow(MainWindow):
                 cancel = QtWidgets.QMessageBox.Cancel
                 okay = QtWidgets.QMessageBox.Ok
                 if closing_widget._may_close:
-                    msg = "You are closing the tab : "+'"'+self.tab_widget.tabText(current_tab)+'"'
+                    msg = "You are closing the tab : "+'"'+self.tab_widget.tabText(tab)+'"'
                     info = "Would you like to quit the Kernel and close all attached Consoles as well?"
                     justthis = QtWidgets.QPushButton("&No, just this Tab", self)
                     justthis.setShortcut('N')
@@ -744,14 +744,14 @@ class ExternalConsoleWindow(MainWindow):
                             background(slave.kernel_client.stop_channels)
                             self.tab_widget.removeTab(self.tab_widget.indexOf(slave))
                         kernel_manager.shutdown_kernel()
-                        self.tab_widget.removeTab(current_tab)
+                        self.tab_widget.removeTab(tab)
                         background(kernel_client.stop_channels)
                         self.sig_kernel_exit.emit(closing_tab_text)
                     elif reply == 0: # close Console
                         if not closing_widget._existing:
                             # Have kernel: don't quit, just close the tab
                             closing_widget.execute("exit True")
-                        self.tab_widget.removeTab(current_tab)
+                        self.tab_widget.removeTab(tab)
                         background(kernel_client.stop_channels)
                 else:
                     reply = QtWidgets.QMessageBox.question(self, title,
@@ -761,14 +761,14 @@ class ExternalConsoleWindow(MainWindow):
                         defaultButton=okay
                         )
                     if reply == okay:
-                        self.tab_widget.removeTab(current_tab)
+                        self.tab_widget.removeTab(tab)
         elif keepkernel: #close console but leave kernel running (no prompt)
-            self.tab_widget.removeTab(current_tab)
+            self.tab_widget.removeTab(tab)
             background(kernel_client.stop_channels)
             
-        else: #close console and kernel (no prompt)
-            tab_text = self.tab_widget.tabText(current_tab).replace(" ", "_")
-            self.tab_widget.removeTab(current_tab)
+        else: #close console and kernel (no prompt) - usually calling exit at cli
+            #tab_text = self.tab_widget.tabText(tab).replace(" ", "_")
+            self.tab_widget.removeTab(tab)
             if kernel_client and kernel_client.channels_running:
                 for slave in slave_tabs:
                     background(slave.kernel_client.stop_channels)
@@ -776,7 +776,8 @@ class ExternalConsoleWindow(MainWindow):
                 if kernel_manager:
                     kernel_manager.shutdown_kernel()
                 background(kernel_client.stop_channels)
-                self.sig_kernel_exit.emit(tab_text)
+                #self.sig_kernel_exit.emit(tab_text)
+                self.sig_kernel_exit.emit(closing_tab_text)
 
         self.update_tab_bar_visibility()
         
@@ -1299,9 +1300,11 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
     
     @safeWrapper
     def execute(self, *code:typing.Union[str, dict, tuple, list, ForeignCall], 
-                where : typing.Optional[typing.Union[int, str, RichJupyterWidget, QtKernelClient]]=None, 
+                where : typing.Optional[typing.Union[int, str, RichJupyterWidget, QtKernelClient]]=None,
+                redirect:typing.Optional[dict]=None,
                 **kwargs) -> typing.Union[str, list]:
-        """Execute code, by default in the kernel behind the active frontend.
+        """Execute code asynchronously, in a kernel.
+        By default, code is executed in the kernel behind the active frontend.
         
         Revamped version of the kernel client execute() where "code" can be 
         a dict carrying all the parameters expected by the "legacy" execute()
@@ -1309,7 +1312,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         
         Parameters:
         -----------
-        code: str or dict or sequence of these (mixing allowed)
+        code: str, dict, ForeignCall, or sequence of these (mixing allowed)
             When a str, it contains the executed code, possibly empty.
             
             When a dict, it must contain the following keys:
@@ -1334,6 +1337,9 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
             
             If where is the special string "all" (lowercase) then the command
             will be executed in all running kernels.
+            
+        redirect: dict (optional, default is None)
+            TODO not used
             
         **kwargs: additional keyword arguments to kernel_client.execute() as 
                 detailed below.
@@ -1368,6 +1374,8 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
                 A dict mapping names to expressions to be evaluated in the user's
                 dict. The expression values are returned as strings formatted using
                 :func:`repr`.
+                
+                This is needed to get return values into Scipyen's workspace
             
             allow_stdin : bool, optional (default self.allow_stdin)
                 Flag for whether the kernel can send stdin requests to frontends.
@@ -1411,7 +1419,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         # ATTENTION 
         # DO NOT confuse frontend.execute() with frontend.kernel_client.execute()
         #
-        # Here we need thr latter: frontend.kernel_client.execute()!
+        # Here we need the latter: frontend.kernel_client.execute()!
         #
         # For the former, see RichJupyterWidget.execute()
         
@@ -1611,7 +1619,13 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
                     
             return ret
                     
-             
+    def get_connection_file(self) -> str:
+        fcall = ForeignCall(user_expressions={"connection_file":"get_connection_file()"})
+        self.execute(fcall)
+        
+    def get_connection_info(self) -> str:
+        fcall = ForeignCall(user_expressions={"connection_info":"get_connection_info()"})
+        self.execute(fcall)
         
     #def frontend_execute(self, frontend, **kwargs) -> bool:
         #"""Delegates to frontend.execute() method.

@@ -15,6 +15,9 @@ from IPython.core.magic import (Magics, magics_class, line_magic,
                                 cell_magic, line_cell_magic,
                                 needs_local_scope)
 
+from ipykernel import (get_connection_file, get_connection_info, 
+                       connect_qtconsole)
+
 from core.utilities import summarize_object_properties
 from core.prog import ContextExecutor
 
@@ -27,6 +30,8 @@ nrn_ipython_initialization_file = os.path.join(os.path.dirname(__module_path__),
 nrngui_magic_cmd = "".join(["-i -n ", nrn_ipython_initialization_file, " 'gui'"])
 nrnpy_magic_cmd = "".join(["-i -n ", nrn_ipython_initialization_file])
 
+shell = get_ipython()
+shell.run_cell("from ipykernel import (get_connection_file, get_connection_info, connect_qtconsole)")
 
 #class ContextExecutor(ContextDecorator):
     #def __enter__(self):
@@ -49,5 +54,8 @@ class NeuronMagics(Magics):
     def nrnpy(self, line, local_ns):
         get_ipython().run_line_magic("run", nrnpy_magic_cmd)
         
-get_ipython().register_magics(NeuronMagics)
+#get_ipython().register_magics(NeuronMagics)
+shell.register_magics(NeuronMagics)
+
+
         

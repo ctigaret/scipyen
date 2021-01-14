@@ -110,10 +110,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #print("workspaceModel to clear %s namespace" % txt)
         if txt in self.foreign_namespaces:
             self.foreign_namespaces[txt]["current"].clear()
-            ns = txt.replace("_", " ")
-            kernel_items_rows = self.rowIndexForItemsWithProps(Workspace=ns)
+            #ns = txt.replace("_", " ")
+            #kernel_items_rows = self.rowIndexForItemsWithProps(Workspace=ns)
+            kernel_items_rows = self.rowIndexForItemsWithProps(Workspace=txt)
             
-            #print("kernel_items_rows",kernel_items_rows)
+            #print("kernel_items_rows for %s" % txt,kernel_items_rows)
             if isinstance(kernel_items_rows, int):
                 if kernel_items_rows >= 0:
                     #print("item", self.item(kernel_items_rows,0).text())
@@ -124,7 +125,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 # will have changed after the removal of previous rows
                 itemnames = [self.item(r,0).text() for r in kernel_items_rows]
                 for name in itemnames:
-                    r = self.rowIndexForItemsWithProps(Name=name, Workspace=ns)
+                    #r = self.rowIndexForItemsWithProps(Name=name, Workspace=ns)
+                    r = self.rowIndexForItemsWithProps(Name=name, Workspace=txt)
                     try:
                         self.removeRow(r)
                     except:

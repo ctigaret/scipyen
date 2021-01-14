@@ -141,6 +141,34 @@ class ForeignCall(DataBag):
     
     kernel_client.execute(**call.dict())
     
+    NOTE: 2021-01-14 16:55:36
+    The user_expression dict is a str:str mapping used to serialize data 
+    generated in the remote kernel so that it is captured in the Scipyen workspace.
+    
+    The serialization occurs via JSON (as ascii data), optionally pickled.
+    
+    CAUTION: Not all Python objects can be pickled - in particular some Qt objects
+    (e.g., widgets, or from the QGraphics framework) cannot be pickled.
+    
+    Also, pickling/unpickling of user-defined data types depends on the modules
+    defining the data type being imported in both the remote and local (Scipyen's)
+    IPython kernels.
+    
+    The keys in user_expressions are name of the variables as they are to appear
+    in Scipyen's user workspace. 
+    
+    The values are str which are going to be evaluated in the calling namespace, 
+    or treated as a byte stream of pickled data, when the key is prefixed with 
+    "pickled_"; in the latter case, the data will be "unpickled" at the receiving
+    end (see unpack_shell_channel_data() in this module).
+    
+    TODO: not used: The user_expressions may contain the special keyword __REDIRECT__ which must
+    be mapped to either "True" or "False"
+    
+    When present and mapped to "True", then the variables returned by the 
+    user_expressions mechanism will be returned to the caller's namespace instead
+    of being exported to Scipyen's user workspace.
+    
     """
     def __init__(self, code="", silent=True, store_history=False, user_expressions=None,
                  allow_stdin=None, stop_on_error=True):
