@@ -77,6 +77,7 @@ import sklearn as sk # machine learning, also nice plot_* functionality
 
 import seaborn as sb # statistical data visualization
 
+from jupyter_core.paths import jupyter_runtime_dir
 #print("mainwindow.py __name__ =", __name__)
 
 #### BEGIN migration to pyqtgraph -- setup global parameters
@@ -1798,8 +1799,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.workspace["scipyen_settings"] = self._scipyen_settings_
         
     @pyqtSlot()
-    def slot_launchExternalConnectIPythonKernel(self):
-        pass
+    def slot_launchExternalRunningIPython(self):
+        self._init_ExternalIPython_(new="connection")
         
     @pyqtSlot()
     @safeWrapper
@@ -1810,6 +1811,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def slot_launchExternalNeuronIPython(self):
         self._init_ExternalIPython_(new="neuron")
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_launchExternalRunningIPythonNeuron(self):
+        self._init_ExternalIPython_(new="neuron_ext")
         
     @safeWrapper
     def _init_ExternalIPython_(self, new:str = ""):
@@ -1828,24 +1834,40 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         Parameters:
         -----------
         new : str (optional, default is "") 
-            Allowed values are: "master", "slave", "connection", "neuron", "" (empty string, the default)
+            Allowed values are:
             
             "master":   creates a new tab with a client connected to a new, local, 
                         kernel process
                         
             "slave":    creates a new tab with a client connected to an existing
-                        local kernel (local kernel); the existing local kernel
-                        is the one running behind the currently active master tab
+                        local kernel started in a separate process: this will be
+                        the one running behind the currently active master tab
+                        of the External IPython Console
                         
-            "connection": asks for a kernel connection json file then creates 
+            "connection": asks for a kernel connection (json) file then creates 
                         a new tab with a client connected to the (possibly remote) 
-                        kernel via the specified connection json file
+                        kernel via the specified connection file.
+                        
+                        Useful to open a console (tab) connected to a remote kernel
+                        e.g. started by a jupyter notebook or jupyterlab server.
+                        
+                        Requires a running notebook (preferred if using bokeh)
+                        or jupyterlab server (themeable).
                         
             "neuron"    : creates a new tab with a client connected to a new, local, 
                         kernel process then initializes NEURON python environment.
                         
                         If no ExternalIPython console exists, launches an instance
                         of ExternalIPython console and starts NEURON.
+                        
+            "neuron_ext": launches neuron in an external kernel
+                        Useful in combination with jupyter notebook or jupyterlab.
+                        
+                        Requires a running notebook (preferred if using bokeh)
+                        or jupyterlab server (themeable).
+                        
+                        
+                        
             
         """
         from core.extipyutils_client import nrn_ipython_initialization_cmd
@@ -1853,16 +1875,37 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #print("_init_ExternalIPython_ new", new)
         
         if not isinstance(self.external_console, consoles.ExternalIPython):
-            #print("\tno external console yet")
-            self.external_console = consoles.ExternalIPython.launch()
+            if isinstance(new, str) and new in ("connection", "neuron_ext"):
+                connection_file, file_type = QtWidgets.QFileDialog.getOpenFileName(self,
+                                                            "Connect to Existing Kernel",
+                                                            jupyter_runtime_dir(),
+                                                            "Connection file (*.json)")
+                if not connection_file:
+                    return
+                
+                self.external_console = consoles.ExternalIPython.launch(existing=connection_file)
+                
+            else:
+                # NOTE: 2021-01-15 14:50:32
+                # this will automatically start a (remote) IPython kernel
+                self.external_console = consoles.ExternalIPython.launch()
+                
             self.workspace["external_console"] = self.external_console
             self.workspaceModel.user_ns_hidden.update({"external_console":self.external_console})
             #self.external_console.window.sig_kernel_count_changed[int].connect(self._slot_remote_kernel_count_changed)
             
-            if isinstance(new, str) and new == "neuron":
-                self.external_console.execute(nrn_ipython_initialization_cmd,
-                                              silent=True,
-                                              store_history=False)
+            # NOTE: 2021-01-15 14:46:07
+            # any value of new other than "neuron" is ignored when the console 
+            # is first initiated
+            if isinstance(new, str):
+                if new == "neuron":
+                    self.external_console.execute(nrn_ipython_initialization_cmd,
+                                                silent=True,
+                                                store_history=False)
+                    
+                elif new == "neuron_ext":
+                    self.external_console.window.start_neuron_in_current_tab()
+
                 
             self.external_console.window.sig_shell_msg_received[object].connect(self._slot_ext_krn_shell_chnl_msg_recvd)
             self.external_console.window.sig_kernel_exit[str].connect(self._slot_ext_krn_exit)
@@ -1873,10 +1916,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             frontend_factory = None
             #print("\texternal console exists")
             if self.external_console.window.active_frontend is None:
-                #print("\t* no active frontend")
                 # console instance exists but does not have an active frontend anymore
+                # therefore kill the running kernel (if any) and start with clean slate
                 if (self.external_console.kernel_manager is not None):
-                    #print("\t\t kernel manager exists")
                     # kill the current (existing) kernel
                     try:
                         self.external_console.kernel_manager.shutdown_kernel(now=True, restart=False)
@@ -1892,7 +1934,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         
                     elif new == "neuron":
                         from functools import partial
-                        frontned_factory = partial(self.external_console.create_tab_with_new_frontend,
+                        frontend_factory = partial(self.external_console.create_tab_with_new_frontend,
                                                    nrn_ipython_initialization_cmd,
                                                    silent=True, store_history=False)
                         
@@ -1900,8 +1942,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                                                    #nrn_ipython_initialization_cmd,
                                                    #silent=True, store_history=False)
                                                    
-                    else: # str is "" as per default
-                        frontend_factory = self.external_console.window.create_tab_with_new_frontend
+                    elif new == "neuron_ext":
+                        frontend_factory = self.external_console.window.create_tab_with_existing_kernel
+                        
+                    #else: # str is "" as per default
+                        #frontend_factory = self.external_console.window.create_tab_with_new_frontend
             else:
                 #print("\t* active frontend exists")
                 if isinstance(new, str):
@@ -1916,14 +1961,22 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         
                     elif new == "neuron":
                         from functools import partial
-                        frontend_factory = partial(self.external_console.window.create_new_tab_with_new_kernel_and_execute,
-                                                   nrn_ipython_initialization_cmd,
+                        frontend_factory = partial(self.external_console.window.create_tab_with_new_frontend,
+                                                   code=nrn_ipython_initialization_cmd,
                                                    silent=True, store_history=False)
-
                         
+                        #frontend_factory = partial(self.external_console.window.create_new_tab_with_new_kernel_and_execute,
+                                                   #nrn_ipython_initialization_cmd,
+                                                   #silent=True, store_history=False)
+                                                   
+                    elif new == "neuron_ext":
+                        frontend_factory = self.external_console.window.create_tab_with_existing_kernel
+
             if frontend_factory is not None:
-                frontend_factory()
-                self.external_console.window.setVisible(True)
+                if frontend_factory():
+                    self.external_console.window.setVisible(True)
+                    if isinstance(new, str) and str == "neuron_ext":
+                        self.external_console.window.start_neuron_in_current_tab()
 
         
     @pyqtSlot()
@@ -3471,6 +3524,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
         self.actionExternalNrnIPython.triggered.connect(self.slot_launchExternalNeuronIPython)
+        self.actionRunning_IPython.triggered.connect(self.slot_launchExternalRunningIPython) 
+        self.actionRunning_IPython_for_Neuron.triggered.connect(self.slot_launchExternalRunningIPythonNeuron) 
         self.actionOpen.triggered.connect(self.slot_openFiles)
         #self.actionOpen.triggered.connect(self.openFile)
         #self.actionOpen_Files.triggered.connect(self.slot_openFiles)
@@ -5288,6 +5343,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if self.external_console.window.tab_widget.count() == 0:
             # only listen to kernels that have a frontend 
             return
+        
+        #print("mainWindow\n\t_slot_ext_krn_shell_chnl_msg_recvd msg tab", msg["tab"])
+        #print("mainwindow\n\t_slot_ext_krn_shell_chnl_msg_recvd msg type", msg["msg_type"])
         
         if msg["msg_type"] == "execute_reply":
             #print("mainWindow: kernel sent execute_reply %s" % msg["tab"])

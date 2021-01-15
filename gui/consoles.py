@@ -100,7 +100,8 @@ from jupyter_client.localinterfaces import is_local_ip
 
 #from core import prog
 from core.prog import safeWrapper
-from core.extipyutils_client import init_commands, execute, ForeignCall
+from core.extipyutils_client import (init_commands, execute, ForeignCall,
+                                    nrn_ipython_initialization_cmd,)
 from core.strutils import str2symbol
 
 flags = dict(base_flags)
@@ -338,15 +339,19 @@ class ExternalConsoleWindow(MainWindow):
                                                      jupyter_runtime_dir(),
                                                      "Connection file (*.json)")
         if not connection_file:
-            return
+            return False
         
         widget = self.connection_frontend_factory(connection_file)
         name = "external {}".format(self.next_external_kernel_id)
-        self.add_tab_with_frontend(widget, name=name)
-        self.sig_kernel_count_changed.emit(self._kernel_counter + self._external_kernel_counter)
-        if widget.kernel_client and isinstance(code, str) and len(code.strip()):
-            widget.kernel_client.execute(code=code, **kwargs)
-            
+        if widget:
+            self.add_tab_with_frontend(widget, name=name)
+            self.sig_kernel_count_changed.emit(self._kernel_counter + self._external_kernel_counter)
+            if widget.kernel_client and isinstance(code, str) and len(code.strip()):
+                widget.kernel_client.execute(code=code, **kwargs)
+                
+            return True
+        
+        return False
         #return widget.kernel_client
         
     #def create_tab_with_existing_kernel_and_execute(self, code=None, **kwargs):
@@ -356,25 +361,33 @@ class ExternalConsoleWindow(MainWindow):
 
     def create_new_tab_with_orphan_kernel(self, km, kc):
         widget=self.new_frontend_orphan_kernel_factory(km, kc)
-        self.add_tab_with_frontend(widget)
+        if widget:
+            self.add_tab_with_frontend(widget)
+            return True
+        
+        return False
         
     def create_tab_with_new_frontend(self, code=None, **kwargs):
         """create a new frontend and attach it to a new tab"""
         widget = self.new_frontend_factory()
-        self.add_tab_with_frontend(widget)
-        if widget.kernel_client and isinstance(code, str) and len(code.strip()):
-            widget.kernel_client.execute(code=code, **kwargs)
+        if widget:
+            self.add_tab_with_frontend(widget)
+            if widget.kernel_client and isinstance(code, str) and len(code.strip()):
+                widget.kernel_client.execute(code=code, **kwargs)
+            
+            return True
+        return False
+            
 
-    def create_new_tab_with_new_kernel_and_execute(self, code=None, **kwargs):
-        """create a new frontend and attach it to a new tab"""
-        widget = self.new_frontend_factory()
-        self.add_tab_with_frontend(widget)
-        widget.kernel_client.execute(code=code, **kwargs)
-        current_widget_index = self.tab_widget.indexOf(widget)
+    #def create_new_tab_with_new_kernel_and_execute(self, code=None, **kwargs):
+        #"""create a new frontend and attach it to a new tab"""
+        #widget = self.new_frontend_factory()
+        #self.add_tab_with_frontend(widget)
+        #widget.kernel_client.execute(code=code, **kwargs)
+        #current_widget_index = self.tab_widget.indexOf(widget)
         
     def create_neuron_tab(self):
-        from core.extipyutils_client import nrn_ipython_initialization_cmd
-        self.create_tab_with_new_frontend(code=nrn_ipython_initialization_cmd,
+        return self.create_tab_with_new_frontend(code=nrn_ipython_initialization_cmd,
                                           silent=True,
                                           store_history=False)
         #self.create_new_tab_with_new_kernel_and_execute(code=nrn_ipython_initialization_cmd,
@@ -388,12 +401,11 @@ class ExternalConsoleWindow(MainWindow):
                                 ####self.tab_widget.indexOf(self.active_frontend))
         
     def start_neuron_in_current_tab(self):
-        from core.extipyutils_client import nrn_ipython_initialization_cmd
         self.active_frontend.kernel_client.execute(code=nrn_ipython_initialization_cmd,
                                                    silent=True,
                                                    store_history=False)
         
-        current_widget_index = self.tab_widget.indexOf(self.active_frontend)
+        #current_widget_index = self.tab_widget.indexOf(self.active_frontend)
         #self.prefix_tab_title("NEURON ", current_widget_index)
         #old_title = self.tab_widget.tabText(current_widget_index)
         #if "NEURON" not in old_title:
@@ -715,8 +727,8 @@ class ExternalConsoleWindow(MainWindow):
             # restart when they get the signal. and then "forward" the 'exit'
             # to the main window
             if keepkernel is not None:
-                for tab in slave_tabs:
-                    tab._hidden = True
+                for slave_tab in slave_tabs:
+                    slave_tab._hidden = True
                     
                 if closing_widget in slave_tabs: # closing a slave tab
                     try :
@@ -835,7 +847,7 @@ class ExternalConsoleWindow(MainWindow):
         for ndx in km_widgets_ndx:
             tab_text = self.tab_widget.tabText(ndx).replace(" ", "_")
             widget = self.tab_widget.widget(ndx)
-            widget.kernel_client.execute(code = "\n".join(init_commands), silent=True, store_history=False)
+            self._scipyen_init_exec_(widget.kernel_client)
             self.sig_kernel_restart.emit(tab_text)
             
             #if "NEURON" in tab_text:
@@ -858,11 +870,17 @@ class ExternalConsoleWindow(MainWindow):
         
         frontends = self.find_widget_by_client_sessionID(sessionID)
         
+        #print("ExternalConsoleWindow:\n\t slot_kernel_shell_chnl_msg_recvd frontends", frontends)
+        
         if len(frontends) > 0:
             masters = [f for f in frontends if self.is_master_frontend(f)]
+            slaves = [f for f in frontends if not self.is_master_frontend(f)]
             
             if len(masters):
                 tab_name = self.find_tab_title(masters[0]).replace(" ", "_")
+                
+            elif len(slaves):
+                tab_name = self.find_tab_title(slaves[0]).replace(" ", "_")
                 
             else:
                 tab_name = str2symbol("session_%s" % sessionID)
@@ -1003,9 +1021,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         widget._may_close = True
         widget._confirm_exit = self.confirm_exit
         widget._display_banner = self.display_banner
-        #cmd = "\n".join(init_commands)
-        #print(cmd)
-        widget.kernel_client.execute(code = "\n".join(init_commands), silent=True, store_history=False)
+        self._scipyen_init_exec_(widget.kernel_client)
         return widget
 
     def new_frontend_connection(self, connection_file):
@@ -1032,6 +1048,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         widget._display_banner = self.display_banner
         widget.kernel_client = kernel_client
         widget.kernel_manager = None
+        self._scipyen_init_exec_(widget.kernel_client)
         return widget
 
     def new_frontend_slave(self, current_widget):
@@ -1112,14 +1129,16 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         # NOTE 2020-07-11 11:51:36
         # these two are equivalent; use the first one as more direct, whereas the
         # second one is more generic, allowing the use of any valid kernel client
-        self.widget.kernel_client.execute(code="\n".join(init_commands), silent=True, store_history=False)
-        #execute(self.widget.kernel_client, code="\n".join(init_commands), silent=True, store_history=False)
+        self._scipyen_init_exec_(self.widget.kernel_client)
 
         # Ignore on OSX, where there is always a menu bar
         if sys.platform != 'darwin' and self.hide_menubar:
             self.window.menuBar().setVisible(False)
 
         self.window.setWindowTitle('External Scipyen Console')
+        
+    def _scipyen_init_exec_(self, client):
+        client.execute(code="\n".join(init_commands), silent=True, store_history=False)
 
     def init_colors(self, widget):
         """Configure the coloring of the widget"""
@@ -1238,8 +1257,14 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         
         # NOTE 2020-07-08 09:17:44
         # this is the GUI Pyqt app (providing a GUI event loop etc)
-        #self.init_qt_app()
+        # ORIGINAL: self.init_qt_app()
+        # We use the currently running QApplication (i.e. the one started by
+        # scipyen.main())
         self.app = QtWidgets.QApplication.instance()
+        
+        # NOTE: 2021-01-15 14:51:38
+        # this one (JupyterApp.initialize) parses argv and sets up the 
+        # configuration framework including parsing sys.argv
         super().initialize(argv)
         if self._dispatching:
             return
@@ -1253,7 +1278,15 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
             if cfg:
                 self.update_config(cfg)
                 
-        JupyterConsoleApp.initialize(self,argv)
+        # NOTE: 2021-01-15 14:50:05
+        # this will automatically start a new IPython kernel:
+        # initializes:
+        #   connection file
+        #   ssh channel
+        #   kernel manager
+        #   kernel client
+        JupyterConsoleApp.initialize(self, argv)
+        
         self.init_qt_elements()
         
         self.init_signal()
@@ -1272,10 +1305,14 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         #self.app.exec_() # already happening
 
     @classmethod
-    def launch(cls, argv=None, **kwargs):
+    def launch(cls, argv=None, existing:typing.Optional[str]=None, **kwargs):
         # the launch_instance mechanism in jupyter and qtconsole does not return
         # an instance of this python "app"
         app = cls.instance(**kwargs)
+        # TODO 2021-01-15 15:39:44
+        # allow launching with an external kernel
+        if isinstance(existing, str) and len(existing.strip()):
+            app.existing = existing
         app.initialize(argv)
         app.start()
         
@@ -1614,7 +1651,15 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
                                 ret += c_ret
                         return ret
             else:
-                frontend = self.window.get_frontend(where.replace("_", " "))
+                if "session_" in where:
+                    sessionID = where.replace("session_","").replace("_", "-")
+                    ftends = self.window.find_widget_by_client_sessionID(sessionID)
+                    if len(ftends)==0:
+                        return
+                    frontend = ftends[0]
+                else:
+                    frontend = self.window.get_frontend(where.replace("_", " "))
+                    
                 if frontend is None:
                     return
                 
