@@ -45,6 +45,3 @@ del(sessions, hocs, start_gui)
 #if __name__ == os.path.basename(os.path.splitext(__file__)[0]):
     ## run -n option
     #pass
-
-
-            

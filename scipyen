@@ -1,4 +1,10 @@
 #! /bin/sh 
-executable=`realpath $0`
-scipyendir=`dirname $executable`
+
+scipyexec=`realpath $0`
+scipyendir=`dirname $scipyexec`
+scipyenvdir=`dirname $scipyendir`
+
+if [ -z $VIRTUAL_ENV ]; then
+    source $scipyenvdir/bin/activate
+fi
 python3 $scipyendir/scipyen.py &

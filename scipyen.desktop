@@ -1,7 +1,7 @@
 [Desktop Entry]
 Comment[en_GB]=
 Comment=
-Exec=$HOME/scipyen/scipyen_start.py
+Exec=$HOME/scipyenv/scipyen/scipyen
 GenericName[en_GB]=
 GenericName=
 Icon=pythonbackend

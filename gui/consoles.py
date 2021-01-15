@@ -697,7 +697,7 @@ class ExternalConsoleWindow(MainWindow):
         keepkernel = None #Use the prompt by default
         if hasattr(closing_widget,'_keep_kernel_on_exit'): #set by exit magic
             keepkernel = closing_widget._keep_kernel_on_exit
-            print("keepkernel", keepkernel)
+            #print("keepkernel", keepkernel)
             # If signal sent by exit magic (_keep_kernel_on_exit, exist and not None)
             # we set local slave tabs._hidden to True to avoid prompting for kernel
             # restart when they get the signal. and then "forward" the 'exit'
