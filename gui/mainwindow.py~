@@ -1798,6 +1798,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.workspace["scipyen_settings"] = self._scipyen_settings_
         
     @pyqtSlot()
+    def slot_launchExternalConnectIPythonKernel(self):
+        pass
+        
+    @pyqtSlot()
     @safeWrapper
     def slot_launchExternalIPython(self):
         self._init_ExternalIPython_()
@@ -1888,9 +1892,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         
                     elif new == "neuron":
                         from functools import partial
-                        frontend_factory = partial(self.external_console.window.create_new_tab_with_new_kernel_and_execute,
+                        frontned_factory = partial(self.externa;_console.create_tab_with_new_frontend,
                                                    nrn_ipython_initialization_cmd,
                                                    silent=True, store_history=False)
+                        
+                        #frontend_factory = partial(self.external_console.window.create_new_tab_with_new_kernel_and_execute,
+                                                   #nrn_ipython_initialization_cmd,
+                                                   #silent=True, store_history=False)
                                                    
                     else: # str is "" as per default
                         frontend_factory = self.external_console.window.create_tab_with_new_frontend
@@ -3586,7 +3594,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         tbactions = (self.newViewersAction, self.consolesAction, self.scriptsAction, self.applicationsAction)
         tw = (w for w in itertools.chain(*(a.associatedWidgets() for a in tbactions)) if w is not self.toolBar)
         
-        for w in tb:
+        for w in tw:
             w.setPopupMode(QtWidgets.QToolButton.InstantPopup)
             
         #### BEGIN do not delete: action for presenting a list of viewer types to choose from
@@ -4293,6 +4301,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
             if self.ipkernel is not None and self.shell is not None and self.console is not None:
                 self.console.execute(''.join(["cd '", targetDir, "'"]), hidden=True)
+                
+            if self.external_console:
+                self.external_console.execute("".join(["os.chdir('", targetDir,"')"]))
                 
             self._setRecentDirectory_(targetDir)
             self.fileSystemModel.setRootPath(targetDir)

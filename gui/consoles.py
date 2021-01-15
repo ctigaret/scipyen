@@ -331,7 +331,7 @@ class ExternalConsoleWindow(MainWindow):
         self.settings.setValue("ExternalConsole/FontWeight", font.weight())
         self.settings.setValue("ExternalConsole/ScrollBarPosition", self.getScrollBarPosition(widget))
         
-    def create_tab_with_existing_kernel(self):
+    def create_tab_with_existing_kernel(self, code=None, **kwargs):
         """create a new frontend attached to an external kernel in a new tab"""
         connection_file, file_type = QtWidgets.QFileDialog.getOpenFileName(self,
                                                      "Connect to Existing Kernel",
@@ -344,17 +344,26 @@ class ExternalConsoleWindow(MainWindow):
         name = "external {}".format(self.next_external_kernel_id)
         self.add_tab_with_frontend(widget, name=name)
         self.sig_kernel_count_changed.emit(self._kernel_counter + self._external_kernel_counter)
+        if widget.kernel_client and isinstance(code, str) and len(code.strip()):
+            widget.kernel_client.execute(code=code, **kwargs)
+            
+        #return widget.kernel_client
         
-        return widget.kernel_client
-        
+    #def create_tab_with_existing_kernel_and_execute(self, code=None, **kwargs):
+        #kc = self.create_tab_with_existing_kernel()
+        #if kc:
+            #kc.execute(code = code, **kwargs)
+
     def create_new_tab_with_orphan_kernel(self, km, kc):
         widget=self.new_frontend_orphan_kernel_factory(km, kc)
         self.add_tab_with_frontend(widget)
         
-    def create_tab_with_existing_kernel_and_execute(self, code=None, **kwargs):
-        kc = self.create_tab_with_existing_kernel()
-        if kc:
-            kc.execute(code = code, **kwargs)
+    def create_tab_with_new_frontend(self, code=None, **kwargs):
+        """create a new frontend and attach it to a new tab"""
+        widget = self.new_frontend_factory()
+        self.add_tab_with_frontend(widget)
+        if widget.kernel_client and isinstance(code, str) and len(code.strip()):
+            widget.kernel_client.execute(code=code, **kwargs)
 
     def create_new_tab_with_new_kernel_and_execute(self, code=None, **kwargs):
         """create a new frontend and attach it to a new tab"""
@@ -365,11 +374,14 @@ class ExternalConsoleWindow(MainWindow):
         
     def create_neuron_tab(self):
         from core.extipyutils_client import nrn_ipython_initialization_cmd
-        self.create_new_tab_with_new_kernel_and_execute(code=nrn_ipython_initialization_cmd,
-                                                        silent=True,
-                                                        store_history=False)
+        self.create_tab_with_new_frontend(code=nrn_ipython_initialization_cmd,
+                                          silent=True,
+                                          store_history=False)
+        #self.create_new_tab_with_new_kernel_and_execute(code=nrn_ipython_initialization_cmd,
+                                                        #silent=True,
+                                                        #store_history=False)
         
-        ndx = self.tab_widget.indexOf(self.active_frontend)
+        #ndx = self.tab_widget.indexOf(self.active_frontend)
         
         #if "NEURON" not in self.tab_widget.tabText(ndx):
             #self.prefix_tab_title("NEURON ", ndx)

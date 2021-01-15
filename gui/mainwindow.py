@@ -1892,9 +1892,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         
                     elif new == "neuron":
                         from functools import partial
-                        frontend_factory = partial(self.external_console.window.create_new_tab_with_new_kernel_and_execute,
+                        frontned_factory = partial(self.external_console.create_tab_with_new_frontend,
                                                    nrn_ipython_initialization_cmd,
                                                    silent=True, store_history=False)
+                        
+                        #frontend_factory = partial(self.external_console.window.create_new_tab_with_new_kernel_and_execute,
+                                                   #nrn_ipython_initialization_cmd,
+                                                   #silent=True, store_history=False)
                                                    
                     else: # str is "" as per default
                         frontend_factory = self.external_console.window.create_tab_with_new_frontend
