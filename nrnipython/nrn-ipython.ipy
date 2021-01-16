@@ -1,0 +1,71 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
+import os, sys, traceback, warnings, json, pickle
+from pprint import pprint
+
+import numpy as np
+import scipy
+
+import matplotlib as mpl
+from matplotlib import pyplot as plt
+from matplotlib import cm
+
+import neuron
+from neuron import h, rxd, units, nrn
+from neuron.units import ms, mV
+h("nrnversion()") # print NEURON version
+h("nrnversion(8)")# print machine where this copy of NEURON was compiled
+
+use_gui = "--nogui" not in sys.argv
+print_help  = any([s in sys.argv for s in ["-h", "--help", "-?"]])
+session_file = None
+hoc_files = []
+
+if print_help:
+    print("Usage: \n pass --nogui to execute without NEURON GUI panels")
+    
+
+#print("sys.argv", sys.argv)
+
+sessions = [i for i in sys.argv if "ses" in os.path.splitext(i)[1]]
+
+#print("sessions", sessions)
+
+if len(sessions):
+    session_file = sessions[0]
+    
+    if os.path.isfile(session_file):
+        use_gui = True
+    else:
+        warnings.warn("Session file %s not found" % session_file)
+    
+    if len(sessions) > 1:
+        warnings.warn("Only the first session file will be loaded")
+
+hocs = [i for i in sys.argv if "hoc" in os.path.splitext(i)[1]]
+
+# NOTE: the h interpreter checks this (the hoc file may be in neuron's library)
+#for hf in hocs:
+    #if not os.path.isfile(hf):
+        #warnings.warn("Hoc file %s not found" % hf)
+
+#print("hocs", hocs)
+
+if use_gui:
+    from neuron import gui
+    
+# standard run library (gives h.continuerun)
+h.load_file("stdrun.hoc")
+    
+if session_file is not None:
+    h.load_file(session_file)
+
+for hoc_file in hocs:
+    h.load_file(hoc_file)
+    
+del(use_gui, session_file, hocs)
+            
+            
+
+

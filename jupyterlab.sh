@@ -1,14 +1,9 @@
-#! /bin/sh 
-
+#!/bin/bash
 realscript=`realpath $0`
 scipyendir=`dirname $realscript`
 scipyenvdir=`dirname $scipyendir`
-
-if [ -z $VIRTUAL_ENV ]; then
-    source $scipyenvdir/bin/activate
-fi
-
 if [ -z $BROWSER ]; then
     source $scipyenvdir/bin/browser
 fi
-python3 $scipyendir/scipyen.py &
+jupyter lab &
+
