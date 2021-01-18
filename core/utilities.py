@@ -2,26 +2,38 @@
 '''
 Various utilities
 '''
-import traceback, re, itertools, time, typing, warnings, numbers, inspect
+import traceback, re, itertools, time, typing, warnings
+from inspect import getmro
+from collections import deque
+from numbers import Number
 from sys import getsizeof
 import numpy as np
 from numpy import ndarray
+from neo.core.dataobject import DataObject as NeoDataObject
+from neo.core.container import Container as NeoContainer
+from pandas.core.base import PandasObject as PandasObject
+from quantities import Quantity as Quantity
+from vigra import VigraArray as VigraArray
 
 from .prog import safeWrapper
 
 abbreviated_type_names = {'IPython.core.macro.Macro' : 'Macro'}
-sequence_types = ['list', 'tuple', "deque"]
-set_types = ["set", "frozenset"]
-dict_types = ["dict"]
-neo_containers =["Block", "Segment"]
+sequence_types = (list, tuple, deque)
+sequence_typenames = ('list', 'tuple', "deque")
+set_types = (set, frozenset)
+set_typenames = ("set", "frozenset")
+dict_types = (dict,)
+dict_typenames = ("dict",)
+# NOTE: neo.Segment class name clashes with nrn.Segment
+neo_containernames = ("Block", "Segment",)
 # NOTE: 2020-07-10 12:52:57
 # PictArray is defunct
 #vigra_array_types = ["VigraArray", "PictArray"] 
-vigra_array_types = ["VigraArray"]
-signal_types = ['Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 
+#vigra_array_typenames = ("VigraArray",)
+signal_types = ('Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 
                 'SpikeTrain', "DataSignal", "IrregularlySampledDataSignal",
-                "TriggerEvent",
-                ]
+                "TriggerEvent",)
+                
 ndarray_type = ndarray.__name__
 
 
@@ -59,8 +71,6 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         #TODO construct handlers for other object types as well including 
         #PyQt5 objects (maybe)
             
-    from numbers import Number
-    
     #print("summarize_object_properties", objname)
     
     result = dict(map(lambda x: (x, {"display":"", "tooltip":""}), standard_obj_summary_headers))
@@ -75,8 +85,8 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
     tt = abbreviated_type_names.get(typename, typename)
     
-    if typename in signal_types and hasattr(obj, "dimensionality"):
-        typename += " (%s)" % obj.dimensionality
+    if tt in signal_types and hasattr(obj, "dimensionality"):
+        tt += " (%s)" % obj.dimensionality
     
     if tt == "instance":
         tt = abbreviated_type_names.get(clsname, clsname)
@@ -105,8 +115,10 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
 
     try:
-        if tt in sequence_types:
-            if len(obj) and all([isinstance(v, numbers.Number) for v in obj]):
+        #if tt in sequence_types:
+        #if objtype in sequence_types:
+        if isinstance(obj, sequence_types):
+            if len(obj) and all([isinstance(v, Number) for v in obj]):
                 datamin = str(min(obj))
                 mintip = "min: "
                 datamax = str(max(obj))
@@ -119,8 +131,10 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz    = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        elif tt in set_types:
-            if len(obj) and all([isinstance(v, numbers.Number) for v in obj]):
+        #elif tt in set_types:
+        #elif objtype in set_types:
+        elif isinstance(obj, set_types):
+            if len(obj) and all([isinstance(v, Number) for v in obj]):
                 datamin = str(min([v for v in obj]))
                 mintip = "min: "
                 datamax = str(max([v for v in obj]))
@@ -133,7 +147,9 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             #memsz    = str(total_size(obj)) # too slow for large collections
             memsztip = "memory size: "
             
-        elif tt in dict_types:
+        #elif tt in dict_types:
+        #elif objtype in dict_types:
+        elif isinstance(obj, dict_types):
             sz = str(len(obj))
             sizetip = "length: "
             
@@ -142,106 +158,108 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsztip = "memory size: "
             
         #elif tt in ('VigraArray', "PictArray"):
-        elif tt in vigra_array_types:
-            dtypestr = str(obj.dtype)
-            dtypetip = "dtype: "
+        #elif tt in vigra_array_types:
+        #elif isinstance(obj, VigraArray):
+            #dtypestr = str(obj.dtype)
+            #dtypetip = "dtype: "
             
-            if obj.size > 0:
-                try:
-                    if np.all(np.isnan(obj[:])):
-                        datamin = str(np.nan)
+            #if obj.size > 0:
+                #try:
+                    #if np.all(np.isnan(obj[:])):
+                        #datamin = str(np.nan)
                         
-                    else:
-                        datamin = str(np.nanmin(obj))
+                    #else:
+                        #datamin = str(np.nanmin(obj))
                         
-                except:
-                    pass
+                #except:
+                    #pass
                 
-                mintip = "min: "
+                #mintip = "min: "
                 
-                try:
-                    if np.all(np.isnan(obj[:])):
-                        datamax = str(np.nan)
+                #try:
+                    #if np.all(np.isnan(obj[:])):
+                        #datamax = str(np.nan)
                     
-                    else:
-                        datamax  = str(np.nanmax(obj))
+                    #else:
+                        #datamax  = str(np.nanmax(obj))
                         
-                except:
-                    pass
+                #except:
+                    #pass
                 
-                maxtip = "max: "
+                #maxtip = "max: "
                 
-            sz    = str(obj.size)
-            sizetip = "size: "
+            #sz    = str(obj.size)
+            #sizetip = "size: "
             
-            ndims   = str(obj.ndim)
-            dimtip = "dimensions: "
+            #ndims   = str(obj.ndim)
+            #dimtip = "dimensions: "
             
-            shp = str(obj.shape)
-            shapetip = "shape: "
+            #shp = str(obj.shape)
+            #shapetip = "shape: "
             
-            axes    = repr(obj.axistags)
-            axestip = "axes: "
+            #axes    = repr(obj.axistags)
+            #axestip = "axes: "
             
-            arrayorder    = str(obj.order)
-            ordertip = "array order: "
+            #arrayorder    = str(obj.order)
+            #ordertip = "array order: "
             
-            memsz    = str(obj.nbytes)
-            #memsz    = "".join([str(getsizeof(obj)), str(obj.nbytes), "bytes"])
-            memsztip = "memory size (array nbytes): "
+            #memsz    = str(obj.nbytes)
+            ##memsz    = "".join([str(getsizeof(obj)), str(obj.nbytes), "bytes"])
+            #memsztip = "memory size (array nbytes): "
             
         #elif tt in ('Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 'SpikeTrain', "DataSignal", "IrregularlySampledDataSignal"):
-        elif tt in signal_types:
-            dtypestr = str(obj.dtype)
-            dtypetip = "dtype: "
+        #elif tt in signal_types:
+        #elif isinstance(obj, (NeoDataObject, Quantity)):
+            #dtypestr = str(obj.dtype)
+            #dtypetip = "dtype: "
             
-            if obj.size > 0:
-                try:
-                    if np.all(np.isnan(obj[:])):
-                        datamin = str(np.nan)
+            #if obj.size > 0:
+                #try:
+                    #if np.all(np.isnan(obj[:])):
+                        #datamin = str(np.nan)
                         
-                    else:
-                        datamin = str(np.nanmin(obj))
+                    #else:
+                        #datamin = str(np.nanmin(obj))
                         
-                except:
-                    pass
+                #except:
+                    #pass
                     
-                mintip = "min: "
+                #mintip = "min: "
                     
-                try:
-                    if np.all(np.isnan(obj[:])):
-                        datamax = str(np.nan)
+                #try:
+                    #if np.all(np.isnan(obj[:])):
+                        #datamax = str(np.nan)
                         
-                    else:
-                        datamax  = str(np.nanmax(obj))
+                    #else:
+                        #datamax  = str(np.nanmax(obj))
                         
-                except:
-                    pass
+                #except:
+                    #pass
                 
-                maxtip = "max: "
+                #maxtip = "max: "
                 
-            sz    = str(obj.size)
-            sizetip = "size: "
+            #sz    = str(obj.size)
+            #sizetip = "size: "
             
-            ndims   = str(obj.ndim)
-            dimtip = "dimensions: "
+            #ndims   = str(obj.ndim)
+            #dimtip = "dimensions: "
             
-            shp = str(obj.shape)
-            shapetip = "shape: "
+            #shp = str(obj.shape)
+            #shapetip = "shape: "
             
-            memsz    = str(obj.nbytes)
-            #memsz    = "".join([str(getsizeof(obj)), str(obj.nbytes), "bytes"])
-            memsztip = "memory size (array nbytes): "
+            #memsz    = str(obj.nbytes)
+            ##memsz    = "".join([str(getsizeof(obj)), str(obj.nbytes), "bytes"])
+            #memsztip = "memory size (array nbytes): "
             
         #elif tt in ('Block', 'Segment'):
-        elif tt in neo_containers:
+        #elif NeoContainer in getmro(objtype):
+        elif isinstance(obj, NeoContainer):
             sz = str(obj.size)
             sizetip = "size: "
                 
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        #elif tt == 'str':
         elif isinstance(obj, str):
             sz = str(len(obj))
             sizetip = "size: "
@@ -273,8 +291,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        #elif isinstance(obj, pd.Series):
-        elif  tt == "Series":
+        elif isinstance(obj, PandasObject):
             dtypestr = "%s" % obj.dtype
             dtypetip = "dtype: "
 
@@ -290,21 +307,21 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        #elif isinstance(obj, pd.DataFrame):
-        elif tt == "DataFrame":
-            sz = "%s" % obj.size
-            sizetip = "size: "
+        ##elif isinstance(obj, pd.DataFrame):
+        #elif tt == "DataFrame":
+            #sz = "%s" % obj.size
+            #sizetip = "size: "
 
-            ndims = "%s" % obj.ndim
-            dimtip = "dimensions: "
+            #ndims = "%s" % obj.ndim
+            #dimtip = "dimensions: "
             
-            shp = str(obj.shape)
-            shapetip = "shape: "
+            #shp = str(obj.shape)
+            #shapetip = "shape: "
 
-            memsz = str(getsizeof(obj))
-            memsztip = "memory size: "
+            #memsz = str(getsizeof(obj))
+            #memsztip = "memory size: "
             
-        elif tt == ndarray_type:
+        elif isinstance(obj, ndarray):
             dtypestr = str(obj.dtype)
             dtypetip = "dtype: "
             
@@ -342,7 +359,15 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             shapetip = "shape: "
             
             memsz    = str(obj.nbytes)
-            memsztip = "memory size: "
+            memsztip = "memory size (bytes): "
+            
+            if isinstance(obj, VigraArray):
+                axes    = repr(obj.axistags)
+                axestip = "axes: "
+                
+                arrayorder    = str(obj.order)
+                ordertip = "array order: "
+            
             
         else:
             #vmemsize = QtGui.QStandardItem(str(getsizeof(obj)))

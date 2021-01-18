@@ -62,6 +62,9 @@ except:
         pass
     
 def special_directories():
+    """
+    TODO
+    """
     if sys.platform == "linux" and HAS_PYXDG:
         if os.environ.get("XDG_SESSION_DESKTOP", "") == "KDE" and "plasma5" in os.environ.get("DESKTOP_SESSION"):
             pass
@@ -76,8 +79,11 @@ def get_user_places():
         
         bookmarks = user_places.getElementsByTagName("bookmark")
         
+        return bookmarks
+        
         
 def get_user_place(path:typing.Union[pathlib.Path, str]) -> str:
+    path = ""
     if isinstance(path, pathlib.Path):
         path = path.as_uri()
         
@@ -89,6 +95,8 @@ def get_user_place(path:typing.Union[pathlib.Path, str]) -> str:
                 path = os.path.abspath(path)
                 
             path = pathlib.Path(path).as_uri()
+            
+        #return path
         
             
     if sys.platform == "linux" and HAS_PYXDG:

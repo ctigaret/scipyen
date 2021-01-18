@@ -21,6 +21,8 @@ import confuse # configuration library for non-gui options
 from PyQt5 import QtCore, QtWidgets
 #### END 3rd party modules
 
+__module_path__ = os.path.abspath(os.path.dirname(__file__))
+__module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 #import scipyen_defaults
 
 # ===================================================
@@ -91,10 +93,10 @@ def main():
     try:
         #sip.setdestroyonexit(False)
         QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-        library_paths = QtCore.QCoreApplication.libraryPaths()
-        #library_paths.insert(0,'/usr/lib64/qt5/plugins')
-        library_paths.append('/usr/lib64/qt5/plugins')
-        library_paths = QtCore.QCoreApplication.setLibraryPaths(library_paths)
+        #library_paths = QtCore.QCoreApplication.libraryPaths()
+        ##library_paths.insert(0,'/usr/lib64/qt5/plugins')
+        #library_paths.append('/usr/lib64/qt5/plugins')
+        #library_paths = QtCore.QCoreApplication.setLibraryPaths(library_paths)
         app = QtWidgets.QApplication(sys.argv)
         #app.setStyle(QtWidgets.QStyleFactory.create("Breeze"))
         #app.setStyle(MyProxyStyle())

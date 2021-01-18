@@ -141,10 +141,6 @@ from PyQt5.uic import loadUiType
 
 #from IPython.lib.deepreload import reload as dreload
 
-from IPython.core.magic import (Magics, magics_class, line_magic,
-                                cell_magic, line_cell_magic,
-                                needs_local_scope)
-
 from IPython.core.history import HistoryAccessor
 #from IPython.core.autocall import ZMQExitAutocall
 
@@ -154,13 +150,12 @@ from jupyter_client.session import Message
 
 #### END 3rd party modules
 
-#print("sys.path in %s named %s:\n" % (__file__, __name__),  sys.path)
 #### BEGIN pict.core modules
 
 #import core.prog as prog
 from core.prog import (timefunc, timeblock, processtimefunc, processtimeblock,
                        Timer, safeWrapper, warn_with_traceback,)
-
+from core.scipyenmagics import ScipyenMagics
 # NOTE: 2017-04-16 09:48:15 
 # these are also imported into the console in slot_initQtConsole(), so they are
 # available directly in the console
@@ -193,7 +188,7 @@ from ephys import (ephys, ltp, membrane,)
 #from .. import config
 
 # NOTE: 2020-09-28 11:37:25
-# ### BEGIN
+# ### BEGIN expose important data types
 # The following data types, introduced by Scipyen, are important and therefore 
 # should be available in the Scipyen Console namespace. We expose them by 
 # importing here.
@@ -271,9 +266,7 @@ if CaTanalysis.LSCaTWindow not in gui_viewers:
 #### END other pict modules
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-
-# NOTE: 2016-04-03 00:17:42
-__module_name__ = os.path.splitext(os.path.basename(__file__))[0]
+__module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 _valid_varname__regex_ = '^[A-Za-z_][A-Za-z0-9_]{1,30}$'
 
@@ -301,7 +294,6 @@ _info_banner_.append("matplotlib.pylab -> plb")
 _info_banner_.append("matplotlib.matlab -> mlb")
 _info_banner_.append("scipy")
 _info_banner_.append("vigra")
-#_info_banner_.append("vigra.pyqt")
 _info_banner_.append("quantities -> pq")
 _info_banner_.append("\n")
 _info_banner_.append("The following modules are from PyQt5")
@@ -336,138 +328,6 @@ __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__,"ma
 
 __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__,"scriptmanagerwindow.ui"), from_imports=True, import_from="gui")
 
-@magics_class
-class ScipyenMagics(Magics):
-    @line_magic
-    @needs_local_scope
-    def exit(self, line, local_ns):
-        """%exit line magic
-        """
-        if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
-            local_ns["mainWindow"].slot_pictQuit()
-            
-        #return line
-    
-    @line_magic
-    @needs_local_scope
-    def quit(self, line, local_ns):
-        """%exit line magic
-        """
-        if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
-            local_ns["mainWindow"].slot_pictQuit()
-            
-        #return line
-    
-    @line_magic
-    @needs_local_scope
-    def external_ipython(self, line, local_ns):
-        """%external_ipython magic launches a separate Jupyter Qt Console process
-        """
-        
-        if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
-            local_ns["mainWindow"]._init_ExternalIPython_()
-            
-        #return line
-    
-    @line_magic
-    @needs_local_scope
-    def neuron_ipython(self, line, local_ns):
-        """%neuron_ipython magic launches a separate NEURON Python process
-        """
-        
-        if "mainWindow" in local_ns and isinstance(local_ns["mainWindow"], ScipyenWindow):
-            local_ns["mainWindow"]._init_ExternalIPython_(new="neuron")
-            
-        #return line
-    
-    @line_magic
-    @needs_local_scope
-    def workspace(self, line, local_ns):
-        """%workspace magic returns a reference to the user namespace
-        
-        Alternative function to use in your own codes: 
-            core.workspacefunctions.user_workspace()
-        
-        """
-        return local_ns
-    
-    @line_magic
-    @needs_local_scope
-    def scipyen_debug(self, line, local_ns):
-        """Turn on/off debugging messages in Scipyen code
-        
-        Calls:
-        scipyen_debug => toggles scipyen debugging
-        
-        scipyen_debug "on", or scipyen_debug True -> turns debugging ON
-        
-        scipyen_debug "off", or scipyen_debug False -> turns debugging OFF
-        
-        any other argument turns debugging OFF
-        
-        For a programmatic way to access/set SCIPYEN_DEBUG, see
-        workspacefunctions.debug_scipyen()
-        
-        Returns:
-        -------
-        The new value of SCIPYEN_DEBUG in the user workspace
-        
-        """
-        if len(line.strip()):
-            if line.strip().lower() in ("on", "true", "off", "false"):
-                val = True if line.strip().lower() in ("on", "true") else False
-            
-            else:
-                val = False
-                
-            return debug_scipyen(val)
-        
-        else:
-            val = user_workspace().get("SCIPYEN_DEBUG", False)
-            return debug_scipyen(not val)
-            
-    @line_magic
-    @needs_local_scope
-    def LSCaT(self, line, local_ns):
-        from imaging import CaTanalysis
-        if len(line.strip()):
-            lsdata = local_ns.get(line, None)
-            
-        else:
-            lsdata = None
-            
-        mw = local_ns.get("mainWindow", None)
-        if isinstance(mw, ScipyenWindow):
-            if lsdata is not None:
-                lscatWindow = CaTanalysis.LSCaTWindow(lsdata, parent=mw, pWin=mw, win_title="LSCaT")
-            else:
-                lscatWindow = CaTanalysis.LSCaTWindow(parent=mw, pWin=mw, win_title="LSCaT")
-            lscatWindow.show()
-            
-        #return line
-    
-    
-#class MyProxyStyle(QtWidgets.QProxyStyle):
-    #"""To prevent repeats of valueChanged in QSpinBox controls for frame navigation.
-    
-    #This raises the spin box SH_SpinBox_ClickAutoRepeatThreshold so that
-    #valueChanged is not repetedly called when frame navigation takes too long time.
-    
-    #See https://bugreports.qt.io/browse/QTBUG-33128.
-    
-    #"""
-    #def __init__(self, *args):
-        #super().__init__(*args)
-        
-    #def styleHint(self, hint, *args, **kwargs):
-        #if hint == QtWidgets.QStyle.SH_SpinBox_ClickAutoRepeatRate:
-            #return 0
-        
-        #elif hint == QtWidgets.QStyle.SH_SpinBox_ClickAutoRepeatThreshold:
-            #return 1000000
-        
-        #return super().styleHint(hint, *args, **kwargs)
-        
 class FileSystemModel(QtWidgets.QFileSystemModel):
     # sys.platform -> 'linux', 'win32', 'cygwin', 'darwin'
     
@@ -1676,10 +1536,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #self._default_scipyen_settings_ = defaults
         self._scipyen_settings_         = settings
         
+        self._scipyendir_ = ""
         # NOTE: 2021-01-10 16:26:18
         # read must be called ONLY ONCE
         if isinstance(self._scipyen_settings_, confuse.LazyConfig) and not self._scipyen_settings_._materialized:
             self._scipyen_settings_.read()
+            defsrc = [s for s in self._scipyen_settings_.sources if s.default]
+            if len(defsrc):
+                self._scipyendir_ = os.path.dirname(defsrc[0].filename)
+                
+            else:
+                self._scipyendir_ = os.path.dirname(__module_path__)
         
         self._temp_python_filename_   = None # cached file name for python source (for loading or running)
         
@@ -1748,7 +1615,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         # NOTE: 2016-03-20 14:49:05
         # we also need to quit the app when Pict main window is closed
-        self.app.destroyed.connect(self.slot_pictQuit)
+        self.app.destroyed.connect(self.slot_Quit)
         
         # NOTE: 2017-07-04 16:10:14
         # for this to work one has to set horizontalScrollBarPolicy
@@ -1870,6 +1737,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         
             
         """
+        # TODO: 2021-01-17 11:08:38 Contemplate:
+        # special case(s) of remote kernel connections where we also start the
+        # remote kernel itself (e.g. jupyter notebook, jupyterlab)
+        # use asynchronous approach to:
+        # 1. start remote kernel
+        # 2. once started, automatically import useful libraries such as bokeh etc
+        # 3. make this in two flavours, one of them with NEURON environment
         from core.extipyutils_client import nrn_ipython_initialization_cmd
         
         #print("_init_ExternalIPython_ new", new)
@@ -2038,6 +1912,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     'config_dir'/config.yaml.
                     On machines runninx Linux, 'config_dir' is
                     $HOME/.config/Scipyen
+                    
+        scipyen_topdir
+                    The top directory tree if scipyen.
+                    By default this is the same as the directory of the package
+                    default configuration file ("config_default.yaml").
+                    
+                    If this file does not exist, or is empty, then this is the 
+                    parent directory of the one containing the mainwindow module.
+                    
+                    NOTE: this can also be displayed by the line magics
+                        %appdir and %scipyendir
         
         
         
@@ -2098,8 +1983,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # * shell.run_cell(str) does the same as console.execute with hidden=False
         #   (the extression in str is always echoed; there is no "hidden" parameter
         #   to run_cell(...))
-        
-        #from core import custom_magics
         
         if not isinstance(self.console, consoles.ScipyenConsole):
             
@@ -2195,7 +2078,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             #
             # this effectively is the second time they're being imported, but this time
             # in the ipkernel environment
-            # __module_name__ is "pict" so we take all its contents into the kernel
+            # __module_file_name__ is "pict" so we take all its contents into the kernel
             # namespace (they're just references to those objects)
             self.workspace = self.ipkernel.shell.user_ns
             
@@ -2211,8 +2094,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.workspace['ipkernel'] = self.ipkernel
             self.workspace['console'] = self.console # useful for testing functionality; remove upon release
             self.workspace["shell"] = self.shell # alias to self.ipkernel.shell
-            #self.workspace["scipyen_defaults"] = self._default_scipyen_settings_
             self.workspace["scipyen_settings"] = self._scipyen_settings_
+            self.workspace["scipyen_topdir"] = self._scipyendir_
             
             #print("exit" in self.ipkernel.shell.user_ns)
             
@@ -2241,7 +2124,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # NOTE: 2020-11-29 15:57:08
             # this imports current module in the user workspace as well
             
-            impcmd = ' '.join(['from', "".join(["gui.", __module_name__]), 'import *'])
+            impcmd = ' '.join(['from', "".join(["gui.", __module_file_name__]), 'import *'])
             
             self.ipkernel.shell.run_cell(impcmd)
             
@@ -2264,7 +2147,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     #@pyqtSlot()
     #@safeWrapper
     #def slot_restoreWorkspace(self):
-        #impcmd = ' '.join(['from', __module_name__, 'import *'])
+        #impcmd = ' '.join(['from', __module_file_name__, 'import *'])
         #self.ipkernel.shell.run_cell(impcmd)
         ##self.workspace['mainWindow'] = self
         #self.workspace['mainWindow'] = self #.workspace['mainWindow']
@@ -3207,7 +3090,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #NOTE: 2017-03-19 22:54:55 also this DOES NOT re-create the output
         #NOTE: I guess I can live with this for now...
 
-    def slot_pictQuit(self):
+    @pyqtSlot()
+    def slot_Quit(self):
         evt = QtGui.QCloseEvent()
         self.closeEvent(evt)
         
@@ -3514,9 +3398,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         # NOTE:2019-08-06 15:21:23
         # this will mess up filesFilterFrame visibility!
-        #self.app.lastWindowClosed.connect(self.slot_pictQuit)
+        #self.app.lastWindowClosed.connect(self.slot_Quit)
         
-        self.actionQuit.triggered.connect(self.slot_pictQuit)
+        self.actionQuit.triggered.connect(self.slot_Quit)
         
         self.actionConsole.triggered.connect(self.slot_initQtConsole)
         #self.actionRestore_Workspace.triggered.connect(self.slot_restoreWorkspace)
