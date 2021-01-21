@@ -4,7 +4,7 @@ scipyendir=`dirname $realscript`
 scipyenvdir=`dirname $scipyendir`
 
 if [ -z $1 ]; then
-    echo "Resetting BROWSER to default"
+    echo "Resetting BROWSER to system's default"
     unset BROWSER
 fi
 
