@@ -3,8 +3,13 @@
 """
 
 import asyncio, subprocess, signal, sys, os
+import concurrent.futures
 from subprocess import (PIPE, Popen,)
+import tornado
 from notebook import notebookapp as nbapp
+
+import zmq
+#from zmq.asyncio import (Context, ZMQEventLoop,)
 
 async def asyncstart_jupyter_notebook():
     nbapp.launch_new_instance()
@@ -13,6 +18,17 @@ def launch_jupyter_notebook_test1():
     loop = asyncio.get_event_loop()
     loop.run_until_complete(asyncstart_jupyter_notebook())
     loop.close()
+    
+def nblaunch(argv=None, **kwargs):
+    app = nbapp.NotebookApp.instance(**kwargs)
+    app.initialize(argv)
+    app.start()
+    return app
+    
+    
+#async def launch_jupyter_notebook_coro_test2(argv=None, **kwarg):
+    #app = nblaunch(argv, **kwargs)
+    #yield app
     
 #def test_run():
     ## invalid syntax
@@ -61,10 +77,7 @@ def launch_jupyter_notebook(browser:str="firefox", redirect=False):
     else:
         return subprocess.run(("jupyter", "notebook", "--browser", browser))
     
-
-
-
-def popen_jupyter_notebook(browser:str="firefox", redirect=False):
+def launch_jupyter_notebook_popen(browser:str="firefox", redirect=False):
     """Launch jupter notebook server as a separate process as if from a shell.
     """
     # NOTE: 2021-01-19 22:08:23
@@ -107,5 +120,20 @@ def kill_process_gracefully(p, sig=None):
         os.kill(p.pid, sig) # interrupt from keyboard
         
     
+def launch_jupyter_notebook_popen_concurrent_thread(browser: str = "firefox", redirect=False):
+    ret = tuple()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        futures = [executor.submit(launch_jupyter_notebook_popen, browser=browser, redirect=False)]
+        
+    for future in concurrent.futures.as_completed(futures):
+        ret = future.result().communicate() # result() returns a subprocess.Popen object
+        
+    return ret
+
     
+def launch_jupyter_notebook_coro_concurrent_thread(browser: str = "firefox", redirect=False):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(nblaunch)
+        return future
+        
     

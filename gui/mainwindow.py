@@ -3011,13 +3011,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #self._updateHistoryView_(self.executionCount-1, self.ipkernel.shell.history_manager.input_hist_raw[-1])
         #self.slot_updateWorkspaceTable()
         
-    def _recallCommand_(self):
-        cmd = self._getHistoryBlockAsCommand_("%recall")
+    #def _recallCommand_(self):
+        ## apparently this isn't used anywhere in Scipyen project
+        #cmd = self._getHistoryBlockAsCommand_("%recall")
 
-        self.ipkernel.shell.run_cell(cmd, store_history = True, silent=False, shell_futures=True)
-        self.executionCount = self.ipkernel.shell.execution_count
-        self._updateHistoryView_(self.executionCount-1, self.ipkernel.shell.history_manager.input_hist_raw[-1])
-        self.slot_updateWorkspaceTable(False)
+        #self.ipkernel.shell.run_cell(cmd, store_history = True, silent=False, shell_futures=True)
+        #self.executionCount = self.ipkernel.shell.execution_count
+        #self._updateHistoryView_(self.executionCount-1, self.ipkernel.shell.history_manager.input_hist_raw[-1])
+        #self.slot_updateWorkspaceTable(False)
 
     @pyqtSlot("QTreeWidgetItem*", int)
     @safeWrapper

@@ -1742,7 +1742,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # remote kernel itself (e.g. jupyter notebook, jupyterlab)
         # use asynchronous approach to:
         # 1. start remote kernel
-        # 2. one started, automatically import useful libraries such as bokeh etc
+        # 2. once started, automatically import useful libraries such as bokeh etc
         # 3. make this in two flavours, one of them with NEURON environment
         from core.extipyutils_client import nrn_ipython_initialization_cmd
         
