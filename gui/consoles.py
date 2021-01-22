@@ -379,40 +379,16 @@ class ExternalConsoleWindow(MainWindow):
         return False
             
 
-    #def create_new_tab_with_new_kernel_and_execute(self, code=None, **kwargs):
-        #"""create a new frontend and attach it to a new tab"""
-        #widget = self.new_frontend_factory()
-        #self.add_tab_with_frontend(widget)
-        #widget.kernel_client.execute(code=code, **kwargs)
-        #current_widget_index = self.tab_widget.indexOf(widget)
-        
     def create_neuron_tab(self):
         return self.create_tab_with_new_frontend(code=nrn_ipython_initialization_cmd,
                                           silent=True,
                                           store_history=False)
-        #self.create_new_tab_with_new_kernel_and_execute(code=nrn_ipython_initialization_cmd,
-                                                        #silent=True,
-                                                        #store_history=False)
-        
-        #ndx = self.tab_widget.indexOf(self.active_frontend)
-        
-        #if "NEURON" not in self.tab_widget.tabText(ndx):
-            #self.prefix_tab_title("NEURON ", ndx)
-                                ####self.tab_widget.indexOf(self.active_frontend))
         
     def start_neuron_in_current_tab(self):
         self.active_frontend.kernel_client.execute(code=nrn_ipython_initialization_cmd,
                                                    silent=True,
                                                    store_history=False)
         
-        #current_widget_index = self.tab_widget.indexOf(self.active_frontend)
-        #self.prefix_tab_title("NEURON ", current_widget_index)
-        #old_title = self.tab_widget.tabText(current_widget_index)
-        #if "NEURON" not in old_title:
-            #new_title= "NEURON %s" % old_title
-            #self.tab_widget.setTabText(current_widget_index, new_title)
-            
-
     def insert_menu_action(self, menu, action, before, defer_shortcut=False):
         """Inserts action to menu before "before", as well adds it to self
 

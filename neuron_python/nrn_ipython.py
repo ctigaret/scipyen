@@ -1,3 +1,29 @@
+# -*- coding: utf-8 -*-
+"""Initialization code to use NEURON environment with external IPython kernels.
+To be used on the "host" side (i.e. executed by the external kernel)
+
+Should NOT be imported in Scipyen or its internal IPython console; instead, its
+use is intended to be run as a script (i.e. as in "run -i -n" ) either:
+a) by one of the custom IPython magics registered with the external IPython 
+    kernel and defined in core.extipyutils_host.py; these are:
+    
+        nrngui and nrnpy
+        
+    which, when called in the external console, initialize the NEURON environment
+    WITH (nrngui) or WITHOUT (nrnpy) NEURON's InterViews-based GUI tools.
+    
+b) as part of the initialization code when launching a NEURON-enabled external
+    IPython kernel from within Scipyen.
+    
+    See for example:
+    
+        The module core.extipyutils_client.py for code executed upon external 
+            IPython kernel initialization
+        
+        The methods create_neuron_tab() and start_neuron_in_current_tab() of
+            gui.consoles.ExternalConsoleWindow
+
+"""
 import os
 import neuron
 from neuron import h, rxd, units, nrn

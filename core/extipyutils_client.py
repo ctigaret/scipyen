@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Module with utilities for an external IPython kernel.
-To be used on the client side (i.e. Scipyen app side)
+To be used on the client side (i.e. Scipyen app side).
+Contains functions and types used ot communicate with the remote kernel via its
+messaging API.
 """
 # on the client side, in a received execute_reply message the keys of
 # msg["content"]["user_expressions"] are identical to those in the

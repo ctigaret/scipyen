@@ -1,6 +1,16 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
+"""IPython script to manually start NEURON environment with IPython kernel.
 
+ATTENTION: This is intended to start NEURON from a shell, and is independent of 
+Scipyen framework.
+
+Running this script from within Scipyen will likely crash Scipyen.
+
+To launch NEURON inside an IPython kernel within Scipyen, use 'Consoles' menu
+in Scipyen's main window.
+
+"""
 import os, sys, traceback, warnings, json, pickle
 from pprint import pprint
 
