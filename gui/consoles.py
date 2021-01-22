@@ -825,7 +825,7 @@ class ExternalConsoleWindow(MainWindow):
                         # (useful when the remote kernel has died but the local 
                         # client still has channels open, in which case it keeps
                         # spewing out "WARNING:traitlets:kernel died:" on stderr)
-                        if not(kernel_client.is_alive())                        
+                        if not(kernel_client.is_alive()):
                             background(kernel_client.stop_channels)
                             
                         # NOTE: 2021-01-22 14:08:10
@@ -852,7 +852,6 @@ class ExternalConsoleWindow(MainWindow):
                 if kernel_manager:
                     kernel_manager.shutdown_kernel()
                 background(kernel_client.stop_channels)
-                #self.sig_kernel_exit.emit(tab_text)
                 self.sig_kernel_exit.emit(closing_tab_text)
 
         self.update_tab_bar_visibility()
