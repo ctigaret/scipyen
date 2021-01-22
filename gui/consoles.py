@@ -453,7 +453,7 @@ class ExternalConsoleWindow(MainWindow):
         else:
             return [self.tab_widget.indexOf(w) for w in filtered_widget_list]
         
-    def find_widget_with_kernel_client(self, km, as_widget_list:bool=True):
+    def find_widget_with_kernel_client(self, kc, as_widget_list:bool=True, alive_only=False):
         """Find the frontends with the specified kernel client.
         
         For a given kernel manager there is only one "master" frontend (the 
@@ -482,13 +482,13 @@ class ExternalConsoleWindow(MainWindow):
         
         """
         
-        if not km.is_alive():
-            return
+        if alive_only and not kc.is_alive():
+            return []
         
         widget_list = [self.tab_widget.widget(i) for i in range(self.tab_widget.count())]
         
         filtered_widget_list = [widget for widget in widget_list if
-                                widget.kernel_client.connection_file == km.connection_file]
+                                widget.kernel_client.connection_file == kc.connection_file]
         
         if as_widget_list:
             return filtered_widget_list
@@ -604,7 +604,30 @@ class ExternalConsoleWindow(MainWindow):
         # Mechanism for capturing kernel messages via the shell channel.
         # In the Qt console framework these communication channels with the (remote)
         # kernel are Qt objects (QtZMQSocketChannel). In particular, the channels
-        # emit generic Qt signals that contain the actual kernel message
+        # emit Qt signals that contain the actual kernel message
+        # 
+        # The kernel client here is a QtKernelClient inherits from 
+        #   jupyter_client.threaded.ThreadedKernelClient
+        # and emits:
+        #   started_channels and stopped_channels Qt signals
+        #
+        # In addition, it (re)defines:
+        #    iopub_channel_class = Type(QtZMQSocketChannel) # iopub channel
+        #    shell_channel_class = Type(QtZMQSocketChannel) # shell channel
+        #    stdin_channel_class = Type(QtZMQSocketChannel) # stdin channel
+        #    hb_channel_class = Type(QtHBChannel)           # heartbeat channel
+        #
+        # where QtZMQSocketChannel is a jupyter_client.threaded.ThreadedZMQSocketChannel
+        #   that is capable of emitting message_received Qt signal
+        #
+        # The channels used by the client for commnication with the kernel are:
+        # 
+        # client.shell_channel -- connected via the client.shell_port
+        # client.stdin_channel -- connected via the client.stdin_port
+        # client.iopub_channel -- connected via the client.iopub_port
+        # client.hb_channel    -- connected via the client.hb_port
+        #
+        # 
         #frontend.kernel_client.started_channels.connect(self.slot_kernel_client_started_channels)
         #frontend.kernel_client.stopped_channels.connect(self.slot_kernel_client_stopped_channels)
         #frontend.kernel_client.iopub_channel.
@@ -672,6 +695,10 @@ class ExternalConsoleWindow(MainWindow):
         It takes the number of the tab to be closed as argument, or a reference
         to the widget inside this tab
         """
+        
+        # NOTE: 2021-01-22 13:40:17
+        # for external kernels this (the client) is oblivious to the kernel manager
+        # i.e. ExternalIPython.active_kernel_manager is None
 
         # let's be sure "tab" and "closing widget" are respectively the index
         # of the tab to close and a reference to the frontend to close
@@ -689,13 +716,16 @@ class ExternalConsoleWindow(MainWindow):
         if closing_widget is None:
             return
         
+        kernel_client = closing_widget.kernel_client
+        kernel_manager = closing_widget.kernel_manager
+        
         closing_tab_text = self.tab_widget.tabText(tab).replace(" ", "_")
 
         #get a list of all slave widgets on the same kernel.
         slave_tabs = self.find_slave_widgets(closing_widget)
 
         keepkernel = None #Use the prompt by default
-        if hasattr(closing_widget,'_keep_kernel_on_exit'): #set by exit magic
+        if hasattr(closing_widget,'_keep_kernel_on_exit'): # set by exit magic
             keepkernel = closing_widget._keep_kernel_on_exit
             #print("keepkernel", keepkernel)
             # If signal sent by exit magic (_keep_kernel_on_exit, exist and not None)
@@ -716,14 +746,13 @@ class ExternalConsoleWindow(MainWindow):
                             
                         else:
                             self.tab_widget.removeTab(tab)
+                            
                     except AttributeError:
                         self.log.info("Master already closed or not local, closing only current tab")
                         self.tab_widget.removeTab(tab)
                     self.update_tab_bar_visibility()
                     return
 
-        kernel_client = closing_widget.kernel_client
-        kernel_manager = closing_widget.kernel_manager
 
         if keepkernel is None and not closing_widget._confirm_exit:
             # don't prompt, just terminate the kernel if we own it
@@ -755,21 +784,33 @@ class ExternalConsoleWindow(MainWindow):
                     pixmap = QtGui.QPixmap(self._app.icon.pixmap(QtCore.QSize(64,64)))
                     box.setIconPixmap(pixmap)
                     reply = box.exec_()
-                    if reply == 1: # close All
+                    if reply == 1: 
+                        # close All and quit the kernel:
+                        # also stop the kernel client channels
                         for slave in slave_tabs:
                             background(slave.kernel_client.stop_channels)
                             self.tab_widget.removeTab(self.tab_widget.indexOf(slave))
+                            
                         kernel_manager.shutdown_kernel()
                         self.tab_widget.removeTab(tab)
                         background(kernel_client.stop_channels)
                         self.sig_kernel_exit.emit(closing_tab_text)
-                    elif reply == 0: # close Console
+                        
+                    elif reply == 0: # just close the Console
                         if not closing_widget._existing:
                             # Have kernel: don't quit, just close the tab
                             closing_widget.execute("exit True")
+                            
                         self.tab_widget.removeTab(tab)
-                        background(kernel_client.stop_channels)
+                        
+                        if not kernel_client.is_alive():
+                            # stop client channels and clear workspace if kernel is dead
+                            background(kernel_client.stop_channels)
+                            self.sig_kernel_exit.emit(closing_tab_text)
+                        
                 else:
+                    # we do nothing tot he kernel here because it was started 
+                    # by someone else
                     reply = QtWidgets.QMessageBox.question(self, title,
                         "Are you sure you want to close this Console?"+
                         "\nThe Kernel and other Consoles will remain active.",
@@ -777,9 +818,28 @@ class ExternalConsoleWindow(MainWindow):
                         defaultButton=okay
                         )
                     if reply == okay:
+                        # figure out if there are other tabs open; it not then
+                        # emit signal to clear up Scipyen's workspace
+                        # NOTE: 2021-01-22 14:09:30
+                        # if kernel has died, also stop this client's channels 
+                        # (useful when the remote kernel has died but the local 
+                        # client still has channels open, in which case it keeps
+                        # spewing out "WARNING:traitlets:kernel died:" on stderr)
+                        if not(kernel_client.is_alive())                        
+                            background(kernel_client.stop_channels)
+                            
+                        # NOTE: 2021-01-22 14:08:10
+                        # gracefully clear up the workspace when no other clients
+                        # are connected to the kernel
+                        if len(slave_tabs) == 1 or not kernel_client.is_alive():
+                            self.sig_kernel_exit.emit(closing_tab_text)
+                            
                         self.tab_widget.removeTab(tab)
-        elif keepkernel: #close console but leave kernel running (no prompt)
+                        
+        elif keepkernel: # close console but leave kernel running (no prompt)
             self.tab_widget.removeTab(tab)
+            if not(kernel_client.is_alive()):
+                self.sig_kernel_exit.emit(closing_tab_text)
             background(kernel_client.stop_channels)
             
         else: #close console and kernel (no prompt) - usually calling exit at cli
@@ -800,12 +860,16 @@ class ExternalConsoleWindow(MainWindow):
     @pyqtSlot()
     @safeWrapper
     def slot_kernel_client_started_channels(self):
+        """Not in use
+        """
         tab_txt = self.tab_widget.tabText(self.tab_widget.indexOf(self.current_widget)).replace(" ", "_")
         self.sig_kernel_started_channels.emit(tab_txt)
         
     @pyqtSlot()
     @safeWrapper
     def slot_kernel_client_stopped_channels(self):
+        """Not in use
+        """
         tab_txt = self.tab_widget.tabText(self.tab_widget.indexOf(self.current_widget)).replace(" ", "_")
         self.sig_kernel_stopped_channels.emit(tab_txt)
         
@@ -1302,7 +1366,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         This may be different from self.kernel_manager which is only set once
         (and hence is the kernel manager of the first frontend of the console)
         """
-        return self.window.active_frontend.kernel_manager
+        return self.window.active_frontend.kernel_manager if self.window.active_frontend else None
     
     @property
     def active_kernel_client(self):
@@ -1310,7 +1374,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         This may be different from self.kernel_client which is only set once
         (and hence is the kernel client of the first frontend of the console)
         """
-        return self.window.active_frontend.kernel_client
+        return self.window.active_frontend.kernel_client if self.window.active_frontend else None
     
     @property
     def active_manager_session(self):
@@ -1318,14 +1382,14 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         This may be different from self.session which is only set once
         (and hence is the session of the first frontend of the console)
         """
-        return self.window.active_frontend.kernel_manager.session
+        return self.window.active_frontend.kernel_manager.session if self.window.active_frontend else None
     
     @property
     def active_client_session(self):
         """Kernel client session of the active frontend.
         The manager and client session are different objects.
         """
-        return self.window.active_frontend.kernel_client.session
+        return self.window.active_frontend.kernel_client.session if self.window.active_frontend else None
     
     @property
     def scrollBarPosition(self):
