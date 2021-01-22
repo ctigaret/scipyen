@@ -809,7 +809,7 @@ class ExternalConsoleWindow(MainWindow):
                             self.sig_kernel_exit.emit(closing_tab_text)
                         
                 else:
-                    # we do nothing tot he kernel here because it was started 
+                    # we do nothing to the kernel here because it was started 
                     # by someone else
                     reply = QtWidgets.QMessageBox.question(self, title,
                         "Are you sure you want to close this Console?"+
@@ -820,14 +820,6 @@ class ExternalConsoleWindow(MainWindow):
                     if reply == okay:
                         # figure out if there are other tabs open; it not then
                         # emit signal to clear up Scipyen's workspace
-                        # NOTE: 2021-01-22 14:09:30
-                        # if kernel has died, also stop this client's channels 
-                        # (useful when the remote kernel has died but the local 
-                        # client still has channels open, in which case it keeps
-                        # spewing out "WARNING:traitlets:kernel died:" on stderr)
-                        if not(kernel_client.is_alive()):
-                            background(kernel_client.stop_channels)
-                            
                         # NOTE: 2021-01-22 14:08:10
                         # gracefully clear up the workspace when no other clients
                         # are connected to the kernel
@@ -835,6 +827,16 @@ class ExternalConsoleWindow(MainWindow):
                             self.sig_kernel_exit.emit(closing_tab_text)
                             
                         self.tab_widget.removeTab(tab)
+                        
+                        # NOTE: 2021-01-22 14:09:30
+                        # if kernel has died, also stop this client's channels 
+                        # (useful when the remote kernel has died but the local 
+                        # client still has channels open, in which case it keeps
+                        # spewing out "WARNING:traitlets:kernel died:" on stderr)
+                        background(kernel_client.stop_channels)
+                        #if not(kernel_client.is_alive()):
+                            #background(kernel_client.stop_channels)
+                            
                         
         elif keepkernel: # close console but leave kernel running (no prompt)
             self.tab_widget.removeTab(tab)
