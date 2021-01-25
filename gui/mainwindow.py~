@@ -1746,7 +1746,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # 3. make this in two flavours, one of them with NEURON environment
         from core.extipyutils_client import nrn_ipython_initialization_cmd
         
-        #print("_init_ExternalIPython_ new", new)
+        print("_init_ExternalIPython_ new", new)
         
         if not isinstance(self.external_console, consoles.ExternalIPython):
             if isinstance(new, str) and new in ("connection", "neuron_ext"):
@@ -3011,13 +3011,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #self._updateHistoryView_(self.executionCount-1, self.ipkernel.shell.history_manager.input_hist_raw[-1])
         #self.slot_updateWorkspaceTable()
         
-    def _recallCommand_(self):
-        cmd = self._getHistoryBlockAsCommand_("%recall")
+    #def _recallCommand_(self):
+        ## apparently this isn't used anywhere in Scipyen project
+        #cmd = self._getHistoryBlockAsCommand_("%recall")
 
-        self.ipkernel.shell.run_cell(cmd, store_history = True, silent=False, shell_futures=True)
-        self.executionCount = self.ipkernel.shell.execution_count
-        self._updateHistoryView_(self.executionCount-1, self.ipkernel.shell.history_manager.input_hist_raw[-1])
-        self.slot_updateWorkspaceTable(False)
+        #self.ipkernel.shell.run_cell(cmd, store_history = True, silent=False, shell_futures=True)
+        #self.executionCount = self.ipkernel.shell.execution_count
+        #self._updateHistoryView_(self.executionCount-1, self.ipkernel.shell.history_manager.input_hist_raw[-1])
+        #self.slot_updateWorkspaceTable(False)
 
     @pyqtSlot("QTreeWidgetItem*", int)
     @safeWrapper
@@ -5267,6 +5268,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     #print("mainwindow: %s len(ns_listings)" % msg["tab"], len(ns_listings))
                     for key, val in ns_listings.items():
                         ns_name = key.replace("ns_listing_of_","").replace(" ", "_")
+                        print("ns_name", ns_name)
                         if ns_name == msg["tab"]:
                             if isinstance(val, dict):
                                 self.workspaceModel.update_foreign_namespace(ns_name, val)

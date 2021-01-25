@@ -1746,7 +1746,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # 3. make this in two flavours, one of them with NEURON environment
         from core.extipyutils_client import nrn_ipython_initialization_cmd
         
-        #print("_init_ExternalIPython_ new", new)
+        print("_init_ExternalIPython_ new", new)
         
         if not isinstance(self.external_console, consoles.ExternalIPython):
             if isinstance(new, str) and new in ("connection", "neuron_ext"):
@@ -5268,6 +5268,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     #print("mainwindow: %s len(ns_listings)" % msg["tab"], len(ns_listings))
                     for key, val in ns_listings.items():
                         ns_name = key.replace("ns_listing_of_","").replace(" ", "_")
+                        #print("ns_name", ns_name)
                         if ns_name == msg["tab"]:
                             if isinstance(val, dict):
                                 self.workspaceModel.update_foreign_namespace(ns_name, val)

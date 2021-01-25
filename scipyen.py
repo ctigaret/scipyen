@@ -18,7 +18,7 @@ import sys, os, atexit, re, inspect, gc, io, traceback
 import confuse # configuration library for non-gui options
 
 # NOTE: 2019-07-29 12:08:47 these are imported indirectly via pict.gui
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import (QtCore, QtWidgets, QtGui, )
 #### END 3rd party modules
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -98,6 +98,7 @@ def main():
         #library_paths.append('/usr/lib64/qt5/plugins')
         #library_paths = QtCore.QCoreApplication.setLibraryPaths(library_paths)
         app = QtWidgets.QApplication(sys.argv)
+        app.icon = QtGui.QIcon.fromTheme("python")
         #app.setStyle(QtWidgets.QStyleFactory.create("Breeze"))
         #app.setStyle(MyProxyStyle())
         

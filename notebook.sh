@@ -12,5 +12,6 @@ if [ -z $BROWSER ]; then
         source $scipyenvdir/bin/browser
     fi
 fi
+
 jupyter notebook &
 
