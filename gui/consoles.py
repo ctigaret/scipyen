@@ -206,7 +206,7 @@ class ExternalConsoleWindow(MainWindow):
     sig_kernel_exit = pyqtSignal(str)
     #sig_will_close = pyqtSignal()
     
-    def __init__(self, app,
+    def __init__(self, app, consoleapp,
                     confirm_exit=True,
                     new_frontend_factory=None,                  # ExternalIPython.new_frontend_master
                     slave_frontend_factory=None,                # ExternalIPython.new_frontend_slave
@@ -251,6 +251,7 @@ class ExternalConsoleWindow(MainWindow):
         self.app = app # this is the parent (running) Scipyen application, not
         # the ExternalIPython! - NOTE: 2021-01-23 21:15:52 this is another 
         # difference from the jupyter qtconsole
+        self.consoleapp = consoleapp # NOTE: THIS is the ExternalIPython app
         
         self._connection_files = set() 
         self._external_connection_files = set()
@@ -260,6 +261,7 @@ class ExternalConsoleWindow(MainWindow):
         # { "master": {"frontend":widget,
         #               "manager_session_ID": str,
         #               "client_session_ID": str} or None, 
+        #               "tab_name": str
         #   "slaves": list of dicts (as for master),
         #   "name":   str}
         #
@@ -459,6 +461,20 @@ class ExternalConsoleWindow(MainWindow):
         
         return False
         
+    def create_tab_with_current_kernel(self):
+        """create a new frontend attached to the same kernel as the current tab"""
+        current_widget = self.tab_widget.currentWidget()
+        current_widget_index = self.tab_widget.indexOf(current_widget)
+        current_widget_name = self.tab_widget.tabText(current_widget_index)
+        widget = self.slave_frontend_factory(current_widget)
+        self.add_tab_with_frontend(widget)
+        #if 'slave' in current_widget_name:
+            ## don't keep stacking slaves
+            #name = current_widget_name
+        #else:
+            #name = '(%s) slave' % current_widget_name
+        #self.add_tab_with_frontend(widget,name=name)
+
     def create_tab_with_new_frontend(self, code=None, **kwargs):
         """create a new frontend and attach it to a new tab
         calls ExternalIPython.new_frontend_master, with its own, newly-created
@@ -591,7 +607,7 @@ class ExternalConsoleWindow(MainWindow):
         else:
             return [self.tab_widget.indexOf(w) for w in filtered_widget_list]
         
-    def find_widget_for_sessionID(self, sessionID:str, 
+    def find_widget_for_client_sessionID(self, sessionID:str, 
                                         as_widget_list:bool=True, alive_only:bool=True):
         widget_list = [self.tab_widget.widget(i) for i in range(self.tab_widget.count())]
         
@@ -610,24 +626,64 @@ class ExternalConsoleWindow(MainWindow):
         else:
             return [self.tab_widget.indexOf(w) for w in filtered_widget_list]
         
-    def find_widget_for_conection_file(self, connection_file:str, 
+    def find_widgets_for_manager_sessionID(self, sessionID:str, 
+                                        as_widget_list:bool=True, alive_only:bool=True):
+        widget_list = [self.tab_widget.widget(i) for i in range(self.tab_widget.count())]
+        
+        if alive_only:
+            filtered_widget_list = [widget for widget in widget_list if
+                                    widget.kernel_manager.is_alive() and \
+                                    widget.kernel_manager.session.session == sessionID]
+            
+        else:
+            filtered_widget_list = [widget for widget in widget_list if \
+                                    widget.kernel_manager.session.session == sessionID]
+        
+        if as_widget_list:
+            return filtered_widget_list
+        
+        else:
+            return [self.tab_widget.indexOf(w) for w in filtered_widget_list]
+        
+    def find_widget_for_connection_file(self, connection_file:str, 
                                       as_widget_list:bool=True, alive_only=True):
         widget_list = [self.tab_widget.widget(i) for i in range(self.tab_widget.count())]
         
         if alive_only:
             filtered_widget_list = [widget for widget in widget_list if
                                     widget.kernel_client.is_alive() and \
-                                    widget.kernel_client.kernel_client.connection_file == connection_file]
+                                    widget.kernel_client.connection_file == connection_file]
             
         else:
             filtered_widget_list = [widget for widget in widget_list if \
-                                    widget.kernel_client.kernel_client.connection_file == connection_file]
+                                    widget.kernel_client.connection_file == connection_file]
             
         if as_widget_list:
             return filtered_widget_list
         
         else:
             return [self.tab_widget.indexOf(w) for w in filtered_widget_list]
+        
+    def find_widgets_for_manager_connection_file(self, connection_file:str,
+                                                 as_widget_list:bool=True, alive_only=True):
+        widget_list = [self.tab_widget.widget(i) for i in range(self.tab_widget.count()) if i.kernel_manager]
+        
+        if alive_only:
+            filtered_widget_list = [widget for widget in widget_list if
+                                    widget.kernel_manager.is_alive() and \
+                                    widget.kernel_manager.connection_file == connection_file]
+            
+        else:
+            filtered_widget_list = [widget for widget in widget_list if \
+                                    widget.kernel_manager.connection_file == connection_file]
+            
+        if as_widget_list:
+            return filtered_widget_list
+        
+        else:
+            return [self.tab_widget.indexOf(w) for w in filtered_widget_list]
+        
+        
     
     def find_tab_title(self, widget:RichJupyterWidget):
         ndx = self.tab_widget.indexOf(widget)
@@ -782,7 +838,8 @@ class ExternalConsoleWindow(MainWindow):
             
         fedict = {"frontend": frontend,
                   "client_session_ID": client_session_ID,
-                  "manager_session_ID": manager_session_ID}
+                  "manager_session_ID": manager_session_ID,
+                  "tab_name": ""}
         
         n_internal_kernels = len([kdict["master"] for kdict in self._connections_.values() if kdict["master"] is not None])
         n_external_kernels = len([kdict["master"] for kdict in self._connections_.values() if kdict["master"] is None])
@@ -794,78 +851,75 @@ class ExternalConsoleWindow(MainWindow):
             # the new connection file name is NOT registered with the self._connections_
             # dictionary
             if cfile not in self._connections_.keys():
-                self._connections_[cfile] = {"master": fedict,
-                                             "slaves": list()}
+                kname = "kernel %d" % n_internal_kernels
                 
                 # NOTE: 2021-01-24 21:47:15
+                # distinguish between kernel name (but not the one in the connection file,
+                # which may be empty) and the tab's name
+                
+                
                 # in this case, name is both the name of the frontend tab and
                 # the name under which we register this connection
-                if not (isinstance(name, str) and len(name.strip())):
-                    next_kernel_ndx = n_external_kernels
-                    name = "kernel %d" % next_kernel_ndx # name of the tab
+                if not isinstance(name, str) or len(name.strip()) == 0:
+                    fedict["tab_name"] = kname # name of the tab
                     
+                    name = kname
+                    
+                else:
+                    fedict["tab_name"] = name
+                    
+                self._connections_[cfile] = {"master": fedict,
+                                             "slaves": list(),
+                                             "name": kname}
+                
                 # name to be injected in the messages received from tbhe kernel
-                self._connections_[cfile]["name"] = name.replace(" ", "_")
+                #self._connections_[cfile]["name"] = kname.replace(" ", "_")
+                #self._connections_[cfile]["name"] = kname
                 
             else:
                 # technically this shouldn't happen
                 raise RuntimeError("A connection file %s has already been registered" % cfile)
-                ## NOTE: 2021-01-24 14:40:24
-                ## technically the execution should never arrive here
-                ## see NOTE: 2021-01-24 14:36:38
-                #if self._connections_[cfile]["master"]:
-                    #raise RuntimeError("A master frontend for the connection file %s already exists" % cfile)
-                
-                #else:
-                    #self._connections_[cfile]["master"] = frontend
-                    
-                    ## this is where things can go awry: what do we do with the other slaves?
-                    #if len(self._connections_["slaves"]):
-                        #for fe in self._connections_["slaves"]:
-                            #self.close_tab(fe)
-                            
-                        #self._connections_[cfile]["slaves"].clear()
                         
-        else:
+        else: # slave frontend
             # NOTE: 2021-01-24 21:25:12
             # check if connection file is already registered here
             if cfile in self._connections_:
                 # connection file already registered => this may be an "internal"
-                # or an "external" slave
-                
+                # slave or an "external" one
                 ndx_slave = len(self._connections_[cfile]["slaves"])
                 
-                self._connections_[cfile]["slaves"].append(fedict)
+                if isinstance(self._connections_[cfile]["master"], dict):
+                    # this is an "internal" slave frontend so it should have
+                    # the same manager session ID as its master - just make
+                    # sure of this, here
+                    
+                    # NOTE: 2021-01-25 19:35:51 this checks that the slave is
+                    # indeed a slave to its master
+                    assert(fedict["manager_session_ID"] == self._connections_[cfile]["master"]["manager_session_ID"])
+
                 
-                if not (isinstance(name, str) and len(name.strip())):
-                    if isinstance(self._connections_[cfile]["master"], dict):
-                        # this is an "internal" slave frontend so it should have
-                        # the same manager session ID as its master - just make sure here
-                        assert(fedict["manager_session_ID"] == self._connections_[cfile]["master"]["manager_session_ID"])
-                        if not (isinstance(name, str) and len(name.strip())):
-                            name = "slave %d to %s" % (ndx_slave, self._connections_[cfile]["name"])
+                if not isinstance(name, str) or len(name.strip()) == 0:
+                    name = "%s (slave %d)" % (self._connections_[cfile]["name"], ndx_slave)
+                    
+                fedict["tab_name"] = name
                         
-                    else:
-                        # this is an "external" slave
-                        
+                self._connections_[cfile]["slaves"].append(fedict)
                 
             else:
                 # in this case the kernel has been launched by an external 
                 # process (e.g. jupyter notebook); therefore we set up its 
                 # dictionary, but there will be no master
-                self._connections_[cfile] = {"master":None, "slaves":[frontend]}
+                kname = "external %d" % n_external_kernels
                 
-                if not (isinstance(name, str) and len(name.strip())):
-                    ndx_external = len([connection["master"] for connection in self._connections_.values() if connection["master"] is None]) - 1
-                    name = "external %d" % ndx_external
+                if not isinstance(name, str) or len(name.strip()) == 0:
+                    name = "%s (slave 0)" % kname
                     
-                self._connections_[cfile]["name"]=name.replace(" ", "_")
-                self._connections_[cfile]["client_sessionID"] = sessionID
-                    
+                fedict["tab_name"] = name
                 
+                self._connections_[cfile] = {"master":None, 
+                                             "slaves":[fedict],
+                                             "name": kname}
                 
-        
-        
         #if self.is_master_frontend(frontend):
             #if frontend.kernel_client.connection_file not in self._connection_files:
                 #self._connection_files.add(frontend.kernel_client.connection_file)
@@ -897,6 +951,7 @@ class ExternalConsoleWindow(MainWindow):
         ##if not name:
             ##name = 'kernel %i' % self.next_kernel_id
             
+        print("adding tab for widget", name)
         self.tab_widget.addTab(frontend, name)
         self.update_tab_bar_visibility()
         self.make_frontend_visible(frontend)
@@ -996,8 +1051,22 @@ class ExternalConsoleWindow(MainWindow):
                 self.close_tab(widget)
             #self.sig_will_close.emit()
             event.accept()
+            
+    def get_frontend_info_dict(self, connection_file:str):
+        if not isinstance(connection_file, str) or len(connection_file.strip()) == 0:
+            return
         
-    def close_tab(self,tab:typing.Union[int, ExternalConsoleWidget]):
+        if connection_file not in self._connections_:
+            return
+        
+        return self._connections_[connection_file]
+    
+    def get_master_frontend_for_connection(self, connection_file:str):
+        fe_dict = self.get_frontend_info_dict(connection_file)["master"]
+        if fe_dict:
+            return fe_dict["frontend"]
+        
+    def close_tab(self,tab:typing.Union[int, RichJupyterWidget]):
         """ Called when you need to try to close a tab.
 
         It takes the number of the tab to be closed as argument, or a reference
@@ -1012,9 +1081,293 @@ class ExternalConsoleWindow(MainWindow):
         # of the tab to close and a reference to the frontend to close
         if type(tab) is not int :
             tab = self.tab_widget.indexOf(tab)
+            
         closing_widget=self.tab_widget.widget(tab)
+        
+        # when trying to be closed, widget might re-send a request to be
+        # closed again, but will be deleted when event will be processed. So
+        # need to check that widget still exists and skip if not. One example
+        # of this is when 'exit' is sent in a slave tab. 'exit' will be
+        # re-sent by this function on the master widget, which ask all slave
+        # widgets to exit
+        if closing_widget is None:
+            return
+        
+        kernel_client = closing_widget.kernel_client
+        kernel_manager = closing_widget.kernel_manager # in external slave frontends this is None!
+        connection_file = closing_widget.kernel_client.connection_file
+        
+        connection_info = self._connections_[connection_file]
+        
+        kname = connection_info["name"]
+        
+        # if closing widget is master, closing it should :
+        # 1. close all active slave frontends
+        # 2. shutdown the kernel
+        # 3. remove connection_info from self._connections_
+        # 4. emit signal of kernel disconnecting so that Scipyen cleans up the workspace model
+        
+        # if closing widget is slave, then closing it should:
+        # 1. NEVER shutdown the kernel
+        # 2. remove itself from the connection_info["slaves"]
+        # 3. ONLY IF connection_info["master"] is None, AND is the last existing slave:
+        #   3.1 remove connection_info from self._connections_
+        #   3.2 emit signal of kernel disconnecting so that Scipyen cleans up the workspace model
+        
+        # HOWEVER: if the user types "exit" in any console, the kernel will
+        # shutdown - therefore all of its frontends must go
+        
+        if self.is_master_frontend(closing_widget):
+            #if len(connection_info["slaves"]):
+                
+            for slave_fe_dict in connection_info["slaves"]:
+                #background(slave_fe_dict["frontend"].kernel_client.stop_channels)
+                self.tab_widget.removeTab(self.tab_widget.indexOf(slave_fe_dict["frontend"]))
+                
+            connection_info["slaves"].clear()
+            
+            #if kernel_manager:
+                #kernel_manager.shutdown_kernel
+                
+            closing_widget.execute("exit")
+            
+            #background(kernel_client.stop_channels)
+            
+            del self._connections_[connection_file]
+            
+            self.tab_widget.removeTab(tab)
+            
+            self.sig_kernel_exit.emit(kname)
+            
+        else:
+            slave_fe_dicts = [s for s in connection_info["slaves"] if s["frontend"] is closing_widget]
+            
+            for slave_fe_dict in slave_fe_dicts:
+                #background(slave_fe_dict["frontend"].kernel_client.stop_channels)
+                self.tab_widget.removeTab(self.tab_widget.indexOf(slave_fe_dict["frontend"]))
+                connection_info["slaves"].remove(slave_fe_dict)
+                
+            if connection_info["master"] is None and len(connection_info["slaves"]) == 0:
+                self.sig_kernel_exit.emit(kname)
+                del self._connections_[connection_file]
+            
+            
+        self.update_tab_bar_visibility()
+            
+            
+        # NOTE: 2021-01-25 23:52:48
+        #### BEGIN DO NOT DELETE: THIS IS part of the old close_tab
+        ## that we may revisit
+        #master_tab = self.get_master_frontend_for_connection(connection_file)
+                
+        #slave_tabs = [fe["frontend"] for fe in self._connections_[connection_file]["slaves"]]
+        
+        ##closing_tab_text = self.tab_widget.tabText(tab).replace(" ", "_")
 
+        ##get a list of all slave widgets on the same kernel.
+        ##slave_tabs = self.find_slave_widgets(closing_widget)
 
+        #keepkernel = None # When None, this prompts the user on what to do
+        
+        ##if closing_widget in slave_tabs:
+            
+        
+        #if hasattr(closing_widget,'_keep_kernel_on_exit'): # set by exit magic (where is that!?)
+            #keepkernel = closing_widget._keep_kernel_on_exit # this happens in slave tabs
+            ##print("keepkernel", keepkernel)
+            
+            ## NOTE: 2021-01-23 10:03:41
+            ## in this clause, 'keepkernel' is set by widget._keep_kernel_on_exit
+            ## if widget._keep_kernel_on_exit is None, the branch does nothing and
+            ## code follows through
+            
+            ## If signal sent by exit magic (_keep_kernel_on_exit), exists and is
+            ## not None) we set local slave tabs._hidden to True to avoid prompting
+            ## for kernel restart when they get the signal; we then "forward" the
+            ## 'exit' to the main window
+            #if keepkernel is not None:
+                ## closing widgets wants to keep the kernel on exit => we just 
+                ## hide the slave tabs
+                #for slave_tab in slave_tabs:
+                    #slave_tab._hidden = True
+                    
+                #if closing_widget in slave_tabs: # closing a slave tab
+                    #try :
+                        ##master_tab = self.find_master_tab(closing_widget)
+                        
+                        #if master_tab:
+                            #master_tab_ndx = self.tab_widget.indexOf(master_tab)#.replace(" ", "_")
+                            #master_tab.execute('exit')
+                            #self.sig_kernel_exit.emit(kname)
+                            
+                        #else:
+                            #self.tab_widget.removeTab(tab)
+                            
+                    #except AttributeError:
+                        #self.log.info("Master already closed or not local, closing only current tab")
+                        #self.tab_widget.removeTab(tab)
+                    #self.update_tab_bar_visibility()
+                    #return
+
+        #if keepkernel is None and not closing_widget._confirm_exit:
+            ## NOTE: 2021-01-23 10:05:16
+            ## this clause does nothing if widget._confirm_exit is True
+            ## otherwise, set keepkernel to the connection file (*.json)
+            ## and the code follows through with the clause below, 
+            ## at NOTE: 2021-01-23 10:08:49
+            ## 
+            ## don't prompt, just terminate the kernel if we own it
+            ## or leave it alone if we don't
+            #keepkernel = closing_widget._existing
+            
+        #if keepkernel is None: # show prompt, ask user what to do
+            ## NOTE: 2021-01-23 10:06:11
+            ## keepkernel has not been set in either of the above clauses
+            ## (see NOTE: 2021-01-23 10:03:41 and NOTE: 2021-01-23 10:05:16)
+            #if kernel_client and kernel_client.channels_running:
+                #title = self.window().windowTitle()
+                #cancel = QtWidgets.QMessageBox.Cancel
+                #okay = QtWidgets.QMessageBox.Ok
+                ## NOTE: 2021-01-23 10:12:26
+                ## widget._may_close is False when the widget is a frontend to a
+                ## remote kernel (e.g. one started by a jupyter notebook)
+                #if closing_widget._may_close:
+                    #msg = "You are closing the tab : "+'"'+self.tab_widget.tabText(tab)+'"'
+                    #info = "Would you like to quit the Kernel and close all attached Consoles as well?"
+                    #justthis = QtWidgets.QPushButton("&No, just this Tab", self)
+                    #justthis.setShortcut('N')
+                    #closeall = QtWidgets.QPushButton("&Yes, close all", self)
+                    #closeall.setShortcut('Y')
+                    ## allow ctrl-d ctrl-d exit, like in terminal
+                    #closeall.setShortcut('Ctrl+D')
+                    #box = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Question,
+                                            #title, msg)
+                    #box.setInformativeText(info)
+                    #box.addButton(cancel)
+                    #box.addButton(justthis, QtWidgets.QMessageBox.NoRole)
+                    #box.addButton(closeall, QtWidgets.QMessageBox.YesRole)
+                    #box.setDefaultButton(closeall)
+                    #box.setEscapeButton(cancel)
+                    #pixmap = QtGui.QPixmap(self._app.icon.pixmap(QtCore.QSize(64,64)))
+                    #box.setIconPixmap(pixmap)
+                    #reply = box.exec_()
+                    #if reply == 1: 
+                        ## close All and quit the kernel:
+                        ## also stop the kernel client channels
+                        #for slave in slave_tabs:
+                            #background(slave.kernel_client.stop_channels)
+                            #self.tab_widget.removeTab(self.tab_widget.indexOf(slave))
+                            
+                        #kernel_manager.shutdown_kernel()
+                        #self.tab_widget.removeTab(tab)
+                        
+                        #background(kernel_client.stop_channels)
+                        #self.sig_kernel_exit.emit(closing_tab_text)
+                        
+                    #elif reply == 0: # just close the Console
+                        #if not closing_widget._existing:
+                            ## Have kernel: don't quit, just close the tab
+                            #closing_widget.execute("exit True")
+                            
+                        #self.tab_widget.removeTab(tab)
+                        
+                        #if not kernel_client.is_alive():
+                            ## stop client channels and clear workspace if kernel is dead
+                            #background(kernel_client.stop_channels)
+                            #self.sig_kernel_exit.emit(closing_tab_text)
+                        
+                #else:
+                    ## NOTE: 2021-01-23 10:13:18
+                    ## we do nothing to the kernel here because it was started 
+                    ## by someone else (i.e. it is a remote kernel)
+                    ##
+                    ## such frontends don't manage the kernel
+                    #assert(kernel_manager is None)
+                    ## NOTE: 2021-01-23 17:11:00
+                    ## first check if kernel is dead (e.g. the remote app such as
+                    ## a server had shut down or somehow killed the kernel)
+                    #if kernel_client.is_alive():
+                        #reply = QtWidgets.QMessageBox.question(self, title,
+                            #"Are you sure you want to close this Console?"+
+                            #"\nThe Kernel and other Consoles will remain active.",
+                            #okay|cancel,
+                            #defaultButton=okay
+                            #)
+                        #if reply == okay: # otherwise, do nothing
+                            ## NOTE: 2021-01-23 10:13:40 Yes we want to close the Console
+                            ## If this is the only (slave) tab connected to this
+                            ## kernel then also clear Scipyen's workspace
+                            #if len(slave_tabs) == 1:
+                                #self.sig_kernel_exit.emit(closing_tab_text)
+                                
+                            ## NOTE: 2021-01-22 14:09:30
+                            ## if kernel has died, also stop this client's channels 
+                            ## (useful when the remote kernel has died but the local 
+                            ## client still has channels open, in which case it keeps
+                            ## spewing out "WARNING:traitlets:kernel died:" on stderr)
+                            #background(kernel_client.stop_channels)
+                            ##if not(kernel_client.is_alive()):
+                                ##background(kernel_client.stop_channels)
+                                
+                            #self.tab_widget.removeTab(tab)
+                        
+                    #else:
+                        ## NOTE: 2021-01-23 17:30:33
+                        ## no need to prompt anything, because the kernel is dead
+                        ## but we need to nform the client to stop listening, and
+                        ## to clear Scipyen's workspace
+                        #background(kernel_client.stop_channels)
+                        #self.sig_kernel_exit.emit(kname)
+                        
+                        
+        #elif keepkernel: # close console but leave kernel running (no prompt)
+            ## NOTE: 2021-01-23 10:08:49
+            ## clause satisfied by clause at NOTE: 2021-01-23 10:05:16
+            ## (remeber that clause at NOTE: 2021-01-23 10:03:41 returns!)
+            #self.tab_widget.removeTab(tab)
+            
+            #if not(kernel_client.is_alive()):
+                ## NOTE: 2021-01-23 10:10:48
+                ## if kernel somehow has died, also clean up Scipyen's workspace
+                #self.sig_kernel_exit.emit(kname)
+                
+            ## NOTE: 2021-01-23 10:11:26
+            ## don't let the client wait (the client is widget-specific)
+            #background(kernel_client.stop_channels)
+            
+        #else: #close console and kernel (no prompt) - usually happens when calling 'exit' at cli
+            ##tab_text = self.tab_widget.tabText(tab).replace(" ", "_")
+            #self.tab_widget.removeTab(tab)
+            #if kernel_client and kernel_client.channels_running:
+                #for slave in slave_tabs:
+                    #background(slave.kernel_client.stop_channels)
+                    #self.tab_widget.removeTab(self.tab_widget.indexOf(slave))
+                #if kernel_manager:
+                    #kernel_manager.shutdown_kernel()
+                #background(kernel_client.stop_channels)
+                #self.sig_kernel_exit.emit(kname)
+
+        #self.update_tab_bar_visibility()
+        #### END DO NOT DELETE
+        
+    def close_tab_old(self,tab:typing.Union[int, ExternalConsoleWidget]):
+        """ Called when you need to try to close a tab.
+
+        It takes the number of the tab to be closed as argument, or a reference
+        to the widget inside this tab
+        """
+        
+        # NOTE: 2021-01-22 13:40:17
+        # for external kernels this (the client) is oblivious to the kernel manager
+        # i.e. ExternalIPython.active_kernel_manager is None
+
+        # let's be sure "tab" and "closing widget" are respectively the index
+        # of the tab to close and a reference to the frontend to close
+        if type(tab) is not int :
+            tab = self.tab_widget.indexOf(tab)
+            
+        closing_widget=self.tab_widget.widget(tab)
+        
         # when trying to be closed, widget might re-send a request to be
         # closed again, but will be deleted when event will be processed. So
         # need to check that widget still exists and skip if not. One example
@@ -1026,12 +1379,16 @@ class ExternalConsoleWindow(MainWindow):
         
         kernel_client = closing_widget.kernel_client
         kernel_manager = closing_widget.kernel_manager
+        connection_file = closing_widget.kernel_client.connection_file
         
-        closing_tab_text = self.tab_widget.tabText(tab).replace(" ", "_")
+        connection_info = self._connections_[connection_file]
+        
+        
+        #closing_tab_text = self.tab_widget.tabText(tab).replace(" ", "_")
 
         #get a list of all slave widgets on the same kernel.
         slave_tabs = self.find_slave_widgets(closing_widget)
-
+        
         keepkernel = None # When None, this prompts the user on what to do
         
         if hasattr(closing_widget,'_keep_kernel_on_exit'): # set by exit magic (where is that!?)
@@ -1060,7 +1417,7 @@ class ExternalConsoleWindow(MainWindow):
                         if master_tab:
                             master_tab_ndx = self.tab_widget.indexOf(master_tab)#.replace(" ", "_")
                             master_tab.execute('exit')
-                            self.sig_kernel_exit.emit(self.tab_widget.tabText(master_ndx))
+                            self.sig_kernel_exit.emit(self.tab_widget.tabText(master_tab_ndx))
                             
                         else:
                             self.tab_widget.removeTab(tab)
@@ -1241,7 +1598,7 @@ class ExternalConsoleWindow(MainWindow):
         for ndx in km_widgets_ndx:
             tab_text = self.tab_widget.tabText(ndx).replace(" ", "_")
             widget = self.tab_widget.widget(ndx)
-            self._scipyen_init_exec_(widget.kernel_client)
+            self.consoleapp._scipyen_init_exec_(widget.kernel_client)
             self.sig_kernel_restart.emit(tab_text)
             
             #if "NEURON" in tab_text:
@@ -1265,7 +1622,17 @@ class ExternalConsoleWindow(MainWindow):
         print("sessionID", sessionID)
         
         # sessionID is stored in frontend.kernel_client.session.session
-        frontends = self.find_widget_for_sessionID(sessionID)
+        frontends = self.find_widget_for_client_sessionID(sessionID)
+        if len(frontends) == 0:
+            return
+        
+        elif len(frontends) > 1:
+            raise RuntimeError("Too many frontends with the same session ID")
+        
+        connection_info = self._connections_[frontends[0].kernel_client.connection_file]
+        
+        msg["connection_name"] = connection_info["name"].replace(" ", "_")
+        self.sig_shell_msg_received.emit(msg)
         
         #print("ExternalConsoleWindow:\n\t slot_kernel_shell_chnl_msg_recvd frontends", frontends)
         # NOTE: tab name is a str representation of the kernel
@@ -1275,25 +1642,25 @@ class ExternalConsoleWindow(MainWindow):
         # use the name stroed in self._connections_, rather than the widget name
         
         
-        if len(frontends) > 0:
-            masters = [f for f in frontends if self.is_master_frontend(f)]
-            slaves = [f for f in frontends if not self.is_master_frontend(f)]
+        #if len(frontends) > 0:
+            #masters = [f for f in frontends if self.is_master_frontend(f)]
+            #slaves = [f for f in frontends if not self.is_master_frontend(f)]
             
-            if len(masters):
-                tab_name = self.find_tab_title(masters[0]).replace(" ", "_")
+            #if len(masters):
+                #tab_name = self.find_tab_title(masters[0]).replace(" ", "_")
                 
-            elif len(slaves):
-                tab_name = self.find_tab_title(slaves[0]).replace(" ", "_")
+            #elif len(slaves):
+                #tab_name = self.find_tab_title(slaves[0]).replace(" ", "_")
                 
-            else:
-                tab_name = str2symbol("session_%s" % sessionID)
+            #else:
+                #tab_name = str2symbol("session_%s" % sessionID)
         
-        else:
-            tab_name = str2symbol("session_%s" % sessionID)
-        #tab_name = self.tab_widget.tabText(self.tab_widget.currentIndex())
+        #else:
+            #tab_name = str2symbol("session_%s" % sessionID)
+        ##tab_name = self.tab_widget.tabText(self.tab_widget.currentIndex())
         
-        msg["tab"] = tab_name
-        self.sig_shell_msg_received.emit(msg)
+        #msg["tab"] = tab_name
+        #self.sig_shell_msg_received.emit(msg)
 
 
 class ExternalIPython(JupyterApp, JupyterConsoleApp):
@@ -1520,7 +1887,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         ip = self.ip
         local_kernel = (not self.existing) or is_local_ip(ip)
 
-        self.window = ExternalConsoleWindow(self.app,
+        self.window = ExternalConsoleWindow(self.app, self, 
                                 confirm_exit=self.confirm_exit,
                                 new_frontend_factory=self.new_frontend_master,
                                 slave_frontend_factory=self.new_frontend_slave,
@@ -2077,7 +2444,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
             else:
                 if "session_" in where:
                     sessionID = where.replace("session_","").replace("_", "-")
-                    ftends = self.window.find_widget_for_sessionID(sessionID)
+                    ftends = self.window.find_widget_for_client_sessionID(sessionID)
                     if len(ftends)==0:
                         return
                     frontend = ftends[0]

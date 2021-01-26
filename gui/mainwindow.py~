@@ -5268,7 +5268,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     #print("mainwindow: %s len(ns_listings)" % msg["tab"], len(ns_listings))
                     for key, val in ns_listings.items():
                         ns_name = key.replace("ns_listing_of_","").replace(" ", "_")
-                        print("ns_name", ns_name)
+                        #print("ns_name", ns_name)
                         if ns_name == msg["tab"]:
                             if isinstance(val, dict):
                                 self.workspaceModel.update_foreign_namespace(ns_name, val)

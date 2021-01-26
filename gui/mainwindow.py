@@ -5222,21 +5222,21 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #### END get rid of this once done developing
         
         #print("_slot_ext_krn_shell_chnl_msg_recvd")
-        #print("\ttab:", msg["tab"], "\n\ttype:", msg["msg_type"], "\n\tstatus:", msg["content"]["status"])
+        #print("\ttab:", msg["connection_name"], "\n\ttype:", msg["msg_type"], "\n\tstatus:", msg["content"]["status"])
         #print("\tuser_expressions:", msg["content"].get("user_expressions", {}))
         
         if self.external_console.window.tab_widget.count() == 0:
             # only listen to kernels that have a frontend 
             return
         
-        #print("mainWindow\n\t_slot_ext_krn_shell_chnl_msg_recvd msg tab", msg["tab"])
+        #print("mainWindow\n\t_slot_ext_krn_shell_chnl_msg_recvd msg tab", msg["connection_name"])
         #print("mainwindow\n\t_slot_ext_krn_shell_chnl_msg_recvd msg type", msg["msg_type"])
         
         if msg["msg_type"] == "execute_reply":
-            #print("mainWindow: kernel sent execute_reply %s" % msg["tab"])
+            #print("mainWindow: kernel sent execute_reply %s" % msg["connection_name"])
             vardict = unpack_shell_channel_data(msg)
             
-            #print("mainWindow: %s len(vardict)" % msg["tab"], len(vardict))
+            #print("mainWindow: %s len(vardict)" % msg["connection_name"], len(vardict))
             
             if len(vardict):
                 prop_dicts = dict([(key, val) for key, val in vardict.items() if key.startswith("properties_of_")])
@@ -5257,25 +5257,25 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     #print("mainWindow: len(prop_dicts)", len(prop_dicts))
                     for key, value in prop_dicts.items():
                         if value["Workspace"]["display"] == "Internal":
-                            value["Workspace"] = {"display":msg["tab"], "tooltip":"Location: %s kernel namespace" % msg["tab"]}
+                            value["Workspace"] = {"display":msg["connection_name"], "tooltip":"Location: %s kernel namespace" % msg["connection_name"]}
                             
                         for propname in value.keys():
-                            value[propname]["tooltip"] = value[propname]["tooltip"].replace("Internal", msg["tab"])
+                            value[propname]["tooltip"] = value[propname]["tooltip"].replace("Internal", msg["connection_name"])
                         
                     self.workspaceModel.updateFromExternal(prop_dicts)
                 
                 if len(ns_listings):
-                    #print("mainwindow: %s len(ns_listings)" % msg["tab"], len(ns_listings))
+                    #print("mainwindow: %s len(ns_listings)" % msg["connection_name"], len(ns_listings))
                     for key, val in ns_listings.items():
                         ns_name = key.replace("ns_listing_of_","").replace(" ", "_")
                         #print("ns_name", ns_name)
-                        if ns_name == msg["tab"]:
+                        if ns_name == msg["connection_name"]:
                             if isinstance(val, dict):
                                 self.workspaceModel.update_foreign_namespace(ns_name, val)
                                 if ns_name in self.workspaceModel.foreign_namespaces:
                                     for varname in self.workspaceModel.foreign_namespaces[ns_name]["current"]:
-                                        self.external_console.execute(cmds_get_foreign_data_props(varname, namespace=msg["tab"].replace(" ", "_")),
-                                                                        where = msg["tab"])
+                                        self.external_console.execute(cmds_get_foreign_data_props(varname, namespace=msg["connection_name"].replace(" ", "_")),
+                                                                        where = msg["connection_name"])
                             
         elif msg["msg_type"] == "kernel_info_reply":
             #print("mainWindow: kernel sent kernel_info_reply")
@@ -5283,12 +5283,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # a signal that the kernel has been started, by which we trigger
             # an initial directory listing.
             #pass
-            self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["tab"].replace(" ", "_")))
+            self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["connection_name"].replace(" ", "_")))
             
         elif msg["msg_type"] == "is_complete_reply":
             #print("mainWindow: kernel sent is_complete_reply")
-            self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["tab"].replace(" ", "_")),
-                                          where = msg["tab"])
+            self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["connection_name"].replace(" ", "_")),
+                                          where = msg["connection_name"])
             
                     
     def execute_in_external_console(self, call, where=None):

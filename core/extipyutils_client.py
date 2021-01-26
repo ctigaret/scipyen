@@ -721,7 +721,7 @@ def unpack_shell_channel_data(msg:dict) -> dict:
                 
             
             elif value_status == "error":
-                ret.update({"error_%s_%s" % (key, msg["tab"].replace(" ", "_")): {"ename":value["ename"],
+                ret.update({"error_%s_%s" % (key, msg["connection_name"].replace(" ", "_")): {"ename":value["ename"],
                                                "evalue": value["evalue"],
                                                "traceback": value["traceback"]}})
                 
@@ -729,12 +729,12 @@ def unpack_shell_channel_data(msg:dict) -> dict:
                 ret.update({"%s_%s_%s" % (value_status, key, msg["tab".replace(" ", "_")]): value_status})
                     
     elif msg_status == "error":
-        ret.update({"error_%s_%s" % (msg["msg_type"], msg["tab"].replace(" ","_")): {"ename": msg["content"]["ename"],
+        ret.update({"error_%s_%s" % (msg["msg_type"], msg["connection_name"].replace(" ","_")): {"ename": msg["content"]["ename"],
                                                    "evalue": msg["content"]["evalue"],
                                                    "traceback": msg["content"]["traceback"]}})
         
     else:
-        ret.update({"%s_%s_%s" % (msg_status, msg["msg_type"], msg["tab"].replace(" ", "_")): msg_status})
+        ret.update({"%s_%s_%s" % (msg_status, msg["msg_type"], msg["connection_name"].replace(" ", "_")): msg_status})
     
     return ret
 
