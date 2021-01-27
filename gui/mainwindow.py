@@ -1782,7 +1782,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 
             self.external_console.window.sig_shell_msg_received[object].connect(self._slot_ext_krn_shell_chnl_msg_recvd)
-            self.external_console.window.sig_kernel_exit[str].connect(self._slot_ext_krn_exit)
+            self.external_console.window.sig_kernel_disconnect[str].connect(self._slot_ext_krn_disconnected)
             self.external_console.window.sig_kernel_restart[str].connect(self._slot_ext_krn_restart)
             self.external_console.window.sig_kernel_stopped_channels[str].connect(self._slot_ext_krn_stop)
             
@@ -5114,8 +5114,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
     @pyqtSlot(str)
     @safeWrapper
-    def _slot_ext_krn_exit(self, txt):
-        #print("mainWindow: _slot_ext_krn_exit %s" % txt)
+    def _slot_ext_krn_disconnected(self, txt):
+        print("mainWindow: _slot_ext_krn_disconnected %s" % txt)
         signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
         self.workspaceModel.remove_foreign_namespace(txt)
         
