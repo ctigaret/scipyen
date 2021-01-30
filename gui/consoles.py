@@ -1077,7 +1077,7 @@ class ExternalConsoleWindow(MainWindow):
             box.addButton(closeall, QtWidgets.QMessageBox.YesRole)
             box.setDefaultButton(closeall)
             box.setEscapeButton(cancel)
-            pixmap = QtGui.QPixmap(self._app.icon.pixmap(QtCore.QSize(64,64)))
+            pixmap = QtGui.QPixmap(self.windowIcon().pixmap(QtCore.QSize(64,64)))
             box.setIconPixmap(pixmap)
             reply = box.exec_()
         else:
@@ -1267,7 +1267,7 @@ class ExternalConsoleWindow(MainWindow):
                     box.addButton(closeall, QtWidgets.QMessageBox.YesRole)
                     box.setDefaultButton(closeall)
                     box.setEscapeButton(cancel)
-                    pixmap = QtGui.QPixmap(self._app.icon.pixmap(QtCore.QSize(64,64)))
+                    pixmap = QtGui.QPixmap(self.windowIcon().pixmap(QtCore.QSize(64,64)))
                     box.setIconPixmap(pixmap)
                     reply = box.exec_()
                     if reply == 1: # close All
@@ -1440,7 +1440,7 @@ class ExternalConsoleWindow(MainWindow):
                     box.addButton(closeall, QtWidgets.QMessageBox.YesRole)
                     box.setDefaultButton(closeall)
                     box.setEscapeButton(cancel)
-                    pixmap = QtGui.QPixmap(self._app.icon.pixmap(QtCore.QSize(64,64)))
+                    pixmap = QtGui.QPixmap(self.windowIcon().pixmap(QtCore.QSize(64,64)))
                     box.setIconPixmap(pixmap)
                     reply = box.exec_()
                     if reply == 1: # close All

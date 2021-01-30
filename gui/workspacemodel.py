@@ -230,11 +230,15 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             for cfile in stale_connections:
                 saved_sessions.pop(cfile, None)
                 
-            if connfilename in saved_sessions:
-                saved_sessions[connfilename].update(session_dict)
-                
-            else:
-                saved_sessions[connfilename] = session_dict
+            # NOTE: check if kernel is still alive here, or at least its connection
+            # file still exists
+            
+            if os.path.isfile(connfilename):
+                if connfilename in saved_sessions:
+                    saved_sessions[connfilename].update(session_dict)
+                    
+                else:
+                    saved_sessions[connfilename] = session_dict
                 
             if len(saved_sessions):
                 with open(sessions_filename, mode="wt") as file_out:
