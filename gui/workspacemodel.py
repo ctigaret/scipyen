@@ -15,7 +15,11 @@ event handlers pre_execute() and post_execute().
 # filter/finder in workspace viewer
 #
 
-import traceback, typing, inspect
+import traceback, typing, inspect, os
+
+import json
+
+#from jupyter_core.paths import jupyter_runtime_dir
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
@@ -62,7 +66,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #self.ndarray_type = np.ndarray.__name__
         self.currentVarItem = None
         
-        self.shell = shell # reference to IPython InteractiveShell os the internal console
+        self.shell = shell # reference to IPython InteractiveShell of the internal console
+        
+        #print("mainWindow" in self.shell.user_ns)
         
         self.cached_vars = dict()
         self.modified_vars = dict()
@@ -78,6 +84,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.setColumnCount(len(standard_obj_summary_headers))
         self.setHorizontalHeaderLabels(standard_obj_summary_headers) # defined in core.utilities
         
+        # NOTE: 2021-01-28 17:47:36
+        # management of workspaces in external kernels
+        # details in self.update_foreign_namespace docstring
         self._foreign_workspace_count_ = -1
         # TODO/FIXME 2020-07-31 00:07:29
         # low priority: choose pallette in a clever way to take into account the
@@ -102,19 +111,217 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.new_vars.clear()
         self.deleted_vars.clear()
         
-    def remove_foreign_namespace(self, txt):
-        #print("workspaceModel to remove %s namespace" % txt)
-        self.clear_foreign_namespace_display(txt, remove=True)
+    def remove_foreign_namespace(self, wspace:dict):
+        #print("workspaceModel to remove %s" % wspace)
+        self.clear_foreign_namespace_display(wspace, remove=True)
+        
+    def _load_session_cache_(self, connfilename:str):
+        saved_sessions = dict()
+        saved_current = set()
+        saved_initial = set()
+        
+        mainWindow = self.shell.user_ns.get("mainWindow", None)
+        
+        if mainWindow:
+            sessions_filename = os.path.join(os.path.dirname(mainWindow.scipyenSettings.user_config_path()),
+                                                "cached_sessions.json")
             
-    def clear_foreign_namespace_display(self, txt, remove=False):
-        #print("workspaceModel to clear %s namespace" % txt)
-        if txt in self.foreign_namespaces:
-            self.foreign_namespaces[txt]["current"].clear()
-            #ns = txt.replace("_", " ")
-            #kernel_items_rows = self.rowIndexForItemsWithProps(Workspace=ns)
-            kernel_items_rows = self.rowIndexForItemsWithProps(Workspace=txt)
+            if os.path.isfile(sessions_filename):
+                try:
+                    with open(sessions_filename, mode="rt") as file_in:
+                        saved_sessions = json.load(file_in)
+                        
+                except:
+                    pass
+                
+            if connfilename in saved_sessions:
+                saved_current = set(saved_sessions[connfilename]["current"])
+                saved_initial = set(saved_sessions[connfilename]["initial"])
+                
+            else:
+                saved_current = None
+                saved_initial = None
+                
+        return saved_current, saved_initial
+    
+    def _merge_session_cache_(self, connfilename:str, symbols:set):
+        # NOTE: 2021-01-28 22:15:24: 
+        # Now, of course, with the remote kernel still alive across
+        # Scipyen/ExternalIPython sessions, its namespace contents may have
+        # been changed by the 3rd party process (e.g. jupyter notebook)
+        #
+        # Upon re-establishing the connection to the remote kernel,
+        # the previously current and initial symbols are now retrieved 
+        # in the initial
+        #
+        # If no change has occurred, initial should be the union of the 
+        # saved initial and saved current symbol sets.
+        
+        # We are only interested in the saved current symbol sets to
+        # be 'migrated' to the actual current set
             
-            #print("kernel_items_rows for %s" % txt,kernel_items_rows)
+        # Symbols that were previously included in "old" initial symbols
+        # (saved_initial) are kept inside the new "initial" set:
+        #   v in initial AND v in saved_initial
+        #
+        # Symbols that were previously in the "old" current symbols are
+        # moved from the "initial" set to the new "current" set:
+        #   v in initial AND v in saved_current
+        #
+        # Symbols added in the meanwhile are moved to the new "current"
+        # set
+        #   v in initial AND v not in saved_initial
+        #
+        # Symbols removed in the meanwhile are discarded:
+        #   v in saved_initial OR v in saved_current AND
+        #       v not in intial_symbols
+        
+        saved_current, saved_initial = self._load_session_cache_(connfilename)
+        
+        if saved_initial is not None and saved_current is not None:
+            retained_initial = symbols & saved_initial
+            
+            #print("retained_initial", retained_initial)
+            
+            retained_current = symbols & saved_current
+            
+            #print("retained_current", retained_current)
+                
+            added_symbols = symbols - (retained_initial | retained_current)
+            
+            #print("added_symbols", added_symbols)
+            
+            current = retained_current | added_symbols
+            
+            initial = symbols - current
+        
+        else:
+            current = set()
+            initial = symbols
+        
+        return current, initial
+            
+    def _save_session_cache_(self, connfilename:str, nsname:str):
+        mainWindow = self.shell.user_ns.get("mainWindow", None)
+        if mainWindow:
+            sessions_filename = os.path.join(os.path.dirname(mainWindow.scipyenSettings.user_config_path()),
+                                             "cached_sessions.json")
+            
+            session_dict = {"current":list(self.foreign_namespaces[nsname]["current"]),
+                            "initial":list(self.foreign_namespaces[nsname]["initial"]),
+                            "name": nsname,
+                            }
+                
+            saved_sessions = dict()
+            
+            if os.path.isfile(sessions_filename):
+                try:
+                    with open(sessions_filename, mode="rt") as file_in:
+                        saved_sessions = json.load(file_in)
+                        
+                except:
+                    pass
+                
+            # NOTE: 2021-01-30 13:48:40
+            # remove stale sessions (where connection files don't exist anymore)
+            
+            stale_connections = [cfile for cfile in saved_sessions if not os.path.isfile(cfile)]
+            
+            for cfile in stale_connections:
+                saved_sessions.pop(cfile, None)
+                
+            if connfilename in saved_sessions:
+                saved_sessions[connfilename].update(session_dict)
+                
+            else:
+                saved_sessions[connfilename] = session_dict
+                
+            if len(saved_sessions):
+                with open(sessions_filename, mode="wt") as file_out:
+                    json.dump(saved_sessions, file_out, indent=4)
+            
+    def clear_foreign_namespace_display(self, workspace:typing.Union[dict, str], remove:bool=False):
+        """De-registers a foreign workspace dictionary.
+        
+        Parameters:
+        ==========
+        
+        workspace: dict or str
+        
+            When a dict it must have the following key/value pairs:
+        
+                "connection_file": str = name of the connection file
+                
+                "master": None, or a dict with the following key/value pairs:
+                    "client_session_ID": str,
+                    "manager_session_ID": str,
+                    "tab_name": str
+                        
+                "name": str = registered natural workspace name (i.e allowing
+                                spaces)
+                    
+                For a non-local session/connection, "master" is mapped to None.
+            
+            When a str, it is the workspace name _AS_REGISTERED_ with the workspace
+            model (i.e. " " replaced with "_")
+        
+        remove: bool, optional (default is False)
+            When True, the workspace name will also be de-registered.
+            
+            If workspace is a dict is till be used to determine whether the 
+            workspace belongs to a remote kernel (which is NOT managed by Scipyen's
+            external ipython) and a snapshot of the symbols in the kernel's 
+            namespace will be saved to the "cached_sessions.json" file 
+            (typically located in ~/.config/Scipyen)
+        
+        """
+        # check that we received a sessions dictionary and that this was generated 
+        # from a remotely-managed kernel
+        
+        
+        if isinstance(workspace, str):
+            nsname = workspace
+            connfilename = None
+            
+            is_local = None
+
+        elif isinstance(workspace, dict) and \
+            all([s in workspace.keys() for s in ("connection_file", "master", "name")]):
+            is_local = isinstance(workspace["master"], dict)
+            nsname = workspace["name"]
+            connfilename = workspace.get("connection_file")
+            
+        else:
+            return
+        
+        #print("clear_foreign_namespace_display nsname", nsname, "connection_file", connfilename)
+                
+        if nsname in self.foreign_namespaces:
+            # NOTE: 2021-01-28 17:45:54
+            # check if workspace nsname belongs to a remote kernel - see docstring to
+            # self.update_foreign_namespace for details
+        
+            if remove: 
+                # kernel is managed externally ==> store the "current" symbols
+                # in cache
+                # FIXME: this won't work because by this time the connection
+                # dict from external console window connections has been removed
+                #connfilename = externalConsole.window.get_connection_filename_for_workspace(natural_nsname)
+                # NOTE: 2021-01-29 10:08:16 RESOLVED: we are sending the
+                # connection dict instead of just the workspace name
+                #print("connfilename", connfilename)
+                if connfilename and os.path.isfile(connfilename) and not is_local:
+                    self._save_session_cache_(connfilename, nsname)
+
+                self.foreign_namespaces.pop(nsname)
+                
+            else:
+                self.foreign_namespaces[nsname]["current"].clear()
+            
+            # OK. Now, update the workspace table
+            kernel_items_rows = self.rowIndexForItemsWithProps(Workspace=nsname)
+            
+            #print("kernel_items_rows for %s" % nsname,kernel_items_rows)
             if isinstance(kernel_items_rows, int):
                 if kernel_items_rows >= 0:
                     #print("item", self.item(kernel_items_rows,0).text())
@@ -125,71 +332,209 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 # will have changed after the removal of previous rows
                 itemnames = [self.item(r,0).text() for r in kernel_items_rows]
                 for name in itemnames:
-                    #r = self.rowIndexForItemsWithProps(Name=name, Workspace=ns)
-                    r = self.rowIndexForItemsWithProps(Name=name, Workspace=txt)
+                    r = self.rowIndexForItemsWithProps(Name=name, Workspace=nsname)
                     try:
                         self.removeRow(r)
                     except:
                         pass
                     
-        if remove:
-            self.foreign_namespaces.pop(txt, None)
+    def update_foreign_namespace(self, ns_name:str, cfile:str, val:typing.Any):
+        """Symbols in external kernels' namepaces are stored here
+        
+        Parameters:
+        ==========
+        ns_name:str Name of the external kernel workspace (this kernel may be managed
+            by the External Console, or by some independent process such as a
+            running jupyter notebook; in ths latter case this is considered a 
+            'remote' kernel even if it is running on the local machine)
+            
+        cfile:str Fully qualified name of the connection file
+            
+        val: dict, list, set, tuple
+            When a dict, it is expected to contain one key ("user_ns") that is 
+                mapped to a list, set, or tuple of strings which are the symbols
+                or identifiers of the variables in the external kernel workspace.
+                
+            Otherwise, it is expected to contain symbols (identifiers) as above
+        
+        self.foreign_namespaces is a DataBag where:
+            key = name of foreign namespace
+            value = dict with two key/set mappings:
+                "initial": the set of symbols present in the said namespace when
+                    it first encountered
+                "current": the set of symbols present at the time this method is 
+                    invoked
+            
+        The intention is that the initial (pre-loaded) symbols in the namespace
+        are made invisible to the user in the workspace table - the user can always
+        inspect the full contents of the namespace by calling dir() in the cliennt
+        console frontend.
+        
+        The distinction is necessary for the workspace model to workout which symbols
+        have been added and which have been removed from the external namespace
+        between subsequenct invocations of this method. Without this distinction
+        the whole mechanism would query the properties for ALL variables in the 
+        externa namespace creating unnecessary data trafic.
+        
+        HOWEVER: Symbols added to the namespace during a session won't be seen
+        in subsequent sessions, when the remote kernel survives (and is reused)
+        from one session to another.
+        
+        This typically happens with external kernels started e.g., by jupyter
+        notebook and such: closing the External Console leaves these kernels running
+        (my design, because these kernels are supposed to be managed by an 
+        independent process); then, re-starting the External Console (either in 
+        the same Scipyen session of in a subsequent one) will "see" these existing
+        symbols as part of the "initial" set and hence they won't be listed in 
+        the workspace table - these variables will in effect be "masked".
+        
+        This "masking" can become a problem when repeatedly restarting Scipyen 
+        (or even just the External Console)  but the remote kernel is kept alive
+         - case in poiint being a running jupyter notebook.
+         
+        The immediate workaround is to drop the distinction between "initial" and
+        "current" symbols when the namspace is first encountered, with the risk 
+        of populating the workspace table with symbols added to the namespace 
+        immediately after the connection to the kernel was initialized (and 
+        including anysymbols created by the code executed at initialization of 
+        the console). Not all these may be relevant to the user.
+
+        Alternatively, a tally of the "current" set of symbols when the connection
+        to the remote kernel is stopped could be saved (as a snapshot) - but only
+        for truly remote kernels (i.e. NOT started by the external ipython console).
+        
+        This snapshot would then be added to the "current" set in a subsequent session
+        IF the connection is made to a running remote kernel which has been used before.
+        
+        To implement this latter solution we need:
+            a) to know that the named workspace (ns_name) belongs to a 'remote'
+                kernel; this can be determined by checking the 
+                ExternalIPython.window._connections_ dictionary like in this 
+                pseudocode:
+                
+                Let cfile be the filename of a connection file, and connections
+                the ExternalIPython.window._connections_ dictionary
+                
+                Find connections[cfile] where 
+                    connections[cfile]['name'] == ns_name
                     
-    def update_foreign_namespace(self, name, val):
-        #print("WorkspaceModel.update_foreign_namespace name %s" % name)
-        user_ns_shown_varnames = set()
+                If found, check that connections[cfile]['master'] is None
+                    If None then the kernel is managed by a 3rd party process.
+                    
+                => remember the connection file name: if this file exists during
+                a future Scipyen session (or ExternalIPython session) and is
+                opened, then, provided that remote kernel is still running, 
+                its variables created in the previous Scipyen or ExternalIPython 
+                session are still present, unless modified by another independent
+                client.
+                        
+            b) to store the "current" set of variables at the end of the session
+                
+                Probably the best is to use a dict with 
+                    key = connection file name
+                    value = set of "current" variables.
+                    
+                then save it at the end of Scipyen session as a *.json file
+                inside Scipyen config directory.
+                
+            c) when starting a remote kernel session in ExternalIPython, check 
+                if the chosen connection file name exists in the dictionary 
+                 stored as described in (b)
+                
+                If the chosen connection file name does exist, then check 
+                the stored "current" dict against the symbols in the remote
+                kernel workspace and popu;ate the workspace model accordingly.
+                
+            d) the remote workspaces dictionary should probably NOT be loaded 
+            via the confuse configuration mechanism: depending on how frequent
+            new remote kernels are used, this file may grow substantially
+            
+            e) set an age limit for the contents of the dictionary, and also
+            give the possibility to clear it at any time (thus re-used kernels
+            will be interpreted as new and symbols persisting across sessions
+            will be masked as it happens now).
+        
+        """
+        #print("WorkspaceModel.update_foreign_namespace ns_name = ",ns_name, " val =", val)
+        #print("WorkspaceModel.update_foreign_namespace ns_name %s" % ns_name)
+        initial = set()
+        current = set()
         
         if isinstance(val, dict):
-            user_ns_shown_varnames = val.get("user_ns", set())
+            initial = val.get("user_ns", set())
             
         elif isinstance(val, (list, set, tuple)):
-            user_ns_shown_varnames = set([k for k in val])
+            initial = set([k for k in val])
             
         else:
             raise TypeError("val expected to be a dict or a list; got %s instead" % type(val).__name__)
                             
-        #first_run = name not in self.foreign_namespaces
+        #print("WorkspaceModel.update_foreign_namespace symbols", initial)
         
-        #print("WorkspaceModel.update_foreign_namespace user_ns_shown_varnames", user_ns_shown_varnames)
+        #saved_sessions = dict()
+        #saved_current = set()
+        #saved_initial = set()
         
-        if len(user_ns_shown_varnames):
-            #print("\t%s in foreign_namespaces" % name, name in self.foreign_namespaces)
-            if name not in self.foreign_namespaces:
-                # special treatment for objects loaded from NEURON at kernel 
-                # initialization time (see extipyutils_client 
-                # nrn_ipython_initialization_cmd and the 
-                # core.neuro_python.nrn_ipython module)
-                
-                current = set()
-                
-                for v in ("h", "ms", "mV",):
-                    if v in user_ns_shown_varnames:
-                        current.add(v)
-                        user_ns_shown_varnames.remove(v)
-                
-                # will trigger _foreign_namespaces_count_changed_ which at the 
-                # moment, does nothing
-                self.foreign_namespaces[name] = {"initial": user_ns_shown_varnames,
-                                                 "current": current}
-                
-            else:    
-                #print("\tupdate_foreign_namespace: foreign namespaces:", self.foreign_namespaces)
-                #print("\tself.foreign_namespaces[name]['current']", self.foreign_namespaces[name]["current"])
-                
-                removed_items = self.foreign_namespaces[name]["current"] - user_ns_shown_varnames
-                #print("\tremoved_items", removed_items)
-                for vname in removed_items:
-                    self.removeRowForVariable(vname, ns = name)
-                    #self.removeRowForVariable(vname, ns = name.replace("_", " "))
-                
-                added_items = user_ns_shown_varnames - self.foreign_namespaces[name]["current"]
-                
-                self.foreign_namespaces[name]["current"] -= removed_items
-                
-                self.foreign_namespaces[name]["current"] |= added_items
-                
-                self.foreign_namespaces[name]["current"] -= self.foreign_namespaces[name]["initial"]
-                
+        #if len(initial):
+        #print("\t%s in foreign_namespaces" % ns_name, ns_name in self.foreign_namespaces)
+        if ns_name not in self.foreign_namespaces:
+            # NOTE:2021-01-28 21:58:59
+            # check to see if there is a snapshot of a currently live kernel
+            # to retrieve live symbols from there
+            if os.path.isfile(cfile): # make sure connection is alive
+                externalConsole = self.shell.user_ns.get("external_console", None)
+                if externalConsole:
+                    cdict = externalConsole.window.connections.get(cfile, None)
+                    if isinstance(cdict, dict) and "master" in cdict and cdict["master"] is None:
+                        #print("found remote connection for %s" % cfile)
+                        current, initial = self._merge_session_cache_(cfile, initial)
+                    
+            # special treatment for objects loaded from NEURON at kernel 
+            # initialization time (see extipyutils_client 
+            # nrn_ipython_initialization_cmd and the 
+            # core.neuron_python.nrn_ipython module)
+            
+            neuron_symbols = initial & {"h", "ms", "mV"} # may have already been in saved current
+            
+            current = current | neuron_symbols # set operations ensure unique elements
+            
+            
+            #for v in ("h", "ms", "mV",):
+                #if v in initial:
+                    #current.add(v)
+                    #initial.remove(v)
+                    
+            # The distinction between initial and current boils down to symbols
+            # visible in the workspace table and for which properties are queried
+            # (i.e., those in the "current" set) versus the symbols NOT visible
+            # in the workspace table and therefore skipped from property query 
+            # (thus keeping the whole excercise of updating the workspace table 
+            # less demanding)
+            
+            # will trigger _foreign_namespaces_count_changed_ which at the 
+            # moment, does nothing
+            self.foreign_namespaces[ns_name] = {"current": current,
+                                                "initial": initial,
+                                                }
+            
+        else:    
+            #print("\tupdate_foreign_namespace: foreign namespaces:", self.foreign_namespaces)
+            #print("\tself.foreign_namespaces[ns_name]['current']", self.foreign_namespaces[ns_name]["current"])
+            
+            removed_symbols = self.foreign_namespaces[ns_name]["current"] - initial
+            #print("\tremoved_symbols", removed_symbols)
+            for vname in removed_symbols:
+                self.removeRowForVariable(vname, ns = ns_name)
+                #self.removeRowForVariable(vname, ns = ns_name.replace("_", " "))
+            
+            added_symbols = initial - self.foreign_namespaces[ns_name]["current"]
+            
+            self.foreign_namespaces[ns_name]["current"] -= removed_symbols
+            
+            self.foreign_namespaces[ns_name]["current"] |= added_symbols
+            
+            self.foreign_namespaces[ns_name]["current"] -= self.foreign_namespaces[ns_name]["initial"]
+            
                 
     def clear(self):
         self.cached_vars.clear()
@@ -224,6 +569,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
     @safeWrapper
     def post_execute(self):
+        """Callback for the internal inprocess ipython kernel
+        """
         # NOTE: 2018-10-07 09:00:53
         # find out what happened to the variables and populate the corresponding
         # dictionaries
@@ -654,8 +1001,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         #self._foreign_workspace_count_ += 1
         for varname, props in prop_dicts.items():
-            ns = props["Workspace"]["display"]
-            ns_key = ns.replace(" ", "_")
+            ns_key = props["Workspace"]["display"]
+            #ns_key = ns.replace(" ", "_")
             
             vname = varname.replace("properties_of_","")
             
@@ -666,7 +1013,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
             ns_index = namespaces.index(ns_key)
             
-            items_row_ndx = self.rowIndexForNamedItemsWithProps(vname, Workspace=ns)
+            items_row_ndx = self.rowIndexForNamedItemsWithProps(vname, Workspace=ns_key)
             
             if items_row_ndx is None:
                 row = self.generateRowFromPropertiesDict(props)

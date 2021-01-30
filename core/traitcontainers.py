@@ -533,7 +533,8 @@ class DataBag(Bunch):
         """
         try:
             obs = object.__getattribute__(self, "__observer__")
-            return key in obs._trait_values.keys()
+            return obs.has_trait(key)
+            #return key in obs._trait_values.keys()
             #if key in obs.__dict__.keys():
                 #return True
         except:
@@ -615,13 +616,16 @@ class DataBag(Bunch):
         except:
             raise
         
-    def pop(self, key, default=None):
+    def pop(self, key, *args):
         try:
             ret = self.__getitem__(key)
             self.__delitem__(key)
             return ret
         except:
-            return default
+            if len(args) == 0:
+                raise
+            else:
+                return args[0]
         
     @property
     def mutable_types(self):

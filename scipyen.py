@@ -98,7 +98,6 @@ def main():
         #library_paths.append('/usr/lib64/qt5/plugins')
         #library_paths = QtCore.QCoreApplication.setLibraryPaths(library_paths)
         app = QtWidgets.QApplication(sys.argv)
-        app.icon = QtGui.QIcon.fromTheme("python")
         #app.setStyle(QtWidgets.QStyleFactory.create("Breeze"))
         #app.setStyle(MyProxyStyle())
         
@@ -114,7 +113,7 @@ def main():
         #mainWindow = mainwindow.ScipyenWindow(app, 
                                               #defaults = scipyen_defaults,
                                               #settings = scipyen_config)
-        
+        #mainWindow.setWindowIcon(app.icon)
         mainWindow.show()
         
         app.exec()

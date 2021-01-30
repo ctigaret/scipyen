@@ -104,9 +104,6 @@ init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, impo
                  "import matplotlib.mlab as mlb",
                  "".join(["sys.path.insert(2, '", os.path.dirname(__module_path__), "')"]),
                  "from core import extipyutils_host as hostutils",
-                 
-                 #"from IPython.lib.deepreload import reload as dreload",
-                 #"sys.path=['" + sys.path[0] +"'] + sys.path",
                  ]
 
 #init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, importlib",
@@ -426,7 +423,7 @@ def cmds_get_foreign_data_props2(dataname:str, namespace:str="Internal") -> list
     # passed as code , not as part of user_expressions)
     # a bit more convoluted, as it creates sub_special_%(dataname) in the foreign namespace
     special = "properties_of"
-    sub_special = "obj_props_"
+    sub_special = "obj_props"
     
      # defines a generator fcn decorated with contextmanager
     cmd1 = define_foreign_data_props_getter_gen_str(dataname, namespace)
@@ -628,7 +625,8 @@ def cmd_foreign_namespace_listing(namespace:str="Internal", as_call=True) -> dic
     """Creates a user_expression containing the variable names in a foreign namespace.
     """
     
-    expr = {"ns_listing_of_%s" % namespace.replace(" ", "_") : "dir()"}
+    expr = {"ns_listing_of_%s" % namespace : "dir()"}
+    #expr = {"ns_listing_of_%s" % namespace.replace(" ", "_") : "dir()"}
     
     if as_call:
         return ForeignCall(user_expressions = expr)
@@ -643,9 +641,13 @@ def cmd_foreign_shell_ns_listing(namespace:str="Internal", as_call=True) -> dict
     
     # NOTE 2020-07-29 22:51:02: WRONG: the value of "ns_listing_of_%s" % namespace
     # must be a str
-    ue1 = "{'user_ns':set([k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys() and not inspect.ismodule(get_ipython().user_ns[k]) and not k.startswith('_') ])}"
+    #ue1 = "{'user_ns':set([k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys() and not inspect.ismodule(get_ipython().user_ns[k]) and not k.startswith('_') ])}"
     
-    expr = {"ns_listing_of_%s" % namespace.replace(" ", "_") : ue1}
+    # NOTE: allow listing of imported modules!
+    ue1 = "{'user_ns':set([k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys() and not k.startswith('_') ])}"
+    
+    expr = {"ns_listing_of_%s" % namespace : ue1}
+    #expr = {"ns_listing_of_%s" % namespace.replace(" ", "_") : ue1}
     
     if as_call:
         return ForeignCall(user_expressions = expr)
@@ -696,11 +698,10 @@ def unpack_shell_channel_data(msg:dict) -> dict:
     #
     # "properties_of_%s"    (varname)
     #
-    # "ns_listing_of_%s"    (kernel_tab_name)
+    # "ns_listing_of_%s"    (workspace_name)
     #
     # ATTENTION The specials are set by the functions than generate the commands
     # generating the user_expressions dictionaries.
-    
     
     ret = dict()
     # peel-off layers one by one so we can always be clear of what this does
@@ -720,21 +721,21 @@ def unpack_shell_channel_data(msg:dict) -> dict:
                 ret.update(data_dict)
                 
             
-            elif value_status == "error":
-                ret.update({"error_%s_%s" % (key, msg["connection_name"].replace(" ", "_")): {"ename":value["ename"],
-                                               "evalue": value["evalue"],
-                                               "traceback": value["traceback"]}})
+            #elif value_status == "error":
+                #ret.update({"error_%s_%s" % (key, msg["workspace_name"]): {"ename":value["ename"],
+                                               #"evalue": value["evalue"],
+                                               #"traceback": value["traceback"]}})
                 
-            else:
-                ret.update({"%s_%s_%s" % (value_status, key, msg["tab".replace(" ", "_")]): value_status})
+            #else:
+                #ret.update({"%s_%s_%s" % (value_status, key, msg["workspace_name"]): value_status})
                     
-    elif msg_status == "error":
-        ret.update({"error_%s_%s" % (msg["msg_type"], msg["connection_name"].replace(" ","_")): {"ename": msg["content"]["ename"],
-                                                   "evalue": msg["content"]["evalue"],
-                                                   "traceback": msg["content"]["traceback"]}})
+    #elif msg_status == "error":
+        #ret.update({"error_%s_%s" % (msg["msg_type"], msg["workspace_name"]): {"ename": msg["content"]["ename"],
+                                                   #"evalue": msg["content"]["evalue"],
+                                                   #"traceback": msg["content"]["traceback"]}})
         
-    else:
-        ret.update({"%s_%s_%s" % (msg_status, msg["msg_type"], msg["connection_name"].replace(" ", "_")): msg_status})
+    #else:
+        #ret.update({"%s_%s_%s" % (msg_status, msg["msg_type"], msg["workspace_name"]): msg_status})
     
     return ret
 

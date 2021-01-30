@@ -1605,6 +1605,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._configureUI_()
         
         self._load_settings_()
+        icon = QtGui.QIcon.fromTheme("python")
+        self.setWindowIcon(icon)
+        
+        QtWidgets.QApplication.setWindowIcon(icon)
+
         
         # -----------------
         # connect widget actions through signal/slot mechanism
@@ -1645,16 +1650,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
         self.threadpool = QtCore.QThreadPool()
         
-        self.__class__._instance = self
-        
-    #@property
-    #def scipyenDefaultSettings(self):
-        #return self._default_scipyen_settings_
-    
-    #@scipyenDefaultSettings.setter
-    #def scipyenDefaultSettings(self, value):
-        #self._default_scipyen_settings_ = value
-        #self.workspace["scipyen_defaults"] = self._default_scipyen_settings_
+        self.__class__._instance = self # FIXME: what's this for?!?
         
     @property
     def scipyenSettings(self):
@@ -1745,10 +1741,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # 2. once started, automatically import useful libraries such as bokeh etc
         # 3. make this in two flavours, one of them with NEURON environment
         from core.extipyutils_client import nrn_ipython_initialization_cmd
-        
-        print("_init_ExternalIPython_ new", new)
+        from functools import partial
+        #print("_init_ExternalIPython_ new", new)
         
         if not isinstance(self.external_console, consoles.ExternalIPython):
+            # NOTE: 2021-01-30 13:52:58
+            # there is no runnin ExternalIPython instance
             if isinstance(new, str) and new in ("connection", "neuron_ext"):
                 connection_file, file_type = QtWidgets.QFileDialog.getOpenFileName(self,
                                                             "Connect to Existing Kernel",
@@ -1769,7 +1767,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             #self.external_console.window.sig_kernel_count_changed[int].connect(self._slot_remote_kernel_count_changed)
             
             # NOTE: 2021-01-15 14:46:07
-            # any value of new other than "neuron" is ignored when the console 
+            # any value of new other than "neuron" or "neuron_ext" is ignored when the console 
             # is first initiated
             if isinstance(new, str):
                 if new == "neuron":
@@ -1782,14 +1780,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 
             self.external_console.window.sig_shell_msg_received[object].connect(self._slot_ext_krn_shell_chnl_msg_recvd)
-            self.external_console.window.sig_kernel_disconnect[str].connect(self._slot_ext_krn_disconnected)
-            self.external_console.window.sig_kernel_restart[str].connect(self._slot_ext_krn_restart)
-            self.external_console.window.sig_kernel_stopped_channels[str].connect(self._slot_ext_krn_stop)
+            self.external_console.window.sig_kernel_disconnect[dict].connect(self._slot_ext_krn_disconnected)
+            self.external_console.window.sig_kernel_restart[dict].connect(self._slot_ext_krn_restart)
+            self.external_console.window.sig_kernel_stopped_channels[dict].connect(self._slot_ext_krn_stop)
             
         else:
+            # NOTE: 2021-01-30 13:53:37
+            # an instance of ExternalIPyton is already running
             frontend_factory = None
             #print("\texternal console exists")
             if self.external_console.window.active_frontend is None:
+                # NOTE: 2021-01-30 13:54:46
                 # console instance exists but does not have an active frontend anymore
                 # therefore kill the running kernel (if any) and start with clean slate
                 if (self.external_console.kernel_manager is not None):
@@ -1807,20 +1808,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         frontend_factory = self.external_console.window.create_tab_with_existing_kernel
                         
                     elif new == "neuron":
-                        from functools import partial
                         frontend_factory = partial(self.external_console.create_tab_with_new_frontend,
-                                                   nrn_ipython_initialization_cmd,
+                                                   code = nrn_ipython_initialization_cmd,
                                                    silent=True, store_history=False)
                         
-                        #frontend_factory = partial(self.external_console.window.create_new_tab_with_new_kernel_and_execute,
-                                                   #nrn_ipython_initialization_cmd,
-                                                   #silent=True, store_history=False)
-                                                   
                     elif new == "neuron_ext":
                         frontend_factory = self.external_console.window.create_tab_with_existing_kernel
+                        frontend_factory = partial(self.external_console.window.create_tab_with_existing_kernel,
+                                                   code = nrn_ipython_initialization_cmd,
+                                                   silent = True, store_history = False)
                         
-                    #else: # str is "" as per default
-                        #frontend_factory = self.external_console.window.create_tab_with_new_frontend
             else:
                 #print("\t* active frontend exists")
                 if isinstance(new, str):
@@ -1834,17 +1831,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         frontend_factory = self.external_console.window.create_tab_with_existing_kernel
                         
                     elif new == "neuron":
-                        from functools import partial
                         frontend_factory = partial(self.external_console.window.create_tab_with_new_frontend,
                                                    code=nrn_ipython_initialization_cmd,
                                                    silent=True, store_history=False)
                         
-                        #frontend_factory = partial(self.external_console.window.create_new_tab_with_new_kernel_and_execute,
-                                                   #nrn_ipython_initialization_cmd,
-                                                   #silent=True, store_history=False)
-                                                   
                     elif new == "neuron_ext":
-                        frontend_factory = self.external_console.window.create_tab_with_existing_kernel
+                        frontend_factory = partial(self.external_console.window.create_tab_with_existing_kernel,
+                                                   code = nrn_ipython_initialization_cmd,
+                                                   silent=True, store_history=False)
 
             if frontend_factory is not None:
                 if frontend_factory():
@@ -5024,12 +5018,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             fileNames, _ = self.chooseFile(caption=u'Open Files', fileFilter=filesFilterString,
                                            single=False, targetDir=None)
         
-        #if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
-            #fileNames, _ = QtWidgets.QFileDialog.getOpenFileNames(self, caption=u'Open Files', filter=filesFilterString, directory=targetDir)
-            
-        #else:
-            #fileNames, _ = QtWidgets.QFileDialog.getOpenFileNames(self, caption=u'Open Files', filter=filesFilterString)
-
         if len(fileNames) > 0:
             for fileName in fileNames:
                 if isinstance(fileName, str) and len(fileName) > 0:
@@ -5061,14 +5049,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     self.recentlyRunScripts.appendleft(self._temp_python_filename_)
                     self._refreshRecentScriptsMenu_()
                     
-            #text = pio.loadFile(self._temp_python_filename_)
-            #self.console.writeText(text)
-            
     @pyqtSlot()
     @safeWrapper
     def _slot_gui_worker_done_(self):
         QtWidgets.QApplication.setOverrideCursor(self._defaultCursor)
-        #QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
         
     @pyqtSlot(object)
     @safeWrapper
@@ -5112,31 +5096,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     #def _slot_remote_kernel_count_changed(self, count):
         #self.workspaceModel.foreign_kernel_palette = list(sb.color_palette("pastel", count))
         
-    @pyqtSlot(str)
-    @safeWrapper
-    def _slot_ext_krn_disconnected(self, txt):
-        print("mainWindow: _slot_ext_krn_disconnected %s" % txt)
-        signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
-        self.workspaceModel.remove_foreign_namespace(txt)
-        
-    @pyqtSlot(str)
-    @safeWrapper
-    def _slot_ext_krn_stop(self, txt):
-        #print("mainWindow: _slot_ext_krn_stop %s" % txt)
-        signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
-        self.workspaceModel.remove_foreign_namespace(txt)
-        
-    @pyqtSlot(str)
-    @safeWrapper
-    def _slot_ext_krn_restart(self, txt):
-        #print("mainWindow: _slot_ext_krn_restart %s" % txt)
-        from core.extipyutils_client import cmd_foreign_shell_ns_listing
-        
-        signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
-        #self.workspaceModel.remove_foreign_namespace(txt)
-        
-        self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=txt.replace("_", " ")))
-        
     @pyqtSlot()
     @safeWrapper
     def _slot_copyToExternalWS(self):
@@ -5170,12 +5129,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         # deal with those that belong to an external workspace
         for ns in self.workspaceModel.foreign_namespaces:
-            wsname = ns.replace("_", " ")
-            varnames = [self.workspaceModel.item(i.row(),0).text() for i in indexList if self.workspaceModel.item(i.row(), wscol).text() == wsname]
+            varnames = [self.workspaceModel.item(i.row(),0).text() for i in indexList if self.workspaceModel.item(i.row(), wscol).text() == ns]
             
             if len(varnames):
-                self.external_console.execute(cmd_copies_from_foreign(*varnames),
-                                              where = wsname)
+                self.external_console.execute(cmd_copies_from_foreign(*varnames), where = ns)
+    
+            #wsname = ns.replace("_", " ")
+            #varnames = [self.workspaceModel.item(i.row(),0).text() for i in indexList if self.workspaceModel.item(i.row(), wscol).text() == wsname]
+            
+            #if len(varnames):
+                #self.external_console.execute(cmd_copies_from_foreign(*varnames),
+                                              #where = wsname)
     
     @pyqtSlot(object)
     @safeWrapper
@@ -5222,25 +5186,44 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #### END get rid of this once done developing
         
         #print("_slot_ext_krn_shell_chnl_msg_recvd")
-        #print("\ttab:", msg["connection_name"], "\n\ttype:", msg["msg_type"], "\n\tstatus:", msg["content"]["status"])
+        #print("\ttab:", msg["workspace_name"], "\n\ttype:", msg["msg_type"], "\n\tstatus:", msg["content"]["status"])
         #print("\tuser_expressions:", msg["content"].get("user_expressions", {}))
         
         if self.external_console.window.tab_widget.count() == 0:
             # only listen to kernels that have a frontend 
             return
         
-        #print("mainWindow\n\t_slot_ext_krn_shell_chnl_msg_recvd msg tab", msg["connection_name"])
+        #print("mainWindow._slot_ext_krn_shell_chnl_msg_recvd:\n\tsession ID =", 
+              #msg["parent_header"]["session"], 
+              #"\n\tworkspace =", msg["workspace_name"],
+              #"\n")
+        
         #print("mainwindow\n\t_slot_ext_krn_shell_chnl_msg_recvd msg type", msg["msg_type"])
         
+        #print("\nmainwindow shell channel message received")
+        #print("\tmessage type:", msg["msg_type"])
+        #print("\tvia connection file:", msg["connection_file"])
+        
+        # ATTENTION: 2021-01-30 14:13:28
+        # only use for debugging
+        #if msg["connection_file"] in self.external_console.window.connections:
+            #if self.external_console.window.connections[msg["connection_file"]]["master"] is None:
+                #print("external kernel via %s" % msg["connection_file"])
+                #print("\t", msg)
+        
         if msg["msg_type"] == "execute_reply":
-            #print("mainWindow: kernel sent execute_reply %s" % msg["connection_name"])
+            #print("\n\t** execute_reply from %s" % msg["workspace_name"])
+            #print("\n****** execute_reply from %s\n"% msg["workspace_name"], msg, "\n*****\n")
             vardict = unpack_shell_channel_data(msg)
             
-            #print("mainWindow: %s len(vardict)" % msg["connection_name"], len(vardict))
+            #print("\n\t** len(vardict) =",  len(vardict))
+            #print("\n\t** vardict =",  vardict)
             
             if len(vardict):
+                # dict with properties of variables in external kernel namespace
                 prop_dicts = dict([(key, val) for key, val in vardict.items() if key.startswith("properties_of_")])
                 
+                # dict with listing of contents of the external kernel namespace
                 ns_listings = dict([(key, val) for key, val in vardict.items() if key.startswith("ns_listing_of_")])
                 
                 # this is needed here so that they don't clutter our own namespace
@@ -5250,6 +5233,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 for key in ns_listings.keys():
                     vardict.pop(key, None)
                     
+                # now vardict only has variables shuttled (via pickle) from the
+                # external kernel namespace into our own
+                    
                 self.workspace.update(vardict)
                 self.workspaceModel.updateTable(from_console=False)
                 
@@ -5257,42 +5243,77 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     #print("mainWindow: len(prop_dicts)", len(prop_dicts))
                     for key, value in prop_dicts.items():
                         if value["Workspace"]["display"] == "Internal":
-                            value["Workspace"] = {"display":msg["connection_name"], "tooltip":"Location: %s kernel namespace" % msg["connection_name"]}
+                            value["Workspace"] = {"display":msg["workspace_name"], 
+                                                  "tooltip":"Location: %s kernel namespace" % msg["workspace_name"]}
                             
                         for propname in value.keys():
-                            value[propname]["tooltip"] = value[propname]["tooltip"].replace("Internal", msg["connection_name"])
+                            value[propname]["tooltip"] = value[propname]["tooltip"].replace("Internal", msg["workspace_name"])
                         
                     self.workspaceModel.updateFromExternal(prop_dicts)
                 
                 if len(ns_listings):
-                    #print("mainwindow: %s len(ns_listings)" % msg["connection_name"], len(ns_listings))
+                    #print("ns_listings =", ns_listings)
                     for key, val in ns_listings.items():
-                        ns_name = key.replace("ns_listing_of_","").replace(" ", "_")
-                        #print("ns_name", ns_name)
-                        if ns_name == msg["connection_name"]:
+                        ns_name = key.replace("ns_listing_of_","")
+                        #ns_name = key.replace("ns_listing_of_","").replace(" ", "_")
+                        #print("\n\t.... ns_name", ns_name, "val", val)
+                        if ns_name == msg["workspace_name"]:
                             if isinstance(val, dict):
-                                self.workspaceModel.update_foreign_namespace(ns_name, val)
+                                self.workspaceModel.update_foreign_namespace(ns_name, msg["connection_file"], val)
                                 if ns_name in self.workspaceModel.foreign_namespaces:
                                     for varname in self.workspaceModel.foreign_namespaces[ns_name]["current"]:
-                                        self.external_console.execute(cmds_get_foreign_data_props(varname, namespace=msg["connection_name"].replace(" ", "_")),
-                                                                        where = msg["connection_name"])
+                                        self.external_console.execute(cmds_get_foreign_data_props(varname, 
+                                                                                                  namespace=msg["workspace_name"]),
+                                                                        where = msg["parent_header"]["session"])
                             
         elif msg["msg_type"] == "kernel_info_reply":
-            #print("mainWindow: kernel sent kernel_info_reply")
+            #print("\n\t** kernel_info_reply from %s" % msg["workspace_name"])
+            #print("\n****** kernel_info_reply from %s\n" % msg["workspace_name"], msg, "\n********\n")
             # usually sent when right after the kernel started - we use this as
             # a signal that the kernel has been started, by which we trigger
             # an initial directory listing.
+            # it seems this is only sent whe a new connection is established to
+            # the kernel (via a new connection file); opening a slave tab again
+            # 
             #pass
-            self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["connection_name"].replace(" ", "_")))
+            #self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["workspace_name"].replace(" ", "_")),
+            self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["workspace_name"]),
+                                          where = msg["parent_header"]["session"])
             
         elif msg["msg_type"] == "is_complete_reply":
-            #print("mainWindow: kernel sent is_complete_reply")
-            self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["connection_name"].replace(" ", "_")),
-                                          where = msg["connection_name"])
-            
+            #print("\n\t** is_complete_reply from %s" % msg["workspace_name"])
+            #print("\n****** is_complete_reply from %s\n"% msg["workspace_name"], msg, "\n********\n")
+            self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["workspace_name"]),
+                                          where = msg["parent_header"]["session"])
                     
     def execute_in_external_console(self, call, where=None):
         self.external_console.execute(call, where=where)
+        
+    @pyqtSlot(dict)
+    @safeWrapper
+    def _slot_ext_krn_disconnected(self, cdict):
+        #print("mainWindow: _slot_ext_krn_disconnected %s" % cdict)
+        signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
+        self.workspaceModel.remove_foreign_namespace(cdict)
+        
+    @pyqtSlot(dict)
+    @safeWrapper
+    def _slot_ext_krn_stop(self, conndict):
+        #print("mainWindow: _slot_ext_krn_stop %s" % conndict)
+        signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
+        self.workspaceModel.remove_foreign_namespace(conndict)
+        
+    @pyqtSlot(dict)
+    @safeWrapper
+    def _slot_ext_krn_restart(self, conndict):
+        #print("mainWindow: _slot_ext_krn_restart %s" % conndict)
+        from core.extipyutils_client import cmd_foreign_shell_ns_listing
+        
+        ns_name = conndict["name"]
+        
+        signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
+        
+        self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=ns_name))
         
     @safeWrapper
     def _import_python_module_file_(self, fileName):
