@@ -8,7 +8,7 @@ if [ -z $VIRTUAL_ENV ]; then
 fi
 
 if [ -z $BROWSER ]; then
-    if [ -a $scipyenvdir/bin/broswer ]; then
+    if [ -a $scipyenvdir/bin/browser ]; then
         source $scipyenvdir/bin/browser
     fi
 fi

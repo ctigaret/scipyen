@@ -8,7 +8,9 @@ if [ -z $VIRTUAL_ENV ]; then
 fi
 
 if [ -z $BROWSER ]; then
-    source $scipyenvdir/bin/browser
+    if [ -a $scipyenvdir/bin/browser ]; then
+        source $scipyenvdir/bin/browser
+    fi
 fi
 
 jupyter lab &

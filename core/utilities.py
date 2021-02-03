@@ -11,7 +11,8 @@ import numpy as np
 from numpy import ndarray
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
-from pandas.core.base import PandasObject as PandasObject
+import pandas as pd
+#from pandas.core.base import PandasObject as PandasObject
 from quantities import Quantity as Quantity
 from vigra import VigraArray as VigraArray
 
@@ -291,7 +292,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        elif isinstance(obj, PandasObject):
+        elif isinstance(obj, pd.Series):
             dtypestr = "%s" % obj.dtype
             dtypetip = "dtype: "
 
@@ -307,19 +308,18 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        ##elif isinstance(obj, pd.DataFrame):
-        #elif tt == "DataFrame":
-            #sz = "%s" % obj.size
-            #sizetip = "size: "
+        elif isinstance(obj, pd.DataFrame):
+            sz = "%s" % obj.size
+            sizetip = "size: "
 
-            #ndims = "%s" % obj.ndim
-            #dimtip = "dimensions: "
+            ndims = "%s" % obj.ndim
+            dimtip = "dimensions: "
             
-            #shp = str(obj.shape)
-            #shapetip = "shape: "
+            shp = str(obj.shape)
+            shapetip = "shape: "
 
-            #memsz = str(getsizeof(obj))
-            #memsztip = "memory size: "
+            memsz = str(getsizeof(obj))
+            memsztip = "memory size: "
             
         elif isinstance(obj, ndarray):
             dtypestr = str(obj.dtype)
