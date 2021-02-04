@@ -24,12 +24,15 @@ b) as part of the initialization code when launching a NEURON-enabled external
             gui.consoles.ExternalConsoleWindow
 
 """
-import os
+import os, sys
 import neuron
 from neuron import h, rxd, units, nrn
 from neuron.units import ms, mV
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
+
+
+
 sys.path.insert(2, __module_path__)
 
 h("nrnversion()") # print NEURON version
@@ -38,6 +41,12 @@ h("nrnversion(8)")# print machine where this copy of NEURON was compiled
 start_gui = "gui" in sys.argv
 
 if start_gui:
+    # NOTE: 2021-02-04 18:00:07
+    # On linux, prevent KDE or other DEs theming from overriding the resources 
+    # (colors etc) in the InterViews GUI
+    if sys.platform == "linux":
+        import subprocess
+        subprocess.run(["xrdb", os.path.join(__module_path__, "app-defaults", "InterViews")])
     from neuron import gui
     h.load_file("stdrun.hoc")
     print("loaded stdrun.hoc")
