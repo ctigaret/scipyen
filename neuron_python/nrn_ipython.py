@@ -37,16 +37,23 @@ sys.path.insert(2, __module_path__)
 
 h("nrnversion()") # print NEURON version
 h("nrnversion(8)")# print machine where this copy of NEURON was compiled
+h.ivoc_style("*foreground", "#000000")
+h.ivoc_style("*MenuBar*foreground",  "#000000")
+h.ivoc_style("*Button*foreground", "#000000")
+h.ivoc_style("*Dialog*foreground", "#000000")
+h.ivoc_style("*FieldEditor*foreground", "#000000")
+
 
 start_gui = "gui" in sys.argv
 
 if start_gui:
-    # NOTE: 2021-02-04 18:00:07
-    # On linux, prevent KDE or other DEs theming from overriding the resources 
-    # (colors etc) in the InterViews GUI
-    if sys.platform == "linux":
-        import subprocess
-        subprocess.run(["xrdb", os.path.join(__module_path__, "app-defaults", "InterViews")])
+    ## NOTE: 2021-02-04 18:00:07
+    ## On linux, prevent KDE or other DEs theming from overriding the resources 
+    ## (colors etc) in the InterViews GUI
+    #if sys.platform == "linux":
+        #import subprocess
+        #compl = subprocess.run(["xrdb", "-merge", os.path.join(__module_path__, "app-defaults", "nrniv")])
+        #print("xrdb: ", compl.returncode)
     from neuron import gui
     h.load_file("stdrun.hoc")
     print("loaded stdrun.hoc")

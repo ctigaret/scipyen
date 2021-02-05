@@ -88,6 +88,10 @@ def main():
     import gui.mainwindow as mainwindow
     faulthandler.enable()
 
+    #if sys.platform == "linux":
+        #import subprocess
+        #compl = subprocess.run(["xrdb", "-merge", os.path.join(__module_path__, "neuron_python",  "app-defaults", "nrniv")])
+        #print("xrdb: ", compl.returncode)
     #sip.setdestroyonexit(True)
 
     try:

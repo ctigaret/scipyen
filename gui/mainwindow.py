@@ -1808,7 +1808,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         frontend_factory = self.external_console.window.create_tab_with_existing_kernel
                         
                     elif new == "neuron":
-                        frontend_factory = partial(self.external_console.create_tab_with_new_frontend,
+                        frontend_factory = partial(self.external_console.window.create_tab_with_new_frontend,
                                                    code = nrn_ipython_initialization_cmd,
                                                    silent=True, store_history=False)
                         

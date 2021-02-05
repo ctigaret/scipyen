@@ -1606,7 +1606,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self._load_settings_()
         icon = QtGui.QIcon.fromTheme("python")
-        self.setWindowIcon(icon))
+        self.setWindowIcon(icon)
         
         QtWidgets.QApplication.setWindowIcon(icon)
 

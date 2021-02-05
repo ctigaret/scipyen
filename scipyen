@@ -13,4 +13,10 @@ if [ -z $BROWSER ]; then
         source $scipyenvdir/bin/browser
     fi
 fi
+
+# NOTE: 2021-02-04 18:00:07
+# On linux, prevent KDE or other DEs theming from overriding the resources 
+# (colors etc) in the InterViews GUI
+xrdb -merge $scipyendir/neuron_python/app-defaults/nrniv
+
 python3 $scipyendir/scipyen.py &

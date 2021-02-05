@@ -19,7 +19,6 @@
 ! *nrn*MenuBar*foreground: #000000
 ! *nrn*MenuItem*foreground: #000000
 *nrniv*MenuBar*foreground: #000000
-!*nrniv*Glyph*foreground: #000000
 *nrniv*Button*foreground: #000000
 !*nrniv*FileChooser*foreground: #000000
 *nrniv*Dialog*foreground: #000000
