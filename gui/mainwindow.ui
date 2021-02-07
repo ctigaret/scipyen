@@ -48,7 +48,7 @@
      <x>0</x>
      <y>0</y>
      <width>1115</width>
-     <height>28</height>
+     <height>25</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -866,12 +866,12 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionRunning_IPython">
    <property name="text">
-    <string>Running IPython</string>
+    <string>Choose kernel...</string>
    </property>
   </action>
   <action name="actionRunning_IPython_for_Neuron">
    <property name="text">
-    <string>Running IPython for Neuron</string>
+    <string>Choose kernel and launch Neuron</string>
    </property>
   </action>
  </widget>
