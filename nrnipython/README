@@ -1,4 +1,3 @@
 link nrnipython shell script to ~/scipyenv/bin as:
     nrnipython
     nrnpy
-    nrnpython
