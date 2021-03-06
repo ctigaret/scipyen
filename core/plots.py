@@ -31,6 +31,7 @@ import vigra
 import pandas as pd
 import seaborn as sb
 from seaborn.external.six import string_types
+#from seaborn._core import variable_type, infer_orient, categorical_order
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -232,6 +233,7 @@ class SB_CategoricalPlotter(sb.categorical._CategoricalPlotter):
                             orient=None, order=None, hue_order=None,
                             skip = None, units=None):
         """Convert input specification into a common representation."""
+        from seaborn._core import infer_orient
         # Option 1:
         # We are plotting a wide-form dataset
         # -----------------------------------
@@ -350,7 +352,8 @@ class SB_CategoricalPlotter(sb.categorical._CategoricalPlotter):
                     raise ValueError(err)
 
             # Figure out the plotting orientation
-            orient = self.infer_orient(x, y, orient)
+            #orient = self.infer_orient(x, y, orient)
+            orient = infer_orient(x, y, orient)
 
             # Option 2a:
             # We are plotting a single set of data
