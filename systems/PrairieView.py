@@ -63,7 +63,7 @@ import ephys.ephys as ephys
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-__UI_PVImporterDialog__, __QDialog__ = __loadUiType__(os.path.join(__module_path__,"PVImporterDialog.ui"), from_imports=True, import_from="gui")
+#__UI_PVImporterDialog__, __QDialog__ = __loadUiType__(os.path.join(__module_path__,"PVImporterDialog.ui"), from_imports=True, import_from="gui")
 __UI_PrairieImporter, __QDialog__ = __loadUiType__(os.path.join(__module_path__, "PrairieImporter.ui"), from_imports=True, import_from="gui")
 
 
@@ -1410,9 +1410,9 @@ class PVSequence (object):
                 else:
                     newAxisDim = data[0][0].ndim
                     
-                return [imgp.concatenateImages([imgp.insertAxis(data[frame][channel], newAxisInfo, newAxisDim) \
-                                                        for frame in range(len(self.frames))], \
-                                                        axis=newAxisInfo) \
+                return [imgp.concatenateImages([imgp.insertAxis(data[frame][channel], newAxisInfo, newAxisDim) 
+                                                        for frame in range(len(self.frames))], 
+                                                        axis=newAxisInfo) 
                                                     for channel in range(len(data[0]))], None
                 
         elif self.sequencetype == PVSequenceType.Single:
@@ -2182,213 +2182,213 @@ class PVScan(object):
         return "\n".join(ret)
     
     
-class PVImportDialog(WorkspaceGuiMixin, __UI_PVImporterDialog__, __QDialog__):
-    """TODO
-    """
-    def __init__(self, currentdir=None, 
-                 presyn_trigger_detect=None, 
-                 postsyn_trigger_detect=None, 
-                 photo_trigger_detect=None, 
-                 imaging_trigger_detect=None, 
-                 name=None,
-                 pvdata_name=None, 
-                 ephys_name=None, 
-                 options=None, 
-                 **kwargs):
-        super(WorkspaceGuiMixin, self).__init__(**kwargs)
-        super().__init__(self, **kwargs)
+#class PVImportDialog(WorkspaceGuiMixin, __UI_PVImporterDialog__, __QDialog__):
+    #"""Do not use
+    #"""
+    #def __init__(self, currentdir=None, 
+                 #presyn_trigger_detect=None, 
+                 #postsyn_trigger_detect=None, 
+                 #photo_trigger_detect=None, 
+                 #imaging_trigger_detect=None, 
+                 #name=None,
+                 #pvdata_name=None, 
+                 #ephys_name=None, 
+                 #options=None, 
+                 #**kwargs):
+        #super(WorkspaceGuiMixin, self).__init__(**kwargs)
+        #super().__init__(self, **kwargs)
         
-        if not isinstance(currentdir, str):
-            currentdir = os.getcwd()
-            #raise TypeError("currentdir expected to be a string; got %s instead" % type(currentdir).__name__)
+        #if not isinstance(currentdir, str):
+            #currentdir = os.getcwd()
+            ##raise TypeError("currentdir expected to be a string; got %s instead" % type(currentdir).__name__)
         
-        if not os.path.exists(currentdir) or not os.path.isdir(currentdir) or not os.access(currentdir, os.R_OK):
-            raise ValueError("%s is not a readable directory" % currentdir)
+        #if not os.path.exists(currentdir) or not os.path.isdir(currentdir) or not os.access(currentdir, os.R_OK):
+            #raise ValueError("%s is not a readable directory" % currentdir)
         
-        for n, t in zip(("presyn_trigger_detect", "postsyn_trigger_detect", "photo_trigger_detect", "imaging_trigger_detect"),
-                        (presyn_trigger_detect, postsyn_trigger_detect, photo_trigger_detect, imaging_trigger_detect)):
+        #for n, t in zip(("presyn_trigger_detect", "postsyn_trigger_detect", "photo_trigger_detect", "imaging_trigger_detect"),
+                        #(presyn_trigger_detect, postsyn_trigger_detect, photo_trigger_detect, imaging_trigger_detect)):
         
-            if not t is None:
-                if not isinstance(t, (tuple, list)):
-                    raise TypeError("%s expected to be a tuple or list; got %s instead" % (n, type(t).__name__))
+            #if not t is None:
+                #if not isinstance(t, (tuple, list)):
+                    #raise TypeError("%s expected to be a tuple or list; got %s instead" % (n, type(t).__name__))
                 
-                if len(t) not in (3, 4):
-                    raise TypeError("%s expected to have three or four elements; got %d instead" % (n, len(t)))
+                #if len(t) not in (3, 4):
+                    #raise TypeError("%s expected to have three or four elements; got %d instead" % (n, len(t)))
                 
-                if not isinstance(t[0], bool):
-                    raise TypeError("first element of %s expected to be a bool; got %s instead" % (n, type(t[0]).__name__))
+                #if not isinstance(t[0], bool):
+                    #raise TypeError("first element of %s expected to be a bool; got %s instead" % (n, type(t[0]).__name__))
                 
-                if not isinstance(t[1], int):
-                    raise TypeError("second element of %s expected to be an int; got %s instead" % (n, type(t[1]).__name__))
+                #if not isinstance(t[1], int):
+                    #raise TypeError("second element of %s expected to be an int; got %s instead" % (n, type(t[1]).__name__))
                 
-                if t[1] < 0:
-                    raise ValueError("second element of %s must be >= 0; got %d instead" % (n, t[1]))
+                #if t[1] < 0:
+                    #raise ValueError("second element of %s must be >= 0; got %d instead" % (n, t[1]))
                 
-                if not isinstance(t[2], str):
-                    raise TypeError("third element of %s expected to be a str; got %s instead" % (n, type(t[2]).__name__))
+                #if not isinstance(t[2], str):
+                    #raise TypeError("third element of %s expected to be a str; got %s instead" % (n, type(t[2]).__name__))
                 
-                if len(t[2]) == 0:
-                    raise ValueError("third element of %s must not be an empty string" % n)
+                #if len(t[2]) == 0:
+                    #raise ValueError("third element of %s must not be an empty string" % n)
                 
-                if len(t) == 4:
-                    if not insinstance(t[3], tuple):
-                        raise TypeError("fourth element of %s must be a tuple; got %s instead" % (n, type(t[3]).__name__))
+                #if len(t) == 4:
+                    #if not insinstance(t[3], tuple):
+                        #raise TypeError("fourth element of %s must be a tuple; got %s instead" % (n, type(t[3]).__name__))
                     
-                    if len(t[3]) != 2:
-                        raise TypeError("fourth element of %s must have two elements; got %d instead" % (n, len(presyn_trigger_detect[3])))
+                    #if len(t[3]) != 2:
+                        #raise TypeError("fourth element of %s must have two elements; got %d instead" % (n, len(presyn_trigger_detect[3])))
                     
-                    if not all([isinstance(p, float) for p in t[3]]):
-                        raise TypeError("fourth element of %s must contain float values" % n)
+                    #if not all([isinstance(p, float) for p in t[3]]):
+                        #raise TypeError("fourth element of %s must contain float values" % n)
         
-        if not isinstance(name, (str, type(None))):
-            raise TypeError("'name' expected to be a string, or None; got %s instead" % type(name).__name__)
+        #if not isinstance(name, (str, type(None))):
+            #raise TypeError("'name' expected to be a string, or None; got %s instead" % type(name).__name__)
         
-        if not isinstance(pvdata_name, (str, type(None))):
-            raise TypeError("'pvdata_name' extected to be a string, or None; got %s instead" % type(pvdata_name).__name__)
+        #if not isinstance(pvdata_name, (str, type(None))):
+            #raise TypeError("'pvdata_name' extected to be a string, or None; got %s instead" % type(pvdata_name).__name__)
         
-        if isinstance(pvdata_name, str) and len(pvdata_name.strip()) == 0:
-            raise ValueError("'pvdata_name' cannot be an empty string")
+        #if isinstance(pvdata_name, str) and len(pvdata_name.strip()) == 0:
+            #raise ValueError("'pvdata_name' cannot be an empty string")
         
-        if not isinstance(ephys_name, (str, type(None))):
-            raise TypeError("'ephys_name' expected to be astring; got %s instead" % type(ephys_name).__name__)
+        #if not isinstance(ephys_name, (str, type(None))):
+            #raise TypeError("'ephys_name' expected to be astring; got %s instead" % type(ephys_name).__name__)
         
-        if isinstance(ephys_name, str) and len(ephys_name.strip()) == 0:
-            raise ValueError("'ephys_name' cannot be an empty string")
+        #if isinstance(ephys_name, str) and len(ephys_name.strip()) == 0:
+            #raise ValueError("'ephys_name' cannot be an empty string")
         
-        if not isinstance(options, (dict, type(None))):
-            raise TypeError("'options' expected to be a dict or None; got %s instead" % type(options).__name__)
+        #if not isinstance(options, (dict, type(None))):
+            #raise TypeError("'options' expected to be a dict or None; got %s instead" % type(options).__name__)
         
-        self.targetdir              = currentdir
-        self.presyn_trigger_detect  = presyn_trigger_detect
-        self.postsyn_trigger_detect = postsyn_trigger_detect
-        self.photo_trigger_detect   = photo_trigger_detect
-        self.imaging_trigger_detect = imaging_trigger_detect
+        #self.targetdir              = currentdir
+        #self.presyn_trigger_detect  = presyn_trigger_detect
+        #self.postsyn_trigger_detect = postsyn_trigger_detect
+        #self.photo_trigger_detect   = photo_trigger_detect
+        #self.imaging_trigger_detect = imaging_trigger_detect
         
-        self.xmlFileFilter          = "XML Files (*.xml)"
-        self.pickleFileFilter       = "Pickle Files (*.pkl)"
-        self.ephysFilesFilter       = ";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)"])
+        #self.xmlFileFilter          = "XML Files (*.xml)"
+        #self.pickleFileFilter       = "Pickle Files (*.pkl)"
+        #self.ephysFilesFilter       = ";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)"])
         
-        self.name                   = name
-        self.pvdata_name            = pvdata_name
-        self._ephys_name            = ephys_name
+        #self.name                   = name
+        #self.pvdata_name            = pvdata_name
+        #self._ephys_name            = ephys_name
         
-        self.pvXMLfileName          = None
-        self.pvscan                 = None
-        self.scanDataOptions        = None
+        #self.pvXMLfileName          = None
+        #self.pvscan                 = None
+        #self.scanDataOptions        = None
         
-        self.ephysdata              = None
+        #self.ephysdata              = None
         
-        self.scandata               = None
-        self.__configure_UI__()
+        #self.scandata               = None
+        #self.__configure_UI__()
         
-    def __configure_UI__(self):
-        self.setupUi(self)
-        #self.pvScanFileChooserToolButton.clicked.connect(self.slot_choosePVFile)
-        #self.pvScanImportFromWorkspaceToolButton.clicked.connect(self.slot_importPVData)
+    #def __configure_UI__(self):
+        #self.setupUi(self)
+        ##self.pvScanFileChooserToolButton.clicked.connect(self.slot_choosePVFile)
+        ##self.pvScanImportFromWorkspaceToolButton.clicked.connect(self.slot_importPVData)
         
-        pass
+        #pass
         
         
-    @pyqtSlot()
-    def slot_choosePVFile(self):
-        self.pvXMLfileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
-                                                                 caption="Open PrairieView file", 
-                                                                 filter=self.xmlFileFilter,
-                                                                 directory=self.targetdir)
+    #@pyqtSlot()
+    #def slot_choosePVFile(self):
+        #self.pvXMLfileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
+                                                                 #caption="Open PrairieView file", 
+                                                                 #filter=self.xmlFileFilter,
+                                                                 #directory=self.targetdir)
         
-        if len(self.pvXMLfileName) == 0:
-            return
+        #if len(self.pvXMLfileName) == 0:
+            #return
         
-        try:
-            self.pvScan = PrairieView.PVScan(pio.loadXMLFile(pvXMLfileName))
+        #try:
+            #self.pvScan = PrairieView.PVScan(pio.loadXMLFile(pvXMLfileName))
             
-        except Exception as e:
-            s = io.StringIO()
-            sei = sys.exc_info()
-            traceback.print_exception(file=s, *sei)
-            msgbox = QtWidgets.QMessageBox()
-            msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-            msgbox.setWindowTitle(sei[0].__class__.__name__)
-            msgbox.setText(sei[0].__class__.__name__)
-            msgbox.setDetailedText(s.getvalue())
-            msgbox.exec()
-            return
+        #except Exception as e:
+            #s = io.StringIO()
+            #sei = sys.exc_info()
+            #traceback.print_exception(file=s, *sei)
+            #msgbox = QtWidgets.QMessageBox()
+            #msgbox.setIcon(QtWidgets.QMessageBox.Critical)
+            #msgbox.setWindowTitle(sei[0].__class__.__name__)
+            #msgbox.setText(sei[0].__class__.__name__)
+            #msgbox.setDetailedText(s.getvalue())
+            #msgbox.exec()
+            #return
             
             
-    @pyqtSlot()
-    def slot_chooseEphysFiles(self):
-        ephysFileNames, _ = QtWidgets.QFileDialog.getOpenFileNames(self, 
-                                                               caption="Open electrophysiology files",
-                                                               filter=self.ephysFilesFilter,
-                                                               directory=self.targetdir)
-        blocks = list()
+    #@pyqtSlot()
+    #def slot_chooseEphysFiles(self):
+        #ephysFileNames, _ = QtWidgets.QFileDialog.getOpenFileNames(self, 
+                                                               #caption="Open electrophysiology files",
+                                                               #filter=self.ephysFilesFilter,
+                                                               #directory=self.targetdir)
+        #blocks = list()
         
-        self.ephysData = None
+        #self.ephysData = None
         
-        try:
-            if len(ephysFileNames) > 0:
-                if all([mimetypes.guess_type(f)[0] == "application/axon-data" for f in ephysFileNames]):
-                    blocks = [pio.loadAxonFile(f) for f in ephysFileNames]
+        #try:
+            #if len(ephysFileNames) > 0:
+                #if all([mimetypes.guess_type(f)[0] == "application/axon-data" for f in ephysFileNames]):
+                    #blocks = [pio.loadAxonFile(f) for f in ephysFileNames]
                     
-                else:
-                    blocks = [pio.loadPickleFile(f) for f in ephysFileNames]
+                #else:
+                    #blocks = [pio.loadPickleFile(f) for f in ephysFileNames]
                     
-            if len(blocks) > 0:
-                if all([isinstance(b, neo.Block) for b in blocks]):
-                    self.ephysData = concatenate_blocks(*blocks)
+            #if len(blocks) > 0:
+                #if all([isinstance(b, neo.Block) for b in blocks]):
+                    #self.ephysData = concatenate_blocks(*blocks)
                     
-                elif all([isinstance(b, neo.Segment) for b in blocks]):
-                    self.ephysData = neo.Block()
-                    self.ephysData.segments[:] = blocks[:]
+                #elif all([isinstance(b, neo.Segment) for b in blocks]):
+                    #self.ephysData = neo.Block()
+                    #self.ephysData.segments[:] = blocks[:]
                     
-                else:
-                    QtWidgets.QMessageBox.critical("Electrophysiology files must contain neo.Blocks or individual neo.Segments")
-                    return
+                #else:
+                    #QtWidgets.QMessageBox.critical("Electrophysiology files must contain neo.Blocks or individual neo.Segments")
+                    #return
                         
-        except Exception as e:
-            s = io.StringIO()
-            sei = sys.exc_info()
-            traceback.print_exception(file=s, *sei)
-            msgbox = QtWidgets.QMessageBox()
-            msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-            msgbox.setWindowTitle(sei[0].__class__.__name__)
-            msgbox.setText(sei[0].__class__.__name__)
-            msgbox.setDetailedText(s.getvalue())
-            msgbox.exec()
-            return
+        #except Exception as e:
+            #s = io.StringIO()
+            #sei = sys.exc_info()
+            #traceback.print_exception(file=s, *sei)
+            #msgbox = QtWidgets.QMessageBox()
+            #msgbox.setIcon(QtWidgets.QMessageBox.Critical)
+            #msgbox.setWindowTitle(sei[0].__class__.__name__)
+            #msgbox.setText(sei[0].__class__.__name__)
+            #msgbox.setDetailedText(s.getvalue())
+            #msgbox.exec()
+            #return
 
-    @pyqtSlot()
-    def slot_chooseOptionsFile(self):
-        from imaging.scandata import (scanDataOptions, ScanDataOptions, )
-        epscatOptionsFileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
-                                                                         caption="Open EPSCaT Options file", 
-                                                                         filter=self.pickleFileFilter,
-                                                                         directory=self.targetdir)
+    #@pyqtSlot()
+    #def slot_chooseOptionsFile(self):
+        #from imaging.scandata import (scanDataOptions, ScanDataOptions, )
+        #epscatOptionsFileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
+                                                                         #caption="Open EPSCaT Options file", 
+                                                                         #filter=self.pickleFileFilter,
+                                                                         #directory=self.targetdir)
         
-        if len(epscatOptionsFileName) == 0:
-            self.scanDataOptions = scanDataOptions()
+        #if len(epscatOptionsFileName) == 0:
+            #self.scanDataOptions = scanDataOptions()
             
-        else:
-            try:
-                self.scanDataOptions = pio.loadPickleFile(epscatOptionsFileName)
+        #else:
+            #try:
+                #self.scanDataOptions = pio.loadPickleFile(epscatOptionsFileName)
                 
-            except Exception as e:
-                s = io.StringIO()
-                sei = sys.exc_info()
-                traceback.print_exception(file=s, *sei)
-                msgbox = QtWidgets.QMessageBox()
-                msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-                msgbox.setWindowTitle(sei[0].__class__.__name__)
-                msgbox.setText(sei[0].__class__.__name__)
-                msgbox.setDetailedText(s.getvalue())
-                msgbox.exec()
-                return
+            #except Exception as e:
+                #s = io.StringIO()
+                #sei = sys.exc_info()
+                #traceback.print_exception(file=s, *sei)
+                #msgbox = QtWidgets.QMessageBox()
+                #msgbox.setIcon(QtWidgets.QMessageBox.Critical)
+                #msgbox.setWindowTitle(sei[0].__class__.__name__)
+                #msgbox.setText(sei[0].__class__.__name__)
+                #msgbox.setDetailedText(s.getvalue())
+                #msgbox.exec()
+                #return
                 
         
-    @pyqtSlot()
-    def slot_importPVData(self):
-        from core.workspacefunctions import getvarsbytype
-        pvdatadocs = getvarsbytype(xmlutils.xml.dom.minidom.Document)
+    #@pyqtSlot()
+    #def slot_importPVData(self):
+        #from core.workspacefunctions import getvarsbytype
+        #pvdatadocs = getvarsbytype(xmlutils.xml.dom.minidom.Document)
         
         
         
@@ -2404,7 +2404,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
                  optionsFileName: typing.Optional[str]=None, 
                  ephysFileNames: typing.Optional[typing.Union[str, tuple, list]]=None,
                  protocolFileName: typing.Optional[str]=None,
-                 clearTriggerEvents: typing.Optional[bool]=None,
+                 clearTriggerEvents: typing.Optional[bool]=False,
                  **kwargs): # parent, flags - see documentation for QDialog constructor in Qt Assistant
         """
         Parameters:
@@ -2424,8 +2424,10 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
                             (these typically would be detected by dialogs called 
                             from the importer GUI)
 
-        clearTriggerEvents:bool - When True, remover all events embedded in the 
-                            electrophysiology dtaa, before detecting trigger events.
+        clearTriggerEvents:bool - optional, default is False
+                            When True (default), remove all neo.Event objects
+                            embedded in the electrophysiology data, before
+                            detecting trigger events.
         
         """
         super(WorkspaceGuiMixin, self).__init__(**kwargs)
@@ -2453,13 +2455,13 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         
         self.scanDataOptions = None # ScanDataOptions object - to be assigned to lsdata
         
-        self._ephys_ = None   # a neo.Block with electrophysiology recordings associated
+        self._ephys_ = None # a neo.Block with electrophysiology recordings associated
                             # with lsdata
                             
         
         self.clearEvents = clearTriggerEvents if isinstance(clearTriggerEvents, bool) else False
                             
-        self.triggerProtocols = list()    # list of TriggerProtocol objects associated
+        self.triggerProtocols = list()  # list of TriggerProtocol objects associated
                                         # with lsdata
                                         
         self.cachedEvents = list()
@@ -2561,6 +2563,9 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         self.clearEventsCheckBox.setIcon(QtGui.QIcon.fromTheme("edit-clear-history"))
         self.clearEventsCheckBox.setChecked(self.clearEvents)
         self.clearEventsCheckBox.stateChanged.connect(self._slot_clearEventsChanged)
+        
+        # this one belongs to the eventDetectionDialogGroup sub-dialog of the 
+        # self.eventDetectionDialog
         self.detectTriggersPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-find"),
                                                               "Detect", parent=self.eventDetectionDialogGroup)
         self.detectTriggersPushButton.clicked.connect(self._slot_detectTriggers)
@@ -2581,6 +2586,8 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         self.protocolEditorDialog.sig_removeProtocol.connect(self._slot_removeProtocol)
         self.protocolEditorDialog.sig_requestProtocolAdd.connect(self._slot_protocolAddRequest)
         self.protocolEditorDialog.finished.connect(self._slot_protocolEditorFinished)
+        
+        self.buttonBox.accepted.connect(self.slot_generateScanData)
         
     @pyqtSlot(int)
     def _slot_removeProtocol(self, index):
@@ -2606,20 +2613,18 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
     
     @pyqtSlot()
     def _slot_editTriggerProtocols(self):
-        print("PVI._slot_editTriggerProtocols")
-        self.protocolEditorDialog.open()
+        #print("PVI._slot_editTriggerProtocols")
         self.protocolEditorDialog.triggerProtocols = self.triggerProtocols
+        self.protocolEditorDialog.open()
         
     @pyqtSlot()
     def _slot_protocolEditorFinished(self):
         pass
         
-        
-    
     @pyqtSlot()
     @safeWrapper
     def _slot_activateTriggerEventDetectionGui(self):
-        """Calls trigger event detection dialog.
+        """Opens the trigger event detection dialog.
         The following signals are connected ot this slot:
             detectTriggersToolButton.clicked()
             protocolEditorDialog.sig_detectTrigger()
@@ -2629,6 +2634,10 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         
         if isinstance(self._ephys_, neo.Block) and len(self._ephys_.segments):
             self.ephysPreview.plot(self._ephys_)
+            
+            nChannels = max([len(seg.analogsignals) + len(seg.irregularlysampledsignals) for seg in self._ephys_.segments])
+              
+            self.eventDetectionWidget.nChannels = nChannels
             self.eventDetectionDialog.open()
             
     @pyqtSlot()
@@ -2659,12 +2668,13 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         self.updateProtocolEditor()
         
     def _detect_trigger_events_(self):
+        print("PrairieViewImporter._detect_trigger_events_")
         signalblockers = [QtCore.QSignalBlocker(w) for w in (self.triggerProtocolFileNameLineEdit,)]
         self.cachedProtocols[:] = self.triggerProtocols[:]
         
-        presyn = self.eventDetectionWidget.presyn
+        presyn  = self.eventDetectionWidget.presyn
         postsyn = self.eventDetectionWidget.postsyn
-        photo = self.eventDetectionWidget.photo
+        photo   = self.eventDetectionWidget.photo
         imaging = self.eventDetectionWidget.imaging
         
         tp = auto_detect_trigger_protocols(self._ephys_,

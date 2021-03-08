@@ -1308,7 +1308,7 @@ def loadPickleFile(fileName):
             result = pickle.load(fileSrc)
             
     except Exception as e:
-        traceback.print_exc()
+        #traceback.print_exc()
         try:
             result = custom_unpickle(fileName)#, exc_info=exc_info)
             #result = custom_unpickle(fileName, exc_info=exc_info)

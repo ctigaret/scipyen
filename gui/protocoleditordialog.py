@@ -6,7 +6,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from PyQt5.uic import loadUiType
 
-
+import numpy as np
 import quantities as pq
 
 from core.datatypes import (arbitrary_unit, check_time_units, units_convertible,
@@ -45,10 +45,16 @@ class TriggerProtocolsModel(QtCore.QAbstractTableModel):
         return 6
     
     def data(self, index, role=QtCore.Qt.DisplayRole):
+        if self._data_ is None:
+            return QtCore.QVariant()
+            
+        if not index.isValid():
+            return QtCore.QVariant()
+
         if len(self._data_) == 0 or not all ((isinstance(p, TriggerProtocol) for p in self._data_)):
             return QtCore.QVariant()
         
-        if role in (QtCore.Qt.DecorationRole, QtCore.Qt.SizeHintRole):
+        if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
             return QtCore.QVariant()
         
         # rows: one for each defined protocol
@@ -71,44 +77,47 @@ class TriggerProtocolsModel(QtCore.QAbstractTableModel):
         
         protocol = self._data_[row]
         
-        value = "Protocol"
-        tip = "Protocol"
+        value = QtCore.QVariant()
+        tip = QtCore.QVariant()
         
         if col == 0: # protocol name
             value = protocol.name
             tip = protocol.name
+            
             if len(value.strip()) == 0:
-                value = "Protocol"
-                tip = "Protocol"
+                value = QtCore.QVariant("Protocol")
+                tip = QtCore.QVariant("Protocol")
                 
         elif col == 1: # presynaptic trigger event
             if isinstance(protocol.presynaptic, TriggerEvent): 
-                value = numbers2str(protocol.presynaptic.times)
-                tip = numbers2str(protocol.presynaptic.times, show_units=True)
+                value = QtCore.QVariant(numbers2str(protocol.presynaptic.times))
+                tip = QtCore.QVariant(numbers2str(protocol.presynaptic.times, show_units=True))
                 
         elif col == 2: # postsynaptic trigger event
             if isinstance(protocol.postsynaptic, TriggerEvent):
-                value = numbers2str(protocol.postsynaptic.times)
-                tip = numbers2str(protocol.postsynaptic.times, show_units = True)
+                value = QtCore.QVariant(numbers2str(protocol.postsynaptic.times))
+                tip = QtCore.QVariant(numbers2str(protocol.postsynaptic.times, show_units = True))
             
         elif col == 3: # photostimulation trigger event
             if isinstance(protocol.photostimulation, TriggerEvent):
-                value = numbers2str(protocol.photostimulation.times)
-                tip = numbers2str(protocol.photostimulation.times, show_units = True)
+                value = QtCore.QVariant(numbers2str(protocol.photostimulation.times))
+                tip = QtCore.QVariant(numbers2str(protocol.photostimulation.times, show_units = True))
             
         elif col == 4: # imaging frame trigger event (imaging delay)
             if isinstance(protocol.imagingDelay, np.ndarray):
-                value = numbers2str(protocol.imagingDelay)
-                tip = numbers2str(protocol.imagingDelay, show_units=True)
+                value = QtCore.QVariant(numbers2str(protocol.imagingDelay))
+                tip = QtCore.QVariant(numbers2str(protocol.imagingDelay, show_units=True))
             
         else: # segment (frame) indices
-            value = tip = numbers2str(protocol.segmentIndices())
+            value = tip = QtCore.QVariant(numbers2str(protocol.segmentIndices()))
             
         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole):
-            return QtCore.QVariant(value)
+            return value
+            #return QtCore.QVariant(value)
         
         else:
-            return QtCore.QVariant(tip)
+            return tip
+            #return QtCore.QVariant(tip)
         
     def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
         if len(self._data_) == 0:
@@ -243,18 +252,20 @@ class TriggerProtocolsModel(QtCore.QAbstractTableModel):
     
     @modelData.setter
     def modelData(self, value):
-        print("\tTriggerProtocolsModel.modelData.setter\n", value)
+        #print("\tTriggerProtocolsModel.modelData.setter\n", value)
         if isinstance(value, list) and all([isinstance(p, TriggerProtocol) for p in value]):
+            self.beginResetModel()
             self._data_ = value
+            self.endResetModel()
             
-            topLeft = self.createIndex(0,0)
-            if len(self._data_):
-                bottomRight = self.createIndex(len(self._data_)-1, len(self.model_columns)-1)
+            #topLeft = self.createIndex(0,0)
+            #if len(self._data_):
+                #bottomRight = self.createIndex(len(self._data_)-1, len(self.model_columns)-1)
                 
-            else:
-                bottomRight = topLeft
+            #else:
+                #bottomRight = topLeft
                 
-            self.dataChanged.emit(topLeft, bottomRight, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
+            #self.dataChanged.emit(topLeft, bottomRight, [QtCore.Qt.DisplayRole, QtCore.Qt.EditRole])
             
 class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
     """Gateway of GUI actions to triggers protocols management.
@@ -315,11 +326,11 @@ class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
         self.importProtocolsToolButton.clicked.connect(self._slot_importProtocols)
         
         self.protocolTableView.setModel(self._dataModel_)
-        self.protocolTableView.model().dataChanged.connect(self._slot_dataChanged)
         self.protocolTableView.horizontalHeader().setSectionsMovable(False)
         self.protocolTableView.verticalHeader().setSectionsMovable(False)
         self.protocolTableView.setAlternatingRowColors(True)
         self.protocolTableView.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
+        self.protocolTableView.model().dataChanged.connect(self._slot_dataChanged)
         self.protocolTableView.addAction(self.addProtocolAction)
         self.protocolTableView.addAction(self.removeProtocolAction)
         sep = QtWidgets.QAction(self)
@@ -405,7 +416,7 @@ class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
     
     @triggerProtocols.setter
     def triggerProtocols(self, value):
-        print("\tProtocolEditorDialog.triggerProtocols.setter\n", value)
+        #print("\tProtocolEditorDialog.triggerProtocols.setter\n", value)
         if isinstance(value, (tuple, list)) and all([isinstance(v, TriggerProtocol) for v in value]):
             self._dataModel_.modelData = value
             

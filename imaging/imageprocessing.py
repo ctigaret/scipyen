@@ -1382,6 +1382,7 @@ Arrays are concatenated in two ways, explained here by examples:
         ignore      = kwargs.pop("ignore", None)
         
     # 1) check the "images" parameter:
+    print("concatenateImages: %d images" % len(images))
     
     if len(images) == 1: # this is OK
         # trivial case of only one image; 
@@ -1415,6 +1416,8 @@ Arrays are concatenated in two ways, explained here by examples:
         elif isinstance(images[0],(tuple, list)):
             if not all([isinstance(i, vigra.VigraArray) for i in images[0]]):
                 raise TypeError("Expecting a sequence of vigra arrays")
+            
+            images = images[0]
             
         else:
             raise TypeError("Expecting a vigra array, or a sequence of vigra arrays")
@@ -1453,7 +1456,6 @@ Arrays are concatenated in two ways, explained here by examples:
     # NOTE: 2017-10-21 00:05:12
     # by now, images should be a sequence of VigraArrays
     
-    #print("concatenateImages: %d images" % len(images))
     
     #print(images)
     

@@ -62,10 +62,8 @@ import neo
 import vigra
 #import vigra.pyqt 
 import matplotlib as mpl
-from matplotlib import cm, colors
-
 # NOTE 2020-11-28 10:03:15
-# taken care of when importing customcm, below
+# taken care of when importing cmaps, below
 #try:
     #import cmocean # some cool palettes/luts
 #except:
@@ -102,39 +100,13 @@ from . import pictgui as pgui
 
 # NOTE 2020-11-28 10:04:05
 # this should automatically import our custom colormaps AND ocean colormaps if found
-from . import custom_colormaps as customcm 
+from . import scipyen_colormaps as colormaps 
 from . import quickdialog
 #### END pict.gui modules
 
 mpl.rcParams['backend']='Qt5Agg'
 
 #__viewer_info__ = {"alias": "iv", "class": "ImageViewer"}
-
-# NOTE 2020-11-28 10:05:40 
-# takes care of custom colormaps and supersedes the NOTE below:
-# NOTE: 2017-06-22 14:22:00 added custom color maps
-#customcm.register_custom_colormaps()
-
-#cm.register_cmap(cmap = cm.cmap_d["gray"])
-
-
-#colormaps = cm.cmap_d.copy() # now this has all mpl and custom colormaps
-#none_colormap = cm.get_cmap(name="gray") # now this has all mpl and custom colormaps
-#cm.register_cmap(name="None", cmap=none_colormap)
-
-# NOTE: 2019-03-26 09:54:59
-# add a "None" colormap NOW (actually, map it to "gray")
-#colormaps["None"] = cm.cmap_d["gray"]
-
-#try:
-    #colormaps.update(cmocean.cm.cmap_d)
-#except:
-    #pass
-
-#colormapnames = [n for n in colormaps.keys()]
-#colormapnames.sort()
-#colormapnames.insert(0, "None") #prepend None to remove any applied colormap
-
 
 if sys.version_info[0] >= 3:
     xrange = range
@@ -3358,7 +3330,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             if np.isnan(image).any():
                 return image
             
-            if not isinstance(self.colorMap, colors.Colormap):
+            if not isinstance(self.colorMap, colormaps.colors.Colormap):
                 #print("self.colorMap is a ", type(self.colorMap))
                 return image
             
@@ -3367,9 +3339,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             lrMapImage = vigra.colors.linearRangeMapping(image)
             
-            nMap = colors.Normalize(vmin=0, vmax=255)
+            nMap = colormaps.colors.Normalize(vmin=0, vmax=255)
             
-            sMap = cm.ScalarMappable(norm = nMap, cmap = self.colorMap)
+            sMap = colormaps.cm.ScalarMappable(norm = nMap, cmap = self.colorMap)
             
             #print(type(sMap))
             
@@ -3777,10 +3749,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     def slot_testColorMap(self, item):
         # NOTE 2020-11-28 10:19:07
         # upgrade to matplotlib 3.x
-        if item in cm._cmap_registry:
-            self.colorMap = cm.get_cmap(name=item, lut=256)
+        if item in colormaps.cm._cmap_registry:
+            self.colorMap = colormaps.cm.get_cmap(name=item, lut=256)
         else:
-            self.colorMap = cm.get_cmap("None", lut=256)
+            self.colorMap = colormaps.cm.get_cmap("None", lut=256)
         #self.colorMap = colormaps.get(item, None)
         self.displayFrame()
           
@@ -3794,10 +3766,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         # NOTE 2020-11-28 10:19:07
         # upgrade to matplotlib 3.x
-        colormapnames = sorted([n for n in cm._cmap_registry.keys()])
-        #colormapnames = sorted([n for n in colormaps.keys()])
+        colormapnames = sorted([n for n in colormaps.cm._cmap_registry.keys()])
         
-        if isinstance(self.colorMap, colors.Colormap):
+        if isinstance(self.colorMap, colormaps.colors.Colormap):
             d = pgui.ItemsListDialog(self, itemsList=colormapnames, title="Select color map", preSelected=self.colorMap.name)
             
         else:
@@ -4196,7 +4167,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if isinstance(colorMapName, str):
             self.colorMap = colormaps.get(colorMapName, None)
                 
-        elif isinstance(colorMapName, mpl.colors.Colormap):
+        elif isinstance(colorMapName, colormaps.colors.Colormap):
             self.colorMap = colorMapName
             
         else:
@@ -4402,11 +4373,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.viewerWidget.clear()
         
     def setColorMap(self, value):
-        if isinstance(value, str) and value in cm._cmap_registry:
-            self.colorMap = cm.get_cmap(value)
+        if isinstance(value, str) and value in colormaps.cm._cmap_registry:
+            self.colorMap = colormaps.cm.get_cmap(value)
             #self.colorMap = colormaps.get(value, None)
             
-        elif isinstance(value, colors.Colormap):
+        elif isinstance(value, colormaps.colors.Colormap):
                 self.colorMap = value
                 
         else:

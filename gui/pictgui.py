@@ -9066,14 +9066,31 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self.update()
         
     def paint(self, painter, styleOption, widget):
-        self.timed_paint(painter, styleOption, widget)
+        # NOTE: 2021-03-07 18:30:02
+        # to time the painter, uncomment "self.timed_paint(...)" below and comment
+        # out the line after it ("self.do_paint(...)")
+        # When times, the duration of one executino of do_paint is printed on
+        # stdout - CAUTION generates large output
+        #self.timed_paint(painter, styleOption, widget)
+        self.do_paint(painter, styleOption, widget)
         
-    #@safeWrapper
     @timefunc
     def timed_paint(self, painter, styleOption, widget):
+        # NOTE: 2021-03-07 18:32:00
+        # timed version of the painter; to time the painter, call this function
+        # instead of "do_paint" in self.paint(...) - see NOTE: 2021-03-07 18:30:02
+        self.do_paint(painter, styleOption, widget)
+        
+    #@safeWrapper
+    def do_paint(self, painter, styleOption, widget):
         """Does the actual painting of the item.
         Also called by super().update() & scene.update()
         """
+        # NOTE: 2021-03-07 18:33:05
+        # both paint and timed_paint call this function; use timed_paint to
+        # time the painter - i.e., to output the duration of the paint execution
+        # on the stdout - CAUTION generates large outputs
+        
         try:
             if not self.__objectVisible__:
                 return

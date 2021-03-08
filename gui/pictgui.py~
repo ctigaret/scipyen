@@ -845,8 +845,8 @@ class PlanarGraphics():
                     ret[key] = src[key] 
                     
                 else:
-                    warnings.warn("%s.copyConvertState: The descriptor %s was not supplied; it will be assigned a default value" % (cls.__name__, key),
-                                stacklevel=3)
+                    #warnings.warn("%s.copyConvertState: The descriptor %s was not supplied; it will be assigned a default value" % (cls.__name__, key),
+                                #stacklevel=3)
                     if key == "z_frame":
                         ret.z_frame = None
                     else:
@@ -9066,11 +9066,21 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self.update()
         
     def paint(self, painter, styleOption, widget):
-        self.timed_paint(painter, styleOption, widget)
+        # NOTE: 2021-03-07 18:30:02
+        # to time the painter, uncomment "self.timed_paint(...)" below and comment
+        # out the line after it ("self.do_paint(...)")
+        #self.timed_paint(painter, styleOption, widget)
+        self.do_paint(painter, styleOption, widget)
         
-    #@safeWrapper
     @timefunc
     def timed_paint(self, painter, styleOption, widget):
+        # NOTE: 2021-03-07 18:32:00
+        # timed version of the painter; to time the painter, call this function
+        # instead of "do_paint" in self.paint(...) - see NOTE: 2021-03-07 18:30:02
+        self.do_paint(painter, styleOption, widget)
+        
+    #@safeWrapper
+    def do_paint(self, painter, styleOption, widget):
         """Does the actual painting of the item.
         Also called by super().update() & scene.update()
         """

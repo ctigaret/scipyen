@@ -476,8 +476,15 @@ class DataBag(Bunch):
             
     def __len__(self):
         obs = object.__getattribute__(self, "__observer__") # bypass self.__getitem__()
-        return len(obs.traits()) - len(DataBagTraitsObserver.hidden_traits) # "length", "mutable_types" and "use_casting" are always in there
-    
+        ret = len(obs.traits())
+        cleanup = [t for t in DataBagTraitsObserver.hidden_traits if t in obs.traits()]
+        
+        if len(cleanup) > ret:
+            return 0
+        
+        else:
+            return ret - len(cleanup)
+
     def __str__(self):
         obs = object.__getattribute__(self, "__observer__")
         d = dict((key, getattr(obs, key)) for key in obs.traits() if key not in DataBagTraitsObserver.hidden_traits and key != "__observer__")

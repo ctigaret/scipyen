@@ -336,6 +336,7 @@ Hereafter, optiona (a) is used.
     
     quantities
     pandas          (pytz)
+    nixio
     neo
     pyqtgraph
     statsmodels     (patsy)

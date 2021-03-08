@@ -31,6 +31,9 @@ from ephys.ephys import (average_segments, )
 
 from imaging.vigrautils import getFrameLayout
 from imaging.axiscalibration import AxisCalibration
+from imaging.imageprocessing import concatenateImages
+from gui import pictgui as pgui
+from gui.pictgui import PlanarGraphics
 
 DEFAULTS = DataBag()
 DEFAULTS["Name"] = "ScanDataOptions"
@@ -480,7 +483,7 @@ class AnalysisUnit(object):
         self._descriptors_ = DataBag(mutable_types=True, allow_none=True)
         #self._descriptors_.mutable_types = True
         
-        if not isinstance(landmark, (pgui.PlanarGraphics, type(None))):
+        if not isinstance(landmark, (PlanarGraphics, type(None))):
             raise TypeError("landmark expected to be a pictgui.PlanarGraphics; got %s instead" % type(landmark).__name__)
         
         self._landmark_ = landmark
@@ -626,9 +629,9 @@ class AnalysisUnit(object):
         _upgrade_attribute_("__unit_name__", "_unit_name_", (str, type(None)), None)
         _upgrade_attribute_("__protocols__", "_protocols_", list, list())
         _upgrade_attribute_("__descriptors__", "_descriptors_", DataBag, DataBag(mutable_types=True, allow_none=True))
-        _upgrade_attribute_("__landmark__", "_landmark_", (pgui.PlanarGraphics, type(None)), None)
+        _upgrade_attribute_("__landmark__", "_landmark_", (PlanarGraphics, type(None)), None)
         
-        if isinstance(self._landmark_, pgui.PlanarGraphics):
+        if isinstance(self._landmark_, PlanarGraphics):
             self._landmark_._upgrade_API_()
             
         self.apiversion = (0, 2)
@@ -951,7 +954,7 @@ class AnalysisUnit(object):
     
     @landmark.setter
     def landmark(self, obj):
-        if not isinstance(obj, pgui.PlanarGraphics):
+        if not isinstance(obj, PlanarGraphics):
             raise TypeError("Expecting a pictgui.PlanarGraphics object; got %s instead" % type(obj).__name__)
         
         if hasattr(self, "_landmark"):
@@ -2384,19 +2387,19 @@ class ScanData(object):
             delattr(self, "_scans_filters_")
             
         for l in self._scenerois_.values():
-            if isinstance(l, pgui.PlanarGraphics):
+            if isinstance(l, PlanarGraphics):
                 l._upgrade_API_()
             
         for l in self._scenecursors_.values():
-            if isinstance(l, pgui.PlanarGraphics):
+            if isinstance(l, PlanarGraphics):
                 l._upgrade_API_()
             
         for l in self._scansrois_.values():
-            if isinstance(l, pgui.PlanarGraphics):
+            if isinstance(l, PlanarGraphics):
                 l._upgrade_API_()
             
         for l in self._scanscursors_.values():
-            if isinstance(l, pgui.PlanarGraphics):
+            if isinstance(l, PlanarGraphics):
                 l._upgrade_API_()
             
         _upgrade_attribute_("__electrophysiology__", "_electrophysiology_", neo.Block, neo.Block(name="Electrophysiology"))
@@ -2406,9 +2409,9 @@ class ScanData(object):
         if isinstance(self._analysis_unit_, AnalysisUnit):
             self._analysis_unit_._upgrade_API_()
         
-        if not hasattr(self, "_scan_region_") or not isinstance(self._scan_region_, (pgui.PlanarGraphics, type(None))):
+        if not hasattr(self, "_scan_region_") or not isinstance(self._scan_region_, (PlanarGraphics, type(None))):
             if hasattr(self, "__scan_region__"):
-                if isinstance(self.__scan_region__, pgui.PlanarGraphics):
+                if isinstance(self.__scan_region__, PlanarGraphics):
                 #print(type(self.__scan_region__))
                     self._scan_region_ = self.__scan_region__.copy()
                     
@@ -2417,14 +2420,14 @@ class ScanData(object):
                     
                 delattr(self, "__scan_region__")
                 
-            elif "scanline" in self._scenerois_.keys() and isinstance(self._scenerois_["scanline"], (pgui.PlanarGraphics, type(None))):
+            elif "scanline" in self._scenerois_.keys() and isinstance(self._scenerois_["scanline"], (PlanarGraphics, type(None))):
                 self._scan_region_ = self._scenerois_["scanline"].copy()
                 self._scenerois_.pop("scanline")
                 
             else:
                 self._scan_region_ = None
                 
-        if isinstance(self._scan_region_, pgui.PlanarGraphics):
+        if isinstance(self._scan_region_, PlanarGraphics):
             self._scan_region_._upgrade_API_()
                 
         if not hasattr(self, "_analysis_units_"):
@@ -2643,7 +2646,9 @@ class ScanData(object):
                 # ScanData and ImageViewer !!!
                 
                 if sceneFrameAxis is None: # find out a reasonable frame axis; avoid channel axis
-                    chindex = scene.channelIndex # vigra array property
+                    # NOTE: 2021-03-08 13:39:10
+                    # channelIndex is a vigra array property
+                    chindex = scene.channelIndex 
                     
                     if chindex == scene.ndim: # no explicit channel axis
                         self._scene_frames_       = scene.shape[-1]
@@ -2877,10 +2882,6 @@ class ScanData(object):
                     #print("ScanData._parse_metadata_() build roi as Path")
                     roi = pgui.Path(*value.sequences[0].definition.coordinates)
                     
-                    #if all([isinstance(e, (pgui.Move, pgui.Line)) for e in roi]):
-                        ##print("ScanData._parse_metadata_() simplifying Path")
-                        #roi = pgui.simplifyPath(roi)
-                    
                     if roi.type.name in ("line", "polyline", "arc", "quad", "cubic") or\
                         (roi.type.name == "path" and not roi.closed): 
                         roi.name = "scanline"
@@ -3046,7 +3047,7 @@ class ScanData(object):
         # NOTE: the statement below does nothing, as the "src" is the actual
         # electrophysiology data mebedded here
         self.adoptTriggerProtocols(self.electrophysiology)
-
+        
     def _concatenate_image_data_(self, other, scene=True, pad_value=None):
         """
         Concatenates scene or scans images along the frame axis
@@ -3325,7 +3326,7 @@ class ScanData(object):
         #result._scan_region_scans_profiles_ = copy.deepcopy(self._scan_region_scans_profiles_)
         #result._scan_region_scene_profiles_ = copy.deepcopy(self._scan_region_scene_profiles_)
         
-        if isinstance(self._scan_region_, pgui.PlanarGraphics):
+        if isinstance(self._scan_region_, PlanarGraphics):
             result._scan_region_ = self._scan_region_.copy()
         
         result._scenerois_.clear()
@@ -3352,7 +3353,7 @@ class ScanData(object):
             for k, i in d.items(): # does nothing if dict is empty
                 obj = i.copy()
                 
-                if isinstance(result._scan_region_, pgui.PlanarGraphics):
+                if isinstance(result._scan_region_, PlanarGraphics):
                     cc_links = [(c, l) for (c,l) in i.objectLinks.items()]
                     for c, link in cc_links:
                         # see NOTE: 2018-07-02 08:36:58
@@ -3533,7 +3534,7 @@ class ScanData(object):
         """
         from gui import pictgui as pgui
 
-        if not isinstance(landmark, pgui.PlanarGraphics):
+        if not isinstance(landmark, PlanarGraphics):
             raise TypeError("Expecting a pictgui.PlanarGraphics object; got %s instead" % type(landmark).__name__)
         
         return (self.locateLandmark(landmark)) is not None
@@ -3547,7 +3548,7 @@ class ScanData(object):
         """
         from gui import pictgui as pgui
         
-        if not isinstance(landmark, pgui.PlanarGraphics):
+        if not isinstance(landmark, PlanarGraphics):
             raise TypeError("Expecting a pictgui.PlanarGraphics object; got %s instead" % type(landmark).__name__)
         
         if isinstance(landmark, pgui.Cursor):
@@ -3559,7 +3560,7 @@ class ScanData(object):
     def hasScansLandmark(self, landmark):
         from gui import pictgui as pgui
 
-        if not isinstance(landmark, pgui.PlanarGraphics):
+        if not isinstance(landmark, PlanarGraphics):
             raise TypeError("Expecting a pictgui.PlanarGraphics object; got %s instead" % type(landmark).__name__)
             
         if isinstance(landmark, pgui.Cursor):
@@ -3601,7 +3602,7 @@ class ScanData(object):
         
         result = list()
         
-        if not isinstance(landmark, pgui.PlanarGraphics):
+        if not isinstance(landmark, PlanarGraphics):
             raise TypeError("Landmark expected to be a pictgui.PlanarGraphics; got %s instead.\n To locate a landmark by its name use self.locateLandmarkByNname()" % type(landmark).__name__)
 
         if isinstance(landmark, pgui.Cursor):
@@ -4026,7 +4027,7 @@ class ScanData(object):
                         if isinstance(source.scanRegion, pgui.Path) and len(source.scanRegion):
                             src_scan_region = source.scanRegion.copy()
                             
-                        elif isinstance(source.scanRegion, pgui.PlanarGraphics) and source.scanRegion.type & pgui.GraphicsObjectType.allShapeTypes:
+                        elif isinstance(source.scanRegion, PlanarGraphics) and source.scanRegion.type & pgui.GraphicsObjectType.allShapeTypes:
                             src_scan_region = source.scanRegion.convertToPath()
                             
                 else:
@@ -4797,7 +4798,7 @@ class ScanData(object):
         else:
             raise TypeError("protocol expected to be a TriggerProtocol object, a string (protocol name), a sequence of TriggerProtocol objects or of strings (protocol names); got %s instead" % type(protocol).__name__)
         
-        if isinstance(landmark, (pgui.PlanarGraphics, str)):
+        if isinstance(landmark, (PlanarGraphics, str)):
             if scene:
                 landmarks = list(self.sceneRois.values()) + list(self.sceneCursors.values()) # use scene landmarks
                 
@@ -4810,7 +4811,7 @@ class ScanData(object):
             landmark_names = [l.name for l in landmarks]
             landmark_types = [l.type for l in landmarks]
             
-            if isinstance(landmark, pgui.PlanarGraphics):
+            if isinstance(landmark, PlanarGraphics):
                 if landmark not in landmarks or landmark.name not in landmark_names or landmark.type not in landmark_types:
                     raise ValueError("landmark %s does not exist in %s images of %s" % (landmark.name, where, self.name))
                 
@@ -4883,7 +4884,7 @@ class ScanData(object):
         elif isinstance(obj, AnalysisUnit):
             return obj in self._analysis_units_
         
-        elif isinstance(obj, pgui.PlanarGraphics):
+        elif isinstance(obj, PlanarGraphics):
             return obj in [u.landmark for u in self._analysis_units_]# if isinstance(u, AnalysisUnit)]
         
         else:
@@ -5317,7 +5318,7 @@ class ScanData(object):
             
         Returns:
         ========
-        Returns the nested AnalysisUnit defined on the specified landmark parameter
+        Returns the AnalysisUnit defined on the specified landmark parameter
         if the latter is not None AND it exists in this ScanData object, AND it has
         been associated with an AnalysisUnit object.
         
@@ -5337,7 +5338,7 @@ class ScanData(object):
             else:
                 return None
             
-        elif isinstance(landmark, pgui.PlanarGraphics):
+        elif isinstance(landmark, PlanarGraphics):
             if landmark not in self.scansCursors.values() and \
                 landmark not in self.sceneCursors.values() and \
                     landmark not in self.scansRois.values() and \
@@ -5363,7 +5364,8 @@ class ScanData(object):
             
     #@safeWrapper
     def extractAnalysisUnit(self, analysis_unit, average=False, 
-                                exclude_failures=False, test_component="any", 
+                                exclude_failures=False, 
+                                test_component="any", 
                                 name=None,
                                 progressSignal = None,
                                 progressValue = None):
@@ -5372,10 +5374,16 @@ class ScanData(object):
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
         
-        This function returns a ScanData object that contains image data regions
-        corresponding to landmark-defined analysis units. 
+        This function returns a ScanData object where scans images contain only
+        the data belonging to a single analysis unit. For landmark-based analysis
+        units this is defined as the scans image data inside the region of interest
+        set by the landmark.
+
+        For example, the region of interest defined by a vertical cursor landmark
+        is a rectangle with the width equal to the cursor's X window, and length
+        equal to the scans image height.
         
-        Optionally, the frames with the same trigger protocol can be averaged to
+        The frames generated using the same trigger protocol can be averaged to
         yield a single frame for that protocol in the result.
         
         Optionally, only the data frames where the event analysis was successful 
@@ -5423,7 +5431,7 @@ class ScanData(object):
             When True, only frames that test for success will be included.
             
         test_component: the keyword "any" (default), or the keyword "all",
-            or an int, or a sequence of ints.
+            an int, or a sequence of ints.
             
             Used when exclude_failures is True and the analysis can distinguish 
             between failed and successful events in the data, according to the 
@@ -5688,7 +5696,9 @@ class ScanData(object):
         
         # for each subarray in scene or scans, create an empty list
         # to each of these lists append the corresponding frames taken out from
-        # the scene or scan vigra arrays
+        # the scene or scan vigra arrays: one list of frames per "channel" - the 
+        # the general case is where there are several channels in the scans or 
+        # scene list
         
         for s in range(len(self.scene)):
             protocol_scene_data_image_frames.append(list())
@@ -6452,17 +6462,28 @@ class ScanData(object):
         # BEGIN assign scene images
         targetScene = list()
         
-        
         for ks in range(len(self.scene)):
             #print("ScanData.extractAnalysisUnit protocol_scene_data_image_frames in scene stack %d" % (len(protocol_scene_data_image_frames[ks]), ks))
-            
+            print("scene channel %d images for protocol" % ks, len(protocol_scene_data_image_frames[ks]))
             if len(protocol_scene_data_image_frames[ks]) == 0:
                 continue
-
-            img = concatenateImages(protocol_scene_data_image_frames[ks], axis = self.sceneFrameAxis)
+            
+            scene_images = protocol_scene_data_image_frames[ks]
+            img = concatenateImages(*scene_images, axis = self.sceneFrameAxis)
+            
+            print("targetSceneImage shape", img.shape)
+            
             targetScene.append(img)
             
+            #if len(protocol_scene_data_image_frames[ks]) == 1:
+                #targetScene.append(protocol_scene_data_image_frames[ks][0])
+            #else:
+                #img = concatenateImages(*protocol_scene_data_image_frames[ks], axis = self.sceneFrameAxis)
+                #targetScene.append(img)
+        
+        print("targetScene elements", len(targetScene))
         # END assign scene images
+        
         
         # BEGIN assign scans images
         targetScans = list()
@@ -6499,9 +6520,13 @@ class ScanData(object):
             else:
                 images = protocol_scans_data_image_frames[ks]
                 
-            img = concatenateImages(images, axis = self.scansFrameAxis)
+            img = concatenateImages(*images, axis = self.scansFrameAxis)
+            
+            print("targetScansImage shape" , img.shape)
 
             targetScans.append(img)
+            
+        print("targetScans elements", len(targetScans))
         
         # END assign scans images
         
@@ -6895,7 +6920,7 @@ class ScanData(object):
                         if c1.height != self.scans[0].shape[1]:
                             c1.height = self.scans[0].shape[1]
             
-                if isinstance(self.scanRegion, pgui.PlanarGraphics):
+                if isinstance(self.scanRegion, PlanarGraphics):
                     links = [l for l in c.objectLinks.items()]
                     
                     for cc, link in links:
@@ -6968,7 +6993,7 @@ class ScanData(object):
                         if new_obj.width != self.scans[0].shape[0]:
                             new_obj.width = self.scans[0].shape[0]
         
-            if isinstance(self.scanRegion, pgui.PlanarGraphics):
+            if isinstance(self.scanRegion, PlanarGraphics):
                 cc_links = [(c, l) for (c,l) in obj.objectLinks.items()]
                 for cc, link in cc_links:
                     # NOTE: 2018-07-02 08:36:58
@@ -7094,7 +7119,7 @@ class ScanData(object):
                 
                 skip_objects = list()
                 
-                if isinstance(self.scanRegion, pgui.PlanarGraphics):
+                if isinstance(self.scanRegion, PlanarGraphics):
                     links = [l for l in obj.objectLinks.items()]
                     #for c, link in obj.objectLinks.items():
                     for c, link in links:
@@ -7239,7 +7264,7 @@ class ScanData(object):
                             c1.height = self.scene[0].shape[1]
                             
                 
-                if isinstance(self.scanRegion, pgui.PlanarGraphics):
+                if isinstance(self.scanRegion, PlanarGraphics):
                     links = [l for l in c.objectLinks.items()]
 
                     for cc, l in links:
@@ -7296,7 +7321,7 @@ class ScanData(object):
                 
                 c1 = c.copy()
                 
-                if isinstance(self.scanRegion, pgui.PlanarGraphics):
+                if isinstance(self.scanRegion, PlanarGraphics):
                     links = [l for l in c.objectLinks.items()]
                     #for cc, link in c.objectLinks.items():
                     for cc, link in links:
@@ -7367,7 +7392,7 @@ class ScanData(object):
                 
                 c1 = c.copy()
                 
-                if isinstance(self.scanRegion, pgui.PlanarGraphics):
+                if isinstance(self.scanRegion, PlanarGraphics):
                     links = [l for l in c.objectLinks.items()]
                     #for cc, link in c.objectLinks.items():
                     for cc, link in links:
@@ -7422,7 +7447,7 @@ class ScanData(object):
                 for k, i in d.items():
                     obj = i.copy()
                     
-                    if isinstance(self.scanRegion, pgui.PlanarGraphics):
+                    if isinstance(self.scanRegion, PlanarGraphics):
                         links = [l for l in i.objectLinks.items()]
                         #for c, link in i.objectLinks.items():
                         for c, link in links:
@@ -7829,7 +7854,7 @@ class ScanData(object):
         """
         import gui.pictgui as pgui
         
-        if not isinstance(obj.pgui.PlanarGraphics):
+        if not isinstance(obj.PlanarGraphics):
             raise TypeError("expecting a pictgui.PlanarGraphics object; got %s instead" % type(obj).__name__)
         
         if isinstance(obj, pgui.Cursor):
@@ -7992,7 +8017,7 @@ class ScanData(object):
         """
         import gui.pictgui as pgui
 
-        if not isinstance(landmark, pgui.PlanarGraphics):
+        if not isinstance(landmark, PlanarGraphics):
             raise TypeError("landmark expected to be a pictgui.PlanarGraphics; got %s instead" % type(landmark).__name__)
         
         if not isinstance(name, str):
@@ -8092,7 +8117,7 @@ class ScanData(object):
             
             landmark = lds[0]
             
-        elif not isinstance(landmark, pgui.PlanarGraphics):
+        elif not isinstance(landmark, PlanarGraphics):
             #warnings.warn("Expecting a pictgui.PlanarGraphics object or a str; got %s instead" % type(landmark).__name__)
             return
         
@@ -8697,7 +8722,7 @@ class ScanData(object):
             obj = cursordict.get(obj, None)
 
         
-        if isinstance(obj, pgui.PlanarGraphics):
+        if isinstance(obj, PlanarGraphics):
             #print("ScanData.removeCursor: %s, %s in %s" % (obj.type, obj.name, where))
             cursordict.pop(obj.name, None)
             
@@ -8936,7 +8961,7 @@ class ScanData(object):
             obj = roidict.get(obj, None)
             
         
-        if isinstance(obj, pgui.PlanarGraphics):
+        if isinstance(obj, PlanarGraphics):
             #print("ScanData.removeRoi: %s, %s in %s" % (obj.type, obj.name, where))
             roidict.pop(obj.name, None)
             
@@ -9816,7 +9841,7 @@ class ScanData(object):
             self._scan_region_ = self.sceneRois[name]
             self._scenerois_.pop(name)
             
-        elif isinstance(obj, pgui.PlanarGraphics):
+        elif isinstance(obj, PlanarGraphics):
             if obj.name in self.sceneRois.keys():
                 self.sceneRois.pop(obj.name)
                 
@@ -9925,7 +9950,8 @@ class ScanData(object):
     @metadata.setter
     def metadata(self, value):
         if isinstance(value, (DataBag, type(None))):
-            self._metadata_ = value
+            self._parse_metadata_(value)
+            #self._metadata_ = value
             
         else:
             raise TypeError("Expecting a DataBag or None; got %s instead" % type(value).__name__)
@@ -10650,3 +10676,42 @@ def scanDataOptions(detection_predicate=1.3, roi_width = 10,
     
     return ret
 
+#def generate_scandata_image_list_by_protocol(nChannels, protocol_images):
+    # TODO: scenes should all have same shape;
+    # When this condition is NOT satisfied, since the scene images have 2D data,
+    # one might try to implement a clever image alignment algorithm to set up
+    # some padding
+    #
+    # scans might have different widths if scanline length has changes from one
+    # batch to another - in this case width padding must be made symmetrical 
+    # around mid-vertical column
+    #
+    # scans might also have different lengths (if sweep duration has changed from
+    # one batch acquisition to another) - in this case length padding shoudl be 
+    # made at the *end* of the scans image
+    # 
+    #if len(protocol_images != nChannels):
+        #raise ValueError("protocol_images mismatch with number of channels (%d vs %s)" % (len(protocol_images), nChannels))
+    
+    #result = list()
+    
+    #for k in range(nChannels):
+        #if len(protocol_images[k]) == 0:
+            #continue
+        
+        #widths = [img.width for img in protocol_images[k]]
+        
+        #if not all([w == widths[0] for w in widths]):
+            #maxWidth = max(widths)
+            #padded = list()
+            
+            #for img in protocol_images[k]:
+                #if img.width < maxWidth:
+                    #pad = maxWidth - img.width
+                    
+                    #pad_pre = pad//2
+                    #pad_post = pad//2 + pad%2
+                    
+                    #new_img = padAxis(img, "x", pad_pre, pad_post, np.nan)
+                
+    
