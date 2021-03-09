@@ -4522,8 +4522,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
         DONE, but still TODO implement Abort processing
         
-        TODO ###
-        
+        TODO FIXME 2021-03-09 22:02:59
+        Allow filtering even if no Reference or Indicator channels 
+        have been defined. This requires a re-design of the whole paradigm of
+        defining filters (with respect to what is filterings and how these are 
+        stored in the configuration)
         """
         if not isinstance(self._data_, ScanData):
             return
@@ -4624,7 +4627,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         #### END unthreaded execution
         
         #### BEGIN Threaded execution - this should be used by default;
-        # mae sure you comment out the unthreaded bit above
+        # make sure you comment out the unthreaded bit above
             
         #NOTE: 2019-10-12 14:58:30
         # for self._data_.scene and self._data_.scans:
@@ -12453,8 +12456,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                     for k in range(data[chNdx].shape[data[chNdx].axistags.index(self._data_.sceneFrameAxis)]):
                         target.segments[k].analogsignals[:] = profiles[k]
                     
-        else:
-            warnings.warn("Data contains no scene!")
+        #else:
+            #warnings.warn("Data contains no scene!")
                 
     @safeWrapper
     def generateScanRregionProfilesFromScans(self): 

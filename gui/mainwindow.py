@@ -237,6 +237,7 @@ from . import quickdialog
 from . import scipyenviewer
 from . import consoles
 from . import gui_viewers
+from . import scipyen_colormaps as colormaps
 from .workspacegui import WorkspaceGuiMixin
 
 from .workspacemodel import WorkspaceModel
@@ -2199,7 +2200,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # This is because workspaceModel doesn't "know" anything about workspaceView.
         self.workspaceModel.updateTable(from_console=value) # emits WorkspaceModel.modelContentsChanged
         
-        self.workspaceChanged.emit() # used by whom?
+        self.workspaceChanged.emit() # used by whom? -> slot_updateWorkspaceView ?
         
     def slot_updateCwd(self):
         if self.cwd != os.getcwd():

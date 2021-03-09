@@ -1471,11 +1471,17 @@ class PVSequence (object):
         filepath    = path to the data files 
         frames      = a list with metadata for each frame in the sequence
         """
-        metadata = dict()
+        #metadata = dict()
+        metadata = DataBag(mutable_types=True, allow_none=True)
         
         metadata["attributes"]  = self.attributes
         metadata["length"]      = self.length
-        metadata["definition"]  = self.definition.metadata()
+        
+        if isinstance(self.definition, PVLinescanDefinition):
+            metadata["definition"]  = self.definition.metadata()
+        else:
+            metadata["definition"] = None
+            
         metadata["zsync"]       = self.zAxisSynchronization
         metadata["file_path"]   = self.filepath
         
@@ -2036,7 +2042,8 @@ class PVScan(object):
         """Returns metadata associated with this PVSCan
         """
         
-        metadata = dict()
+        #metadata = dict()
+        metadata = DataBag(mutable_types=True, allow_none=True)
         metadata["configuration"] = self.configuration.as_dict()
         metadata["file_path"] = self.filepath
         
@@ -2405,29 +2412,40 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
                  ephysFileNames: typing.Optional[typing.Union[str, tuple, list]]=None,
                  protocolFileName: typing.Optional[str]=None,
                  clearTriggerEvents: typing.Optional[bool]=False,
+                 auto_export:bool = False,
                  **kwargs): # parent, flags - see documentation for QDialog constructor in Qt Assistant
         """
         Parameters:
         -----------
-        All are optional, with defaults being None
-        
-        name:str  - name of generated ScanData
-        pvScanFileName:str - name of PrairieView scan experiment (XML) file
-        optionsFileName:str - name of a pickle (*pkl) file containing ScanData options
+        name:str (optional, default is None) - name of generated ScanData
+        pvScanFileName:str (optional, default is None) - name of PrairieView scan experiment (XML) file
+        optionsFileName:str (optional, default is None) - name of a pickle (*pkl) file containing ScanData options
         ephysFileNames:str or sequence of str - name(s) of Axon file(s) , or
-                            pickle (*.pkl) files, containing associated electrophysiology
+                    pickle (*.pkl) files, containing associated electrophysiology
                             data.
-                            The Axon files can be text (*.atf) or binary (*.abf)
-                            files.
+                    
+                    The Axon files can be text (*.atf) or binary (*.abf) files.
+                    
+                    Optional; default is None
                             
-        protocolFileName:str - name of pickle (*.pkl) file with TriggerProtocols
-                            (these typically would be detected by dialogs called 
-                            from the importer GUI)
+        protocolFileName:str (optional, default is None) - name of pickle (*.pkl) 
+                    file with TriggerProtocols 
 
-        clearTriggerEvents:bool - optional, default is False
+        clearTriggerEvents:bool (optional, default is False)
                             When True (default), remove all neo.Event objects
                             embedded in the electrophysiology data, before
                             detecting trigger events.
+                            
+        auto_export: bool (optional, default is False)
+            When True, pressing "OK" button will export the generated ScanData
+            to the workspace.
+            
+            This is a convenience to place data directly in Scipyen's workspace.
+            
+            When False (the default) the dialog simply generates the Scandata 
+            object and stores it in the "scanData" attribute. TODO: Because this
+            can be time consuming best is to call this asynchronously, when 
+            auto_export is False.
         
         """
         super(WorkspaceGuiMixin, self).__init__(**kwargs)
@@ -2490,6 +2508,8 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         if isinstance(protocolFileName, str) and len(protocolFileName.strip()):
             if os.path.isfile(self.protocolFileName) and "pickle" in pio.mimetypes.guess_type(self.protocolFileName)[0]:
                 self.protocolFileName = protocolFileName
+                
+        self.auto_export = auto_export
         
         self._configureUI_()
         
@@ -3187,6 +3207,10 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
                 
             if isinstance(self.triggerProtocols, (tuple, list)) and all([isinstance(v, TriggerProtocol) for v in self.triggerProtocols]):
                 self._scandata_.triggerProtocols = self.triggerProtocols
+                
+            if self.auto_export:
+               self._scipyenWindow_.workspace[strutils.str2symbol(self.dataName)] = self._scandata_ 
+               self._scipyenWindow_.slot_updateWorkspaceTable(False)
             
     def updateProtocolEditor(self):
         self.protocolEditorDialog.triggerProtocols = self.triggerProtocols

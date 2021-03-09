@@ -1382,7 +1382,7 @@ Arrays are concatenated in two ways, explained here by examples:
         ignore      = kwargs.pop("ignore", None)
         
     # 1) check the "images" parameter:
-    print("concatenateImages: %d images" % len(images))
+    #print("concatenateImages: %d images" % len(images))
     
     if len(images) == 1: # this is OK
         # trivial case of only one image; 

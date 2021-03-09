@@ -18,7 +18,7 @@ __translation_table_to_identifier = str.maketrans(dict([(c_, "_") for c_ in stri
 __translation_table_to_R_identifier = str.maketrans(dict([(c_, ".") for c_ in string.punctuation + string.whitespace]))
 
 def str2symbol(s):
-    """Returns a string that can be used as valid Python source code symbol.
+    """Returns a string that can be used as valid Python symbol (a.k.a variable name).
     
     If argument can already be sued as a symbol ('s.isidentifier() is True') 
     returns the argument unchanged.
