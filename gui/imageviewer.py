@@ -3143,7 +3143,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
     @pyqtSlot()
     def slot_loadImageFromWorkspace(self):
-        from workspacefunctions import getvarsbytype
+        from core.workspacefunctions import getvarsbytype
         
         if self._scipyenWindow_ is None:
             return
@@ -3168,7 +3168,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 if self._displayedChannel_ >= image.channels:
                     self._displayedChannel_ = "all"
             
-            self.view(image, title = image_title, displayChannel = self._displayedChannel_)
+            self.view(image, doc_title = image_title, displayChannel = self._displayedChannel_)
         
     @pyqtSlot(bool)
     def slot_displayAllChannels(self, value):

@@ -1839,6 +1839,9 @@ fileLoaders["application/x-octave"] = loadOctave
 fileLoaders["application/octet-stream"]
 
 def getLoaderForFile(fName):
+    if "pkl" in os.path.splitext(fName)[-1]:
+        return fileLoaders["application/x-pickle"]
+    
     mime_type, file_type, _ = getMimeAndFileType(fName)
     
     ret = fileLoaders[mime_type] # fileLoaders is a default dict with None the default value

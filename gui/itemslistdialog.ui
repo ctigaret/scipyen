@@ -33,6 +33,25 @@
       </widget>
      </item>
      <item>
+      <widget class="QLineEdit" name="searchLineEdit">
+       <property name="toolTip">
+        <string>Type here to search</string>
+       </property>
+       <property name="statusTip">
+        <string>Type here to search</string>
+       </property>
+       <property name="whatsThis">
+        <string>Type here to search</string>
+       </property>
+       <property name="placeholderText">
+        <string>&lt;type to search&gt;</string>
+       </property>
+       <property name="clearButtonEnabled">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QDialogButtonBox" name="buttonBox">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>

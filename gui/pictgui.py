@@ -11564,6 +11564,12 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         self._selectedItemText_ = list()
         self.preSelected = list()
         
+        self.searchLineEdit.undoAvailable=True
+        self.searchLineEdit.redoAvailable=True
+        self.searchLineEdit.setClearButtonEnabled(True)
+        
+        self.searchLineEdit.textEdited.connect(self.slot_locateSelectName)
+        
         self.listWidget.setSelectionMode(selectmode)
     
         if title is not None:
@@ -11582,6 +11588,21 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
                 self.preSelected = preSelected
                 
             self.setItems(itemsList)
+            
+    @pyqtSlot(str)
+    def slot_locateSelectName(self, txt):
+        #found_items = self.listWidget.findItems(txt, QtCore.Qt.MatchContains | QtCore.Qt.MatchWildcard)
+        found_items = self.listWidget.findItems(txt, QtCore.Qt.MatchContains)
+        for row in range(self.listWidget.count()):
+            self.listWidget.item(row).setSelected(False)
+            
+        if self.selectionMode == QtWidgets.QAbstractItemView.SingleSelection:
+            found_items[-1].setSelected(True)
+            self.itemSelected.emit(str(found_items[-1].text()))
+        else:
+            for item in found_items:
+                item.setSelected(True)
+                self.itemSelected.emit(str(item.text()))
       
     def validateItems(self, itemsList):
         # 2016-08-10 11:51:07
@@ -11593,7 +11614,7 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
 
     @property
     def selectionMode(self):
-        return listWidget.selectionMode()
+        return self.listWidget.selectionMode()
     
     @selectionMode.setter
     def selectionMode(self, selectmode):
