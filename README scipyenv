@@ -279,6 +279,8 @@ Hereafter, optiona (a) is used.
     scipy
     sympy           (mpmath)
     cmocean         (for nice colormaps)
+    cmasher         (ditto)
+    viscm           matplotlib module to visualize colormaps (pip install viscm)
     scikit-learn    (joblib, threadpoolctl)
     scikit-image    (imageio, networkx, decorator, pywavelets, tifffile)
     seaborn  

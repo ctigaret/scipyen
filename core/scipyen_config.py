@@ -25,13 +25,14 @@
 #
 
 #import base64
-#import os
+import os
 import inspect, typing
 import confuse
 
 from .traitcontainers import DataBag
 
 scipyen_lazy_config = confuse.LazyConfig("Scipyen")
+scipyen_config_dir = os.path.dirname(scipyen_lazy_config.user_config_path())
 
 #from goodconf import GoodConf, Value
 #from dynaconf import Dynaconf

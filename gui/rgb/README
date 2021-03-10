@@ -1,4 +1,85 @@
-Specification of color maps
----------------------------
+Specification of color maps for matplotlib
+------------------------------------------
+
+Matplotlib "colors" module supports ListedColormap and LinearSegmentedColormap.
+
+ListedColormap.colors is a list of lists of R,G,B values in the closed interval [0,1]
+
+LinearSegmentedColormap._segmentdata is a dict with keys "red", "green", "blue"
+each mapped to a list of triplets (x, y0, y1).
+
+Both can be written to/read from ASCII files (either comma- or tab-separated 
+values) with extention ".txt".
+
+These files can be saved either in this directory (hence distributed
+with Scipyen), in Scipyen's configuration directory (on Unix this is 
+~/.config/Scipyen) or in the current working directory - see 
+scipyen/gui/scipyen_colormaps.py module for details.
+
+The ASCII file contents follow one of two alternative templates:
+    
+    1) for ListedColormap:        
+        Three columns with the first row (header) being "r", "g", "b"
+        and all other rows containing floating point values in the closed 
+        interval [0,1].
+        
+        For example:
+            
+        r,g,b
+        0.267004,0.004874,0.329415
+        0.26851,0.009605,0.335427
+        0.269944,0.014625,0.341379
+        0.271305,0.019942,0.347269
+        0.272594,0.025563,0.353093
+        0.273809,0.031497,0.358853
+        0.274952,0.037752,0.364543
+        0.276022,0.044167,0.370164
+        0.277018,0.050344,0.375715
+        0.277941,0.056324,0.381191
+        0.278791,0.062145,0.386592
+        0.279566,0.067836,0.391917
+        0.280267,0.073417,0.397163
+        0.280894,0.078907,0.402329
+        0.281446,0.08432,0.407414
+        0.281924,0.089666,0.412415
+        0.282327,0.094955,0.417331
+        0.282656,0.100196,0.42216
+        0.28291,0.105393,0.426902
+        0.283091,0.110553,0.431554
+        ...
+        
+    2) for LinearSegmentedColormap:
+        Four columns with the first row (header) being "c", "x", "y1", "y2"
+        
+        For the rest of the rows, the first column contains one of "r", "g", "b"
+        characters, whereas the other three columns contain floating point values
+        in the closed interval [0,1]
+        
+        For example:
+            
+        c,x,y0,y1
+        r,0.0,0.0,0.0
+        r,0.5,0.0,0.0
+        r,0.75,1.0,1.0
+        r,1.0,1.0,1.0
+        g,0.0,0.0,0.0
+        g,0.5,1.0,1.0
+        g,1.0,1.0,1.0
+        b,0.0,0.0,0.0
+        b,0.25,0.66,0.66
+        b,0.5,0.0,0.0
+        b,0.75,0.0,1.0
+        b,1.0,1.0,1.0
+        
+        Note that the values in the "x" column spanning the SAME character in the 
+        first column (i.e., either "r", "g", or "b") MUST be monotonically 
+        increasing and within the cloed intervl [0,1] as well.
+        
+        ATTENTION: This criterion is not yet checked when reading these files.
+            
+        
+
+
+
 
 
