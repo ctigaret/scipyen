@@ -11597,8 +11597,9 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
             self.listWidget.item(row).setSelected(False)
             
         if self.selectionMode == QtWidgets.QAbstractItemView.SingleSelection:
-            found_items[-1].setSelected(True)
-            self.itemSelected.emit(str(found_items[-1].text()))
+            if len(found_items):
+                found_items[-1].setSelected(True)
+                self.itemSelected.emit(str(found_items[-1].text()))
         else:
             for item in found_items:
                 item.setSelected(True)

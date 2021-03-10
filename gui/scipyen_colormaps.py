@@ -159,8 +159,18 @@ def register_colormap(cdata, name:typing.Optional[str]=None,
         
 
 def get(name, lut=None, default=None):
-    if isinstance(name, str) and len(name.strip()) and name in cm._cmap_registry:
-        return cm.get_cmap(name=name, lut=lut)
+    if isinstance(name, str) and len(name.strip()):
+        if name in cm._cmap_registry:
+            return cm.get_cmap(name=name, lut=lut)
+
+        else:
+            if default is None:
+                return cm.get_cmap(name="gray", lut=lut)
+            
+            elif isinstance(default, str) and default in cm._cmap_registry:
+                return cm.get_cmap(name=default, lut=lut)
+            
+            return cm.get_cmap(name="gray", lut=lut)
         #return cm._cmap_registry[name]
     
     elif isinstance(name, colors.Colormap):

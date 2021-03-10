@@ -3423,7 +3423,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             img_view = self._data_
             dimindices = []
             
-        # up to now, img_view is a 2D slice view of self._data_, will _ALL_ avaiable channels
+        # up to now, img_view is a 2D slice view of self._data_, will _ALL_ available channels
             
         # get a channel view on the 2D slice view of self._data_
         if isinstance(channel, int) and "c" in self._currentFrameData_.axistags and channel_index in range(self._currentFrameData_.channels):
@@ -3460,10 +3460,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if isinstance(self._data_, vigra.VigraArray):
             self._currentFrameData_, _ = self._generate_frame_view_(channel_index) # this is an array view !
             
-            if self.colorMap is None:
-                self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self.imageNormalize))
-                
-            else:
+            if isinstance(self.colorMap, colormaps.colors.Colormap):
                 if self._currentFrameData_.channels == 1:
                     if self._currentFrameData_.channelIndex < self._currentFrameData_.ndim:
                         self._currentFrameData_ = self._currentFrameData_.squeeze()
@@ -3476,6 +3473,23 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     #warnings.warn("Cannot apply color map to a multi-band image")
                     self._currentFrameData_ = self._currentFrameData_.squeeze().copy()
                     self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self.imageNormalize))
+            
+            else:
+                self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self.imageNormalize))
+                
+            #else:
+                #if self._currentFrameData_.channels == 1:
+                    #if self._currentFrameData_.channelIndex < self._currentFrameData_.ndim:
+                        #self._currentFrameData_ = self._currentFrameData_.squeeze()
+                        
+                    #cFrame = self._applyColorTable_(self._currentFrameData_)
+                    
+                    #self.viewerWidget.view(cFrame.qimage(normalize = self.imageNormalize))
+                    
+                #else: # don't apply color map to a multi-band frame data
+                    ##warnings.warn("Cannot apply color map to a multi-band image")
+                    #self._currentFrameData_ = self._currentFrameData_.squeeze().copy()
+                    #self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self.imageNormalize))
         
             # TODO FIXME: what if we view a transposed array ???? (e.g. viewing it on
             # Y or X axis instead of the Z or T axis?)
@@ -3749,6 +3763,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     def slot_testColorMap(self, item):
         # NOTE 2020-11-28 10:19:07
         # upgrade to matplotlib 3.x
+        #print("ImageViewer.slot_testColorMap %s" % item)
         if item in colormaps.cm._cmap_registry:
             self.colorMap = colormaps.cm.get_cmap(name=item, lut=256)
         else:
@@ -3760,6 +3775,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     @safeWrapper
     def slot_chooseColorMap(self, *args):
         if self._data_ is None:
+            return
+        
+        if not isinstance(self._data_, vigra.VigraArray) or self._currentFrameData_.channels > 1:
+            QtWidgets.QMessageBox.information(self,"Choose Color Map","Color maps can only be applied to single channel views of VigraArrays")
             return
         
         self.prevColorMap = self.colorMap # cache the current colorMap
