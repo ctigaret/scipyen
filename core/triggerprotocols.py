@@ -30,7 +30,7 @@ TriggerEventType -> now defined in core.triggerevent
 TriggerProtocol
 
 """
-import typing, warnings
+import typing, warnings, traceback
 from itertools import chain
 from copy import (deepcopy, copy,)
 from numbers import (Number, Real,)
@@ -263,13 +263,17 @@ def auto_define_trigger_events(src, event_type, analog_index,
                                                         use_lo_hi=use_lo_hi, 
                                                         label=label, name=name)
                             
-                        embed_trigger_event(event, s, clear=clear)
+                        if isinstance(event, TriggerEvent):
+                            embed_trigger_event(event, s, clear=clear)
+                            
+                        else:
+                            warnings.warn("No trigger event was detected in signal %d" % sndx)
                         
                     else:
                         raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (ndx, len(s.analogsignals)))
 
         elif isinstance(analog_index, int):
-            for s in data:
+            for ks, s in enumerate(data):
                 if analog_index in range(len(s.analogsignals)):
                     if isinstance(time_slice, (tuple, list)) \
                         and all([isinstance(t, pq.Quantity) and check_time_units(t) for t in time_slice]) \
@@ -285,7 +289,10 @@ def auto_define_trigger_events(src, event_type, analog_index,
                                                       use_lo_hi=use_lo_hi, 
                                                       label=label, name=name)
                         
-                    embed_trigger_event(event, s, clear=clear)
+                    if isinstance(event, TriggerEvent):
+                        embed_trigger_event(event, s, clear=clear)
+                    else:
+                        warnings.warn("No trigger event detected in signal %d, in segment %d" % (analog_index, ks))
                     
                 else:
                     raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (analog_index, len(s.analogsignals)))
@@ -356,6 +363,9 @@ def detect_trigger_events(x, event_type, use_lo_hi=True, label=None, name=None):
     
     [lo_hi, hi_lo] = detect_trigger_times(x)
     
+    if all([v is None for v in (lo_hi, hi_lo)]):
+        return
+    
     if use_lo_hi:
         times = lo_hi
         
@@ -395,26 +405,34 @@ def detect_trigger_times(x):
     if not isinstance(x, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % type(x).__name__)
     
-    # WARNING: algorithm fails for noisy signls with no TTL waveform!
-    cbook, dist = cluster.vq.kmeans(x, 2)
     
-    code, cdist = cluster.vq.vq(x, sorted(cbook))
+    # WARNING: algorithm fails for noisy signals with no TTL waveform
     
-    diffcode = np.diff(code)
-    
-    ndx_lo_hi = np.where(diffcode ==  1)[0].flatten() # transitions from low to high
-    ndx_hi_lo = np.where(diffcode == -1)[0].flatten() # hi -> lo transitions
-    
-    if ndx_lo_hi.size:
-        times_lo_hi = [x.times[k] for k in ndx_lo_hi]
+    try:
+        cbook, dist = cluster.vq.kmeans(x, 2)
+            
+        code, cdist = cluster.vq.vq(x, sorted(cbook))
         
-    else:
+        diffcode = np.diff(code)
+        
+        ndx_lo_hi = np.where(diffcode ==  1)[0].flatten() # transitions from low to high
+        ndx_hi_lo = np.where(diffcode == -1)[0].flatten() # hi -> lo transitions
+        
+        if ndx_lo_hi.size:
+            times_lo_hi = [x.times[k] for k in ndx_lo_hi]
+            
+        #else:
+            #times_lo_hi = None
+            
+        if ndx_hi_lo.size:
+            times_hi_lo = [x.times[k] for k in ndx_hi_lo]
+            
+        #else:
+            #times_hi_lo = None
+
+    except Exception as e:
+        #traceback.print_exc()
         times_lo_hi = None
-        
-    if ndx_hi_lo.size:
-        times_hi_lo = [x.times[k] for k in ndx_hi_lo]
-        
-    else:
         times_hi_lo = None
         
     return times_lo_hi, times_hi_lo
