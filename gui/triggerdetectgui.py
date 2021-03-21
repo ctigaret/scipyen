@@ -21,6 +21,7 @@ from core.triggerprotocols import (TriggerProtocol,
                                    auto_detect_trigger_protocols,
                                    embed_trigger_protocol, 
                                    embed_trigger_event,
+                                   get_trigger_events,
                                    parse_trigger_protocols,
                                    remove_trigger_protocol,
                                    parse_trigger_protocols,)
@@ -479,35 +480,23 @@ class TriggerDetectDialog(qd.QuickDialog):
     sig_undoDetectTriggers = pyqtSignal(name="sig_undoDetectTriggers")
     
     def __init__(self, ephys=None, title="Detect Trigger Events", clearEvents=False,
-                 parent=None, **kwargs):
+                 parent=None, ephysViewer=None, **kwargs):
         super().__init__(parent=parent, title=title) # calls ancestor's setupUi()
-        self._ephysViewer_ = SignalViewer()
-        self._ephysViewer_.frameChanged[int].connect(self._slot_ephysFrameChanged)
-        self._clear_events_flag_ = clearEvents
-        self._ephys_= None
-        self._cached_events_ = list()
-        self._detected_ = False
-        
-        # no mixing of types when ephys is a sequence ...
-        if isinstance(ephys, (Block, Segment)) or \
-            (isinstance(ephys, (tuple, list)) and \
-                (all([isinstance(v, Block) for v in ephys]) or \
-                    all([isinstyane(v, Segment) for v in ephys]))):
-            self._ephys_ = ephys
             
-        # cache the events
-        self._cached_events_ = get_events(self._ephys_)
-
         self.eventDetectionWidget = TriggerDetectWidget(parent = self) 
-        
-        if self._ephys_:
-            self._update_trigger_detect_ranges_(0)
-            
         self.addWidget(self.eventDetectionWidget)
         
-        # NOTE: 2021-01-06 10:57:10
-        # extend/reuse the Quickdialog's own button box => widgets nicely aligned
-        # on the same row instead of occupying an additional row
+        self._clear_events_flag_ = clearEvents
+        self._detected_ = False
+        
+        if not isinstance(ephysViewer, SignalViewer):
+            self._ephysViewer_ = SignalViewer(win_title = "Trigger Events Detection")
+            
+        else:
+            self._ephysViewer_ = ephysViewer
+        
+        self._ephysViewer_.frameChanged[int].connect(self._slot_ephysFrameChanged)
+        
         self.clearEventsCheckBox = qd.CheckBox(self, "Clear existing")
         
         self.clearEventsCheckBox.setIcon(QtGui.QIcon.fromTheme("edit-clear-history"))
@@ -522,6 +511,9 @@ class TriggerDetectDialog(qd.QuickDialog):
                                                             "Undo", parent=self.buttons)
         self.undoTriggersPushButton.clicked.connect(self.slot_undo)
         
+        # NOTE: 2021-01-06 10:57:10
+        # extend/reuse the Quickdialog's own button box => widgets nicely aligned
+        # on the same row instead of occupying an additional row
         self.buttons.layout.insertWidget(0, self.clearEventsCheckBox)
         self.buttons.layout.insertWidget(1, self.detectTriggersPushButton)
         self.buttons.layout.insertWidget(2, self.undoTriggersPushButton)
@@ -531,8 +523,31 @@ class TriggerDetectDialog(qd.QuickDialog):
         self.buttons.OK.setIcon(QtGui.QIcon.fromTheme("dialog-ok-apply"))
         self.buttons.Cancel.setIcon(QtGui.QIcon.fromTheme("dialog-cancel"))
         
+        self.statusBar = QtWidgets.QStatusBar(parent=self)
+        self.addWidget(self.statusBar)
+        
         self.setWindowModality(QtCore.Qt.WindowModal)
         
+        # parse ephys parameter
+        self._ephys_= None
+        # no mixing of types when ephys is a sequence ...
+        if isinstance(ephys, (Block, Segment)) or \
+            (isinstance(ephys, (tuple, list)) and \
+                (all([isinstance(v, Block) for v in ephys]) or \
+                    all([isinstyane(v, Segment) for v in ephys]))):
+            self._ephys_ = ephys
+            
+            if isinstance(self._ephysViewer_, SignalViewer):
+                self._ephysViewer_.plot(self._ephys_)
+            
+        if self._ephys_:
+            # cache the events
+            self._cached_events_ = get_events(self._ephys_)
+            self._update_trigger_detect_ranges_(0)
+            
+        else:
+            self._cached_events_ = list()
+
     def open(self):
         if self._ephys_:
             self._ephysViewer_.plot(self.ephys)
@@ -653,18 +668,26 @@ class TriggerDetectDialog(qd.QuickDialog):
         if any((presyn, postsyn, photo, imaging)):
             self._cached_events_ = get_events(self._ephys_)
             
+            # NOTE: 2021-03-21 14:29:27
+            # only clear existing trigger events
+            clear_flag = "triggers" if self._clear_events_flag_ else False
+            
             auto_detect_trigger_protocols(self._ephys_,
                                         presynaptic = presyn,
                                         postsynaptic = postsyn,
                                         photostimulation = photo,
                                         imaging = imaging,
-                                        clear = self._clear_events_flag_,
+                                        clear = clear_flag,
                                         protocols=False)
             
             self._detected_ = True
             
             if self.isVisible():
                 self._ephysViewer_.plot(self.ephys)
+                
+            #nEvents = len(get_trigger_events(self.ephys))
+            
+            #self.statusBar.showMessage("%d trigger events detected" % nEvents)
         
        
     def _update_trigger_detect_ranges_(self, frameindex):
@@ -699,7 +722,9 @@ class TriggerDetectDialog(qd.QuickDialog):
         if segment:
             #self.eventDetectionWidget.nChannels = sum([len(getattr(segment, x, [])) for x in ("analogsignals",
                                                                                               #"irregularlysampledsignals")])
-            self.eventDetectionWidget.nChannels = len(segment.analogsignals)
+            nChannels = max([len(seg.analogsignals) + len(seg.irregularlysampledsignals) for seg in self._ephys_.segments])
+            self.eventDetectionWidget.nChannels = nChannels
+            #self.eventDetectionWidget.nChannels = len(segment.analogsignals)
             
             self.eventDetectionWidget.signalStart = float(min([sig.t_start for sig in segment.analogsignals]).magnitude)
             self.eventDetectionWidget.sgnalStop = float(max([sig.t_stop for sig in segment.analogsignals]).magnitude)

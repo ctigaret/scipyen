@@ -8,16 +8,17 @@ core.neoutils code split and redistributed across core.neoutils, ephys.ephys and
 core.triggerprotocols
 
 Functions and classes defined here:
+====================================
 
 I. Module-level functions for the management of trigger events and protocols
 ============================================================================
 auto_define_trigger_events
 auto_detect_trigger_protocols
-clear_events
 detect_trigger_events
 detect_trigger_times
 embed_trigger_event
 embed_trigger_protocol
+get_trigger_events
 modify_trigger_protocol
 parse_trigger_protocols
 remove_events
@@ -28,6 +29,10 @@ II. Classes
 TriggerEvent -> now defined in core.triggerevent
 TriggerEventType -> now defined in core.triggerevent
 TriggerProtocol
+
+Functions and classes defined somewere else but used here:
+===========================================================
+clear_events - core.neoutils
 
 """
 import typing, warnings, traceback
@@ -46,7 +51,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 from core.datatypes import (check_time_units, is_string, 
                             RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
 from core.neoutils import (get_index_of_named_signal, remove_events, clear_events,
-                           is_same_as)
+                           is_same_as, get_events)
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal, )
 from core.prog import safeWrapper
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
@@ -198,7 +203,9 @@ def auto_define_trigger_events(src, event_type, analog_index,
     The src parameter (a reference)
     
     Side effects:
-        Creates and appends TriggerEvent objects to the segments in src
+        Creates and appends TriggerEvent objects to the segments in 'src'.
+        The number of events detected (and embedded in 'src') can be retrieved
+        using get_trigger_events(src)
     """
     if isinstance(src, neo.Block):
         data = src.segments
@@ -266,8 +273,8 @@ def auto_define_trigger_events(src, event_type, analog_index,
                         if isinstance(event, TriggerEvent):
                             embed_trigger_event(event, s, clear=clear)
                             
-                        else:
-                            warnings.warn("No trigger event was detected in signal %d" % sndx)
+                        #else:
+                            #warnings.warn("No trigger event was detected in signal %d" % sndx)
                         
                     else:
                         raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (ndx, len(s.analogsignals)))
@@ -291,8 +298,8 @@ def auto_define_trigger_events(src, event_type, analog_index,
                         
                     if isinstance(event, TriggerEvent):
                         embed_trigger_event(event, s, clear=clear)
-                    else:
-                        warnings.warn("No trigger event detected in signal %d, in segment %d" % (analog_index, ks))
+                    #else:
+                        #warnings.warn("No trigger event detected in signal %d, in segment %d" % (analog_index, ks))
                     
                 else:
                     raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (analog_index, len(s.analogsignals)))
@@ -305,6 +312,36 @@ def auto_define_trigger_events(src, event_type, analog_index,
                 
                 
     return src
+
+def get_trigger_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
+                       as_dict:bool=False, classify:bool=True) -> list:
+    """Returns a list of TriggerEvent objects embedded in the data
+    """
+    events = get_events(src, as_dict=as_dict) 
+    
+    # NOTE: 2021-03-21 15:34:14
+    # cannot blindly use chain.from_iterable here because a DataObject is also
+    # an iterable (ie. we end up extracting individual time stamps from events)!
+    if len(events):
+        if as_dict:
+            ret = dict(events)
+            for key, val in ret.items():
+                if isinstance(val, (tuple, list)):
+                    val = [e for e in val if isinstance(e, TriggerEvent)]
+                    
+                elif isinstance(val, dict)
+            
+        if not as_dict:
+            if all([isinstance(e, (tuple, list)) for e in events]):
+                if all([all([isinstance(e1, DataObject) for e1 in e]) for e in events]):
+                    # one nesting level, uniform - a list of segments
+                    events = [ev for ev in chain.from_iterable(events) if isinstance(ev, TriggerEvent)]
+                elif all([all([isinstance(e1, (tuple, list)) and all([isinstance(e2, DataObject) for e2 in e1]) for e1 in e]) for e in events]):
+                    # two nesting levels, uniform - alist of blocks with their own segments
+                    events = []
+            
+    else:
+        return events # empty list
 
 @safeWrapper
 def detect_trigger_events(x, event_type, use_lo_hi=True, label=None, name=None):
@@ -1105,7 +1142,8 @@ def auto_detect_trigger_protocols(data: neo.Block,
                 
     Returns:
     =======
-    A list of trigger protocols
+    When protocols is True, returns a list of trigger protocols; otherwise, 
+    returns None
         
     """
     # NOTE: 2021-01-06 11:28:23 NEW: introduced "up" parameter - to use the
@@ -1185,202 +1223,203 @@ def auto_detect_trigger_protocols(data: neo.Block,
         tp, _ = parse_trigger_protocols(data)
         return tp
     
-def auto_detect_trigger_protocols2(data: neo.Block, 
-                               presynaptic:tuple=(), 
-                               postsynaptic:tuple=(),
-                               photostimulation:tuple=(),
-                               imaging:tuple=(),
-                               clear:typing.Union[bool, str, tuple]=False,
-                               up=True, protocols=True):
+#def auto_detect_trigger_protocols2(data: neo.Block, 
+                               #presynaptic:tuple=(), 
+                               #postsynaptic:tuple=(),
+                               #photostimulation:tuple=(),
+                               #imaging:tuple=(),
+                               #clear:typing.Union[bool, str, tuple]=False,
+                               #up=True, protocols=True):
     
-    """Determines the set of trigger protocols in a neo.Block by searching for 
-    trigger waveforms in the analogsignals contained in data.
+    #""" TODO: what's the intention?
+    #Determines the set of trigger protocols in a neo.Block by searching for 
+    #trigger waveforms in the analogsignals contained in data.
     
-    Time stamps of the detected trigger protocols will then be used to construct
-    TriggerEvent objects according to which of the keyword parameters below
-    have been specified.
+    #Time stamps of the detected trigger protocols will then be used to construct
+    #TriggerEvent objects according to which of the keyword parameters below
+    #have been specified.
     
-    Var-positional parameters:
-    =========================
+    #Var-positional parameters:
+    #=========================
     
-    data: a neo.Block, neo.Segment, or sequence (tuple, list) of either neo.Block
-        or neo.Segment objects.
+    #data: a neo.Block, neo.Segment, or sequence (tuple, list) of either neo.Block
+        #or neo.Segment objects.
             
-    Named parameters:
-    =================
+    #Named parameters:
+    #=================
     
-    presynaptic, postsynaptic, photostimulation, imaging:
+    #presynaptic, postsynaptic, photostimulation, imaging:
     
-        Each is a tuple with three or four elements
+        #Each is a tuple with three or four elements
         
-            (trigger event type, signal index, label, (t_start, t_stop))
+            #(trigger event type, signal index, label, (t_start, t_stop))
         
-        that specify parameters for the detection of pre-, postsynaptic, 
-        photostimulation or imaging (trigger) event types, respectively. 
+        #that specify parameters for the detection of pre-, postsynaptic, 
+        #photostimulation or imaging (trigger) event types, respectively. 
         
-        Their values are passed along to the auto_define_trigger_events,
-        detect_trigger_events, and detect_trigger_times functions.
+        #Their values are passed along to the auto_define_trigger_events,
+        #detect_trigger_events, and detect_trigger_times functions.
 
-        When empty, no events of the specified type will be constructed.
+        #When empty, no events of the specified type will be constructed.
         
-        The tuple elements are as follows:
-        ---------------------------------
+        #The tuple elements are as follows:
+        #---------------------------------
         
-        signal_index: int = the index of the analog signal in a Segment's 
-            'analogsignals' attribute, where the trigger-like waveforms were
-            recorded.
+        #signal_index: int = the index of the analog signal in a Segment's 
+            #'analogsignals' attribute, where the trigger-like waveforms were
+            #recorded.
             
-            A trigger-like waveform is a rectangular pulse, or a train
-            of rectangular pulses with polarity (upward or downward) specified 
-            by the 'up' parameter, which emulate a TTL signal.
+            #A trigger-like waveform is a rectangular pulse, or a train
+            #of rectangular pulses with polarity (upward or downward) specified 
+            #by the 'up' parameter, which emulate a TTL signal.
             
-            Currently, thei functions supports only the "up" logic i.e., 
-            upward-going TTL-like waveforms.
+            #Currently, thei functions supports only the "up" logic i.e., 
+            #upward-going TTL-like waveforms.
             
         
-        label: str = a label to be assigned to the detected event
+        #label: str = a label to be assigned to the detected event
         
-        (t_start, t_stop): pair of python Quantity objects defining a time slice
-            or interval, of the signal, where the events are to be detected.
+        #(t_start, t_stop): pair of python Quantity objects defining a time slice
+            #or interval, of the signal, where the events are to be detected.
             
-            This is optional. When given, the search for TTL-like waveforms 
-            is restricted to the time interval between t_start and t_stop 
-            (t_start is included in the interval). 
+            #This is optional. When given, the search for TTL-like waveforms 
+            #is restricted to the time interval between t_start and t_stop 
+            #(t_start is included in the interval). 
             
-            Otherwise, by default, TTL-like waveforms are searched along the 
-            entire duration of the signal.
+            #Otherwise, by default, TTL-like waveforms are searched along the 
+            #entire duration of the signal.
             
-            Recommended for signals that contain additional waveforms or are too 
-            noisy.
+            #Recommended for signals that contain additional waveforms or are too 
+            #noisy.
         
-    clear: bool, str, TriggerEventType or sequence (tuple, list) - specifies
-        the removal of existing events (if any) before detecting TriggerEvents.
-        ATTENTION: The event removal is done on ALL data segments.
+    #clear: bool, str, TriggerEventType or sequence (tuple, list) - specifies
+        #the removal of existing events (if any) before detecting TriggerEvents.
+        #ATTENTION: The event removal is done on ALL data segments.
         
-        Optional (default is False).
+        #Optional (default is False).
         
-        When False (default), the detected trigger event arrays will be appended
-        to the list of neo.Event objects in the data segments. This list is the 
-        'events' attribute of the neo.Segment objects.
+        #When False (default), the detected trigger event arrays will be appended
+        #to the list of neo.Event objects in the data segments. This list is the 
+        #'events' attribute of the neo.Segment objects.
         
-        When True, all events will be removed before detecting trigger events.
+        #When True, all events will be removed before detecting trigger events.
         
-        When a str, the allowed values are (WARNING: case-sensitive, and no 
-                    spurious spaces):
-            "all"       => same effect as when 'clear' is True
+        #When a str, the allowed values are (WARNING: case-sensitive, and no 
+                    #spurious spaces):
+            #"all"       => same effect as when 'clear' is True
             
-            "triggers"  => remove all existing TriggerEvents regardless of their 
-                            TriggerEventType; other neo.Event objects are retained.
+            #"triggers"  => remove all existing TriggerEvents regardless of their 
+                            #TriggerEventType; other neo.Event objects are retained.
                             
-            "same"      => remove trigger events that have values identical to  
-                            the ones of the newly-created evets here; the
-                            identity test checks for the length and values of the
-                            time stamps, and the values of the event labels.
+            #"same"      => remove trigger events that have values identical to  
+                            #the ones of the newly-created evets here; the
+                            #identity test checks for the length and values of the
+                            #time stamps, and the values of the event labels.
                             
-            a valid TriggerEventType string (e.g. "presynaptic", "postsynaptic",
-                etc., see triggerevent.TriggerEventType for details)
-                        => remove only trigger event of the specified type
+            #a valid TriggerEventType string (e.g. "presynaptic", "postsynaptic",
+                #etc., see triggerevent.TriggerEventType for details)
+                        #=> remove only trigger event of the specified type
                 
-        When a sequence, its elements may be (type mixing is not allwed):
-            * str = valid TriggerEventType strings as described above
-            * TriggerEventType values
-                NOTE: TriggerEventType is an enum.IntEnum;
-                see triggerevent.TriggerEventType for details
+        #When a sequence, its elements may be (type mixing is not allwed):
+            #* str = valid TriggerEventType strings as described above
+            #* TriggerEventType values
+                #NOTE: TriggerEventType is an enum.IntEnum;
+                #see triggerevent.TriggerEventType for details
                 
-    up:bool, optional (default is True). Specifies the direction of TTL-like 
-        waveforms
-        When True, TTL-like waveforms are expected to follow an "up" logic 
-        (i.e., they are low-to-high, or upwards deflections).
+    #up:bool, optional (default is True). Specifies the direction of TTL-like 
+        #waveforms
+        #When True, TTL-like waveforms are expected to follow an "up" logic 
+        #(i.e., they are low-to-high, or upwards deflections).
         
-    protocols:bool, default is True
-        When True, the function also constructs and returns a list of 
-        TriggerProtocol objects.
+    #protocols:bool, default is True
+        #When True, the function also constructs and returns a list of 
+        #TriggerProtocol objects.
         
-        When False, the function only detects (and embeds) trigger events in the
-        data. TriggerProtocol objects can then be parsed from the data by
-        calling parse_trigger_protocols() at a separate stage.
+        #When False, the function only detects (and embeds) trigger events in the
+        #data. TriggerProtocol objects can then be parsed from the data by
+        #calling parse_trigger_protocols() at a separate stage.
                 
-    Returns:
-    =======
-    A list of trigger protocols
+    #Returns:
+    #=======
+    #A list of trigger protocols
         
-    """
-    # NOTE: 2021-01-06 11:28:23 NEW: introduced "up" parameter - to use the
-    # ability to detect negative pulses ("down" logic); 
+    #"""
+    ## NOTE: 2021-01-06 11:28:23 NEW: introduced "up" parameter - to use the
+    ## ability to detect negative pulses ("down" logic); 
             
-    # NOTE: 2021-01-06 13:54:58
-    # any admissible value of 'clear' except for "same" is used here; then, the
-    # call to auto_define_trigger_events() below gets 'clear' as either False
-    # (if 'clear' has been used here) or as "same", which instructs the 
-    # auto_define_trigger_events() function to, respectively, do nothing or to
-    # remove existing triggers when they have identical parameters as the 
-    # newly-created ones.
-    if isinstance(clear, bool) and clear:
-        clear_events(data)
-        clear = False
+    ## NOTE: 2021-01-06 13:54:58
+    ## any admissible value of 'clear' except for "same" is used here; then, the
+    ## call to auto_define_trigger_events() below gets 'clear' as either False
+    ## (if 'clear' has been used here) or as "same", which instructs the 
+    ## auto_define_trigger_events() function to, respectively, do nothing or to
+    ## remove existing triggers when they have identical parameters as the 
+    ## newly-created ones.
+    #if isinstance(clear, bool) and clear:
+        #clear_events(data)
+        #clear = False
 
-    elif isinstance(clear, (TriggerEventType, tuple, list)):
-        # NOTE: 2021-01-06 12:38:32
-        # specifying triggerType implies triggersOnly is True
-        clear_events(data, triggerType = clear)
-        # also, clear_events raises error if clear is a non compliant sequence
-        clear = False
+    #elif isinstance(clear, (TriggerEventType, tuple, list)):
+        ## NOTE: 2021-01-06 12:38:32
+        ## specifying triggerType implies triggersOnly is True
+        #clear_events(data, triggerType = clear)
+        ## also, clear_events raises error if clear is a non compliant sequence
+        #clear = False
         
-    elif isinstance(clear, str):
-        if clear == "all":
-            clear_events(data)
-            clear = False
+    #elif isinstance(clear, str):
+        #if clear == "all":
+            #clear_events(data)
+            #clear = False
             
-        elif clear == "triggers":
-            clear_events(data, triggersOnly = True)
-            clear = False
+        #elif clear == "triggers":
+            #clear_events(data, triggersOnly = True)
+            #clear = False
             
-        elif clear in TriggerEventType.names():
-            # see NOTE: 2021-01-06 12:38:32
-            clear_events(data, triggerType=TriggerEventType[clear])
-            clear = False
+        #elif clear in TriggerEventType.names():
+            ## see NOTE: 2021-01-06 12:38:32
+            #clear_events(data, triggerType=TriggerEventType[clear])
+            #clear = False
             
-        elif clear != "same":
-            clear = False
+        #elif clear != "same":
+            #clear = False
             
-    # collect trigger parameter tuples in a mapping, to iterate
-    tpars = {"presynaptic": presynaptic,
-             "postsynaptic": postsynaptic,
-             "photostimulation":photostimulation,
-             "imaging_frame":imaging}
+    ## collect trigger parameter tuples in a mapping, to iterate
+    #tpars = {"presynaptic": presynaptic,
+             #"postsynaptic": postsynaptic,
+             #"photostimulation":photostimulation,
+             #"imaging_frame":imaging}
     
-    # NOTE: 2019-03-14 21:43:21
-    # depending on the length of the tuple in the keyword parameters
-    # we detect events in the whole signal or we limit detetion to a defined 
-    # time-slice of the signal
+    ## NOTE: 2019-03-14 21:43:21
+    ## depending on the length of the tuple in the keyword parameters
+    ## we detect events in the whole signal or we limit detetion to a defined 
+    ## time-slice of the signal
     
-    # iterate through trigger parameter tuples - example given here for one loop
-    # to be explicit:
-    #### if len(presynaptic) >= 2:
-    ####    pfun = partial(auto_define_trigger_events, event_type = "presynaptic", 
-    ####               analog_index = presynaptic[0], label = presynaptic[1], 
-    ####               use_lo_hi=up, clear=clear)
+    ## iterate through trigger parameter tuples - example given here for one loop
+    ## to be explicit:
+    ##### if len(presynaptic) >= 2:
+    #####    pfun = partial(auto_define_trigger_events, event_type = "presynaptic", 
+    #####               analog_index = presynaptic[0], label = presynaptic[1], 
+    #####               use_lo_hi=up, clear=clear)
         
-    ####    if len(presynaptic) == 3:
-    ####        pfun(data, time_slice = presynaptic[2])
-    ####    else:
-    ####        pfun(data)
+    #####    if len(presynaptic) == 3:
+    #####        pfun(data, time_slice = presynaptic[2])
+    #####    else:
+    #####        pfun(data)
     
-    for p_name, p_tuple in tpars.items():
-        if len(tpars[p_name]) >= 2:
-            pfun = partial(auto_define_trigger_events, event_type = p_name, 
-                        analog_index = p_tuple[0], label = p_tuple[1], 
-                        use_lo_hi=up, clear=clear)
+    #for p_name, p_tuple in tpars.items():
+        #if len(tpars[p_name]) >= 2:
+            #pfun = partial(auto_define_trigger_events, event_type = p_name, 
+                        #analog_index = p_tuple[0], label = p_tuple[1], 
+                        #use_lo_hi=up, clear=clear)
             
-            if len(p_tuple) == 3:
-                pfun(data, time_slice = p_tuple[2])
+            #if len(p_tuple) == 3:
+                #pfun(data, time_slice = p_tuple[2])
                 
-            else:
-                pfun(data)
+            #else:
+                #pfun(data)
                 
-    if protocols:
-        tp, _ = parse_trigger_protocols(data)
-        return tp
+    #if protocols:
+        #tp, _ = parse_trigger_protocols(data)
+        #return tp
 
 #### END Module-level functions
         

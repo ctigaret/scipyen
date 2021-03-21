@@ -116,8 +116,6 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
 
     try:
-        #if tt in sequence_types:
-        #if objtype in sequence_types:
         if isinstance(obj, sequence_types):
             if len(obj) and all([isinstance(v, Number) for v in obj]):
                 datamin = str(min(obj))
@@ -132,8 +130,6 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz    = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        #elif tt in set_types:
-        #elif objtype in set_types:
         elif isinstance(obj, set_types):
             if len(obj) and all([isinstance(v, Number) for v in obj]):
                 datamin = str(min([v for v in obj]))
@@ -148,8 +144,6 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             #memsz    = str(total_size(obj)) # too slow for large collections
             memsztip = "memory size: "
             
-        #elif tt in dict_types:
-        #elif objtype in dict_types:
         elif isinstance(obj, dict_types):
             sz = str(len(obj))
             sizetip = "length: "
@@ -158,102 +152,6 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz    = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        #elif tt in ('VigraArray', "PictArray"):
-        #elif tt in vigra_array_types:
-        #elif isinstance(obj, VigraArray):
-            #dtypestr = str(obj.dtype)
-            #dtypetip = "dtype: "
-            
-            #if obj.size > 0:
-                #try:
-                    #if np.all(np.isnan(obj[:])):
-                        #datamin = str(np.nan)
-                        
-                    #else:
-                        #datamin = str(np.nanmin(obj))
-                        
-                #except:
-                    #pass
-                
-                #mintip = "min: "
-                
-                #try:
-                    #if np.all(np.isnan(obj[:])):
-                        #datamax = str(np.nan)
-                    
-                    #else:
-                        #datamax  = str(np.nanmax(obj))
-                        
-                #except:
-                    #pass
-                
-                #maxtip = "max: "
-                
-            #sz    = str(obj.size)
-            #sizetip = "size: "
-            
-            #ndims   = str(obj.ndim)
-            #dimtip = "dimensions: "
-            
-            #shp = str(obj.shape)
-            #shapetip = "shape: "
-            
-            #axes    = repr(obj.axistags)
-            #axestip = "axes: "
-            
-            #arrayorder    = str(obj.order)
-            #ordertip = "array order: "
-            
-            #memsz    = str(obj.nbytes)
-            ##memsz    = "".join([str(getsizeof(obj)), str(obj.nbytes), "bytes"])
-            #memsztip = "memory size (array nbytes): "
-            
-        #elif tt in ('Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 'SpikeTrain', "DataSignal", "IrregularlySampledDataSignal"):
-        #elif tt in signal_types:
-        #elif isinstance(obj, (NeoDataObject, Quantity)):
-            #dtypestr = str(obj.dtype)
-            #dtypetip = "dtype: "
-            
-            #if obj.size > 0:
-                #try:
-                    #if np.all(np.isnan(obj[:])):
-                        #datamin = str(np.nan)
-                        
-                    #else:
-                        #datamin = str(np.nanmin(obj))
-                        
-                #except:
-                    #pass
-                    
-                #mintip = "min: "
-                    
-                #try:
-                    #if np.all(np.isnan(obj[:])):
-                        #datamax = str(np.nan)
-                        
-                    #else:
-                        #datamax  = str(np.nanmax(obj))
-                        
-                #except:
-                    #pass
-                
-                #maxtip = "max: "
-                
-            #sz    = str(obj.size)
-            #sizetip = "size: "
-            
-            #ndims   = str(obj.ndim)
-            #dimtip = "dimensions: "
-            
-            #shp = str(obj.shape)
-            #shapetip = "shape: "
-            
-            #memsz    = str(obj.nbytes)
-            ##memsz    = "".join([str(getsizeof(obj)), str(obj.nbytes), "bytes"])
-            #memsztip = "memory size (array nbytes): "
-            
-        #elif tt in ('Block', 'Segment'):
-        #elif NeoContainer in getmro(objtype):
         elif isinstance(obj, NeoContainer):
             sz = str(obj.size)
             sizetip = "size: "

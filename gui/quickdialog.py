@@ -1,4 +1,4 @@
-"""quickdialog module from vigranumpy/pyqt
+"""quickdialog module adaptedfrom vigranumpy.pyqt.quickdialog
 """
 #######################################################################
 #                                                                      
@@ -34,13 +34,10 @@
 #    OTHER DEALINGS IN THE SOFTWARE.                                   
 #                                                                      
 #######################################################################
-
 # NOTE: 2019-10-06 00:43:44
-# modified by Cezar M. Tigaret (cezar.tigaret@gmail.com, TigaretC@cardiff.ac.uk)
-# for use with PyQt5
-#import PyQt4.QtGui  as qt
-#import PyQt4.QtCore as QtCore
-#from PyQt4.QtCore import SIGNAL
+# Adaptation for use with PyQt5
+# Copyright 209-2021 by Cezar M. Tigaret (cezar.tigaret@gmail.com, TigaretC@cardiff.ac.uk)
+#########################################################################
 import PyQt5.QtCore as QtCore
 import PyQt5.QtGui as QtGui
 import PyQt5.QtWidgets as QtWidgets
@@ -247,7 +244,6 @@ class CheckBox(QtWidgets.QCheckBox):
 
     def selection(self):
         return self.isChecked()
-
 
 class Choice(QtWidgets.QFrame):
     def __init__(self, parent, label, vertical = 0):

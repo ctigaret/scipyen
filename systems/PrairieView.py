@@ -44,7 +44,7 @@ import iolib.pictio as pio
 
 from gui import resources_rc as resources_rc
 from gui import quickdialog as qd
-from gui.triggerdetectgui import TriggerDetectWidget
+from gui.triggerdetectgui import TriggerDetectDialog, TriggerDetectWidget
 from gui.protocoleditordialog import ProtocolEditorDialog
 from gui import pictgui as pgui
 from gui.workspacegui import WorkspaceGuiMixin
@@ -2566,43 +2566,50 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         
         self.protocolsImportToolButton.clicked.connect(self._slot_importProtocolFromWorkspace)
         
-        self.detectTriggersToolButton.clicked.connect(self._slot_activateTriggerEventDetectionGui)
+        self.detectTriggersToolButton.clicked.connect(self._slot_startTriggerEventDetectionGui)
         self.editTriggerProtocolsToolButton.clicked.connect(self._slot_editTriggerProtocols)
         self.buildScandataToolButton.clicked.connect(self.slot_generateScanData)
         
-        self.ephysPreview = sv.SignalViewer(pWin = self._scipyenWindow_)
+        self.ephysPreview = sv.SignalViewer(pWin = self._scipyenWindow_, 
+                                            win_title = "Trigger Events Detection")
         
-        self.eventDetectionDialog = qd.QuickDialog(self, "Detect Trigger Events")
-        self.eventDetectionWidget = TriggerDetectWidget(parent = self.eventDetectionDialog) 
-        self.eventDetectionDialog.addWidget(self.eventDetectionWidget)
+        #### BEGIN - use TriggerDetectDialog instead of local code
+        #self.eventDetectionDialog = qd.QuickDialog(self, "Detect Trigger Events")
+        #self.eventDetectionWidget = TriggerDetectWidget(parent = self.eventDetectionDialog) 
+        #self.eventDetectionDialog.addWidget(self.eventDetectionWidget)
         
-        self.eventDetectionDialogGroup = qd.HDialogGroup(self.eventDetectionDialog)
+        #self.eventDetectionDialogGroup = qd.HDialogGroup(self.eventDetectionDialog)
         
-        self.clearEventsCheckBox = qd.CheckBox(self.eventDetectionDialogGroup,
-                                               "Clear existing")
-        self.clearEventsCheckBox.setIcon(QtGui.QIcon.fromTheme("edit-clear-history"))
-        self.clearEventsCheckBox.setChecked(self.clearEvents)
-        self.clearEventsCheckBox.stateChanged.connect(self._slot_clearEventsChanged)
+        #self.clearEventsCheckBox = qd.CheckBox(self.eventDetectionDialogGroup,
+                                               #"Clear existing")
+        #self.clearEventsCheckBox.setIcon(QtGui.QIcon.fromTheme("edit-clear-history"))
+        #self.clearEventsCheckBox.setChecked(self.clearEvents)
+        #self.clearEventsCheckBox.stateChanged.connect(self._slot_clearEventsChanged)
         
-        # this one belongs to the eventDetectionDialogGroup sub-dialog of the 
-        # self.eventDetectionDialog
-        self.detectTriggersPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-find"),
-                                                              "Detect", parent=self.eventDetectionDialogGroup)
-        self.detectTriggersPushButton.clicked.connect(self._slot_detectTriggers)
-        self.eventDetectionDialogGroup.addWidget(self.detectTriggersPushButton)
-        self.undoTriggersPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-undo"),
-                                                               "Discard", parent=self.eventDetectionDialogGroup)
-        self.undoTriggersPushButton.clicked.connect(self._slot_undoTriggers)
-        self.eventDetectionDialogGroup.addWidget(self.undoTriggersPushButton)
-        self.eventDetectionDialog.setWindowModality(QtCore.Qt.WindowModal)
-        self.eventDetectionDialog.finished.connect(self._slot_deactivateTriggerEventDetectionGui)
+        ## this one belongs to the eventDetectionDialogGroup sub-dialog of the 
+        ## self.eventDetectionDialog
+        #self.detectTriggersPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-find"),
+                                                              #"Detect", parent=self.eventDetectionDialogGroup)
+        #self.detectTriggersPushButton.clicked.connect(self._slot_detectTriggers)
+        #self.eventDetectionDialogGroup.addWidget(self.detectTriggersPushButton)
+        #self.undoTriggersPushButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("edit-undo"),
+                                                               #"Discard", parent=self.eventDetectionDialogGroup)
+        #self.undoTriggersPushButton.clicked.connect(self._slot_undoTriggers)
+        #self.eventDetectionDialogGroup.addWidget(self.undoTriggersPushButton)
+        #self.eventDetectionDialog.setWindowModality(QtCore.Qt.WindowModal)
+        #self.eventDetectionDialog.finished.connect(self._slot_stopTriggerEventDetectionGui)
         
+        # NOTE: 2021-03-21 11:35:59 just a "place holder" here; the actual dialog 
+        # created in _slot_startTriggerEventDetectionGui()
+        self.eventDetectionDialog = None # when a TriggerDetectDialog, this caches the detection options & events
+        
+        #### END use TriggerDetectDialog
         self.protocolEditorDialog = ProtocolEditorDialog(parent=self, title = "Edit Trigger Protocols")
         
         # the ProtocolEditorDialog works on a reference to the list of 
         # TriggerProtocols stored in here.
         self.protocolEditorDialog.triggerProtocols = self.triggerProtocols
-        self.protocolEditorDialog.sig_detectTriggers.connect(self._slot_activateTriggerEventDetectionGui)
+        self.protocolEditorDialog.sig_detectTriggers.connect(self._slot_startTriggerEventDetectionGui)
         self.protocolEditorDialog.sig_removeProtocol.connect(self._slot_removeProtocol)
         self.protocolEditorDialog.sig_requestProtocolAdd.connect(self._slot_protocolAddRequest)
         self.protocolEditorDialog.finished.connect(self._slot_protocolEditorFinished)
@@ -2643,7 +2650,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         
     @pyqtSlot()
     @safeWrapper
-    def _slot_activateTriggerEventDetectionGui(self):
+    def _slot_startTriggerEventDetectionGui(self):
         """Opens the trigger event detection dialog.
         The following signals are connected ot this slot:
             detectTriggersToolButton.clicked()
@@ -2653,15 +2660,19 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             return
         
         if isinstance(self._ephys_, neo.Block) and len(self._ephys_.segments):
-            self.ephysPreview.plot(self._ephys_)
+            if self.eventDetectionDialog is None:
+                self.eventDetectionDialog = TriggerDetectDialog(ephys=self._ephys_,
+                                                                clearEvents=True,
+                                                                ephysViewer = self.ephysPreview,
+                                                                parent=self)
+                self.eventDetectionDialog.finished.connect(self._slot_stopTriggerEventDetectionGui)
             
-            nChannels = max([len(seg.analogsignals) + len(seg.irregularlysampledsignals) for seg in self._ephys_.segments])
-              
-            self.eventDetectionWidget.nChannels = nChannels
+            #self.ephysPreview.plot(self._ephys_) # done in TriggerDetectDialog c'tor
+            
             self.eventDetectionDialog.open()
             
     @pyqtSlot()
-    def _slot_deactivateTriggerEventDetectionGui(self):
+    def _slot_stopTriggerEventDetectionGui(self):
         """Closes trigger event detection dialog and interprets the result.
         If dialog.result() is "accepted" (or yes/ok) then a new set collection
         of trigger protocols is generated.
@@ -2692,10 +2703,10 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         signalblockers = [QtCore.QSignalBlocker(w) for w in (self.triggerProtocolFileNameLineEdit,)]
         self.cachedProtocols[:] = self.triggerProtocols[:]
         
-        presyn  = self.eventDetectionWidget.presyn
-        postsyn = self.eventDetectionWidget.postsyn
-        photo   = self.eventDetectionWidget.photo
-        imaging = self.eventDetectionWidget.imaging
+        presyn  = self.eventDetectionDialog.presyn
+        postsyn = self.eventDetectionDialog.postsyn
+        photo   = self.eventDetectionDialog.photo
+        imaging = self.eventDetectionDialog.imaging
         
         tp = auto_detect_trigger_protocols(self._ephys_,
                                            presynaptic = presyn,
@@ -2719,7 +2730,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         if self._ephys_ is None:
             return
         
-        signalblockers = [QtCore.QSignalBlocker(w_ for w in (triggerProtocolFileNameLineEdit,))]
+        signalblockers = [QtCore.QSignalBlocker(self.triggerProtocolFileNameLineEdit)]
         
         for k,s in enumerate(self._ephys_.segments):
             s.events.clear()

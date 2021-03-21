@@ -2687,8 +2687,9 @@ def merge_signal_channels(*args, name=""):
     
     return __internal_merge__(*args)
 
-def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence]) -> list:
-    """Returns a list of neo.Events embedded in data.
+def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
+               as_dict:bool=False, flat:bool=False) -> list:
+    """Returns a collection of neo.Events embedded in data.
     
     Useful as a cache of events in neo data.
     
@@ -2698,45 +2699,142 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence]) -> li
     *src: neo.Block, neo.Segment, sequence (tuple, list) of neo.Block, sequence  
         (tuple, list) of neo.Segment, or None
         
+    Named parameters:
+    =================
+    as_dict: bool, default False
+        When True, return a dictionary as explained below, under 'Returns'. 
+        Otherwise, return a (possibly, ragged nested) list (see 'Returns')
+        
+    flat: bool, default False
+        Used when as_dict is False.
+        When 'flat' is True, returns a simple (1D) list of events in the order 
+        of the neo.Block (and of neo.Segment in each block) in 'src'; segment 
+        index if the faster-running index
+        
+        When False (the default), returns a ragged nested list of events, as
+        explained below, under 'Returns'
+        
     Returns:
     =======
-    A nested list with one element per src's Segments, with each element being
-    a reference to the Segment's 'events' attribute (itself a list).
+    By default (i.e. with as_dict and flat both False) returns a ragged nested
+    list of neo.Event (or TriggerEvent) objects, with nesting level dependent on
+    what is contained in 'src':
     
-    The list has two nesting levels when src is a sequence of neo.Block, and one
-    nesting level in all other cases, except for empty lists.
+        Type of src:                Indexing levels of the returned list:
+        --------------------------------------------------------------------------
+        Sequence of neo.Block       3   e.g.,
+                                            [
+                                                [...],  # block index
+                                                [
+                                                    [...], # segment index
+                                                    [...,block_i_ segment_j_event_k, ...],
+                                                    [...]
+                                                ],
+                                                [...]
+                                            ]
+        
+                                    outer index (level 0) = index (i) of block 
+                                                            in src sequence
+                                    level 1 index         = index (j) of the 
+                                                            segment in block_i
+                                    inner index (level 2) = index (k) of the 
+                                                            event in segment j 
+                                                            of block i
+        
+        neo.Block, 
+        sequence of neo.Segments    2   e.g., 
+                                            [
+                                                [...], # segment index
+                                                [
+                                                    [...],
+                                                    [..., segment_i_event_j],
+                                                    [...]
+                                                ],
+                                                [...]
+                                            ]
+                                            
+                                    outer index (level 0) = index (i) of the
+                                                            segment in src (or
+                                                            src.segments when
+                                                            src is a neo.Block)
+                                                            
+                                    inner index (level 1) = index (j) of the event
+                                                            in segment i
+        
+        neo.Segment                 1   i.e., [..., event_i, ...]
+        
+        None                        0   i.e., [] - empty list!
+        
     
+    When 'as_dict' is True, returns a dict which depends on the contents of 'src':
     
-    Type of src:                Nesting levels of the returned list:
-    --------------------------------------------------------------------------
-    Sequence of neo.Block       2   e.g., [block_index[segment_index[events]]]
+        When 'src' is a sequence of neo.Block objects, returns:
     
-    neo.Block, 
-    sequence of neo.Segments    1   e.g., [segment_index[events]]
-    
-    neo.Segment                 1   i.e., [[events]]
-    
-    None                        0   i.e., []
-    
-    May return an empty list, or a list with empty elements.
-    
+            {"block_i": {"segment_j": event_list}}
+        
+            where:
+                'i' runs from 0 to the number of neo.Block objects in 'src'
+                'j' runs from 0 to len(block_i.segments), for each block (i.e., 
+                    'j' runs varies faster)
+        
+        When 'src' is a neo.Block object or a sequence of neo.Segments:
+            {"segment_i": event_list}
+            
+            where 'i' runs from 0 to len(src) (or len(src.segments) is src is 
+                a neo.Block)
+                
+        When 'src' is a neo.Segment:
+            {"segment_0": event_list}
+            
+        When no events have been found in 'src' the function returns an empty list.
+        
     """
+    # NOTE 2021-03-21 17:54:12
+    # src is an unpacked tuple! It may be convenient to supply data already packed
+    # as a single tuple or list parameter - this will be assigned to src[0]
+    # NOTE: 2021-03-21 18:13:04
+    # new return type!
     if len(src) == 1:
         if isinstance(src[0], neo.Block):
-            return [s.events for s in src[0].segments]
+            if as_dict:
+                return {"block_0": dict([("segment_%d" % k, s.events) for k, s in enumerate(src[0].segments)])}
+            
+            else:
+                if flat:
+                    # flattened list
+                    return [e for e in chain.from_iterable([s.events for s in src[0].segments])]
+                else: # ragged nested sequence
+                    return [s.events for s in src[0].segments]
         
         elif isinstance(src[0], neo.Segment):
-            return [src[0].events]
+            if as_dict:
+                return {"segment_0":src[0].events}
+            else:
+                return src[0].events
     
         elif isinstance(src[0], (tuple, list)):
             if all([isinstance(v, neo.Block) for v in src[0]]):
-                return [[s.events for s in b.segments] for b in src[0]]
+                if as_dict:
+                    return dict([("block_%d" % kb, dict([("segment_%d" % k, s.events) for k,s in enumerate(b.segments)]) ) for kb, b in enumerate(src[0])])
+                else:
+                    if flat:
+                        return [e for e in chain.from_iterable([s.events for s in chain(*[b.segments for b in src[0]])])]
+                    else:
+                        # ragged nested sequence
+                        return [[s.events for s in b.segments] for b in src[0]]
             
             elif all([isinstance(v, neo.Segment) for v in src[0]]):
-                return [v.segments for v in src[0]]
+                if as_dict:
+                    return dict([("segment_%d" % k, s.events) for k, s in enumerate(src[0])])
+                else:
+                    if flat:
+                        return [e for e in chain(*[s.events for s in src[0]])]
+                    else:
+                        # ragged nested sequence
+                        return [v.segments for v in src[0]]
             
             else:
-                raise TypeError("Expecting a sequence of neo.Block or neo.Segment")
+                raise TypeError("Expecting a uniformly typed sequence of neo.Block or neo.Segment objects")
             
         elif src[0] is None:
             return []
@@ -2746,10 +2844,26 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence]) -> li
         
     elif len(src) > 1:
         if all([isinstance(v, neo.Block) for v in src]):
-            return [[s.events for s in b.segments] for b in src]
+            if as_dict:
+                return dict([("block_%d" % kb, dict([("segment_%d" % k, s.events) for k, s in enumerate(b.segments)])) for kb, b in enumerate(src)])
+            
+            else:
+                if flat:
+                    return [e for e in chain.from_iterable([s.events for s in chain(*[b.segments for b in src])])]
+                else:
+                    # ragged nested sequence
+                    return [[s.events for s in b.segments] for b in src]
         
         elif all([isinstance(v, neo.Segment) for v in src]):
-            return [v.segments for v in src[0]]
+            if as_dict:
+                return dict([("segment_%d" % k, s.events) for s in src])
+                
+            else:
+                if flat:
+                    return [e for e in chain(*[s.events for s in src])]
+                else:
+                    # ragged nested sequence
+                    return [v.segments for v in src[0]]
         
         else:
             raise TypeError("Expecting a sequence of neo.Block or neo.Segment")
