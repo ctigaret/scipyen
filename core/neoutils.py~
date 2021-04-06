@@ -2688,7 +2688,7 @@ def merge_signal_channels(*args, name=""):
     return __internal_merge__(*args)
 
 def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
-               as_dict:bool=False, flat:bool=False) -> list:
+               as_dict:bool=False, flat:bool=False, event_class:typing.Optional[]=None) -> list:
     """Returns a collection of neo.Events embedded in data.
     
     Useful as a cache of events in neo data.
@@ -2766,23 +2766,28 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
         None                        0   i.e., [] - empty list!
         
     
-    When 'as_dict' is True, returns a dict of the form
+    When 'as_dict' is True, returns a dict which depends on the contents of 'src':
     
-        {"block_i": {"segment_j": event_list}}
-        
-        Where 'i' runs form 0 to the number of neo.Blocm objects in src, and 'j'
-        runs from 0 to len(block_i.segments), for each block.
-        
+        When 'src' is a sequence of neo.Block objects, returns:
     
-        #When 'src' is a sequence of neo.Block objects, the list has two nesting 
-        #levels.
+            {"block_i": {"segment_j": event_list}}
         
-        #When no events have been found in 'src' the function returns an empty list.
+            where:
+                'i' runs from 0 to the number of neo.Block objects in 'src'
+                'j' runs from 0 to len(block_i.segments), for each block (i.e., 
+                    'j' runs varies faster)
         
-        #WARNING: The function EVER returns a list of events (see above) !
+        When 'src' is a neo.Block object or a sequence of neo.Segments:
+            {"segment_i": event_list}
+            
+            where 'i' runs from 0 to len(src) (or len(src.segments) is src is 
+                a neo.Block)
+                
+        When 'src' is a neo.Segment:
+            {"segment_0": event_list}
+            
+        When no events have been found in 'src' the function returns an empty list.
         
-        
-    
     """
     # NOTE 2021-03-21 17:54:12
     # src is an unpacked tuple! It may be convenient to supply data already packed

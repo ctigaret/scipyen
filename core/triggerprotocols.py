@@ -314,10 +314,22 @@ def auto_define_trigger_events(src, event_type, analog_index,
     return src
 
 def get_trigger_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
-                       as_dict:bool=False, classify:bool=True) -> list:
+                       as_dict:bool=False, flat:boot=False) -> list:
     """Returns a list of TriggerEvent objects embedded in the data
     """
-    events = get_events(src, as_dict=as_dict) 
+    
+    def __check_leaf__(parent, key, value):
+        if isinstance(value, (tuple, list)):
+            parent[key] = [v for v in value if isinstance((e, TriggerEvent))]
+            
+        elif isinstance(value, dict):
+            for k, v in value.items():
+                __check_leaf__(parent[key], k, v)
+                
+    def __check_list__():
+        pass
+                
+    events = get_events(src, as_dict=as_dict, flat=flat) 
     
     # NOTE: 2021-03-21 15:34:14
     # cannot blindly use chain.from_iterable here because a DataObject is also
@@ -325,11 +337,14 @@ def get_trigger_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence
     if len(events):
         if as_dict:
             ret = dict(events)
-            for key, val in ret.items():
-                if isinstance(val, (tuple, list)):
-                    val = [e for e in val if isinstance(e, TriggerEvent)]
+            for key, val in events.items():
+                __check_leaf__(ret, key, val)
+                #if isinstance(val, (tuple, list)):
+                    #ret[key] = [e for e in val if isinstance(e, TriggerEvent)]
                     
-                elif isinstance(val, dict)
+                #elif isinstance(val, dict):
+                    
+                    #pass
             
         if not as_dict:
             if all([isinstance(e, (tuple, list)) for e in events]):
