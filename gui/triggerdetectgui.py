@@ -487,7 +487,13 @@ class TriggerDetectDialog(qd.QuickDialog):
         self.addWidget(self.eventDetectionWidget)
         
         self._clear_events_flag_ = clearEvents
-        self._detected_ = False
+        
+        # NOTE: 2021-04-11 17:02:58
+        # thsi only informs that the detection had been performed, NOT if any
+        # events had been detected!
+        self.detected = False # True does NOT imply trigger events had been detected!
+        
+        self.triggerProtocols = list()
         
         if not isinstance(ephysViewer, SignalViewer):
             self._ephysViewer_ = SignalViewer(win_title = "Trigger Events Detection")
@@ -577,7 +583,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         
     @pyqtSlot(int)
     def done(self, value):
-        if value == QtWidgets.QDialog.Accepted and not self._detected_:
+        if value == QtWidgets.QDialog.Accepted and not self.detected:
             self.detect_triggers()
             
         if self._ephysViewer_.isVisible():
@@ -604,6 +610,10 @@ class TriggerDetectDialog(qd.QuickDialog):
     def slot_undo(self):
         """Quickly restore the events - no fancy stuff
         """
+        self._restore_events_()
+        self.detected = False
+        
+    def _restore_events_(self):
         if len(self._cached_events_):
             if isinstance(self._ephys_, Block):
                 for k, s in enumerate(self._ephys_.segments):
@@ -622,8 +632,6 @@ class TriggerDetectDialog(qd.QuickDialog):
                     for k, s in enumerate(self._ephys_):
                         s.events = self._cached_events_[k]
                         
-        self._detected_ = False
-            
     @property
     def ephys(self):
         return self._ephys_
@@ -658,32 +666,39 @@ class TriggerDetectDialog(qd.QuickDialog):
     
     def detect_triggers(self):
         if self._ephys_ is None:
+            self.detected=False
             return
         
-        presyn = self.eventDetectionWidget.presyn
-        postsyn = self.eventDetectionWidget.postsyn
-        photo = self.eventDetectionWidget.photo
-        imaging = self.eventDetectionWidget.imaging
+        #presyn = self.eventDetectionWidget.presyn
+        #postsyn = self.eventDetectionWidget.postsyn
+        #photo = self.eventDetectionWidget.photo
+        #imaging = self.eventDetectionWidget.imaging
         
-        if any((presyn, postsyn, photo, imaging)):
-            self._cached_events_ = get_events(self._ephys_)
+        #if any((self.eventDetectionWidget.presyn, self.eventDetectionWidget.postsyn, self.eventDetectionWidget.photo, self.eventDetectionWidget.imaging)):
+        if any((self.presyn, self.postsyn, self.photo, self.imaging)):
+            self._cached_events_ = get_events(self._ephys_) # cache all events, not just the trigger ones
             
             # NOTE: 2021-03-21 14:29:27
             # only clear existing trigger events
             clear_flag = "triggers" if self._clear_events_flag_ else False
             
-            auto_detect_trigger_protocols(self._ephys_,
-                                        presynaptic = presyn,
-                                        postsynaptic = postsyn,
-                                        photostimulation = photo,
-                                        imaging = imaging,
+            tp = auto_detect_trigger_protocols(self._ephys_,
+                                        presynaptic = self.presyn,
+                                        postsynaptic = self.postsyn,
+                                        photostimulation = self.photo,
+                                        imaging = self.imaging,
                                         clear = clear_flag,
-                                        protocols=False)
+                                        protocols=True)
             
-            self._detected_ = True
+            self.triggerProtocols[:] = tp[:]
+            
+            self.detected = True
             
             if self.isVisible():
                 self._ephysViewer_.plot(self.ephys)
+                
+            if len(self.triggerProtocols) == 0:
+                self._restore_events_()
                 
             #nEvents = len(get_trigger_events(self.ephys))
             

@@ -314,49 +314,10 @@ def auto_define_trigger_events(src, event_type, analog_index,
     return src
 
 def get_trigger_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
-                       as_dict:bool=False, flat:boot=False) -> list:
+                       as_dict:bool=False, flat:bool=False) -> list:
     """Returns a list of TriggerEvent objects embedded in the data
     """
-    
-    def __check_leaf__(parent, key, value):
-        if isinstance(value, (tuple, list)):
-            parent[key] = [v for v in value if isinstance((e, TriggerEvent))]
-            
-        elif isinstance(value, dict):
-            for k, v in value.items():
-                __check_leaf__(parent[key], k, v)
-                
-    def __check_list__():
-        pass
-                
-    events = get_events(src, as_dict=as_dict, flat=flat) 
-    
-    # NOTE: 2021-03-21 15:34:14
-    # cannot blindly use chain.from_iterable here because a DataObject is also
-    # an iterable (ie. we end up extracting individual time stamps from events)!
-    if len(events):
-        if as_dict:
-            ret = dict(events)
-            for key, val in events.items():
-                __check_leaf__(ret, key, val)
-                #if isinstance(val, (tuple, list)):
-                    #ret[key] = [e for e in val if isinstance(e, TriggerEvent)]
-                    
-                #elif isinstance(val, dict):
-                    
-                    #pass
-            
-        if not as_dict:
-            if all([isinstance(e, (tuple, list)) for e in events]):
-                if all([all([isinstance(e1, DataObject) for e1 in e]) for e in events]):
-                    # one nesting level, uniform - a list of segments
-                    events = [ev for ev in chain.from_iterable(events) if isinstance(ev, TriggerEvent)]
-                elif all([all([isinstance(e1, (tuple, list)) and all([isinstance(e2, DataObject) for e2 in e1]) for e1 in e]) for e in events]):
-                    # two nesting levels, uniform - alist of blocks with their own segments
-                    events = []
-            
-    else:
-        return events # empty list
+    return get_events(*src, triggers=True, as_dict=as_dict, flat=flat)
 
 @safeWrapper
 def detect_trigger_events(x, event_type, use_lo_hi=True, label=None, name=None):
