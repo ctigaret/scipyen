@@ -36,7 +36,10 @@ class TriggerEventType(IntEnum):#, EnumMixin):
     """Convenience enum type for trigger event types.
     
     Types are defined as follows:
+    =============================
     
+    Primitive types:
+    -----------------
     presynaptic         = 1 # synaptic stimulus (e.g. delivered via TTL to stim box)
     postsynaptic        = 2 # typically a squre pulse of current injection e.g. at the soma, to elicit APs
     photostimulation    = 4 # typically an uncaging event (generally a TTL which opens a soft or hard shutter for a stimulation laser, or a laser diode)
@@ -45,6 +48,8 @@ class TriggerEventType(IntEnum):#, EnumMixin):
     sweep               = 32 # "external" trigger for electrophysiology acquisition
     user                = 64 # anything else
     
+    Derived (or composite) types:
+    -----------------------------
     frame               = imaging_frame (*)
     line                = imaging_line (*)
     imaging             = imaging_frame | imaging_line = 24
@@ -94,6 +99,93 @@ class TriggerEventType(IntEnum):#, EnumMixin):
         """
         for t in TriggerEventType:
             yield t
+            
+    @staticmethod
+    def namevalue(name:str):
+        """Return the value (int) for given name;
+        If name is not a valid TriggerEventType name returns -1
+        """
+        if name in TriggerEventType.names():
+            return getattr(TriggerEventType, name).value
+        
+        return -1
+            
+    @staticmethod
+    def strand(name1:str, name2:str):
+        """ Emulates '&' operator for type names 'name1' and 'name2'.
+        If neither arguments are vlid TriggerEventType names returns 0
+        """
+        if any([n not in TriggerEventType.names() for n in [name1, name2]]):
+            return 0
+        
+        val1 = TriggerEventType.namevalue(name1)
+        val2 = TriggerEventType.namevalue(name2)
+        
+        return val1 & val2
+    
+    @staticmethod
+    def is_derived(t):
+        """Checks if the specified type is a derived or a primitive type.
+        
+        Returns True for a derived type.
+        
+        """
+        if isinstance(t, TriggerEventType):
+            return len([_t for _t in filter(lambda x: x & t for _t in TriggerEventType.types()) if _t is not t]) > 0
+            
+        elif isinstance(t, int):
+            if t not in TriggerEventType.values():
+                raise ValueError("Unknown trigger event type value %d" % t)
+            return len([_t for _t in filter(lambda x: x & t, TriggerEventType.values()) if _t is not t]) > 0
+            
+        elif isinstance(t, str):
+            if t not in TriggerEventType.names():
+                raise ValueError("Unknown trigger event type name %s" % t)
+            return len([_t for _t in filter(lambda x: x.nameand(t), TriggerEventType.names()) if _t is not t]) > 0
+            
+        else:
+            raise TypeError("Expecting a TriggerEventType, int or str; got %s instead" % type(t).__name__)
+        
+    @staticmethod
+    def primitives(t):
+        """ Returns a list of primitive TriggerEventType objects for t.
+        If t is already a primitive type, returns an empty list.
+        """
+        if isinstance(t, TriggerEventType):
+            return [_t for _t in filter(lambda x: x & t, TriggerEventType.types()) if _t is not t and _t.value < t.value]
+        
+        elif isinstance(t, int):
+            if t not in TriggerEventType.values():
+                raise ValueError("Unknown trigger event type value %d" % t)
+            
+            return [_t for _t in filter(lambda x: x & t, TriggerEventType.values()) if _t is not t and _t.value < t.value]
+        
+        elif isinstance(t, str):
+            if t not in TriggerEventType.names():
+                raise ValueError("Unknown trigger event type name %s" % t)
+            
+            return [_t for _t in filter(lambda x: x.nameand(t), TriggerEventType.names()) if _t is not t and _t.value < t.value ]
+            
+        else:
+            raise TypeError("Expecting a TriggerEventType, int or str; got %s instead" % type(t).__name__)
+        
+    def derived(self):
+        """Convenience method.
+        """
+        return TriggerEventType.is_derived(self)
+    
+    def components(self):
+        """Returns a list of primitive TriggerEventType for thsi instance.
+        
+        If this instance is already a primitive, returns an empty list
+        """
+        return TriggerEventType.primitives(self)
+    
+    def nameand(self, name:str):
+        """ Applies strand() to the name of this object and the argument.
+        """
+        return TriggerEventType.strand(self.name, name)
+        
         
 class TriggerEvent(DataObject):
     """Trigger event.

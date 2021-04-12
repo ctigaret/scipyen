@@ -67,12 +67,12 @@ from imaging.axisutils import *
 # in case it is not, call pip3 install --user pyxdg
 try:
     import xdg # CAUTION this is from pyxdg
-    from xdg import Mime
+    from xdg import Mime as xdgmime
     
 except Exception as e:
     warnings.warn("Python module 'pyxdg' not found; xdg mime info utilities not available")
     xdg = None
-    Mime = None
+    xdgmime = None
 
 # NOTE: 2019-04-21 18:34:08 
 # somewhat redundant but I found that the Mime module in pyxdg distributed with
@@ -82,11 +82,11 @@ except Exception as e:
 # for 64 bit python, install libmagicwin64
 # ATTENTION: on Mac OSX you also needs to install libmagic (homebrew) or file (macports)
 try:
-    import magic # file identification using libmagic
+    import magic as libmagic # file identification using libmagic
     
 except Exception as e:
     warnings.warn("Python module 'magic' not found; advanced file type identification will be limited")
-    magic = None
+    libmagic = None
 
 
 
@@ -1916,13 +1916,13 @@ def getMimeAndFileType(fileName):
     encoding = None
     
     # NOTE: 2020-02-16 18:15:34
-    # 1) find out the file type
+    # 1) DETERMINE THE FILE TYPE
     # 1.1) try the python-magic first
-    if magic is not None:
+    if libmagic is not None:
         # magic module is loaded
         try:
             if os.path.isfile(fileName):
-                file_type = magic.from_file(fileName)
+                file_type = libmagic.from_file(fileName)
             
                 if isinstance(file_type, bytes):
                     file_type = file_type.decode()
@@ -1939,11 +1939,11 @@ def getMimeAndFileType(fileName):
         except Exception as e:
             traceback.print_exc()
             
-    # 2) determine the mime type
+    # 2) DETERMINE THE MIME TYPE
     # 2.1) try the pyxdg module
-    if Mime is not None:
+    if xdgmime is not None:
         try:
-            mime = Mime.get_type(fileName)
+            mime = xdgmime.get_type(fileName)
             mime_type = "/".join([mime.media, mime.subtype]) # e.g. "text/plain"
             #mime_type = mime.get_comment() # don't rely on this as it can have more than just "media/subtype" !
         
@@ -1951,8 +1951,15 @@ def getMimeAndFileType(fileName):
             traceback.print_exc()
             
     # 2.2) try the mimetypes module
-    if mime_type is None:
-        mime_type, encoding = mimetypes.guess_type(fileName)
+    # NOTE: 2021-04-12 11:31:29
+    # this is in case the actual file type and mime type are not registered
+    # with either the global or the user mime data base(s)
+    if mime_type in ["application/executable", None] or file_type is "data":
+        _mime_type, encoding = mimetypes.guess_type(fileName)
+        if _mime_type is not None:
+            # NOTE: 2021-04-12 11:31:24
+            # if mimetypes report None for type, revert to what xdgmime returned
+            mime_type = _mime_type
         
     return mime_type, file_type, encoding
         
