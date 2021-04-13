@@ -2905,20 +2905,31 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
     from .triggerprotocols import (TriggerEvent, TriggerEventType,)
     
     if isinstance(triggers, bool):
+        print("filter for trigger events %s" % ("in" if triggers else "out"))
         filtfn = partial(filter, lambda x: isinstance(x, TriggerEvent)) if triggers else partial(filterfalse, lambda x: isinstance(x, TriggerEvent))
+        
+    elif triggers is not None:
+        if isinstance(triggers, str):
+            if triggers not in TriggerEventType.names():
+                raise ValueError("Unknown trigger event type name %s" % triggers)
+            
+            triggers = TriggerEventType.type(triggers)
+            
+            filtfn = partial(filter, lambda x: isinstance(x, TriggerEvent) and x.type.nameand(triggers))
+            
+        elif isinstance(triggers, int):
+            if triggers not in TriggerEventType.values():
+                raise ValueError("Unknown trigger event type value %d" % triggers)
+            
+        elif isinstance(triggers, (tuple, list)):
+            trigs = [t for t in triggers if is isinstance(t, TriggerEventType) else TriggerEventType.type(t) if (isinstance(t, (int, str)) and t in TriggerEventType.values() or t in TriggerEventType.names())]
         
     elif isinstance(triggers, TriggerEventType):
         filtfn = partial(filter, lambda x: isinstance(x, TriggerEvent) and x.type == triggers)
         
-    elif isinstance(triggers, str):
-        if triggers not in TriggerEventType.names():
-            raise ValueError("Unknown trigger event type name %s" % triggers)
         
-        filtfn = partial(filter, lambda x: isinstance(x, TriggerEvent) and x.type.nameand(triggers))
+        triggers = TriggerEventType.type(triggers)
         
-    elif isinstance(triggers, int):
-        if triggers not in TriggerEventType.values():
-            raise ValueError("Unknown trigger event type value %d" % triggers)
         filtfn = partial(filter, lambda x: isinstance(x, TriggerEvent) and x.type.value & triggers)
         
     elif isinstance(triggers, (tuple, list)) and all([isinstance(v, (str, int, TriggerEventType)) for v in triggers]):
@@ -2949,6 +2960,7 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
             if flat:  # flattened list
                 return [e for e in chain.from_iterable([[e for e in filtfn(s.events)] for s in src.segments])]
             else: # ragged nested sequence
+                print("Ragged nested sequence for a block")
                 return [[e for e in filtfn(s.events)] for s in src.segments]
     
     elif isinstance(src, neo.Segment):
