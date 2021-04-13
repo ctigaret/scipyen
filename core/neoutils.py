@@ -2749,43 +2749,33 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
         The default behaviour is to match the trigger event type in the data
         exactly to the triggers specification. To change this, see 'match' below.
         
-    match: bool, str, (optional, default is None)
-        When None, the trigger event type specified in 'triggers' is to be
-        matched exactly by the type of trigger events in the data.
+    match: str, (optional, default is 'strict'). 
+        Allowed values are: 
         
-        This parameter is ignored when triggers is None or bool (with any value).
-    
-        When False, or 'down', allow 'down-matching' the triggers specification to the 
-        actual type of the trigger event in the data.
+        "strict" (default), "s", "up" "u", "down", "dn", "d", "both", "b"
         
-        When True, or 'up' allow both up-matching between triggers specification
-        and actual type fo the trigger events in the data.
-
-        When 'both', allow both up-mathcing and down-matching (see below)
+        Used when triggers is a TriggerEventType TriggerEventType name or 
+        TriggerEventType value, or a sequence of these.
         
-        Some TriggerEventType values are combinations (OR-ed values) of more 
-        primitive ones:
+        When match == 'strict' or 's' the type of TriggerEvent retrieved must match 
+        exactly the TrigggerEventType obejct(s) specified by triggers.
         
-        Primitive trigger event types:
-        -----------------------------
-        TriggerEventType.presynaptic = 1
-        TriggerEventType.postsynaptic = 2
-        TriggerEventType.photostimulation = 4
-        TriggerEventType.imaging_frame = 8 
-        TriggerEventType.imaging_line = 16 
-        TriggerEventType.sweep = 32
-        TriggerEventType.user = 64
+        When match == "up" or 'u' the type of TriggerEvent must be one of the types
+        specified in 'triggers', or a composite TriggerEventType derived from 
+        those specified in 'triggers' (which can be eitherf primitive or composite
+        types).
         
-        Aliased trigger event types (also primitives):
-        ---------------------------------------------
-        TriggerEventType.frame = TriggerEventType.imaging_frame = 8
-        TriggerEventType.line = TriggerEventType.imaging_line = 16
+        When match == "down", "dn" or 'd', the type of TriggerEvent must be one 
+        of the types specified in 'triggers', or a TriggerEventType that is a 
+        components of those specified in 'triggers' (if these are composite types)
         
-        DERIVED (or COMPOSITE) trigger event types:
-        -------------------------------------------
-        TriggerEventType.imaging = TriggerEventType.imaging_frame | TriggerEventType.imaging_line = 24
-        TriggerEventType.acquisition = TriggerEventType.imaging | TriggerEventType.sweep = 56
-
+        When match == 'both' or 'b' the type of the TriggerEvent must be one of
+        the TriggerEventType obejcts specified in 'triggers', a component of those
+        (if these are composite typs) or a derived of those.
+        
+        For the meaning of 'primitive' and 'composite' TriggerEventType objects,
+        see the documentation for triggerevent.TriggerEventType
+        
         1) 'Down-matching' refers to selecting primitive types based on a specified
         composite type that is derived from these primitive types.
         
@@ -2908,44 +2898,22 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
         print("filter for trigger events %s" % ("in" if triggers else "out"))
         filtfn = partial(filter, lambda x: isinstance(x, TriggerEvent)) if triggers else partial(filterfalse, lambda x: isinstance(x, TriggerEvent))
         
-    elif triggers is not None:
-        if isinstance(triggers, str):
-            if triggers not in TriggerEventType.names():
-                raise ValueError("Unknown trigger event type name %s" % triggers)
+    elif isinstance(triggers, (int, str, TriggerEventType)):
+        if isinstance(triggers, (int, str)):
+            if triggers not in TriggerEventType.values() and triggers not in TriggerEventType.names():
+                raise ValueError("Unknown trigger event type %s" % triggers)
             
             triggers = TriggerEventType.type(triggers)
             
-            filtfn = partial(filter, lambda x: isinstance(x, TriggerEvent) and x.type.nameand(triggers))
-            
-        elif isinstance(triggers, int):
-            if triggers not in TriggerEventType.values():
-                raise ValueError("Unknown trigger event type value %d" % triggers)
-            
-        elif isinstance(triggers, (tuple, list)):
-            trigs = [t for t in triggers if is isinstance(t, TriggerEventType) else TriggerEventType.type(t) if (isinstance(t, (int, str)) and t in TriggerEventType.values() or t in TriggerEventType.names())]
-        
-    elif isinstance(triggers, TriggerEventType):
         filtfn = partial(filter, lambda x: isinstance(x, TriggerEvent) and x.type == triggers)
+            
+    elif isinstance(triggers, (tuple, list)):
+        triggers = [TriggerEventType.type(t) for t in triggers if isinstance(t, (TriggerEventType, int, str))]
         
+        filtfn = partial(filter, lambda x: isinstance(x, TriggerEvent) and x.type in triggers)
         
-        triggers = TriggerEventType.type(triggers)
-        
-        filtfn = partial(filter, lambda x: isinstance(x, TriggerEvent) and x.type.value & triggers)
-        
-    elif isinstance(triggers, (tuple, list)) and all([isinstance(v, (str, int, TriggerEventType)) for v in triggers]):
-        bad_names = [t for t in triggers if isinstance(t, str) and t not in TriggerEventType.names()]
-        if len(bad_names):
-            raise ValueError("Unknown trigger event type names %s" % " ".join(bad_names))
-        
-        bad_values = [t for t in triggers if isinstance(t, int) and t not in TriggerEventType.values()]
-        if len(bad_values):
-            raise ValueError("Unknown trigger event type values %s" % bad_values)
-        
-        filtfn = partial(filter, lambda x: isinstance(x, TriggerEvent) and (x.type in triggers or x.type.name in triggers or x.type.value in triggers))
-        
-    else:                     
+    else:  # anything esle: return all events
         filtfn = partial(filter, lambda x: True)
-        #filtfn = partial(filter, lambda x: type(x).__name__ == "TriggerEvent") if triggers else partial(filterfalse, lambda x: type(x).__name__ == "TriggerEvent")
 
     if len(src) == 0:
         return []
