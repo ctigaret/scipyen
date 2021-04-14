@@ -479,7 +479,7 @@ class TriggerDetectDialog(qd.QuickDialog):
     sig_detectTriggers = pyqtSignal(name="sig_detectTriggers")
     sig_undoDetectTriggers = pyqtSignal(name="sig_undoDetectTriggers")
     
-    def __init__(self, ephys=None, title="Detect Trigger Events", clearEvents=False,
+    def __init__(self, ephysdata=None, title="Detect Trigger Events", clearEvents=False,
                  parent=None, ephysViewer=None, **kwargs):
         super().__init__(parent=parent, title=title) # calls ancestor's setupUi()
             
@@ -534,14 +534,14 @@ class TriggerDetectDialog(qd.QuickDialog):
         
         self.setWindowModality(QtCore.Qt.WindowModal)
         
-        # parse ephys parameter
+        # parse ephysdata parameter
         self._ephys_= None
-        # no mixing of types when ephys is a sequence ...
-        if isinstance(ephys, (Block, Segment)) or \
-            (isinstance(ephys, (tuple, list)) and \
-                (all([isinstance(v, Block) for v in ephys]) or \
-                    all([isinstyane(v, Segment) for v in ephys]))):
-            self._ephys_ = ephys
+        # no mixing of types when ephysdata is a sequence ...
+        if isinstance(ephysdata, (Block, Segment)) or \
+            (isinstance(ephysdata, (tuple, list)) and \
+                (all([isinstance(v, Block) for v in ephysdata]) or \
+                    all([isinstyane(v, Segment) for v in ephysdata]))):
+            self._ephys_ = ephysdata
             
             if isinstance(self._ephysViewer_, SignalViewer):
                 self._ephysViewer_.plot(self._ephys_)
@@ -556,12 +556,12 @@ class TriggerDetectDialog(qd.QuickDialog):
 
     def open(self):
         if self._ephys_:
-            self._ephysViewer_.plot(self.ephys)
+            self._ephysViewer_.plot(self.ephysdata)
         super().open()
         
     def exec(self):
         if self._ephys_:
-            self._ephysViewer_.plot(self.ephys)
+            self._ephysViewer_.plot(self.ephysdata)
         super().exec()
         
     def closeEvent(self, evt):
@@ -601,7 +601,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         
     @pyqtSlot()
     def slot_detect(self):
-        if self.ephys is None:
+        if self.ephysdata is None:
             return
         
         self.detect_triggers()
@@ -633,11 +633,11 @@ class TriggerDetectDialog(qd.QuickDialog):
                         s.events = self._cached_events_[k]
                         
     @property
-    def ephys(self):
+    def ephysdata(self):
         return self._ephys_
     
-    @ephys.setter
-    def ephys(self, value):
+    @ephysdata.setter
+    def ephysdata(self, value):
         if not isinstance(value, Block, Segment, tuple, list):
             return
         
@@ -695,12 +695,12 @@ class TriggerDetectDialog(qd.QuickDialog):
             self.detected = True
             
             if self.isVisible():
-                self._ephysViewer_.plot(self.ephys)
+                self._ephysViewer_.plot(self.ephysdata)
                 
             if len(self.triggerProtocols) == 0:
                 self._restore_events_()
                 
-            #nEvents = len(get_trigger_events(self.ephys))
+            #nEvents = len(get_trigger_events(self.ephysdata))
             
             #self.statusBar.showMessage("%d trigger events detected" % nEvents)
         

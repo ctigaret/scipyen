@@ -2450,7 +2450,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         
         if isinstance(self._ephys_, neo.Block) and len(self._ephys_.segments):
             if self.eventDetectionDialog is None:
-                self.eventDetectionDialog = TriggerDetectDialog(ephys=self._ephys_,
+                self.eventDetectionDialog = TriggerDetectDialog(ephysdata=self._ephys_,
                                                                 clearEvents=True,
                                                                 ephysViewer = self.ephysPreview,
                                                                 parent=self)
@@ -3036,7 +3036,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         
         
     @property
-    def ephys(self):
+    def ephysdata(self):
         return self._ephys_
     
     @property

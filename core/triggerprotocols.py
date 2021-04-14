@@ -314,10 +314,40 @@ def auto_define_trigger_events(src, event_type, analog_index,
     return src
 
 def get_trigger_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
-                       as_dict:bool=False, flat:bool=False) -> list:
-    """Returns a list of TriggerEvent objects embedded in the data
+                       as_dict:bool=False, flat:bool=False, 
+                       triggers:typing.Optional[typing.Union[str, int, type, typing.Sequence]]=None,
+                       match:str="==") -> list:
     """
-    return get_events(*src, triggers=True, as_dict=as_dict, flat=flat)
+    Returns a list of TriggerEvent objects embedded in the data.
+    
+    Delegates to neoutils.get_events
+    
+    Variadic Parameters:
+    ====================
+    *src: neo.Block, neo.Segment, sequence (tuple, list) of neo.Block, sequence  
+        (tuple, list) of neo.Segment, or Non
+    
+    Named Parameters:
+    ================
+    as_dict:bool (*)
+    flat:bool (*)
+    triggers: TriggerEventType, str, int, or sequence (tuple, list) of these.
+        Optional, default is None
+        When None, neoutils.get_events is called with 'triggers=True'
+        Otherwise, the value will be passed direcly to the 'triggers' parameter
+        of neoutils.et_events.
+        
+    match:str (*)
+    
+    (*) Passed directly to neoutils.get_events()
+    
+    See also: neoutils.get_events()
+    
+    """
+    if triggers is None:
+        triggers = True
+        
+    return get_events(*src, triggers=triggers, as_dict=as_dict, flat=flat, match=match)
 
 @safeWrapper
 def detect_trigger_events(x, event_type, use_lo_hi=True, label=None, name=None):
@@ -1003,7 +1033,7 @@ def auto_detect_trigger_protocols(data: neo.Block,
                                postsynaptic:tuple=(),
                                photostimulation:tuple=(),
                                imaging:tuple=(),
-                               clear:typing.Union[bool, str, tuple]=False,
+                               clear:typing.Union[bool, str, int, tuple, list, ]=False,
                                up=True, protocols=True):
     
     """Determines the set of trigger protocols in a neo.Block by searching for 
@@ -1136,29 +1166,31 @@ def auto_detect_trigger_protocols(data: neo.Block,
         clear_events(data)
         clear = False
 
-    elif isinstance(clear, (TriggerEventType, tuple, list)):
+    elif isinstance(clear, (TriggerEventType, str,  int, tuple, list)):
+        if isinstance(clear, str) and clear == "triggers":
+            clear = True
         # NOTE: 2021-01-06 12:38:32
         # specifying triggerType implies triggersOnly is True
-        clear_events(data, triggerType = clear)
+        clear_events(data, triggers = clear)
         # also, clear_events raises error if clear is a non compliant sequence
         clear = False
         
-    elif isinstance(clear, str):
-        if clear == "all":
-            clear_events(data)
-            clear = False
+    #elif isinstance(clear, str):
+        #if clear == "all":
+            #clear_events(data)
+            #clear = False
             
-        elif clear == "triggers":
-            clear_events(data, triggersOnly = True)
-            clear = False
+        #elif clear == "triggers":
+            #clear_events(data, triggers = True)
+            #clear = False
             
-        elif clear in TriggerEventType.names():
-            # see NOTE: 2021-01-06 12:38:32
-            clear_events(data, triggerType=TriggerEventType[clear])
-            clear = False
+        #elif clear in TriggerEventType.names():
+            ## see NOTE: 2021-01-06 12:38:32
+            #clear_events(data, triggerType=TriggerEventType[clear])
+            #clear = False
             
-        elif clear != "same":
-            clear = False
+        #elif clear != "same":
+            #clear = False
             
     # collect trigger parameter tuples in a mapping, to iterate
     tpars = {"presynaptic": presynaptic,
