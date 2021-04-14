@@ -4307,7 +4307,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         irregularSignalChannelIndex=irregularSignalChannelIndex,
                         separateSignalChannels=separateSignalChannels,
                         interval=interval, unitIndex=unitIndex,channelIndex=channelIndex,
-                        plotstyle=plotStyle, get_focus=get_focus, showFrame=shpwFrame,
+                        plotstyle=plotStyle, get_focus=get_focus, showFrame=showFrame,
                         *args, **kwargs)
             
 
@@ -4582,7 +4582,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if len(self._cached_epochs_[self.currentFrame]):
                 self._plotEpochs_(from_cache=True)
                 
-                
+    @safeWrapper
+    def refresh(self):
+        self.displayFrame()
+        
     @safeWrapper
     def displayFrame(self):
         """ Plots individual frame (data "sweep" or "segment")
