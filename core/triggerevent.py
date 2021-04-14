@@ -183,7 +183,7 @@ class TriggerEventType(IntEnum):#, EnumMixin):
         
         """
         return TriggerEventType.is_derived_type(t)
-        
+    
     @staticmethod
     def primitive_component_types(t):
         """ Returns a list of primitive TriggerEventType objects that compose 't'.
@@ -300,7 +300,35 @@ class TriggerEventType(IntEnum):#, EnumMixin):
         
         If this TriggerEventType is not a composite returns an empty list
         """
-        return TriggerEventType.primitive_component_types(self)
+        return TriggerEventType.component_types(self)
+    
+    def includes(self, t):
+        """Returns True if 't' is a component of this TriggerEventType.
+        
+        't' may be a primitive or a composite TriggerEventType.
+        
+        Always returns False when this TriggerEventType is a primitive.
+        """
+        t = TriggerEventType.type(t)
+            
+        return t in self.components()
+    
+    def is_primitive_of(self, t):
+        """Returns True if this TriggerEventType is a primitive of 't'.
+        
+        Always returns False when this TriggerEventType is a composite (i.e., 
+        even if it is a component of 't').
+        """
+        t = TriggerEventType.type(t)
+            
+        return self in t.primitives()
+    
+    def is_component_of(self, t):
+        """Returns True if this TriggerEventType is a component of 't'.
+        """
+        t = TriggerEventType.type(t)
+        
+        return self in t.components()
     
     def nameand(self, name:str):
         """ Applies strand() to the name of this object and the argument.

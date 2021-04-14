@@ -2688,14 +2688,15 @@ def merge_signal_channels(*args, name=""):
 def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
                as_dict:bool=False, flat:bool=False,
                triggers:typing.Optional[typing.Union[bool, str, int, type, typing.Sequence]]=None,
-               strict:bool=True) -> list:
+               match:str="==") -> list:
     """ Returns a collection of neo.Events embedded in data.
     
     Useful as a cache of events in neo data.
     
+    NOTE: Below, the 'type' of a TriggerEvent is a TriggerEventType enum value.
+    
     Variadic Parameters:
     ====================
-    
     *src: neo.Block, neo.Segment, sequence (tuple, list) of neo.Block, sequence  
         (tuple, list) of neo.Segment, or None
         
@@ -2714,101 +2715,96 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
         When False (the default), returns a ragged nested list of events, as
         explained below, under 'Returns'
         
-    triggers:bool, TriggerEventType, str, int, or sequence of 
-        TriggerEventType, str and/or int (mixed elements allowed)
-        Optional, default is None, in which case return all events found (these 
-        can be neo.Event or TriggerEvent objects, defined in Scipyen's 
-        core.triggerevent module)
+    triggers:bool, TriggerEventType, str, int, or sequence of TriggerEventType, 
+        str and/or int (mixed elements allowed in the sequence).
+        
+        Optional, default is None.
+        
+        
+        When None, return all events found in data (i.e., both neo.Event and 
+        core.triggerevent.TriggerEvent objects)
         
         If True, include only TriggerEvent objects (if found) in the return.
         
         If False, exclude TriggerEvent from the return
         
         If a TriggerEventType (see core.triggerevent module), return only those 
-        TriggerEvent objects that have the specified type:
+        TriggerEvent objects that have the type identical or related(*) to the 
+        type(s) specified in 'triggers'.
         
-            event.type == triggers
+        If a str, return only TriggerEvent objects with type identical or 
+        related(*) to the TriggerEventType with name specified in 'triggers'
         
-        If a str, return only TriggerEvent objects with the specified type name:
-        
-            event.type.name == triggers
-        
-        If an int, return only TriggerEvent objects with the specified type value:
-        
-            event.type.value == triggers
+        If an int, return only TriggerEvent objects with type identical or 
+        related(*) to the TriggerEventType with the value specified in 'triggers'.
         
         When a sequence (i.e. tuple or list), 'triggers' can contain a mixture of
-        int, str, TriggerEventType.
+        int, str, TriggerEventType, treated as above.
         
-            In this case the function return all TriggerEvent objects with types
-            contained in the 'triggers' sequence:
+        (*) The default behaviour is to return TriggerEvent objects with type that
+        match exactly the specification in 'triggers'. This behaviour can be finely
+        tuned using the 'match' parameter, below.
+        
+    match: str, (optional, default is 'strict') - the rule for mathcing the type 
+        of the returned TriggerEvent objects to the type(s) in 'triggers'
+        
+        Used when 'triggers' is a TriggerEventType object, a TriggerEventType 
+        name (str), a TriggerEventType value (int), or a sequences of any of 
+        these.
+        
+        Allowed values: 
+        
+        "strict" (default), "s", "==": 
+            returns TriggerEvent objects with types that matches exactly the 
+            TrigggerEventType object(s) specified by 'triggers'.
             
-            i.e.:
-            event.type in triggers or event.type.name in triggers or event.type.value in triggers
+            When 'triggers' is a sequence, all TriggerEvent objects with types 
+            that match any of those in 'triggers' will be returned.
         
-        The default behaviour is to match the trigger event type in the data
-        exactly to the triggers specification. To change this, see 'match' below.
+        "up", "u", ">=": 
+            returns TriggerEvent objects with types equal to those in 'triggers' 
+            or derived from those in 'triggers' - i.e. included in these
+            ('up-matching').
+            
+            The types in 'triggers' may be primitive or composite.
         
-    match: str, (optional, default is 'strict'). 
-        Allowed values are: 
+        "updistinct", "ud", ">": 
+            returns TriggerEvent objects with composite types derived from those
+            'triggers' (i.e. they include them) but are distinct from them
         
-        "strict" (default), "s", "up" "u", "down", "dn", "d", "both", "b"
+        "down", "dn", "d", "<=": 
+            returns TriggerEvent objects with types equal to, or components of,
+            those in 'triggers' - i.e. are included in the types in 'triggers'
+            ('down-matching')
         
-        Used when triggers is a TriggerEventType TriggerEventType name or 
-        TriggerEventType value, or a sequence of these.
+        "downdistinct", "dnd", "dd", "<": 
+            returns TriggerEvent objects with types that are components of those
+            those in 'triggers' (i.e. included by these) but are distinct from them
         
-        When match == 'strict' or 's' the type of TriggerEvent retrieved must match 
-        exactly the TrigggerEventType obejct(s) specified by triggers.
+        "downprimitive", "dnp", "dp" "<<": 
+            returns TriggerEvent objects with primitive type that are included 
+            in those in 'triggers'
         
-        When match == "up" or 'u' the type of TriggerEvent must be one of the types
-        specified in 'triggers', or a composite TriggerEventType derived from 
-        those specified in 'triggers' (which can be eitherf primitive or composite
-        types).
+        "related", "rel", "r", "sim", "~": 
+            returns TriggerEvent objects with types that are qeual to, include or
+            are included in the types in 'triggers'
         
-        When match == "down", "dn" or 'd', the type of TriggerEvent must be one 
-        of the types specified in 'triggers', or a TriggerEventType that is a 
-        components of those specified in 'triggers' (if these are composite types)
+        "distinctrelated", "drel", "dr", "lgt", ><": 
+            returns TriggerEvent objects with type that includes or is included
+            y those in 'triggers' yet are distinct from them
+            
+        "distinct", "dt", "diff", "<>":
+            returns TriggerEvent objects with type distinct from any of those
+            in 'triggers' (but they may be included, or may include any of these)
+            
+        "unrelated", "ur", "/=":
+            return TriggerEvent objects with types distinct and unrelated to those
+            in 'triggers' (i.e. do not include and are not included in any of these)
         
-        When match == 'both' or 'b' the type of the TriggerEvent must be one of
-        the TriggerEventType obejcts specified in 'triggers', a component of those
-        (if these are composite typs) or a derived of those.
         
         For the meaning of 'primitive' and 'composite' TriggerEventType objects,
-        see the documentation for triggerevent.TriggerEventType
-        
-        1) 'Down-matching' refers to selecting primitive types based on a specified
-        composite type that is derived from these primitive types.
-        
-        For example, specifying triggers = TriggerEventType.imaging, or 
-        triggers = 'imaging', or triggers = 24 will select all trigger events of
-        type 'imaging_frame', 'imaging_line', or 'imaging'.
-        
-        Thus, down-matching will select trigger events with orim
-        
-        2) When an actual trigger event in the data has already a DERIVED type 
-        it will NOT be selected by 
-        specifying a lower (primitive) value in 'triggers', even if this value is
-        'contained' in the event type.
-        
-        
-        For example, specifying triggers = 'imaging_frame' or triggers = 8 will
-        NOT select those trigger events with type 'imaging' in the data. 
-        
-        To enable this "up-matching" of the 'triggers' parameter, set the 'strict'
-        parameter to False (see below)
-        
-        When False, allows "up/down-matching" of primitive values in 'triggers' 
-        specification to trigger events with derived types found in the data.
-        
-        Can be used when the contained event has a 'combined' (or 'derived') type
-        
-        For example, consider some data containing a trigger event of "imaging" type.
-        
-        When 'strict' is True (the default), specifying 'triggers' as 'imaging_frame'
-        will NOT select this event.
-        
-        
-        
+        ans their inclusion relationships,  see the documentation for 
+        triggerevent.TriggerEventType
         
         
     Returns:
@@ -2894,8 +2890,67 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
     
     from .triggerprotocols import (TriggerEvent, TriggerEventType,)
     
+    # NOTE: 2021-04-14 09:39:42
+    # below, x is a TriggerEvent object and y is a TriggerEventType object.
+    
+    if not isinstance(match, str):
+        raise TypeError("match rule expected a str; got %s instead" % type(match).__name__)
+    
+    if match in ("strict", "s", "=="):
+        typefilter = lambda x,y: x.type == y
+        
+    elif match in ("down", "dn", "d", "le", "<="):
+        # match y to trigger events with same type as y or with a type that is a 
+        # component of y;
+        # y must be composite
+        typefilter = lambda x, y: x.type == y or x.type.is_component_of(y)
+        
+    elif match in ("downdistinct", "dnd", "dd", "lt", "<"):
+        # match y to trigger events with type that is a component of y, but different
+        # from y;
+        # y must be composite
+        typefilter = lambda x, y: x.type.is_component_of(y)
+        
+    elif match in ("downprimtive", "dnp", "dp", "lp", "<<"):
+        # find trigger events of types that are primitives of y;
+        # y must be composite;
+        # since this returns primitives, events with type that exactly match y
+        # will be excluded
+        typefilter = lambda x, y: x.type.is_primitive_of(y)
+        
+    elif match in ("up", "u", "ge", ">="):
+        # match trigger event with same type as y or with a type that is a 
+        # composite of y (ncludes y)
+        # y can be a primitive type or a composite type
+        typefilter = lambda x, y: x.type == y or x.type.includes(y)
+        
+    elif match in ("updistinct", "ud", "gt", ">"):
+        # match trigger event with type that is a composite of (includes) y
+        # yet is different than y
+        typefilter = lambda x, y: x.type.includes(y)
+        
+    elif match in ("related", "rel", "r", "sim", "~"):
+        typefilter = lambda x, y: x.type == y or x.type.is_component_of(y) or x.type.includes(y)
+        
+    elif match in ("distinctrelated", "drel", "dr", "lgt", "><"):
+        typefilter = lambda x, y: x.type.is_component_of(y) or x.type.includes(y)
+        
+    elif match in ("distinct", "dt", "diff", "<>"):
+        typefilter = lambda x, y: x.type != y
+        
+    elif match in ("unrelated", "ur", "/="):
+        typefilter = lambda x, y: x.type != y and not x.type.includes(y) and not y.includes(x.type)
+        
+    else:
+        raise ValueError("Unknown match rule specification %s" % match)
+    
+    if len(src) == 0:
+        return []
+    
+    elif len(src) == 1:
+        src = src[0]
+        
     if isinstance(triggers, bool):
-        print("filter for trigger events %s" % ("in" if triggers else "out"))
         filtfn = partial(filter, lambda x: isinstance(x, TriggerEvent)) if triggers else partial(filterfalse, lambda x: isinstance(x, TriggerEvent))
         
     elif isinstance(triggers, (int, str, TriggerEventType)):
@@ -2905,22 +2960,16 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
             
             triggers = TriggerEventType.type(triggers)
             
-        filtfn = partial(filter, lambda x: isinstance(x, TriggerEvent) and x.type == triggers)
+        filtfn = partial(filter, lambda x: isinstance(x, TriggerEvent) and typefilter(x, triggers))
             
     elif isinstance(triggers, (tuple, list)):
         triggers = [TriggerEventType.type(t) for t in triggers if isinstance(t, (TriggerEventType, int, str))]
         
-        filtfn = partial(filter, lambda x: isinstance(x, TriggerEvent) and x.type in triggers)
+        filtfn = partial(filter, lambda x: isinstance(x, TriggerEvent) and any([typefilter(x, tr) for tr in triggers]))
         
     else:  # anything esle: return all events
         filtfn = partial(filter, lambda x: True)
 
-    if len(src) == 0:
-        return []
-    
-    elif len(src) == 1:
-        src = src[0]
-        
     if isinstance(src, neo.Block):
         if as_dict:
             return {"block_0": dict([("segment_%d" % k, [e for e in filtfn(s.events)]) for k, s in enumerate(src.segments)])}
@@ -2928,7 +2977,6 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
             if flat:  # flattened list
                 return [e for e in chain.from_iterable([[e for e in filtfn(s.events)] for s in src.segments])]
             else: # ragged nested sequence
-                print("Ragged nested sequence for a block")
                 return [[e for e in filtfn(s.events)] for s in src.segments]
     
     elif isinstance(src, neo.Segment):
@@ -2964,35 +3012,6 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
         
     else:
         raise TypeError("Unexpected parameter type %s" % type(src[0]).__name__)
-        
-    #elif len(src) > 1:
-        #if all([isinstance(v, neo.Block) for v in src]):
-            #if as_dict:
-                #return dict([("block_%d" % kb, dict([("segment_%d" % k, s.events) for k, s in enumerate(b.segments)])) for kb, b in enumerate(src)])
-            
-            #else:
-                #if flat:
-                    #return [e for e in chain.from_iterable([s.events for s in chain(*[b.segments for b in src])])]
-                #else:
-                    ## ragged nested sequence
-                    #return [[s.events for s in b.segments] for b in src]
-        
-        #elif all([isinstance(v, neo.Segment) for v in src]):
-            #if as_dict:
-                #return dict([("segment_%d" % k, s.events) for s in src])
-                
-            #else:
-                #if flat:
-                    #return [e for e in chain(*[s.events for s in src])]
-                #else:
-                    ## ragged nested sequence
-                    #return [v.segments for v in src[0]]
-        
-        #else:
-            #raise TypeError("Expecting a sequence of neo.Block or neo.Segment")
-        
-    #else:
-        #return list()
         
 def clear_events(src:typing.Union[neo.Block, neo.Segment, typing.Sequence], 
                  triggers:typing.Optional[typing.Union[bool, str, int, type, typing.Sequence]]=None):
