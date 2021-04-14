@@ -10,12 +10,14 @@ import warnings
 from enum import IntEnum
 from numbers import (Number, Real,)
 from copy import (deepcopy, copy,)
+from itertools import chain
 import numpy as np
 import quantities as pq
 import neo
 from neo.core.dataobject import (DataObject, ArrayDict,)
 from core.datatypes import (check_time_units, is_string, 
                             RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
+from core.utilities import unique
 
 def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None, 
                file_origin=None, description=None, event_type=None,
@@ -53,6 +55,8 @@ class TriggerEventType(IntEnum):#, EnumMixin):
     
     Composite (or derived) types:
     -----------------------------
+    synaptic            = presynaptic | postsynaptic  = 3
+    stimulus            = presynaptic | postsynaptic | photostimulation = 7
     imaging             = imaging_frame | imaging_line = 24
     acquisition         = imaging | sweep = 56
     
@@ -61,7 +65,9 @@ class TriggerEventType(IntEnum):#, EnumMixin):
     """
     presynaptic         =  1 # synaptic stimulus (e.g. delivered via TTL to stim box)
     postsynaptic        =  2 # typically a squre pulse of current injection e.g. at the soma, to elicit APs
+    synaptic            = presynaptic | postsynaptic # 3
     photostimulation    =  4 # typically an uncaging event (generally a TTL which opens a soft or hard shutter for a stimulation laser, or a laser diode)
+    stimulus            = presynaptic | postsynaptic | photostimulation # 7
     imaging_frame       =  8 # TTL that triggers the acquisition of an image frame
     imaging_line        = 16 # TTL trigger for a scanning line of the imaging system
     sweep               = 32 # "external" trigger for electrophysiology acquisition
@@ -114,13 +120,24 @@ class TriggerEventType(IntEnum):#, EnumMixin):
             if t in TriggerEventType.names():
                 return [_t for _t in TriggerEventType if _t.name == t][0]
             else:
-                raise ValueError("Unknown trigger event type name %s" % t)
+                # check for user-defined composite type - break it down to a list
+                # of existing types, if possible
+                t_hat = [TriggerEventType.type(_t.strip()) for _t in t.split("|")]
+                if len(t_hat):
+                    return t_hat
+                else:
+                    raise ValueError("Unknown trigger event type name %s" % t)
             
         elif isinstance(t, int):
             if t in TriggerEventType.values():
                 return [_t for _t in TriggerEventType if _t.value == t][0]
             else:
-                raise ValueError("Unknown trigger event type value %d" % t)
+                # check for implicit composite type (i.e. NOT listed in the definition)
+                ret = [_t for _t in TriggerEventType if _t.value & t]
+                if len(ret):
+                    return ret
+                else:
+                    raise ValueError("Unknown trigger event type value %d" % t)
             
         elif isinstance(t, TriggerEventType):
             return t
@@ -197,17 +214,25 @@ class TriggerEventType(IntEnum):#, EnumMixin):
             TriggerEventType.values() or TriggerEventType.names(), respectively)
         
         """
-        if isinstance(t, int):
-            if t not in TriggerEventType.values():
-                raise ValueError("Unknown trigger event type value %d" % t)
+        if isinstance(t, (int, str)):
+            t_hat = TriggerEventType.type(t)
+            if isinstance(t_hat, list):
+                #return [__t for __t in chain.from_iterable([[_t for _t in filter(lambda x: x & t, TriggerEventType) if _t.is_primitive() and _t.value < t_.value] for t_ in t_hat])]
+                return unique([__t for __t in chain.from_iterable([[_t for _t in TriggerEventType if _t.is_primitive() and _t.value <= t_.value] for t_ in t_hat])])
+            else:
+                t = t_hat
+                
+        #if isinstance(t, int):
+            #if t not in TriggerEventType.values():
+                #raise ValueError("Unknown trigger event type value %d" % t)
             
-            t = TriggerEventType.type(t)
+            #t = TriggerEventType.type(t)
             
-        elif isinstance(t, str):
-            if t not in TriggerEventType.names():
-                raise ValueError("Unknown trigger event type name %s" % t)
+        #elif isinstance(t, str):
+            #if t not in TriggerEventType.names():
+                #raise ValueError("Unknown trigger event type name %s" % t)
             
-            t = TriggerEventType.type(t)
+            #t = TriggerEventType.type(t)
             
         elif not isinstance(t, TriggerEventType):
             raise TypeError("Expecting a TriggerEventType, int or str; got %s instead" % type(t).__name__)
@@ -229,22 +254,38 @@ class TriggerEventType(IntEnum):#, EnumMixin):
             TriggerEventType.values() or TriggerEventType.names(), respectively)
         
         """
-        if isinstance(t, int):
-            if t not in TriggerEventType.values():
-                raise ValueError("Unknown trigger event type value %d" % t)
+        if isinstance(t, (int, str)):
+            t_hat = TriggerEventType.type(t)
+            if isinstance(t_hat, list):
+                # NOTE: 2021-04-14 23:33:22
+                # by definition this only occurs with a composite type
+                #return [__t for __t in chain.from_iterable([[_t for _t in filter(lambda x: x & t_, TriggerEventType) if _t.value < t_.value] for t_ in t_hat])]
+                return unique([__t for __t in chain.from_iterable([[_t for _t in TriggerEventType if _t.value <= t_.value] for t_ in t_hat])])
+            else:
+                t = t_hat
+                
+        #if isinstance(t, int):
+            #if t not in TriggerEventType.values():
+                #raise ValueError("Unknown trigger event type value %d" % t)
             
-            t = TriggerEventType.type(t)
+            #t_hat = TriggerEventType.type(t)
+            
+            #if isinstance(t_hat, list):
+                #return [_t for _t in t_hat if _t.value < t]
+            
+            #else:
+                #t = t_hat
         
-        elif isinstance(t, str):
-            if t not in TriggerEventType.names():
-                raise ValueError("Unknown trigger event type name %s" % t)
+        #elif isinstance(t, str):
+            #if t not in TriggerEventType.names():
+                #raise ValueError("Unknown trigger event type name %s" % t)
             
-            t = TriggerEventType.type(t)
+            #t = TriggerEventType.type(t)
             
         elif not isinstance(t, TriggerEventType):
             raise TypeError("Expecting a TriggerEventType, int or str; got %s instead" % type(t).__name__)
         
-        return [_t for _t in filter(lambda x: x & t, TriggerEventType.types()) if _t.value < t.value]
+        return [_t for _t in filter(lambda x: x & t, TriggerEventType) if _t.value < t.value]
     
     @staticmethod
     def derived_types(t):
@@ -257,17 +298,25 @@ class TriggerEventType(IntEnum):#, EnumMixin):
             TriggerEventType.values() or TriggerEventType.names(), respectively)
         
         """
-        if isinstance(t, int):
-            if t not in TriggerEventType.values():
-                raise ValueError("Unknown trigger event type value %d" % t)
+        if isinstance(t, (int, str)):
+            t_hat = TriggerEventType.type(t)
+            if isinstance(t_hat, list):
+                #return [__t for __t in chain.from_iterable([[_t for _t in filter(lambda x: x & t_, TriggerEventType) if _t is not t_ and _t.value > t_.value] for t_ in t_hat])]
+                return unique([__t for __t in chain.from_iterable([[_t for _t in TriggerEventType if _t is not t_ and _t.value > t_.value] for t_ in t_hat])])
+            else:
+                t = t_hat
+                
+        #if isinstance(t, int):
+            #if t not in TriggerEventType.values():
+                #raise ValueError("Unknown trigger event type value %d" % t)
             
-            t = TriggerEventType.type(t)
+            #t = TriggerEventType.type(t)
             
-        elif isinstance(t, str):
-            if t not in TriggerEventType.names():
-                raise ValueError("Unknown trigger event type name %s" % t)
+        #elif isinstance(t, str):
+            #if t not in TriggerEventType.names():
+                #raise ValueError("Unknown trigger event type name %s" % t)
             
-            t = TriggerEventType.type(t)
+            #t = TriggerEventType.type(t)
             
         elif not isinstance(t, TriggerEventType):
             raise TypeError("Expecting a TriggerEventType, int or str; got %s instead" % type(t).__name__)

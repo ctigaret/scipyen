@@ -4582,7 +4582,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if len(self._cached_epochs_[self.currentFrame]):
                 self._plotEpochs_(from_cache=True)
                 
-                
+    @safeWrapper
+    def refresh(self):
+        """
+        Simply calls displayFrame().
+        Since the data is held by reference, external changes ot the data will
+        be automatically displayed
+        """
+        self.displayFrame()
+        
     @safeWrapper
     def displayFrame(self):
         """ Plots individual frame (data "sweep" or "segment")
