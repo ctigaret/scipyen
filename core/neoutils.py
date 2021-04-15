@@ -2893,55 +2893,56 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
     from .triggerprotocols import (TriggerEvent, TriggerEventType,)
     
     # NOTE: 2021-04-14 09:39:42
-    # below, x is a TriggerEvent object and y is a TriggerEventType object.
+    # below, x is a TriggerEvent object and y is a TriggerEventType object, or a
+    # list of TriggerEventType objects
     
     if not isinstance(match, str):
         raise TypeError("match rule expected a str; got %s instead" % type(match).__name__)
     
     if match in ("strict", "s", "=="):
-        typefilter = lambda x,y: x.type == y
+        typefilter = lambda x,y: x.type == y if isinstance(y, TriggerEventType) else any([x.type == y_ for y_ in y])
         
     elif match in ("down", "dn", "d", "le", "<="):
         # match y to trigger events with same type as y or with a type that is a 
         # component of y;
         # y must be composite
-        typefilter = lambda x, y: x.type == y or x.type.is_component_of(y)
+        typefilter = lambda x, y: (x.type == y or x.type.is_component_of(y)) if isinstance(y, TriggerEventType) else any([(x.type == y_ or x.type.is_component_of(y_)) for y_ in y])
         
     elif match in ("downdistinct", "dnd", "dd", "lt", "<"):
         # match y to trigger events with type that is a component of y, but different
         # from y;
         # y must be composite
-        typefilter = lambda x, y: x.type.is_component_of(y)
+        typefilter = lambda x, y: x.type.is_component_of(y) if isinstance(y, TriggerEventType) else any([x.type.is_component_of(y_) for y_ in y])
         
     elif match in ("downprimtive", "dnp", "dp", "lp", "<<"):
         # find trigger events of types that are primitives of y;
         # y must be composite;
         # since this returns primitives, events with type that exactly match y
         # will be excluded
-        typefilter = lambda x, y: x.type.is_primitive_of(y)
+        typefilter = lambda x, y: x.type.is_primitive_of(y) if isinstance(y, TriggerEventType) else any([x.type.is_primitive_of(y_) for y_ in y])
         
     elif match in ("up", "u", "ge", ">="):
         # match trigger event with same type as y or with a type that is a 
         # composite of y (ncludes y)
         # y can be a primitive type or a composite type
-        typefilter = lambda x, y: x.type == y or x.type.includes(y)
+        typefilter = lambda x, y: (x.type == y or x.type.includes(y)) if isinstance(y, TriggerEventType) else any([(x.type == y_ or x.type.includes(y_)) for y_ in y])
         
     elif match in ("updistinct", "ud", "gt", ">"):
         # match trigger event with type that is a composite of (includes) y
         # yet is different than y
-        typefilter = lambda x, y: x.type.includes(y)
+        typefilter = lambda x, y: x.type.includes(y) if isinstance(y, TriggerEventType) else any([x.type.includes(y_) for y_ in y])
         
     elif match in ("related", "rel", "r", "sim", "~"):
-        typefilter = lambda x, y: x.type == y or x.type.is_component_of(y) or x.type.includes(y)
+        typefilter = lambda x, y: (x.type == y or x.type.is_component_of(y) or x.type.includes(y)) if isinstance(y, TriggerEventType) else any([(x.type == y_ or x.type.is_component_of(y_) or x.type.includes(y_)) for y_ in y])
         
     elif match in ("distinctrelated", "drel", "dr", "lgt", "><"):
-        typefilter = lambda x, y: x.type.is_component_of(y) or x.type.includes(y)
+        typefilter = lambda x, y: (x.type.is_component_of(y) or x.type.includes(y)) if isinstance(y, TriggerEventType) else any([(x.type.is_component_of(y_) or x.type.includes(y_)) for y_ in y])
         
     elif match in ("distinct", "dt", "diff", "<>"):
-        typefilter = lambda x, y: x.type != y
+        typefilter = lambda x, y: x.type != y if isinstance(y, TriggerEventType) else all([x.type != y_ for y_ in y])
         
     elif match in ("unrelated", "ur", "/="):
-        typefilter = lambda x, y: x.type != y and not x.type.includes(y) and not y.includes(x.type)
+        typefilter = lambda x, y: (x.type != y and not x.type.includes(y) and not y.includes(x.type)) if isinstance(y, TriggerEventType) else all([(x.type != y_ and not x.type.includes(y_) and not y_.includes(x.type)) for y_ in y])
         
     else:
         raise ValueError("Unknown match rule specification %s" % match)
@@ -2957,8 +2958,8 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
         
     elif isinstance(triggers, (int, str, TriggerEventType)):
         if isinstance(triggers, (int, str)):
-            if triggers not in TriggerEventType.values() and triggers not in TriggerEventType.names():
-                raise ValueError("Unknown trigger event type %s" % triggers)
+            #if triggers not in TriggerEventType.values() and triggers not in TriggerEventType.names():
+                #raise ValueError("Unknown trigger event type %s" % triggers)
             
             triggers = TriggerEventType.type(triggers)
             

@@ -495,11 +495,14 @@ class TriggerDetectDialog(qd.QuickDialog):
         
         self.triggerProtocols = list()
         
+        self._owns_viewer_ = True
+        
         if not isinstance(ephysViewer, SignalViewer):
             self._ephysViewer_ = SignalViewer(win_title = "Trigger Events Detection")
             
         else:
             self._ephysViewer_ = ephysViewer
+            self._owns_viewer_ = False
         
         self._ephysViewer_.frameChanged[int].connect(self._slot_ephysFrameChanged)
         
@@ -583,10 +586,10 @@ class TriggerDetectDialog(qd.QuickDialog):
         
     @pyqtSlot(int)
     def done(self, value):
-        if value == QtWidgets.QDialog.Accepted and not self.detected:
+        if value == QtWidgets.QDialog.Accepted and not self._detected_:
             self.detect_triggers()
             
-        if self._ephysViewer_.isVisible():
+        if self._owns_viewer- and      self._ephysViewer_.isVisible():
             self._ephysViewer_.close()
             
         super().done(value)

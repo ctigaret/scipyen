@@ -122,9 +122,15 @@ class TriggerEventType(IntEnum):#, EnumMixin):
             else:
                 # check for user-defined composite type - break it down to a list
                 # of existing types, if possible
-                t_hat = [TriggerEventType.type(_t.strip()) for _t in t.split("|")]
-                if len(t_hat):
-                    return t_hat
+                if "|" in t:
+                    #t_names = [_t.strip() for _t in t.split("|")]
+                    #print(t_names)
+                    #t_hat = [TriggerEventType.type(_t) for _t in t_names]
+                    t_hat = [TriggerEventType.type(_t.strip()) for _t in t.split("|")]
+                    if len(t_hat):
+                        return t_hat
+                    else:
+                        raise ValueError("Unknown trigger event type name %s" % t)
                 else:
                     raise ValueError("Unknown trigger event type name %s" % t)
             

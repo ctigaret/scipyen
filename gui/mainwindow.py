@@ -3358,13 +3358,18 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         ''' Collect file menu actions & submenus that are built in the UI file. This should be 
             done before loading the plugins.
         '''
+        
+        # NOTE: 2021-04-15 10:12:33 TODO
+        # allow user to choose app style interactively -- 
+        
+        # list of available syle names
+        self._available_Qt_style_names_ = QtWidgets.QStyleFactory.keys()
 
-        # END
         # NOTE: 2016-05-02 14:26:58
         # add HERE a "Recent Files" submenu to the menuFile
 
-        # NOTE: 2017-11-10 14:17:11
-        # TODO factor the follwing out in a plugin-like framework
+        # NOTE: 2017-11-10 14:17:11 TODO
+        # factor-out the following (BEGIN ... END) in a plugin-like framework
         # BEGIN
         #self.lscatWindow = CaTanalysis.LSCaTWindow(parent=self, pWin=self, win_title="LSCaT")
         

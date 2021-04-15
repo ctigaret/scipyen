@@ -1002,6 +1002,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.menubar.addMenu(self.docksMenu)
         ##print("_configureUI_ widget actions menu added to the menu bar")
         
+        self.actionDetect_Triggers.triggered.connect(self.slot_detectTriggers)
+        
     def addCursors(self, cursorType="c", *where, **kwargs):
         """Manually adds a set of cursors to the selected axes in the SignalViewer window.
         
@@ -1428,6 +1430,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @safeWrapper
     def slot_showAnnotationsDock(self):
         self.annotationsDockWidget.show()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_detectTriggers(self):
+        if isinstance(self.y, (neo.Block, neo.Segment)) or (isinstance(self.y, (tuple, list)) and all([isinstance(v, (neo.Block, neo.Segment)) for v in self.y])):
+            from gui.triggerdetectgui import TriggerDetectDialog
+            tdlg = TriggerDetectDialog(ephysdata=self.y, ephysViewer=self, parent=self)
+            tdlg.open()
         
     @safeWrapper
     def reportCursors(self):
