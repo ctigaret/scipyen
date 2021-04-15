@@ -1608,6 +1608,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._load_settings_()
         icon = QtGui.QIcon.fromTheme("python")
         self.setWindowIcon(icon)
+        #self._default_GUI_style = self.app.style()
+        self._current_GUI_style_name = "Default"
         
         QtWidgets.QApplication.setWindowIcon(icon)
 
@@ -3364,6 +3366,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         # list of available syle names
         self._available_Qt_style_names_ = QtWidgets.QStyleFactory.keys()
+        self.actionGUI_Style.triggered.connect(self._slot_set_Application_style)
 
         # NOTE: 2016-05-02 14:26:58
         # add HERE a "Recent Files" submenu to the menuFile
@@ -5396,6 +5399,36 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     traceback.print_exc()
                     
         self.statusbar.showMessage("Done!")
+        
+    @pyqtSlot(str)
+    @safeWrapper
+    def _slot_set_app_gui_style_(self, value):
+        if value == "Default":
+            self.app.setStyle(QtWidgets.QApplication.style())
+            self._current_GUI_style_name = "Default"
+        else:
+            self.app.setStyle(value)
+            self._current_GUI_style_name = value
+        
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_set_Application_style(self):
+        from gui.pictgui import ItemsListDialog
+        d = ItemsListDialog(self, itemsList = ["Default"] + self._available_Qt_style_names_,
+                            title="Choose Application GUI Style",
+                            preSelected = self._current_GUI_style_name)
+        
+        d.itemSelected.connect(self._slot_set_app_gui_style_)
+        
+        a = d.exec()
+        
+        if a == QtWidgets.QDialog.Accepted:
+            self._slot_set_app_gui_style_(self._current_GUI_style_name)
+            
+        else:
+            self._slot_set_app_gui_style_("Default")
+
+        
                 
     @pyqtSlot()
     @safeWrapper

@@ -132,6 +132,7 @@ from core import (xmlutils, strutils, neoevent, neoepoch, neoutils, )
 from core.neoutils import (get_non_empty_spike_trains,get_non_empty_events,
                            get_segments_in_channel_index, 
                            normalized_signal_index,
+                           check_ephys_data, check_ephys_data_collection,
                            )
 
 from core.prog import safeWrapper
@@ -1002,6 +1003,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.menubar.addMenu(self.docksMenu)
         ##print("_configureUI_ widget actions menu added to the menu bar")
         
+        self.actionDetect_Triggers.triggered.connect(self.slot_detectTriggers)
+        self.actionDetect_Triggers.setEnabled(False)
+        
     def addCursors(self, cursorType="c", *where, **kwargs):
         """Manually adds a set of cursors to the selected axes in the SignalViewer window.
         
@@ -1428,6 +1432,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @safeWrapper
     def slot_showAnnotationsDock(self):
         self.annotationsDockWidget.show()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_detectTriggers(self):
+        if isinstance(self.y, (neo.Block, neo.Segment)) or (isinstance(self.y, (tuple, list)) and all([isinstance(v, (neo.Block, neo.Segment)) for v in self.y])):
+            from gui.triggerdetectgui import TriggerDetectDialog
+            tdlg = TriggerDetectDialog(ephysdata=self.y, ephysViewer=self, parent=self)
+            tdlg.open()
         
     @safeWrapper
     def reportCursors(self):
@@ -4040,6 +4052,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                               separateSignalChannels=separateSignalChannels,
                               channelIndex=channelIndex,
                               unitIndex=unitIndex)
+            
+            if check_ephys_data_collection(self.y):
+                
                         
             self.plot_args = args
             self.plot_kwargs = kwargs
@@ -4584,6 +4599,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
     @safeWrapper
     def refresh(self):
+        """
+        Simply calls displayFrame().
+        Since the data is held by reference, external changes ot the data will
+        be automatically displayed
+        """
         self.displayFrame()
         
     @safeWrapper

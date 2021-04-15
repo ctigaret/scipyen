@@ -516,6 +516,11 @@ from . import utilities
 
 #### END pict.core modules
 
+ephys_data = (neo.Block, neo.Segment, neo.AnalogSignal, neo.IrregularlySampledSignal, 
+              neo.SpikeTrain, DataSignal, IrregularlySampledDataSignal,)
+
+ephys_data_collection = (neo.Block, neo.Segment)
+
 if __debug__:
     global __debug_count__
 
@@ -3049,6 +3054,57 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
             
         else:
             raise TypeError("Unexpected parameter type %s" % type(src[0]).__name__)
+        
+def check_ephys_data_collection(x):
+    """Checks if x is a data type representing a collection of electrophysiology data.
+    This check is performed too often not to warrant a function for it.
+    
+    See neoutils.check_ephys_data for what is understood by electrophysiolgy data
+    
+    """
+    if isinstance(x, ephys_data_collection):
+        return True
+    
+    if isinstance(x, (tuple, list)) and all([isinstace(x_, ephys_data_collection) for x_ in x]):
+        return True
+    
+    return False
+        
+def check_ephys_data(x):
+    """Checks if x is a electrophysiology data type.
+    
+    This check is performed too often not to warrant a function for it.
+    
+    Electrophysiology data types are:
+    neo.Block, neo.Segment, neo.AnalogSignal, neo.IrregularlySampledSignal, 
+    neo.SpikeTrain, 
+    core.datatypes.DataSignal, and core.datatypes.IrregularlySampledDataSignal
+    
+    They MAY contain attributes that are ancillary data types such as neo.Event, 
+    neo.Epoch, and other (non-signal-like) data types, as well as 
+    core.triggerevent.TriggerEvent objects. However, these are hardly useful on
+    their own, as electrophysiology data.
+    
+    DataSignal and IrregularlySampledDataSignal are included because they emulate
+    their respective neo counterparts but allow the signal domain to be other 
+    than time. While electrophysiology data usually represents a physical quantity
+    that varies over time, these two data types can be used to represent quantities
+    that vary over space, for example, the fluorescence intensity of an ion or
+    voltage indicator.
+    
+    Although electrophysiology data can be represented by less specialized data 
+    types such as arrays and matrices (numpy arrays, pandas Series, etc)  they
+    are rather too generic to be considered here.
+        
+    
+    """
+    if isinstance(x, ephys_data):
+        return True
+    
+    if isinstance(x, (tuple, list)) and all([isinstace(x_, ephys_data) for x_ in x]):
+        return True
+    
+    return False
         
 def clear_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence], 
                  triggers:typing.Optional[typing.Union[bool, str, int, type, typing.Sequence]]=None,

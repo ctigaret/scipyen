@@ -132,6 +132,7 @@ from core import (xmlutils, strutils, neoevent, neoepoch, neoutils, )
 from core.neoutils import (get_non_empty_spike_trains,get_non_empty_events,
                            get_segments_in_channel_index, 
                            normalized_signal_index,
+                           check_ephys_data, check_ephys_data_collection,
                            )
 
 from core.prog import safeWrapper
@@ -1003,6 +1004,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         ##print("_configureUI_ widget actions menu added to the menu bar")
         
         self.actionDetect_Triggers.triggered.connect(self.slot_detectTriggers)
+        self.actionDetect_Triggers.setEnabled(False)
         
     def addCursors(self, cursorType="c", *where, **kwargs):
         """Manually adds a set of cursors to the selected axes in the SignalViewer window.
@@ -4050,6 +4052,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                               separateSignalChannels=separateSignalChannels,
                               channelIndex=channelIndex,
                               unitIndex=unitIndex)
+            
+            self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self.y))
                         
             self.plot_args = args
             self.plot_kwargs = kwargs

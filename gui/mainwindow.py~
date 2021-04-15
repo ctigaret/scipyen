@@ -1608,6 +1608,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._load_settings_()
         icon = QtGui.QIcon.fromTheme("python")
         self.setWindowIcon(icon)
+        self._default_GUI_style = self.app.style()
+        self._current_GUI_style_name = "Default"
         
         QtWidgets.QApplication.setWindowIcon(icon)
 
@@ -2200,7 +2202,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # This is because workspaceModel doesn't "know" anything about workspaceView.
         self.workspaceModel.updateTable(from_console=value) # emits WorkspaceModel.modelContentsChanged
         
-        self.workspaceChanged.emit() # used by whom?
+        self.workspaceChanged.emit() # used by whom? -> slot_updateWorkspaceView ?
         
     def slot_updateCwd(self):
         if self.cwd != os.getcwd():
@@ -3358,13 +3360,19 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         ''' Collect file menu actions & submenus that are built in the UI file. This should be 
             done before loading the plugins.
         '''
+        
+        # NOTE: 2021-04-15 10:12:33 TODO
+        # allow user to choose app style interactively -- 
+        
+        # list of available syle names
+        self._available_Qt_style_names_ = QtWidgets.QStyleFactory.keys()
+        self.actionGUI_Style.triggered.connect(self._slot_set_Application_style)
 
-        # END
         # NOTE: 2016-05-02 14:26:58
         # add HERE a "Recent Files" submenu to the menuFile
 
-        # NOTE: 2017-11-10 14:17:11
-        # TODO factor the follwing out in a plugin-like framework
+        # NOTE: 2017-11-10 14:17:11 TODO
+        # factor-out the following (BEGIN ... END) in a plugin-like framework
         # BEGIN
         #self.lscatWindow = CaTanalysis.LSCaTWindow(parent=self, pWin=self, win_title="LSCaT")
         
@@ -5391,6 +5399,37 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     traceback.print_exc()
                     
         self.statusbar.showMessage("Done!")
+        
+    @pyqtSlot(str)
+    @safeWrapper
+    def _slot_set_app_gui_style_(self, value):
+        if value == "Default":
+            self.app.setStyle(self._default_GUI_style)
+            self.app.setStyle(QtWidgets.QApplication.style())
+            self._current_GUI_style_name = "Default"
+        else:
+            self.app.setStyle(value)
+            self._current_GUI_style_name = value
+        
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_set_Application_style(self):
+        from gui.pictgui import ItemsListDialog
+        d = ItemsListDialog(self, itemsList = ["Default"] + self._available_Qt_style_names_,
+                            title="Choose Application GUI Style",
+                            preSelected = self._current_GUI_style_name)
+        
+        d.itemSelected.connect(self._slot_set_app_gui_style_)
+        
+        a = d.exec()
+        
+        if a == QtWidgets.QDialog.Accepted:
+            self._slot_set_app_gui_style_(self._current_GUI_style_name)
+            
+        else:
+            self._slot_set_app_gui_style_("Default")
+
+        
                 
     @pyqtSlot()
     @safeWrapper

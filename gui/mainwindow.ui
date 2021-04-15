@@ -48,7 +48,7 @@
      <x>0</x>
      <y>0</y>
      <width>1115</width>
-     <height>25</height>
+     <height>28</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -104,6 +104,7 @@
      <string>Settings</string>
     </property>
     <addaction name="actionConsole_font"/>
+    <addaction name="actionGUI_Style"/>
    </widget>
    <widget class="QMenu" name="menuConsoles">
     <property name="title">
@@ -872,6 +873,11 @@ NOTE: you can click anywhere in the row to select</string>
   <action name="actionRunning_IPython_for_Neuron">
    <property name="text">
     <string>Choose kernel and launch Neuron</string>
+   </property>
+  </action>
+  <action name="actionGUI_Style">
+   <property name="text">
+    <string>GUI Style...</string>
    </property>
   </action>
  </widget>

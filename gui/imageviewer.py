@@ -3778,7 +3778,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             return
         
         if not isinstance(self._data_, vigra.VigraArray) or self._currentFrameData_.channels > 1:
-            QtWidgets.QMessageBox.information(self,"Choose Color Map","Cannt apply color maps to multi-channel images")
+            QtWidgets.QMessageBox.information(self,"Choose Color Map","Cannot apply color maps to multi-channel images")
             return
         
         self.prevColorMap = self.colorMap # cache the current colorMap

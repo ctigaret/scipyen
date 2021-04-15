@@ -26,7 +26,9 @@ from core.triggerprotocols import (TriggerProtocol,
                                    remove_trigger_protocol,
                                    parse_trigger_protocols,)
 
-from core.neoutils import (concatenate_blocks, get_events,)
+from core.neoutils import (concatenate_blocks, get_events,
+                           check_ephys_data_collection, check_ephys_data)
+
 from core.strutils import (numbers2str,quantity2str,)
 
 from gui import quickdialog as qd
@@ -568,19 +570,19 @@ class TriggerDetectDialog(qd.QuickDialog):
         super().exec()
         
     def closeEvent(self, evt):
-        if self._ephysViewer_.isVisible():
+        if self._ephysViewer_.isVisible() and self._owns_viewer_:
             self._ephysViewer_.close()
         super().closeEvent(evt)
         
     @pyqtSlot()
     def accept(self):
-        if self._ephysViewer_.isVisible():
+        if self._ephysViewer_.isVisible() and self._owns_viewer_:
             self._ephysViewer_.close()
         super().accept()
         
     @pyqtSlot()
     def reject(self):
-        if self._ephysViewer_.isVisible():
+        if self._ephysViewer_.isVisible() and self._owns_viewer_:
             self._ephysViewer_.close()
         super().reject()
         
@@ -589,7 +591,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         if value == QtWidgets.QDialog.Accepted and not self._detected_:
             self.detect_triggers()
             
-        if self._owns_viewer- and      self._ephysViewer_.isVisible():
+        if self._ephysViewer_.isVisible() and self._owns_viewer_:
             self._ephysViewer_.close()
             
         super().done(value)
@@ -662,7 +664,8 @@ class TriggerDetectDialog(qd.QuickDialog):
     
     @ephysdata.setter
     def ephysdata(self, value):
-        if not isinstance(value, (Block, Segment, tuple, list)):
+        #if not isinstance(value, (Block, Segment, tuple, list)):
+        if not check_ephys_data_collection(value):
             return
         
         self._ephys_ = value
