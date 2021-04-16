@@ -3055,22 +3055,41 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
         else:
             raise TypeError("Unexpected parameter type %s" % type(src[0]).__name__)
         
-def check_ephys_data_collection(x):
+def check_ephys_data_collection(x:typing.Any, mix:bool=False):
     """Checks if x is a data type representing a collection of electrophysiology data.
     This check is performed too often not to warrant a function for it.
     
+    Parameters:
+    ----------
+    x: data to be checked
+    mix: bool (optional, default is False)
+        When True, allow mixing of neo.Block and neo.Segment in x, when x is a 
+        sequence (tuple, list)
+    
+ 
     See neoutils.check_ephys_data for what is understood by electrophysiolgy data
     
     """
     if isinstance(x, ephys_data_collection):
         return True
     
-    if isinstance(x, (tuple, list)) and all([isinstace(x_, ephys_data_collection) for x_ in x]):
-        return True
-    
-    return False
+    if isinstance(x, (tuple, list)):
+        if mix:
+            return all([isinstace(x_, ephys_data_collection) for x_ in x])
+            
+        else:
+            return any([all([isinstance(x_, e_type) for x_ in x]) for e_type in ephys_data_collection])
         
-def check_ephys_data(x):
+    else:
+        if mix:
+            return isinstance(x, ephys_data_collection)
+        
+        else:
+            return any([isinstance(x, e_type) for e_type in ephys_data_collection])
+            
+    return False
+    
+def check_ephys_data(x:typing.Any, mix:bool=False):
     """Checks if x is a electrophysiology data type.
     
     This check is performed too often not to warrant a function for it.
@@ -3096,13 +3115,27 @@ def check_ephys_data(x):
     types such as arrays and matrices (numpy arrays, pandas Series, etc)  they
     are rather too generic to be considered here.
         
+    Parameters:
+    ----------
+    x: data to be checked
+    
+    mix: bool (optional, default is False)
+        When True, allow mixing of neo.Block and neo.Segment in x, when x is a 
+        sequence (tuple, list)
     
     """
-    if isinstance(x, ephys_data):
-        return True
+    if isinstance(x, (tuple, list)):
+        if mix:
+            return all([isinstance(x_, ephys_data) for x_ in x])
+        
+        else:
+            return any([all([isinstance(x_, e_type) for x_ in x]) for e_type in ephys_data])
     
-    if isinstance(x, (tuple, list)) and all([isinstace(x_, ephys_data) for x_ in x]):
-        return True
+    else:
+        if mix:
+            return isinstance(x, ephys_data)
+        else:
+            return any([isinstance(x, e_type) for e_type in ephys_data])
     
     return False
         

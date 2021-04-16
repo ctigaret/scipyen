@@ -10172,7 +10172,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 win.clear()
                 
             else:
-                win = sv.SignalViewer(pWin = self._scipyenWindow_, asGUIClient=True)
+                win = sv.SignalViewer(pWin = self._scipyenWindow_)#, asGUIClient=True)
             
                 winSettingsStrPrefix = "LSCaTAnalysis/EphysWindow_"
                                             
@@ -10278,7 +10278,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 win.clear()
                 
             else:
-                win = sv.SignalViewer(pWin = self._scipyenWindow_, asGUIClient=True)
+                win = sv.SignalViewer(pWin = self._scipyenWindow_)#, asGUIClient=True)
             
                 winSettingsStrPrefix = "LSCaTAnalysis/ProfileWindow_"
                                             
@@ -10368,7 +10368,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 win.unlinkFromViewers()
                 
             else:
-                win = sv.SignalViewer(pWin = self._scipyenWindow_, asGUIClient=True)
+                win = sv.SignalViewer(pWin = self._scipyenWindow_)#, asGUIClient=True)
             
                 winSettingsStrPrefix = "LSCaTAnalysis/ScansDataWindow_"
                                             
@@ -10442,7 +10442,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 win = self.sceneblockviewers[0]
                 
             else:
-                win = sv.SignalViewer(pWin = self._scipyenWindow_, asGUIClient=True)
+                win = sv.SignalViewer(pWin = self._scipyenWindow_)#, asGUIClient=True)
                 winSettingsStrPrefix = "LSCaTAnalysis/SceneDataWindow_"
                 
                 if self.settings.contains("%s_Size" % winSettingsStrPrefix):

@@ -610,6 +610,12 @@ class WindowManager(__QMainWindow__):
     
     @safeWrapper
     def deRegisterViewer(self, win):
+        """Removes references to the viewer window 'win' from the manager.
+        
+        ATTENTION: This function neither removes the viewer object from the 
+        workspace, nor unbinds it from its symbol in the workspace!!!
+        
+        """
         if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             return
         
@@ -2313,10 +2319,60 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         return varnames
     
-    def removeFromWorkspace(self, name:str, from_console:bool=True):
-        self.workspace.pop(name, None)
-        self.slot_updateWorkspaceTable(from_console)
-
+    def removeFromWorkspace(self, value:typing.Any, from_console:bool=True, by_name=True):
+        """Removes a single variable from the workspace.
+        By default, the variable to be removed is specified by the symbol (name)
+        to which it is bound in the workspace. Thus, if the variable has been 
+        'deleted' at the console (therefore is was unbound from its symbol and 
+        the symbol was removedfrom the workspace) the workspace table viewer will 
+        be updated accordingly.
+        
+        NOTE: 2021-04-16 10:07:26
+        Changed to allow the direct removal of a variable by first performing an
+        inverse lookup for its symbol (name) in the workspace.
+        
+        If found, the symbol (and its bound variable) will be removed from the 
+        workspace,  and the workspace viewer GUI will be updated.
+        
+        Parameters:
+        ----------
+        value: any type.
+            Typically, this is a str, which is the symbol to which the variable is
+            (was) bound to, in the workspace.
+            
+            However, it now (2021-04-16 10:09:59) can also be any type.
+            
+        Named parametsrs:
+        ----------------
+        from_console:bool, default is True
+            Indicates whether the variable has been 'deleted' at the Scipyen's
+            console. Set it to False ghen the variable is to be removed 
+            programmatically from code.
+            
+        
+        by_name:bool, default is True
+            Used when value is a str, to indicate that it represents the symbol
+            of the variable, in the workspace.
+            
+            Must be set to False when value is a str variable and not a symbol
+            
+        WARNING Because this also updates the workspace viewer, it is better to
+        avoid calling this function to batch-remove variables
+        
+        """
+        if isinstance(value, str) and by_name:
+            self.workspace.pop(value, None)
+            self.slot_updateWorkspaceTable(from_console)
+            
+        else:
+            # inverse lookup he jey mapped ot this value
+            if value in self.workspace.values():
+                names=[name for name, val in self.workspace.items() if val is value]
+                if len(names):
+                    self.workspace.pop(names[0], None)
+                    
+            self.slot_updateWorkspaceTable(from_console)
+        
     def assignToWorkspace(self, name:str, val:object, from_console:bool = False):
         #print("MainWindow.assignToWorkspace", name, val)
         self.workspace[name] = val
@@ -2879,6 +2935,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_deleteSelectedVars(self):
+        """Batch-removes variables from the workspace.
+        
+        Variables are selected by their workspace names (symbols) using the 
+        Workspace viewer GUI.
+        """
         indexList = self.workspaceView.selectedIndexes()
         
         if len(indexList) == 0:

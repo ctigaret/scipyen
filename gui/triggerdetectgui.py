@@ -497,10 +497,10 @@ class TriggerDetectDialog(qd.QuickDialog):
         
         self.triggerProtocols = list()
         
-        self._owns_viewer_ = True
         
         if not isinstance(ephysViewer, SignalViewer):
             self._ephysViewer_ = SignalViewer(win_title = "Trigger Events Detection")
+            self._owns_viewer_ = True
             
         else:
             self._ephysViewer_ = ephysViewer
@@ -542,19 +542,18 @@ class TriggerDetectDialog(qd.QuickDialog):
         # parse ephysdata parameter
         self._ephys_= None
         # no mixing of types when ephysdata is a sequence ...
-        if isinstance(ephysdata, (Block, Segment)) or \
-            (isinstance(ephysdata, (tuple, list)) and \
-                (all([isinstance(v, Block) for v in ephysdata]) or \
-                    all([isinstyane(v, Segment) for v in ephysdata]))):
+        #if isinstance(ephysdata, (Block, Segment)) or \
+            #(isinstance(ephysdata, (tuple, list)) and \
+                #(all([isinstance(v, Block) for v in ephysdata]) or \
+                    #all([isinstyane(v, Segment) for v in ephysdata]))):
+        if check_ephys_data_collection(ephysdata, mix=False):
             self._ephys_ = ephysdata
-            
-            if isinstance(self._ephysViewer_, SignalViewer):
-                self._ephysViewer_.plot(self._ephys_)
-            
-        if self._ephys_:
-            # cache the events
             self._cached_events_ = get_events(self._ephys_)
             self._update_trigger_detect_ranges_(0)
+            
+            #if isinstance(self._ephysViewer_, SignalViewer):
+            if self.isVisible():
+                self._ephysViewer_.plot(self._ephys_)
             
         else:
             self._cached_events_ = list()
@@ -570,29 +569,64 @@ class TriggerDetectDialog(qd.QuickDialog):
         super().exec()
         
     def closeEvent(self, evt):
-        if self._ephysViewer_.isVisible() and self._owns_viewer_:
-            self._ephysViewer_.close()
+        """for when the dialog is closed fomr the window's close button
+        """
+        print("closeEvent owns viewer", self._owns_viewer_)
+        if self._ephysViewer_.isVisible():
+            if self._owns_viewer_:
+                self._ephysViewer_.close()
+            else:
+                self._ephysViewer_.refresh()
+                
+        # NOTE: 2021-04-16 11:30:35
+        # unbind the SignalViewer reference from this symbol, otherwise the garbage
+        # collector will try to double-delete C++ objects (in pyqtgraph)
+        self._ephysViewer_ = None
+        
         super().closeEvent(evt)
         
     @pyqtSlot()
     def accept(self):
-        if self._ephysViewer_.isVisible() and self._owns_viewer_:
-            self._ephysViewer_.close()
+        #print("accept owns viewer", self._owns_viewer_)
         super().accept()
+        # NOTE: 2021-04-16 11:24:35 this calls done(QDialog.Accepted), which 
+        # does all the things commented below
+        #if self._ephysViewer_.isVisible():
+            #if self._owns_viewer_:
+                #self._ephysViewer_.close()
+            #else:
+                #self._ephysViewer_.refresh()
+                
         
     @pyqtSlot()
     def reject(self):
-        if self._ephysViewer_.isVisible() and self._owns_viewer_:
-            self._ephysViewer_.close()
+        #print("reject owns viewer", self._owns_viewer_)
         super().reject()
+        # NOTE: 2021-04-16 11:24:48 this calls done(QDialog.Rejected), which 
+        # does all the things commented below
+        #if self._ephysViewer_.isVisible():
+            #if self._owns_viewer_:
+                #self._ephysViewer_.close()
+            #else:
+                #self._ephysViewer_.refresh()
         
     @pyqtSlot(int)
     def done(self, value):
         if value == QtWidgets.QDialog.Accepted and not self._detected_:
             self.detect_triggers()
             
-        if self._ephysViewer_.isVisible() and self._owns_viewer_:
-            self._ephysViewer_.close()
+        #print("done owns viewer", self._owns_viewer_)
+        if self._ephysViewer_.isVisible():
+            if self._owns_viewer_:
+                self._ephysViewer_.close()
+            
+            else:
+                self._ephysViewer_.refresh()
+                
+        # NOTE: 2021-04-16 11:30:35
+        # unbind the SignalViewer reference from this symbol, otherwise the garbage
+        # collector will try to double-delete C++ objects (in pyqtgraph)
+        self._ephysViewer_ = None
             
         super().done(value)
         
@@ -665,7 +699,7 @@ class TriggerDetectDialog(qd.QuickDialog):
     @ephysdata.setter
     def ephysdata(self, value):
         #if not isinstance(value, (Block, Segment, tuple, list)):
-        if not check_ephys_data_collection(value):
+        if not check_ephys_data_collection(value, mix=False):
             return
         
         self._ephys_ = value
@@ -728,9 +762,9 @@ class TriggerDetectDialog(qd.QuickDialog):
             else:
                 self._detected_ = True
                 
-            #nEvents = len(get_trigger_events(self.ephysdata))
+            nEvents = len(get_trigger_events(self.ephysdata, flat=True))
             
-            #self.statusBar.showMessage("%d trigger events detected" % nEvents)
+            self.statusBar.showMessage("%d trigger events detected" % nEvents)
         
        
     def _update_trigger_detect_ranges_(self, frameindex):

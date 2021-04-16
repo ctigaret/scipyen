@@ -388,6 +388,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                  *args, **kwargs):
         """SignalViewer constructor.
         """
+        super(QMainWindow, self).__init__(parent)
         if y is None:
             if x is not None:  # only the data variable Y is passed, 
                 y = x
@@ -775,6 +776,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionPNG.triggered.connect(self.slot_export_png)
         
         self.cursorsMenu = QtWidgets.QMenu("Cursors", self)
+        
+        self.menubar.setNativeMenuBar(True)
 
         self.menubar.addMenu(self.cursorsMenu)
         self.addCursorsMenu = QtWidgets.QMenu("Add Cursors", self)

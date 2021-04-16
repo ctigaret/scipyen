@@ -499,35 +499,40 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """
         return self._scipyenWindow_;
     
-    @appWindow.setter
-    def appWindow(self, val: QtWidgets.QMainWindow):
-        if type(val).__name__ == "ScipyenWindow":
-            self._scipyenWindow_ =val
-        else:
-            raise TypeError("Unexpected type for appWindow setter argument; a ScipyenWindow is required with attribute 'workspace'; instead we've got %s" % type(val).__name__)
+    #@appWindow.setter
+    #def appWindow(self, val: QtWidgets.QMainWindow):
+        ## NOTE: 2021-04-16 09:47:59 FIXME
+        ## This is wrong, as it results in appWindow being ALWAYS
+        ## ScipyenWindow
+        #if type(val).__name__ == "ScipyenWindow":
+            #self._scipyenWindow_ =val
+        #else:
+            #raise TypeError("Unexpected type for appWindow setter argument; a ScipyenWindow is required with attribute 'workspace'; instead we've got %s" % type(val).__name__)
     
-    @property
-    def guiClient(self):
-        """Boolean (default False) indicating whether this window manages its own settings.
+    #@property
+    #def guiClient(self):
+        #"""NOTE: 2021-04-16 09:54:37 DEPRECATED
+        #Boolean (default False) indicating whether this window is managed 
+        #by windows other than Scipyen's Main window.
         
-        When the viewer subclass instance is used as a standalone window, this 
-        property should be set to False (its default value).
+        #When the viewer subclass instance is used as a standalone window, this 
+        #property should be set to False (its default value).
         
-        When the viewer subclass instance is subordinated to another GUI main window
-        which has control over, and manages the settings of this instance,
-        then guiClient property should be set to True, to avoid race conditions
-        and recurrences (infinite loops).
+        #When the viewer subclass instance is subordinated to another GUI window
+        #which has control over, and manages the settings of this instance,
+        #then guiClient property should be set to True, to avoid race conditions
+        #and recurrences (infinite loops).
         
-        guiClient is also useful for a managing Main Window instance to 
-        control other aspects of the viewer's functionality, e.g. management of
-        PlanarGraphics objects in an ImageViewer.
+        #guiClient is also useful for a managing Main Window instance to 
+        #control other aspects of the viewer's functionality, e.g. management of
+        #PlanarGraphics objects in an ImageViewer.
         
-        This property also has a setter.
+        #This property also has a setter.
         
-        ATTENTION: When guiClient is True, appWindow must be a reference to the
-        Scipyen's MainWindow instance.
-        """
-        return type(self._scipyenWindow_).__name__ != "ScipyenViewer"
+        #ATTENTION: When guiClient is True, appWindow must be a reference to the
+        #Scipyen's MainWindow instance.
+        #"""
+        #return type(self._scipyenWindow_).__name__ != "ScipyenWindow"
     
     #@guiClient.setter
     #def guiClient(self, value: bool):
@@ -614,11 +619,16 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
     def closeEvent(self, evt:QtCore.QEvent):
         """All viewers in Scipyen should behave consistently.
-        May by overridden in derived classes.
+        However, this may by overridden in derived classes.
         """
-        self.saveSettings()
         evt.accept()
-        self.close()
+        if type(self.appWindow).__name__ == "ScipyenWindow":
+            if self in self.appWindow.workspace.values():
+                self.appWindow.deRegisterViewer(self) # this will also save settings and close the viewer window
+                self.appWindow.removeFromWorkspace(self, from_console=False, by_name=False)
+        else:
+            self.saveSettings()
+            self.close()
     
     def event(self, evt:QtCore.QEvent):
         """Generic event handler
