@@ -585,6 +585,17 @@ def __name_lookup__(container: typing.Sequence, name:str,
         
     return names.index(name)
 
+def sequence_depth(x):
+    """Returns the depth of a nested sequence (tuple or list).
+    A linear sequence has depth 1; this is incremented by 1 for each next level
+    of nested sequences.
+    
+    A non-sequence has depth 0
+    """
+    if isinstance(x, (tuple, list)):
+        return 1 + max([sequence_depth(x_) for x_ in x])
+    return 0
+
         
 @safeWrapper
 def safe_identity_test(x, y):

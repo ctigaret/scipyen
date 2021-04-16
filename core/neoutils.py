@@ -2860,6 +2860,9 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
                                                             
                                     inner index (level 1) = index (j) of the event
                                                             in segment i
+                                                            
+            NOTE that in the case of neo.Block, its 'segments' is in fact a sequence
+            of neo.Segment objects
         
         neo.Segment                 1   i.e., [..., event_i, ...]
         
@@ -2978,7 +2981,7 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
     else:  # anything esle: return all events
         filtfn = partial(filter, lambda x: True)
         
-    if clear:
+    if clear: # function is used to clear events
         if isinstance(src, neo.Block):
             target = src.segments
         elif isinstance(src, neo.Segment):
@@ -3011,28 +3014,34 @@ def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
                     
             return
         
-    else:
+    else: # function is used to query events
         if isinstance(src, neo.Block):
             if as_dict:
                 return {"block_0": dict([("segment_%d" % k, [e for e in filtfn(s.events)]) for k, s in enumerate(src.segments)])}
             else:
-                if flat:  # flattened list
-                    return [e for e in chain.from_iterable([[e for e in filtfn(s.events)] for s in src.segments])]
-                else: # ragged nested sequence
-                    return [[e for e in filtfn(s.events)] for s in src.segments]
+                ret = [[e for e in filtfn(s.events)] for s in src.segments] # ragged nested sequence
+                if flat: 
+                    return [e for e in chain.from_iterable(ret)] # flattened list
+                else:
+                    return ret
+                    #return [e for e in chain.from_iterable([[e for e in filtfn(s.events)] for s in src.segments])]
+                #else: # ragged nested sequence
+                    #return [[e for e in filtfn(s.events)] for s in src.segments]
         
         elif isinstance(src, neo.Segment):
             if as_dict:
                 return {"segment_0": [e for e in filtfn(src.events)]}
             else:
-                return [e for e in filtfn(src.events)]
+                return [e for e in filtfn(src.events)] # by default only a flattened list
 
         elif isinstance(src, (tuple, list)):
             if all([isinstance(v, neo.Block) for v in src]):
                 if as_dict:
                     return dict([("block_%d" % kb, dict([("segment_%d" % k, [e for e in filtfn(s.events)]) for k,s in enumerate(b.segments)])) for kb, b in enumerate(src)])
                 else:
+                    #ret = [[[e for e in filtfn(s.events)] for s in b.segments] for b in src]
                     if flat:
+                        #return [e for e in chain.from_iterable([ee for ee in chain()])]
                         return [e for e in chain.from_iterable([[e for e in filtfn(s.events)] for s in chain(*[b.segments for b in src])])]
                     else:  # ragged nested sequence
                         return [[[e for e in filtfn(s.events)] for s in b.segments] for b in src]

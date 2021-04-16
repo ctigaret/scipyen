@@ -541,22 +541,30 @@ class TriggerDetectDialog(qd.QuickDialog):
         
         # parse ephysdata parameter
         self._ephys_= None
-        # no mixing of types when ephysdata is a sequence ...
-        #if isinstance(ephysdata, (Block, Segment)) or \
-            #(isinstance(ephysdata, (tuple, list)) and \
-                #(all([isinstance(v, Block) for v in ephysdata]) or \
-                    #all([isinstyane(v, Segment) for v in ephysdata]))):
-        if check_ephys_data_collection(ephysdata, mix=False):
-            self._ephys_ = ephysdata
-            self._cached_events_ = get_events(self._ephys_)
-            self._update_trigger_detect_ranges_(0)
+        
+        self._set_ephys_data_(ephysdata)
             
-            #if isinstance(self._ephysViewer_, SignalViewer):
+    def _set_ephys_data_(self, value):
+        if check_ephys_data_collection(value, mix=False):
+            # no mixing of types when ephysdata is a sequence ...
+            self._ephys_ = value
+            self._cached_events_ = get_events(self._ephys_)
+            
+            flat_events = get_events(self._ephys_, flat=True)
+            
+            if len(flat_events):
+                nEvents = len(flat_events)
+                nTriggers = len([t for t in flat_events if isinstance(t, TriggerEvent)])
+                self.statusBar.showMessage("Data has %d events, of which %d are trigger events" % (nEvents, nTriggers))
+
             if self.isVisible():
                 self._ephysViewer_.plot(self._ephys_)
             
+            self._update_trigger_detect_ranges_(0)
+            
         else:
             self._cached_events_ = list()
+        
 
     def open(self):
         if self._ephys_:
@@ -698,17 +706,22 @@ class TriggerDetectDialog(qd.QuickDialog):
     
     @ephysdata.setter
     def ephysdata(self, value):
-        #if not isinstance(value, (Block, Segment, tuple, list)):
-        if not check_ephys_data_collection(value, mix=False):
-            return
+        self._set_ephys_data_(value)
+        ##if not isinstance(value, (Block, Segment, tuple, list)):
+        #if not check_ephys_data_collection(value, mix=False):
+            #return
         
-        self._ephys_ = value
-        self._cached_events_ = get_events(self._ephys_)
-        self._update_trigger_detect_ranges_(0)
-        #self.eventDetectionWidget._update_trigger_detect_ranges_(0)
+        #self._ephys_ = value
+        #self._cached_events_ = get_events(self._ephys_)
+        #flat_events = get_events(self._ephys_, flat=True)
+        #nEvents = len(flat_events)
+        #nTriggers = len([t for t in flat_events is isinstance(t, TriggerEvent)])
+        #self.statusBar.showMessage("Data has %d events, of which %d are trigger events" % (nEvents, nTriggers))
         
-        if self.isVisible():
-            self._ephysViewer_.plot(self._ephys_)
+        #if self.isVisible():
+            #self._ephysViewer_.plot(self._ephys_)
+        
+        #self._update_trigger_detect_ranges_(0)
         
     @property
     def presyn(self):
