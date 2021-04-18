@@ -494,8 +494,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         This is a reference to the  Scipyen main window, unless explicitly given
         as something else at the viewer's initiation.
         
-        appWindow gives access to Scipyen main window API (e.g. the workspace)
-        and is used regardless of the value of guiClient property.
+        appWindow gives access to Scipyen main window API (e.g. the workspace).
         """
         return self._scipyenWindow_;
     
@@ -511,17 +510,20 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     
     #@property
     #def guiClient(self):
-        #"""NOTE: 2021-04-16 09:54:37 DEPRECATED
+        #"""NOTE: 2021-04-16 09:54:37 DEPRECATED 
         #Boolean (default False) indicating whether this window is managed 
-        #by windows other than Scipyen's Main window.
+        #by Scipyen's Main window, or not.
         
-        #When the viewer subclass instance is used as a standalone window, this 
-        #property should be set to False (its default value).
+        #When True, the viewer objects is subordinated to another GUI window
+        #which controls and manages the settings of the viewer, and for frame-enabled
+        #viewers, frame navigation (to avoid race conditions and infinite recurring
+        #loops).
         
-        #When the viewer subclass instance is subordinated to another GUI window
-        #which has control over, and manages the settings of this instance,
-        #then guiClient property should be set to True, to avoid race conditions
-        #and recurrences (infinite loops).
+        #When False, the viewer is managed by SCipyen's Main Window (as window 
+        #manager).
+        
+        #When the viewer is used as a standalone window, this property should be
+        #set to False (its default value).
         
         #guiClient is also useful for a managing Main Window instance to 
         #control other aspects of the viewer's functionality, e.g. management of
@@ -538,7 +540,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     #def guiClient(self, value: bool):
         #"""Sets up this viewer as a GUI client.
         
-        #When a GUI client, the viewer has a slightly restricted fucntionality.
+        #When a GUI client, the viewer has a slightly restricted functionality:
+        
         
         #"""
         #if not isinstance(value, bool):

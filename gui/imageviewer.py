@@ -75,7 +75,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 
 #### END 3rd party modules
 
-#### BEGIN pict.core modules
+#### BEGIN scipyen core modules
 from core import utilities
 from core.utilities import safeWrapper
 from core import strutils as strutils
@@ -86,13 +86,13 @@ from imaging.axisutils import (axisTypeFlags, defaultAxisTypeName,
                                defaultAxisTypeSymbol, defaultAxisTypeUnits,)
 #from core import neo
 #from core import metaclass_solver
-#### END pict.core modules
+#### END scipyen core modules
 
-#### BEGIN pict.iolib modules
+#### BEGIN scipyen iolib modules
 from iolib import pictio as pio
-#### END pict.iolib modules
+#### END scipyen iolib modules
 
-#### BEGIN pict.gui modules
+#### BEGIN scipyen gui modules
 from .scipyenviewer import ScipyenViewer, ScipyenFrameViewer
 
 from . import signalviewer as sv
@@ -102,7 +102,7 @@ from . import pictgui as pgui
 # this should automatically import our custom colormaps AND ocean colormaps if found
 from . import scipyen_colormaps as colormaps 
 from . import quickdialog
-#### END pict.gui modules
+#### END scipyen gui modules
 
 mpl.rcParams['backend']='Qt5Agg'
 
@@ -1187,7 +1187,10 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         roi.canMove = movable
         roi.canEdit = editable
         
-        if isinstance(parentWidget, ImageViewer) and not parentWidget.guiClient:
+        # NOTE: 2021-04-18 12:13:21 FIXME
+        # do I reallly need guiClient, here? rois and cursors should always be 
+        # notified of frame change, right?
+        if isinstance(parentWidget, ImageViewer):# and not parentWidget.guiClient:
             parentWidget.frameChanged[int].connect(roi.slotFrameChanged)
             
         if autoSelect:
@@ -1537,7 +1540,10 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
         cursor.canMove = movable
             
-        if isinstance(parentWidget, ImageViewer) and not parentWidget.guiClient:
+        # NOTE: 2021-04-18 12:13:21 FIXME
+        # do I reallly need guiClient, here? rois and cursors should always be 
+        # notified of frame change, right?
+        if isinstance(parentWidget, ImageViewer):# and not parentWidget.guiClient:
             parentWidget.frameChanged[int].connect(cursor.slotFrameChanged)
             
         self.__scene__.addItem(cursor)
@@ -2372,7 +2378,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     @currentFrame.setter
     def currentFrame(self, val):
         """
-        Emits self.frameChanged signal when not a guiClient
+        Emits self.frameChanged signal
         """
         if not isinstance(val, int) or val >= self._number_of_frames_ or val < 0: 
             return
@@ -2417,7 +2423,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         #self.framesQSlider.valueChanged.connect(self.slot_setFrameNumber)
         
         # NOTE: 2018-05-21 20:59:18
-            
+        # managed to do away with guiClient here
     
     @property
     def cursors(self):

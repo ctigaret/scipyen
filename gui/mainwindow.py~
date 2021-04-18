@@ -4286,8 +4286,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def slot_importPrairieView(self):
         #from systems.PrairieView import PrairieViewImporter # PrairieView already imported as module
-        pvimp = PrairieView.PrairieViewImporter()
-        # NOTE one can also directly set pvimp.auto_export = True to automatically
+        # NOTE: 2021-04-18 12:25:11
+        # must absolutely pass reference to self as parent so that in Qt/C++ side
+        # pvimp object is owned by self; otherwise, the garbage collector will
+        # free its memory allocation when it goes out of scope at the end of this
+        # function
+        pvimp = PrairieView.PrairieViewImporter(parent=self)
+        # NOTE: 2021-04-18 12:27:23
+        # one can also directly set pvimp.auto_export = True to automatically
         # export the generated ScanData directly to workspace and thus avoiding 
         # the extra slot below
         pvimp.finished[int].connect(self._slot_prairieViewImportGuiDone)

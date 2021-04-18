@@ -2244,6 +2244,8 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         # the slot returns - this means its window will close and the C/C++
         # objects that compose it will be garbage collected (also meaning that 
         # later delete actions on these objects will throw exceptions)
+        #
+        # see also scipyen gui.mainwindow.ScipyenWindow.slot_importPrairieView()
         super(WorkspaceGuiMixin, self).__init__(parent=parent, **kwargs)
         super().__init__(parent=parent, **kwargs)
         

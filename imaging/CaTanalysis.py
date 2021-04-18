@@ -5005,304 +5005,319 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             
             self.displayFrame()
             
+    @pyqtSlot(int)
+    @safeWrapper
+    def _slot_prairieViewImportGuiDone(self, value):
+        if value:
+            dlg = self.sender()
+            if dlg is not None:
+                self._scipyenWindow_.assignToWorkspace(dlg.scanDataVarName, dlg.scandata)
+                self.setData(dlg.scandata, dlg.scanDataVarName)
+            
+            self.statusBar().showMessage("Import PrairieView done!")
+            
     @pyqtSlot()
     @safeWrapper
     def slot_importPrairieView(self):
         import mimetypes, io
         from systems import PrairieView
+        pvimp = PrairieView.PrairieViewImporter(parent=self) # see NOTE: 2021-04-18 12:25:11 in gui.mainwindow
+        pvimp.finished[int].connect(self._slot_prairieViewImportGuiDone)
+        pvimp.open()
+        
+        ##targetDir = self._scipyenWindow_.recentDirectories[0]
+        ##targetDir = self._scipyenWindow_.currentDirMerlin
+        
+        #targetDir = os.getcwd()
+        
+        #lsdata = None
 
-        #targetDir = self._scipyenWindow_.recentDirectories[0]
-        #targetDir = self._scipyenWindow_.currentDir
-        targetDir = os.getcwd()
+        ## 1) choose PrairieView xml file:
+        #pvXMLfileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
+                                                                 #caption="Open PrairieView file", 
+                                                                 #filter="XML Files (*.xml)",
+                                                                 #directory=targetDir)
         
-        lsdata = None
-
-        # 1) choose PrairieView xml file:
-        pvXMLfileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
-                                                                 caption="Open PrairieView file", 
-                                                                 filter="XML Files (*.xml)",
-                                                                 directory=targetDir)
-        
-        if len(pvXMLfileName) == 0:
-            return
-        
-        tempDataVarName = os.path.splitext(os.path.basename(pvXMLfileName))[0]
-        
-        lsdata_varname = strutils.str2symbol(tempDataVarName)
-        
-        try:
-            pvScan = PrairieView.PVScan(pio.loadXMLFile(pvXMLfileName))
-            lsdata = pvScan.scandata()
-            
-        except Exception as e:
-            s = io.StringIO()
-            sei = sys.exc_info()
-            traceback.print_exc()
-            traceback.print_exception(file=s, *sei)
-            msgbox = QtWidgets.QMessageBox()
-            msgbox.setSizeGripEnabled(True)
-            msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-            #msgbox.setWindowTitle(sei[0].__class__.__name__)
-            msgbox.setWindowTitle(type(e).__name__)
-            msgbox.setText(sei[0].__class__.__name__)
-            msgbox.setDetailedText(s.getvalue())
-            msgbox.exec()
-            return
-            
-        
-        # 2) choose epscats options pickle file or rely on "factory" default
-        
-        epscatOptionsFileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
-                                                                         caption="Open EPSCaT Options file for %s" % tempDataVarName, 
-                                                                         filter="Pickle Files (*.pkl)",
-                                                                         directory=targetDir)
-        
-        if len(epscatOptionsFileName) == 0:
-            epscatoptions = scanDataOptions()
-            
-        else:
-            try:
-                epscatoptions = pio.loadPickleFile(epscatOptionsFileName)
-                
-                # NOTE: 2018-06-20 09:13:58
-                # this will ensure we have these options in as well (epscat)
-                # this is so that the parameters for event detection are stored in the 
-                # ScanData analysisOptions as well
-                if "TriggerEventDetection" not in epscatoptions:
-                    defaultoptions = scanDataOptions()
-                    epscatoptions["TriggerEventDetection"] = defaultoptions["TriggerEventDetection"]
-                    
-            except Exception as e:
-                s = io.StringIO()
-                sei = sys.exc_info()
-                traceback.print_exception(file=s, *sei)
-                msgbox = QtWidgets.QMessageBox()
-                msgbox.setSizeGripEnabled(True)
-                msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-                msgbox.setWindowTitle(type(e).__name__)
-                #msgbox.setWindowTitle(sei[0].__class__.__name__)
-                msgbox.setText(sei[0].__class__.__name__)
-                msgbox.setDetailedText(s.getvalue())
-                msgbox.exec()
-                return
-            
-        # 3) choose electrophysiology files
-        
-        # these can be (possibly, multiple) abf files (each with a segment)
-        # or a single pickle file
-        
-        # when a single abf file, it should have as many segments as frames 
-        # but this is not checked
-        
-        # when multiple abf files, they should all have one segment (sweep) each and 
-        # there should be as many single-sweep abf files as frames in data
-        
-        # again this is not checked
-        
-        # trigger events will be detected automatically after prompting the user for 
-        # arguments
-        
-        # when a pickle file, it should have a single neo.Block with as many sweeps
-        # as frames in data, optionally with trigger events already defined
-        
-        # the user is expected to select at least one abf or pickle file
-        
-        #ephysFilesFilter = ";;".join(["All file types (*.*)", "Pickle files (*.pkl)", "Axon files (*.abf)"])
-        ephysFilesFilter = ";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)"])
-        
-        ephysFileNames, _ = QtWidgets.QFileDialog.getOpenFileNames(self, 
-                                                               caption="Open electrophysiology files for %s" % tempDataVarName,
-                                                               filter = ephysFilesFilter,
-                                                               directory=targetDir)
-        blocks = list()
-        
-        ephysData = None
-        
-        # 1) read ephys files, try to generate a neo.Block
-        # if that fails, carry on to construct lsdata w/o ephys
-        try:
-            if len(ephysFileNames) > 0:
-                #if all([mimetypes.guess_type(f)[0] == "application/axon-data" for f in ephysFileNames]):
-                if all(["application/axon" in mimetypes.guess_type(f)[0] for f in ephysFileNames]):
-                    blocks = [pio.loadAxonFile(f) for f in ephysFileNames]
-                    
-                else:
-                    blocks = [pio.loadPickleFile(f) for f in ephysFileNames]
-                    
-            if len(blocks) > 0:
-                if all([isinstance(b, neo.Block) for b in blocks]):
-                    ephysData = neoutils.concatenate_blocks(*blocks)
-                    #ephysData = ephys.concatenate_blocks(*blocks)
-                    
-                elif all([isinstance(b, neo.Segment) for b in blocks]):
-                    ephysData = neo.Block()
-                    ephysData.segments[:] = blocks[:]
-                    
-                else:
-                    QtWidgets.QMessageBox.critical("Electrophysiology files must contain neo.Blocks or individual neo.Segments")
-                    #return
-                        
-        except Exception as e:
-            traceback.print_exc()
-            s = io.StringIO()
-            sei = sys.exc_info()
-            traceback.print_exc()
-            traceback.print_exception(file=s, *sei)
-            msgbox = QtWidgets.QMessageBox()
-            msgbox.setSizeGripEnabled(True)
-            msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-            msgbox.setWindowTitle(type(e).__name__)
-            #msgbox.setWindowTitle(sei[0].__class__.__name__)
-            msgbox.setText(sei[0].__class__.__name__)
-            msgbox.setDetailedText(s.getvalue())
-            msgbox.exec()
+        #if len(pvXMLfileName) == 0:
             #return
         
-        if lsdata is None:
-            return
+        #tempDataVarName = os.path.splitext(os.path.basename(pvXMLfileName))[0]
         
-        if isinstance(ephysData, neo.Block):
-            # 2020-09-06 21:51:30
-            # preview electrophysiology data to help in settings the trigger protocols
-            ephys_preview = sv.SignalViewer(pWin = self._scipyenWindow_)
-            ephys_preview.plot(ephysData)
+        #lsdata_varname = strutils.str2symbol(tempDataVarName)
+        
+        #try:
+            #pvScan = PrairieView.PVScan(pio.loadXMLFile(pvXMLfileName))
+            #lsdata = pvScan.scandata()
             
-            # ephys constructed, now check if has as many segments as there are
-            # frames in lsdata;
-            # adjust segments if necessary
-            if len(ephysData.segments) > lsdata.nScanFrames:
-                msgbox_btn = QtWidgets.QMessageBox.question(self, "Importing electrophysiology into %s" % tempDataVarName,
-                                                "Block data has more segments (%d) that linescan frames (%d).\n Do you wish to discard surplus segments?" % (len(ephysData.segments), lsdata.nScanFrames))
-
-
-                if msgbox_btn in (QtWidgets.QMessageBox.Yes,  QtWidgets.QMessageBox.Ok):
-                    for k in range(len(ephysData.segments), lsdata.nScanFrames):
-                        ephysData.segments = ephysData.segments[0:lsdata.nScanFrames]
-                        
-            elif len(ephysData.segments) < lsdata.nScanFrames:
-                msgbox_btn = QtWidgets.QMessageBox.question(self, "Importing electrophysiology into %s" % tempDataVarName,
-                                                "Block data has fewer segments (%d) that linescan frames (%d).\n Do you wish to append empty segments to electrophysiology?" % (len(ephysData.segments), lsdata.nScanFrames))
-
-                if msgbox_btn in (QtWidgets.QMessageBox.Yes,  QtWidgets.QMessageBox.Ok):
-                    for k in range(len(ephysData.segments), lsdata.nScanFrames):
-                        ephysData.segments.append(neo.Segment())
-
-            # now go ahead and try to "guess" trigger events based on the user's dialog
-            # (by detecting trigger waveforms in specific time intervals on specific signals)
-            # if that fails or is bypassed, just accept the ephys data as is
-            # and continue to construct lsdata without trigger protocols
-            try:
-                dlg = quickdialog.QuickDialog(self, "Data name and trigger protocols for %s:" % tempDataVarName)
-                
-                #dlg.setModal(False) # NOTE: 2020-11-29 17:10:53 exec() will force it to modal
-                dlg.setSizeGripEnabled(True)
-                
-                namePrompt = quickdialog.StringInput(dlg, "Data name:")
-                
-                namePrompt.variable.setClearButtonEnabled(True)
-                namePrompt.variable.redoAvailable=True
-                namePrompt.variable.undoAvailable=True
-                
-                namePrompt.setText(lsdata_varname)
-                
-                ephysNamePrompt = quickdialog.StringInput(dlg, "Electrophysiology name:")
-                
-                ephysNamePrompt.variable.setClearButtonEnabled(True)
-                ephysNamePrompt.variable.redoAvailable=True
-                ephysNamePrompt.variable.undoAvailable=True
-                
-                ephysNamePrompt.setText(os.path.splitext(os.path.basename(ephysFileNames[0]))[0])
-                
-                
-                tp, _  = parse_trigger_protocols(ephysData) # this may be an empty list
+        #except Exception as e:
+            #s = io.StringIO()
+            #sei = sys.exc_info()
+            #traceback.print_exc()
+            #traceback.print_exception(file=s, *sei)
+            #msgbox = QtWidgets.QMessageBox()
+            #msgbox.setSizeGripEnabled(True)
+            #msgbox.setIcon(QtWidgets.QMessageBox.Critical)
+            ##msgbox.setWindowTitle(sei[0].__class__.__name__)
+            #msgbox.setWindowTitle(type(e).__name__)
+            #msgbox.setText(sei[0].__class__.__name__)
+            #msgbox.setDetailedText(s.getvalue())
+            #msgbox.exec()
+            #return
+            
         
-                if len(tp) == 0:
-                    # will call dlg.exec() from within self._trigger_events_detection_gui_
-                    ephysStart = ephysData.segments[0].analogsignals[0].t_start.magnitude.flatten()[0]
-                    ephysEnd   = ephysData.segments[0].analogsignals[0].t_stop.magnitude.flatten()[0]
-                    # ask to parse trigger protocols from emphys; does NOT need any signals
-                    # only returns arguments for trigger event detection, below
-                    OK, trig_dlg_result = self._trigger_events_detection_gui_(epscatoptions,
-                                                                                ephysStart, ephysEnd,
-                                                                                dlg=dlg)
+        ## 2) choose epscats options pickle file or rely on "factory" default
+        
+        #epscatOptionsFileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
+                                                                         #caption="Open EPSCaT Options file for %s" % tempDataVarName, 
+                                                                         #filter="Pickle Files (*.pkl)",
+                                                                         #directory=targetDir)
+        
+        #if len(epscatOptionsFileName) == 0:
+            #epscatoptions = scanDataOptions()
+            
+        #else:
+            #try:
+                #epscatoptions = pio.loadPickleFile(epscatOptionsFileName)
+                
+                ## NOTE: 2018-06-20 09:13:58
+                ## this will ensure we have these options in as well (epscat)
+                ## this is so that the parameters for event detection are stored in the 
+                ## ScanData analysisOptions as well
+                #if "TriggerEventDetection" not in epscatoptions:
+                    #defaultoptions = scanDataOptions()
+                    #epscatoptions["TriggerEventDetection"] = defaultoptions["TriggerEventDetection"]
                     
-                    if OK: # if not OK, do create lsdata w/o ephys !
-                        presyn = trig_dlg_result[0]
-                        postsyn = trig_dlg_result[1]
-                        photo = trig_dlg_result[2]
-                        imaging = trig_dlg_result[3]
-                        epscatoptions = trig_dlg_result[4]
-                    
-                        tp = auto_detect_trigger_protocols(ephysData, 
-                                                    presynaptic=presyn, 
-                                                    postsynaptic=postsyn,
-                                                    photostimulation=photo,
-                                                    imaging=imaging,
-                                                    clear=True)
-                        
-                        ephys_preview.plot(ephysData)
-                        
-                        lsdata.electrophysiology = neoutils.neo_copy(ephysData)
-                        lsdata.electrophysiology.name = ephysNamePrompt.text()
-                
-                else: # we still need to call dlg.exec()
-                    if dlg.exec() == QtWidgets.QDialog.Accepted: # if rejected, do create lsdata w/o ephys
-                        lsdata.electrophysiology = neoutils.neo_copy(ephysData) # just accept ephys data
-                        lsdata.electrophysiology.name = ephysNamePrompt.text()
-                        
-                if isinstance(tp, (tuple, list)) and len(tp) and len(lsdata.electrophysiology.segments):
-                    lsdata.triggerProtocols = tp # will "adopt" protocols and embed events in the ephys, scans & scene block
-                    
-                lsdata.analysisOptions = epscatoptions
-                
-                lsdata_varname = namePrompt.text()
-                lsdata.name = namePrompt.text()
-                
-                ephys_preview.setVisible(False)
-                
-            except Exception as e:
-                traceback.print_exc()
-                s = io.StringIO()
-                sei = sys.exc_info()
-                traceback.print_exception(file=s, *sei)
-                msgbox = QtWidgets.QMessageBox()
-                msgbox.setSizeGripEnabled(True)
-                msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-                msgbox.setWindowTitle(type(e).__name__)
-                #msgbox.setWindowTitle(sei[0].__class__.__name__)
-                msgbox.setText(sei[0].__class__.__name__)
-                msgbox.setDetailedText(s.getvalue())
-                msgbox.exec()
-                ephys_preview.setVisible(False)
+            #except Exception as e:
+                #s = io.StringIO()
+                #sei = sys.exc_info()
+                #traceback.print_exception(file=s, *sei)
+                #msgbox = QtWidgets.QMessageBox()
+                #msgbox.setSizeGripEnabled(True)
+                #msgbox.setIcon(QtWidgets.QMessageBox.Critical)
+                #msgbox.setWindowTitle(type(e).__name__)
+                ##msgbox.setWindowTitle(sei[0].__class__.__name__)
+                #msgbox.setText(sei[0].__class__.__name__)
+                #msgbox.setDetailedText(s.getvalue())
+                #msgbox.exec()
                 #return
+            
+        ## 3) choose electrophysiology files
+        
+        ## these can be (possibly, multiple) abf files (each with a segment)
+        ## or a single pickle file
+        
+        ## when a single abf file, it should have as many segments as frames 
+        ## but this is not checked
+        
+        ## when multiple abf files, they should all have one segment (sweep) each and 
+        ## there should be as many single-sweep abf files as frames in data
+        
+        ## again this is not checked
+        
+        ## trigger events will be detected automatically after prompting the user for 
+        ## arguments
+        
+        ## when a pickle file, it should have a single neo.Block with as many sweeps
+        ## as frames in data, optionally with trigger events already defined
+        
+        ## the user is expected to select at least one abf or pickle file
+        
+        ##ephysFilesFilter = ";;".join(["All file types (*.*)", "Pickle files (*.pkl)", "Axon files (*.abf)"])
+        #ephysFilesFilter = ";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)"])
+        
+        #ephysFileNames, _ = QtWidgets.QFileDialog.getOpenFileNames(self, 
+                                                               #caption="Open electrophysiology files for %s" % tempDataVarName,
+                                                               #filter = ephysFilesFilter,
+                                                               #directory=targetDir)
+        #blocks = list()
+        
+        #ephysData = None
+        
+        ## 1) read ephys files, try to generate a neo.Block
+        ## if that fails, carry on to construct lsdata w/o ephys
+        #try:
+            #if len(ephysFileNames) > 0:
+                ##if all([mimetypes.guess_type(f)[0] == "application/axon-data" for f in ephysFileNames]):
+                #if all(["application/axon" in mimetypes.guess_type(f)[0] for f in ephysFileNames]):
+                    #blocks = [pio.loadAxonFile(f) for f in ephysFileNames]
+                    
+                #else:
+                    #blocks = [pio.loadPickleFile(f) for f in ephysFileNames]
+                    
+            #if len(blocks) > 0:
+                #if all([isinstance(b, neo.Block) for b in blocks]):
+                    #ephysData = neoutils.concatenate_blocks(*blocks)
+                    ##ephysData = ephys.concatenate_blocks(*blocks)
+                    
+                #elif all([isinstance(b, neo.Segment) for b in blocks]):
+                    #ephysData = neo.Block()
+                    #ephysData.segments[:] = blocks[:]
+                    
+                #else:
+                    #QtWidgets.QMessageBox.critical("Electrophysiology files must contain neo.Blocks or individual neo.Segments")
+                    ##return
+                        
+        #except Exception as e:
+            #traceback.print_exc()
+            #s = io.StringIO()
+            #sei = sys.exc_info()
+            #traceback.print_exc()
+            #traceback.print_exception(file=s, *sei)
+            #msgbox = QtWidgets.QMessageBox()
+            #msgbox.setSizeGripEnabled(True)
+            #msgbox.setIcon(QtWidgets.QMessageBox.Critical)
+            #msgbox.setWindowTitle(type(e).__name__)
+            ##msgbox.setWindowTitle(sei[0].__class__.__name__)
+            #msgbox.setText(sei[0].__class__.__name__)
+            #msgbox.setDetailedText(s.getvalue())
+            #msgbox.exec()
+            ##return
+        
+        #if lsdata is None:
+            #return
+        
+        #if isinstance(ephysData, neo.Block):
+            ## 2020-09-06 21:51:30
+            ## preview electrophysiology data to help in settings the trigger protocols
+            #ephys_preview = sv.SignalViewer(pWin = self._scipyenWindow_)
+            #ephys_preview.plot(ephysData)
+            
+            ## ephys constructed, now check if has as many segments as there are
+            ## frames in lsdata;
+            ## adjust segments if necessary
+            #if len(ephysData.segments) > lsdata.nScanFrames:
+                #msgbox_btn = QtWidgets.QMessageBox.question(self, "Importing electrophysiology into %s" % tempDataVarName,
+                                                #"Block data has more segments (%d) that linescan frames (%d).\n Do you wish to discard surplus segments?" % (len(ephysData.segments), lsdata.nScanFrames))
 
-        else: # do still ask for a custom data name
-            dlg = quickdialog.QuickDialog(self, "Data name for %s:" % tempDataVarName)
-            
-            namePrompt = quickdialog.StringInput(dlg, "Data name:")
-            
-            namePrompt.variable.setClearButtonEnabled(True)
-            namePrompt.variable.redoAvailable=True
-            namePrompt.variable.undoAvailable=True
-            
-            namePrompt.setText(lsdata_varname)
-            
-            if dlg.exec() == QtWidgets.QDialog.Accepted: # if rejected, this IS the last chance to cancel
-                lsdata_varname = namePrompt.text()
-                lsdata.name = lsdata_varname
+
+                #if msgbox_btn in (QtWidgets.QMessageBox.Yes,  QtWidgets.QMessageBox.Ok):
+                    #for k in range(len(ephysData.segments), lsdata.nScanFrames):
+                        #ephysData.segments = ephysData.segments[0:lsdata.nScanFrames]
+                        
+            #elif len(ephysData.segments) < lsdata.nScanFrames:
+                #msgbox_btn = QtWidgets.QMessageBox.question(self, "Importing electrophysiology into %s" % tempDataVarName,
+                                                #"Block data has fewer segments (%d) that linescan frames (%d).\n Do you wish to append empty segments to electrophysiology?" % (len(ephysData.segments), lsdata.nScanFrames))
+
+                #if msgbox_btn in (QtWidgets.QMessageBox.Yes,  QtWidgets.QMessageBox.Ok):
+                    #for k in range(len(ephysData.segments), lsdata.nScanFrames):
+                        #ephysData.segments.append(neo.Segment())
+
+            ## now go ahead and try to "guess" trigger events based on the user's dialog
+            ## (by detecting trigger waveforms in specific time intervals on specific signals)
+            ## if that fails or is bypassed, just accept the ephys data as is
+            ## and continue to construct lsdata without trigger protocols
+            #try:
+                #dlg = quickdialog.QuickDialog(self, "Data name and trigger protocols for %s:" % tempDataVarName)
                 
-            else:
-                return
+                ##dlg.setModal(False) # NOTE: 2020-11-29 17:10:53 exec() will force it to modal
+                #dlg.setSizeGripEnabled(True)
+                
+                #namePrompt = quickdialog.StringInput(dlg, "Data name:")
+                
+                #namePrompt.variable.setClearButtonEnabled(True)
+                #namePrompt.variable.redoAvailable=True
+                #namePrompt.variable.undoAvailable=True
+                
+                #namePrompt.setText(lsdata_varname)
+                
+                #ephysNamePrompt = quickdialog.StringInput(dlg, "Electrophysiology name:")
+                
+                #ephysNamePrompt.variable.setClearButtonEnabled(True)
+                #ephysNamePrompt.variable.redoAvailable=True
+                #ephysNamePrompt.variable.undoAvailable=True
+                
+                #ephysNamePrompt.setText(os.path.splitext(os.path.basename(ephysFileNames[0]))[0])
+                
+                
+                #tp, _  = parse_trigger_protocols(ephysData) # this may be an empty list
+        
+                #if len(tp) == 0:
+                    ## will call dlg.exec() from within self._trigger_events_detection_gui_
+                    #ephysStart = ephysData.segments[0].analogsignals[0].t_start.magnitude.flatten()[0]
+                    #ephysEnd   = ephysData.segments[0].analogsignals[0].t_stop.magnitude.flatten()[0]
+                    ## ask to parse trigger protocols from emphys; does NOT need any signals
+                    ## only returns arguments for trigger event detection, below
+                    #OK, trig_dlg_result = self._trigger_events_detection_gui_(epscatoptions,
+                                                                                #ephysStart, ephysEnd,
+                                                                                #dlg=dlg)
+                    
+                    #if OK: # if not OK, do create lsdata w/o ephys !
+                        #presyn = trig_dlg_result[0]
+                        #postsyn = trig_dlg_result[1]
+                        #photo = trig_dlg_result[2]
+                        #imaging = trig_dlg_result[3]
+                        #epscatoptions = trig_dlg_result[4]
+                    
+                        #tp = auto_detect_trigger_protocols(ephysData, 
+                                                    #presynaptic=presyn, 
+                                                    #postsynaptic=postsyn,
+                                                    #photostimulation=photo,
+                                                    #imaging=imaging,
+                                                    #clear=True)
+                        
+                        #ephys_preview.plot(ephysData)
+                        
+                        #lsdata.electrophysiology = neoutils.neo_copy(ephysData)
+                        #lsdata.electrophysiology.name = ephysNamePrompt.text()
+                
+                #else: # we still need to call dlg.exec()
+                    #if dlg.exec() == QtWidgets.QDialog.Accepted: # if rejected, do create lsdata w/o ephys
+                        #lsdata.electrophysiology = neoutils.neo_copy(ephysData) # just accept ephys data
+                        #lsdata.electrophysiology.name = ephysNamePrompt.text()
+                        
+                #if isinstance(tp, (tuple, list)) and len(tp) and len(lsdata.electrophysiology.segments):
+                    #lsdata.triggerProtocols = tp # will "adopt" protocols and embed events in the ephys, scans & scene block
+                    
+                #lsdata.analysisOptions = epscatoptions
+                
+                #lsdata_varname = namePrompt.text()
+                #lsdata.name = namePrompt.text()
+                
+                #ephys_preview.setVisible(False)
+                
+            #except Exception as e:
+                #traceback.print_exc()
+                #s = io.StringIO()
+                #sei = sys.exc_info()
+                #traceback.print_exception(file=s, *sei)
+                #msgbox = QtWidgets.QMessageBox()
+                #msgbox.setSizeGripEnabled(True)
+                #msgbox.setIcon(QtWidgets.QMessageBox.Critical)
+                #msgbox.setWindowTitle(type(e).__name__)
+                ##msgbox.setWindowTitle(sei[0].__class__.__name__)
+                #msgbox.setText(sei[0].__class__.__name__)
+                #msgbox.setDetailedText(s.getvalue())
+                #msgbox.exec()
+                #ephys_preview.setVisible(False)
+                ##return
+
+        #else: # do still ask for a custom data name
+            #dlg = quickdialog.QuickDialog(self, "Data name for %s:" % tempDataVarName)
+            
+            #namePrompt = quickdialog.StringInput(dlg, "Data name:")
+            
+            #namePrompt.variable.setClearButtonEnabled(True)
+            #namePrompt.variable.redoAvailable=True
+            #namePrompt.variable.undoAvailable=True
+            
+            #namePrompt.setText(lsdata_varname)
+            
+            #if dlg.exec() == QtWidgets.QDialog.Accepted: # if rejected, this IS the last chance to cancel
+                #lsdata_varname = namePrompt.text()
+                #lsdata.name = lsdata_varname
+                
+            #else:
+                #return
             
 
-        var_name = strutils.str2symbol(lsdata_varname)
-        self._scipyenWindow_.assignToWorkspace(var_name, lsdata)
+        #var_name = strutils.str2symbol(lsdata_varname)
+        #self._scipyenWindow_.assignToWorkspace(var_name, lsdata)
         
-        self.setData(lsdata, var_name)
-        #self._parsedata_(lsdata, lsdata_varname)
+        #self.setData(lsdata, var_name)
+        ##self._parsedata_(lsdata, lsdata_varname)
         
             
-        self.statusBar().showMessage("Done!")
+        #self.statusBar().showMessage("Done!")
         
     def _analyzeFrames_(self, frames, progressSignal=None, setMaxSignal=None, **kwargs):
         if self._data_ is None:
