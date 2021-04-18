@@ -543,6 +543,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         self._ephys_= None
         
         self._set_ephys_data_(ephysdata)
+        self.setSizeGripEnabled(True)
             
     def _set_ephys_data_(self, value):
         if check_ephys_data_collection(value, mix=False):
@@ -620,7 +621,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         
     @pyqtSlot(int)
     def done(self, value):
-        if value == QtWidgets.QDialog.Accepted and not self._detected_:
+        if value == QtWidgets.QDialog.Accepted and not self.detected:
             self.detect_triggers()
             
         #print("done owns viewer", self._owns_viewer_)
@@ -670,7 +671,7 @@ class TriggerDetectDialog(qd.QuickDialog):
             else:
                 self._ephysViewer_.plot(self._ehys_)
                 
-        self._detected_ = False
+        self.detected = False
         
     def _restore_events_(self):
         if len(self._cached_events_):
@@ -692,11 +693,11 @@ class TriggerDetectDialog(qd.QuickDialog):
                         s.events[:] = self._cached_events_[k][:]
                         
     @property
-    def _detected_(self):
+    def detected(self):
         return self._triggers_detected_
     
-    @_detected_.setter
-    def _detected_(self, val):
+    @detected.setter
+    def detected(self, val):
         self._triggers_detected_ = val
         self.detectTriggersPushButton.setEnabled(not self._triggers_detected_)
         
@@ -741,7 +742,7 @@ class TriggerDetectDialog(qd.QuickDialog):
     
     def detect_triggers(self):
         if self._ephys_ is None:
-            self._detected_=False
+            self.detected=False
             return
         
         #presyn = self.eventDetectionWidget.presyn
@@ -770,10 +771,10 @@ class TriggerDetectDialog(qd.QuickDialog):
             
             if len(self.triggerProtocols) == 0:
                 self._restore_events_()
-                self._detected_ = False
+                self.detected = False
                 
             else:
-                self._detected_ = True
+                self.detected = True
                 
             nEvents = len(get_trigger_events(self.ephysdata, flat=True))
             

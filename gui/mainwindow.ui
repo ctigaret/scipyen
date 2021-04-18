@@ -59,7 +59,7 @@
      <property name="title">
       <string>&amp;Import</string>
      </property>
-     <addaction name="actionImport_Fluorescence_Time_Series_File"/>
+     <addaction name="actionImport_PrairieView_data"/>
      <addaction name="actionImport_XY_Raster_Scan_File"/>
      <addaction name="actionImport_Electrophysiology_File"/>
      <addaction name="actionImport_Protocol_File"/>
@@ -735,9 +735,9 @@ NOTE: you can click anywhere in the row to select</string>
     <string>&amp;On Console</string>
    </property>
   </action>
-  <action name="actionImport_Fluorescence_Time_Series_File">
+  <action name="actionImport_PrairieView_data">
    <property name="text">
-    <string>&amp;Fluorescence Time Series</string>
+    <string>PrairieView data</string>
    </property>
   </action>
   <action name="actionImport_XY_Raster_Scan_File">

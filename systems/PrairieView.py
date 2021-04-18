@@ -2194,7 +2194,7 @@ class PVScan(object):
 class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, ):
     sig_protocolRemoved = pyqtSignal(int, name="sig_protocolRemoved")
     
-    def __init__(self, 
+    def __init__(self, parent=None,
                  name: typing.Optional[str] = None,
                  pvScanFileName: typing.Optional[str]=None, 
                  optionsFileName: typing.Optional[str]=None, 
@@ -2237,8 +2237,15 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             auto_export is False.
         
         """
-        super(WorkspaceGuiMixin, self).__init__(**kwargs)
-        super().__init__(**kwargs)
+        # NOTE: 2021-04-18 11:49:52
+        # 'parent' parameter is required; when called from a PyQt5 slot, 'parent'
+        # should be set to the object which own the slot, so that it will take
+        # owership fo the dialog; otherwise, the dialog will go out of scope when
+        # the slot returns - this means its window will close and the C/C++
+        # objects that compose it will be garbage collected (also meaning that 
+        # later delete actions on these objects will throw exceptions)
+        super(WorkspaceGuiMixin, self).__init__(parent=parent, **kwargs)
+        super().__init__(parent=parent, **kwargs)
         
         self._scandata_ = None # the outcome: a ScanData object
         
@@ -2301,6 +2308,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         self.auto_export = auto_export
         
         self._configureUI_()
+        self.setSizeGripEnabled(True)
         
     def _configureUI_(self):
         self.setupUi(self)
@@ -2488,50 +2496,34 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             else:
                 self.triggerProtocolFileNameLineEdit.setText("")
             
-            #self._detect_trigger_events_()
-            ## trigger events may have already been detected, and hence trigger
-            ## protocols list may have already been populated
-            #if len(self.triggerProtocols) == 0:
-                #self._detect_trigger_events_()
+    ## NOTE: 2021-04-11 14:12:46
+    ## not needed anymore: event detection is delegated to the eventDetectionDialog
+    #def _detect_trigger_events_(self):
+        ##print("PrairieViewImporter._detect_trigger_events_")
+        #signalblockers = [QtCore.QSignalBlocker(w) for w in (self.triggerProtocolFileNameLineEdit,)]
+        #self.cachedProtocols[:] = self.triggerProtocols[:]
         
-    #@pyqtSlot()
-    #def _slot_detectTriggers(self): # not used !?!
-        #if self._ephys_ is None:
-            #return
+        #presyn  = self.eventDetectionDialog.presyn
+        #postsyn = self.eventDetectionDialog.postsyn
+        #photo   = self.eventDetectionDialog.photo
+        #imaging = self.eventDetectionDialog.imaging
         
-        #self._detect_trigger_events_()
-        
-        #self.ephysPreview.plot(self._ephys_)
-        #self.updateProtocolEditor()
-        
-    # NOTE: 2021-04-11 14:12:46
-    # not needed anymore: event detection is delegated to the eventDetectionDialog
-    def _detect_trigger_events_(self):
-        #print("PrairieViewImporter._detect_trigger_events_")
-        signalblockers = [QtCore.QSignalBlocker(w) for w in (self.triggerProtocolFileNameLineEdit,)]
-        self.cachedProtocols[:] = self.triggerProtocols[:]
-        
-        presyn  = self.eventDetectionDialog.presyn
-        postsyn = self.eventDetectionDialog.postsyn
-        photo   = self.eventDetectionDialog.photo
-        imaging = self.eventDetectionDialog.imaging
-        
-        tp = auto_detect_trigger_protocols(self._ephys_,
-                                           presynaptic = presyn,
-                                           postsynaptic = postsyn,
-                                           photostimulation = photo,
-                                           imaging = imaging,
-                                           clear = self.clearEvents)
+        #tp = auto_detect_trigger_protocols(self._ephys_,
+                                           #presynaptic = presyn,
+                                           #postsynaptic = postsyn,
+                                           #photostimulation = photo,
+                                           #imaging = imaging,
+                                           #clear = self.clearEvents)
         
         
-        if len(tp):
-            self.triggerProtocols[:] = tp[:]
-            self.cachedProtocolFileName = self.triggerProtocolFileNameLineEdit.text()
-            self.triggerProtocolFileNameLineEdit.setText("<detected>")
+        #if len(tp):
+            #self.triggerProtocols[:] = tp[:]
+            #self.cachedProtocolFileName = self.triggerProtocolFileNameLineEdit.text()
+            #self.triggerProtocolFileNameLineEdit.setText("<detected>")
             
-        else:
-            self.triggerProtocols[:] = self.cachedProtocols[:]
-            self.triggerProtocolFileNameLineEdit.setText(self.cachedProtocolFileName)
+        #else:
+            #self.triggerProtocols[:] = self.cachedProtocols[:]
+            #self.triggerProtocolFileNameLineEdit.setText(self.cachedProtocolFileName)
             
     @pyqtSlot()
     def _slot_undoTriggers(self):
@@ -2849,38 +2841,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             segments_with_protocol = [p.segmentIndices() for p in self._scandata_.triggerProtocols]
             
             data_segments = [k for k in range(self._scandata_.scansFrames)]
-            
-            
                 
-                
-    #@pyqtSlot()
-    #@safeWrapper
-    #def _slot_modalDetectTriggerProtocols(self):
-        #if self._scandata_ is None:
-            #return
-        
-        #if isinstance(self._scandata_.electrophysiology, neo.Block) and len(self._scandata_.electrophysiology.segments):
-            ##ephys_preview = sv.SignalViewer(pWin = self._scipyenWindow_)
-            ##ephys_preview.plot(self._ephys_)
-            #self.ephysPreview.plot(self._ephys_)
-            #if self.eventDetectionDialog.exec():
-            
-            #dlg = qd.QuickDialog(self, "Detect Trigger Events")
-            #edw = TriggerDetectWidget(parent = dlg) 
-            #dlg.addWidget(edw)
-            #dlg.setWindowModality(QtCore.Qt.WindowModal)
-            #if dlg.exec() == QtWidgets.QDialog.Accepted:
-                #tp = auto_detect_trigger_protocols(self._ephys_,
-                                                   #presynaptic = edw.presyn,
-                                                   #postsynaptic = edw.postsyn,
-                                                   #photostimulation = edw.photo,
-                                                   #imaging = edw.imaging,
-                                                   #clear=edw.clearExisting)
-                #if len(tp):
-                    #self.ephysPreview.plot(self._ephys_)
-                    ##ephys_preview.plot(self._ephys_)
-                    #self.slot_generateScanData()
-        
     @safeWrapper
     def loadPVScan(self, fileName):
         if len(fileName) and os.path.isfile(fileName):
@@ -3007,10 +2968,33 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self.errorMessage("PrairieView Importer", "Load protocols from file:\nExpecting a Pickle file; got %s which is a %s instead" % (fileName, mime_type))
             return False
         
+    @pyqtSlot()
+    def done(self, value):
+        """Generates ScanData object (if accepted) and closes the dialog.
+        value: a QtWidgets.QDialog.DialogCode (Accepted = 1, Rejected = 2)
+        NOTE: Clients need to connect custom slots to this dialog's accepted(),
+        rejected(), or finished(int) signals
+        """
+        if value == QtWidgets.QDialog.Accepted:
+            self.slot_generateScanData()
+            
+        super().done(value)        
+        
+    @pyqtSlot()
+    def accept(self):
+        # NOTE: 2021-04-16 11:24:35 this calls done(QDialog.Accepted)
+        super().accept()
+        
+    @pyqtSlot()
+    def reject(self):
+        # NOTE: 2021-04-16 11:24:48 this calls done(QDialog.Rejected)
+        super().reject()
         
     @pyqtSlot()
     @safeWrapper
     def slot_generateScanData(self):
+        """If sel.auto_export is True, it also export the result to workspace.
+        """
         if isinstance(self._pvscan_, PVScan):
             self._scandata_ = self._pvscan_.scandata()
             
@@ -3028,8 +3012,9 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
                 self._scandata_.triggerProtocols = self.triggerProtocols
                 
             if self.auto_export:
-               self._scipyenWindow_.workspace[strutils.str2symbol(self.dataName)] = self._scandata_ 
-               self._scipyenWindow_.slot_updateWorkspaceTable(False)
+                self._scipyenWindow_.assignToWorkspace(self.scanDataVarName, self.scanData, from_console=False)
+                #self._scipyenWindow_.workspace[strutils.str2symbol(self.dataName)] = self._scandata_ 
+                #self._scipyenWindow_.slot_updateWorkspaceTable(False)
             
     def updateProtocolEditor(self):
         self.protocolEditorDialog.triggerProtocols = self.triggerProtocols
@@ -3046,3 +3031,9 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
     @property
     def scanData(self):
         return self._scandata_
+    
+    @property
+    def scandata(self):
+        """Alias to self.scanData
+        """
+        return self.scanData
