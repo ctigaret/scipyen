@@ -7370,7 +7370,7 @@ class Planar2QGraphicsManager(QtCore.QObject):
         pass
         
 class GraphicsObject(QtWidgets.QGraphicsObject):
-    """Graphical object that displays PlanarGraphics objects using Qt Framework classes.
+    """Qt Graphics Framework object frontend for PlanarGraphics objects
     FIXME
     TODO Logic for building/editing ROIs is broken for ellipse -- why?
     TODO check cachedPath logic
