@@ -3899,10 +3899,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             action_0 = openFileObjects
             
         
-        openParentFolderInSystemApp = cm.addAction("Open Containing Folder In File Manager")
+        openParentFolderInSystemApp = cm.addAction("Open Parent Folder In File Manager")
         openParentFolderInSystemApp.triggered.connect(self.slot_systemOpenParentFolderForSelectedItems)
         
-        openFolderInFileManager = cm.addAction("Open Current Folder In File Manager")
+        openFolderInFileManager = cm.addAction("Open This Folder In File Manager")
         openFolderInFileManager.triggered.connect(self.slot_systemOpenCurrentFolder)
         
         if action_0 is None:
