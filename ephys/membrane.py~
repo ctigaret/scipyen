@@ -53,8 +53,9 @@ import core.datatypes as dt
 import core.plots as plots
 import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
-import core.triggerprotocols
-from core.triggerprotocols import (TriggerEvent, TriggerEventType, TriggerProtocol)
+#import core.triggerprotocols
+from core.triggerevent import (TriggerEvent, TriggerEventType)
+from core.triggerprotocols import (TriggerProtocol)
 #import imaging.scandata
 from imaging.scandata import ScanData
 
@@ -2024,11 +2025,11 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,
                   
     triggers: None (default), or
     
-              datatypes.TriggerEvent where 'times' attribute indicate the time
+              TriggerEvent where 'times' attribute indicate the time
               of current pulses (in the time domain of Vm), or
               
-              datatypes.TriggerProtocol containing postsynaptic trigger events
-              (see datatypes.TriggerProtocol and datatypes.TriggerEvent for details)
+              TriggerProtocol containing postsynaptic trigger events
+              (see TriggerProtocol and TriggerEvent for details)
                 the times of the current injection pulses for eliciting APs are
                 taken as sthe postsynaptic trigger times
                 
@@ -2055,7 +2056,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,
             'events' attribute. 
             
             Raises ValueError if segment.events is empty or contains no 
-            dataypes.TriggerEvent objects.
+            TriggerEvent objects.
               
               
               

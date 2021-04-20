@@ -4692,7 +4692,7 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
 def analyse_AP_step_injection_series(data, **kwargs):
     """ Action potential (AP) detection and analysis in I-clamp experiment.
     
-    Performs action potential (AP) detection and analysis indata from a single 
+    Performs action potential (AP) detection and analysis in data from a single 
     I-clamp experiment containing a series of increasing depolarizing current 
     injection steps.
     
