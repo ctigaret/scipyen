@@ -128,15 +128,19 @@ UnitTypes = collections.defaultdict(lambda: "NA",
 Genotypes = ["NA", "wt", "het", "hom"]
 
 sipfx = ("yotta", "zetta", "exa", "peta", "tera", 
-       "giga", "mega", "kilo", "hecto", "deca", 
-       "deci", "centi", "milli", "micro", "nano",
-       "pico", "femto", "atto", "zepto", "yotto",)
+         "giga", "mega", "kilo", "hecto", "deca", 
+         "deci", "centi", "milli", "micro", "nano",
+         "pico", "femto", "atto", "zepto", "yotto",)
+
+SI_prefix = sipfx
 
 sisymb = ("Y", "Z", "E", "P", "T", "G", "M", "k", "h", "da",
           "d", "c", "m", "mu", "n", "p", "f", "a", "z", "y",)
 
-exps = tuple([k for k in range(24,2,-3)] + [2,1,-1,-2] + [k for k in range(-3, -37, -3)])
+SI_symbols = sisymb
 
+exps = tuple([k for k in range(24,2,-3)] + [2,1,-1,-2] + [k for k in range(-3, -37, -3)])
+exponents_of_10 = exps
 
 SI10Powers = dict([(p, dict([("exponent", e), ("symbol", s)])) for (p,e,s) in zip(sipfx, exps, sisymb)])
 
@@ -202,6 +206,8 @@ def make_scaled_unit_quantity(base_quantity, power):
     
     return pq.UnitQuantity(name, factor * base_quantity, symbol=symbol)
     
+# NOTE: the string argument refers to the prefix to be prepended to the original
+# unit string
 kiloohm = kohm = make_scaled_unit_quantity(pq.ohm, "kilo")
 custom_unit_symbols[kohm.symbol] = kohm
 megaohm = Mohm = make_scaled_unit_quantity(pq.ohm, "mega")
@@ -209,17 +215,8 @@ custom_unit_symbols[Mohm.symbol] = Mohm
 gigaohm = Gohm = make_scaled_unit_quantity(pq.ohm, "giga")
 custom_unit_symbols[Gohm.symbol] = Gohm
 
-#kiloohm = kohm = pq.UnitQuantity("kiloohm", 1e3 * pq.ohm, symbol="kohm")
-#megaohm = Mohm = pq.UnitQuantity("megaohm", 1e6 * pq.ohm, symbol="Mohm")
-#gigaohm = Gohm = pq.UnitQuantity("gigaohm", 1e9 * pq.ohm, symbol="Gohm")
-
-
 # some other useful units TODO
 
-#relative_tolerance = 1e-4
-#absolute_tolerance = 1e-4
-#equal_nan = True
-    
 def isVector(x):
     """Returns True if x is a numpy array encapsulating a vector.
     
@@ -710,7 +707,6 @@ def name_from_unit(u):
     return d_name
             
     
-
 def check_time_units(value):
     if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
         raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)
@@ -785,7 +781,7 @@ def categorize_data_frame_columns(data, *column_names, inplace=True):
             ret[c] = pd.Categorical(data[c].astype("category"))
             
         return ret
-
+    
 class UnitsStringValidator(QtGui.QValidator):
     def __init__(self, parent=None):
         super(UnitsStringValidator, self).__init__(parent)
@@ -810,22 +806,279 @@ class IndicatorCalibration(object):
         self.Fmin = Fmin
         self.Fmax = Fmax
         
-#class EnumMixin(object):
-    #@classmethod
-    #def names(cls):
-        #for e in cls:
-            #yield e.name
+class TypeEnum(IntEnum):
+    """Common ancestor for enum types used in Scipyen
+    """
+    @classmethod
+    def names(cls):
+        """Iterate through the names in TypeEnum enumeration.
+        """
+        for t in cls:
+            yield t.name
+    
+    @classmethod
+    def values(cls):
+        """Iterate through the int values of TypeEnum enumeration.
+        """
+        for t in cls:
+            yield t.value
+        
+    @classmethod
+    def types(cls):
+        """Iterate through the elements of TypeEnum enumeration.
+        Useful to quickly remember what the members of this enum are (with their
+        names and values).
+        
+        A TypeEnum enum member is by definition a member 
+        of TypeEnum enum and an instance of TypeEnum.
+        
+        """
+        for t in cls:
+            yield t
             
-    #@classmethod
-    #def values(cls):
-        #for e in cls:
-            #yield e.value
+    @classmethod
+    def namevalue(cls, name:str):
+        """Return the value (int) for given name;
+        If name is not a valid TypeEnum name returns -1
+        """
+        if name in cls.names():
+            return getattr(cls, name).value
+        
+        return -1
+    
+    @classmethod
+    def type(cls, t):
+        if isinstance(t, str):
+            if t in cls.names():
+                return [_t for _t in cls if _t.name == t][0]
+            else:
+                # check for user-defined composite type - break it down to a list
+                # of existing types, if possible
+                if "|" in t:
+                    t_hat = [cls.type(_t.strip()) for _t in t.split("|")]
+                    if len(t_hat):
+                        return t_hat
+                    else:
+                        raise ValueError("Unknown trigger event type name %s" % t)
+                else:
+                    raise ValueError("Unknown trigger event type name %s" % t)
             
+        elif isinstance(t, int):
+            if t in cls.values():
+                return [_t for _t in cls if _t.value == t][0]
+            else:
+                # check for implicit composite type (i.e. NOT listed in the definition)
+                ret = [_t for _t in cls if _t.value & t]
+                if len(ret):
+                    return ret
+                else:
+                    raise ValueError("Unknown trigger event type value %d" % t)
             
-    #@classmethod
-    #def items(cls):
-        #for e in cls:
-            #yield e
+        elif isinstance(t, cls):
+            return t
+        
+        else:
+            raise TypeError("Expecting a %s, int or str; got %s instead" % (cls.__name__, type(t).__name__))
+            
+    @classmethod
+    def strand(cls, name1:str, name2:str):
+        """ Emulates '&' operator for type names 'name1' and 'name2'.
+        If neither arguments are valid names returns 0
+        """
+        if any([n not in cls.names() for n in [name1, name2]]):
+            return 0
+        
+        val1 = cls.namevalue(name1)
+        val2 = cls.namevalue(name2)
+        
+        return val1 & val2
+    
+    @classmethod
+    def is_primitive_type(cls, t):
+        """Checks if 't' is a primitive type in this types enumeration.
+        
+        Parameters:
+        -----------
+        t: int, str, TypeEnum (or subclass)
+        
+            When an int or a str, the value must be a valid one (i.e., found in
+            TypeEnum.values() or TypeEnum.names(), respectively)
+        
+        """
+        return len(cls.primitive_component_types(t)) == 0
+    
+    @classmethod
+    def is_derived_type(cls, t):
+        """Checks if 't' is a compound type (i.e. derived from other type enums)
+        
+        Parameters:
+        -----------
+        t: int, str, TypeEnum (or subclass)
+        
+            When an int or a str, the value must be a valid one (i.e., found in
+            TypeEnum.values() or TypeEnum.names(), respectively)
+        
+        """
+        return len(cls.component_types(t)) > 0
+        #return len(cls.primitive_component_types(t)) > 0
+        
+    @classmethod
+    def is_composite_type(cls, t):
+        """Alias of TypeEnum.is_derived_type()
+        
+        Parameters:
+        -----------
+        t: int, str, TypeEnum (or subclass)
+        
+            When an int or a str, the value must be a valid one (i.e., found in
+            TypeEnum.values() or TypeEnum.names(), respectively)
+        
+        """
+        return cls.is_derived_type(t)
+    
+    @classmethod
+    def primitive_component_types(cls, t):
+        """ Returns a list of primitive TypeEnum objects that compose 't'.
+        If 't' is already a primitive type, returns an empty list.
+        
+        Parameters:
+        -----------
+        t: int, str, TypeEnum (or subclass)
+        
+            When an int or a str, the value must be a valid one (i.e., found in
+            TypeEnum.values() or TypeEnum.names(), respectively)
+        
+        """
+        if isinstance(t, (int, str)):
+            t_hat = cls.type(t)
+            if isinstance(t_hat, list):
+                return unique([__t for __t in chain.from_iterable([[_t for _t in cls if _t.is_primitive() and _t.value <= t_.value] for t_ in t_hat])])
+            else:
+                t = t_hat
+                
+        elif not isinstance(t, cls):
+            raise TypeError("Expecting a TypeEnum, int or str; got %s instead" % type(t).__name__)
+        
+        return [_t for _t in filter(lambda x: x & t, cls) if _t.value < t.value and _t.is_primitive()]
+        
+    @classmethod
+    def component_types(cls, t):
+        """ Returns a list of TypeEnum objects that compose 't'.
+        If 't' is already a primitive type, returns an empty list.
+    
+        The TypeEnum objects can also be composite types.
+        
+        Parameters:
+        -----------
+        t: int, str, TypeEnum (or subclass)
+        
+            When an int or a str, the value must be a valid one (i.e., found in
+            TypeEnum.values() or TypeEnum.names(), respectively)
+        
+        """
+        if isinstance(t, (int, str)):
+            t_hat = cls.type(t)
+            if isinstance(t_hat, list):
+                # NOTE: 2021-04-14 23:33:22
+                # by definition this only occurs with a composite type
+                return unique([__t for __t in chain.from_iterable([[_t for _t in cls if _t.value <= t_.value] for t_ in t_hat])])
+            else:
+                t = t_hat
+                
+        elif not isinstance(t, cls):
+            raise TypeError("Expecting a %s, int or str; got %s instead" % (cls.__name__, type(t).__name__))
+        
+        return [_t for _t in filter(lambda x: x & t, cls) if _t.value < t.value]
+    
+    @classmethod
+    def derived_types(cls, t):
+        """ Returns the composite TypeEnum objects where 't' participates.
+        Parameters:
+        -----------
+        t: int, str, TypeEnum (or subclass)
+        
+            When an int or a str, the value must be a valid one (i.e., found in
+            TypeEnum.values() or TypeEnum.names(), respectively)
+        
+        """
+        if isinstance(t, (int, str)):
+            t_hat = cls.type(t)
+            if isinstance(t_hat, list):
+                return unique([__t for __t in chain.from_iterable([[_t for _t in cls if _t is not t_ and _t.value > t_.value] for t_ in t_hat])])
+            else:
+                t = t_hat
+                
+        elif not isinstance(t, cls):
+            raise TypeError("Expecting a %s, int or str; got %s instead" % (cls.__name__, type(t).__name__))
+        
+        return [_t for _t in filter(lambda x: x & t, cls) if not _t.is_primitive() and _t is not t and _t.value > t.value]# _t.value > t.value]
+        
+    
+    def is_derived(self):
+        """Return True if this TypeEnum object is a composite (i.e., derived) type.
+        """
+        return self.is_derived_type(self)
+    
+    def is_composite(self):
+        """Return True if this TypeEnum object is a composite (i.e., derived) type.
+        """
+        return self.is_derived()
+    
+    def is_primitive(self):
+        return self.is_primitive_type(self)
+    
+    def primitives(self):
+        """Returns a list of primitive types used to generate this type.
+        
+        Compound types are generated from primitive types through the logical
+        OR operator (bitwise OR).
+        
+        Returns an empty list of this is a primitive type.
+        """
+        return self.primitive_component_types(self)
+    
+    def components(self):
+        """Returns a list of components for this TypeEnum object.
+        
+        Compound types are generated from primitive types through the logical
+        OR operator (bitwise OR).
+        
+        If this TypeEnum object is a primitive returns an empty list
+        """
+        return self.component_types(self)
+    
+    def includes(self, t):
+        """Returns True if 't' is a component of this TypeEnum object.
+        
+        't' may be a primitive or a composite type.
+        
+        Always returns False when this is a primitive.
+        """
+        t = self.type(t)
+            
+        return t in self.components()
+    
+    def is_primitive_of(self, t):
+        """Returns True if this TypeEnum object is a primitive of 't'.
+        
+        Always returns False when this TypeEnum object is a composite (i.e., 
+        even if it is a component of 't').
+        """
+        t = self.type(t)
+            
+        return self in t.primitives()
+    
+    def is_component_of(self, t):
+        """Returns True if this TypeEnum object is a component of 't'.
+        """
+        t = self.type(t)
+        
+        return self in t.components()
+    
+    def nameand(self, name:str):
+        """ Applies strand() to the name of this object and the argument.
+        """
+        return self.strand(self.name, name)
         
         
 #class PictArray(vigra.VigraArray):

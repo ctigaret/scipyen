@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-"""traitlets-aware containers
+"""
+Traitlets-aware containers
 An attempt to supplement traitlets package with container traits that can trigger
 notifications if their contents change.
 

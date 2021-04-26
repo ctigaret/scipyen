@@ -4693,8 +4693,8 @@ def analyse_AP_step_injection_series(data, **kwargs):
     """ Action potential (AP) detection and analysis in I-clamp experiment.
     
     Performs action potential (AP) detection and analysis in data from a single 
-    I-clamp experiment containing a series of increasing depolarizing current 
-    injection steps.
+    I-clamp experiment (a "run") with a series of increasing depolarizing current 
+    injection steps (one injection per "sweep").
     
     Parameters:
     ----------
@@ -4708,8 +4708,10 @@ def analyse_AP_step_injection_series(data, **kwargs):
         When a single neo.Segment, this contains data from a single step current
         injection.
         
-        Each segment and must contain at least two analog signals, one with the
-        injected current and the other, with the recorded membrane potential.
+        Prerequisites:
+        1. Each segment must contain two analog signals (neo.AnalogSignal ):
+        * recorded membrane potential
+        * the injected current
         
         It is assumed that the amount of injected current is different in each 
         segment and that the duration of the current injection step is the same 
@@ -5323,7 +5325,7 @@ def analyse_AP_step_injection_series_replicate(*blocks, **kwargs):
     """AP analysis in several runs, each containing series of depolarising step current injections.
     DEPRECATED
     Iteratively applies analyse_AP_step_injection_series() for each series in the run
-    the summarizes the result (reports average values).
+    then summarizes the result (reports average values).
     
     Arguments:
     ==========

@@ -15,7 +15,7 @@ import numpy as np
 import quantities as pq
 import neo
 from neo.core.dataobject import (DataObject, ArrayDict,)
-from core.datatypes import (check_time_units, is_string, 
+from core.datatypes import (check_time_units, is_string, TypeEnum,
                             RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
 from core.utilities import unique
 
@@ -34,8 +34,10 @@ def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None,
     
     return e
 
-class TriggerEventType(IntEnum):#, EnumMixin):
+class TriggerEventType(TypeEnum):
     """Convenience enum type for trigger event types.
+    
+    Inherits introspection methods from dataypes.TypeEnum.
     
     Types are defined as follows:
     =============================
@@ -77,320 +79,6 @@ class TriggerEventType(IntEnum):#, EnumMixin):
     imaging             = imaging_frame | imaging_line  # 24
     acquisition         = imaging | sweep               # 56
     
-    @staticmethod
-    def names():
-        """Iterate through the names in TriggerEventType enumeration.
-        """
-        for t in TriggerEventType:
-            yield t.name
-    
-    @staticmethod
-    def values():
-        """Iterate through the int values of TriggerEventType enumeration.
-        """
-        for t in TriggerEventType:
-            yield t.value
-        
-    @staticmethod
-    def types():
-        """Iterate through the elements of TriggerEventType enumeration.
-        Useful to quickly remember what the members of this enum are (with their
-        names and values).
-        
-        A TriggerEventType enum member is by definition a member 
-        of TriggerEventType enum and an instance of TriggerEventType.
-        
-        """
-        for t in TriggerEventType:
-            yield t
-            
-    @staticmethod
-    def namevalue(name:str):
-        """Return the value (int) for given name;
-        If name is not a valid TriggerEventType name returns -1
-        """
-        if name in TriggerEventType.names():
-            return getattr(TriggerEventType, name).value
-        
-        return -1
-    
-    @staticmethod
-    def type(t):
-        if isinstance(t, str):
-            if t in TriggerEventType.names():
-                return [_t for _t in TriggerEventType if _t.name == t][0]
-            else:
-                # check for user-defined composite type - break it down to a list
-                # of existing types, if possible
-                if "|" in t:
-                    #t_names = [_t.strip() for _t in t.split("|")]
-                    #print(t_names)
-                    #t_hat = [TriggerEventType.type(_t) for _t in t_names]
-                    t_hat = [TriggerEventType.type(_t.strip()) for _t in t.split("|")]
-                    if len(t_hat):
-                        return t_hat
-                    else:
-                        raise ValueError("Unknown trigger event type name %s" % t)
-                else:
-                    raise ValueError("Unknown trigger event type name %s" % t)
-            
-        elif isinstance(t, int):
-            if t in TriggerEventType.values():
-                return [_t for _t in TriggerEventType if _t.value == t][0]
-            else:
-                # check for implicit composite type (i.e. NOT listed in the definition)
-                ret = [_t for _t in TriggerEventType if _t.value & t]
-                if len(ret):
-                    return ret
-                else:
-                    raise ValueError("Unknown trigger event type value %d" % t)
-            
-        elif isinstance(t, TriggerEventType):
-            return t
-        
-        else:
-            raise TypeError("Expecting a TriggerEventType, int or str; got %s instead" % type(t).__name__)
-            
-    @staticmethod
-    def strand(name1:str, name2:str):
-        """ Emulates '&' operator for type names 'name1' and 'name2'.
-        If neither arguments are vlid TriggerEventType names returns 0
-        """
-        if any([n not in TriggerEventType.names() for n in [name1, name2]]):
-            return 0
-        
-        val1 = TriggerEventType.namevalue(name1)
-        val2 = TriggerEventType.namevalue(name2)
-        
-        return val1 & val2
-    
-    @staticmethod
-    def is_primitive_type(t):
-        """Checks if the TriggerEventType 't' is a primitive type.
-        
-        Parameters:
-        -----------
-        t: int, str, TriggerEventType
-        
-            When an int or a str, the value must be a valid one (i.e., found in
-            TriggerEventType.values() or TriggerEventType.names(), respectively)
-        
-        """
-        return len(TriggerEventType.primitive_component_types(t)) == 0
-    
-    @staticmethod
-    def is_derived_type(t):
-        """Checks if the TriggerEventType 't' is a compund (i.e. derived) type.
-        
-        Parameters:
-        -----------
-        t: int, str, TriggerEventType
-        
-            When an int or a str, the value must be a valid one (i.e., found in
-            TriggerEventType.values() or TriggerEventType.names(), respectively)
-        
-        """
-        return len(TriggerEventType.component_types(t)) > 0
-        #return len(TriggerEventType.primitive_component_types(t)) > 0
-        
-    @staticmethod
-    def is_composite_type(t):
-        """Alias of TriggerEventType.is_derived_type()
-        
-        Parameters:
-        -----------
-        t: int, str, TriggerEventType
-        
-            When an int or a str, the value must be a valid one (i.e., found in
-            TriggerEventType.values() or TriggerEventType.names(), respectively)
-        
-        """
-        return TriggerEventType.is_derived_type(t)
-    
-    @staticmethod
-    def primitive_component_types(t):
-        """ Returns a list of primitive TriggerEventType objects that compose 't'.
-        If 't' is already a primitive type, returns an empty list.
-        
-        Parameters:
-        -----------
-        t: int, str, TriggerEventType
-        
-            When an int or a str, the value must be a valid one (i.e., found in
-            TriggerEventType.values() or TriggerEventType.names(), respectively)
-        
-        """
-        if isinstance(t, (int, str)):
-            t_hat = TriggerEventType.type(t)
-            if isinstance(t_hat, list):
-                #return [__t for __t in chain.from_iterable([[_t for _t in filter(lambda x: x & t, TriggerEventType) if _t.is_primitive() and _t.value < t_.value] for t_ in t_hat])]
-                return unique([__t for __t in chain.from_iterable([[_t for _t in TriggerEventType if _t.is_primitive() and _t.value <= t_.value] for t_ in t_hat])])
-            else:
-                t = t_hat
-                
-        #if isinstance(t, int):
-            #if t not in TriggerEventType.values():
-                #raise ValueError("Unknown trigger event type value %d" % t)
-            
-            #t = TriggerEventType.type(t)
-            
-        #elif isinstance(t, str):
-            #if t not in TriggerEventType.names():
-                #raise ValueError("Unknown trigger event type name %s" % t)
-            
-            #t = TriggerEventType.type(t)
-            
-        elif not isinstance(t, TriggerEventType):
-            raise TypeError("Expecting a TriggerEventType, int or str; got %s instead" % type(t).__name__)
-        
-        return [_t for _t in filter(lambda x: x & t, TriggerEventType) if _t.value < t.value and _t.is_primitive()]
-        
-    @staticmethod
-    def component_types(t):
-        """ Returns a list of TriggerEventType objects that compose 't'.
-        If 't' is already a primitive type, returns an empty list.
-    
-        The TriggerEventType objects can also be composite types.
-        
-        Parameters:
-        -----------
-        t: int, str, TriggerEventType
-        
-            When an int or a str, the value must be a valid one (i.e., found in
-            TriggerEventType.values() or TriggerEventType.names(), respectively)
-        
-        """
-        if isinstance(t, (int, str)):
-            t_hat = TriggerEventType.type(t)
-            if isinstance(t_hat, list):
-                # NOTE: 2021-04-14 23:33:22
-                # by definition this only occurs with a composite type
-                #return [__t for __t in chain.from_iterable([[_t for _t in filter(lambda x: x & t_, TriggerEventType) if _t.value < t_.value] for t_ in t_hat])]
-                return unique([__t for __t in chain.from_iterable([[_t for _t in TriggerEventType if _t.value <= t_.value] for t_ in t_hat])])
-            else:
-                t = t_hat
-                
-        #if isinstance(t, int):
-            #if t not in TriggerEventType.values():
-                #raise ValueError("Unknown trigger event type value %d" % t)
-            
-            #t_hat = TriggerEventType.type(t)
-            
-            #if isinstance(t_hat, list):
-                #return [_t for _t in t_hat if _t.value < t]
-            
-            #else:
-                #t = t_hat
-        
-        #elif isinstance(t, str):
-            #if t not in TriggerEventType.names():
-                #raise ValueError("Unknown trigger event type name %s" % t)
-            
-            #t = TriggerEventType.type(t)
-            
-        elif not isinstance(t, TriggerEventType):
-            raise TypeError("Expecting a TriggerEventType, int or str; got %s instead" % type(t).__name__)
-        
-        return [_t for _t in filter(lambda x: x & t, TriggerEventType) if _t.value < t.value]
-    
-    @staticmethod
-    def derived_types(t):
-        """ Returns the composite TriggerEventType objects where 't' participates.
-        Parameters:
-        -----------
-        t: int, str, TriggerEventType
-        
-            When an int or a str, the value must be a valid one (i.e., found in
-            TriggerEventType.values() or TriggerEventType.names(), respectively)
-        
-        """
-        if isinstance(t, (int, str)):
-            t_hat = TriggerEventType.type(t)
-            if isinstance(t_hat, list):
-                #return [__t for __t in chain.from_iterable([[_t for _t in filter(lambda x: x & t_, TriggerEventType) if _t is not t_ and _t.value > t_.value] for t_ in t_hat])]
-                return unique([__t for __t in chain.from_iterable([[_t for _t in TriggerEventType if _t is not t_ and _t.value > t_.value] for t_ in t_hat])])
-            else:
-                t = t_hat
-                
-        #if isinstance(t, int):
-            #if t not in TriggerEventType.values():
-                #raise ValueError("Unknown trigger event type value %d" % t)
-            
-            #t = TriggerEventType.type(t)
-            
-        #elif isinstance(t, str):
-            #if t not in TriggerEventType.names():
-                #raise ValueError("Unknown trigger event type name %s" % t)
-            
-            #t = TriggerEventType.type(t)
-            
-        elif not isinstance(t, TriggerEventType):
-            raise TypeError("Expecting a TriggerEventType, int or str; got %s instead" % type(t).__name__)
-        
-        return [_t for _t in filter(lambda x: x & t, TriggerEventType) if not _t.is_primitive() and _t is not t and _t.value > t.value]# _t.value > t.value]
-        
-        
-    def is_derived(self):
-        """Return True if this TriggerEventType is a composite (i.e., derived) type.
-        """
-        return TriggerEventType.is_derived_type(self)
-    
-    def is_composite(self):
-        """Return True if this TriggerEventType is a composite (i.e., derived) type.
-        """
-        return self.is_derived()
-    
-    def is_primitive(self):
-        return TriggerEventType.is_primitive_type(self)
-    
-    def primitives(self):
-        """Returns a list of primitive TriggerEventType for this TriggerEventType.
-        
-        If this instance is already a primitive, returns an empty list
-        """
-        return TriggerEventType.primitive_component_types(self)
-    
-    def components(self):
-        """Returns a list of components for this TriggerEventType
-        
-        If this TriggerEventType is not a composite returns an empty list
-        """
-        return TriggerEventType.component_types(self)
-    
-    def includes(self, t):
-        """Returns True if 't' is a component of this TriggerEventType.
-        
-        't' may be a primitive or a composite TriggerEventType.
-        
-        Always returns False when this TriggerEventType is a primitive.
-        """
-        t = TriggerEventType.type(t)
-            
-        return t in self.components()
-    
-    def is_primitive_of(self, t):
-        """Returns True if this TriggerEventType is a primitive of 't'.
-        
-        Always returns False when this TriggerEventType is a composite (i.e., 
-        even if it is a component of 't').
-        """
-        t = TriggerEventType.type(t)
-            
-        return self in t.primitives()
-    
-    def is_component_of(self, t):
-        """Returns True if this TriggerEventType is a component of 't'.
-        """
-        t = TriggerEventType.type(t)
-        
-        return self in t.components()
-    
-    def nameand(self, name:str):
-        """ Applies strand() to the name of this object and the argument.
-        """
-        return TriggerEventType.strand(self.name, name)
-        
-        
 class TriggerEvent(DataObject):
     """Trigger event.
     
@@ -966,12 +654,6 @@ class TriggerEvent(DataObject):
         
         return ret # for convenience so that we can chain this e.g. "return obj.copy().shift()"
         
-    #def shiftCopy(self, value):
-        #"""Returns a shifted copy of this event
-        #"""
-        
-        #return self.copy().shift(value)
-        
     def __getitem__(self, i):
         obj = super(TriggerEvent, self).__getitem__(i)
         if self._labels is not None and self._labels.size > 0:
@@ -995,11 +677,6 @@ class TriggerEvent(DataObject):
             
         setattr(self, "__event_type__", getattr(other, "__event_type__", TriggerEventType.presynaptic))
         
-    #def duplicate_with_new_data(self, signal):
-        #new = self.__class__(times=signal)
-        #new._copy_data_complement(self)
-        #return new
-    
     def duplicate_with_new_data(self, times, labels=None, units=None):
         '''
         Create a new :class:`TriggerEvent` with the same metadata

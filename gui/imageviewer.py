@@ -245,7 +245,6 @@ class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
     def slot_newMaxRangeValueReceived(self, val):
         self.rangeMaxSpinBox.setValue(val)
         
-    
 
 class AxesCalibrationDialog(QDialog, Ui_AxisCalibrationDialog):
     def __init__(self, image, pWin=None, parent=None):
