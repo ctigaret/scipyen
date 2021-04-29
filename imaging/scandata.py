@@ -2879,6 +2879,8 @@ class ScanData(object):
                     self._analysismode_ = ScanData.ScanDataAnalysisMode.frame
                     self._scandatatype_ = ScanData.ScanDataType.linescan
                     
+                    print("ScanData._parse_metadata_ coordinates", value.sequences[0].definition.coordinates)
+                    
                     #print("ScanData._parse_metadata_() build roi as Path")
                     roi = pgui.Path(*value.sequences[0].definition.coordinates)
                     

@@ -5756,8 +5756,12 @@ class Path(PlanarGraphics):
         Initialize Path from a sequence of PlanarGraphics objects.
         This is also used for unpickling
         """
+        print("Path.__init_from_planar_graphics_")
         for p in args:
             self._objects_.append(p.copy())
+            
+        for p in self:
+            print(p)
 
     def __init__(self, *args, name:typing.Optional[str]="path", frameindex=[], currentframe:int=0, 
                  graphicstype=None, closed=False,
@@ -5830,6 +5834,7 @@ class Path(PlanarGraphics):
                                 linked_objects = linked_objects)
         
         if len(args):
+            print("PlanarGraphics.__init__ *args", args)
             if len(args) == 1: # construct Path from one argument in *args
                 if isinstance(args[0], Path): # copy constructor
                     # NOTE: 2021-04-26 11:52:53
@@ -6014,7 +6019,9 @@ class Path(PlanarGraphics):
                     
         if len(self):
             for o in self._objects_:
+                print(o.type, ": x=", o.x, "y=",o.y)
                 o._currentframe_ = currentframe
+            
             
             x = min([o.x for o in self._objects_ if o is not None])
             y = min([o.y for o in self._objects_ if o is not None])
