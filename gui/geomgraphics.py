@@ -539,7 +539,7 @@ class PlanarGraphics():
         
         e.g., for a Rect:
         
-        _planar_descriptors_ = ("x", "y", "w", "h", "z_frame")
+        _planar_descriptors_ = ("x", "y", "w", "h")
         
     _graphics_object_type_: a GraphicsObjectType enum value
     
@@ -612,20 +612,29 @@ class PlanarGraphics():
     
     @classmethod
     def validateDescriptors(cls, *args):
-        return len(args) == len(cls._planar_descriptors_) and all([isinstance(v, numbers.Number) for v in args])
+        return len(args) == len(cls._planar_descriptors_) and all([isinstance(v, numbers.Number, str) for v in args])
     
     @classmethod
     def validateState(cls, value):
+        #print("PlanarGraphics (%s) validateState(%s: %s)" % (cls.__name__, value.__class__.__name__, value))
+        #print("PlanarGraphics (%s) _planar_descriptors_: %s" % (cls.__name__, cls._planar_descriptors_))
+        
         if not isinstance(value, DataBag):
             return False
 
         all_keys = all([a in value.keys() for a in cls._planar_descriptors_])
         
+        #print("\tall_keys", all_keys)
+        
+        #print([(d, ":", type(value[d])) for d in cls._planar_descriptors_])
+        
+        
         if all_keys:
-            valid_descriptors = all([isinstance(value[d], numbers.Number) for d in cls._planar_descriptors_])
-            #non_frame_descriptors = [d for d in cls._planar_descriptors_ if d != "z_frame"]
-            #valid_descriptors = all([isinstance(value[d], numbers.Number) for d in non_frame_descriptors])
+            valid_descriptors = all([isinstance(value[d], (numbers.Number, str)) for d in cls._planar_descriptors_])
+            #valid_descriptors = all([isinstance(value[d], (numbers.Number, str, type(None))) for d in cls._planar_descriptors_])
             
+            # NOTE: 2021-04-30 16:45:56
+            # z_frame IS NOT a planar descriptor but is required in the state data bag
             valid_z_frame = hasattr(value, "z_frame") and isinstance(value.z_frame, (int, type(None)))
             
             return valid_descriptors and valid_z_frame
@@ -665,8 +674,9 @@ class PlanarGraphics():
         # NOTE: 2020-11-01 14:01:12
         # z_frame has special treatment; by default this is set to None so that
         # the object is visible in any frame
-        descriptors = [d for d in cls._planar_descriptors_ if d != "z_frame"]
-        state = DataBag(dict(zip(descriptors, [0]*len(descriptors))))
+        #descriptors = [d for d in cls._planar_descriptors_ if d != "z_frame"]
+        #state = DataBag(dict(zip(descriptors, [0]*len(descriptors))))
+        state = DataBag(dict(zip(cls._planar_descriptors_, [0]*len(cls._planar_descriptors_))))
         state.z_frame = None
         return state
     
@@ -683,7 +693,7 @@ class PlanarGraphics():
         # accept objects created with older API
         # NOTE: 2020-11-01 14:23:16
         # z_frame has special treatment and it was absent in old APIs
-        descriptors = [d for d in cls._planar_descriptors_ if d != "z_frame"]
+        #descriptors = [d for d in cls._planar_descriptors_ if d != "z_frame"]
         
         if isinstance(src, DataBag):
             ret = src.copy()
@@ -720,14 +730,14 @@ class PlanarGraphics():
                 if key in src:
                     ret[key] = src[key] 
                     
-                else:
-                    #warnings.warn("%s.copyConvertState: The descriptor %s was not supplied; it will be assigned a default value" % (cls.__name__, key),
-                                #stacklevel=3)
-                    if key == "z_frame":
-                        ret.z_frame = None
-                    else:
-                        ret[key] = 0
-            
+                #else:
+                    ##warnings.warn("%s.copyConvertState: The descriptor %s was not supplied; it will be assigned a default value" % (cls.__name__, key),
+                                ##stacklevel=3)
+                    #if key == "z_frame":
+                        #ret.z_frame = None
+                    #else:
+                        #ret[key] = 0
+                        
         # now remove any extra predictors that have nothing to do with this type
         # NOTE: now we DO need to take z_frame into account
         extra_keys = [k for k in ret if k not in cls._planar_descriptors_]
@@ -735,13 +745,18 @@ class PlanarGraphics():
         for key in extra_keys:
             ret.__delitem__(key)
             
+        if hasattr(src, "z_frame"):
+            ret.z_frame = src.z_frame
+        else:
+            ret.z_frame = None
+            
         return ret
     
     @classmethod
     def copyConvertStates(cls, *args):
         """Use this to convert states from old API
         """
-        #print("\tPlanarGraphics.copyConvertStates for %s" % cls.__name__, args)
+        #print("\tPlanarGraphics (%s).copyConvertStates" % cls.__name__, args)
         return [s for s in map(cls.copyConvertState, args)]
     
     # ### END :class: methods
@@ -831,12 +846,15 @@ class PlanarGraphics():
         else:
             descriptors = [d for d in self.__class__._planar_descriptors_ if d != "z_frame"]
             
-            if len(args) != len(descriptors):
+            #if len(args) != len(descriptors):
+            if len(args) != len(self.__class__._planar_descriptors_):
                 raise ValueError("Expecting %d descriptors (without 'z_frame'); got %d instead" % (len(args), len(descriptors)))
             
             # NOTE: 2020-11-02 15:43:05
             # z_frame is set up below, using frameindex
-            self._states_ = [DataBag(dict(zip(descriptors, args)), 
+            #self._states_ = [DataBag(dict(zip(descriptors, args)), 
+                                    #mutable_types=True, allow_none=True)]
+            self._states_ = [DataBag(dict(zip(self.__class__._planar_descriptors_, args)), 
                                     mutable_types=True, allow_none=True)]
             
         self._states_[0].z_frame = None
@@ -845,7 +863,10 @@ class PlanarGraphics():
         
         self._currentframe_ = currentframe
         
-        self.checkStates()
+        #print("PlanarGraphics (%s).__init_from_descriptors__: %d states" % (self.__class__.__name__, len(self._states_)), self._states_)
+        self._checkStates_()
+        
+        #print("PlanarGraphics (%s).__init_from_descriptors__: %d states" % (self.__class__.__name__, len(self._states_)), self._states_)
         
     def __init_from_state__(self, state:dict, frameindex:typing.Optional[typing.Iterable]=[], 
                             currentframe:int=0) -> None:
@@ -856,7 +877,7 @@ class PlanarGraphics():
             
         self._currentframe_ = currentframe
         
-        self.checkStates()
+        self._checkStates_()
         
         #self.setCurrentState()
         
@@ -881,7 +902,7 @@ class PlanarGraphics():
                 
             self._currentframe_ = currentframe
             
-            self.checkStates()
+            self._checkStates_()
             
             #self.setCurrentState()
             
@@ -962,9 +983,12 @@ class PlanarGraphics():
         
         """
         
-        # consistency - fix up previous API
-        if "z_frame" not in self.__class__._planar_descriptors_:
-            self.__class__._planar_descriptors_ = tuple([d for d in self.__class__._planar_descriptors_] + ["z_frame"])
+        #print("PlanarGraphics (%s).__init__ *args" % self.__class__.__name__, *args)
+        
+        # NOTE: reverted on 2021-04-30 16:42:24
+        ## consistency - fix up previous API - reverted on 2021-04-30 16:42:16
+        #if "z_frame" not in self.__class__._planar_descriptors_:
+            #self.__class__._planar_descriptors_ = tuple([d for d in self.__class__._planar_descriptors_] + ["z_frame"])
             
         self.apiversion = (0,3)
             
@@ -1122,7 +1146,7 @@ class PlanarGraphics():
                     
                     self._states_ = self.__class__.copyConvertStates(*src._states_)
                     
-                    self.checkStates()
+                    self._checkStates_()
                     
                     return # we're DONE here
                 
@@ -1175,7 +1199,7 @@ class PlanarGraphics():
                                                    currentframe=currentframe)
                         
             else:# NOTE: many var-positional arguments
-                # these can be -- scalars: their number, order and 
+                # these can only be scalars: their number, order and 
                 # semantics are dictated by self._planar_descriptors_ when not empty
                 # When constructing a Path, args must contain individual PlanarGraphics objects
                 # for text PlanarGraphics there is only one shape descriptor in the sequence
@@ -1194,7 +1218,7 @@ class PlanarGraphics():
                 
                 self._currentframe_ = currentframe
             
-                self.checkStates()
+                self._checkStates_()
                 self._apply_frame_index_(frameindex)
                 
                 
@@ -1375,20 +1399,21 @@ class PlanarGraphics():
         else:
             object.__setattr__(self, name, value)
             
-    def checkStates(self):
+    def _checkStates_(self):
         """Ensures consistency of the PlanarGraphics states.
         
         A PlanarGraphics state can be:
         
-        (a) ubiquitous:     its z_frame attribute is None
-            * the state is drawn in any frame of the data 
+        (a) ubiquitous: its z_frame attribute is None:
+            * the state is represented (drawn) in all frames of the data 
+            * there can only be one such state
             
-        (b) frame-avoiding: the z_frame attribute is an int and is < 0
-            * the state should be drawn in any frame EXCEPT the one which has
+        (b) frame-avoiding: the z_frame attribute is an int < 0
+            * the state is represented in all frames EXCEPT the one which has
               index equal to -1 * z_frame - 1 (if it exists)
             
         (c) single-frame: the z_frame is an int >= 0
-            * the state shoould be drawn ONLY in the frame with index == z_frame
+            * the state is represented ONLY in the frame with index == z_frame
               (if it exists)
             
         The co-existence of the states in a PlanarGraphics object is governed by
@@ -1400,9 +1425,9 @@ class PlanarGraphics():
         
             Corollaries:
             
-            * the PlanarGraphics object can have only one ubiquitous state, and
+            1) the PlanarGraphics object can have only one ubiquitous state, and
             
-            * no other states co-exist with an ubiquitous state
+            2) no other states co-exist with an ubiquitous state
             
         Rule II. 
         --------
@@ -1456,12 +1481,16 @@ class PlanarGraphics():
         
         WARNING: This can be very expensive - only call it at construction
         """
+        #print("PlanarGraphics (%s) _checkStates_: %d states: " % (self.__class__.__name__, len(self._states_)), self._states_)
         if len(self._states_):
             # make sure the states conform to the planar descriptors
             states = [s for s in self._states_ if self.__class__.validateState(s)]
             
+            #print("\tvalid states:", states)
+            
             # 1) check for the existence of ubiquitous states
             ubiquitous_states = [s for s in states if s.z_frame is None]
+            #print("\tubiquitous states:", ubiquitous_states)
             del ubiquitous_states[1:] # enforce singleton element - idiom works for empty lists too
             
             if len(ubiquitous_states):
@@ -1575,7 +1604,7 @@ class PlanarGraphics():
         # invisible states
         # get indices of invisible states (z_frame < 0), converted to "real" 
         # frame indices (-1 * z_frame -1) --> these should resolve to 
-        # indices >= 0 that are NOT among the given frameindex, otherwise 
+        # indices >= 0 that are NOT included in the given frameindex, otherwise 
         # the visibility of the associated state(s) is ambiguous; 
         # NOTE: frameindex may contain None, for the state that is meant to
         # be visible in all frames
@@ -2821,8 +2850,8 @@ class PlanarGraphics():
             the current frame; otherwise, operate in the state where
             z_frame == current frame, if it exists
                     
-        NOTE: Might want to call self.checkStates() after executing this function.
-        Since checkStates can be expensive the decision to call it is left to 
+        NOTE: Might want to call self._checkStates_() after executing this function.
+        Since _checkStates_ can be expensive the decision to call it is left to 
         the user.
         """
         if state is None:
@@ -3147,7 +3176,7 @@ class PlanarGraphics():
         # (II)  one frame-avoding state and maximum a single-frame state 
         #       (visible in the avoided frame)
         # (III) any number of single-frame states
-        self.checkStates()
+        self._checkStates_()
         
         # NOTE: 2020-11-13 13:02:19
         # allow frame to override state z_frame
@@ -3428,7 +3457,7 @@ class PlanarGraphics():
                         else:
                             self._states_[:] = [new_state]
                                 
-        self.checkStates()
+        self._checkStates_()
         
     def getObjectForFrame(self, frame:typing.Optional[int]=None) -> typing.Optional[object]:
         """Returns a PlnaraGRaphics of the same type at self, for the specified frame.
@@ -4720,8 +4749,6 @@ class ArcMove(PlanarGraphics):
     """
     _planar_descriptors_ = ("x", "y", "w", "h", "a")
     
-    #_planar_descriptors_ = ("x", "y", "w", "h", "a", "z_frame")
-    
     _graphics_object_type_ = GraphicsObjectType.arcmove
     
     _qt_path_composition_call_ = "arcMoveTo"
@@ -4877,8 +4904,7 @@ class Line(PlanarGraphics):
     
     """
     _planar_descriptors_ = ("x", "y")
-    #_planar_descriptors_ = ("x", "y", "z_frame")
-    
+
     # NOTE: 2021-04-25 11:14:20 
     # Because lineTo is in fact stored as a single coordinate (x,y) pair,
     # if a Path starts with a line, the intial point on the path is implied to 
@@ -4930,7 +4956,6 @@ class Move(PlanarGraphics):
     Start is an alias of Move in this module.
     """
     _planar_descriptors_ = ("x", "y")
-    #_planar_descriptors_ = ("x", "y", "z_frame")
     
     _graphics_object_type_ = GraphicsObjectType.point
     
@@ -5002,7 +5027,6 @@ class Cubic(PlanarGraphics):
     
     """
     _planar_descriptors_ = ("x", "y", "c1x", "c1y", "c2x","c2y")
-    #_planar_descriptors_ = ("x", "y", "c1x", "c1y", "c2x","c2y", "z_frame")
     
     _graphics_object_type_ = GraphicsObjectType.cubic
     
@@ -5149,7 +5173,6 @@ class Quad(PlanarGraphics):
     object (Move, Line, CubicCurve or QuadCurve element).
     """
     _planar_descriptors_ = ("x", "y", "cx", "cy")
-    #_planar_descriptors_ = ("x", "y", "cx", "cy", "z_frame")
     
     _graphics_object_type_ = GraphicsObjectType.quad
     
@@ -5264,8 +5287,6 @@ class Ellipse(PlanarGraphics):
     x, y, w, h specify the coordinates of the bounding rectangle
     """
     _planar_descriptors_ = ("x", "y", "w", "h")
-    
-    #_planar_descriptors_ = ("x", "y", "w", "h", "z_frame")
     
     _graphics_object_type_ = GraphicsObjectType.ellipse
     
@@ -5402,7 +5423,6 @@ class Rect(PlanarGraphics):
     # ATTENTION: these must be present in the exact order in which they are passed
     # to the parametric form of the constructor
     _planar_descriptors_ = ("x", "y", "w", "h")
-    #_planar_descriptors_ = ("x", "y", "w", "h", "z_frame")
     
     _graphics_object_type_ = GraphicsObjectType.rectangle
     
@@ -5582,7 +5602,6 @@ class Text(PlanarGraphics):
     TODO also adapt the GraphicsObject frontend to support this class!
     """
     _planar_descriptors_ = ("text", "x", "y") 
-    #_planar_descriptors_ = ("text", "x", "y", "z_frame") 
     
     _graphics_object_type_ = GraphicsObjectType.text
     
@@ -5741,7 +5760,6 @@ class Path(PlanarGraphics):
     # in any given frame, and a subset of them are visible in more than one frame.
     
     _planar_descriptors_ = () 
-    #_planar_descriptors_ = ("z_frame",) 
     
     _graphics_object_type_ = GraphicsObjectType.path
     
@@ -5756,12 +5774,12 @@ class Path(PlanarGraphics):
         Initialize Path from a sequence of PlanarGraphics objects.
         This is also used for unpickling
         """
-        print("Path.__init_from_planar_graphics_")
+        #print("Path.__init_from_planar_graphics_")
         for p in args:
             self._objects_.append(p.copy())
             
-        for p in self:
-            print(p)
+        #for p in self:
+            #print(p)
 
     def __init__(self, *args, name:typing.Optional[str]="path", frameindex=[], currentframe:int=0, 
                  graphicstype=None, closed=False,
@@ -5834,7 +5852,7 @@ class Path(PlanarGraphics):
                                 linked_objects = linked_objects)
         
         if len(args):
-            print("PlanarGraphics.__init__ *args", args)
+            #print("Path.__init__ *args", args, " %d elements" % len(args))
             if len(args) == 1: # construct Path from one argument in *args
                 if isinstance(args[0], Path): # copy constructor
                     # NOTE: 2021-04-26 11:52:53
@@ -5988,7 +6006,8 @@ class Path(PlanarGraphics):
                             
                             self._objects_.append(aa)
                                 
-                        elif isinstance(a, (tuple, list)): 
+                        elif isinstance(a, (tuple, list)):
+                            #print("Path.__init__ coordinates %d: %s" % (k, a))
                             # FIXME: 2021-04-25 14:47:19 Shouldn't this go?
                             # It is convenient to construct a Path from a list of
                             # coordinate tuples (i.e., one per path element)...
@@ -6014,12 +6033,17 @@ class Path(PlanarGraphics):
                         self._objects_.insert(0,Move(0,0, 
                                                      frameindex = frameindex, 
                                                      currentframe=currentframe))
+                        
+                    #print("Path.__init__ from coord sequence: self._objects_", self._objects_)
+                    
+                    #for o in self._objects_:
+                        #print("Path.__init__ from coord sequence", o._states_)
                     
                     self._graphics_object_type_ = GraphicsObjectType.path
                     
         if len(self):
             for o in self._objects_:
-                print(o.type, ": x=", o.x, "y=",o.y)
+                #print(o.type, ": x=", o.x, "y=",o.y)
                 o._currentframe_ = currentframe
             
             
