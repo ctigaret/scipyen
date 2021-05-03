@@ -83,10 +83,10 @@ from core.workspacefunctions import debug_scipyen
 #### BEGIN pict.gui modules
 from . import quickdialog
 from . import resources_rc
-from .geomgraphics import (Arc, ArcMove, Cubic, Cursor, Ellipse, Line, Move, Path,
+from .planargraphics import (Arc, ArcMove, Cubic, Cursor, Ellipse, Line, Move, Path,
                            PlanarGraphics, Point, Quad, Rect, Text,
-                           GraphicsObject, GraphicsObjectType,
-                           __new_planar_graphic__)
+                           PlanarGraphicsType, GraphicsObjectType, GraphicsObject, 
+                           __new_planar_graphic__, printQPainterPath)
 
 #### END pict.gui modules
 
@@ -549,4 +549,14 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         self._selectedItemText_ = item.text()
         self.itemSelected.emit(item.text())
         self.accept()
+        
+class SelectablePlotItem(pg.PlotItem):
+    itemClicked = pyqtSignal()
+    
+    def __init__(self, **kwargs):
+        super(SelectablePlotItem, self).__init__(**kwargs)
+        
+    def mousePressEvent(self, ev):
+        super(SelectablePlotItem, self).mousePressEvent(ev)
+        self.itemClicked.emit()
         

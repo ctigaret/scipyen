@@ -809,6 +809,13 @@ class IndicatorCalibration(object):
 class TypeEnum(IntEnum):
     """Common ancestor for enum types used in Scipyen
     """
+    #@classmethod
+    #def __repr__(cls):
+        #return  "%s:\n" % cls.__name__ + "\t\n".join(["%s = %d" % (t.name, t.value) for t in cls])
+    #@staticmethod
+    #def __repr__():
+        #return super().__repr__() + ", ".join(["%s = %d" % (t.name, t.value) for t in cls])
+    
     @classmethod
     def names(cls):
         """Iterate through the names in TypeEnum enumeration.
