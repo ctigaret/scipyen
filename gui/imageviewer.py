@@ -1726,7 +1726,8 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @pyqtSlot(str, QtCore.QPoint)
     @safeWrapper
     def slot_graphicsObjectMenuRequested(self, crsId, pos):
-        if crsId in self.__cursors__.keys() and self.__cursors__[crsId].objectType & pgui.PlanarGraphicsType.allCursorTypes:
+        #if crsId in self.__cursors__.keys() and self.__cursors__[crsId].objectType & pgui.PlanarGraphicsType.allCursorTypes:
+        if crsId in self.__cursors__.keys() and self.__cursors__[crsId].backend.type & pgui.PlanarGraphicsType.allCursorTypes:
             self._cursorContextMenuSourceId = crsId 
             
             cm = QtWidgets.QMenu("Cursor Menu", self)
@@ -1742,7 +1743,8 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             crsRemoveAction.triggered.connect(self.slot_removeCursor)
             cm.exec(pos)
             
-        elif crsId in self.__rois__.keys() and self.__rois__[crsId].objectType & pgui.PlanarGraphicsType.allObjectTypes:
+        #elif crsId in self.__rois__.keys() and self.__rois__[crsId].objectType & pgui.PlanarGraphicsType.allObjectTypes:
+        elif crsId in self.__rois__.keys() and self.__rois__[crsId].backend.type & pgui.PlanarGraphicsType.allObjectTypes:
             self._roiContextMenuSourceId = crsId
             
             cm = QtWidgets.QMenu("ROI Menu", self)
@@ -2277,8 +2279,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                  frame:(int, type(None)) = None, 
                  displayChannel = None, normalize: (bool, ) = False, gamma: (float, ) = 1.0, 
                  *args, **kwargs):
-        super().__init__(data=data, parent=parent, pWin=pWin, ID=ID, win_title=win_title, doc_title=doc_title, frame=frame, *args, *kwargs)
 
+        super().__init__(data=data, parent=parent, pWin=pWin, ID=ID, win_title=win_title, doc_title=doc_title, frame=frame, *args, *kwargs)
+        
         self._image_width_ = 0
         self._image_height_ = 0
         self.imageNormalize             = None
@@ -2355,6 +2358,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self._scaleBarOrigin_            = (0, 0)
         self._scaleBarLength_            = (10,10)
+        
+        self.loadSettings()
         
         if isinstance(data, ImageViewer.supported_types) or any([t in type(data).mro() for t in ImageViewer.supported_types]):
             self.setData(data, doc_title=self._docTitle_)
@@ -4167,12 +4172,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         elif name in self.graphicsObjects(rois=False):
             self.viewerWidget.slot_removeCursorByName(name)
-        
-    def _load_viewer_settings_(self):
+            
+    def loadSettings(self):
+        self.loadWindowSettings()
+        self.loadViewerSettings()
+            
+    def loadViewerSettings(self):
         #colorMapName = self.settings.value("ImageViewer/ColorMap", None)
         colorMapName = self.settings.value("/".join([self.__class__.__name__, "ColorMap"]), None)
         
-        print("ImageViewer._load_viewer_settings_ colorMapName", colorMapName)
+        #print("ImageViewer %s loadViewerSettings colorMapName" % self, colorMapName)
         
         if isinstance(colorMapName, str):
             self.colorMap = colormaps.get(colorMapName, None)
@@ -4203,8 +4212,22 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if isinstance(color, QtGui.QColor) and color.isValid():
             self.sharedRoisColor = roiscolor
             
-    def _save_viewer_settings_(self):
-        print("ImageViewer._save_viewer_settings_ self.colorMap", self.colorMap)
+        #if self.colorMap:
+            #print("ImageViewer %s loadViewerSettings got colorMap" % self, self.colorMap, self.colorMap.name)
+        #else:
+            #print("ImageViewer %s loadViewerSettings got colorMap" % self, self.colorMap)
+            
+    def saveSettings(self):
+        self.saveWindowSettings()
+        self.saveViewerSettings()
+        
+    def saveViewerSettings(self):
+        #if self.colorMap:
+            #print("ImageViewer %s saveViewerSettings self.colorMap" % self, self.colorMap, ":", self.colorMap.name)
+            
+        #else:
+            #print("ImageViewer %s saveViewerSettings self.colorMap" % self, self.colorMap)
+            
         if isinstance(self.colorMap, colormaps.colors.Colormap):
             self.settings.setValue("/".join([self.__class__.__name__, "ColorMap"]), self.colorMap.name)
             
@@ -4352,12 +4375,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.framesQSlider.setMaximum(0)
         self.framesQSpinBox.setMaximum(0)
         self._data_ = None
-        #self.imageNormalize             = None
-        #self.imageGamma                 = None
-        #self.colorMap                   = None
-        #self.prevColorMap               = None
         self._separateChannels           = False
-        #self.setWindowTitle("Image Viewer")
         self.tStride                    = 0
         self.zStride                    = 0
         self.frameAxisInfo              = None
