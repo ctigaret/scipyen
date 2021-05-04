@@ -141,11 +141,8 @@ import math
 from collections import (ChainMap, namedtuple, defaultdict, OrderedDict,)
 from functools import (partial, partialmethod,)
 from enum import (Enum, IntEnum,)
-#from abc import ABCMeta, ABC
+from abc import (ABC, abstractmethod,)# ABCMeta)
 from copy import copy
-#from traitlets.utils.bunch import Bunch
-
-
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -158,21 +155,6 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from PyQt5.uic import loadUiType as __loadUiType__
 #### END 3rd party modules
 
-#### BEGIN core python modules
-# NOTE: use Python re instead of QRegExp
-import sys, os, re, numbers, itertools, warnings, traceback
-import typing
-import math
-from collections import (ChainMap, namedtuple, defaultdict, OrderedDict,)
-from functools import (partial, partialmethod,)
-from enum import (Enum, IntEnum,)
-#from abc import ABCMeta, ABC
-from copy import copy
-#from traitlets.utils.bunch import Bunch
-
-
-#### END core python modules
-
 #### BEGIN core modules
 from core.datatypes import TypeEnum
 from core.traitcontainers import DataBag
@@ -181,10 +163,6 @@ from core.prog import (safeWrapper, deprecated,
 from core.utilities import (unique, index_of,)
 from core.workspacefunctions import debug_scipyen
 #### END core modules
-
-#### BEGIN gui modules
-
-#### END gui modules
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -214,13 +192,12 @@ def __new_planar_graphic__(cls, states, name="", frameindex=[], currentframe=0,
     """
     #print("__new_planar_graphic__: cls", cls)
     
-    # NOTE: 2020-12-23 15:11:49 TODO/FIXME:
-    # a design flaw in pictio.CustomUnpickler can return matplotlib.widgets.Cursor
-    # when finding pictgui.Cursor
-    # until we fix that flaw in pictio, let's compensate for it here
-    if "Cursor" in cls.__name__:
-        cls = Cursor
-        
+    # NOTE: 2021-05-04 10:51:51 FIXME/TODO
+    # do away with pictgui.Cursor - use specialized cursor subclasses
+    # also do away with PlanarGraphicsType
+    if cls.__name__ == "Cursor":
+        cls = Cursor # avoid pictio.CustomUnipckler choosing matplotlib cursor class
+    
     obj = cls(states, name=name, graphicstype=graphicstype, closed=closed, 
             currentframe=currentframe, frameindex=frameindex, 
             linked_objects=linked_objects)
@@ -293,7 +270,7 @@ def __constrain_square__(p0, p1):
 
 class PlanarGraphicsType(TypeEnum):
     """Enumeration of all supported graphical object types.
-    FIXME Complete the doc string
+    DEPRECATED but kept for backward compatibility with old data.
     Type name             type value  QGraphicsItem               Planar Descriptors
     ===============================================================================
     vertical_cursor     = 1                                     x, y, width, height, xWin, yWin, radius
@@ -1305,7 +1282,9 @@ class PlanarGraphics():
         ## TODO
         
 
-    def __call__(self, path=None, frame=None, closed=None, connected=False):
+    def __call__(self, path:typing.Optional[QtGui.QPainterPath]=None, 
+                frame:typing.Optional[int]=None, closed:typing.Optional[bool]=None,
+                connected:typing.Optional[bool]=False):
         """Returns a QtGui.QPainterPath object. 
         
         QPainterPath composition methods used here depend on the subclass of
@@ -1339,16 +1318,8 @@ class PlanarGraphics():
         else:
             raise TypeError("closed expected to be a boolean or None; got %s instead" % type(closed).__name__)
         
-        state = self.getState()
+        state = self.getState(frame)
         
-        #if frame is None:
-            #state = self.currentState # the common state or the state associated with current frame, if present
-            
-        #else:
-            #state = self.getState(frame)
-            
-        #print("%s PlanarGraphics() state %s" % (self.name, state) )
-            
         if state is None or len(state) == 0:
             return path
             
@@ -1929,7 +1900,26 @@ class PlanarGraphics():
         
         self._closed_ = value
         
-    def asControlPath(self, frame=None):
+    def controlPoints(self, frame=None):
+        if isinstance(self, Cursor):
+            raise NotImplementedError("Cursors do not have control points")
+        
+        state = self.getState(frame)
+        
+        if state and len(state):
+            return ((state.x, state.y),)
+        
+        return tuple()
+    
+    def controlQPoints(self, frame=None):
+        if isinstance(self, Cursor):
+            raise NotImplementedError("Cursors do not have control points")
+        
+        cp = self.controlPoints(frame)
+        return [QtCore.QPointF(p[0],p[1]) for p in cp]
+        
+    #@abstractmethod
+    def controlPath(self, frame=None):
         """Returns a copy of this object as a Path object containing control points.
         
         The returned Path is composed of Move and Line elements only.
@@ -1938,21 +1928,27 @@ class PlanarGraphics():
         Ellipse, Rect, Cubic, Quad, etc) should override this function.
         
         """
-        import core.datatypes as dt
+        if isinstance(self, Cursor):
+            raise NotImplementedError("Cursors do not have control path")
         
         ret = Path()
-        
-        state = self.getState(frame)
-        
-        if state is None:
-            return ret
-        
-        if isinstance(state, DataBag) and len(state)==0:
-            ret.append(Move(state.x, state.y))
-            # NOTE: 2018-04-20 16:08:03
-            # override in a :subclass: 
+        cp = self.controlPoints(frame)
+        for k, p in enumerate(cp):
+            ret.append(Move(p[0], [1]))
             
         return ret
+        
+        #state = self.getState(frame)
+        
+        #if state is None:
+            #return ret
+        
+        #if isinstance(state, DataBag) and len(state)==0:
+            #ret.append(Move(state.x, state.y))
+            ## NOTE: 2018-04-20 16:08:03
+            ## override in a :subclass: 
+            
+        #return ret
     
     def asPath(self, frame=None, closed=False):
         """Returns a COPY of this object's state as a Path, for the specified frame.
@@ -1975,6 +1971,8 @@ class PlanarGraphics():
             ret.append(self.__class__(state.copy(), graphicstype = self._graphics_object_type_))
             
         return ret
+    
+    
     
     def convertToPath(self, closed=False): 
         """Creates a Path from all frame-state associations.
@@ -2395,7 +2393,7 @@ class PlanarGraphics():
             else:
                 f.setVisible(True)
                     
-            f.setPos(self.x, self.y) # also calls __drawObject__() and update()
+            f.setPos(self.x, self.y) # also calls _drawObject_() and update()
             
     def removeState(self, stateOrFrame):
         """Removes a state associated with a frame index or indices specified in "stateOrFrame".
@@ -2495,7 +2493,7 @@ class PlanarGraphics():
             
             setattr(state, name, value)
             
-    def hasStateForFrame(self, frame):
+    def hasStateForFrame(self, frame=None):
         """Returns True if there is a state is visible in frame.
 
         Parameters:
@@ -3458,42 +3456,6 @@ class PlanarGraphics():
         "cached" object)
         """
         return self.__class__(self.getState(frame))
-    
-    #def get(self, param:str, frame:typing.Optional[int]=None) -> typing.Any:
-        #"""Accessor (getter) for a planar descriptor.
-        #"""
-        #if not isinstance(param, str):
-            #raise TypeError("Expecting a str; got %s instead" % type(param).__name__)
-        
-        #if len(param.strip()) == 0:
-            #raise ValueError("Expecting a non-empty string")
-        
-        ##if param not in [d for d in self.__class__._planar_descriptors_ if d != "z_frame"]:
-        #if param not in [d for d in self.__class__._planar_descriptors_]:
-            #raise KeyError("Planar descriptor %s not found in %s" % (param, self.__class__.__name__))
-        
-        #state = self.getState(frame)
-        
-        #if state is not None:
-            #return state[param]
-        
-    #def set(self, param:str, value:typing.Any, frame:typing.Optional[int]=None) -> typing.Any:
-        #"""Accessor (setter) for a planar descriptor.
-        #"""
-        #if not isinstance(param, str):
-            #raise TypeError("Expecting a str; got %s instead" % type(param).__name__)
-        
-        #if len(param.strip()) == 0:
-            #raise ValueError("Expecting a non-empty string")
-        
-        #if param not in [d for d in self.__class__._planar_descriptors_ if d != "z_frame"]:
-            #raise KeyError("Planar descriptor %s not found in %s" % (param, self.__class__.__name__))
-        
-        #state = self.getState(frame)
-        
-        #if state is not None:
-            #state[param] = value
-        
     
     @staticmethod
     def getCurveLength(obj, prev=None):
@@ -4466,6 +4428,7 @@ class Cursor(PlanarGraphics):
     #_planar_descriptors_ = ("x", "y", "width", "height", "xwindow", "ywindow", "radius", "z_frame")
     
     _graphics_object_type_ = PlanarGraphicsType.vertical_cursor
+    
     _qt_path_composition_call_ = None
     
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
@@ -4505,8 +4468,6 @@ class Cursor(PlanarGraphics):
         
         if len(linked_objects):
             self._linked_objects_.update(linked_objects)
-        
-        #print("Cursor %s init link_objects = %s: " % (self, linked_objects))
         
     def map_to_pc_on_path(self, other, path):
         x = int(self.x)
@@ -4552,8 +4513,52 @@ class Cursor(PlanarGraphics):
 
 class VerticalCursor(Cursor):
     _graphics_object_type_ = PlanarGraphicsType.vertical_cursor
+    
+    def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
+                 linked_objects=dict(), **kwargs):
+        
+        super().__init__(*args, name=name, frameindex=frameindex, 
+                         currentframe=currentframe, 
+                         graphicstype=PlanarGraphicsType.vertical_cursor, 
+                         closed=True, 
+                         linked_objects=linked_objects)
+        
+class HorizontalCursor(Cursor):
+    _graphics_object_type_ = PlanarGraphicsType.horizontal_cursor
    
-
+    def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
+                 linked_objects=dict(), **kwargs):
+        
+        super().__init__(*args, name=name, frameindex=frameindex, 
+                         currentframe=currentframe, 
+                         graphicstype=PlanarGraphicsType.horizontal_cursor, 
+                         closed=True, 
+                         linked_objects=linked_objects)
+        
+class CrosshairCursor(Cursor):
+    _graphics_object_type_ = PlanarGraphicsType.crosshair_cursor
+   
+    def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
+                 linked_objects=dict(), **kwargs):
+        
+        super().__init__(*args, name=name, frameindex=frameindex, 
+                         currentframe=currentframe, 
+                         graphicstype=PlanarGraphicsType.crosshair_cursor, 
+                         closed=True, 
+                         linked_objects=linked_objects)
+        
+class PointCursor(Cursor):
+    _graphics_object_type_ = PlanarGraphicsType.point_cursor
+   
+    def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
+                 linked_objects=dict(), **kwargs):
+        
+        super().__init__(*args, name=name, frameindex=frameindex, 
+                         currentframe=currentframe, 
+                         graphicstype=PlanarGraphicsType.point_cursor, 
+                         closed=True, 
+                         linked_objects=linked_objects)
+        
 class Arc(PlanarGraphics):
     """Encapsulates parameters for QPainterPath.arcTo() function
     
@@ -4613,12 +4618,7 @@ class Arc(PlanarGraphics):
         cp3: the end point of the arc (line to)
         
         """
-        
-        if frame is None:
-            state = self.currentState
-            
-        else:
-            state = self.getState(frame)
+        state = self.getState(frame)
             
         if state is None or len(state) == 0:
             return tuple() # empty path
@@ -4649,8 +4649,8 @@ class Arc(PlanarGraphics):
         cp3 = (major_axis * np.cos(sweep_angle), minor_axis * np.sin(sweep_angle))
         
         return (cp0, cp1, cp2, cp3)
-        
-    def asControlPath(self, frame = None):
+    
+    def controlPath(self, frame = None):
         """Returns the control points for this Arc, as a Path object
         
         To be used for graphical manipulation of the arc.
@@ -4809,8 +4809,8 @@ class ArcMove(PlanarGraphics):
         cp2 = (state.x + w/2, state.y + h/2)
         
         return (cp0, cp1, cp2)
-        
-    def asControlPath(self, frame = None):
+    
+    def controlPath(self, frame = None):
         """Returns the control points for this ArcMove, as a Path object
         
         NOTE: Since this is a move on an arc trajectory, there is NO sweep length
@@ -4913,6 +4913,31 @@ class Line(PlanarGraphics):
                          graphicstype=PlanarGraphicsType.point, closed=closed,
                          linked_objects=linked_objects)
         
+    def controlPoints(self, frame=None):
+        state = self.getState(frame)
+
+        if state and len(state):
+            return ((state.x, state.y),)
+        
+        return tuple() # empty path
+        
+    
+    def controlPath(self, frame=None):
+        # NOTE: 2021-05-04 13:17:54
+        # a Path ALWAYS starts with a Move!
+        ret = Path()
+        cp = self.controlPoints(frame)
+        for k, p in cp:
+            ret.append(Line(p[0], p[1]))
+            
+        return ret
+        
+    def qPoints(self):
+        return [QtCore.QPointF(self.x, self.y)]
+        
+    def qPoint(self):
+        return QtCore.QPointF(self.x, self.y)
+    
     def qGraphicsItem(self, pointSize=0, frame = None):
         if frame is None:
             state = self.currentState
@@ -4961,11 +4986,26 @@ class Move(PlanarGraphics):
                          graphicstype=PlanarGraphicsType.point, closed=closed,
                          linked_objects=linked_objects)
         
+    def controlPoints(self, frame=None):
+        state = self.getState(frame)
+        
+        if state and len(state):
+            return ((state.x, state.y),)
 
-    def points(self):
+        return tuple()
+    
+    def controlPath(self, frame=None):
+        ret = Path()
+        cp = self.controlPoints(frame)
+        for k, p in enumerate(cp):
+            ret.append(Move(p[0], p[1]))
+            
+        return ret
+        
+    def qPoints(self):
         return [QtCore.QPointF(self.x, self.y)]
     
-    def point(self):
+    def qPoint(self):
         return QtCore.QPointF(self.x, self.y)
     
     def qGraphicsItem(self, pointSize=0, frame = None):
@@ -5048,7 +5088,7 @@ class Cubic(PlanarGraphics):
         
         return ((state.x, state.y), (state.c1x, state.c1y), (state.c2x, state.c2y))
     
-    def asControlPath(self, frame=None):
+    def controlPath(self, frame=None):
         ret = Path()
         
         cp = self.controlPoints(frame)
@@ -5095,16 +5135,17 @@ class Cubic(PlanarGraphics):
     
         self.updateFrontends()
         
-    def qPoints(self, frame=None):
-        cp = self.controlPoints(frame)
+    #def controlQPoints(self, frame=None):
+        #cp = self.controlPoints(frame)
+        #return [QtCore.QPointF(p[0], p[1]) for p in cp]
         
-        if len(cp):
-            return [QtCore.QPointF(cp[0][0], cp[0][1]),
-                    QtCore.QPointF(cp[1][0], cp[1][1]), 
-                    QtCore.QPointF(cp[2][0], cp[2][1])]
+        ##if len(cp):
+            ##return [QtCore.QPointF(cp[0][0], cp[0][1]),
+                    ##QtCore.QPointF(cp[1][0], cp[1][1]), 
+                    ##QtCore.QPointF(cp[2][0], cp[2][1])]
         
-        else:
-            return list()
+        ##else:
+            ##return list()
         
     def translate(self, dx, dy):
         self.x += dx
@@ -5193,7 +5234,7 @@ class Quad(PlanarGraphics):
         
         return ((state.x, state.y), (state.cx, state.cy))
         
-    def asControlPath(self, frame=None):
+    def controlPath(self, frame=None):
         ret = Path()
         cp = self.controlPoints(frame)
         
@@ -5310,8 +5351,9 @@ class Ellipse(PlanarGraphics):
         
         return ((state.x, state.y), (state.x + state.w, state.y + state.h))
     
-    def asControlPath(self, frame=None):
-        """Control path is a line along the first diagonal of the encolsing rectangle
+    
+    def controlPath(self, frame=None):
+        """Control path is a line along the first diagonal of the enclosing rectangle
         (top-left to bottom-right)
         """
         ret = Path()
@@ -5379,19 +5421,7 @@ class Ellipse(PlanarGraphics):
                 QtCore.QPointF(state.x, state.y + state.h)]
     
     def qGraphicsItem(self, pointSize=0, frame = None):
-        if frame is None:
-            state = self.currentState
-            
-        else:
-            if not isinstance(frame, int):
-                raise TypeError("frame expected to be an int or None; got %s instead" % frame)
-
-            if frame in self.frameIndices:
-                state = self.getState(frame)
-                
-            else:
-                warnings.warn("No state is associated with specified frame (%d)" % frame)
-                return
+        state = self.getstate(frame)
             
         if state is None or len(state) == 0:
             warnings.warn("undefined state")
@@ -5447,8 +5477,15 @@ class Rect(PlanarGraphics):
         
         return ((state.x, state.y), (state.x + state.w, state.y + state.h))
     
-    def asControlPath(self, frame=None):
+    def controlPath(self, frame=None):
         """Control path is the diagonal from top-left to bottom-right
+        
+        This is based on the state associated with the specified frame, or with
+        the current frame when 'frame' is None
+        
+        Frame: an int or None (which signifies the current frame)
+        
+        When no state exists for the specified frame, returns an empty Path.
         """
         ret = Path()
         cp = self.controlPoints(frame)
@@ -5657,7 +5694,7 @@ class Text(PlanarGraphics):
     def fromControlPath(self, path, frame=None):
         pass
                 
-    def asControlPath(self, frame=None):
+    def controlPath(self, frame=None):
         return Path()
     
     def asPath(self, frame=None, closed=False):
@@ -6099,7 +6136,9 @@ class Path(PlanarGraphics):
         s = "\n ".join(["%d: %s" % (k, e.__str__()) for k,e in enumerate(self._objects_)])
         return "%s object:\n name %s\n path elements: \n %s" % (self.__class__, self._ID_, s)
         
-    def __call__(self, path=None, frame=None, closed=None, connected=False):
+    def __call__(self, path:typing.Optional[QtGui.QPainterPath]=None, 
+                frame:typing.Optional[int]=None, closed:typing.Optional[bool]=None,
+                connected:typing.Optional[bool]=False):
         """Generates a QtGui.QPainterPath.
         
         Named parameters:
@@ -6316,22 +6355,22 @@ class Path(PlanarGraphics):
                 s.x += dx
                 s.y += dy
                 
-                if "cx" in s.__class__._planar_descriptors_:
+                if "cx" in s:#.__class__._planar_descriptors_:
                     s.cx += dx
                     
-                if "c1x" in s.__class__._planar_descriptors_:
+                if "c1x" in s:#.__class__._planar_descriptors_:
                     s.c1x += dx
                     
-                if "c2x" in s.__class__._planar_descriptors_:
+                if "c2x" in s:#.__class__._planar_descriptors_:
                     s.c2x += dx
                 
-                if "cy" in s.__class__._planar_descriptors_:
+                if "cy" in s:#.__class__._planar_descriptors_:
                     s.y += dy
                     
-                if "c1y" in s.__class__._planar_descriptors_:
+                if "c1y" in s:#.__class__._planar_descriptors_:
                     s.c1y += dy
                     
-                if "c2y" in s.__class__._planar_descriptors_:
+                if "c2y" in s:#.__class__._planar_descriptors_:
                     s.c2y += dy
                 
     def index(self, other, *where):
@@ -6543,13 +6582,13 @@ class Path(PlanarGraphics):
                 for s in states:
                     s.x += delta_x
                     
-                    if "cx" in s.__class__._planar_descriptors_:
+                    if "cx" in s:#.["_planar_descriptors_"]:
                         s.cx += delta_x
                         
-                    if "c1x" in s.__class__._planar_descriptors_:
+                    if "c1x" in s:#.["_planar_descriptors_"]:
                         s.c1x += delta_x
                         
-                    if "c2x" in s.__class__._planar_descriptors_:
+                    if "c2x" in s:#.["_planar_descriptors_"]:
                         s.c2x += delta_x
                     
         # this is a tuple !
@@ -6597,13 +6636,13 @@ class Path(PlanarGraphics):
                 for s in states:
                     s.y += delta_y
                     
-                    if "cy" in s.__class__._planar_descriptors_:
+                    if "cy" in s:#.__class__._planar_descriptors_:
                         s.cy += delta_y
                         
-                    if "c1y" in s.__class__._planar_descriptors_:
+                    if "c1y" in s:#.__class__._planar_descriptors_:
                         s.c1v += delta_y
                         
-                    if "c2y" in s.__class__._planar_descriptors_:
+                    if "c2y" in s:#.__class__._planar_descriptors_:
                         s.c2y += delta_y
                     
         # this is a tuple!
@@ -6843,8 +6882,10 @@ class Path(PlanarGraphics):
         state for the current frame, the returned list will be empty.
         
         """
-        raise NotImplementedError("Path object do not support this method")
-        #return [p.getState(self._currentframe_) for p in self._objects_] # may be empty
+        #raise NotImplementedError("Path object do not support this method")
+        states = [p.getState(self._currentframe_) for p in self._objects_] # may be empty
+        
+        return states if len(states) else None
         
     @property
     def closed(self):
@@ -6952,11 +6993,6 @@ class Path(PlanarGraphics):
             
         return [o for o in [o.getState(frame) for o in self._objects_] if o is not None]
     
-        #if len(self._objects_):
-            #objects = [o for o in [o.getState(frame) for o in self._objects_] if o is not None]
-            
-            #return Path(objects)
-                    
     def removeState(self, value):
         for o in self._objects_:
             o.removeState(value)
@@ -6970,7 +7006,7 @@ class Path(PlanarGraphics):
             
         return tuple(ret)
         
-    def asControlPath(self, frame=None):
+    def controlPath(self, frame=None):
         """Returns a Path that represents a polyline connecting all control points.
         """
         ret = Path()
@@ -7337,7 +7373,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
     NOTE: 2018-01-17 21:56:23
     currentframe and framesVisibility __init__() parameters cached to be 
-    available when exiting build mode (i.e., from within __finalizeShape__)
+    available when exiting build mode (i.e., from within _finalizeShape_)
          
          
     TODO: when building a shape, by default the resulting backend has no frame-state
@@ -7387,71 +7423,13 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     From the GUI, the user can manipulate the frontend directly (mouse and key
     strokes) whereas the backends can only be are manipulated indirectly (via their 
     frontends).
-    
-    
-    
-    The following graphical types are supported (see the PlanarGraphicsType enumeration):
-
-    vertical_cursor     = 1     
-    horizontal_cursor   = 2     
-    crosshair_cursor    = 4     
-    point_cursor        = 8     
-    point               = 16    
-    line                = 32    
-    polyline            = 64
-    rectangle           = 128   
-    polygon             = 256   
-    ellipse             = 512   
-    quad                = 1024
-    cubic               = 2048
-    arc                 = 4096
-    arcmove             = 8192
-    path                = 16384 
-    text                = 32768 
-    
-    lineCursorTypes     = vertical_cursor       | horizontal_cursor
-    shapedCursorTypes   = lineCursorTypes       | crosshair_cursor
-    allCursorTypes      = shapedCursorTypes     | point_cursor
-    
-    lineTypes         = line                  | polyline
-    polygonTypes        = rectangle             | polygon 
-    linearShapeTypes    = polygonTypes          | lineTypes
-    arcTypes            = arc                   | arcmove
-    curveTypes          = ellipse               | arcTypes
-    basicShapeTypes     = linearShapeTypes      | curveTypes
-    commonShapeTypes    = basicShapeTypes       | point
-    geometricShapeTypes = commonShapeTypes      | path
-    allShapeTypes       = geometricShapeTypes   | text
-    
-    allObjectTypes      = allCursorTypes        | allShapeTypes
-  
-    Any combination of these flags can be used to determine the type of the
-    GraphicsObject instance or its inclusion in the subsets above, using 
-    logical AND (&).
-    
-    e.g. self.objectType & allCursorTypes returns > 0 if the object is a cursor type
-    
-    Non-cursor types are rendered by means of QAbstractGraphicsShapeItem. This means
-    that except for text, path, point and line, the generated shaped are always closed
-    (in particular the polygons).
-    
-    To generate open polygons use the "path" type with QPainterPaths to draw 
-    an open polygon (in Qt a polygon is considered "open" if the two extreme 
-    points have different coordinates).
-        
     """
     
-    #nonCursorTypes      = PlanarGraphicsType.allShapeTypes
-    
-    #allObjectTypes      = allCursorTypes                        | allShapeTypes
-    
-    #undefinedType       = 0
-    
-        
     # this is for Qt Graphics View Framework RTTI logic
     Type = QtWidgets.QGraphicsItem.UserType + PlanarGraphicsType.allObjectTypes
     
-    signalPosition = pyqtSignal(int, str, "QPointF", name="signalPosition")
+    #signalPosition = pyqtSignal(int, str, "QPointF", name="signalPosition")
+    signalPosition = pyqtSignal(str, "QPointF", name="signalPosition")
     
     # used to notify the cursor manager (a graphics viewer widget) that this cursor has been selected
     selectMe = pyqtSignal(str, bool, name="selectMe") 
@@ -7468,54 +7446,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     
     signalIDChanged = pyqtSignal(str, name="signalIDChanged")
     
-
-    # NOTE: 2017-08-08 22:57:15 TODO:
-    # API change to allow various graphic object types
-    # NOTE: regular shape items as in QAbstractGraphicsShapeItem derivatives:
-    # QGraphicsLineItem - straight lines, or points (a <<VERY>> short line)
-    # QGraphicsEllipseItem - ellipse, circle and arcs of ellipse or circle, or point (a <<VERY>> small circle)
-    # QGraphicsRectItem - rectangle, square, point (a <<VERY>> small square)
-    # QGraphicsPolygonItem -- polygons
-    # QGraphicsPathItem --  any path
-    #
-    # Requirements for construction:
-    # (these are for pre-defined cursors and ROIs, for 
-    #  interactively defining a ROI, see notes for buildMode)
-    #
-    # for cursors (of any type) -- 6-tuple (width, height, radius, winX, winY, cursor_type)
-    # for ellipse (including circles), rectangles (including squares): 5-tuple (x, y, width, height, shape_type)
-    # for arcs: 6-tuple (x, y, width, height, startAngle, spanAngle) => pies
-    # for lines: 5-tuple (x1, y1, x2, y2, shape_type)
-    # for generic path: I could fallback to the datatypes.ScanROI contructor rules to generate a QPainterPath
-    #
-    # Drawing mechanisms:
-    # TODO: __drawObject__ to delegate
-    # for cursors -- TODO: __drawCursor__ should only contain code for cursor drawing
-    # for other QAbstractGraphicsShapeItem objects:
-    #                TODO: construct a member QAbstractGraphicsShapeItem object
-    #                       use its path(), shape(), boundingRect() functions
-    
-    # NOTE: 2018-01-15 22:38:58
-    # To align GraphicsObject API with PlanarGraphics API the following parameters
-    # have been removed from the GraphicsObject c'tor, as being redundant: 
-    # visibleInAllFrames
-    # linkedToFrame
-    #
-    # When frameVisibility is an empty list, the GraphicsObject becomes visible 
-    # in all available frames and its backend (a PlanarGraphics object) has a 
-    # common status. Furthermore, in this case various planar descriptors have 
-    # the same value in _ALL_ frames (as if linkedToFrame was False)
-    #
-    # Conversely, when frameVisibility is not empty, the GraphicsObject frontend
-    # is visible ONLY in the frame indices listed there, and its PlanarGraphics
-    # backend has frame-state associations. Implicitly, changing the value of 
-    # planar graphic descriptors in one frame are reflected in that frame only
-    # (as if linkedToFrame was True).
-    #
-    # To be able to modify planar descriptor values in a frame-specific manner,
-    # then set frameVisibility to the list of _ALL_ frame indices in the data.
-    
-    def __setup_default_appearance__(self):
+    def _setup_default_appearance_(self):
         self.defaultTextBackgroundBrush = QtGui.QBrush(QtCore.Qt.white, QtCore.Qt.SolidPattern)
         self.defaultBrush = QtGui.QBrush(QtCore.Qt.white, QtCore.Qt.SolidPattern)
         
@@ -7579,276 +7510,11 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self.defaultCBSelectedPen.setWidth(self.defaultPenWidth)
         self.defaultCBSelectedPen.setCapStyle(QtCore.Qt.RoundCap)
         self.defaultCBSelectedPen.setJoinStyle(QtCore.Qt.RoundJoin)
-    
-    def __init__(self, 
-                 parameters=None, 
-                 pos=None, 
-                 objectType=PlanarGraphicsType.allShapeTypes,
-                 currentFrame=0, 
-                 visibleFrames = [], 
-                 label=None, 
-                 labelShowsPosition=True, 
-                 showLabel=True,
-                 parentWidget=None):
-                 
-        """
-        Named parameters:
-        =================
-        parameters: (optional, default is None) a PlanarGraphics object, or a 
-            sequence of numeric values for the construction of a PlanarGraphics
-            object as described in the table below.
-                    
-            When 'parameters' is None or an empty sequence, the 'objectType'
-            parameter determines the behaviour as follows:
-            (1) if objectType is NOT a cursor type, this triggers the 
-                interactive drawing logic (to build the PlanarGraphics shape 
-                using the GUI).
-                
-            (2) if objectType is a cursor type, raises an error (cursors cannot
-            be built interactively)
-            
-            Otherwise, the length of the sequence must match the number of the 
-            numeric values expected by the to-be-constructed PlanarGraphics with
-            the type specified by 'objectType' parameter (see table).
-        
-        "objectType":     Value:    Type of "parameters" argument:
-        ========================================================================
-        vertical_cursor   1         numeric 5-tuple (W, H, xWin, yWin, radius)
-        horizontal_cursor 2         numeric 5-tuple (W, H, xWin, yWin, radius)
-        crosshair_cursor  4         numeric 5-tuple (W, H, xWin, yWin, radius)
-        point_cursor      8         numeric 5-tuple (W, H, xWin, yWin, radius)
-        point             16        numeric triple  (X, Y, radius)
-        line              32        numeric 4-tuple (X0, Y0, X1, Y1) or QLineF
-        rectangle         64        numeric 4-tuple (X,  Y,  W,  H)  or QRectF
-        ellipse           128       numeric 4-tuple (X,  Y,  W,  H)  or QRectF
-        polygon           256       sequence of numeric pairs (X, Y) or sequence of QPointF
-        path              512       QPainterPath or a sequence of two-element tuples, where:
-                                    element 0 is a str one of: "move", "start", 
-                                    "line", "curve", or "control"
-                                    element 1 is a tuple of coordinates (x,y);
-                                    Each "curve" element MUST be followed by two 
-                                    "control" elements.
-                                            
-        text              1024        str
-        ========================================================================
-        (See PlanarGraphicsType enum for details)
-        
-        pos:    QtCore.QPoint or QtCore.QPointF, or None; default is None, which
-                places the object at the scene's (0,0) coordinate
-        
-        objectType : one of the PlanarGraphicsType enum values default is 
-                    GraphicsObject.allShapeTypes (see PlanarGraphicsType enum 
-                    for details)
-                    
-        currentFrame, visibleFrames -- used only for parametric c'tor (which 
-                    also builds a backend)
-            
-                    
-        label: str or None (default) : this is what may be shown as cursor label 
-            (the default is to show its own ID, if given)
-        
-        labelShowsPosition : bool (default is True)
-        
-        showLabel : bool (default is True)
-        
-        parentWidget : QtWidget (GraphicsImageViewerWidget) or None (default)
-        
-        roiId: str or None (default is None): this sets a default ID for the object
-                
-                NOTE: when None, the object will get its ID from the type
-                
-                NOTE: this is NOT the variable name under which this object is
-                bound in the caller's namespace
-                
-        """
-        #NOTE: 2017-11-20 22:57:21
-        # backend for non-cursor types is self._graphicsShapedItem
-        # whereas in cursor self._graphicsShapedItem is None !!!
-        
-        super(QtWidgets.QGraphicsObject, self).__init__()
-        print("GraphicsObject__init__")
-        print("\t parameters", parameters)
-        print("\t objectType", objectType)
-        print("\t pos", pos)
-        print("\t currentFrame", currentFrame)
-        print("\t visibleFrames", visibleFrames)
-        print("\t label", label)
-        print("\t labelShowsPosition", labelShowsPosition)
-        print("\t showLabel", showLabel)
-        print("\t parentWidget", parentWidget)
-        
-        if not isinstance(parentWidget, QtWidgets.QWidget) and type(parentWidget).__name__ != "GraphicsImageViewerWidget":
-            raise TypeError("'parentWidget' expected to be a GraphicsImageViewerWidget; got %s instead" % (type(self._parentWidget).__name__))
-        
-        self._parentWidget = parentWidget
-        
-        if isinstance(objectType, int):
-            if not objectType & PlanarGraphicsType.allObjectTypes:
-                raise ValueError("Unknown PlanarGraphicsType value: %s" % objectType)
-            
-        elif not isinstance(objectType, PlanarGraphicsType):
-            raise TypeError("Second parameter must be an int or a PlanarGraphicsType; got %s instead" % (type(objectType).__name__))
-        
-        self.__setup_default_appearance__()
-        # NOT: 2017-11-24 22:30:00
-        # assign this early
-        # this MAY be overridden in __parse_parameters__
-        #self._objectType = objectType # an int or enum !!!
-        
-        # NOTE: this is the actual string used for label display; 
-        # it may be suffixed with the position if labelShowsPosition is True
-        self._displayStr= "" 
-        self._ID_ = ""
-            
-        # check for frameVisibility parameter
-        # execute this in the __parse_parameters__ function so that we can 
-        # distinguish between the case where we construct a GraphicsObject from 
-        # a PlanarGraphics backend (and therefore frame visibility is given by 
-        # the backend's frame-state associations) and the case where we construct
-        # a GraphicsObject parametrically (thus constructing a new backend from 
-        # scratch, hence we need frameVisibility parameter to set up the backend's
-        # frame-state associations)
 
         # see qt5 examples/widgets/painting/pathstroke/
-
         self._pointSize = 5
         self._c_penWidth = 1
         self._c_penStyle = QtCore.Qt.SolidLine
-        
-        # NOTE: 2018-01-17 15:33:58
-        # used in buildMode or editMode; applies to non-cursor objects only
-        #self._c_shape_point         = -1
-        self._c_activePoint         = -1 # shape point editing - used in edit & build modes
-        self._c_activeControlPoint  = -1 # path control point editing; valid values are 0 and 1
-        self._control_points        = [None, None]  # used in curve (cubic, quad) segment building for path ROIs
-        self._constrainedPoint      = None
-        self._hover_point           = None    # because a null QPointF is still valid:
-        self._movePoint             = False
-        
-        # CAUTION make sure this is empty after exit from build or edit modes
-        # ATTENTION NO subpaths allowed in cached path (for the moment) = use only
-        # non-path ("primitive") PlanarGraphics objects as elements
-        # CAUTION this ALWAYS  has a commonState (i.e. we cache it for the currently
-        # displayed frame)
-
-        # exists throughtout the lifetime of self.
-        # must not be empty
-        # generated in the following circumstances:
-        # 1) __finalizeShape__ after exit from build mode
-        # 2) __parse_parameters__ when _objectType is not a cursor
-        #   either when object is build parametrically, or when it is derived from
-        #   a backend. 
-        #   depending on _objectType, _cachedPath may contain a copy of the backend
-        #   itself, or a "control" path (containing control points & lines)
-        #   
-        # WARNING the cached path can contain only Move, Line, Cubic and Quad objects !!!
-        #   e.g., for a rectangle or ellipse, the control line (used in building & editing)
-        #   is in fact the diagonal or one of the diameters, respectively
-        
-        self._cachedPath_ = Path()
-        
-        self._shapeIsEditable       = False # control point editing
-        self._movable               = True # moveable by mouse or keyboard
-        self._editable              = True # switching to edit mode allowed
-        self._transformable         = False # rotation & skewing
-        self._buildMode_             = False
-        self._showlabel             = showLabel
-        self._opaqueLabel = True
-        self._curveBuild = False
-        
-        # NOTE: 2017-06-29 08:32:11
-        # flags when a new position change sequence has begun (the previous 
-        # sequence, if any, ended with a mouse release event)
-        self._positionChangeHasBegun = False
-        
-        
-        # NOTE: 2017-11-23 00:08:04
-        # unlike non-cursor types, cursors are NOT back-ended by a QGraphicsItem
-        # but rather directly painted by self.paint() method
-        # the flag below toggles the cursor painting ON / OFF
-        # TODO sync me with current frame cf self._frameindex
-        self.__objectVisible__ = True
-        
-        self._labelShowsCoordinates = labelShowsPosition
-        
-        self._wbarPos = QtCore.QPointF() # planar descriptor for cursor width bar; NOT stored in the backend
-        
-        # NOTE: 2017-06-28 17:19:20
-        # used as a flag to know when itemChange has been called the first time
-        # when object is a cursor type
-        self._deltaPos = QtCore.QPointF()# NOT stored in the baskend
-
-        # NOTE: 2017-06-30 13:52:03
-        # used for linked cursors logic, when object if a cursor type
-        self._oldPos = QtCore.QPointF() # NOT stored in the backend
-        
-        # elements of cursor types - do NOT use _graphicsShapedItem here
-        # because the Qt GraphicsView system will be decorate its bounding rect 
-        # when selected
-        self._vline     = QtCore.QLineF() # vertical cursor line
-        self._hline     = QtCore.QLineF() # horizontal cursor line
-        self._hwbar     = QtCore.QLineF() # vertical cursor window line
-        self._vwbar     = QtCore.QLineF() # horizontal cursor window line
-        self._crect     = QtCore.QRectF() # point cursor central rect
-        self._wrect     = QtCore.QRectF() # point and crosshair cursor window rect
-
-        self._labelRect = QtCore.QRectF() # a Null rectangle!!!
-        self._labelPos  = QtCore.QPointF()
-        
-        self._backend_ = None
-
-        self.__parse_parameters__(parameters, pos, objectType, visibleFrames, currentFrame)
-        
-        # ###
-        # BEGIN ID and label management
-        # ###
-        
-        # NOTE: bring names under a common value and KISS!
-        # use same string for ID, label (the prefix of the display string) and backend name
-        
-        # if ID is given in the constructor, use it for self._ID_; else, generate it from object type
-        #
-        # if label is given in the constructor, use it for label, and for the ID !!!;
-        #
-        # else, if there is a backend and the backend has a name, use this as a label
-        #
-        # otherwise, use the ID for both label and backend name
-        
-        
-        if isinstance(label, str) and len(label.strip()) > 0: 
-            # label passed as __init__ parameter overrides => set name for backend too
-            self._ID_ = label
-            if self._backend_ is not None:
-                self._backend_.name = self._ID_
-                self._backend_.updateLinkedObjects()
-            
-        else:
-            # no label passed at __init__; 
-            if self._backend_ is not None and isinstance(self._backend_.name, str) and len(self._backend_.name.strip()):
-                # if backend exists, use its name as ID
-                self._ID_ = self._backend_.name
-                
-            else:
-                self._ID_ = self.backend.type.name
-                #if isinstance(self._objectType, int):
-                    #try:
-                        #self._ID_ = PlanarGraphicsType(self._objectType).name
-                        
-                    #except:
-                        #self._ID_ = "graphics_object"
-                        
-                #else:
-                    #self._ID_ = self._objectType.name
-                    
-        # ###
-        # END ID and label manageent
-        # ###
-
-        # NOTE: 2018-01-26 10:07:28
-        # use a list of backends !!!
-        self._linkedGraphicsObjects = list()
-                
-        self._isLinked = len(self._linkedGraphicsObjects)>0
         
         self._textPen               = self.defaultTextPen
         self._textBrush             = self.defaultTextBrush
@@ -7877,7 +7543,140 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self._controlLinePen        = QtGui.QPen(QtGui.QBrush(QtCore.Qt.lightGray), 
                                                  1, QtCore.Qt.SolidLine)
         
+    def __init__(self, 
+                 obj=None, 
+                 labelShowsPosition=True, 
+                 showLabel=True,
+                 parentWidget=None):
+                 
+        """
+        Named parameters:
+        =================
+        obj: (optional) a PlanarGraphics object or None (default)
+                    
+            When 'obj' is None this triggers the interactive drawing logic
+            (to build the PlanarGraphics shape using the GUI).
+                
+        labelShowsPosition : bool (default is True)
+        
+        showLabel : bool (default is True)
+        
+        parentWidget : QtWidget (GraphicsImageViewerWidget) or None (default)
+        
+        """
+        if not isinstance(obj, (PlanarGraphics, type(None))):
+            raise TypeError("First parameter expected a PlanarGraphics or None; got %s instead" % type(obj).__name__)
 
+        super(QtWidgets.QGraphicsObject, self).__init__()
+
+        #print("GraphicsObject__init__")
+        #print("\t parameters", parameters)
+        ##print("\t objectType", objectType)
+        ##print("\t pos", pos)
+        ##print("\t currentFrame", currentFrame)
+        ##print("\t visibleFrames", visibleFrames)
+        ##print("\t label", label)
+        #print("\t labelShowsPosition", labelShowsPosition)
+        #print("\t showLabel", showLabel)
+        #print("\t parentWidget", parentWidget)
+        
+        self._backend_ = obj
+        
+        if not isinstance(parentWidget, QtWidgets.QWidget) and type(parentWidget).__name__ != "GraphicsImageViewerWidget":
+            raise TypeError("'parentWidget' expected to be a GraphicsImageViewerWidget; got %s instead" % (type(self._parentWidget_).__name__))
+        
+        self._parentWidget_             = parentWidget
+        self._labelShowsCoordinates_    = labelShowsPosition
+        self._showLabel_                = showLabel
+        # NOTE: this is the actual string used for label display; 
+        # it may be suffixed with the position if labelShowsPosition is True
+        self._displayStr_= "" 
+        self._ID_ = ""
+        
+        self._setup_default_appearance_()
+        # NOT: 2017-11-24 22:30:00
+        # assign this early
+        # this MAY be overridden in __parse_parameters__
+        #self._graphics_object_type_ = objectType # an int or enum !!!
+        
+
+        # NOTE: 2018-01-17 15:33:58
+        # used in buildMode or editMode; applies to non-cursor objects only
+        #self._c_shape_point         = -1
+        self._c_activePoint         = -1 # shape point editing - used in edit & build modes
+        self._c_activeControlPoint  = -1 # path control point editing; valid values are 0 and 1
+        self._control_points        = [None, None]  # used in curve (cubic, quad) segment building for path ROIs
+        self._constrainedPoint      = None
+        self._hover_point           = None    # because a null QPointF is still valid:
+        self._movePoint             = False
+        
+
+        self._cachedPath_ = Path() # used in build mode
+        
+        # NOTE: 2017-06-29 08:32:11
+        # flags when a new position change sequence has begun (the previous 
+        # sequence, if any, ended with a mouse release event)
+        self._positionChangeHasBegun = False
+        
+        
+        # FIXME: 2021-05-04 11:08:40 get rid of this
+        # NOTE: 2017-11-23 00:08:04 
+        # unlike non-cursor types, cursors are NOT back-ended by a QGraphicsItem
+        # but rather directly painted by self.paint() method
+        # the flag below toggles the cursor painting ON / OFF
+        # TODO sync me with current frame cf self._frameindex
+        self.__objectVisible__ = True
+        
+        
+        self._wbarPos = QtCore.QPointF() # cursor "width" bar; NOT stored in the backend
+        
+        # NOTE: 2017-06-28 17:19:20
+        # used for cursors to pass on position change
+        self._deltaPos = QtCore.QPointF() # NOT stored in the baskend
+
+        # NOTE: 2017-06-30 13:52:03
+        # used for linked cursors logic, when object if a cursor type
+        self._oldPos = QtCore.QPointF() # NOT stored in the backend
+        
+        # elements of cursor types - do NOT use _graphicsShapedItem here
+        # because the Qt GraphicsView system will be decorate its bounding rect 
+        # when selected
+        self._vline     = QtCore.QLineF() # vertical cursor line
+        self._hline     = QtCore.QLineF() # horizontal cursor line
+        self._hwbar     = QtCore.QLineF() # vertical cursor window line
+        self._vwbar     = QtCore.QLineF() # horizontal cursor window line
+        self._crect     = QtCore.QRectF() # point cursor central rect
+        self._wrect     = QtCore.QRectF() # point and crosshair cursor window rect
+
+        self._labelRect = QtCore.QRectF() # a Null rectangle!!!
+        self._labelPos  = QtCore.QPointF()
+        
+        # ###
+        # BEGIN ID and label management
+        # ###
+        
+        if isinstance(self._backend_, PlanarGraphics):
+            if isinstance(self._backend_.name, str) and len(self._backend_.name.strip()):
+                self._ID_ = self._backend_.name
+            else:
+                self._ID_ = type(self._backend_).__name__
+                
+        else:
+            self._ID_ = ""
+            
+        self._setDisplayStr_(self._ID_)
+                    
+        # ###
+        # END ID and label manageent
+        # ###
+
+        # FIXME: 2021-05-04 11:11:19 One backend per frontend!
+        # NOTE: 2018-01-26 10:07:28
+        # use a list of backends !!!
+        #self._linkedGraphicsObjects = list()
+                
+        #self._isLinked = len(self._linkedGraphicsObjects)>0
+        
         self.setFlags(QtWidgets.QGraphicsItem.ItemIsMovable                 | \
                       QtWidgets.QGraphicsItem.ItemIsFocusable               | \
                       QtWidgets.QGraphicsItem.ItemIsSelectable              | \
@@ -7888,572 +7687,566 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         #self.setBoundingRegionGranularity(0.5)
         
+        self._shapeIsEditable_      = False # control point editing
+        self._movable_              = True # moveable by mouse or keyboard
+        self._editable_             = True # switching to edit mode allowed
+        self._transformable_        = False # rotation & skewing
+        self._opaqueLabel_          = True
+        self._curveBuild_           = False
+        self._buildMode_            = self._backend_ is None
+        
         if self._backend_ is not None:
-            if self._backend_.type == PlanarGraphicsType.crosshair_cursor:
+            if isinstance(self._backend_, CrosshairCursor):
                 self.setBoundingRegionGranularity(0.5)
                 
-            self.setVisible(len(self._backend_.frameIndices)==0 or self._backend_.hasStateForFrame(self._backend_.currentFrame))
+            #if self._backend_.type == PlanarGraphicsType.crosshair_cursor:
+                #self.setBoundingRegionGranularity(0.5)
+                
+            self.__objectVisible__  = len(self._backend_.frameIndices)==0 or self._backend_.hasStateForFrame(self._backend_.currentFrame)
+            
             if self not in self._backend_.frontends:
                 self._backend_.frontends.append(self)
             
-            for f in self._backend_.frontends:
-                if f != self:
-                    self.signalGraphicsObjectPositionChange.connect(f.slotLinkedGraphicsObjectPositionChange)
-                    f.signalGraphicsObjectPositionChange.connect(self.slotLinkedGraphicsObjectPositionChange)
+            #for f in self._backend_.frontends:
+                #if f != self:
+                    #self.signalGraphicsObjectPositionChange.connect(f.slotLinkedGraphicsObjectPositionChange)
+                    #f.signalGraphicsObjectPositionChange.connect(self.slotLinkedGraphicsObjectPositionChange)
                     
-        self.__drawObject__() 
+        self._drawObject_() 
                     
         self.update()
         
-    def __make_backend__(self, parameters, pos, gtype, frameindex=None, currentframe=0):
-        """DEPRECATED
-        This is poor design: PlanarGrahics (backend) should construct GraphicsObject
-        (frontend) when needed, not vice-versa.
+    #def __make_backend__(self, parameters, pos, gtype, frameindex=None, currentframe=0):
+        #"""DEPRECATED
+        #This is poor design: PlanarGrahics (backend) should construct GraphicsObject
+        #(frontend) when needed, not vice-versa.
         
-        Constructs a PlanarGraphics backend from geometric coordinates.
+        #Constructs a PlanarGraphics backend from geometric coordinates.
         
-        This also generates a PlanarGraphics backend from the 'parameters' argument
+        #This also generates a PlanarGraphics backend from the 'parameters' argument
         
-        Parameters:
-        ===========
+        #Parameters:
+        #===========
         
-        parameters : numeric sequence, a str, or one of the following QtCore
-            types: QLineF, QRectF, QPolygonF
-                NOTE: QRectF is used as abounding rectangle for Rect and Ellipse
+        #parameters : numeric sequence, a str, or one of the following QtCore
+            #types: QLineF, QRectF, QPolygonF
+                #NOTE: QRectF is used as abounding rectangle for Rect and Ellipse
         
-        """
-        # NOTE 2021-04-25 13:37:19
-        # TODO FIXME I think the frame index paradigm must be revisited...
-        # check frameindex and currentframe
-        if isinstance(frameindex, (tuple, list)):
-            # this can be an empty sequence!!!
-            if len(frameindex)> 0:
-                if len(frameindex) == 1 and frameindex[0] is None:
-                    frameindex.clear()
+        #"""
+        ## NOTE 2021-04-25 13:37:19
+        ## TODO FIXME I think the frame index paradigm must be revisited...
+        ## check frameindex and currentframe
+        #if isinstance(frameindex, (tuple, list)):
+            ## this can be an empty sequence!!!
+            #if len(frameindex)> 0:
+                #if len(frameindex) == 1 and frameindex[0] is None:
+                    #frameindex.clear()
                     
-                elif not all([isinstance(a, numbers.Integral) and a >= 0 for a in frameindex]):
-                    raise TypeError("visible frame indices must be non-negative integers")
+                #elif not all([isinstance(a, numbers.Integral) and a >= 0 for a in frameindex]):
+                    #raise TypeError("visible frame indices must be non-negative integers")
         
-        elif isinstance(frameindex, numbers.Integral):
-            if frameindex < 0:
-                raise ValueError("visible frame index cannot be negative")
+        #elif isinstance(frameindex, numbers.Integral):
+            #if frameindex < 0:
+                #raise ValueError("visible frame index cannot be negative")
             
-            frameindex = [frameindex]
+            #frameindex = [frameindex]
             
-        elif frameindex is None:
-            frameindex = []
+        #elif frameindex is None:
+            #frameindex = []
             
-        else:
-            raise TypeError("Index of visible frames (frameindex) expected to be an int or a sequence of int, or None; got %s instead" % type(frameindex).__name__)
+        #else:
+            #raise TypeError("Index of visible frames (frameindex) expected to be an int or a sequence of int, or None; got %s instead" % type(frameindex).__name__)
         
-        self._frameindex = frameindex
+        #self._frameindex = frameindex
 
-        if not isinstance(currentframe, numbers.Integral):
-            raise TypeError("currentframe expected to be an int got %s instead" % type(currentFrame).__name__)
+        #if not isinstance(currentframe, numbers.Integral):
+            #raise TypeError("currentframe expected to be an int got %s instead" % type(currentFrame).__name__)
         
-        self._currentframe_ = currentframe
+        #self._currentframe_ = currentframe
         
-        if gtype & PlanarGraphicsType.allCursorTypes: # parametric c'tor for cursors
-            if len(parameters) == 5 and all([isinstance(c, numbers.Number) for c in parameters]):
-                if pos is None:
-                    pos = QtCore.QPointF(0.,0.)
+        #if gtype & PlanarGraphicsType.allCursorTypes: # parametric c'tor for cursors
+            #if len(parameters) == 5 and all([isinstance(c, numbers.Number) for c in parameters]):
+                #if pos is None:
+                    #pos = QtCore.QPointF(0.,0.)
                 
-                self._backend_ = Cursor(pos.x(),  
-                                        pos.y(),
-                                        float(parameters[0]),
-                                        float(parameters[1]),
-                                        float(parameters[2]), 
-                                        float(parameters[3]), 
-                                        float(parameters[4]), 
-                                        frameindex=frameindex,
-                                        name=self._objectType.name,
-                                        currentframe=self._currentframe_,
-                                        graphicstype=gtype)
+                #self._backend_ = Cursor(pos.x(),  
+                                        #pos.y(),
+                                        #float(parameters[0]),
+                                        #float(parameters[1]),
+                                        #float(parameters[2]), 
+                                        #float(parameters[3]), 
+                                        #float(parameters[4]), 
+                                        #frameindex=frameindex,
+                                        #name=self._graphics_object_type_.name,
+                                        #currentframe=self._currentframe_,
+                                        #graphicstype=gtype)
                 
-                super().setPos(pos)
+                #super().setPos(pos)
                 
-            else:
-                raise ValueError("For parametric cursor construction, 'parameters' must be a sequence of five 5 numbers; instead got %d elements" % (len(parameters)))
+            #else:
+                #raise ValueError("For parametric cursor construction, 'parameters' must be a sequence of five 5 numbers; instead got %d elements" % (len(parameters)))
                 
-        else: # parametric c'tor for non-cursor graphic objects
-            # NOTE: 2021-04-25 13:41:06
-            # Enter build mode when one of the following is True:
-            # * parameters is an empty sequence
-            # * parameters is an empty Path
-            # 
-            if any([parameters is None, (isinstance(parameters, (tuple, list, Path)) and len(parameters) == 0)]):
-                self._buildMode_ = True # self._backend_ will be built in __finalizeShape__() after exit from build mode
-            #if parameters is None or (isinstance(parameters, (tuple, list)) and len(parameters) == 0) \
-                #or (isinstance(parameters, Path) and len(parameters) == 0) or \
-                #self._objectType == PlanarGraphicsType.allShapeTypes:
-                ## enters build mode
-                #self._buildMode_ = True # self._backend_ will be built in __finalizeShape__() after exit from build mode
-            elif isinstance(parameters, QtCore.QLineF):
-                # NOTE: 2021-04-25 13:47:18
-                # FIXME: this should be set appropriately by Path.__init__
-                #self._objectType = PlanarGraphicsType.line
-                self._backend_ = Path(Move(parameters.p1().x(), parameters.p1().y()),
-                            Line(parameters.p2().x(), parameters.p2().y()),
-                            frameindex = self._frameindex,
-                            currentframe = self._currentframe_)
+        #else: # parametric c'tor for non-cursor graphic objects
+            ## NOTE: 2021-04-25 13:41:06
+            ## Enter build mode when one of the following is True:
+            ## * parameters is an empty sequence
+            ## * parameters is an empty Path
+            ## 
+            #if any([parameters is None, (isinstance(parameters, (tuple, list, Path)) and len(parameters) == 0)]):
+                #self._buildMode_ = True # self._backend_ will be built in _finalizeShape_() after exit from build mode
+            ##if parameters is None or (isinstance(parameters, (tuple, list)) and len(parameters) == 0) \
+                ##or (isinstance(parameters, Path) and len(parameters) == 0) or \
+                ##self._graphics_object_type_ == PlanarGraphicsType.allShapeTypes:
+                ### enters build mode
+                ##self._buildMode_ = True # self._backend_ will be built in _finalizeShape_() after exit from build mode
+            #elif isinstance(parameters, QtCore.QLineF):
+                ## NOTE: 2021-04-25 13:47:18
+                ## FIXME: this should be set appropriately by Path.__init__
+                ##self._graphics_object_type_ = PlanarGraphicsType.line
+                #self._backend_ = Path(Move(parameters.p1().x(), parameters.p1().y()),
+                            #Line(parameters.p2().x(), parameters.p2().y()),
+                            #frameindex = self._frameindex,
+                            #currentframe = self._currentframe_)
     
-                if self._backend_.name is None or len(self._backend_.name) == 0:
-                    self._backend_.name = self._backend_.type.name
+                #if self._backend_.name is None or len(self._backend_.name) == 0:
+                    #self._backend_.name = self._backend_.type.name
                 
-                self._cachedPath_ = self._backend_.asPath()
+                #self._cachedPath_ = self._backend_.asPath()
                 
-            elif isinstance(parameters, QtCore.QRectF):
-                # parametric construction from a QRectF -- bounding rectangle
-                # for Ellipse and Rect
-                if gtype & PlanarGraphicsType.rectangle:
-                    self._backend_ = Rect(parameters.topLeft().x(), 
-                                            parameters.topLeft().y(), 
-                                            parameters.width(), 
-                                            parameters.height(), 
-                                            name = self._objectType.name, 
-                                            frameindex = self._frameindex, 
-                                            currentframe=self._currentframe_)
+            #elif isinstance(parameters, QtCore.QRectF):
+                ## parametric construction from a QRectF -- bounding rectangle
+                ## for Ellipse and Rect
+                #if gtype & PlanarGraphicsType.rectangle:
+                    #self._backend_ = Rect(parameters.topLeft().x(), 
+                                            #parameters.topLeft().y(), 
+                                            #parameters.width(), 
+                                            #parameters.height(), 
+                                            #name = self._graphics_object_type_.name, 
+                                            #frameindex = self._frameindex, 
+                                            #currentframe=self._currentframe_)
                     
-                elif gtype & PlanarGraphicsType.ellipse:
-                    self._backend_ = Ellipse(parameters.topLeft().x(), 
-                                            parameters.topLeft().y(), 
-                                            parameters.width(), 
-                                            parameters.height(), 
-                                            name = self._objectType.name, 
-                                            frameindex = self._frameindex, 
-                                            currentframe=self._currentframe_)
+                #elif gtype & PlanarGraphicsType.ellipse:
+                    #self._backend_ = Ellipse(parameters.topLeft().x(), 
+                                            #parameters.topLeft().y(), 
+                                            #parameters.width(), 
+                                            #parameters.height(), 
+                                            #name = self._graphics_object_type_.name, 
+                                            #frameindex = self._frameindex, 
+                                            #currentframe=self._currentframe_)
                     
-                else:
-                    raise ValueError("mismatch between the graphics object type (%s) and parameter type (%s)" % (gtype, type(parameters).__name__))
+                #else:
+                    #raise ValueError("mismatch between the graphics object type (%s) and parameter type (%s)" % (gtype, type(parameters).__name__))
                 
-                if self._backend_.name is None or len(self._backend_.name) == 0:
-                    self._backend_.name = self._backend_.type.name
+                #if self._backend_.name is None or len(self._backend_.name) == 0:
+                    #self._backend_.name = self._backend_.type.name
                 
-                self._cachedPath_ = self._backend_.asPath()
+                #self._cachedPath_ = self._backend_.asPath()
                         
-            elif isinstance(parameters, QtGui.QPolygonF):
-                # parametric c'tor from a QPolygonF
-                # NOTE: QPolygonF if a :typedef: for QPointF list (I think?)
-                # this HAS to be done this way, becase QPolygonF is NOT a python iterable
-                #self._objectType = PlanarGraphicsType.polygon
-                self._backend_ = Path()
+            #elif isinstance(parameters, QtGui.QPolygonF):
+                ## parametric c'tor from a QPolygonF
+                ## NOTE: QPolygonF if a :typedef: for QPointF list (I think?)
+                ## this HAS to be done this way, becase QPolygonF is NOT a python iterable
+                ##self._graphics_object_type_ = PlanarGraphicsType.polygon
+                #self._backend_ = Path()
                 
-                for k, p in enumerate(parameters):
-                    if k == 0:
-                        self._backend_.append(Move(p.x(), p.y()))
+                #for k, p in enumerate(parameters):
+                    #if k == 0:
+                        #self._backend_.append(Move(p.x(), p.y()))
                         
-                    else:
-                        self._backend_.append(Line(p.x(), p.y()))
+                    #else:
+                        #self._backend_.append(Line(p.x(), p.y()))
                         
-                if self._frameindex is not None and len(self._frameindex):
-                    self._backend_.frameIndices = self._frameindex
-                    self._backend_.currentFrame = self._currentframe_
-                
-                if self._backend_.name is None or len(self._backend_.name) == 0:
-                    self._backend_.name = self._objectType.name
-                
-                self._cachedPath_ = self._backend_.asPath()
-                
-            elif isinstance(parameters, QtGui.QPainterPath):
-                #self._objectType = PlanarGraphicsType.path
-                
-                self._backend_ = Path()
-                
-                self._backend_.adoptPainterPath(parameters)
-                
                 #if self._frameindex is not None and len(self._frameindex):
-                self._backend_.frameIndices = self._frameindex
-                self._backend_.currentFrame = self._currentframe_
+                    #self._backend_.frameIndices = self._frameindex
+                    #self._backend_.currentFrame = self._currentframe_
+                
+                #if self._backend_.name is None or len(self._backend_.name) == 0:
+                    #self._backend_.name = self._graphics_object_type_.name
+                
+                #self._cachedPath_ = self._backend_.asPath()
+                
+            #elif isinstance(parameters, QtGui.QPainterPath):
+                ##self._graphics_object_type_ = PlanarGraphicsType.path
+                
+                #self._backend_ = Path()
+                
+                #self._backend_.adoptPainterPath(parameters)
+                
+                ##if self._frameindex is not None and len(self._frameindex):
+                #self._backend_.frameIndices = self._frameindex
+                #self._backend_.currentFrame = self._currentframe_
                     
-                if self._backend_.name is None or len(self._backend_.name) == 0:
-                    self._backend_.name = self._objectType.name
+                #if self._backend_.name is None or len(self._backend_.name) == 0:
+                    #self._backend_.name = self._graphics_object_type_.name
                 
-                self._cachedPath_ = self._backend_.asPath()
+                #self._cachedPath_ = self._backend_.asPath()
                 
-            elif isinstance(parameters, str):
-                pass #FIXME/TODO
+            #elif isinstance(parameters, str):
+                #pass #FIXME/TODO
             
-            elif isinstance(parameters, (tuple, list)):
-                if all([isinstance(p, (QtCore.QPointF, QtCore.QPoint)) for p in parameters]):
-                    # parametric c'tor from sequence of Qt points
-                    #self._objectType = PlanarGraphicsType.polygon
+            #elif isinstance(parameters, (tuple, list)):
+                #if all([isinstance(p, (QtCore.QPointF, QtCore.QPoint)) for p in parameters]):
+                    ## parametric c'tor from sequence of Qt points
+                    ##self._graphics_object_type_ = PlanarGraphicsType.polygon
                     
-                    self._backend_ = Path()
-                    self._backend_.append(Move(parameters[0].x(), parameters[0].y()))
+                    #self._backend_ = Path()
+                    #self._backend_.append(Move(parameters[0].x(), parameters[0].y()))
                     
-                    for c in parameters[1:]:
-                        self._backend_.append(Line(c.x(), c.y()))
+                    #for c in parameters[1:]:
+                        #self._backend_.append(Line(c.x(), c.y()))
                         
+                    ##if self._frameindex is not None and len(self._frameindex):
+                    #self._backend_.frameIndices = self._frameindex
+                    #self._backend_.currentFrame = self._currentframe_
+                        
+                    #if self._backend_.name is None or len(self._backend_.name) == 0:
+                        #self._backend_.name = self._graphics_object_type_.name
+                    
+                    #self._cachedPath_ = self._backend_.asPath()
+
+                #elif all([isinstance(p, (Start, Move, Line, Cubic, Quad, Arc, ArcMove)) for p in parameters]):
+                    #self._backend_ = Path(parameters) # a copy c'tor
+                    ##self._graphics_object_type_ = self._backend_.type
+
                     #if self._frameindex is not None and len(self._frameindex):
-                    self._backend_.frameIndices = self._frameindex
-                    self._backend_.currentFrame = self._currentframe_
-                        
-                    if self._backend_.name is None or len(self._backend_.name) == 0:
-                        self._backend_.name = self._objectType.name
+                        #self._backend_.frameIndices = self._frameindex
+                        #self._backend_.currentFrame = self._currentframe_
                     
-                    self._cachedPath_ = self._backend_.asPath()
+                    #if self._backend_.name is None or len(self._backend_.name) == 0:
+                        #self._backend_.name = self._graphics_object_type_.name
+                    
+                    #self._cachedPath_ = self._backend_.asPath()
+                    
+                #elif all([isinstance(p, numbers.Number) for p in parameters]):
+                    #if gtype & (PlanarGraphicsType.line | PlanarGraphicsType.rectangle | PlanarGraphicsType.ellipse):
+                        #if len(parameters) == 4:
+                            ## x0, y0, x1, y1; either a line, 
+                            ## or the line of a rectangle's diagonal
+                            ## or one of the diameters of an ellipse
+                            ## the above is determined by the passed object type argument
+                            ## to __init__
+                            
+                            ## cachedPath stores the control line (a diagonal)
+                            #if self._graphics_object_type_ == PlanarGraphicsType.line:
+                                
+                                #self._backend_ = Path(Move(parameters[0], parameters[1]), 
+                                                        #Line(parameters[2], parameters[3]))
+                                
+                            #elif self._graphics_object_type_ == PlanarGraphicsType.rectangle:
+                                #self._backend_ = Rect(parameters[0], parameters[1], 
+                                                    #parameters[2] - parameters[0],
+                                                    #parameters[3] - parameters[1])
+                                
+                            #else:
+                                #self._backend_ = Ellipse(parameters[0], 
+                                                        #parameters[1], 
+                                                        #parameters[2] - parameters[0],
+                                                        #parameters[3] - parameters[1])
 
-                elif all([isinstance(p, (Start, Move, Line, Cubic, Quad, Arc, ArcMove)) for p in parameters]):
-                    self._backend_ = Path(parameters) # a copy c'tor
-                    #self._objectType = self._backend_.type
+                            ## override backend's frame-state associations & currentframe 
+                            ## ONLY if self._frameindex was set by __init__ parameter
+                            ##if self._frameindex is not None and len(self._frameindex):
+                            #self._backend_.frameIndices = self._frameindex
+                            #self._backend_.currentFrame = self._currentframe_
+                            
+                            #if self._backend_.name is None or len(self._backend_.name) == 0:
+                                #self._backend_.name = self._graphics_object_type_.name
+                    
+                            #self._cachedPath_ = self._backend_.asPath()
+                            
+                        #else:
+                            #raise TypeError("For line, ellipse or rectangle, a sequence of four scalars were expected")
+                            
+                    #elif gtype & PlanarGraphicsType.point:
+                        ## parametric construction of a Point
+                        ## TODO 2017-11-25 00:16:35
+                        ## make it accept a pictgui.Point - TODO define this :class: !
+                        #if len(parameters) in (2,3):
+                            #x = parameters[0]
+                            #y = parameters[1]
+                            
+                            #if len(parameters) == 3:
+                                #self._pointSize = parameters[2]
 
-                    if self._frameindex is not None and len(self._frameindex):
-                        self._backend_.frameIndices = self._frameindex
-                        self._backend_.currentFrame = self._currentframe_
-                    
-                    if self._backend_.name is None or len(self._backend_.name) == 0:
-                        self._backend_.name = self._objectType.name
-                    
-                    self._cachedPath_ = self._backend_.asPath()
-                    
-                elif all([isinstance(p, numbers.Number) for p in parameters]):
-                    if gtype & (PlanarGraphicsType.line | PlanarGraphicsType.rectangle | PlanarGraphicsType.ellipse):
-                        if len(parameters) == 4:
-                            # x0, y0, x1, y1; either a line, 
-                            # or the line of a rectangle's diagonal
-                            # or one of the diameters of an ellipse
-                            # the above is determined by the passed object type argument
-                            # to __init__
+                            #self._backend_ = Move(parameters[0], parameters[1],
+                                                #frameindex = self._frameindex,
+                                                #currentframe=self._currentframe_)
+                                
+                            #if self._backend_.name is None or len(self._backend_.name) == 0:
+                                #self._backend_.name = self._graphics_object_type_.name
                             
-                            # cachedPath stores the control line (a diagonal)
-                            if self._objectType == PlanarGraphicsType.line:
+                            #self._cachedPath_ = self._backend_.asPath()
+                            
+                        #else:
+                            #raise TypeError("For a point, 'parameters' is expected to be a sequence of two (x,y) or three (x, y, radius) numbers; got %s instead" % (type(parameters).__name__))
+                    
+                    #elif gtype & (PlanarGraphicsType.polygon | PlanarGraphicsType.polyline):
+                        #if len(parameters)%2:
+                            #raise TypeError("For polygons or polyline, the numeric parameters must be a sequence with an even number of elements (x0,y0,x1,y1,... etc)")
+                            
+                        #self._backend_ = Path()
+                        
+                        #for k in range(0, len(parameters),2):
+                            #if k == 0:
+                                #self._backend_.append(Move(parameters[k], parameters[k+1]))
                                 
-                                self._backend_ = Path(Move(parameters[0], parameters[1]), 
-                                                        Line(parameters[2], parameters[3]))
+                            #else:
+                                #self._backend_.append(Line(parameters[k], parameters[k+1]))
                                 
-                            elif self._objectType == PlanarGraphicsType.rectangle:
-                                self._backend_ = Rect(parameters[0], parameters[1], 
-                                                    parameters[2] - parameters[0],
-                                                    parameters[3] - parameters[1])
-                                
-                            else:
-                                self._backend_ = Ellipse(parameters[0], 
-                                                        parameters[1], 
-                                                        parameters[2] - parameters[0],
-                                                        parameters[3] - parameters[1])
+                        #self._backend_.frameIndices = self._frameindex
+                        
+                        #self._backend_.currentFrame = self._currentframe_
+                            
+                        #if self._backend_.name is None or len(self._backend_.name) == 0:
+                            #self._backend_.name = self._graphics_object_type_.name
+                        
+                        #self._cachedPath_ = self._backend_.asPath()
+                            
+                #elif all([isinstance(p, (tuple, list)) and len(p) == 2 and all([isinstance(cc, numbers.Number) for cc in p]) for p in parameters]):
+                    ## parametric c'tor from (X,Y) pairs of scalar coordinates
+                    ## force polyline type -- if you want to build a rectangle se above
+                    
+                    #self._backend_ = Path()
+                    #self._backend_.append(Move(parameters[0][0], parameters[0][1]))
 
-                            # override backend's frame-state associations & currentframe 
-                            # ONLY if self._frameindex was set by __init__ parameter
-                            #if self._frameindex is not None and len(self._frameindex):
-                            self._backend_.frameIndices = self._frameindex
-                            self._backend_.currentFrame = self._currentframe_
-                            
-                            if self._backend_.name is None or len(self._backend_.name) == 0:
-                                self._backend_.name = self._objectType.name
-                    
-                            self._cachedPath_ = self._backend_.asPath()
-                            
-                        else:
-                            raise TypeError("For line, ellipse or rectangle, a sequence of four scalars were expected")
-                            
-                    elif gtype & PlanarGraphicsType.point:
-                        # parametric construction of a Point
-                        # TODO 2017-11-25 00:16:35
-                        # make it accept a pictgui.Point - TODO define this :class: !
-                        if len(parameters) in (2,3):
-                            x = parameters[0]
-                            y = parameters[1]
-                            
-                            if len(parameters) == 3:
-                                self._pointSize = parameters[2]
-
-                            self._backend_ = Move(parameters[0], parameters[1],
-                                                frameindex = self._frameindex,
-                                                currentframe=self._currentframe_)
-                                
-                            if self._backend_.name is None or len(self._backend_.name) == 0:
-                                self._backend_.name = self._objectType.name
-                            
-                            self._cachedPath_ = self._backend_.asPath()
-                            
-                        else:
-                            raise TypeError("For a point, 'parameters' is expected to be a sequence of two (x,y) or three (x, y, radius) numbers; got %s instead" % (type(parameters).__name__))
-                    
-                    elif gtype & (PlanarGraphicsType.polygon | PlanarGraphicsType.polyline):
-                        if len(parameters)%2:
-                            raise TypeError("For polygons or polyline, the numeric parameters must be a sequence with an even number of elements (x0,y0,x1,y1,... etc)")
-                            
-                        self._backend_ = Path()
+                    #for p in parameters[1:]:
+                        #self._backend_.append(Line(p[0], p[1]))
                         
-                        for k in range(0, len(parameters),2):
-                            if k == 0:
-                                self._backend_.append(Move(parameters[k], parameters[k+1]))
-                                
-                            else:
-                                self._backend_.append(Line(parameters[k], parameters[k+1]))
-                                
-                        self._backend_.frameIndices = self._frameindex
+                    #if gtype == PlanarGraphicsType.polygon:
+                        #self._backend_.closed = True
                         
-                        self._backend_.currentFrame = self._currentframe_
-                            
-                        if self._backend_.name is None or len(self._backend_.name) == 0:
-                            self._backend_.name = self._objectType.name
-                        
-                        self._cachedPath_ = self._backend_.asPath()
-                            
-                elif all([isinstance(p, (tuple, list)) and len(p) == 2 and all([isinstance(cc, numbers.Number) for cc in p]) for p in parameters]):
-                    # parametric c'tor from (X,Y) pairs of scalar coordinates
-                    # force polyline type -- if you want to build a rectangle se above
+                    #else:
+                        #self._graphics_object_type_ = PlanarGraphicsType.polyline
                     
-                    self._backend_ = Path()
-                    self._backend_.append(Move(parameters[0][0], parameters[0][1]))
-
-                    for p in parameters[1:]:
-                        self._backend_.append(Line(p[0], p[1]))
-                        
-                    if gtype == PlanarGraphicsType.polygon:
-                        self._backend_.closed = True
-                        
-                    else:
-                        self._objectType = PlanarGraphicsType.polyline
+                    ##if self._frameindex is not None and len(self._frameindex):
+                    #self._backend_.frameIndices = self._frameindex
+                    #self._backend_.currentFrame = self._currentframe_
                     
-                    #if self._frameindex is not None and len(self._frameindex):
-                    self._backend_.frameIndices = self._frameindex
-                    self._backend_.currentFrame = self._currentframe_
+                    #if self._backend_.name is None or len(self._backend_.name) == 0:
+                        #self._backend_.name = self._graphics_object_type_.name
                     
-                    if self._backend_.name is None or len(self._backend_.name) == 0:
-                        self._backend_.name = self._objectType.name
-                    
-                    self._cachedPath_ = self._backend_.asPath()
+                    #self._cachedPath_ = self._backend_.asPath()
                         
 
-    def __parse_parameters__(self, parameters, pos, gtype, frameindex = None, currentframe = 0):
-        """Determines whether the constructor is supposed to build, or was given a backend
+    #def __parse_parameters__(self, obj, pos, gtype, frameindex = None, currentframe = 0):
+        #"""Determines whether to build a backend or use the given one.
         
-        The process follows some rules:
+        #The process follows some rules:
         
-        1) For parametric constructors:
-        1.1) for cursors, build the backend (Cursor) from the supplied parameters
-        1.2) for shaped objects, build the cached path then generate a backend from it
+        #1) For parametric constructors:
+        #1.1) for cursors, build the backend (Cursor) from the supplied parameters
+        #1.2) for shaped objects, build the cached path then generate a backend from it
         
-        2) When this object is initialized from a planar graphic object:
-        2.1) for cursors, use the planar graphics as backend
-        2.2) for shaped objects (i.e. antything but Cursor), use the planar 
-            graphics passed in 'parameters' as backend then generate a cached
-            path from the state descriptor associated with the current frame
-        (or from the common state descriptor)
+        #2) When this object is initialized from a planar graphic object:
+        #2.1) for cursors, use the planar graphics as backend
+        #2.2) for shaped objects (i.e. antything but Cursor), use the planar 
+            #graphics passed in 'parameters' as backend then generate a cached
+            #path from the state descriptor associated with the current frame
+        #(or from the common state descriptor)
         
-        3) When function returns there shoud ALWAYS be a backend and, in the case
-        of shaped objects, a cached path.
+        #3) When function returns there shoud ALWAYS be a backend and, in the case
+        #of shaped objects, a cached path.
         
-        3.1) The ONLY EXCEPTION this rule is for shaped objects construction with
-        no parameters whatsoever: buildMode is invoked to generate a backend and 
-        a cached path.
+        #3.1) The ONLY EXCEPTION this rule is for shaped objects construction with
+        #no parameters whatsoever: buildMode is invoked to generate a backend and 
+        #a cached path.
         
-        frameindex and current frame are used ONLY when the graphics object is contructed
-        parametrically (which also generates its own new backend);
+        #frameindex and current frame are used ONLY when the graphics object is contructed
+        #parametrically (which also generates its own new backend);
         
-        when the graphics object is contructed on an existing backend, frameindex 
-        and currentframe parameters passed to the function call here are ignored
+        #when the graphics object is contructed on an existing backend, frameindex 
+        #and currentframe parameters passed to the function call here are ignored
         
-        """
-        print("GraphicsObject.__parse_parameters__")
-        print("\tparameters", parameters)
-        print("\tpos", pos)
-        print("\tgtype", gtype)
-        print("\tframeindex", frameindex)
-        print("\tcurrentframe", currentframe)
-        # ###
-        # BEGIN parse parameters
-        # ###
+        #"""
+        #print("GraphicsObject.__parse_parameters__")
+        #print("\tparameters", obj)
+        #print("\tpos", pos)
+        #print("\tgtype", gtype)
+        #print("\tframeindex", frameindex)
+        #print("\tcurrentframe", currentframe)
+        ## ###
+        ## BEGIN parse parameters
+        ## ###
         
-        # NOTE: 2021-04-24 22:02:33 FIXME
-        # this should not be needed: the GraphicsObject must ALWAYS have a PlanarGraphics
-        # backend and the the graphics type must be the one of the backend!
-        #if isinstance(parameters, PlanarGraphics): 
-            ## parameters are the backend, so override self._objectType set in __init__
-            #self._objectType = parameters.type
+        ## NOTE: 2021-04-24 22:02:33 FIXME/TODO
+        ## this should not be needed: the GraphicsObject must ALWAYS have a PlanarGraphics
+        ## backend and the the graphics type must be the one of the backend!
+        ##if isinstance(parameters, PlanarGraphics): 
+            ### parameters are the backend, so override self._graphics_object_type_ set in __init__
+            ##self._graphics_object_type_ = parameters.type
             
-        if not isinstance(pos, (QtCore.QPoint, QtCore.QPointF, type(None))):
-            raise TypeError("When given, pos must be a QPoint or QPointF")
+        ##if not isinstance(pos, (QtCore.QPoint, QtCore.QPointF, type(None))):
+            ##raise TypeError("When given, pos must be a QPoint or QPointF")
         
-        # TODO 2017-11-25 00:15:21
-        # set up backends when parameter is a pictgui primitive
-        # link coordinate changes to the attributes of the backend
-        #
-        # FIXME: a str argument should be treated by parametric c'tor for a Text
-        # PlanarGraphics
-        if isinstance(parameters, PlanarGraphics):
-            if isinstance(parameters, Path) and len(parameters) == 0:
-                # NOTE: 2021-05-01 20:38:31
-                # this will force _buildMode_ to True, triggering thd drawing logic,
-                # from inside of __make_backend__()
-                self.__make_backend__(parameters, pos, frameindex, currentframe) 
+        ## TODO 2017-11-25 00:15:21
+        ## set up backends when parameter is a pictgui primitive
+        ## link coordinate changes to the attributes of the backend
+        ##
+        ## FIXME: a str argument should be treated by parametric c'tor for a Text
+        ## PlanarGraphics
+        #if isinstance(obj, PlanarGraphics):
+            #if isinstance(obj, Path) and len(obj) == 0:
+                ## NOTE: 2021-05-01 20:38:31
+                ## this will force _buildMode_ to True, triggering thd drawing logic,
+                ## from inside of __make_backend__()
+                #self.__make_backend__(parameters, pos, frameindex, currentframe) 
                 
-            else:
-                self._backend_ = parameters
+            #else:
+                #self._backend_ = parameters
                 
-        elif isinstance(parameters, str):
-            pass
+        #elif isinstance(parameters, str):
+            #pass
             
-        if isinstance(parameters, (Cursor, Ellipse, Rect, Path, Text, str)):
-            if isinstance(parameters, (Cursor, Ellipse, Rect, Path)):
-                if isinstance(parameters, Path) and len(parameters) == 0:
-                    # NOTE: 2021-05-01 20:38:31
-                    # this will force _buildMode_ to True, triggering thd drawing logic,
-                    # from inside of __make_backend__()
-                    self.__make_backend__(parameters, pos, frameindex, currentframe) 
-                else:
-                    self._backend_    = parameters # so that we reference this directly from this object
-                    #self._objectType = self._backend_.type
+        #if isinstance(parameters, (Cursor, Ellipse, Rect, Path, Text, str)):
+            #if isinstance(parameters, (Cursor, Ellipse, Rect, Path)):
+                #if isinstance(parameters, Path) and len(parameters) == 0:
+                    ## NOTE: 2021-05-01 20:38:31
+                    ## this will force _buildMode_ to True, triggering thd drawing logic,
+                    ## from inside of __make_backend__()
+                    #self.__make_backend__(parameters, pos, frameindex, currentframe) 
+                #else:
+                    #self._backend_    = parameters # so that we reference this directly from this object
+                    ##self._graphics_object_type_ = self._backend_.type
                 
-                # cursors do not have a cached path
-                if not isinstance(parameters, Cursor):
-                    self._cachedPath_ = self._backend_.asPath()
+                ## cursors do not have a cached path
+                #if not isinstance(parameters, Cursor):
+                    #self._cachedPath_ = self._backend_.asPath()
                 
-            elif isinstance(parameters, str): # TODO: move this to __make_backend__
-                    painter.drawText(parameters)
-                    self._backend_ = Text(parameters)
+            #elif isinstance(parameters, str): # TODO: move this to __make_backend__
+                    #painter.drawText(parameters)
+                    #self._backend_ = Text(parameters)
                     
-                    #self._objectType = PlanarGraphicsType.text
+                    ##self._graphics_object_type_ = PlanarGraphicsType.text
                     
-            else:
-                raise TypeError("Inavlid 'parameters' type for backend-based construction: %s" % type(parameters).__name__)
+            #else:
+                #raise TypeError("Inavlid 'parameters' type for backend-based construction: %s" % type(parameters).__name__)
 
-            self._buildMode_ = False
+            #self._buildMode_ = False
                     
-            self._frameindex = self._backend_.frameIndices
-            self._currentframe_ = self._backend_.currentFrame
+            #self._frameindex = self._backend_.frameIndices
+            #self._currentframe_ = self._backend_.currentFrame
                 
-            if self._backend_.name is None or len(self._backend_.name) == 0:
-                self._backend_.name = self._objectType.name
-                self._backend_.updateLinkedObjects()
+            #if self._backend_.name is None or len(self._backend_.name) == 0:
+                #self._backend_.name = self._graphics_object_type_.name
+                #self._backend_.updateLinkedObjects()
             
-            if pos is None or (isinstance(pos, (QtCore.QPoint, QtCore.QPointF)) and pos.isNull()):
-                if self._backend_ is not None and self._backend_.hasStateForFrame(self._currentframe_):
-                    pos = self._backend_.pos
-                else:
-                    pos = QtCore.QPointF(0,0)
+            #if pos is None or (isinstance(pos, (QtCore.QPoint, QtCore.QPointF)) and pos.isNull()):
+                #if self._backend_ is not None and self._backend_.hasStateForFrame(self._currentframe_):
+                    #pos = self._backend_.pos
+                #else:
+                    #pos = QtCore.QPointF(0,0)
                 
-            super().setPos(pos)
+            #super().setPos(pos)
             
-        else:
-            self.__make_backend__(parameters, pos, frameindex, currentframe)
+        #else:
+            #self.__make_backend__(parameters, pos, frameindex, currentframe)
         
             
-        # ###
-        # END parse parameters
-        # ###
+        ## ###
+        ## END parse parameters
+        ## ###
         
     def __str__(self):
         return "%s, type %s, ID %s, backend %s" \
-            % (self.__repr__(), self._objectType.name, self._ID_, self.backend.__repr__())
+            % (self.__repr__(), type(self.backend).__name__, self._ID_, self.backend.__repr__())
             
-    def __setDisplayStr__(self, value=None):
-        """Constructs the label string
+        #return "%s, type %s, ID %s, backend %s" \
+            #% (self.__repr__(), self._graphics_object_type_.name, self._ID_, self.backend.__repr__())
+            
+    def _setDisplayStr_(self, value:str=None):
+        """Constructs the label string.
+        
+        Value may be an empty string
         """
-        nameStr = ""
-        
-        if value is None:
-            if self._backend_ is None:
-                nameStr = self._ID_
-                
-            else:
-                nameStr = self._backend_.name
+        nameStr = value if isinstance(value, str) else self._backend_.name if self._backend_ is not None else self._ID_
 
-        elif isinstance(value, str):
-            nameStr = value
-            
-        else:
-            raise TypeError("Expecting a string argument, or None; got %s instead" % (type(value).__name__))
-        
-        if self._backend_ is not None and self._backend_.hasStateForFrame(self._currentframe_):
-            if not isinstance(self._backend_, Path):
-                stateDescriptor = self._backend_.getState(self._currentframe_)
-
-                if isinstance(stateDescriptor, list) and len(stateDescriptor):
-                    stateDescriptor = stateDescriptor[0]
-                    
-                if stateDescriptor is not None and len(stateDescriptor):
-                    if self._parentWidget is not None: # why this condition here?
-                        if self._labelShowsCoordinates:
-                            if self.objectType & PlanarGraphicsType.allCursorTypes:
-                                if self._objectType & PlanarGraphicsType.vertical_cursor:
-                                    nameStr += ": %g" % stateDescriptor.x
-                                    
-                                elif self._objectType == PlanarGraphicsType.horizontal_cursor:
-                                    nameStr += ": %g" % stateDescriptor.y
-                                    
-                                else:
-                                    nameStr += ": %g, %g" % (stateDescriptor.x, stateDescriptor.y)
-                            
-        self._displayStr = nameStr
-        
-    @safeWrapper
-    def __calculate_shape__(self):
-        if self._backend_ is not None:
-            # non-cursor
-            if self._buildMode_ or self.editMode:
-                if self._cachedPath_ is not None and len(self._cachedPath_)> 0:
-                    path.addPath(self._cachedPath_())
-                    
-                    if len(self._cachedPath_) > 1:
-                        for k, element in enumerate(self._cachedPath_):
-                            path.addEllipse(element.x, element.y,
-                                            self._pointSize * 2.,
-                                            self._pointSize * 2.)
-                            
-                path.addRect(sc.sceneRect())
-                
-            path.addPath(self._backend_())
-                
-            self.__setDisplayStr__()
-                
-            self.__updateLabelRect__()
-            
-            path.addRect(self._labelRect)
-            
-            if self.isSelected():
-                if self._isLinked: # linked to other GraphicsObjects !!!
-                    pen  = self._linkedSelectedPen
-                    
+        if self._labelShowsCoordinates_ and isinstance(self._backend_, Cursor):
+            state = self._backend_.currentState
+            if state:
+                if isinstance(self._backend_, VerticalCursor):
+                    nameStr += ": %g" % state.x
+                elif isinstance(self._backend_, HorizontalCursor):
+                    nameStr += ": %g" % state.y
                 else:
-                    pen = self._selectedCursorPen
+                    nameStr += ": %g, %g" % (state.x, state.y)
+                            
+        self._displayStr_ = nameStr
+        
+    #@safeWrapper
+    #def _calculate_shape_(self, path):
+        #if self._backend_ is not None:
+            ## non-cursor
+            #if self._buildMode_ or self.editMode:
+                #if self._cachedPath_ is not None and len(self._cachedPath_)> 0:
+                    #path.addPath(self._cachedPath_())
                     
-            else:
-                if self._isLinked:# linked to other GraphicsObjects !!!
-                    pen = self._linkedPen
-                    #self._graphicsShapedItem.setPen(self._linkedPen)
-                    
-                else:
-                    pen = self._cursorPen
-                    
-            pathStroker = QtGui.QPainterPathStroker(pen)
-            
-            return pathStroker.createStroke(path)
-            
-        else: 
-            # no backend = this is in buildMode
-            if self._cachedPath_ is not None and len(self._cachedPath_)> 0:
-                pathStroker = QtGui.QPainterPathStroker(self._selectedCursorPen)
+                    #if len(self._cachedPath_) > 1:
+                        #for k, element in enumerate(self._cachedPath_):
+                            #path.addEllipse(element.x, element.y,
+                                            #self._pointSize * 2.,
+                                            #self._pointSize * 2.)
+                            
+                #path.addRect(sc.sceneRect())
                 
-                path.addPath(pathStroker.createStroke(self._cachedPath_()))
+            #path.addPath(self._backend_())
+                
+            #self._setDisplayStr_()
+                
+            #self._updateLabelRect_()
+            
+            #path.addRect(self._labelRect)
+            
+            #if self.isSelected():
+                #if self._isLinked: # linked to other GraphicsObjects !!!
+                    #pen  = self._linkedSelectedPen
+                    
+                #else:
+                    #pen = self._selectedCursorPen
+                    
+            #else:
+                #if self._isLinked:# linked to other GraphicsObjects !!!
+                    #pen = self._linkedPen
+                    ##self._graphicsShapedItem.setPen(self._linkedPen)
+                    
+                #else:
+                    #pen = self._cursorPen
+                    
+            #pathStroker = QtGui.QPainterPathStroker(pen)
+            
+            #return pathStroker.createStroke(path)
+            
+        #else: 
+            ## no backend = this is in buildMode
+            #if self._cachedPath_ is not None and len(self._cachedPath_)> 0:
+                #pathStroker = QtGui.QPainterPathStroker(self._selectedCursorPen)
+                
+                #path.addPath(pathStroker.createStroke(self._cachedPath_()))
 
-            path.addRect(sc.sceneRect())
+            #path.addRect(sc.sceneRect())
             
             
-        return path
+        #return path
     
             
     @safeWrapper
-    def __updateLabelRect__(self):
+    def _updateLabelRect_(self):
         """Calculates label bounding rectangle
         """
-        if len(self._displayStr) > 0:
-            fRect = self._parentWidget.fontMetrics().boundingRect(self._displayStr)
+        if len(self._displayStr_) > 0:
+            fRect = self._parentWidget_.fontMetrics().boundingRect(self._displayStr_)
             self._labelRect.setRect(fRect.x(), fRect.y(), fRect.width(), fRect.height())
 
         else:
             self._labelRect  = QtCore.QRectF() # a null rect
         
-    def __finalizeShape__(self):
+    def _finalizeShape_(self):
         """Creates the _graphicsShapedItem, an instance of QGraphicsItem.
         Used only by non-cursor types, after exit from build mode.
         Relies on self._cachedPath_ which is a PlanarGraphics Path object. Therefore
-        if makes inferences from self._objectType and the number of elements in
+        if makes inferences from self._graphics_object_type_ and the number of elements in
         self._cachedPath_
         """
-        if self._objectType & PlanarGraphicsType.allCursorTypes:
+        if self._graphics_object_type_ & PlanarGraphicsType.allCursorTypes:
             # NOTE: do NOT use _graphicsShapedItem for cursors !!!
             return
             
@@ -8466,13 +8259,13 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     # needs to create particular backends for Rect and Ellipse
                     # because self._cachedPath_ is a generic Path object
                     # (see __parse_parameters__)
-                    if self._objectType == PlanarGraphicsType.rectangle:
+                    if self._graphics_object_type_ == PlanarGraphicsType.rectangle:
                         self._backend_ = Rect(self._cachedPath_[0].x,
                                              self._cachedPath_[0].y,
                                              self._cachedPath_[1].x-self._cachedPath_[0].x,
                                              self._cachedPath_[1].y-self._cachedPath_[0].y)
                         
-                    elif self._objectType == PlanarGraphicsType.ellipse:
+                    elif self._graphics_object_type_ == PlanarGraphicsType.ellipse:
                         self._backend_ = Ellipse(self._cachedPath_[0].x,
                                                 self._cachedPath_[0].y,
                                                 self._cachedPath_[1].x-self._cachedPath_[0].x,
@@ -8500,26 +8293,23 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         self.update()
 
-    def __drawObject__(self):
+    def _drawObject_(self):
         if self._backend_ is None:
             return
 
-        #if self._backend_.currentFrame != self._currentframe_:
-            #self._backend_.currentFrame = self._currentframe_
-        
-        if len(self._displayStr) > 0:
-            self.__setDisplayStr__(self._displayStr)
+        #if len(self._displayStr_) > 0:
+            #self._setDisplayStr_(self._displayStr_)
+            
+        #else:
+            #self._setDisplayStr_()
+            
+        if isinstance(self._backend_, Cursor):
+            self._drawCursor_()
             
         else:
-            self.__setDisplayStr__()
+            self._drawROI_()
             
-        if self.isCursor:
-            self.__drawCursor__()
-            
-        else:
-            self.__drawROI__()
-            
-    def __drawROI__(self):
+    def _drawROI_(self):
         if self._buildMode_:
             return
         
@@ -8527,7 +8317,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
 
         self.update()
         
-    def __drawCursor__(self):
+    def _drawCursor_(self):
         """Draws cursor
         """
         # NOTE: 2017-11-27 21:08:06
@@ -8630,12 +8420,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
     @property
     def isLinked(self):
-        self._isLinked = len(self._linkedGraphicsObjects) > 0
-        return self._isLinked
+        return self._backend_ and self in self._backend_.frontends and len(self._backend_.frontends) > 1
+        #return len(self._linkedGraphicsObjects) > 0
     
-    def isLinkedWith(self, other):
-        return other.ID in self._linkedGraphicsObjects
-        
     # NOTE: 2017-06-30 12:04:24
     # TODO: functions/event handlers to implement/overload:
     # TODO OPTIONAL: collidesWithItem()
@@ -8644,15 +8431,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     # TODO OPTIONAL: keyReleaseEvent (to move it by keyboard)
     # TODO OPTIONAL: hoverMoveEvent -- optional
     
-    def type(self):
-        return GraphicsObject.Type
-    
     @safeWrapper
     def getShapePathElements(self):
-        if not self.hasStateDescriptor:
-            return
-        
-        if self.objectType & PlanarGraphicsType.allCursorTypes:
+        if isinstance(self._backend_, Cursor) or not self.hasStateDescriptor:
             return
         
         path = self.graphicsItem.shape() #  a QPainterPath with subpaths!
@@ -8675,14 +8456,14 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         """No mapping transformations here, as the cached path is a copy of the
         _backend_'s state associated with the current frame.
         """
-        if self.objectType & PlanarGraphicsType.allCursorTypes:
+        if isinstance(self._backend_, (Cursor, type(None))):
             return
         
         sc = self.scene()
             
         if self.scene() is None:
             try:
-                sc = self._parentWidget.scene
+                sc = self._parentWidget_.scene
             except:
                 return
         
@@ -8695,24 +8476,20 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         top = pad
         bottom =sc.height() - pad
         
-        if self._backend_ is None:
-            return
+        self._cachedPath_ = self._backend_.controlPath()
         
-        if isinstance(self._backend_, (Ellipse, Rect)):
-            self._cachedPath_ = Path(Move(self._backend_.x, 
-                                            self._backend_.y),
-                                       Line(self._backend_.x + self._backend_.w,
-                                            self._backend_.y + self._backend_.h))
+        #if isinstance(self._backend_, (Ellipse, Rect)):
+            #self._cachedPath_ = self._backend_.controlPath()
+            ##self._cachedPath_ = Path(Move(self._backend_.x, 
+                                            ##self._backend_.y),
+                                       ##Line(self._backend_.x + self._backend_.w,
+                                            ##self._backend_.y + self._backend_.h))
                                     
-        elif isinstance(self._backend_, Path):
-            if self._backend_.hasStateForFrame(self._currentframe_):
-                self._cachedPath_ = self._backend_.asPath(self._currentframe_)
+        #elif isinstance(self._backend_, Path):
+            #self._cachedPath_ = self._backend_.asPath()
                 
-            else:
-                self._cachedPath_ = Path()
-                
-        else:
-            self._cachedPath_ = self._backend_.asPath()
+        #else:
+            #self._cachedPath_ = self._backend_.asPath()
             
     def show(self):
         self.setVisible(True)
@@ -8726,43 +8503,38 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         """
         bRect = QtCore.QRectF()
         sc = self.scene()
-        #if self.scene() is None:
-            #sc = self.scene
+
         if sc is None:
-            if self._parentWidget is not None:
-                sc = self._parentWidget.scene
+            if self._parentWidget_ is not None:
+                sc = self._parentWidget_.scene
                 
         if sc is None:
             return bRect #  return a null QRect!
             
-        self.__setDisplayStr__(self._ID_)
+        self._setDisplayStr_(self._ID_)
             
-        self.__updateLabelRect__()
+        self._updateLabelRect_()
         
         try:
-            if self.objectType & PlanarGraphicsType.allCursorTypes:
-                # NOTE: 2018-01-25 22:06:25
-                # this is required: what if this cursor is linked with one in another
-                # window that shows a different frame, for which the backend has no
-                # state descriptor?
-                # seame check is done for non-cursor types, below
-                state = self._backend_.getState(self._currentframe_) 
+            if isinstance(self._backend_, Cursor):
+                state = self._backend_.getState() 
+                #state = self._backend_.getState(self._currentframe_) 
                 
                 if isinstance(state, DataBag) and len(state):
-                    if self.isVerticalCursor:
+                    if isinstance(self._backend_, VerticalCursor):
                         # QRectF(x,y,w,h)
                         bRect = self.mapRectFromScene(QtCore.QRectF(state.x - state.xwindow/2,
                                                                     0, 
                                                                     state.xwindow, 
                                                                     state.height))
                         
-                    elif self.isHorizontalCursor:
+                    elif isinstance(self._backend_, HorizontalCursor):
                         bRect = self.mapRectFromScene(QtCore.QRectF(0, 
                                                                     state.y - state.ywindow/2,  
                                                                     state.width, 
                                                                     state.ywindow))
                         
-                    elif self.isCrosshairCursor:
+                    elif isinstance(self._backend_, CrosshairCursor):
                         bRect =  self.mapRectFromScene(QtCore.QRectF(-state.width//2, 
                                                                     -state.height//2, 
                                                                     state.width, 
@@ -8782,9 +8554,10 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         
             else:
                 # not a cursor
-                if self._backend_ is not None and self._backend_.hasStateForFrame(self._currentframe_) and self._backend_() is not None:
-                    #bRect = self.mapRectFromScene(self._backend_().controlPointRect()) # relies on planar graphics's shape !!!!
+                #if self._backend_ is not None and self._backend_.hasStateForFrame(self._currentframe_) and self._backend_() is not None:
+                if self._backend_ is not None and not isinstance(self._backend_, Cursor):
                     bRect = self.mapRectFromScene(self._backend_().boundingRect()) # relies on planar graphics's shape !!!!
+                    #bRect = self.mapRectFromScene(self._backend_().controlPointRect()) # relies on planar graphics's shape !!!!
                     
                     if self.editMode:
                         bRect |= self.mapRectFromScene(self._cachedPath_().boundingRect())
@@ -8805,10 +8578,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     lrect.moveBottomLeft(bRect.center())
                     
                     bRect |= lrect # union
+                    
         except Exception as exc:
             traceback.print_exc()
-            #print("in %s %s frame %d" % (self.type, self.name, self.currentFrame))
-        
                 
         return bRect
     
@@ -8826,14 +8598,17 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         """
         #if not self.hasStateDescriptor:
             #return
-        
-        if not self.isCursor:
-            if self.isText:
-                # TODO FIXME ???
-                raise NotImplementedError("Scene coordinates from text objects not yet implemented")
             
-            if len(self._cachedPath_ > 0):
-                return Path([self.mapToScene(p) for p in self._cachedPath_.qPoints()])
+        if self._backend_ and len(self._cachedPath_ > 0):
+            return Path([self.mapToScene(p) for p in self._cachedPath_.qPoints()])
+        
+        #if self._backend_ is not None and isinstance(self._backend_, Cursor):
+            #if self.isText:
+                ## TODO FIXME ???
+                #raise NotImplementedError("Scene coordinates from text objects not yet implemented")
+            
+            #if len(self._cachedPath_ > 0):
+                #return Path([self.mapToScene(p) for p in self._cachedPath_.qPoints()])
             
     def toSceneCursor(self):
         """Returns a new pictgui.Cursor object or None if isCursor is False.
@@ -8850,14 +8625,11 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         #if not self.hasStateDescriptor:
             #return
         
-        if self.isCursor:
-            stateDescriptor = self._backend_.getState(self._currentframe_)
-            if stateDescriptor and len(stateDescriptor):
-                p = self.mapToScene(QtCore.QPointF(self._backend_.x, self._backend_.y))
-                return Cursor(self.name, p.x(), p.y(), self._backend_.width, self._backend_.height, self._backend_.xwindow, self._backend_.ywindow, self._backend_.radius)
-            
-                #p = self.mapToScene(QtCore.QPointF(stateDescriptor.x, stateDescriptor.y))
-                #return Cursor(self.name, p.x(), p.y(), stateDescriptor.width, stateDescriptor.height, stateDescriptor.xwindow, stateDescriptor.ywindow, stateDescriptor.radius)
+        if isinstance(self._backend_, Cursor):
+            state = self._backend_.getState()
+            if state and len(state):
+                p = self.mapToScene(QtCore.QPointF(state.x, state.y))
+                return Cursor(self._backend_.name, p.x(), p.y(), self._backend_.width, self._backend_.height, self._backend_.xwindow, self._backend_.ywindow, self._backend_.radius)
             
     def getScenePosition(self):
         """Returns the position in the scene as x, y sequence
@@ -8930,25 +8702,27 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         sc = self.scene()
         
         if sc is None:
-            if self._parentWidget is not None:
-                sc = self._parentWidget.scene
+            if self._parentWidget_ is not None:
+                sc = self._parentWidget_.scene
                 
         if sc is None:
             #path.addRect(QtCore.QRectF()) #  return a null QRect!
             return path
         
-        if self.objectType & PlanarGraphicsType.allCursorTypes:
-            state = self._backend_.getState(self._currentframe_)
+        #if self.objectType & PlanarGraphicsType.allCursorTypes:
+        if isinstance(self._backend_, Cursor):
+            state = self._backend_.getState()
             if state is not None and len(state):
-                if self.isCrosshairCursor:
+                #if self.isCrosshairCursor:
+                if isinstance(self._backend_, CrosshairCursor):
                     path.moveTo(state.x, -state.height//2 - self._deltaPos.y()) # BEGIN vertical line
                     path.lineTo(state.x, state.height//2 - self._deltaPos.y())  # END vertical line
                     path.moveTo(-state.width//2 - self._deltaPos.x(), state.y)  # BEGIN horizontal line
                     path.lineTo(state.width//2 - self._deltaPos.x(), state.y)   # END horizontal line
                     
-                    self.__setDisplayStr__()
+                    self._setDisplayStr_()
                         
-                    self.__updateLabelRect__()
+                    self._updateLabelRect_()
                     
                     path.addRect(self._labelRect)
                     
@@ -8958,10 +8732,11 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             return path
         
         else:
-            if self._backend_ is not None and self._backend_.hasStateForFrame(self._currentframe_) and self._backend_() is not None:
+            if self._backend_ is not None and self._backend_.hasStateForFrame() and self._backend_() is not None:
                 path.addPath(self.mapFromScene(self._backend_()))
                 
-                if self._objectType == PlanarGraphicsType.line:
+                #if self._graphics_object_type_ == PlanarGraphicsType.line:
+                if isinstance(self._backend_, Line):
                     p0 = self.mapFromScene(QtCore.QPointF(self._backend_[0].x, 
                                                           self._backend_[0].y))
                     
@@ -8970,7 +8745,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     
                     path.addRect(QtCore.QRectF(p0,p1))
                     
-                elif self._objectType == PlanarGraphicsType.path:
+                #elif self._graphics_object_type_ == PlanarGraphicsType.path:
+                elif isinstance(self._backend_, Path):
                     path.addRect(self.mapRectFromScene(self._backend_().boundingRect()))
                 
                 if self.editMode:
@@ -8984,9 +8760,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             
                             path.addEllipse(pt, self._pointSize, self._pointSize)
 
-                self.__setDisplayStr__()
+                self._setDisplayStr_()
                     
-                self.__updateLabelRect__()
+                self._updateLabelRect_()
                 
                 lrect = QtCore.QRectF(self._labelRect.topLeft(),
                                       self._labelRect.bottomRight())
@@ -9061,11 +8837,11 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             super().update()
         
     def redraw(self):
-        self.__drawObject__()
+        self._drawObject_()
 
-        #if self._labelShowsCoordinates:
-        self.__setDisplayStr__()
-        self.__updateLabelRect__()
+        #if self._labelShowsCoordinates_:
+        self._setDisplayStr_()
+        self._updateLabelRect_()
 
         self.update()
         
@@ -9078,7 +8854,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         #self.timed_paint(painter, styleOption, widget)
         self.do_paint(painter, styleOption, widget)
         
-    @timefunc
+    @timefunc # defined in core.prog
     def timed_paint(self, painter, styleOption, widget):
         # NOTE: 2021-03-07 18:32:00
         # timed version of the painter; to time the painter, call this function
@@ -9088,7 +8864,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     #@safeWrapper
     def do_paint(self, painter, styleOption, widget):
         """Does the actual painting of the item.
-        Also called by super().update() & scene.update()
+        Also called by self.update(), super().update() & scene.update()
         """
         # NOTE: 2021-03-07 18:33:05
         # both paint and timed_paint call this function; use timed_paint to
@@ -9103,10 +8879,11 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 if self._backend_ is None:
                     return
                 
-                if not self._backend_.hasStateForFrame(self._backend_.currentFrame):
+                #if not self._backend_.hasStateForFrame(self._backend_.currentFrame):
+                if not self._backend_.hasStateForFrame():
                     return
                 
-            self.__updateLabelRect__()
+            self._updateLabelRect_()
             
             if self._buildMode_:
                 painter.setPen(self._selectedCursorPen)
@@ -9114,7 +8891,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 
             else:
                 if self.isSelected(): # inherited from QGraphicsItem via QGraphicsObject
-                    if self._isLinked:
+                    if self.isLinked:
                         painter.setPen(self._linkedSelectedPen)
                         textPen = self._linkedTextPen
                         
@@ -9127,7 +8904,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         textPen = self._textPen
                         
                 else:
-                    if self._isLinked:
+                    if self.isLinked:
                         painter.setPen(self._linkedPen)
                         textPen = self._linkedTextPen
                         
@@ -9148,32 +8925,36 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                     
             painter.setRenderHints(QtGui.QPainter.Antialiasing | QtGui.QPainter.TextAntialiasing)
             
-            if self.objectType & PlanarGraphicsType.allCursorTypes:
+            if isinstance(self._backend_, Cursor):
                 # NOTE: 2018-01-18 14:47:49
                 # WARNING: DO NOT use _graphicsShapedItem to represent cursors,
                 # because the Qt GraphicsView system renders its shape's bounding 
                 # rect with a dotted line when item is selected.
                 ### self._graphicsShapedItem.paint(painter, styleOption, widget)
 
-                lines = None
-                rects = None
+                lines = list()
+                rects = list()
                 
                 state = self._backend_.getState(self._backend_.currentFrame)
                 
                 if state is None or len(state) == 0:
                     return
                 
-                if self._objectType == PlanarGraphicsType.vertical_cursor:
+                # NOTE: 2021-05-04 15:49:24
+                # the old-style type checks below is for backward compatibility
+                if isinstance(self._backend_, VerticalCursor) or self._backend_.type & PlanarGraphicsType.vertical_cursor:
                     lines = [self._vline, self._hwbar]
                     
                     labelPos = self.mapFromScene(QtCore.QPointF(self._backend_.x - self._labelRect.width()/2, 
                                                                 self._labelRect.height()))
 
-                elif self._objectType == PlanarGraphicsType.horizontal_cursor:
+                #elif self._graphics_object_type_ == PlanarGraphicsType.horizontal_cursor:
+                elif isinstance(self._backend_, HorizontalCursor) or self._backend_.type & PlanarGraphicsType.horizontal_cursor:
                     lines = [self._hline, self._vwbar]
                     labelPos = self.mapFromScene(QtCore.QPointF(0, self._backend_.height/2 - self._labelRect.height()/2))
 
-                elif self._objectType == PlanarGraphicsType.crosshair_cursor:
+                #elif self._graphics_object_type_ == PlanarGraphicsType.crosshair_cursor:
+                elif isinstance(self._backend_, CrosshairCursor) or self._backend_.type & PlanarGraphicsType.crosshair_cursor:
                     lines = [self._vline, self._hline]
                     labelPos = self.mapFromScene(QtCore.QPointF(self._backend_.x  - self._labelRect.width()/2,
                                                                 self._labelRect.height()))
@@ -9185,10 +8966,10 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     labelPos = self.mapFromScene(QtCore.QPointF(self._backend_.x - self._labelRect.width()/2,
                                                                 self._backend_.y - self._labelRect.height()))
 
-                if lines is not None:
+                if len(lines):# is not None:
                     painter.drawLines(lines)
                     
-                if rects is not None:
+                if len(rects):# is not None:
                     painter.drawRects(rects)
                     
             else:
@@ -9203,35 +8984,45 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     # first draw the shape
                     painter.setPen(self._selectedCursorPen)
                     
-                    if self.objectType & PlanarGraphicsType.path:
-                        painter.drawPath(self._cachedPath_)
-                        #painter.drawPath(self._cachedPath_())
-                        
-                        if self._curveBuild and self._hover_point is not None:
-                            if self._control_points[0] is not None:
-                                path = QtGui.QPainterPath(self._cachedPath_[-1].point())
-                                
-                                if self._control_points[1] is not None:
-                                    path.cubicTo(self._control_points[0], 
-                                                self._control_points[1], 
-                                                self._hover_point)
+                    #if self.objectType & PlanarGraphicsType.path:
+                    if isinstance(self._backend_, Path):
+                        if self._backend_.type == PlanarGraphicsType.poltyon:
+                            for k, element in enumerate(self._cachedPath_):
+                                if k > 0:
+                                    painter.drawLine(self._cachedPath_[k-1].point(), 
+                                                     self._cachedPath_[k].point())
+                        else:
+                            painter.drawPath(self._cachedPath_)
+                            #painter.drawPath(self._cachedPath_())
+                            
+                            if self._curveBuild_ and self._hover_point is not None:
+                                if self._control_points[0] is not None:
+                                    path = QtGui.QPainterPath(self._cachedPath_[-1].point())
                                     
-                                else:
-                                    path.quadTo(self._control_points[0], 
-                                                self._hover_point)
-                                    
-                                painter.drawPath(path)
+                                    if self._control_points[1] is not None:
+                                        path.cubicTo(self._control_points[0], 
+                                                    self._control_points[1], 
+                                                    self._hover_point)
+                                        
+                                    else:
+                                        path.quadTo(self._control_points[0], 
+                                                    self._hover_point)
+                                        
+                                    painter.drawPath(path)
                                 
                     if len(self._cachedPath_) > 1:
-                        if self.objectType & PlanarGraphicsType.line:
+                        #if self.objectType & PlanarGraphicsType.line:
+                        if isinstance(self._backend_, Line):
                             painter.drawLine(self._cachedPath_[-2].point(), 
                                             self._cachedPath_[-1].point())
                             
-                        elif self.objectType & PlanarGraphicsType.rectangle:
+                        #elif self.objectType & PlanarGraphicsType.rectangle:
+                        elif isinstance(self._backend_, Rect):
                             painter.drawRect(QtCore.QRectF(self._cachedPath_[-2].point(), 
                                                         self._cachedPath_[-1].point()))
                             
-                        elif self.objectType & PlanarGraphicsType.ellipse:
+                        #elif self.objectType & PlanarGraphicsType.ellipse:
+                        elif isinstance(self._backend_, Ellipse):
                             painter.drawEllipse(QtCore.QRectF(self._cachedPath_[-2].point(), 
                                                             self._cachedPath_[-1].point()))
                             
@@ -9239,7 +9030,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             for k, element in enumerate(self._cachedPath_):
                                 if k > 0:
                                     painter.drawLine(self._cachedPath_[k-1].point(), 
-                                                    self._cachedPath_[k].point())
+                                                     self._cachedPath_[k].point())
                         
 
                     # NOTE: 2018-01-24 15:56:51 
@@ -9344,7 +9135,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     # NOTE: 2018-01-24 16:12:43
                     # SELECT PEN & BRUSH FIRST
                     if self.isSelected():
-                        if self._isLinked: # linked to other GraphicsObjects !!!
+                        if self.isLinked: # linked to other GraphicsObjects !!!
                             painter.setPen(self._linkedSelectedPen)
                             
                         elif self.sharesBackend:
@@ -9354,7 +9145,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             painter.setPen(self._selectedCursorPen)
                             
                     else:
-                        if self._isLinked:# linked to other GraphicsObjects !!!
+                        if self.isLinked:# linked to other GraphicsObjects !!!
                             painter.setPen(self._linkedPen)
                             
                         elif self.sharesBackend:
@@ -9363,8 +9154,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         else:
                             painter.setPen(self._cursorPen)
                             
-                    if self.objectType & PlanarGraphicsType.point:
-                        if self._isLinked:# linked to other GraphicsObjects !!!
+                    #if self.objectType & PlanarGraphicsType.point:
+                    if self._backend_.type & PlanarGraphicsType.point:
+                        if self.isLinked:# linked to other GraphicsObjects !!!
                             brush = QtGui.QBrush(self.defaultLinkedCursorColor)
                             
                         else:
@@ -9379,7 +9171,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     
                     #if self._cachedPath_ is not None and len(self._cachedPath_):
                     if self._backend_ is not None:
-                        if self._objectType == PlanarGraphicsType.ellipse:
+                        #if self._backend_.type == PlanarGraphicsType.ellipse:
+                        if isinstance(self._backend_, Ellipse):
                             r_ = self.mapRectFromScene(self._backend_.x,
                                                        self._backend_.y,
                                                        self._backend_.w,
@@ -9387,7 +9180,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             
                             painter.drawEllipse(r_)
 
-                        elif self._objectType == PlanarGraphicsType.rectangle:
+                        #elif self._graphics_object_type_ == PlanarGraphicsType.rectangle:
+                        elif isinstance(self._backend_, Rect):
                             r_ = self.mapRectFromScene(self._backend_.x,
                                                        self._backend_.y,
                                                        self._backend_.w,
@@ -9395,7 +9189,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             
                             painter.drawRect(r_)
                                                                             
-                        elif self._objectType == PlanarGraphicsType.point:
+                        #elif self._graphics_object_type_ == PlanarGraphicsType.point:
+                        elif self._backend_.type & PlanarGraphicsType.point:
                             p_ = self.mapFromScene(self._backend_.x,
                                                    self._backend_.y)
                             
@@ -9409,8 +9204,12 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             painter.drawEllipse(r_)
                             
                         else: # general Path backend, including polyline, polygon
-                            path = self._backend_.asPath(frame=self._currentframe_)
+                            path = self._backend_.asPath() # this is a pictgui.Path
+                            #qpath = self._backend_()
                             
+                            # NOTE: 2021-05-04 14:10:24
+                            # the path() call below generates a QPainterPath
+                            # which is then mapped from scene to qpath
                             qpath = self.mapFromScene(path())
                             
                             painter.drawPath(qpath)
@@ -9427,7 +9226,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         # ATTENTION for paths, curves have extra control points!
                         
                         if self._cachedPath_ is not None and len(self._cachedPath_) > 0:
-                            if self.objectType & PlanarGraphicsType.path:
+                            #if self.objectType & PlanarGraphicsType.path:
+                            if isinstance(self._backend_, Path):
                                 for k, element in enumerate(self._cachedPath_):
                                     if isinstance(element, Quad):
                                         pt = self.mapFromScene(QtCore.QPointF(element.x, element.y))
@@ -9466,7 +9266,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                         
                                         painter.drawEllipse(pt, self._pointSize, self._pointSize)
                                         
-                            elif self._objectType & (PlanarGraphicsType.rectangle | PlanarGraphicsType.ellipse):
+                            elif self._backend_.type & (PlanarGraphicsType.rectangle | PlanarGraphicsType.ellipse):
                                 p0 = self.mapFromScene(QtCore.QPointF(self._cachedPath_[0].x, 
                                                                       self._cachedPath_[0].y))
                                 
@@ -9497,13 +9297,13 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             #painter.drawPath(self.shape())
             #### END DEBUGGING
 
-            if self._showlabel:
-                if len(self._displayStr) > 0 and labelPos is not None:
+            if self._showLabel_:
+                if len(self._displayStr_) > 0 and labelPos is not None:
                     pen = painter.pen()
                     bgMode = painter.backgroundMode()
                     bg = painter.background()
                     
-                    if self._opaqueLabel:
+                    if self._opaqueLabel_:
                         painter.setBackgroundMode(QtCore.Qt.OpaqueMode)
                         self._textBackgroundBrush.setStyle(QtCore.Qt.SolidPattern)
                         
@@ -9514,7 +9314,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         
                     painter.setBackground(self._textBackgroundBrush)
                         
-                    painter.drawText(labelPos, self._displayStr)
+                    painter.drawText(labelPos, self._displayStr_)
                     
                     painter.setBackground(bg)
                     painter.setBackgroundMode(bgMode)
@@ -9544,7 +9344,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
          1 & 2 achieved by partially restricting the new position and/or repainting.
          
         3. For non-cursors:
-            just pudates the backen'd x and y coordinates (the effects of which
+            just updates the backen'd x and y coordinates (the effects of which
             depend on what the backend is) for the current frame
         """
         # TODO because this changes the backend, we must ensure the backend
@@ -9581,30 +9381,36 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         #print("self._deltaPos: ", self._deltaPos)
         
+        # NOTE: position changes are fed to the backend indirectly (i.e. not here)
+        # by the intermediate self._deltaPos whcih is then taken into account
+        # by the shape() method called before painting.
+        
         if change == QtWidgets.QGraphicsItem.ItemPositionChange and self.scene():
             if self._backend_ is None:
+                self._deltaPos = QtCore.QPointF()
                 return QtCore.QPoint()
             
-            if not self._backend_.hasStateForFrame(self._currentframe_) or\
-                    not self.__objectVisible__:
+            if not self._backend_.hasStateForFrame() or not self.__objectVisible__:
+                self._deltaPos = QtCore.QPointF()
                 value = QtCore.QPointF()
                 return value
             
-            if self.objectType & PlanarGraphicsType.allCursorTypes:
+            if isinstance(self._backend_, Cursor):
                 # cursor types
-                stateDescriptor = self._backend_.getState(self._backend_.currentFrame)
+                state = self._backend_.currentState
                 
-                if stateDescriptor is None or len(stateDescriptor) == 0:
+                if state is None or len(state) == 0:
                     return value
                 
                 # NOTE 2018-01-18 16:57:28
                 # ATTENTION This is also called by self.setPos() (inherited)
-                self._positionChangeHasBegun = True # flag used in __drawCursor__()
+                self._positionChangeHasBegun = True # flag used in _drawCursor_()
                 
                 newPos = value
                 
                 # vertical cursors
-                if self._objectType == PlanarGraphicsType.vertical_cursor:
+                # See NOTE: 2021-05-04 15:49:24 for the old style type checks below
+                if isinstance(self._backend_, VerticalCursor) or self._backend_.type & PlanarGraphicsType.vertical_cursor:
                     if not self.pos().isNull():
                         self._deltaPos = (newPos - self.pos())
 
@@ -9617,7 +9423,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         newPos.setX(self._backend_.width)
 
                 # horizontal cursors
-                elif self._objectType == PlanarGraphicsType.horizontal_cursor:
+                elif isinstance(self._backend_, HorizontalCursor) or self._backend_.type & PlanarGraphicsType.horizontal_cursor:
                     if not self.pos().isNull():
                         self._deltaPos = (newPos - self.pos())
 
@@ -9630,7 +9436,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         newPos.setY(self._backend_.height)
 
                 # crosshair cursors
-                elif self._objectType == PlanarGraphicsType.crosshair_cursor:
+                elif isinstance(self._backend_, CrosshairCursor) or self._ackend_.type & PlanarGraphicsType.crosshair_cursor:
                     if newPos.x() <= 0.0:
                         newPos.setX(0.0)
                         
@@ -9668,30 +9474,33 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 self._backend_.x = newPos.x()
                 self._backend_.y = newPos.y()
                 
-            elif self._objectType & PlanarGraphicsType.allShapeTypes:
+            #elif self._graphics_object_type_ & PlanarGraphicsType.allShapeTypes:
+            else:
                 #non-cursor types
-                if isinstance(self._backend_, Path): # use the x and y property setters
-                    self._backend_.x = value.x()
-                    self._backend_.y = value.y()
+                self._backend_.x = value.x()
+                self._backend_.y = value.y()
+                #if isinstance(self._backend_, Path): # use the x and y property setters
+                    #self._backend_.x = value.x()
+                    #self._backend_.y = value.y()
                     
-                else:
-                    self._backend_.x = value.x()
-                    self._backend_.y = value.y()
+                #else:
+                    #self._backend_.x = value.x()
+                    #self._backend_.y = value.y()
                 
             self._backend_.updateLinkedObjects()
 
-            #self.__drawObject__()
+            #self._drawObject_()
             
-            if self._labelShowsCoordinates:
-                self.__setDisplayStr__()
+            if self._labelShowsCoordinates_:
+                self._setDisplayStr_()
                 
-                self.__updateLabelRect__()
+                self._updateLabelRect_()
                 
-            self.update()
+            self.update() # calls paint()
             
             self.signalBackendChanged.emit(self._backend_)
         
-            self.signalGraphicsObjectPositionChange.emit(self.mapToScene(value - self._oldPos))
+            #self.signalGraphicsObjectPositionChange.emit(self.mapToScene(value - self._oldPos))
             
             self._oldPos = self.pos()
                 
@@ -9716,7 +9525,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             pass
 
         elif change == QtWidgets.QGraphicsItem.ItemSceneHasChanged: # now self.scene() is the NEW scene
-            self.__drawObject__()
+            self._drawObject_()
 
         self._oldPos = self.pos()
             
@@ -9739,7 +9548,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         When ROI type is path, CTRL + ALT modifier creates a subpath.
         
-        When ROI type is path and we are in _curveBuild mode, CTRL + ALT modifiers
+        When ROI type is path and we are in _curveBuild_ mode, CTRL + ALT modifiers
         create a second control point, to create a cubic Bezier curve.
         
         
@@ -9772,7 +9581,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             if self.objectType == PlanarGraphicsType.allShapeTypes and \
                 len(self._cachedPath_) == 0:
                 # before adding first point, cheeck key modifiers and set
-                # self._objectType accordingly
+                # self._graphics_object_type_ accordingly
                 
                 # NOTE: 2018-01-23 22:41:05
                 # ATTENTION: do not delete commented-out "mods" code -- for debugging
@@ -9781,35 +9590,35 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 
                 if evt.modifiers() == QtCore.Qt.ShiftModifier: 
                     ###SHIFT => rectangle
-                    self._objectType = PlanarGraphicsType.rectangle
+                    self._graphics_object_type_ = PlanarGraphicsType.rectangle
                     mods = "shift"
                     
                 elif evt.modifiers() == QtCore.Qt.ControlModifier: 
                     ###CTRL => ellipse
-                    self._objectType = PlanarGraphicsType.ellipse
+                    self._graphics_object_type_ = PlanarGraphicsType.ellipse
                     mods = "ctrl"
                     
                 elif evt.modifiers() ==  QtCore.Qt.AltModifier: 
                     ###ALT => path
-                    self._objectType = PlanarGraphicsType.path
+                    self._graphics_object_type_ = PlanarGraphicsType.path
                     mods = "alt"
                 
                 elif evt.modifiers() == (QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier):
                     ###CTRL+SHIFT => polygon
-                    self._objectType = PlanarGraphicsType.polygon
+                    self._graphics_object_type_ = PlanarGraphicsType.polygon
                     mods = "ctrl+shift"
                     
                 elif evt.modifiers() == (QtCore.Qt.AltModifier | QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier):
                     ###ALt+CTRL+SHIFT => point
                     mods = "alt+=ctrl+shift"
-                    self._objectType = PlanarGraphicsType.point
+                    self._graphics_object_type_ = PlanarGraphicsType.point
                     
                 else: 
                     if evt.modifiers() == QtCore.Qt.NoModifier:
                         mods = "none"
                         
                     ###anything else, or no modifiers => line
-                    self._objectType = PlanarGraphicsType.line
+                    self._graphics_object_type_ = PlanarGraphicsType.line
             
                 #print("press at: ", evt.pos(), " mods: ", mods)
                 
@@ -9819,7 +9628,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 
                 if self.objectType & PlanarGraphicsType.point:
                     # stop here if building just a point
-                    self.__finalizeShape__()
+                    self._finalizeShape_()
                     
                 #return
                 
@@ -9855,7 +9664,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                 
                             #print("to finalize: ", self._cachedPath_)
                             
-                            self.__finalizeShape__()
+                            self._finalizeShape_()
                             
                             #return
                         
@@ -9872,8 +9681,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         #return
                     
                     elif self.objectType & PlanarGraphicsType.path:
-                        if self._curveBuild:
-                            # self._curveBuild is set in mouse move event handler
+                        if self._curveBuild_:
+                            # self._curveBuild_ is set in mouse move event handler
                             if evt.modifiers() == (QtCore.Qt.ControlModifier | QtCore.Qt.AltModifier):
                                 self._control_points[1] = evt.pos()
 
@@ -9897,7 +9706,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                         
                                     self._control_points[0] = None # cp has been used
                                     
-                                    self._curveBuild = False
+                                    self._curveBuild_ = False
                                     
                         else:
                             if evt.modifiers() == (QtCore.Qt.ControlModifier | QtCore.Qt.AltModifier): # allow the creation of a subpath
@@ -10049,7 +9858,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             elif evt.modifiers() == QtCore.Qt.AltModifier and self.objectType == PlanarGraphicsType.path:
                 mods ="alt"
                 
-                self._curveBuild = True # stays True until next mouse release or mouse press
+                self._curveBuild_ = True # stays True until next mouse release or mouse press
                     
             #print("move at: ", evt.pos())
             #print("mods: ", mods)
@@ -10154,7 +9963,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         if f != self:
                             f.redraw()
             
-                self.signalPosition[int, str, "QPointF"].emit(self.objectType.value, self._ID_, self.pos())
+                #self.signalPosition[int, str, "QPointF"].emit(self.objectType.value, self._ID_, self.pos())
+                self.signalPosition[str, "QPointF"].emit(self._ID_, self.pos())
                 #self.__updateCachedPathFromBackend__()
                 # NOTE 2017-08-12 13:22:26
                 # this IS NEEDED for cursor movement by mouse !!!!
@@ -10200,9 +10010,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 mods = "none"
                 
             #print("release at: ", evt.pos(), " mods: ", mods)
-            #print("obj type: ", self._objectType)
+            #print("obj type: ", self._graphics_object_type_)
             
-            if self._curveBuild:
+            if self._curveBuild_:
                 if self._control_points[1] is None: # we allow mod of 1st cp when there is no 2nd cp
                     self._control_points[0] = evt.pos()
                     
@@ -10215,10 +10025,11 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         if self.canMove:
             # together with itemChange, this implements special treatment
             # of the object shape in the case of cursors (see notes in itemChange code)
-            if self.objectType & PlanarGraphicsType.allCursorTypes:
-                stateDescriptor = self._backend_.getState(self._currentframe_)
+            #if self.objectType & PlanarGraphicsType.allCursorTypes:
+            if isinstance(self._backend_, Cursor):
+                state = self._backend_.getState()
                 
-                if stateDescriptor is None or len(stateDescriptor) == 0:
+                if state is None or len(state) == 0:
                     return
                 
                 self._positionChangeHasBegun=False
@@ -10227,14 +10038,14 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 if self._wbarPos.x()< 0:
                     self._wbarPos.setX(0.0)
                     
-                elif self._wbarPos.x() >= stateDescriptor.width:
-                    self._wbarPos.setX(stateDescriptor.width-1)
+                elif self._wbarPos.x() >= state.width:
+                    self._wbarPos.setX(state.width-1)
                             
                 if self._wbarPos.y()< 0:
                     self._wbarPos.setY(0.0)
                     
-                elif self._wbarPos.y() >= stateDescriptor.height:
-                    self._wbarPos.setY(stateDescriptor.height-1)
+                elif self._wbarPos.y() >= state.height:
+                    self._wbarPos.setY(state.height-1)
                 
             self._oldPos = self.pos()
             self._deltaPos = QtCore.QPointF(0.0, 0.0)
@@ -10257,7 +10068,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         ## TODO: bring up cursor properties dialog
         ## NOTE: if in buildMode, end ROI construction 
         #if self._buildMode_:
-            #self.__finalizeShape__()
+            #self._finalizeShape_()
             
         #self.selectMe.emit(self._ID_, True)
 
@@ -10401,7 +10212,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         if self._buildMode_:
             # exit build mode here
             if evt.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
-                self.__finalizeShape__()
+                self._finalizeShape_()
 
             elif evt.key() == QtCore.Qt.Key_Escape:
                 self._buildMode_ = False
@@ -10431,7 +10242,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             #if stateDescriptor is None or len(stateDescriptor) == 0:
                 #return
             
-            if self._objectType == PlanarGraphicsType.vertical_cursor:
+            if self._graphics_object_type_ == PlanarGraphicsType.vertical_cursor:
                 if evt.key() == QtCore.Qt.Key_Right:
                     if evt.modifiers() & QtCore.Qt.ShiftModifier:
                         self.moveBy(10.0,0.0)
@@ -10459,7 +10270,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     elif self._wbarPos.y() > stateDescriptor.height-1:
                         self._wbarPos.setY(stateDescriptor.height-1)
                         
-                    self.__drawObject__()
+                    self._drawObject_()
 
                 elif evt.key() == QtCore.Qt.Key_Down:
                     if evt.modifiers() & QtCore.Qt.ShiftModifier:
@@ -10474,9 +10285,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     elif self._wbarPos.y() > stateDescriptor.height-1:
                         self._wbarPos.setY(stateDescriptor.height-1)
                         
-                    self.__drawObject__()
+                    self._drawObject_()
                 
-            elif self._objectType == PlanarGraphicsType.horizontal_cursor:
+            elif self._graphics_object_type_ == PlanarGraphicsType.horizontal_cursor:
                 if evt.key() == QtCore.Qt.Key_Right:
                     if evt.modifiers() & QtCore.Qt.ShiftModifier:
                         self._wbarPos += QtCore.QPointF(10.0, 0.0)
@@ -10490,7 +10301,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     elif self._wbarPos.x() > stateDescriptor.width-1:
                         self._wbarPos.setX(stateDescriptor.width-1)
                         
-                    self.__drawObject__()
+                    self._drawObject_()
                     
                 elif evt.key() == QtCore.Qt.Key_Left:
                     if evt.modifiers() & QtCore.Qt.ShiftModifier:
@@ -10505,7 +10316,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     elif self._wbarPos.x() > stateDescriptor.width-1:
                         self._wbarPos.setX(stateDescriptor.width-1)
                         
-                    self.__drawObject__()
+                    self._drawObject_()
                     
                 elif evt.key() == QtCore.Qt.Key_Up:
                     if evt.modifiers() & QtCore.Qt.ShiftModifier:
@@ -10521,7 +10332,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     else:
                         self.moveBy(0.0,1.0)
                         
-            elif self._objectType == PlanarGraphicsType.crosshair_cursor:
+            elif self._graphics_object_type_ == PlanarGraphicsType.crosshair_cursor:
                 if evt.key() == QtCore.Qt.Key_Right:
                     moveX = 1.0
                     if evt.modifiers() & QtCore.Qt.ShiftModifier:
@@ -10661,7 +10472,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 else:
                     self.moveBy(0.0,1.0)
                     
-        self.__drawObject__()
+        self._drawObject_()
         self.update()
 
         super(GraphicsObject, self).keyPressEvent(evt)
@@ -10685,11 +10496,11 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self._cBPen              = self.defaultCBPen
         self._cBSelectedPen      = self.defaultCBSelectedPen
         
-        self._opaqueLabel = True
+        self._opaqueLabel_ = True
         
-        self._labelShowsCoordinates = False
+        self._labelShowsCoordinates_ = False
         
-        self.__drawObject__()
+        self._drawObject_()
         
         self.update()
         
@@ -10698,10 +10509,10 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     
     @property
     def hasTransparentLabel(self):
-        return not self._opaqueLabel
+        return not self._opaqueLabel_
     
     def setTransparentLabel(self, value):
-        self._opaqueLabel = not value
+        self._opaqueLabel_ = not value
         
         self.redraw()
         #self.update()
@@ -10732,36 +10543,36 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             if self.__objectVisible__:
                 self.redraw()
             
-            if len(self._linkedGraphicsObjects):
-                for c in self._linkedGraphicsObjects.values():
-                    if c != self:
-                        c._currentframe_ = val
-                        c.setVisible(len(c._backend_.frameIndices) > 0 or c._backend_.hasStateForFrame(val))
-                        if c.__objectVisible__:
-                            c.redraw()
+            #if len(self._linkedGraphicsObjects):
+                #for c in self._linkedGraphicsObjects.values():
+                    #if c != self:
+                        #c._currentframe_ = val
+                        #c.setVisible(len(c._backend_.frameIndices) > 0 or c._backend_.hasStateForFrame(val))
+                        #if c.__objectVisible__:
+                            #c.redraw()
 
-    @pyqtSlot("QPointF")
-    @safeWrapper
-    def slotLinkedGraphicsObjectPositionChange(self, deltapos):
-        """Catched signals emitted by linked graphics objects
-        """
-        other = self.sender()
-        if self._currentframe_ == other._currentframe_:
-            if self.hasStateDescriptor and other.hasStateDescriptor:
+    #@pyqtSlot("QPointF")
+    #@safeWrapper
+    #def slotLinkedGraphicsObjectPositionChange(self, deltapos):
+        #"""Catched signals emitted by linked graphics objects
+        #"""
+        #other = self.sender()
+        #if self._currentframe_ == other._currentframe_:
+            #if self.hasStateDescriptor and other.hasStateDescriptor:
                 
-                self.setFlag(QtWidgets.QGraphicsItem.ItemSendsGeometryChanges, False)
-                self.setFlag(QtWidgets.QGraphicsItem.ItemSendsScenePositionChanges, False)
+                #self.setFlag(QtWidgets.QGraphicsItem.ItemSendsGeometryChanges, False)
+                #self.setFlag(QtWidgets.QGraphicsItem.ItemSendsScenePositionChanges, False)
                 
-                self.setPos(self.pos() + self.mapFromScene(deltapos))
+                #self.setPos(self.pos() + self.mapFromScene(deltapos))
                                     
-                if self._labelShowsCoordinates:
-                    self.__setDisplayStr__()
-                    self.__updateLabelRect__()
+                #if self._labelShowsCoordinates_:
+                    #self._setDisplayStr_()
+                    #self._updateLabelRect_()
                     
-                self.update()
+                #self.update()
                     
-                self.setFlag(QtWidgets.QGraphicsItem.ItemSendsGeometryChanges, True)
-                self.setFlag(QtWidgets.QGraphicsItem.ItemSendsScenePositionChanges, True)
+                #self.setFlag(QtWidgets.QGraphicsItem.ItemSendsGeometryChanges, True)
+                #self.setFlag(QtWidgets.QGraphicsItem.ItemSendsScenePositionChanges, True)
         
     @property
     def visible(self):
@@ -10857,15 +10668,15 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     
     @property
     def parentwidget(self):
-        return self._parentWidget
+        return self._parentWidget_
     
     @property
     def showLabel(self):
-        return self._showlabel
+        return self._showLabel_
     
     @showLabel.setter
     def showLabel(self, value):
-        self._showlabel=value
+        self._showLabel_=value
         self.update()
     
     @property
@@ -10971,20 +10782,22 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         """
         return self._ID_
     
-    @ID.setter
-    def ID(self, value):
-        if isinstance(value, str):
-            if len(value.strip()):
-                if self._ID_ != value: # check to avoid recurrence
-                    self._ID_ = value
-                    self.signalIDChanged.emit(self._ID_)
-                    self.redraw()
+    #@ID.setter
+    #def ID(self, value):
+        #if isinstance(value, str):
+            #if len(value.strip()):
+                #if self._ID_ != value: # check to avoid recurrence
+                    #self._ID_ = value
+                    #if isinstance(self._backend_, PlanarGraphics):
+                        #self._backend_.name = self._ID_
+                    #self.signalIDChanged.emit(self._ID_)
+                    #self.redraw()
                     
-            else:
-                raise ValueError("value expected to be a non-empty string")
+            #else:
+                #raise ValueError("value expected to be a non-empty string")
             
-        else:
-            raise TypeError("value expected to be a non-empty string; got %s instead" % type(value).__name__)
+        #else:
+            #raise TypeError("value expected to be a non-empty string; got %s instead" % type(value).__name__)
         
     @property
     def linkedToFrame(self):
@@ -11003,18 +10816,18 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     def labelShowsPosition(self):
         """When True, the coordinates will be displayed next to its name, on the label
         """
-        return self._labelShowsCoordinates
+        return self._labelShowsCoordinates_
     
     @labelShowsPosition.setter
     def labelShowsPosition(self, value):
-        self._labelShowsCoordinates = value
+        self._labelShowsCoordinates_ = value
         self.redraw()
-        #self.__drawObject__()
+        #self._drawObject_()
         #self.update()
         
         for f in self._backend_.frontends:
             if f != self:
-                f._labelShowsCoordinates = value
+                f._labelShowsCoordinates_ = value
                 f.redraw()
 
     #@property
@@ -11048,7 +10861,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         if not self.hasStateDescriptor:
             return
         
-        if self._objectType & PlanarGraphicsType.allCursorTypes:
+        if self._graphics_object_type_ & PlanarGraphicsType.allCursorTypes:
             stateDescriptor = self._backend_.getState(self._currentframe_)
             
             if stateDescriptor and len(stateDescriptor):
@@ -11059,7 +10872,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         if not self.hasStateDescriptor:
             return
         
-        if self._objectType & PlanarGraphicsType.allCursorTypes:
+        if self._graphics_object_type_ & PlanarGraphicsType.allCursorTypes:
             stateDescriptor = self._backend_.getState(self._currentframe_)
             
             if stateDescriptor is not None and len(stateDescriptor):
@@ -11115,7 +10928,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         if not self.hasStateDescriptor:
             return
         
-        if self._objectType & PlanarGraphicsType.allCursorTypes:
+        if self._graphics_object_type_ & PlanarGraphicsType.allCursorTypes:
             stateDescriptor = self._backend_.getState(self._currentframe_)
             if stateDescriptor is not None and len(stateDescriptor):
                 return stateDescriptor.ywindow
@@ -11125,7 +10938,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         if not self.hasStateDescriptor:
             return
         
-        if self._objectType & PlanarGraphicsType.allCursorTypes:
+        if self._graphics_object_type_ & PlanarGraphicsType.allCursorTypes:
             stateDescriptor = self._backend_.getState(self._currentframe_)
             
             if stateDescriptor is not None and len(stateDescriptor):
@@ -11161,7 +10974,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         if not self.hasStateDescriptor:
             return
         
-        if self._objectType & PlanarGraphicsType.allCursorTypes:
+        if self._graphics_object_type_ & PlanarGraphicsType.allCursorTypes:
             stateDescriptor = self._backend_.getState(self._currentframe_)
             if stateDescriptor is not None and len(stateDescriptor):
                 return stateDescriptor.radius
@@ -11171,7 +10984,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         if not self.hasStateDescriptor:
             return
         
-        if self._objectType & PlanarGraphicsType.allCursorTypes:
+        if self._graphics_object_type_ & PlanarGraphicsType.allCursorTypes:
             stateDescriptor = self._backend_.getState(self._currentframe_)
             if stateDescriptor is not None and len(stateDescriptor):
                 stateDescriptor.radius = val
@@ -11292,17 +11105,17 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     @textBackground.setter
     def textBackground(self, brush):
         self._textBackgroundBrush = brush
-        self.__drawObject__
+        self._drawObject_
         self.update()
         
     @property
     def opaqueLabel(self):
-        return self._opaqueLabel
+        return self._opaqueLabel_
     
     @opaqueLabel.setter
     def opaqueLabel(self, val):
-        self._opaqueLabel = val
-        self.__drawObject__
+        self._opaqueLabel_ = val
+        self._drawObject_
         self.update()
         
     @property
@@ -11312,7 +11125,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     @labelFont.setter
     def labelFont(self, font):
         self._textFont = font
-        self.__drawObject__
+        self._drawObject_
         self.update()
         
     @property
@@ -11328,19 +11141,19 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         Editing is done via control points (GUI editing).
         
         """
-        if self.objectType & PlanarGraphicsType.allCursorTypes:
-            return False
+        #if self.objectType & PlanarGraphicsType.allCursorTypes:
+            #return False
         
-        return self._shapeIsEditable
+        return self._shapeIsEditable_
     
     @editMode.setter
     def editMode(self, value):
-        if self.objectType & PlanarGraphicsType.allCursorTypes:
-            return
+        #if self.objectType & PlanarGraphicsType.allCursorTypes:
+            #return
 
-        self._shapeIsEditable = value
+        self._shapeIsEditable_ = value
         
-        if self._shapeIsEditable:
+        if self._shapeIsEditable_:
             self.__updateCachedPathFromBackend__()
             
         self.update()
@@ -11352,26 +11165,26 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         By default, all graphics object types can be moved.
         For ROI types, setting this to False also sets editMode to False.
         """
-        return self._movable
+        return self._movable_
     
     @canMove.setter
     def canMove(self, value):
-        self._movable = value
+        self._movable_ = value
         
-        if not self._movable:
+        if not self._movable_:
             self.editMode = False
         
         self.setFlag(QtWidgets.QGraphicsItem.ItemIsMovable, value)
         
     @property
     def canEdit(self):
-        return self._editable
+        return self._editable_
     
     @canEdit.setter
     def canEdit(self, value):
-        self._editable = value
+        self._editable_ = value
         
-        if not self._editable:
+        if not self._editable_:
             self.editMode=False
         
         self.setFlag(QtWidgets.QGraphicsItem.ItemIsMovable, value)
@@ -11379,129 +11192,20 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     @property
     def canTransform(self):
         """Can the object be transformed (rotated/scaled/skewed).
-        By default, objects cannot be transformes, except for being moved
+        By default, objects cannot be transformed, except for being moved
         around the scene (see "canMove").
         However, non-cursor objects can be rotated/scaled/skewed
         when this property is set to "True"
         """
-        if self.objectType & PlanarGraphicsType.allCursorTypes:
+        if isinstance(self._backend_, Cursor):
             return False
         
-        return self._transformable
+        return self._transformable_
     
     @canTransform.setter
     def canTransform(self, value):
-        if self.objectType & PlanarGraphicsType.allCursorTypes:
-            return
+        self._transformable_ = False if isinstance(self._backend_, Cursor) else value
         
-        self._transformable = value
-        
-    @property
-    def autoLabel(self):
-        return self._autoLabel
-    
-    @autoLabel.setter
-    def autoLabel(self, value):
-        if not isinstance(value, bool):
-            raise TypeError("Boolean expected; got %s instead" % type(value).__name__)
-        
-        self._autoLabel = value
-        self.__setDisplayStr__()
-
-    # NOTE: 2017-06-26 22:48:53 
-    # immutable properties
-    # ###
-    @property
-    def objectType(self):
-        return None if self._backend_ is None else self._backend_.type
-        
-    @property
-    def isCursor(self):
-        return self.objectType & PlanarGraphicsType.allCursorTypes
-    
-    @property
-    def isLineCursor(self):
-        return self.objectType & PlanarGraphicsType.lineCursorTypes
-    
-    @property
-    def isShapedCursor(self):
-        return self.objectType & PlanarGraphicsType.shapedCursorTypes
-    
-    @property
-    def isVerticalCursor(self):
-        return self.objectType == PlanarGraphicsType.vertical_cursor
-    
-    @property
-    def isHorizontalCursor(self):
-        return self.objectType == PlanarGraphicsType.horizontal_cursor
-    
-    @property
-    def isCrosshairCursor(self):
-        return self.objectType == PlanarGraphicsType.crosshair_cursor
-    
-    @property
-    def isPointCursor(self):
-        return self.objectType == PlanarGraphicsType.point_cursor
-    
-    @property
-    def isShapeObject(self):
-        """All non-cursor types
-        """
-        return self.objectType & PlanarGraphicsType.allObjectTypes
-    
-    @property
-    def isROI(self):
-        return self.objectType & PlanarGraphicsType.geometricShapeTypes
-    
-    @property
-    def isPolygonal(self):
-        return self.objectType & PlanarGraphicsType.polygonTypes
-    
-    @property
-    def isLinear(self):
-        return self.objectType & PlanarGraphicsType.linearShapeTypes
-    
-    @property
-    def isBasicShape(self):
-        return self.objectType & PlanarGraphicsType.basicShapeTypes
-    
-    @property
-    def isCommonShape(self):
-        return self.objectType & PlanarGraphicsType.commonShapeTypes
-    
-    @property
-    def isGeometricShape(self):
-        """Alias to self.isROI
-        """
-        return self.isROI
-
-    @property
-    def isPoint(self):
-        return self.objectType == PlanarGraphicsType.point
-    
-    @property
-    def isPolygon(self):
-        return self.objectType == PlanarGraphicsType.polygon
-    
-    @property
-    def isRectangle(self):
-        return self.objectType == PlanarGraphicsType.rectangle
-    
-    @property
-    def isLine(self):
-        return self.objectType == PlanarGraphicsType.line
-    
-    @property
-    def isEllipse(self):
-        return self.objectType == PlanarGraphicsType.ellipse
-    
-    @property
-    def isPath(self):
-        return self.objectType == PlanarGraphicsType.path
-    
-    @property
-    def isText(self):
-        return self.objectType == PlanarGraphicsType.text
     
 def printQPainterPath(p):
     s = []

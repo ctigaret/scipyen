@@ -2334,11 +2334,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.slot_updateWorkspaceTable(from_console)
             
         else:
-            # inverse lookup he jey mapped ot this value
-            if value in self.workspace.values():
-                names=[name for name, val in self.workspace.items() if val is value]
-                if len(names):
-                    self.workspace.pop(names[0], None)
+            # inverse lookup the key mapped to this value
+            objects = [(name, obj) for (name, obj) in self.workspace.items() if obj is value]
+            if len(objects):
+                #print("ScipyenWindow.removeFromWorkspace", objects)
+                for o in objects:
+                    self.workspace.pop(o[0], None)
+            #if value in self.workspace.values():
+                #names=[name for name, val in self.workspace.items() if val is value]
+                #if len(names):
+                    #self.workspace.pop(names[0], None)
                     
             self.slot_updateWorkspaceTable(from_console)
         

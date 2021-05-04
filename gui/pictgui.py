@@ -84,7 +84,8 @@ from core.workspacefunctions import debug_scipyen
 from . import quickdialog
 from . import resources_rc
 from .planargraphics import (Arc, ArcMove, Cubic, Cursor, Ellipse, Line, Move, Path,
-                           PlanarGraphics, Point, Quad, Rect, Text,
+                           PlanarGraphics, Point, Quad, Rect, Text, VerticalCursor,
+                           HorizontalCursor, CrosshairCursor, PointCursor,
                            PlanarGraphicsType, GraphicsObjectType, GraphicsObject, 
                            __new_planar_graphic__, printQPainterPath)
 

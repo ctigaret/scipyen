@@ -175,16 +175,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         else:
             self._ID_  = self.winId()
 
-        #if isinstance(pWin, QtWidgets.QMainWindow) and type(pWin).__name__ == "ScipyenWindow":
-            #self._scipyenWindow_  = pWin
-        
-        #else:
-            #if type(parent).__name__ == "ScipyenWindow":
-                #self._scipyenWindow_   = parent
-        
-        #if isinstance(varname, str) and len(varname.strip()):
-            #self._data_var_name_ = varname
-            
         self._configureUI_()
         
         self.loadSettings()
@@ -624,14 +614,18 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """All viewers in Scipyen should behave consistently.
         However, this may by overridden in derived classes.
         """
+        self.saveSettings()
         evt.accept()
         if type(self.appWindow).__name__ == "ScipyenWindow":
-            if self in self.appWindow.workspace.values():
+            #print(self)
+            #print(self in [v for v in self.appWindow.workspace.values()])
+            #print(any([v is self for v in self.appWindow.workspace.values()]))
+            #if self in self.appWindow.workspace.values():
+            if any([v is self for v in self.appWindow.workspace.values()]):
                 self.appWindow.deRegisterViewer(self) # this will also save settings and close the viewer window
                 self.appWindow.removeFromWorkspace(self, from_console=False, by_name=False)
-        else:
-            self.saveSettings()
-            self.close()
+        #else:
+        self.close()
     
     def event(self, evt:QtCore.QEvent):
         """Generic event handler
