@@ -1928,12 +1928,14 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
             if self.selectedCursor == cursor:
                 self.selectedCursor = None
-            
-            if isinstance(cursor.objectType, pgui.PlanarGraphicsType):
-                cType = cursor.objectType.value
                 
-            else:
-                cType = cursor.objectType
+            cType = cursor.backend.type.value
+            
+            #if isinstance(cursor.objectType, pgui.PlanarGraphicsType):
+                #cType = cursor.objectType.value
+                
+            #else:
+                #cType = cursor.objectType
 
             #removed_cursor = self.__graphicsObjects__[cType].pop(crsId, None)
             self.__graphicsObjects__[cType].pop(crsId, None)
