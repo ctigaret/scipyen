@@ -7611,17 +7611,18 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self.__objectVisible__ = True
         
         
-        self._wbarPos = QtCore.QPointF() # cursor "width" bar; NOT stored in the backend
+        # NOTE: 2017-06-30 13:52:03
+        # used for whisker displacement on vertical & horizontal cursors
+        self._hwbarPos = QtCore.QPointF() # cursor "width" bar; NOT stored in the backend
+        self._vwbarPos = QtCore.QPointF() # cursor "width" bar; NOT stored in the backend
         
         # NOTE: 2017-06-28 17:19:20
         # used for cursors to pass on position change
         self._deltaPos = QtCore.QPointF() # NOT stored in the baskend
 
-        # NOTE: 2017-06-30 13:52:03
-        # used for linked cursors logic, when object if a cursor type
-        # NOTE: 2021-05-05 14:22:46
-        # doesn't seem to be used by anybody
-        #self._oldPos = QtCore.QPointF() # NOT stored in the backend
+        # NOTE: 2021-05-06 22:02:24 
+        # position cache
+        self._oldPos = QtCore.QPointF() # NOT stored in the backend
         
         # elements of cursor types - do NOT use _graphicsShapedItem here
         # because the Qt GraphicsView system will be decorate its bounding rect 
@@ -7679,8 +7680,10 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     #f.signalGraphicsObjectPositionChange.connect(self.slotLinkedGraphicsObjectPositionChange)
                     
         self._drawObject_() 
+    
         if isinstance(self._backend_, PlanarGraphics) and self._backend_.hasStateForFrame():
             self.setPos(self._backend_.x, self._backend_.y)
+            self._oldPos = self.pos()
                     
         self.update()
         
@@ -8229,15 +8232,74 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self.update()
         
     def _drawMainCursorLines_(self, state:dict, vert:bool=True, horiz:bool=True):
+        """Draws the main cursor lines.
+        state: dict (or DataBag) with x, y, height and width attributes (see Cursor)
+        vert, horiz: bool (by default, both True) 
+        
+            Which line to draw:
+            \   Cursor  Vertical    Horizontal  Crosshair   Point(*)
+             \  type:
+            ===================================================================
+            vert:       True        False       True        False
+            horiz:      False       True        True        False
+            
+        (*) This function is a noop when called with both vert and horiz set as 
+        False - therefore it doesn't need to be called for a Point cursor
+        """
+        ## NOTE: 2018-01-18 15:16:55
+        ## THE CORRECT WAY TO DRAW THE CURSOR LINES is by mapping the coordinates
+        # of the PlanarGraphics backend object from scene (where they are defined)
+        # to the coordinate system of the actual graphics object (in this case, 
+        # the line)
+        # 
+        if not isinstance(self._backend_, Cursor):
+            return
+        
         if vert:
-            ## NOTE: 2018-01-18 15:16:55
-            ## THAT'S THE CORRECT WAY TO DRAW !!!
             self._vline = QtCore.QLineF(self.mapFromScene(QtCore.QPointF(state.x, 0)), 
                                         self.mapFromScene(QtCore.QPointF(state.x, state.height)))
                 
         if horiz:
             self._hline = QtCore.QLineF(self.mapFromScene(QtCore.QPointF(0, state.y)), 
                                         self.mapFromScene(QtCore.QPointF(state.width, state.y)))
+
+    def _drawCursorWhiskers_(self, state:dict, vert:bool=False, horiz:bool=False):
+        """Draws the whisker bars orthogonal to the main cursor line(s)
+        state: dict (or DataBag) with x, y, xwindow and ywindow attributes (see Cursor)
+        vert:  draws the (horizontal) whisker for the vertical main line (horizontal whisker bar)
+        horiz: draws the (vertical) whisker for horizontal main line (vertical whisker bar)
+        
+        CAUTION Semantics is different from that in _drawMainCursorLines_:
+            Which whiskers to draw:
+            \   Cursor  Vertical    Horizontal  Crosshair(*)   Point
+             \  type:
+            ===================================================================
+            vert:       False       True        False          True
+            horiz:      True        False       False          True
+            
+        (*) when both are False, this is a noop; best to avoid calling it for a
+        Crosshair cursor
+        """
+        if not isinstance(self._backend_, Cursor):
+            return
+        
+        #print("vert", vert, "horiz", horiz)
+        
+        if not vert:
+            self._vwbar = QtCore.QLineF(self.mapFromScene(QtCore.QPointF(state.x, 
+                                                                         state.y - state.ywindow/2)),
+                                        self.mapFromScene(QtCore.QPointF(state.x,
+                                                                         state.y + state.ywindow/2)))
+                                        
+        if not horiz:
+            self._hwbar = QtCore.QLineF(self.mapFromScene(QtCore.QPointF(state.x - state.xwindow/2,
+                                                                         state.y)), 
+                                        self.mapFromScene(QtCore.QPointF(state.x + state.xwindow/2,
+                                                                         state.y)))
+        
+        #print("self._vwbar", self._vwbar)
+        #print("self._hwbar", self._hwbar)
+        
     def _drawCursor_(self):
         """Draws cursor.
         Creates the graphic components, which are rendered by __paint__
@@ -8265,8 +8327,16 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             
             # NOTE: 2021-05-05 09:34:59
             # _vline and _hline are the main cursor lines
-            # _hwbar and _vwbar are the "whiskers"
-            # _crect and _wcrect are for point cursors
+            # _hwbar and _vwbar are their respective "whiskers" orthogonal to 
+            # the main lines
+            # _crect is the actual point for the point cursor
+            # _wcrect is the "target" rect for both point and crosshair cursors
+            
+            # NOTE: 2021-05-06 20:54:14
+            # to draw an ellipse (circle) instead of a rectangle (square) create
+            # and use a user-configurable flag, then get the painter draw an 
+            # ellipse using these rectangle coordinates by calling drawEllipse(...)
+            # instead of drawRects(), in self.__paint__()
             
             vert = isinstance(self._backend_, (VerticalCursor, CrosshairCursor)) or \
                     self._backend_.type & (PlanarGraphicsType.vertical_cursor | PlanarGraphicsType.crosshair_cursor)
@@ -8274,95 +8344,30 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             horiz = isinstance(self._backend_, (HorizontalCursor, CrosshairCursor)) or \
                     self._backend_.type & (PlanarGraphicsType.horizontal_cursor | PlanarGraphicsType.crosshair_cursor)
             
-            self._drawMainCursorLines_(state, vert, horiz)
+            if not isinstance(self._backend_, PointCursor) and \
+                not self._backend_.type & PlanarGraphicsType.point_cursor:
+                self._drawMainCursorLines_(state, vert, horiz) # avoid noop call
+                
+            if not isinstance(self._backend_, CrosshairCursor) and \
+                not self._backend_.type & PlanarGraphicsType.crosshair_cursor:
+                    self._drawCursorWhiskers_(state, vert, horiz)
             
-            if isinstance(self._backend_, (VerticalCursor, CrosshairCursor)) or \
-                self._backend_.type & (PlanarGraphicsType.vertical_cursor | PlanarGraphicsType.crosshair_cursor):
-                
-                ## NOTE: 2018-01-18 15:16:55
-                ## THAT'S THE CORRECT WAY !!!
-                #self._vline = QtCore.QLineF(self.mapFromScene(QtCore.QPointF(state.x, 0)), 
-                                            #self.mapFromScene(QtCore.QPointF(state.x, state.height)))
-                
-                #if isinstance(self._backend_, CrosshairCursor) or self._backend_.type & PlanarGraphicsType.crosshair_cursor:
-                    #self._hline = QtCore.QLineF(self.mapFromScene(QtCore.QPointF(0, state.y)), 
-                                                #self.mapFromScene(QtCore.QPointF(state.width, state.y)))
-                    
-                    
-                
-                if isinstance(self._backend_, VerticalCursor) or self._backend_.type & PlanarGraphicsType.vertical_cursor:
-                    # vertical cursors
-                    if self._positionChangeHasBegun:
-                        newY = self._wbarPos.y() + self._deltaPos.y()
-                        
-                        if newY < 0:
-                            newY = 0
-                            
-                        elif newY > state.height-1:
-                            newY = state.height-1
-                            
-                        self._hwbar = QtCore.QLineF(self.mapFromScene(QtCore.QPointF(state.x - state.xwindow/2,
-                                                                                    newY)),
-                                                    self.mapFromScene(QtCore.QPointF(state.x + state.xwindow/2,
-                                                                                    newY)))
-                        
-                    else:
-                        #self._hwbar = QtCore.QLineF(self.mapFromScene(QtCore.QPointF(state.x - state.xwindow/2,
-                                                                                    #state.y)), 
-                                                    #self.mapFromScene(QtCore.QPointF(state.x + state.xwindow/2,
-                                                                                    #state.y)))
-                
-                        self._hwbar = QtCore.QLineF(self.mapFromScene(QtCore.QPointF(state.x - state.xwindow/2,
-                                                                                    self._wbarPos.y())), 
-                                                    self.mapFromScene(QtCore.QPointF(state.x + state.xwindow/2,
-                                                                                    self._wbarPos.y())))
-                
-            elif isinstance(self._backend_, (HorizontalCursor, CrosshairCursor)) or \
-                self._backend_.type & (PlanarGraphicsType.horizontal_cursor | PlanarGraphicsType.crosshair_cursor):
-                
-                #self._hline = QtCore.QLineF(self.mapFromScene(QtCore.QPointF(0, state.y)), 
-                                            #self.mapFromScene(QtCore.QPointF(state.width, state.y)))
-                
-                if isinstance(self._backend_, HorizontalCursor) or self._backend_.type & PlanarGraphicsType.horizontal_cursor:
-                    # horizontal cursors
-                    if self._positionChangeHasBegun:
-                        #newX = state.x + self._deltaPos.x()
-                        newX = self._wbarPos.x() + self._deltaPos.x()
-                        
-                        if newX < 0:
-                            newX = 0
-                            
-                        elif newX > state.width-1:
-                            newX = state.width-1
-                            
-                        self._vwbar = QtCore.QLineF(self.mapFromScene(QtCore.QPointF(newX, 
-                                                                                    state.y - state.ywindow/2)),
-                                                    self.mapFromScene(QtCore.QPointF(newX, 
-                                                                                    state.y + state.ywindow/2)))
-                        
-                    else:
-                        #self._vwbar = QtCore.QLineF(self.mapFromScene(QtCore.QPointF(state.x, 
-                                                                                    #state.y - state.ywindow/2)),
-                                                    #self.mapFromScene(QtCore.QPointF(state.x, 
-                                                                                    #state.y + state.ywindow/2)))
-                
-                        self._vwbar = QtCore.QLineF(self.mapFromScene(QtCore.QPointF(self._wbarPos.x(), 
-                                                                                    state.y - state.ywindow/2)),
-                                                    self.mapFromScene(QtCore.QPointF(self._wbarPos.x(), 
-                                                                                    state.y + state.ywindow/2)))
-                
-            else:
+            if isinstance(self._backend_, (CrosshairCursor, PointCursor)) or \
+                self._backend_.type & (PlanarGraphicsType.crosshair_cursor | PlanarGraphicsType.point_cursor):
+                # the "target" rect, component of the point cursor and of the crosshair cursor
+                self._wrect = QtCore.QRectF(self.mapFromScene(QtCore.QPointF(state.x - state.xwindow/2,
+                                                                            state.y - state.ywindow/2)),
+                                            self.mapFromScene(QtCore.QPointF(state.x + state.xwindow/2,
+                                                                            state.y + state.ywindow/2)))
+                                            
+            if isinstance(self._backend_, PointCursor) or \
+                self._backend_.type & PlanarGraphicsType.point_cursor:
                 # component of the point cursor (central rect)
                 self._crect = QtCore.QRectF(self.mapFromScene(QtCore.QPointF(state.x - state.radius,
                                                                             state.y - state.radius)),
                                             self.mapFromScene(QtCore.QPointF(state.x + state.radius,
                                                                             state.y + state.radius)))
                 
-                # component of the point cursor and of the crosshair cursor (window rect)
-                self._wrect = QtCore.QRectF(self.mapFromScene(QtCore.QPointF(state.x - state.xwindow/2,
-                                                                            state.y - state.ywindow/2)),
-                                            self.mapFromScene(QtCore.QPointF(state.x + state.xwindow/2,
-                                                                            state.y + state.ywindow/2)))
 
             super().update()
             
@@ -8469,13 +8474,12 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         try:
             if isinstance(self._backend_, Cursor):
                 state = self._backend_.currentState
-                #state = self._backend_.getState() 
-                #state = self._backend_.getState(self._currentframe_) 
                 
+                # NOTE: 2021-05-06 15:31:21 see NOTE: 2021-05-04 15:49:24
+                # REMINDER: QRectF(x,y,w,h)
                 if isinstance(state, DataBag) and len(state):
                     if isinstance(self._backend_, VerticalCursor) or \
                         self._backend_.type & PlanarGraphicsType.vertical_cursor:
-                        # QRectF(x,y,w,h)
                         bRect = self.mapRectFromScene(QtCore.QRectF(state.x - state.xwindow/2,
                                                                     0, 
                                                                     state.xwindow, 
@@ -8490,10 +8494,21 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         
                     elif isinstance(self._backend_, CrosshairCursor) or \
                         self._backend_.type & PlanarGraphicsType.crosshair_cursor:
-                        bRect =  self.mapRectFromScene(QtCore.QRectF(-state.width//2, 
-                                                                     -state.height//2, 
-                                                                      state.width, 
-                                                                      state.height))
+                        vRect = self.mapRectFromScene(QtCore.QRectF(state.x - state.xwindow/2,
+                                                                    0, 
+                                                                    state.xwindow, 
+                                                                    state.height))
+                        
+                        hRect = self.mapRectFromScene(QtCore.QRectF(0, 
+                                                                    state.y - state.ywindow/2,  
+                                                                    state.width, 
+                                                                    state.ywindow))
+                        
+                        bRect = vRect | hRect
+                        #bRect =  self.mapRectFromScene(QtCore.QRectF(-state.width//2, 
+                                                                     #-state.height//2, 
+                                                                      #state.width, 
+                                                                      #state.height))
                         
                     else: # point cursor
                         bRect = self.mapRectFromScene(QtCore.QRectF(state.x - state.xwindow/2, 
@@ -8870,7 +8885,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 lines = list()
                 rects = list()
                 
-                #state = self._backend_.getState(self._backend_.currentFrame)
                 state = self._backend_.currentState
                 
                 if state is None or len(state) == 0:
@@ -8880,11 +8894,14 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     sceneWidth  = self.scene().rootImage.boundingRect().width()
                     sceneHeight = self.scene().rootImage.boundingRect().height()
                 else:
-                    sceneWidth  = self._backend_.width
-                    sceneHeight = self._backend_.height
+                    sceneWidth  = state.width
+                    sceneHeight = state.height
                     
-                #sceneCenter = QtCore.QPointF(sceneWidth/2, sceneHeight/2)
-
+                labelXmin = 0
+                labelXmax = sceneWidth - self._labelRect.width()
+                labelYmin = self._labelRect.height() 
+                labelYmax = sceneHeight - self._labelRect.height()
+                    
                 # NOTE: 2021-05-04 15:49:24
                 # the old-style type checks below is for backward compatibility
                 if isinstance(self._backend_, VerticalCursor) or \
@@ -8892,84 +8909,95 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         
                     lines = [self._vline, self._hwbar]
                     
-                    labelX = self._backend_.x - self._labelRect.width()/2
+                    labelX = max([min([state.x - self._labelRect.width()/2, labelXmax]), labelXmin])
+                        
+                    labelY = labelYmin
                     
-                    if labelX < 0:# self._labelRect.width()/2:
-                        labelX = 0
-                        #labelX = self._backend_.x #+ self._labelRect.width()/2
-                        
-                    elif labelX + self._labelRect.width() > sceneWidth:
-                        labelX = sceneWidth - self._labelRect.width()
-                        
-                    #elif labelX > (sceneWidth - self._labelRect.width()/2):
-                        #labelX = self._backend_.x - self._labelRect.width()
-                        
-                    labelY = self._labelRect.height()
+                    # move the whisker (_hwbar) vertically to reflect the y movement
+                    #if not self._hwbarPos.isNull():
+                        #self._hwbar.setP1(QtCore.QPointF(self.mapFromScene(QtCore.QPointF(state.x - state.xwindow/2,
+                                                                           #state.y)).x(),
+                                                         #self._hwbarPos.y()))
+                        #self._hwbar.setP2(QtCore.QPointF(self.mapFromScene(QtCore.QPointF(state.x + state.xwindow/2,
+                                                                                          #state.y)).x(),
+                                                         #self._hwbarPos.y()))
+                                                                        
+                        #self._hwbar.setP1(self.mapFromScene(QtCore.QPointF(state.x - state.xwindow/2,
+                                                                        #self._hwbarPos.y())))
+                        #self._hwbar.setP2(self.mapFromScene(QtCore.QPointF(state.x + state.xwindow/2,
+                                                                        #self._hwbarPos.y())))
+                    #p1 = self._hwbar.p1()
                     
-                    labelPos = self.mapFromScene(QtCore.QPointF(labelX,labelY))
-
-                #elif self._graphics_object_type_ == PlanarGraphicsType.horizontal_cursor:
+                    #print(self._deltaPos, ";", p1)
+                    #if not self._deltaPos.isNull():
+                        #self._hwbar.translate(0., self.mapToScene(self._deltaPos).y())
+                    
+                    #self._hwbar.p1().setY(p1.y() - self._deltaPos.y())
+                    #p1 = self.mapFromScene(QtCore.QPointF(state.x - state.xwindow/2, state.y))
+                    #p1.setY(self._hwbarPos.y())
+                    
+                    #p2 = self.mapFromScene(QtCore.QPointF(state.x + state.xwindow/2, state.y))
+                    #p2.setY(self._hwbarPos.y())
+                    
+                    #self._hwbar.setP1(p1)
+                    #self._hwbar.setP2(p2)
+                    
+                    #self._hwbar.setP1(self.mapFromScene(QtCore.QPointF(state.x - state.xwindow/2,
+                                                                       #self._hwbarPos.y())))
+                    #self._hwbar.setP2(self.mapFromScene(QtCore.QPointF(state.x + state.xwindow/2,
+                                                                       #self._hwbarPos.y())))
+                    
                 elif isinstance(self._backend_, HorizontalCursor) or \
                     self._backend_.type == PlanarGraphicsType.horizontal_cursor:
                         
                     lines = [self._hline, self._vwbar]
-                    labelX = 0
-                    labelY = self._backend_.y - self._labelRect.height()/2
                     
-                    if labelY < self._labelRect.height():
-                        labelY = self._labelRect.height()
-                    #if labelY < self._labelRect.height():
-                        #labelY = self._backend_.y + self._labelRect.height()/2
+                    labelX = labelXmin
                         
-                    labelPos = self.mapFromScene(QtCore.QPointF(labelX, labelY))
+                    labelY = max([min([state.y - self._labelRect.height(), labelYmax]), labelYmin])
 
-                #elif self._graphics_object_type_ == PlanarGraphicsType.crosshair_cursor:
+                    # move the whisker (_vwbar) horizontally to reflect the x movement
+                    self._vwbar.setP1(self.mapFromScene(QtCore.QPointF(state.x, 
+                                                                       state.y - state.ywindow/2)))
+                    self._vwbar.setP2(self.mapFromScene(QtCore.QPointF(state.x, 
+                                                                       state.y + state.ywindow/2)))
+                    
                 elif isinstance(self._backend_, CrosshairCursor) or \
                     self._backend_.type == PlanarGraphicsType.crosshair_cursor:
                         
                     lines = [self._vline, self._hline]
-                    labelX = self._backend_.x - self._labelRect.width()/2
                     
-                    if labelX < 0:# self._labelRect.width()/2:
-                        labelX = self._backend_.x #+ self._labelRect.width()/2
-                        
-                    elif labelX > (sceneWidth - self._labelRect.width()/2):
-                        labelX = self._backend_.x - self._labelRect.width()
-                        
-                    labelY = self._labelRect.height()
+                    rects = [self._wrect]
                     
-                    labelPos = self.mapFromScene(QtCore.QPointF(labelX,labelY))
-                    #labelPos = self.mapFromScene(QtCore.QPointF(self._backend_.x  - self._labelRect.width()/2,
-                                                                #self._labelRect.height()))
+                    labelX = state.x - self._labelRect.width()/2
                     
-                    #rects = [self._wrect]
-                    #if self._deltaPos:
-                        #print("***")
-                        #print("vline center", self.mapToScene(self._vline.center()))
-                        #print("hline center", self.mapToScene(self._hline.center()))
-                        #print("_deltaPos", self._deltaPos)
-                        #print("_dPos mapped from scene", self.mapFromScene(self._deltaPos))
-                    #print("Pos:", self.pos(), "_deltaPos", self._deltaPos)
+                    labelX = max([min([state.x - self._labelRect.width()/2, labelXmax]), labelXmin])
                     
-                    # compensate horizontal movement of vline
-                    vline_dY = self._vline.center().y() - sceneHeight/2
-                    if vline_dY != 0:
-                        self._vline.translate(0, -vline_dY)
-                    #if self._deltaPos:
-                        #self._vline.translate(QtCore.QPointF(0.,-self.mapFromScene(self._deltaPos).y()))                        
-                    # compensate vertical movement of hline
-                    #self._hline.translate(QtCore.QPointF(-self._deltaPos.x(), 0.))
+                    labelY = labelYmin#self._labelRect.height()
+                    
+                    # compensate vertical movement of vline
+                    self._vline.setP1(self.mapFromScene(QtCore.QPointF(state.x, 0)))
+                    self._vline.setP2(self.mapFromScene(QtCore.QPointF(state.x, sceneHeight)))
+                    
+                    # compensate horizontal lateral) movement of hline
+                    self._hline.setP1(self.mapFromScene(QtCore.QPointF(0, state.y)))
+                    self._hline.setP2(self.mapFromScene(QtCore.QPointF(sceneWidth, state.y)))
                         
                 else: # point cursor
-                    rects = [self._crect]
-                    labelPos = self.mapFromScene(QtCore.QPointF(self._backend_.x - self._labelRect.width()/2,
-                                                                self._backend_.y - self._labelRect.height()))
+                    lines = [self._vwbar, self._hwbar]
+                    rects = [self._crect, self._wrect]
 
-                if len(lines):# is not None:
+                    labelX = max([min([state.x - self._labelRect.width()/2, labelXmax]), labelXmin])
+                    
+                    labelY = max([min([state.y - self._labelRect.height(), labelYmax]), labelYmin])
+                    
+                if len(lines):
                     painter.drawLines(lines)
                     
-                if len(rects):# is not None:
+                if len(rects):
                     painter.drawRects(rects)
+
+                labelPos = self.mapFromScene(QtCore.QPointF(labelX, labelY))
                     
             else: # non-cursor types
                 # NOTE: FIXME be aware of undefined behaviours !!! (check flags and types)
@@ -9402,6 +9430,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             # value is a RELATIVE change (relative to the pos of the item when 
             # the change started)
             
+            
             #print("position change: value=", value)
             if self._backend_ is None:
                 self._deltaPos = QtCore.QPointF()
@@ -9409,7 +9438,12 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             
             if not self._backend_.hasStateForFrame() or not self.__objectVisible__:
                 self._deltaPos = QtCore.QPointF()
-                return QtCore.QPoint()#value
+                #return QtCore.QPoint()
+                return value
+            
+            newPos = value
+            self._oldPos = QtCore.QPointF(newPos)
+            self._hwbarPos = QtCore.QPointF(newPos)
             
             if isinstance(self._backend_, Cursor):
                 # cursor types
@@ -9417,14 +9451,28 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 
                 if state is None or len(state) == 0:
                     self._deltaPos = QtCore.QPointF()
-                    return QtCore.QPoint()#value
+                    return value
+                    #return QtCore.QPoint()
                 
                 # NOTE 2018-01-18 16:57:28
                 # ATTENTION This is also called by self.setPos() (inherited)
                 self._positionChangeHasBegun = True # flag used in _drawCursor_()
                 
-                newPos = value
+                #self._hwbarPos += self._deltaPos
+                #self._vwbarPos += self._deltaPos
                 
+                #if self._hwbarPos.x()< 0:
+                    #self._hwbarPos.setX(0.0)
+                    
+                #elif self._hwbarPos.x() >= state.width:
+                    #self._hwbarPos.setX(state.width-1)
+                            
+                #if self._hwbarPos.y()< 0:
+                    #self._hwbarPos.setY(0.0)
+                    
+                #elif self._hwbarPos.y() >= state.height:
+                    #self._hwbarPos.setY(state.height-1)
+                    
                 # See NOTE: 2021-05-04 15:49:24 for the old style type checks below
                 if isinstance(self._backend_, VerticalCursor) or \
                     self._backend_.type & PlanarGraphicsType.vertical_cursor:
@@ -9447,18 +9495,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     elif newPos.x() > state.width:
                         newPos.setX(state.width)
                         
-                    #elif newPos.x() > self._backend_.width:
-                        #newPos.setX(self._backend_.width)
-                        
-                    # FIXME: 2021-05-05 15:12:08
-                    # sort out the translation of the whisker bars
-                    #if self._hwbar:
-                        ##dY = self._wbarPos.y() + self._deltaPos.y()
-                        #dPos = QtCore.QPointF(0., self._deltaPos.y())
-                        #print(dPos)
-                        #self._hwbar.translate(self.mapToScene(dPos))
-                        #self._hwbar.translate(0, self._deltaPos.y())
-
                 elif isinstance(self._backend_, HorizontalCursor) or \
                     self._backend_.type & PlanarGraphicsType.horizontal_cursor:
                     # horizontal cursors
@@ -9480,9 +9516,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     elif newPos.y() > state.height:
                         newPos.setY(state.height)
 
-                    #elif newPos.y() > self._backend_.height:
-                        #newPos.setY(self._backend_.height)
-
                 elif isinstance(self._backend_, CrosshairCursor) or \
                     self._backend_.type & PlanarGraphicsType.crosshair_cursor:
                     # crosshair cursors
@@ -9502,23 +9535,13 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     if newPos.x() > state.width:
                         newPos.setX(state.width)
 
-                    #if newPos.x() > self._backend_.width:
-                        #newPos.setX(self._backend_.width)
-
                     if newPos.y() <= 0.0:
                         newPos.setY(0.0)
                         
                     if newPos.y() > state.height:
                         newPos.setY(state.height)
                         
-                    #if newPos.y() > self._backend_.height:
-                        #newPos.setY(self._backend_.height)
-                        
                     self._deltaPos = (newPos - self.pos()) 
-                    #self._deltaPos = (newPos - QtCore.QPointF(state.x, state.y)) 
-                    
-                    #self._deltaPos = (newPos - QtCore.QPointF(self._backend_.x, 
-                                                              #self._backend_.y))
                     
                 else: # point cursors
                     if newPos.x() <= 0.0:
@@ -9527,33 +9550,19 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     if newPos.x() > state.width:
                         newPos.setX(state.width)
 
-                    #if newPos.x() > self._backend_.width:
-                        #newPos.setX(self._backend_.width)
-
                     if newPos.y() <= 0.0:
                         newPos.setY(0.0)
                         
                     if newPos.y() > state.height:
                         newPos.setY(state.height)
                         
-                    #if newPos.y() > self._backend_.height:
-                        #newPos.setY(self._backend_.height)
-                        
                     self._deltaPos = (newPos - QtCore.QPointF(state.x, state.y))
-                    
-                    #self._deltaPos = (newPos - QtCore.QPointF(self._backend_.x,
-                                                              #self._backend_.y))
                     
                 # NOTE: 2018-01-18 15:44:28
                 # CAUTION value is already in scene coordinates, so no mapping needed
                 # here; 
                 state.x = newPos.x()
                 state.y = newPos.y()
-                
-                #self._backend_.x = newPos.x()
-                #self._backend_.y = newPos.y()
-                
-                #self._wbarPos += self._deltaPos
                 
             #elif self._graphics_object_type_ & PlanarGraphicsType.allShapeTypes:
             else: #non-cursor types
@@ -9580,7 +9589,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             
             self.signalBackendChanged.emit(self._backend_)
         
-            #self._oldPos = self.pos()
+            #self._oldPos = newPos
                 
         # NOTE: 2017-08-11 13:19:28
         # selection change is applied to all GraphicsObject types, not just cursors
@@ -9604,6 +9613,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             self._drawObject_()
 
         #self._oldPos = self.pos()
+        #self._oldPos = newPos
             
         return super(GraphicsObject, self).itemChange(change, value)
 
@@ -10109,21 +10119,21 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 
                 self._positionChangeHasBegun=False
                 
-                self._wbarPos += self._deltaPos
+                #self._hwbarPos += self._deltaPos
                     
-                if self._wbarPos.x()< 0:
-                    self._wbarPos.setX(0.0)
+                #if self._hwbarPos.x()< 0:
+                    #self._hwbarPos.setX(0.0)
                     
-                elif self._wbarPos.x() >= state.width:
-                    self._wbarPos.setX(state.width-1)
+                #elif self._hwbarPos.x() >= state.width:
+                    #self._hwbarPos.setX(state.width-1)
                             
-                if self._wbarPos.y()< 0:
-                    self._wbarPos.setY(0.0)
+                #if self._hwbarPos.y()< 0:
+                    #self._hwbarPos.setY(0.0)
                     
-                elif self._wbarPos.y() >= state.height:
-                    self._wbarPos.setY(state.height-1)
+                #elif self._hwbarPos.y() >= state.height:
+                    #self._hwbarPos.setY(state.height-1)
                 
-            #self._oldPos = self.pos()
+            self._oldPos = self.pos()
             self._deltaPos = QtCore.QPointF(0.0, 0.0)
             
         # NOTE: 2017-06-29 08:40:08# don't do this -- it disturbs the crosshair lines
@@ -10335,31 +10345,31 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         
                 elif evt.key() == QtCore.Qt.Key_Up:
                     if evt.modifiers() & QtCore.Qt.ShiftModifier:
-                        self._wbarPos += QtCore.QPointF(0.0,-10.0)
+                        self._hwbarPos += QtCore.QPointF(0.0,-10.0)
                         
                     else:
-                        self._wbarPos += QtCore.QPointF(0.0,-1.0)
+                        self._hwbarPos += QtCore.QPointF(0.0,-1.0)
                         
-                    if self._wbarPos.y()< 0:
-                        self._wbarPos.setY(0.0)
+                    if self._hwbarPos.y()< 0:
+                        self._hwbarPos.setY(0.0)
                         
-                    elif self._wbarPos.y() > state.height-1:
-                        self._wbarPos.setY(state.height-1)
+                    elif self._hwbarPos.y() > state.height-1:
+                        self._hwbarPos.setY(state.height-1)
                         
                     self._drawObject_()
 
                 elif evt.key() == QtCore.Qt.Key_Down:
                     if evt.modifiers() & QtCore.Qt.ShiftModifier:
-                        self._wbarPos += QtCore.QPointF(0.0,10.0)
+                        self._hwbarPos += QtCore.QPointF(0.0,10.0)
                         
                     else:
-                        self._wbarPos += QtCore.QPointF(0.0,1.0)
+                        self._hwbarPos += QtCore.QPointF(0.0,1.0)
                         
-                    if self._wbarPos.y()< 0:
-                        self._wbarPos.setY(0.0)
+                    if self._hwbarPos.y()< 0:
+                        self._hwbarPos.setY(0.0)
                         
-                    elif self._wbarPos.y() > state.height-1:
-                        self._wbarPos.setY(state.height-1)
+                    elif self._hwbarPos.y() > state.height-1:
+                        self._hwbarPos.setY(state.height-1)
                         
                     self._drawObject_()
                 
@@ -10368,31 +10378,31 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 # horizontal cursor
                 if evt.key() == QtCore.Qt.Key_Right:
                     if evt.modifiers() & QtCore.Qt.ShiftModifier:
-                        self._wbarPos += QtCore.QPointF(10.0, 0.0)
+                        self._hwbarPos += QtCore.QPointF(10.0, 0.0)
                         
                     else:
-                        self._wbarPos += QtCore.QPointF(1.0, 0.0)
+                        self._hwbarPos += QtCore.QPointF(1.0, 0.0)
                         
-                    if self._wbarPos.x()< 0:
-                        self._wbarPos.setX(0.0)
+                    if self._hwbarPos.x()< 0:
+                        self._hwbarPos.setX(0.0)
                         
-                    elif self._wbarPos.x() > state.width-1:
-                        self._wbarPos.setX(state.width-1)
+                    elif self._hwbarPos.x() > state.width-1:
+                        self._hwbarPos.setX(state.width-1)
                         
                     self._drawObject_()
                     
                 elif evt.key() == QtCore.Qt.Key_Left:
                     if evt.modifiers() & QtCore.Qt.ShiftModifier:
-                        self._wbarPos += QtCore.QPointF(-10.0, 0.0)
+                        self._hwbarPos += QtCore.QPointF(-10.0, 0.0)
                         
                     else:
-                        self._wbarPos += QtCore.QPointF(-1.0, 0.0)
+                        self._hwbarPos += QtCore.QPointF(-1.0, 0.0)
                         
-                    if self._wbarPos.x()< 0:
-                        self._wbarPos.setX(0.0)
+                    if self._hwbarPos.x()< 0:
+                        self._hwbarPos.setX(0.0)
                         
-                    elif self._wbarPos.x() > state.width-1:
-                        self._wbarPos.setX(state.width-1)
+                    elif self._hwbarPos.x() > state.width-1:
+                        self._hwbarPos.setX(state.width-1)
                         
                     self._drawObject_()
                     
