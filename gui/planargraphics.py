@@ -8877,9 +8877,13 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     return
                 
                 if "GraphicsImageViewerScene" in type(self.scene()).__name__:
-                    sceneWidth = self.scene().rootImage.boundingRect().width()
+                    sceneWidth  = self.scene().rootImage.boundingRect().width()
+                    sceneHeight = self.scene().rootImage.boundingRect().height()
                 else:
-                    sceneWidth = self._backend_.width
+                    sceneWidth  = self._backend_.width
+                    sceneHeight = self._backend_.height
+                    
+                #sceneCenter = QtCore.QPointF(sceneWidth/2, sceneHeight/2)
 
                 # NOTE: 2021-05-04 15:49:24
                 # the old-style type checks below is for backward compatibility
@@ -8891,10 +8895,14 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     labelX = self._backend_.x - self._labelRect.width()/2
                     
                     if labelX < 0:# self._labelRect.width()/2:
-                        labelX = self._backend_.x #+ self._labelRect.width()/2
+                        labelX = 0
+                        #labelX = self._backend_.x #+ self._labelRect.width()/2
                         
-                    elif labelX > (sceneWidth - self._labelRect.width()/2):
-                        labelX = self._backend_.x - self._labelRect.width()
+                    elif labelX + self._labelRect.width() > sceneWidth:
+                        labelX = sceneWidth - self._labelRect.width()
+                        
+                    #elif labelX > (sceneWidth - self._labelRect.width()/2):
+                        #labelX = self._backend_.x - self._labelRect.width()
                         
                     labelY = self._labelRect.height()
                     
@@ -8909,7 +8917,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     labelY = self._backend_.y - self._labelRect.height()/2
                     
                     if labelY < self._labelRect.height():
-                        labelY = self._backend_.y + self._labelRect.height()/2
+                        labelY = self._labelRect.height()
+                    #if labelY < self._labelRect.height():
+                        #labelY = self._backend_.y + self._labelRect.height()/2
                         
                     labelPos = self.mapFromScene(QtCore.QPointF(labelX, labelY))
 
@@ -8933,6 +8943,22 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                                                 #self._labelRect.height()))
                     
                     #rects = [self._wrect]
+                    #if self._deltaPos:
+                        #print("***")
+                        #print("vline center", self.mapToScene(self._vline.center()))
+                        #print("hline center", self.mapToScene(self._hline.center()))
+                        #print("_deltaPos", self._deltaPos)
+                        #print("_dPos mapped from scene", self.mapFromScene(self._deltaPos))
+                    #print("Pos:", self.pos(), "_deltaPos", self._deltaPos)
+                    
+                    # compensate horizontal movement of vline
+                    vline_dY = self._vline.center().y() - sceneHeight/2
+                    if vline_dY != 0:
+                        self._vline.translate(0, -vline_dY)
+                    #if self._deltaPos:
+                        #self._vline.translate(QtCore.QPointF(0.,-self.mapFromScene(self._deltaPos).y()))                        
+                    # compensate vertical movement of hline
+                    #self._hline.translate(QtCore.QPointF(-self._deltaPos.x(), 0.))
                         
                 else: # point cursor
                     rects = [self._crect]
@@ -8958,7 +8984,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     
                     #if self.objectType & PlanarGraphicsType.path:
                     if isinstance(self._backend_, Path):
-                        if self._backend_.type == PlanarGraphicsType.poltyon:
+                        if self._backend_.type == PlanarGraphicsType.polygon:
                             for k, element in enumerate(self._cachedPath_):
                                 if k > 0:
                                     painter.drawLine(self._cachedPath_[k-1].point(), 
@@ -9488,7 +9514,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     #if newPos.y() > self._backend_.height:
                         #newPos.setY(self._backend_.height)
                         
-                    self._deltaPos = (newPos - QtCore.QPointF(state.x, state.y)) 
+                    self._deltaPos = (newPos - self.pos()) 
+                    #self._deltaPos = (newPos - QtCore.QPointF(state.x, state.y)) 
                     
                     #self._deltaPos = (newPos - QtCore.QPointF(self._backend_.x, 
                                                               #self._backend_.y))
