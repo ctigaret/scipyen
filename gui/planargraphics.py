@@ -7540,7 +7540,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                  obj=None, 
                  labelShowsPosition=True, 
                  showLabel=True,
-                 parentWidget=None):
+                 parentWidget=None,
+                 roundCursorPoint=True):
                  
         """
         Named parameters:
@@ -7550,19 +7551,24 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             When 'obj' is None this triggers the interactive drawing logic
             (to build the PlanarGraphics shape using the GUI).
                 
-        labelShowsPosition : bool (default is True)
+        labelShowsPosition: bool (default is True)
         
-        showLabel : bool (default is True)
+        showLabel: bool (default is True)
         
-        parentWidget : QtWidget (GraphicsImageViewerWidget) or None (default)
+        parentWidget: QtWidget (GraphicsImageViewerWidget) or None (default)
+        
+        roundCursorPoint: bool (default is True) - specifies how a Point cursor
+            and the 'target' for a Point and Crosshair cursor are drawn.
+            
+            When True (the default), these will be drawn as an ellipse (circle).
+            
+            When False, these will be drawn as rectangles
         
         """
         if not isinstance(obj, (PlanarGraphics, type(None))):
             raise TypeError("First parameter expected a PlanarGraphics or None; got %s instead" % type(obj).__name__)
 
         super(QtWidgets.QGraphicsObject, self).__init__()
-
-        #print("GraphicsObject__init__(",obj, labelShowsPosition, showLabel, parentWidget,")")
 
         self._backend_ = obj
         
@@ -7572,6 +7578,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self._parentWidget_             = parentWidget
         self._labelShowsCoordinates_    = labelShowsPosition
         self._showLabel_                = showLabel
+        self._roundCursor_              = roundCursorPoint
         # NOTE: this is the actual string used for label display; 
         # it may be suffixed with the position if labelShowsPosition is True
         self._displayStr_= "" 
@@ -8283,8 +8290,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         if not isinstance(self._backend_, Cursor):
             return
         
-        #print("vert", vert, "horiz", horiz)
-        
         if not vert:
             self._vwbar = QtCore.QLineF(self.mapFromScene(QtCore.QPointF(state.x, 
                                                                          state.y - state.ywindow/2)),
@@ -8296,9 +8301,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                                                          state.y)), 
                                         self.mapFromScene(QtCore.QPointF(state.x + state.xwindow/2,
                                                                          state.y)))
-        
-        #print("self._vwbar", self._vwbar)
-        #print("self._hwbar", self._hwbar)
         
     def _drawCursor_(self):
         """Draws cursor.
@@ -8901,6 +8903,16 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 labelXmax = sceneWidth - self._labelRect.width()
                 labelYmin = self._labelRect.height() 
                 labelYmax = sceneHeight - self._labelRect.height()
+                
+                # NOTE: 2021-05-07 09:15:46 - new logic for itemChange and paint
+                # Compensate for main cursor line displacement by resetting the
+                # lines' points; in the past this was done by limiting/resetting
+                # coordinates in the new position in self.itemChange() but its
+                # 'undoing' (to allow the whiskers to move) was a pain
+                # turned out to be a pain
+                # 
+                # Also, compensate label position so that it is drawn consistently
+                # with the cursor type and does not clutter too much
                     
                 # NOTE: 2021-05-04 15:49:24
                 # the old-style type checks below is for backward compatibility
@@ -8913,40 +8925,10 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         
                     labelY = labelYmin
                     
-                    # move the whisker (_hwbar) vertically to reflect the y movement
-                    #if not self._hwbarPos.isNull():
-                        #self._hwbar.setP1(QtCore.QPointF(self.mapFromScene(QtCore.QPointF(state.x - state.xwindow/2,
-                                                                           #state.y)).x(),
-                                                         #self._hwbarPos.y()))
-                        #self._hwbar.setP2(QtCore.QPointF(self.mapFromScene(QtCore.QPointF(state.x + state.xwindow/2,
-                                                                                          #state.y)).x(),
-                                                         #self._hwbarPos.y()))
-                                                                        
-                        #self._hwbar.setP1(self.mapFromScene(QtCore.QPointF(state.x - state.xwindow/2,
-                                                                        #self._hwbarPos.y())))
-                        #self._hwbar.setP2(self.mapFromScene(QtCore.QPointF(state.x + state.xwindow/2,
-                                                                        #self._hwbarPos.y())))
-                    #p1 = self._hwbar.p1()
-                    
-                    #print(self._deltaPos, ";", p1)
-                    #if not self._deltaPos.isNull():
-                        #self._hwbar.translate(0., self.mapToScene(self._deltaPos).y())
-                    
-                    #self._hwbar.p1().setY(p1.y() - self._deltaPos.y())
-                    #p1 = self.mapFromScene(QtCore.QPointF(state.x - state.xwindow/2, state.y))
-                    #p1.setY(self._hwbarPos.y())
-                    
-                    #p2 = self.mapFromScene(QtCore.QPointF(state.x + state.xwindow/2, state.y))
-                    #p2.setY(self._hwbarPos.y())
-                    
-                    #self._hwbar.setP1(p1)
-                    #self._hwbar.setP2(p2)
-                    
-                    #self._hwbar.setP1(self.mapFromScene(QtCore.QPointF(state.x - state.xwindow/2,
-                                                                       #self._hwbarPos.y())))
-                    #self._hwbar.setP2(self.mapFromScene(QtCore.QPointF(state.x + state.xwindow/2,
-                                                                       #self._hwbarPos.y())))
-                    
+                    # compensate vertical movement of vline
+                    self._vline.setP1(self.mapFromScene(QtCore.QPointF(state.x, 0)))
+                    self._vline.setP2(self.mapFromScene(QtCore.QPointF(state.x, sceneHeight)))
+
                 elif isinstance(self._backend_, HorizontalCursor) or \
                     self._backend_.type == PlanarGraphicsType.horizontal_cursor:
                         
@@ -8956,12 +8938,10 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         
                     labelY = max([min([state.y - self._labelRect.height(), labelYmax]), labelYmin])
 
-                    # move the whisker (_vwbar) horizontally to reflect the x movement
-                    self._vwbar.setP1(self.mapFromScene(QtCore.QPointF(state.x, 
-                                                                       state.y - state.ywindow/2)))
-                    self._vwbar.setP2(self.mapFromScene(QtCore.QPointF(state.x, 
-                                                                       state.y + state.ywindow/2)))
-                    
+                    # compensate horizontal lateral) movement of hline
+                    self._hline.setP1(self.mapFromScene(QtCore.QPointF(0, state.y)))
+                    self._hline.setP2(self.mapFromScene(QtCore.QPointF(sceneWidth, state.y)))
+                        
                 elif isinstance(self._backend_, CrosshairCursor) or \
                     self._backend_.type == PlanarGraphicsType.crosshair_cursor:
                         
@@ -8995,7 +8975,11 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     painter.drawLines(lines)
                     
                 if len(rects):
-                    painter.drawRects(rects)
+                    if self._roundCursor_:
+                        for r in rects:
+                            painter.drawEllipse(r)
+                    else:
+                        painter.drawRects(rects)
 
                 labelPos = self.mapFromScene(QtCore.QPointF(labelX, labelY))
                     
@@ -9010,7 +8994,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     # first draw the shape
                     painter.setPen(self._selectedCursorPen)
                     
-                    #if self.objectType & PlanarGraphicsType.path:
                     if isinstance(self._backend_, Path):
                         if self._backend_.type == PlanarGraphicsType.polygon:
                             for k, element in enumerate(self._cachedPath_):
@@ -9445,8 +9428,15 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             self._oldPos = QtCore.QPointF(newPos)
             self._hwbarPos = QtCore.QPointF(newPos)
             
-            if isinstance(self._backend_, Cursor):
-                # cursor types
+            if isinstance(self._backend_, Cursor): # cursor types
+                # NOTE: 2021-05-07 09:14:13 new logic for itemChange and paint
+                # Let newPos reflect the movement, but compensate main cursor
+                # lines displacement in self.__paint__(). 
+                # This will then allow the whiskers to "move" as directed by the
+                # change.
+                # In the past this was done by restricting newPos here, which 
+                # hindered the movement of the cursor whiskers.
+                # see also NOTE: 2021-05-07 09:15:46
                 state = self._backend_.currentState
                 
                 if state is None or len(state) == 0:
@@ -9458,36 +9448,16 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 # ATTENTION This is also called by self.setPos() (inherited)
                 self._positionChangeHasBegun = True # flag used in _drawCursor_()
                 
-                #self._hwbarPos += self._deltaPos
-                #self._vwbarPos += self._deltaPos
-                
-                #if self._hwbarPos.x()< 0:
-                    #self._hwbarPos.setX(0.0)
-                    
-                #elif self._hwbarPos.x() >= state.width:
-                    #self._hwbarPos.setX(state.width-1)
-                            
-                #if self._hwbarPos.y()< 0:
-                    #self._hwbarPos.setY(0.0)
-                    
-                #elif self._hwbarPos.y() >= state.height:
-                    #self._hwbarPos.setY(state.height-1)
-                    
                 # See NOTE: 2021-05-04 15:49:24 for the old style type checks below
+                # vertical cursors:
                 if isinstance(self._backend_, VerticalCursor) or \
                     self._backend_.type & PlanarGraphicsType.vertical_cursor:
-                    # vertical cursors
                     #if not self.pos().isNull():
                         #self._deltaPos = (newPos - self.pos())
                     self._deltaPos = (newPos - self.pos())
 
-                    # NOTE: 2021-05-05 14:28:50
-                    # reset the Y coordinate for vertical cursors, thus
-                    # restrict movement to horizontal direction only
-                    newPos.setY(self.pos().y())
-                    
                     # NOTE: 2021-05-05 14:30:40
-                    # futher, impose limits on how far this can move laterally 
+                    # restrict how far this can move laterally 
                     # (horizontally)
                     if newPos.x() < 0:
                         newPos.setX(0.0)
@@ -9495,20 +9465,15 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     elif newPos.x() > state.width:
                         newPos.setX(state.width)
                         
+                # horizontal cursors:
                 elif isinstance(self._backend_, HorizontalCursor) or \
                     self._backend_.type & PlanarGraphicsType.horizontal_cursor:
-                    # horizontal cursors
                     #if not self.pos().isNull():
                         #self._deltaPos = (newPos - self.pos())
                     self._deltaPos = (newPos - self.pos())
 
-                    # NOTE: 2021-05-05 14:29:12
-                    # reset the X coordinate for horizontal cursors, thus
-                    # restrict movement to vertical direction only
-                    newPos.setX(self.pos().x()) 
-
                     # NOTE: 2021-05-05 14:31:12
-                    # further, restrict vertical movement (i.e. how far can this
+                    # restrict vertical movement (i.e. how far can this
                     # be moved vertically)
                     if newPos.y() < 0:
                         newPos.setY(0.0)
@@ -9516,19 +9481,33 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     elif newPos.y() > state.height:
                         newPos.setY(state.height)
 
-                elif isinstance(self._backend_, CrosshairCursor) or \
-                    self._backend_.type & PlanarGraphicsType.crosshair_cursor:
-                    # crosshair cursors
+                ## crosshair cursors:
+                #elif isinstance(self._backend_, CrosshairCursor) or \ 
+                    #self._backend_.type & PlanarGraphicsType.crosshair_cursor:
+                    ## NOTE: 2021-05-05 14:32:14
+                    ## Allow movement both horizontally and vertically; restrict
+                    ## how far it can move in both directions
+                    ##
+                    #if newPos.x() <= 0.0:
+                        #newPos.setX(0.0)
+                        
+                    #if newPos.x() > state.width:
+                        #newPos.setX(state.width)
+
+                    #if newPos.y() <= 0.0:
+                        #newPos.setY(0.0)
+                        
+                    #if newPos.y() > state.height:
+                        #newPos.setY(state.height)
+                        
+                    #self._deltaPos = (newPos - self.pos()) 
                     
+                # crosshair & point cursors:
+                else: 
                     # NOTE: 2021-05-05 14:32:14
-                    # Allow movement both horiontally and vertically, but restrict
-                    # how far it can moven in both directions
+                    # Allow movement both horizontally and vertically; restrict
+                    # how far it can move in both directions
                     #
-                    # ATTENTION 2021-05-05 14:33:00
-                    # with this logic the lines actually move, but this is not
-                    # what is intended; FIXME restrict the displacement of the
-                    # vertical line in the lateral direction and that of the 
-                    # horizontal line in the vertical direction
                     if newPos.x() <= 0.0:
                         newPos.setX(0.0)
                         
@@ -9541,22 +9520,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     if newPos.y() > state.height:
                         newPos.setY(state.height)
                         
-                    self._deltaPos = (newPos - self.pos()) 
-                    
-                else: # point cursors
-                    if newPos.x() <= 0.0:
-                        newPos.setX(0.0)
-                        
-                    if newPos.x() > state.width:
-                        newPos.setX(state.width)
-
-                    if newPos.y() <= 0.0:
-                        newPos.setY(0.0)
-                        
-                    if newPos.y() > state.height:
-                        newPos.setY(state.height)
-                        
-                    self._deltaPos = (newPos - QtCore.QPointF(state.x, state.y))
+                    self._deltaPos = (newPos - self.pos())
+                    #self._deltaPos = (newPos - QtCore.QPointF(state.x, state.y))
                     
                 # NOTE: 2018-01-18 15:44:28
                 # CAUTION value is already in scene coordinates, so no mapping needed
