@@ -572,11 +572,11 @@ class PlanarGraphics():
         
         _planar_descriptors_ = ("x", "y", "w", "h")
         
-    _graphics_object_type_: a PlanarGraphicsType enum value
+    _planar_graphics_type_: a PlanarGraphicsType enum value
     
         e.g., for a Rect:
         
-        _graphics_object_type_ = PlanarGraphicsType.rectangle
+        _planar_graphics_type_ = PlanarGraphicsType.rectangle
         
     _qt_path_composition_call_: a str with the QPainterPath method name (callable) to be used when
         generating a QPainterPath from this object.
@@ -629,7 +629,7 @@ class PlanarGraphics():
     # to the parametric form of the constructor
     _planar_descriptors_ = () 
     
-    _graphics_object_type_ = None
+    _planar_graphics_type_ = None
     
     _qt_path_composition_call_ = ""
     
@@ -924,7 +924,7 @@ class PlanarGraphics():
         =========================
         *args: either:
             1) sequence of planar descriptors specific to the PlanarGraphics 
-                primitive type, but WITHOUT z_frame (which is specified via 
+                subclass type, but WITHOUT z_frame (which is specified via 
                 the 'frameindex' parameter)
                 
                 The expected order is as specified in the _planar_descriptors_
@@ -940,9 +940,34 @@ class PlanarGraphics():
         These are common to all PlanarGraphics subclasses.
         
         name: str (default None) = the ID of the new object; 
-                when empty, the ID is assigned the name of the planar graphics 
-                type
-            
+                When an empty string or not a string, the ID is assigned the 
+                first letter of the PlanarGraphics  subclass (in lower case).
+                
+                To avoid ambiguities, subclasses should override this rule (as
+                the Cursor subclasses do); 
+                however, it is highly recommended to pass a non-empty string here.
+                
+                The default naming rule is as follows:
+                * for cursors:
+                    CrosshairCursor:    "cc"
+                    HorizontalCursor:   "hc"
+                    PointCursor:        "pc"
+                    VerticalCursor:     "vc"
+                    
+                * for non-cursors:
+                    Arc:                "a"
+                    ArcMove:            "av"
+                    Cubic:              "c"
+                    Ellipse:            "e"
+                    Line:               "l"
+                    Move/Start/Point:   "m"
+                    Path:               "p"
+                        NOTE: this includes polylines and polygons
+                    Quad:               "q"
+                    Rect:               "r"
+                    Text:               "t"
+                    
+                
         frameindex: iterable (tuple, list, or range); default is empty: 
             indices of data frames associated with the PlanarGraphics' states.
             
@@ -990,14 +1015,14 @@ class PlanarGraphics():
         closed: boolean, default False: only used for Path objects
         
         """
+        # NOTE: 2021-05-08 10:07:01 - automatic ID assignment rule
+        # CAUTION: should be overruled in subclasses; better to assign a valid
+        # non-empty string here
+        if name is None or (isinstance(name, str) and len(name.strip()) == 0):
+            name = self.__class__.__name__[0].lower()
         
         #print("PlanarGraphics (%s).__init__ *args" % self.__class__.__name__, *args)
         
-        # NOTE: reverted on 2021-04-30 16:42:24
-        ## consistency - fix up previous API - reverted on 2021-04-30 16:42:16
-        #if "z_frame" not in self.__class__._planar_descriptors_:
-            #self.__class__._planar_descriptors_ = tuple([d for d in self.__class__._planar_descriptors_] + ["z_frame"])
-            
         self.apiversion = (0,3)
             
         # NOTE: 2018-02-09 17:35:42
@@ -1024,14 +1049,14 @@ class PlanarGraphics():
         
         #### BEGIN check and set graphicstype
         # NOTE: 2021-05-03 09:02:59
-        # normally this should be set by the subclass attribute _graphics_object_type_
+        # normally this should be set by the subclass attribute _planar_graphics_type_
         # however, it needs to be specified for Cursor objects - poor design...
         if graphicstype is None:
             if isinstance(self, Cursor): # special treatment here
-                self._graphics_object_type_ = PlanarGraphicsType.crosshair_cursor
+                self._planar_graphics_type_ = PlanarGraphicsType.crosshair_cursor
                     
             else:
-                self._graphics_object_type_ = self.__class__._graphics_object_type_
+                self._planar_graphics_type_ = self.__class__._planar_graphics_type_
         
         elif isinstance(graphicstype, (str, int)):
             graphicstype = PlanarGraphicsType.type(graphicstype)
@@ -1049,7 +1074,7 @@ class PlanarGraphics():
         else:
             raise TypeError("graphicstype expected to be an int, a str, a pictgui.PlanarGraphicsType, or None; got %s instead" % type(graphicstype).__name__)
         
-        self._graphics_object_type_ = graphicstype
+        self._planar_graphics_type_ = graphicstype
                 
         #### END check and set graphicstype
         
@@ -1072,10 +1097,11 @@ class PlanarGraphics():
             self._ID_ = name
             
         else:
-            if isinstance(self._graphics_object_type_, PlanarGraphicsType):
-                self._ID_ = self._graphics_object_type_.name
-            else:
-                self._ID_ = self.__class__.__name__
+            # NOTE: 2021-05-08 10:33:18 new automatic naming rule
+            self._ID_ = self.__class__.__name__[0].lower()
+            #if isinstance(self._planar_graphics_type_, PlanarGraphicsType):
+                #self._ID_ = self._planar_graphics_type_.name
+            #else:
                 
         if not isinstance(self, Cursor):
             self._closed_ = closed
@@ -1113,7 +1139,7 @@ class PlanarGraphics():
                     
                     self._closed_ = src._closed_
                     
-                    self._graphics_object_type_ = src._graphics_object_type_
+                    self._planar_graphics_type_ = src._planar_graphics_type_
                     
                     # NOTE: this may or may NOT point to a valid z_frame;
                     # is does NOT matter here, but only at display time.
@@ -1189,13 +1215,13 @@ class PlanarGraphics():
                 
                 if isinstance(self, Cursor):
                     if graphicstype is None:# or not graphicstype & PlanarGraphicsType.allCursorTypes:
-                        self._graphics_object_type_ = PlanarGraphicsType.crosshair_cursor
+                        self._planar_graphics_type_ = PlanarGraphicsType.crosshair_cursor
                         
                     else:
-                        self._graphics_object_type_ = graphicstype
+                        self._planar_graphics_type_ = graphicstype
                         
                 else:
-                    self._graphics_object_type_ = graphicstype
+                    self._planar_graphics_type_ = graphicstype
                         
         # ### END constructor code
 
@@ -1220,7 +1246,7 @@ class PlanarGraphics():
                                             self._ID_,
                                             framedx,
                                             self.currentFrame,
-                                            self._graphics_object_type_,
+                                            self._planar_graphics_type_,
                                             self.closed,
                                             self._linked_objects_.copy(),
                                             self._position_)
@@ -1231,7 +1257,7 @@ class PlanarGraphics():
                                          self._ID_,
                                          framedx,
                                          self.currentFrame,
-                                         self._graphics_object_type_,
+                                         self._planar_graphics_type_,
                                          False,
                                          self._linked_objects_.copy())
         
@@ -1241,7 +1267,7 @@ class PlanarGraphics():
                                          self._ID_,
                                          framedx,
                                          self.currentFrame,
-                                         self._graphics_object_type_,
+                                         self._planar_graphics_type_,
                                          self.closed,
                                          self._linked_objects_.copy())
         
@@ -1270,7 +1296,7 @@ class PlanarGraphics():
             
     
     def __repr__(self):
-        return " ".join([self.__class__.__name__, ", type:", self._graphics_object_type_.name, ", name:", self._ID_])
+        return " ".join([self.__class__.__name__, ", type:", self._planar_graphics_type_.name, ", name:", self._ID_])
     #"def" __eq__(self, other):
         ## TODO
         
@@ -1961,7 +1987,7 @@ class PlanarGraphics():
             state = self.getState(frame)
         
         if isinstance(state, DataBag) and len(state):
-            ret.append(self.__class__(state.copy(), graphicstype = self._graphics_object_type_))
+            ret.append(self.__class__(state.copy(), graphicstype = self._planar_graphics_type_))
             
         return ret
     
@@ -2009,7 +2035,7 @@ class PlanarGraphics():
                 
             states = self._states_
             ret = self.__class__(states, 
-                                graphicstype=self._graphics_object_type_,
+                                graphicstype=self._planar_graphics_type_,
                                 frameindex=self.frameIndices,
                                 name=self._ID_,
                                 closed=self.closed,
@@ -3145,7 +3171,7 @@ class PlanarGraphics():
         # NOTE: 2020-11-13 12:43:53 re-write
         
         if not self.__class__.validateState(state):
-            warnings.warn("State %s if not valid for this PlanarGraphics %s (%s)" % (state, self.__class__.__name__, self._graphics_object_type_))
+            warnings.warn("State %s if not valid for this PlanarGraphics %s (%s)" % (state, self.__class__.__name__, self._planar_graphics_type_))
             return
         
         #NOTE: 2020-11-13 16:02:53
@@ -4375,7 +4401,7 @@ class PlanarGraphics():
 
     @property
     def type(self):
-        return self._graphics_object_type_
+        return self._planar_graphics_type_
         
     @property
     def frontends(self):
@@ -4394,33 +4420,18 @@ class PlanarGraphics():
 class Cursor(PlanarGraphics):
     """Encapsulates the coordinates of a cursor:
     
-    x, y, width, height, xwindow, ywindow, radius, name, type
+    x, y, width, height, xwindow, ywindow, radius
     
-    where:
     
-    x,y = position of cursor; 
+    see Cursor.__init__() documentation for details
     
-    width, height: the span of the cursor (i.e. size of the region containing
-        valid cursor positions)
-        
-    radius
-    
-    xwindow, ywindow: a window, respectively, around the x and y position
-    
-    z_frame: only relevant for image stacks: the index of the frame where the
-        cursor is defined.
-        
-    type: PlanarGraphicsType.crosshair_cursor, horizontal_cursor, vertical_cursor, point_cursor
-    
-    For 1D cursors (i.e. vertical and horizontal) only the parameters on the direction
-    perpendicular to the cursor are relevant: e..g for a vertical cursor
     """
     
     _planar_descriptors_ = ("x", "y", "width", "height", "xwindow", "ywindow", "radius")
 
     #_planar_descriptors_ = ("x", "y", "width", "height", "xwindow", "ywindow", "radius", "z_frame")
     
-    _graphics_object_type_ = PlanarGraphicsType.vertical_cursor
+    _planar_graphics_type_ = PlanarGraphicsType.vertical_cursor
     
     _qt_path_composition_call_ = None
     
@@ -4428,9 +4439,11 @@ class Cursor(PlanarGraphics):
                  graphicstype=PlanarGraphicsType.crosshair_cursor, closed=False,
                  linked_objects=dict()):
         """
-        Keyword parameters:
-        ===================
-        x, y:               scalars, cursor position (in pixels)
+        Variadic parameters:
+        ====================
+        x, y:               scalars, cursor position (in pixels) - coordinates 
+                            are in the image space; this associates a coordinate
+                            system with origin (0,0) at top left
         
         width, height:      scalars, size of cursor main axis (in pixels) or 
                             None 
@@ -4438,11 +4451,15 @@ class Cursor(PlanarGraphics):
         xwindow, ywindow:   scalars, size of cursor's window 
         
         radius:             scalar, cursor radius (for point cursors) 
+
+        Keyword parameters:
+        ===================
+        These are common to all PlanarGraphics objects.
         
-        name:               str, this cursor's name
-        
-        graphicstype:         PlanarGraphicsType enum value defining a cursor
-                            (see pictgui.PlanarGraphicsType)
+        name:               (optional, default is None) str, this cursor's name
+                            When None, or an empty string, the cursor's name (or 
+                            ID) will be the first letter of the :class: name
+                            
         
         
         At most one of x or y can be None (which one is determined by its
@@ -4451,6 +4468,10 @@ class Cursor(PlanarGraphics):
         When width or height are None, they will use the full size of their 
         corresponding image axes.
         """
+        
+        if name is None or (isinstance(name, str) and len(name.strip()) == 0):
+            name = "cr"
+        
         super().__init__(*args, name=name, frameindex=frameindex, 
                          currentframe=currentframe, 
                          graphicstype=graphicstype, 
@@ -4516,10 +4537,13 @@ class Cursor(PlanarGraphics):
                     #euclid_lengths = [math.sqrt((e1.x -  e0.x) ** 2 + (e1.y - e0.y) ** 2) for (e0,e1) in zip(path[:-1], path[1:])]
 
 class VerticalCursor(Cursor):
-    _graphics_object_type_ = PlanarGraphicsType.vertical_cursor
+    _planar_graphics_type_ = PlanarGraphicsType.vertical_cursor
     
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
                  linked_objects=dict(), **kwargs):
+        
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            name = "vc"
         
         super().__init__(*args, name=name, frameindex=frameindex, 
                          currentframe=currentframe, 
@@ -4545,10 +4569,13 @@ class VerticalCursor(Cursor):
         return path
         
 class HorizontalCursor(Cursor):
-    _graphics_object_type_ = PlanarGraphicsType.horizontal_cursor
+    _planar_graphics_type_ = PlanarGraphicsType.horizontal_cursor
    
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
                  linked_objects=dict(), **kwargs):
+        
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            name = "hc"
         
         super().__init__(*args, name=name, frameindex=frameindex, 
                          currentframe=currentframe, 
@@ -4575,10 +4602,13 @@ class HorizontalCursor(Cursor):
         return path
         
 class CrosshairCursor(Cursor):
-    _graphics_object_type_ = PlanarGraphicsType.crosshair_cursor
+    _planar_graphics_type_ = PlanarGraphicsType.crosshair_cursor
    
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
                  linked_objects=dict(), **kwargs):
+        
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            name = "cc"
         
         super().__init__(*args, name=name, frameindex=frameindex, 
                          currentframe=currentframe, 
@@ -4607,10 +4637,13 @@ class CrosshairCursor(Cursor):
         return path
         
 class PointCursor(Cursor):
-    _graphics_object_type_ = PlanarGraphicsType.point_cursor
+    _planar_graphics_type_ = PlanarGraphicsType.point_cursor
    
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
                  linked_objects=dict(), **kwargs):
+        
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            name = "pc"
         
         super().__init__(*args, name=name, frameindex=frameindex, 
                          currentframe=currentframe, 
@@ -4658,7 +4691,7 @@ class Arc(PlanarGraphics):
     
     #_planar_descriptors_ = ("x", "y", "w", "h", "s", "l", "z_frame")
     
-    _graphics_object_type_ = PlanarGraphicsType.arc
+    _planar_graphics_type_ = PlanarGraphicsType.arc
     
     _qt_path_composition_call_ = "arcTo"
     
@@ -4819,7 +4852,7 @@ class ArcMove(PlanarGraphics):
     """
     _planar_descriptors_ = ("x", "y", "w", "h", "a")
     
-    _graphics_object_type_ = PlanarGraphicsType.arcmove
+    _planar_graphics_type_ = PlanarGraphicsType.arcmove
     
     _qt_path_composition_call_ = "arcMoveTo"
     
@@ -4978,7 +5011,7 @@ class Line(PlanarGraphics):
     # Because lineTo is in fact stored as a single coordinate (x,y) pair,
     # if a Path starts with a line, the intial point on the path is implied to 
     # be a Move(0,0) point
-    _graphics_object_type_ = PlanarGraphicsType.line
+    _planar_graphics_type_ = PlanarGraphicsType.line
     
     _qt_path_composition_call_ = "lineTo"
 
@@ -5051,7 +5084,7 @@ class Move(PlanarGraphics):
     """
     _planar_descriptors_ = ("x", "y")
     
-    _graphics_object_type_ = PlanarGraphicsType.point
+    _planar_graphics_type_ = PlanarGraphicsType.point
     
     _qt_path_composition_call_ = "moveTo"
 
@@ -5137,7 +5170,7 @@ class Cubic(PlanarGraphics):
     """
     _planar_descriptors_ = ("x", "y", "c1x", "c1y", "c2x","c2y")
     
-    _graphics_object_type_ = PlanarGraphicsType.cubic
+    _planar_graphics_type_ = PlanarGraphicsType.cubic
     
     _qt_path_composition_call_ = "cubicTo"
 
@@ -5284,7 +5317,7 @@ class Quad(PlanarGraphics):
     """
     _planar_descriptors_ = ("x", "y", "cx", "cy")
     
-    _graphics_object_type_ = PlanarGraphicsType.quad
+    _planar_graphics_type_ = PlanarGraphicsType.quad
     
     _qt_path_composition_call_ = "quadTo"
 
@@ -5398,7 +5431,7 @@ class Ellipse(PlanarGraphics):
     """
     _planar_descriptors_ = ("x", "y", "w", "h")
     
-    _graphics_object_type_ = PlanarGraphicsType.ellipse
+    _planar_graphics_type_ = PlanarGraphicsType.ellipse
     
     _qt_path_composition_call_ = "addEllipse"
     
@@ -5523,7 +5556,7 @@ class Rect(PlanarGraphics):
     # to the parametric form of the constructor
     _planar_descriptors_ = ("x", "y", "w", "h")
     
-    _graphics_object_type_ = PlanarGraphicsType.rectangle
+    _planar_graphics_type_ = PlanarGraphicsType.rectangle
     
     _qt_path_composition_call_ = "addRect"
 
@@ -5709,7 +5742,7 @@ class Text(PlanarGraphics):
     """
     _planar_descriptors_ = ("text", "x", "y") 
     
-    _graphics_object_type_ = PlanarGraphicsType.text
+    _planar_graphics_type_ = PlanarGraphicsType.text
     
     _qt_path_composition_call_ = ""
     
@@ -5899,7 +5932,7 @@ class Path(PlanarGraphics):
     
     _planar_descriptors_ = () 
     
-    _graphics_object_type_ = PlanarGraphicsType.path
+    _planar_graphics_type_ = PlanarGraphicsType.path
     
     _qt_path_composition_call_ = "addPath"
     
@@ -6006,7 +6039,7 @@ class Path(PlanarGraphics):
                     
                     self._position_ = args[0]._position_
                     
-                    self._graphics_object_type_ = args[0]._graphics_object_type_
+                    self._planar_graphics_type_ = args[0]._planar_graphics_type_
                     
                     return
                         
@@ -6024,17 +6057,17 @@ class Path(PlanarGraphics):
                         
                     if all([isinstance(e, (Move, Line)) for e in self._objects_]):
                         if len(self._objects_) == 2:
-                            self._graphics_object_type_ = PlanarGraphicsType.line
+                            self._planar_graphics_type_ = PlanarGraphicsType.line
                         
                         else:
                             if self._closed_:
-                                self._graphics_object_type_ = PlanarGraphicsType.polygon
+                                self._planar_graphics_type_ = PlanarGraphicsType.polygon
                             
                             else:
-                                self._graphics_object_type_ = PlanarGraphicsType.polyline
+                                self._planar_graphics_type_ = PlanarGraphicsType.polyline
                         
                     else:
-                        self._graphics_object_type_ = PlanarGraphicsType.path
+                        self._planar_graphics_type_ = PlanarGraphicsType.path
                         
                 elif isinstance(args[0], (tuple, list)) and len(args[0]): # construct from one packed iterable
                     # NOTE: clauses for c'tor based on an iterable passed as sole
@@ -6054,17 +6087,17 @@ class Path(PlanarGraphics):
                             
                         #if all([isinstance(e, (Move, Line)) for e in self._objects_]):
                             #if len(self._objects_) == 2:
-                                #self._graphics_object_type_ = PlanarGraphicsType.line
+                                #self._planar_graphics_type_ = PlanarGraphicsType.line
                             
                             #else:
                                 #if self._closed_:
-                                    #self._graphics_object_type_ = PlanarGraphicsType.polygon
+                                    #self._planar_graphics_type_ = PlanarGraphicsType.polygon
                                 
                                 #else:
-                                    #self._graphics_object_type_ = PlanarGraphicsType.polyline
+                                    #self._planar_graphics_type_ = PlanarGraphicsType.polyline
                             
                         #else:
-                            #self._graphics_object_type_ = PlanarGraphicsType.path
+                            #self._planar_graphics_type_ = PlanarGraphicsType.path
                             
                             
                         #if len(self._objects_):
@@ -6094,7 +6127,7 @@ class Path(PlanarGraphics):
                         
                         self._position_ = (x,y)
                         
-                        self._graphics_object_type_ = PlanarGraphicsType.path
+                        self._planar_graphics_type_ = PlanarGraphicsType.path
                         
                 elif isinstance(args[0], QtGui.QPainterPath):
                     for k in range(args[0].elementCount()):
@@ -6128,7 +6161,7 @@ class Path(PlanarGraphics):
                     x = min([o.x for o in self if o is not None])
                     y = min([o.y for o in self if o is not None])
                     self._position_ = (x,y)
-                    self._graphics_object_type_ = PlanarGraphicsType.path
+                    self._planar_graphics_type_ = PlanarGraphicsType.path
                     
             else:
                 if all([isinstance(a, (PlanarGraphics, tuple, list)) for a in args]):
@@ -6177,7 +6210,7 @@ class Path(PlanarGraphics):
                     #for o in self._objects_:
                         #print("Path.__init__ from coord sequence", o._states_)
                     
-                    self._graphics_object_type_ = PlanarGraphicsType.path
+                    self._planar_graphics_type_ = PlanarGraphicsType.path
                     
         if len(self):
             for o in self._objects_:
@@ -6196,7 +6229,7 @@ class Path(PlanarGraphics):
                                         self._ID_, 
                                         self.frameIndices, 
                                         self._currentframe_,
-                                        self._graphics_object_type_, 
+                                        self._planar_graphics_type_, 
                                         self._closed_,
                                         self._linked_objects_.copy(),
                                         self._position_)
@@ -7496,7 +7529,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     backend automatically
     
     b) constructing a PlanarGraphics object then displaying it in a scene (by 
-    calling the appropriate addGraphicsObject method in ImageViewer) will generate
+    calling the appropriate addPlanarGraphics method in ImageViewer) will generate
     a GraphicsObject frontend in that image viewer's scene.
     
     From the GUI, the user can manipulate the frontend directly (mouse and key
@@ -7673,7 +7706,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         # NOT: 2017-11-24 22:30:00
         # assign this early
         # this MAY be overridden in __parse_parameters__
-        #self._graphics_object_type_ = objectType # an int or enum !!!
+        #self._planar_graphics_type_ = objectType # an int or enum !!!
         
 
         # NOTE: 2018-01-17 15:33:58
@@ -7803,10 +7836,10 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         """Creates the _graphicsShapedItem, an instance of QGraphicsItem.
         Used only by non-cursor types, after exit from build mode.
         Relies on self._cachedPath_ which is a PlanarGraphics Path object. Therefore
-        if makes inferences from self._graphics_object_type_ and the number of elements in
+        if makes inferences from self._planar_graphics_type_ and the number of elements in
         self._cachedPath_
         """
-        #if self._graphics_object_type_ & PlanarGraphicsType.allCursorTypes:
+        #if self._planar_graphics_type_ & PlanarGraphicsType.allCursorTypes:
         if isinstance(self._backend_, Cursor):
             # NOTE: do NOT use _graphicsShapedItem for cursors !!!
             return
@@ -7814,20 +7847,20 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         else:#FIXME in build mode there is no _backend_; we create it here from the cached path
             #NOTE: for non-cursors, cachedPath is generated in build mode, or in
             #NOTE:  __parse_parameters__()
-            # FIXME 2021-05-05 10:03:09 _graphics_object_type_ it NOT used anymore!
+            # FIXME 2021-05-05 10:03:09 _planar_graphics_type_ it NOT used anymore!
             if len(self._cachedPath_):
                 if self._backend_ is None:
                     # NOTE: 2018-01-23 20:20:38
                     # needs to create particular backends for Rect and Ellipse
                     # because self._cachedPath_ is a generic Path object
                     # (see __parse_parameters__)
-                    if self._graphics_object_type_ == PlanarGraphicsType.rectangle:
+                    if self._planar_graphics_type_ == PlanarGraphicsType.rectangle:
                         self._backend_ = Rect(self._cachedPath_[0].x,
                                              self._cachedPath_[0].y,
                                              self._cachedPath_[1].x-self._cachedPath_[0].x,
                                              self._cachedPath_[1].y-self._cachedPath_[0].y)
                         
-                    elif self._graphics_object_type_ == PlanarGraphicsType.ellipse:
+                    elif self._planar_graphics_type_ == PlanarGraphicsType.ellipse:
                         self._backend_ = Ellipse(self._cachedPath_[0].x,
                                                 self._cachedPath_[0].y,
                                                 self._cachedPath_[1].x-self._cachedPath_[0].x,
@@ -8855,7 +8888,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             
                             painter.drawEllipse(r_)
 
-                        #elif self._graphics_object_type_ == PlanarGraphicsType.rectangle:
+                        #elif self._planar_graphics_type_ == PlanarGraphicsType.rectangle:
                         elif isinstance(self._backend_, Rect):
                             r_ = self.mapRectFromScene(self._backend_.x,
                                                        self._backend_.y,
@@ -8864,7 +8897,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             
                             painter.drawRect(r_)
                                                                             
-                        #elif self._graphics_object_type_ == PlanarGraphicsType.point:
+                        #elif self._planar_graphics_type_ == PlanarGraphicsType.point:
                         elif self._backend_.type & PlanarGraphicsType.point:
                             p_ = self.mapFromScene(self._backend_.x,
                                                    self._backend_.y)
@@ -9188,7 +9221,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             if self.objectType == PlanarGraphicsType.allShapeTypes and \
                 len(self._cachedPath_) == 0:
                 # before adding first point, cheeck key modifiers and set
-                # self._graphics_object_type_ accordingly
+                # self._planar_graphics_type_ accordingly
                 
                 # NOTE: 2018-01-23 22:41:05
                 # ATTENTION: do not delete commented-out "mods" code -- for debugging
@@ -9197,35 +9230,35 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 
                 if evt.modifiers() == QtCore.Qt.ShiftModifier: 
                     ###SHIFT => rectangle
-                    self._graphics_object_type_ = PlanarGraphicsType.rectangle
+                    self._planar_graphics_type_ = PlanarGraphicsType.rectangle
                     mods = "shift"
                     
                 elif evt.modifiers() == QtCore.Qt.ControlModifier: 
                     ###CTRL => ellipse
-                    self._graphics_object_type_ = PlanarGraphicsType.ellipse
+                    self._planar_graphics_type_ = PlanarGraphicsType.ellipse
                     mods = "ctrl"
                     
                 elif evt.modifiers() ==  QtCore.Qt.AltModifier: 
                     ###ALT => path
-                    self._graphics_object_type_ = PlanarGraphicsType.path
+                    self._planar_graphics_type_ = PlanarGraphicsType.path
                     mods = "alt"
                 
                 elif evt.modifiers() == (QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier):
                     ###CTRL+SHIFT => polygon
-                    self._graphics_object_type_ = PlanarGraphicsType.polygon
+                    self._planar_graphics_type_ = PlanarGraphicsType.polygon
                     mods = "ctrl+shift"
                     
                 elif evt.modifiers() == (QtCore.Qt.AltModifier | QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier):
                     ###ALt+CTRL+SHIFT => point
                     mods = "alt+=ctrl+shift"
-                    self._graphics_object_type_ = PlanarGraphicsType.point
+                    self._planar_graphics_type_ = PlanarGraphicsType.point
                     
                 else: 
                     if evt.modifiers() == QtCore.Qt.NoModifier:
                         mods = "none"
                         
                     ###anything else, or no modifiers => line
-                    self._graphics_object_type_ = PlanarGraphicsType.line
+                    self._planar_graphics_type_ = PlanarGraphicsType.line
             
                 #print("press at: ", evt.pos(), " mods: ", mods)
                 
@@ -9616,7 +9649,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 mods = "none"
                 
             #print("release at: ", evt.pos(), " mods: ", mods)
-            #print("obj type: ", self._graphics_object_type_)
+            #print("obj type: ", self._planar_graphics_type_)
             
             if self._curveBuild_:
                 if self._control_points[1] is None: # we allow mod of 1st cp when there is no 2nd cp

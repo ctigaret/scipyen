@@ -26,84 +26,6 @@ class ContextExecutor(ContextDecorator):
     def __exit__(self, *exc):
         return False
     
-#class NeoPatchCtx(ContextDecorator):
-    ##from core import patchneo as patchneo
-    ##from core import neoevent as neoevent
-    ##from core import neoepoch as neoepoch
-    
-    ##import core.patchneo as patchneo
-    ##import core.neoevent as neoevent
-    ##import core.neoepoch as neoepoch
-    
-    #_new_AnalogSignalArray_orig_ = neo.core.analogsignal._new_AnalogSignalArray
-    #_new_IrregularlySampledSignal_orig_ = neo.core.irregularlysampledsignal._new_IrregularlySampledSignal
-    #_new_spiketrain_orig_ = neo.core.spiketrain._new_spiketrain
-    
-    #_new_event_orig_ = neo.core.event._new_event
-    #Event_orig = neo.core.event.Event
-    #Epoch_orig = neo.core.epoch.Epoch
-    
-    #_normalize_array_annotations_orig_ = neo.core.dataobject._normalize_array_annotations
-    
-    #def __init__(self):
-        ##print("NeoPatchCtx: sys.path =", sys.path)
-        ##self.sys_path = sys.path
-        #self.scipyen_path = pathlib.Path(sys.path[0])
-        
-    #def __enter__(self):
-        #self.neo_patches = load_patch_modules(self.scipyen_path, "neoevent", "neoepoch", "patchneo")
-        
-        #neo.core.dataobject._normalize_array_annotations = self.neo_patches["patchneo"]._normalize_array_annotations
-        #neo.core.analogsignal._new_AnalogSignalArray = self.neo_patches["patchneo"]._new_AnalogSignalArray_v1
-        #neo.core.spiketrain._new_spiketrain = self.neo_patches["patchneo"]._new_spiketrain_v1
-        #neo.core.irregularlysampledsignal._new_IrregularlySampledSignal = self.neo_patches["patchneo"]._new_IrregularlySampledSignal_v1
-        
-        #neo.core.event._new_event = self.neo_patches["neoevent"]._new_event
-        #neo.core.event.Event = self.neo_patches["neoevent"].Event
-        #neo.core.Event = self.neo_patches["neoevent"].Event
-        #neo.io.axonio.Event = self.neo_patches["neoevent"].Event
-        #neo.Event = self.neo_patches["neoevent"].Event
-        
-        #neo.core.epoch.Epoch = self.neo_patches["neoepoch"].Epoch
-        #neo.core.Epoch = self.neo_patches["neoepoch"].Epoch
-        #neo.Epoch = self.neo_patches["neoepoch"].Epoch
-        
-        #return self
-
-    #def __exit__(self, *exc):
-        ##print ("NeoPatchCtx.__exit__: patchneo in sys.modules =", "patchneo" in sys.modules)
-        #neo.core.dataobject._normalize_array_annotations = self._normalize_array_annotations_orig_
-        
-        #neo.core.analogsignal._new_AnalogSignalArray = self._new_AnalogSignalArray_orig_
-        #neo.core.spiketrain._new_spiketrain = self._new_spiketrain_orig_
-        #neo.core.irregularlysampledsignal._new_IrregularlySampledSignal = self._new_IrregularlySampledSignal_orig_
-        
-        #neo.core.event._new_event = self.Event_orig
-        #neo.core.event.Event = self.Event_orig
-        #neo.core.Event = self.Event_orig
-        #neo.io.axonio.Event = self.Event_orig
-        #neo.Event = self.Event_orig
-        #neo.core.event._new_event = self._new_event_orig_
-        
-        #neo.core.epoch.Epoch = self.Epoch_orig
-        #neo.core.Epoch = self.Epoch_orig
-        #neo.Epoch = self.Epoch_orig
-        
-        #for mname in self.neo_patches:
-            #if mname in sys.modules:
-                #del sys.modules[mname]
-        
-        ##if "neoevent" in sys.modules:
-            ##del sys.modules["neoevent"]
-        
-        ##if "neoepoch" in sys.modules:
-            ##del sys.modules["neoepoch"]
-        
-        ##if "patchneo" in sys.modules:
-            ##del sys.modules["patchneo"]
-
-        #return False
-    
 class Timer(object):
     """Recipe 13.13 "Making a Stopwatch Timer" in Python Cookbook 3rd Ed. 2013
     """
@@ -250,6 +172,107 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
     traceback.print_stack(file=log)
     log.write(warnings.formatwarning(message, category, filename, lineno, line))
     
+def deprecation(msg):
+    warnings.warn(msg, DeprecationWarning, stacklevel=2)
+    
+def iter_attribute(iterable:typing.Iterable, attribute:str, silentfail:bool=True)-> typing.Iterator:
+    """Iterator accessing the specified attribute of the elements in 'iterable'.
+    Elements lacking the specified attribute yield None, unless 'silentfail' is 
+    False.
+    
+    Positional parameters:
+    ======================
+    iterable: An iterable
+
+    attribute:str The name of the attribute that is sought
+
+    silentfail:bool, optional (default is True)
+        When True, elements that lack the attribute yield None; otherwise, an
+        AttributeError is raised when such an element is found in 'iterable'.
+    """
+    if silentfail:
+        return (getattr(item, attribute, None) for item in iterable)
+    else:
+        return (getattr(item, attribute) for item in iterable)
+    
+def filter_type(iterable:typing.Iterable, klass:typing.Type) -> typing.Iterator:
+    """Iterates elements of 'iterable' that are of type specified by 'klass'
+    
+    Parameters:
+    ===========
+    iterable: An iterable
+    klass: a type
+    """
+    return filter(lambda x: isinstance(x, klass), iterable)
+
+def filterfalse_type(iterable:typing.Iterable, klass:typing.Type) -> typing.Iterator:
+    """The negated version of filter_type.
+    Iterates elements that are NOT of type specified in 'klass'
+
+    Parameters:
+    ===========
+    iterable: An iterable
+    klass: a type
+    """
+    return filter(lambda x: not isinstance(x, klass), iterable)
+
+
+def filter_attribute(iterable:typing.Iterable,attribute:str, value:typing.Any, 
+                     predicate:typing.Callable[...,bool]=lambda x,y: x==y,
+                     silentfail:bool=True) -> typing.Iterator:
+    """Iterates elements in 'iterable' for which 'attribute' satisfies 'predicate'.
+    
+    Positional parameters:
+    ======================
+    iterable: an iterable
+    
+    attribute: str - The name of the attribute of the elements in iterable
+    
+    value: object - the value against which the attribute value is compared
+    
+    predicate: binary callable taking two parans returning bool
+        Optional; by default this is lambda x,y: x == y
+        With x being the element attribute value and y being the value compared 
+        against
+        
+    silentfail:bool Optional, default is True.
+        When True, yield None if 'attribute' is not found in elements of 'iterable';
+        otherwise, raise AttributeError
+        
+    """
+    return filter(lambda x: predicate(getattr(x, attribute, None) if silentfail else getattr(x, attribute),
+                                      value), iterable)
+    
+def filterfalse_attribute(iterable:typing.Iterable, attribute:str, value:typing.Any, 
+                     predicate:typing.Callable[...,bool]=lambda x,y: x==y,
+                     silentfail:bool=True) -> typing.Iterator:
+    """The negated version of filter_attribute.
+    Iterates elements in 'iterable' for which 'attribute' does NOT satisfy 'predicate'.
+    Positional parameters:
+    ======================
+    iterable: an iterable
+    
+    attribute: str - The name of the attribute of the elements in iterable
+    
+    value: object - the value against which the attribute value is compared
+    
+    predicate: binary callable taking two parans returning bool
+        Optional; by default this is lambda x,y: x == y
+        With x being the element attribute value and y being the value compared 
+        against
+        
+    silentfail:bool Optional, default is True.
+        When True, yield None if 'attribute' is not found in elements of 'iterable';
+        otherwise, raise AttributeError
+        
+    silentfail:bool Optional, default is True.
+        When True, yield None if 'attribute' is not found in elements of 'iterable';
+        otherwise, raise AttributeError
+        
+    """
+    return filter(lambda x: not predicate(getattr(x, attribute, None) if silentfail else getattr(x, attribute),
+                                          value), iterable)
+    
 # ### END module functions
 
 # ### BEGIN Decorators
@@ -266,8 +289,6 @@ def deprecated(f, *args, **kwargs):
             
     return wrapper
     
-    
-
 #NOTE: 2017-11-22 22:00:40 FIXME TODO
 # for pyqtSlots, place this AFTER the @pyqtSlot decorator
 def safeWrapper(f, *args, **kwargs):

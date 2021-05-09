@@ -8571,7 +8571,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
         for w in self.scansviewers:
             if w != win:
-                w.addGraphicsObject(obj, label=obj.name, labelShowsPosition=False)
+                w.addPlanarGraphics(obj, label=obj.name, labelShowsPosition=False)
                 
         for f in obj.frontends:
             f.labelShowsPosition = False
@@ -8584,7 +8584,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             if pc:
                 for w in self.sceneviewers:
                     if w != win:
-                        pcobj = w.addGraphicsObject(pc, label = pc.name,
+                        pcobj = w.addPlanarGraphics(pc, label = pc.name,
                                                 labelShowsPosition=False)
                         
                         if (pcobj is not None):
@@ -8967,7 +8967,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             
         for w in windows:
             if w != win:
-                w.addGraphicsObject(obj, label=obj.name, labelShowsPosition=False)
+                w.addPlanarGraphics(obj, label=obj.name, labelShowsPosition=False)
         
         # by now, obj has at least one frontend
         for f in obj.frontends:
@@ -8998,7 +8998,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 if pc:
                     for w in self.sceneviewers:
                         if w != win:
-                            pcobj = w.addGraphicsObject(pc, label = pc.name,
+                            pcobj = w.addPlanarGraphics(pc, label = pc.name,
                                                     labelShowsPosition=False)
                             
                             if (pcobj is not None):
@@ -10059,7 +10059,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
 
                 if len(self._data_.scanRegion.frontends) == 0:
                     for win in self.sceneviewers:
-                        win.addGraphicsObject(self._data_.scanRegion,
+                        win.addPlanarGraphics(self._data_.scanRegion,
                                               showLabel=False,
                                               movable=False,
                                               editable=False,
@@ -11225,7 +11225,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 if len(obj.frontends):
                     obj.frontends.clear
                 
-                win.addGraphicsObject(obj, showLabel=False, 
+                win.addPlanarGraphics(obj, showLabel=False, 
                                         movable=False, 
                                         editable=False,
                                         labelShowsPosition=False)
@@ -11305,7 +11305,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                     #print("_display_graphics_objects_ obj", obj)
                     if len(obj.frontends) == 0:
                         for k, win in enumerate(windows):
-                            gobj = win.addGraphicsObject(obj, labelShowsPosition=False)
+                            gobj = win.addPlanarGraphics(obj, labelShowsPosition=False)
                             
                             if gobj is not None:# it may be None if there is no image displayed in the window
                                 gobj.setTransparentLabel(transparent_label)
