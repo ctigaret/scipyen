@@ -9125,48 +9125,18 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 
                 # See NOTE: 2021-05-04 15:49:24 for the old style type checks below
                 # vertical cursors:
-                if isinstance(self._backend_, VerticalCursor) or \
-                    self._backend_.type & PlanarGraphicsType.vertical_cursor:
+                if value.x() <= 0.0:
+                    value.setX(0.0)
+                    
+                if value.x() > state.width:
+                    value.setX(state.width)
 
-                    # NOTE: 2021-05-05 14:30:40
-                    # restrict how far this can move laterally 
-                    # (horizontally)
-                    if value.x() < 0:
-                        value.setX(0.0)
-                        
-                    elif value.x() > state.width:
-                        value.setX(state.width)
-                        
-                # horizontal cursors:
-                elif isinstance(self._backend_, HorizontalCursor) or \
-                    self._backend_.type & PlanarGraphicsType.horizontal_cursor:
-
-                    # NOTE: 2021-05-05 14:31:12
-                    # restrict vertical movement (i.e. how far can this
-                    # be moved vertically)
-                    if value.y() < 0:
-                        value.setY(0.0)
-                        
-                    elif value.y() > state.height:
-                        value.setY(state.height)
-
-                # crosshair & point cursors:
-                else: 
-                    # NOTE: 2021-05-05 14:32:14
-                    # Allow movement both horizontally and vertically; restrict
-                    # how far it can move in both directions
-                    #
-                    if value.x() <= 0.0:
-                        value.setX(0.0)
-                        
-                    if value.x() > state.width:
-                        value.setX(state.width)
-
-                    if value.y() <= 0.0:
-                        value.setY(0.0)
-                        
-                    if value.y() > state.height:
-                        value.setY(state.height)
+                if value.y() <= 0.0:
+                    value.setY(0.0)
+                    
+                if value.y() > state.height:
+                    value.setY(state.height)
+                    
                         
             # NOTE: 2018-01-18 15:44:28
             # 'value' is already in scene coordinates, so no mapping needed here
