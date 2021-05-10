@@ -8561,7 +8561,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         # - else return
         win = self.scansviewers[0]
         
-        frontend_obj = win.viewerWidget.createNewCursor(pgui.GraphicsObjectType.vertical_cursor, autoSelect=True)
+        frontend_obj = win.viewerWidget.newGraphicsObject(pgui.VerticalCursor)
+        #frontend_obj = win.viewerWidget.createNewCursor(pgui.GraphicsObjectType.vertical_cursor, autoSelect=True)
         
         obj = frontend_obj.backend # the added pictgui.Cursor
         

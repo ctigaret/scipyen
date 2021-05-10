@@ -634,7 +634,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     signalCursorAdded         = pyqtSignal(object, name="signalCursorAdded")
     signalCursorChanged       = pyqtSignal(object, name="signalCursorChanged")
     signalCursorRemoved       = pyqtSignal(object, name="signalCursorRemoved")
-    signalCursorSelected      = pyqtSignal(object, name="signalCursorSelected")
+    signalGraphicsObjectSelected      = pyqtSignal(object, name="signalGraphicsObjectSelected")
     signalRoiAdded            = pyqtSignal(object, name="signalRoiAdded")
     signalRoiChanged          = pyqtSignal(object, name="signalRoiChanged")
     signalRoiRemoved          = pyqtSignal(object, name="signalRoiRemoved")
@@ -743,56 +743,54 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.signalZoomChanged[float].emit(self.__zoomVal__)
         
     def _cursorEditor(self, crsId=None):
-        if len(self.__cursors__) == 0:
+        if len([o for o in self.cursors]) == 0:
             return
         
         if crsId is None:
-            cselectDlg = pgui.ItemsListDialog(self, sorted([cId for cId in self.__cursors__.keys()]), "Select cursor")
+            cselectDlg = pgui.ItemsListDialog(self, sorted([c.name for c in self.cursors]), "Select cursor")
             
             a = cselectDlg.exec_()
             
             if a == QtWidgets.QDialog.Accepted:
-                crsId = cselectDlg.selectedItemText
+                crsId = cselectDlg._selectedItemText_
             else:
                 return
         
-        cursor = self.__cursors__[crsId]
+        cursor = [o for o in filter(lambda x: isinstance(x.backend, pgui.Cursor) and x.backend.name == crsId, self.graphicsObjects)]
         
-        cursor_type = cursor.objectType
+        if len(cursor) == 0:
+            return
         
-        cDict = self._graphicsObjects_[cursor_type]
+        cursor = cursor[0]
         
         d = quickdialog.QuickDialog(self, "Edit cursor %s" % cursor.name)
-        #d = vigra.pyqt.quickdialog.QuickDialog(self, "Edit cursor %s" % cursor.name)
+
         d.promptWidgets = list()
         
         namePrompt = quickdialog.StringInput(d, "New label:")
-        #namePrompt = vigra.pyqt.quickdialog.StringInput(d, "New label:")
         namePrompt.variable.setClearButtonEnabled(True)
         namePrompt.variable.redoAvailable=True
         namePrompt.variable.undoAvailable=True
-        namePrompt.setText(cursor.ID)
+        namePrompt.setText(crsId)
         
         d.promptWidgets.append(namePrompt)
         
         showsPositionCheckBox = quickdialog.CheckBox(d, "Label shows position")
-        #showsPositionCheckBox = vigra.pyqt.quickdialog.CheckBox(d, "Label shows position")
         showsPositionCheckBox.setChecked(cursor.labelShowsPosition)
         
         
         d.promptWidgets.append(showsPositionCheckBox)
         
         showsOpaqueLabel = quickdialog.CheckBox(d, "Opaque label")
-        #showsOpaqueLabel = vigra.pyqt.quickdialog.CheckBox(d, "Opaque label")
         showsOpaqueLabel.setChecked(not cursor.hasTransparentLabel)
         
         d.promptWidgets.append(showsOpaqueLabel)
         
         # NOTE: 2021-05-04 15:53:58
-        # old tyle type checks basd on PlanarGraphicsrtype kept for backward compatibility
-        if isinstance(cursor.backend, pgui.VerticalCursor) or (isinstance(cursor.backend, pgui.PlanarGeraphics) and cursor.backend.type & pgui.PlanarGraphicsType.vertical_cursor):
+        # old style type checks based on PlanarGraphicsrtype kept for backward compatibility
+        # NOTE: 2021-05-10 14:27:11 transition to complete removal or PlanarGraphicsType enum
+        if isinstance(cursor.backend, pgui.VerticalCursor):
             promptX = quickdialog.FloatInput(d, "X coordinate (pixels):")
-            #promptX = vigra.pyqt.quickdialog.FloatInput(d, "X coordinate (pixels):")
             promptX.variable.setClearButtonEnabled(True)
             promptX.variable.redoAvailable=True
             promptX.variable.undoAvailable=True
@@ -800,16 +798,14 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             d.promptWidgets.append(promptX)
         
             promptXWindow = quickdialog.FloatInput(d, "Horizontal window size (pixels):")
-            #promptXWindow = vigra.pyqt.quickdialog.FloatInput(d, "Horizontal window size (pixels):")
             promptXWindow.variable.setClearButtonEnabled(True)
             promptXWindow.variable.redoAvailable=True
             promptXWindow.variable.undoAvailable=True
             promptXWindow.setValue(cursor.xwindow)
             d.promptWidgets.append(promptXWindow)
             
-        elif isinstance(cursor.backend, pgui.HorizontalCursor) or (isinstance(cursor.backend, pgui.PlanarGeraphics) and cursor.backend.type & pgui.PlanarGraphicsType.horizontal_cursor):
+        elif isinstance(cursor.backend, pgui.HorizontalCursor):
             promptY = quickdialog.FloatInput(d, "Y coordinate (pixels):")
-            #promptY = vigra.pyqt.quickdialog.FloatInput(d, "Y coordinate (pixels):")
             promptY.variable.setClearButtonEnabled(True)
             promptY.variable.redoAvailable=True
             promptY.variable.undoAvailable=True
@@ -817,7 +813,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             d.promptWidgets.append(promptY)
             
             promptYWindow = quickdialog.FloatInput(d, "Vertical window size (pixels):")
-            #promptYWindow = vigra.pyqt.quickdialog.FloatInput(d, "Vertical window size (pixels):")
             promptYWindow.variable.setClearButtonEnabled(True)
             promptYWindow.variable.redoAvailable=True
             promptYWindow.variable.undoAvailable=True
@@ -826,7 +821,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
         else: # crosshair / point cursors
             promptX = quickdialog.FloatInput(d, "X coordinate:")
-            #promptX = vigra.pyqt.quickdialog.FloatInput(d, "X coordinate:")
             promptX.variable.setClearButtonEnabled(True)
             promptX.variable.redoAvailable=True
             promptX.variable.undoAvailable=True
@@ -834,7 +828,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             d.promptWidgets.append(promptX)
             
             promptXWindow = quickdialog.FloatInput(d, "Horizontal window size:")
-            #promptXWindow = vigra.pyqt.quickdialog.FloatInput(d, "Horizontal window size:")
             promptXWindow.variable.setClearButtonEnabled(True)
             promptXWindow.variable.redoAvailable=True
             promptXWindow.variable.undoAvailable=True
@@ -842,7 +835,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             d.promptWidgets.append(promptXWindow)
             
             promptY = quickdialog.FloatInput(d, "Y coordinate:")
-            #promptY = vigra.pyqt.quickdialog.FloatInput(d, "Y coordinate:")
             promptY.variable.setClearButtonEnabled(True)
             promptY.variable.redoAvailable=True
             promptY.variable.undoAvailable=True
@@ -850,16 +842,13 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             d.promptWidgets.append(promptY)
             
             promptYWindow = quickdialog.FloatInput(d, "Vertical window size:")
-            #promptYWindow = vigra.pyqt.quickdialog.FloatInput(d, "Vertical window size:")
             promptYWindow.variable.setClearButtonEnabled(True)
             promptYWindow.variable.redoAvailable=True
             promptYWindow.variable.undoAvailable=True
             promptYWindow.setValue(cursor.ywindow)
             d.promptWidgets.append(promptYWindow)
                 
-        
         framesWhereVisible = quickdialog.StringInput(d, "Visible frames:")
-        #framesWhereVisible = vigra.pyqt.quickdialog.StringInput(d, "Visible frames:")
         framesWhereVisible.setToolTip("Enter comma-separated list of visible frames, the keyword 'all', or 'range(start,[stop,[step]]')")
         framesWhereVisible.setWhatsThis("Enter comma-separated list of visible frames, the keyword 'all', or 'range(start,[stop,[step]]')")
         
@@ -888,15 +877,11 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         d.promptWidgets.append(framesWhereVisible)
         
         linkToFramesCheckBox = quickdialog.CheckBox(d, "Link position to frame number")
-        #linkToFramesCheckBox = vigra.pyqt.quickdialog.CheckBox(d, "Link position to frame number")
-        
-        #linkToFramesCheckBox.setChecked( not cursor.backend.hasCommonState)
         linkToFramesCheckBox.setChecked( len(cursor.backend.states) > 1)
         
         d.promptWidgets.append(linkToFramesCheckBox)
         
         for w in d.promptWidgets:
-            #if not isinstance(w, vigra.pyqt.quickdialog.CheckBox):
             if not isinstance(w, quickdialog.CheckBox):
                 w.variable.setClearButtonEnabled(True)
                 w.variable.redoAvailable=True
@@ -909,23 +894,23 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
             if newName is not None and len(newName.strip()) > 0:
                 if newName != old_name:
-                    if newName in cDict:
+                    if newName in [o.name for o in self.cursors]:
                         QtWidgets.QMessageBox.critical(self, "Cursor name clash", "A cursor named %s already exists" % newName)
                         return
                     
-            if cursor.isVerticalCursor:
-                cursor.x = promptX.value()
-                cursor.xwindow = promptXWindow.value()
+            if isinstance(cursor.backend, pgui.VerticalCursor) or cursor.backend.type & pgui.PlanarGraphicsType.vertical_cursor:
+                cursor.backend.x = promptX.value()
+                cursor.backend.xwindow = promptXWindow.value()
                 
-            elif cursor.isHorizontalCursor:
-                cursor.y = promptY.value()
-                cursor.ywindow = promptYWindow.value()
+            elif isinstance(cursor.backend, pgui.HorizontalCursor) or cursor.backend.type & pgui.PlanarGraphicsType.horizontal_cursor:
+                cursor.backend.y = promptY.value()
+                cursor.backend.ywindow = promptYWindow.value()
 
             else:
-                cursor.x = promptX.value()
-                cursor.y = promptY.value()
-                cursor.xwindow = promptXWindow.value()
-                cursor.ywindow = promptYWindow.value()
+                cursor.backend.x = promptX.value()
+                cursor.backend.y = promptY.value()
+                cursor.backend.xwindow = promptXWindow.value()
+                cursor.backend.ywindow = promptYWindow.value()
         
             cursor.labelShowsPosition = showsPositionCheckBox.selection()
             
@@ -936,19 +921,12 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
             txt = framesWhereVisible.text()
             
-            #print("txt", txt)
-            
-            #print("GraphicsImageViewerWidget._cursorEditor imageViewer:", self.__image_viewer__)
-            
             if len(txt.strip()) == 0:
                 newFrames = []
                 
             elif txt.strip().lower() == "all":
                 if self.__image_viewer__ is not None:
-                    #print("GraphicsImageViewerWidget._cursorEditor imageViewer.nFrames:", self.__image_viewer__.nFrames)
-                    
                     newFrames = [f for f in range(self.__image_viewer__.nFrames)]
-                    
                 else:
                     newFrames = []
                 
@@ -976,11 +954,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 except Exception as e:
                     traceback.print_exc()
                     
-            #print(newFrames)
-                    
             linkToFrames = linkToFramesCheckBox.selection()
-            
-            #print(linkToFrames)
             
             if linkToFrames:
                 cursor.frameVisibility = newFrames
@@ -988,16 +962,10 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 cursor.backend.linkFrames(newFrames)
                 
             else:
-                # no frame linking required
                 cursor.frameVisibility = []
             
             cursor.backend.name = newName
             
-            if old_name != cursor.name:
-                cDict = self._graphicsObjects_[cursor.objectType]
-                cDict.pop(old_name, None)
-                cDict[cursor.name] = cursor
-                
             self.signalCursorChanged.emit(cursor.backend)
 
         self._cursorContextMenuSourceId = None
@@ -1202,11 +1170,67 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
         return roi
     
-    def newPlanarGraphics(self, item:typing.Optional[pgui.PlanarGraphics]=None, movable=True,
-                          editable=True, showLabel=True, labelShowsPosition=True,
-                          autoSelect=False):
+    def newGraphicsObject(self, item:typing.Optional[typing.Union[pgui.PlanarGraphics, type]], 
+                          movable=True, editable=True, showLabel=True, 
+                          labelShowsPosition=True, autoSelect=False) -> typing.Optional[pgui.GraphicsObject]:
+        """Creates a GraphicsObject that represents a PlanarGraphics for display.
+        
+        The object is created by either:
+        1) passing a PlanarGraphics (e.g. constructed in separate code then 
+           passed to this function call as the 'item' parameter).
+           
+           NOTE: This is the way to parametrically create a GraphicsObject:
+           create the PlanarGraphics 'backend' first, then use it to construct
+           the GraphicsObject 'frontend' which will be added to the scene.
+           
+        2) using GUI interaction (mouse events with key modifiers): here, a
+            GraphicsObject is constructed in "buildMode", which will create its
+            own 'backend'; the management of mouse events (and associated key 
+            modifiers) is taken care of by the GraphicsObject :class:.
+            
+            In this case, the type of the PlanarGraphics 'backend' is specified
+            by passing its :class: as the 'item' parameter.
+            
+            To keep things simple, all GraphicsObject/PlanarGraphics constructed
+            via GUI will get a default name as specified by the concrete 'backend'
+            type, will be visible in all available frames, and their 'currentFrame'
+            attribute will be set to the current frame of the viewer, or 0 (zero).
+            
+        Parameters:
+        ===========
+        
+        item: a pgui.PlanarGraphics object, or a :class: object that is a
+            concrete subclass of pgui.PlanarGraphics.
+            
+        movable:bool, optional (default is True)
+            When True, the user can move the object in the scene using the mouse
+            
+        editable:bool, optional (default is True)
+            When True, the user can edit the object (and indirectly its 'backend' 
+            shape) using mouse actions and associated key modifiers
+            
+        labelShowsPosition:bool optional (default is True)
+            When True, the displayed label also shows the object's position.
+            
+            This is mostly useful for cursors, where is displays:
+            the 'x' coordinate for Vertical cursors
+            the 'y' coordinate for Horizontal cursors
+            the 'x,y' coordinates pair for Crosshair and Point cursors
+            
+            NOTE: The coordinate values are NOT calibrated (i.e. they are in pixels)
+            
+            ATTENTION: To avoid clutter, this parameter should be set to False
+                for non-cursor PlanarGraphics.
+                
+        autoSelect:bool, optional (default is True)
+            When True, the GraphicsObject will be selected after adding to the
+            scene.
+            
+        """
         if self.__scene__.rootImage is None:
             return
+        
+        qobj = None
         
         if isinstance(self.__image_viewer__, ImageViewer):
             parentWidget = self.__image_viewer__
@@ -1230,447 +1254,525 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 if item.x > maxWidth:
                     item.x  = maxWidth
                     
-            pgui.GraphicsObject(obj=item, showLabel=showLabel, 
-                                      labelShowsPosition = labelShowsPosition,
-                                      parentWidget = parentWidget)
+            qobj = pgui.GraphicsObject(obj=item, showLabel=showLabel, 
+                                       labelShowsPosition = labelShowsPosition,
+                                       parentWidget = parentWidget)
             
-            self._planargraphics_.append(item)
-
         elif isinstance(item, type) and pgui.PlanarGraphics in item.__mro__:
-            if pgui.Cursor in item.__mro__:
-                def_x = np.floor(self.__scene__.rootImage.boundingRect().center().x())
-                def_y = np.floor(self.__scene__.rootImage.boundingRect().center().y())
-
-                currentTopLabelText = self._topLabel.text()
-                
-                self._topLabel.setText(currentTopLabelText + " Double-click left mouse button for cursor position")
-                
-                #currentCursor = super(GraphicsImageViewerWidget, self).cursor()
-                currentCursor = self._imageGraphicsView.viewport().cursor()
-                
-                #print("currentCursor shape:", currentCursor.shape())
-                
-                self._imageGraphicsView.viewport().setCursor(QtCore.Qt.CrossCursor)
-                #self.setCursor(QtCore.Qt.CrossCursor)
-                
-                #mouseEventFilters = [pgui.MouseEventSink(c) for c in cDict.values()]
-                
-                #if len(cDict) > 0:
-                #if len(self._planargraphics_):
-                    ## install mouse event filter for all other cursors
-                    #mouseEventFilters = [pgui.MouseEventSink(c) for c in self.scene.]
-                    #for ck, c in enumerate(cDict.values()):
-                    #for ck, c in enumerate(self._planargraphics_):
-                        #c.installEventFilter(mouseEventFilters[ck])
-                    
-                while not self.__escape_pressed___ and not self.__mouse_pressed___:
-                    QtCore.QCoreApplication.processEvents()
-                    
-                self.__escape_pressed___ = False
-                self.__mouse_pressed___  = False
-                
-                if len(cDict) > 0:
-                    for ck, c in enumerate(cDict.values()):
-                        c.removeEventFilter(mouseEventFilters[ck])
-                
-                self._imageGraphicsView.viewport().setCursor(currentCursor)
-                
-                self._topLabel.setText(currentTopLabelText)
-                
-                if isinstance(self.__last_mouse_click_lmb__, (QtCore.QPoint, QtCore.QPointF)):
-                    point = QtCore.QPointF(self.__last_mouse_click_lmb__)
-                    
-                else:
-                
-                    valx = np.floor(self.__scene__.rootImage.boundingRect().center().x())
-                    valy = np.floor(self.__scene__.rootImage.boundingRect().center().y())
-                    
-                    if len(cDict) > 0:
-                        # find a suitable position so we don't land on previous objects
-                        if cType & pgui.PlanarGraphicsType.vertical_cursor or \
-                            cType & pgui.PlanarGraphicsType.crosshair_cursor or \
-                                cType & pgui.PlanarGraphicsType.point_cursor:
-                            
-                            max_x = max([o.x for o in cDict.values()])
-                            valx = (self.__scene__.rootImage.boundingRect().width() + max_x) / 2
-                            
-                        if cType & pgui.PlanarGraphicsType.horizontal_cursor or \
-                            cType & pgui.PlanarGraphicsType.crosshair_cursor or \
-                                cType & pgui.PlanarGraphicsType.point_cursor:
-                        
-                            max_y = max([o.y for o in cDict.values()])
-                            valy = (self.__scene__.rootImage.boundingRect().height() + max_y) / 2
-                            
-                    point = QtCore.QPointF(valx, valy)
-                
-                
-                obj = item()
-        else:
-            pass # TODO start shape building process
-        
-    def createNewCursor(self, cType, window=None, radius=None, pos=None, movable=True, 
-                        editable=True, frame=None,  label=None, frameVisibility=[],
-                        showLabel=True, labelShowsPosition = True, 
-                        autoSelect=False, parentWidget = None):
-        """Creates a cursors, programmatically. DEPRECATED  
-        
-        cType: int or one of the pictgui.PlanarGraphicsType cursor type enum values, 
-            or a pictgui.Cursor object
-        
-        When cType is an int or GraphicsObjecType enum value, then the keyword
-            parameters are used for constructing a pictgui.GraphicsObject 
-            representation of a pictgui.Cursor
-
-        When cType is a pictgui.Cursor object, keyword parameters given may
-            override the Cursor's own values.
-        
-            NOTE: pictgui.Cursor objects can have both width and height None. 
-            When this happens, the width/height will be taken from the scene 
-            geometry.
-        
-            The Cursor window (in x or y direction) can be None for vertical or 
-            horizontal cursors, respectively. It can be overridden by the "window" 
-            keyword parameter here (default is the default _cursorWindow value 
-            in GraphicsImageViewerWidget).
-        
-            By design, neither xwindow nor ywindow can be None in crosshair and 
-            point cursors.
+            # NOTE: 2021-05-10 11:47:48 
+            # The user creates a new object by GUI interaction:
+            # * for cursors, we only need a single mouse click in the scene, to
+            #   indicate where the initial cursor position
+            # * for non-cursors, we need a more elaborate set of actions to "draw"
+            #   the PlanarGraphics backend, which can be:
+            #   a) a primitive (Move, Line, Ellipse, Retangle)
+            #   b) a Path constructed from any number of the above primitives
+            #      plus Arc, ArcMove, Cubic and Quad, and other Path objects
             
-            NOTE: special attention should be given to the "name" attribute of
-            the cursor object, which is also used to assign the ID of the 
-            graphics object. 
+            default_x = np.floor(self.__scene__.rootImage.boundingRect().center().x())
+            default_y = np.floor(self.__scene__.rootImage.boundingRect().center().y())
             
-        
-        
-        """
-        if self.__scene__.rootImage is None:
-            return
-        
-        if parentWidget is None:
-            if isinstance(self.__image_viewer__, ImageViewer):
-                parentWidget = self.__image_viewer__
-            else:
-                parentWidget = self
+            name = "%s%d" % (item._default_label_, len([o for o in filter_type(self.planarGraphics, item)]))
             
-        if window is None:
-            window = self.__cursorWindow__
-            
-        if radius is None:
-            radius = self.__cursorRadius__
-            
-        if frame is None:
             if isinstance(parentWidget, ImageViewer):
                 frame = parentWidget.currentFrame
             else:
                 frame = 0
                 
-        nFrames = 1
+            if pgui.Cursor in item.__mro__:
+                # Construct a concrete Cursor type by clicking in the scene
+                # requires that the scene has a rootImage.
+                if item not in (pgui.CrosshairCursor, pgui.HorizontalCursor, pgui.PointCursor, pgui.VerticalCursor):
+                    raise TypeError("Expecting a CrosshairCursor, HorizontalCursor, PointCursor, or VerticalCursor")
                 
-        #if isinstance(parentWidget, ImageViewer):
-            #nFrames = parentWidget.nFrames
-            
-            #if frame < 0 :
-                #frame = nFrames
-                
-            #if frame >= nFrames:
-                #frame = nFrames-1
-                
-        if isinstance(cType, pgui.Cursor): # construct from a pgui.Cursor
-            # NOTE: 2021-05-04 15:59:42
-            # this is backwards compatible 
-            
-            # builds a GUI cursor for a backend PlanarGraphics object (a pictgui.Cursor)
-            # this comes with its own coordinates, but we allow these to be
-            # overridden here by this constructor's optional "pos" parameter
-            cDict = self._graphicsObjects_[cType.type.value]
-            
-            valx = np.floor(self.__scene__.rootImage.boundingRect().center().x())
-            valy = np.floor(self.__scene__.rootImage.boundingRect().center().y())
-            
-            if cType.xwindow is None:
-                cType.xwindow = window
-    
-            if cType.ywindow is None:
-                cType.ywindow = window
-                
-            if isinstance(pos, (tuple, list)) and \
-                len(pos) == 2 and all([isinstance(a, (numbers.Real, pq.Quantity)) for a in pos]):
-                cType.x = pos[0]
-                cType.y = pos[1]
-            
-            elif isinstance(pos, (QtCore.QPoint, QtCore.QPointF)):
-                cType.x = pos.x()
-                cType.y = pos.y()
-        
-            else:
-                # no pos specified -- unlikely but anyhow...
-                if cType.x is None or cType.y is None:
-                    # just in case the PlanarGraphics object x or y are not set
-                    if len(cDict) > 0:
-                        # find a suitable position so we don't land on previous objects
-                        if cType.type & pgui.PlanarGraphicsType.vertical_cursor or \
-                            cType.type & pgui.PlanarGraphicsType.crosshair_cursor or \
-                                cType.type & pgui.PlanarGraphicsType.point_cursor:
-                            
-                            # NOTE: 2020-11-18 10:46:23
-                            # o is a GraphicsObject, not PlanarGraphicsObject!
-                            max_x = max([o.x for o in cDict.values()])
-                            min_x = min([o.x for o in cDict.values()])
-                            
-                            valx = (self.__scene__.rootImage.boundingRect().width() + max_x) / 2
-                            
-                        if cType.type & pgui.PlanarGraphicsType.horizontal_cursor or \
-                            cType.type & pgui.PlanarGraphicsType.crosshair_cursor or \
-                                cType.type & pgui.PlanarGraphicsType.point_cursor:
-                        
-                            # NOTE: 2020-11-18 10:46:23
-                            # o is a GraphicsObject, not PlanarGraphicsObject!
-                            max_y = max([o.y for o in cDict.values()])
-                            valy = (self.__scene__.rootImage.boundingRect().height() + max_y) / 2
-                            
-                    if cType.x is None:
-                        cType.x = valx
-                        
-                    if cType.y is None:
-                        cType.y = valy
-                    
-            if cType.width is None:
-                cType.width = self.__scene__.sceneRect().width()
-                
-            if cType.height is None:
-                cType.height = self.__scene__.sceneRect().height()
-            
-            if cType.radius is None:
-                cType.radius = self.__cursorRadius__
-                
-            if isinstance(label, str) and len(label) > 0:
-                crsId = label
-                
-            else:
-                tryName = cType.name
-                if tryName in cDict.keys():
-                    tryName = utilities.counter_suffix(tryName, [s for s in cDict.keys()])
-                    
-                crsId = tryName
-                
-            if crsId in self.__cursors__.keys():
-                crsId +="%d" % len(cDict)
-                
-            if frameVisibility is None:
-                if len(cType.frameIndices) == 0:
-                    frameVisibility = [f for f in range(nFrames)]
-                    
-                else:
-                    frameVisibility = cType.frameIndices
-                
-            else:
-                if isinstance(frameVisibility, (tuple, list)):
-                    if len(frameVisibility):
-                        if len(frameVisibility) == 1 and frameVisibility[0] is None:
-                            frameVisibility.clear()
-                            
-                        else:
-                            if not all([isinstance(f, int) for f in frameVisibility]):
-                                raise TypeError("frameVisibility expected to be a sequence of int, an empty sequence, the sequence [None], or just None; got %s instead" % frameVisibility)
-                            
-                    else:
-                        frameVisibility = [0]
-                            
-                else:
-                    raise TypeError("frame visibility must be specified as a list of ints or an empty list, or None; got %s instead" % frameVisibility)
-                
-            qcursor = pgui.GraphicsObject(obj                 = cType,
-                                          showLabel           = showLabel,
-                                          labelShowsPosition  = labelShowsPosition,
-                                          parentWidget        = parentWidget)
-            
-        else:              # parametric c'tor :
-            # NOTE: 2018-09-28 10:20:29
-            # cType is a PlanarGraphicsType enum value
-            cTypeStr = ""
-            
-            if cType & pgui.PlanarGraphicsType.vertical_cursor:
-                cTypeStr = "v"
-                cursor_factory = pgui.VerticalCursor
-
-            elif cType & pgui.PlanarGraphicsType.horizontal_cursor:
-                cTypeStr = "h"
-                cursor_factory = pgui.HorizontalCursor
-
-            elif cType & pgui.PlanarGraphicsType.point_cursor:
-                cTypeStr = "p"
-                cursor_factory = pgui.PointCursor
-
-            elif cType & pgui.PlanarGraphicsType.crosshair_cursor:
-                cTypeStr = "c"
-                cursor_factory = pgui.CrosshairCursor
-
-            else:
-                return
-            
-            # NOTE: 2018-09-28 10:21:32
-            # because it can be an enum value or an int resulted from
-            # logical OR between several enum values, 
-            # see NOTE: 2018-09-28 10:20:29
-            if isinstance(cType, int):
-                cDict = self._graphicsObjects_[cType]
-                
-            else:
-                cDict = self._graphicsObjects_[cType.value]
-            
-            if label is None or (isinstance(label, str) and len(label) == 0):
-                crsId = "%s%d" % (cTypeStr, len(cDict))
-                
-            elif instance(label, str) and len(label):
-                crsId = "%s%d" % (label, len(cDict))
-                
-            else:
-                raise TypeError("label expected to be a non-empty str or None; got %s instead" % type(name).__name__)
-                
-            if isinstance(pos, (tuple, list)) and \
-                len(pos) == 2 and all([isinstance(a, (numbers.Real, pq.Quantity)) for a in pos]):
-                point = QtCore.QPointF(pos[0], pos[1])
-                    
-            elif isinstance(pos, (QtCore.QPoint, QtCore.QPointF)):
-                point = QtCore.QPointF(pos)
-            
-            else:
-                # no pos specified
-                
-                # NOTE: 2018-09-28 11:20:32
-                # cursor() is reimplemented as access method for a pictgui.Cursor!
-                # must use the superclass instance method
                 currentTopLabelText = self._topLabel.text()
                 
                 self._topLabel.setText(currentTopLabelText + " Double-click left mouse button for cursor position")
                 
-                #currentCursor = super(GraphicsImageViewerWidget, self).cursor()
-                currentCursor = self._imageGraphicsView.viewport().cursor()
-                
-                #print("currentCursor shape:", currentCursor.shape())
+                currentGUICursor = self._imageGraphicsView.viewport().cursor()
                 
                 self._imageGraphicsView.viewport().setCursor(QtCore.Qt.CrossCursor)
-                #self.setCursor(QtCore.Qt.CrossCursor)
                 
-                mouseEventFilters = [pgui.MouseEventSink(c) for c in cDict.values()]
+                eventSinks = [pgui.MouseEventSink() for o in self.graphicsObjects]
                 
-                if len(cDict) > 0:
-                    # install mouse event filter for all other cursors
-                    for ck, c in enumerate(cDict.values()):
-                        c.installEventFilter(mouseEventFilters[ck])
-                    
+                [_ for _ in itertools.starmap(lambda x,y: x.installEventFilter(y),
+                                              zip(self.graphicsObjects, eventSinks))]
+                
+                # NOTE: 2021-05-10 10:41:19 
+                # wait for mouse press or Esc key press
                 while not self.__escape_pressed___ and not self.__mouse_pressed___:
-                    QtCore.QCoreApplication.processEvents()
+                    # NOTE: 2021-05-10 10:39:47
+                    # see self.mousePressEvent(), self.mouseReleaseEvent() and
+                    # self.keyPressEvent()
+                    # the self.mouse...Event() set up __last_mouse_click_lmb__
+                    # the self.keyPressEvent() captures Esc key press
+                    QtCore.QCoreApplication.processEvents() 
                     
                 self.__escape_pressed___ = False
                 self.__mouse_pressed___  = False
                 
-                if len(cDict) > 0:
-                    for ck, c in enumerate(cDict.values()):
-                        c.removeEventFilter(mouseEventFilters[ck])
+                [_ for _ in itertools.starmap(lambda x,y: x.removeEventFilter(y),
+                                              zip(self.graphicsObjects, eventSinks))]
                 
-                self._imageGraphicsView.viewport().setCursor(currentCursor)
+                self._imageGraphicsView.viewport().setCursor(currentGUICursor)
                 
                 self._topLabel.setText(currentTopLabelText)
                 
+                # NOTE: 2021-05-10 10:38:15 
+                # self.__last_mouse_click_lmb__ is set by self.mousePressEvent
+                
                 if isinstance(self.__last_mouse_click_lmb__, (QtCore.QPoint, QtCore.QPointF)):
+                    # the loop at NOTE: 2021-05-10 10:41:19 was interrupted by
+                    # mouse press, therefore we land here
                     point = QtCore.QPointF(self.__last_mouse_click_lmb__)
                     
-                else:
-                
-                    valx = np.floor(self.__scene__.rootImage.boundingRect().center().x())
-                    valy = np.floor(self.__scene__.rootImage.boundingRect().center().y())
+                    if self.scene.sceneRect().contains(point):
+                        # NOTE: 2021-05-10 10:49:38
+                        # item is one of the concrete pgui cursor classes, so it
+                        # works as a factory here:
+                        pobj = item(point.x(), point.y(), 
+                                    self.scene.sceneRect().width(),
+                                    self.scene.sceneRect().height(),
+                                    self.__cursorWindow__, 
+                                    self.__cursorWindow__,
+                                    self.__cursorRadius__,
+                                    name=name,
+                                    frameindex=[],
+                                    currentFrame=frame)
+                        
+                        qobj = pgui.GraphicsObject(obj=pobj, showLabel=showLabel, 
+                                       labelShowsPosition = labelShowsPosition,
+                                       parentWidget = parentWidget)
+                        
+                    self.__last_mouse_click_lmb__ = None
                     
-                    if len(cDict) > 0:
-                        # find a suitable position so we don't land on previous objects
-                        if cType & pgui.PlanarGraphicsType.vertical_cursor or \
-                            cType & pgui.PlanarGraphicsType.crosshair_cursor or \
-                                cType & pgui.PlanarGraphicsType.point_cursor:
+                    
+                #else:
+                    ## the loop at NOTE: 2021-05-10 10:41:19 was interrupted by 
+                    ## Esc key press => there should be no cursor constructed!
+                    #valx = np.floor(self.__scene__.rootImage.boundingRect().center().x())
+                    #valy = np.floor(self.__scene__.rootImage.boundingRect().center().y())
+                    
+                    #if len(cDict) > 0:
+                        ## find a suitable position so we don't land on previous objects
+                        #if cType & pgui.PlanarGraphicsType.vertical_cursor or \
+                            #cType & pgui.PlanarGraphicsType.crosshair_cursor or \
+                                #cType & pgui.PlanarGraphicsType.point_cursor:
                             
-                            max_x = max([o.x for o in cDict.values()])
-                            valx = (self.__scene__.rootImage.boundingRect().width() + max_x) / 2
+                            #max_x = max([o.x for o in cDict.values()])
+                            #valx = (self.__scene__.rootImage.boundingRect().width() + max_x) / 2
                             
-                        if cType & pgui.PlanarGraphicsType.horizontal_cursor or \
-                            cType & pgui.PlanarGraphicsType.crosshair_cursor or \
-                                cType & pgui.PlanarGraphicsType.point_cursor:
+                        #if cType & pgui.PlanarGraphicsType.horizontal_cursor or \
+                            #cType & pgui.PlanarGraphicsType.crosshair_cursor or \
+                                #cType & pgui.PlanarGraphicsType.point_cursor:
                         
-                            max_y = max([o.y for o in cDict.values()])
-                            valy = (self.__scene__.rootImage.boundingRect().height() + max_y) / 2
+                            #max_y = max([o.y for o in cDict.values()])
+                            #valy = (self.__scene__.rootImage.boundingRect().height() + max_y) / 2
                             
-                    point = QtCore.QPointF(valx, valy)
-            
-            if not self.__scene__.sceneRect().contains(point) or point == QtCore.QPointF(0,0):
-                point.setX(np.floor(self.__scene__.rootImage.boundingRect().center().x()))
-                point.setY(np.floor(self.__scene__.rootImage.boundingRect().center().y()))
+                    #point = QtCore.QPointF(valx, valy)
                 
-            width = self.__scene__.sceneRect().width()
-            height = self.__scene__.sceneRect().height()
-            
-            if frameVisibility is None:
-                frameVisibility = []
                 
-            elif isinstance(frameVisibility, (tuple, list)):
-                if len(frameVisibility):
-                    if len(frameVisibility) == 1 and frameVisibility[0] is None:
-                        frameVisibility.clear()
-                        
-                    else:
-                        if not all([isinstance(f, int) for f in frameVisibility]):
-                            raise TypeError("frameVisibility expected a sequence of int, [], or [None], or just None; got %s instead" % frameVisibility)
-                        
-            pcursor = cursor_factory(point.x(), point.y(), width, height, window, window, radius,
-                                     name = crsId, frameindex = frameVisibility,
-                                     currentframe=frame)
-            
-            qcursor = pgui.GraphicsObject(obj                   = pcursor,
-                                          showLabel             = showLabel,
-                                          labelShowsPosition    = labelShowsPosition,
-                                          parentWidget          = parentWidget)
-            
-            #qcursor = pgui.GraphicsObject(parameters = (width, height, window, window, radius),
-                                            #pos                 = point, 
-                                            #objectType          = cType,
-                                            #currentFrame        = frame,
-                                            #visibleFrames       = frameVisibility, 
-                                            #label               = crsId,
-                                            #showLabel           = showLabel,
-                                            #labelShowsPosition  = labelShowsPosition,
-                                            #parentWidget        = parentWidget)
-            
-        qcursor.canMove = movable
+                #obj = item()
+            else:
+                pass # TODO start shape building process
+        
+        qobj.canMove = movable
+        qobj.canEdit = editable
             
         # NOTE: 2021-04-18 12:13:21 FIXME
         # do I reallly need guiClient, here? rois and cursors should always be 
         # notified of frame change, right?
         if isinstance(parentWidget, ImageViewer):# and not parentWidget.guiClient:
-            parentWidget.frameChanged[int].connect(qcursor.slotFrameChanged)
+            parentWidget.frameChanged[int].connect(qobj.slotFrameChanged)
             
-        self.__scene__.addItem(qcursor)
-
+        self.scene.addItem(qobj)
+        
         if autoSelect:
-            for c in self.__cursors__.values():
+            for c in self.graphicsObjects:
                 c.setSelected(False)
                 
-            qcursor.setSelected(True)
+            qobj.setSelected(True)
             
-        qcursor.signalPosition.connect(self.slot_reportCursorPos)
-        qcursor.selectMe[str, bool].connect(self.slot_setSelectedCursor)
-        qcursor.requestContextMenu.connect(self.slot_graphicsObjectMenuRequested)
-        qcursor.signalBackendChanged.connect(self.slot_cursorChanged)
-        
-        cDict[crsId] = qcursor
+        if isinstance(qobj.backend, pgui.Cursor):
+            qobj.signalPosition.connect(self.slot_reportCursorPos)
+            
+        qobj.selectMe[str, bool].connect(self.slot_setSelectedCursor)
+        qobj.requestContextMenu.connect(self.slot_graphicsObjectMenuRequested)
+        qobj.signalBackendChanged.connect(self.slot_cursorChanged)
         
         self.scene.update(self.scene.sceneRect().x(), \
                           self.scene.sceneRect().y(), \
                           self.scene.sceneRect().width(), \
                           self.scene.sceneRect().height())
         
-        if qcursor.backend.hasStateForFrame():
-            qcursor.show()
+        if qobj.backend.hasStateForFrame():
+            qobj.show()
             
-        #self.signalCursorAdded.emit(cursor.backend)
+        return qobj
         
-        return qcursor
+    #def createNewCursor(self, cType, window=None, radius=None, pos=None, movable=True, 
+                        #editable=True, frame=None,  label=None, frameVisibility=[],
+                        #showLabel=True, labelShowsPosition = True, 
+                        #autoSelect=False, parentWidget = None):
+        #"""Creates a cursors, programmatically. DEPRECATED  
+        
+        #cType: int or one of the pictgui.PlanarGraphicsType cursor type enum values, 
+            #or a pictgui.Cursor object
+        
+        #When cType is an int or GraphicsObjecType enum value, then the keyword
+            #parameters are used for constructing a pictgui.GraphicsObject 
+            #representation of a pictgui.Cursor
+
+        #When cType is a pictgui.Cursor object, keyword parameters given may
+            #override the Cursor's own values.
+        
+            #NOTE: pictgui.Cursor objects can have both width and height None. 
+            #When this happens, the width/height will be taken from the scene 
+            #geometry.
+        
+            #The Cursor window (in x or y direction) can be None for vertical or 
+            #horizontal cursors, respectively. It can be overridden by the "window" 
+            #keyword parameter here (default is the default _cursorWindow value 
+            #in GraphicsImageViewerWidget).
+        
+            #By design, neither xwindow nor ywindow can be None in crosshair and 
+            #point cursors.
+            
+            #NOTE: special attention should be given to the "name" attribute of
+            #the cursor object, which is also used to assign the ID of the 
+            #graphics object. 
+            
+        
+        
+        #"""
+        #if self.__scene__.rootImage is None:
+            #return
+        
+        #if parentWidget is None:
+            #if isinstance(self.__image_viewer__, ImageViewer):
+                #parentWidget = self.__image_viewer__
+            #else:
+                #parentWidget = self
+            
+        #if window is None:
+            #window = self.__cursorWindow__
+            
+        #if radius is None:
+            #radius = self.__cursorRadius__
+            
+        #if frame is None:
+            #if isinstance(parentWidget, ImageViewer):
+                #frame = parentWidget.currentFrame
+            #else:
+                #frame = 0
+                
+        #nFrames = 1
+                
+        ##if isinstance(parentWidget, ImageViewer):
+            ##nFrames = parentWidget.nFrames
+            
+            ##if frame < 0 :
+                ##frame = nFrames
+                
+            ##if frame >= nFrames:
+                ##frame = nFrames-1
+                
+        #if isinstance(cType, pgui.Cursor): # construct from a pgui.Cursor
+            ## NOTE: 2021-05-04 15:59:42
+            ## this is backwards compatible 
+            
+            ## builds a GUI cursor for a backend PlanarGraphics object (a pictgui.Cursor)
+            ## this comes with its own coordinates, but we allow these to be
+            ## overridden here by this constructor's optional "pos" parameter
+            #cDict = self._graphicsObjects_[cType.type.value]
+            
+            #valx = np.floor(self.__scene__.rootImage.boundingRect().center().x())
+            #valy = np.floor(self.__scene__.rootImage.boundingRect().center().y())
+            
+            #if cType.xwindow is None:
+                #cType.xwindow = window
+    
+            #if cType.ywindow is None:
+                #cType.ywindow = window
+                
+            #if isinstance(pos, (tuple, list)) and \
+                #len(pos) == 2 and all([isinstance(a, (numbers.Real, pq.Quantity)) for a in pos]):
+                #cType.x = pos[0]
+                #cType.y = pos[1]
+            
+            #elif isinstance(pos, (QtCore.QPoint, QtCore.QPointF)):
+                #cType.x = pos.x()
+                #cType.y = pos.y()
+        
+            #else:
+                ## no pos specified -- unlikely but anyhow...
+                #if cType.x is None or cType.y is None:
+                    ## just in case the PlanarGraphics object x or y are not set
+                    #if len(cDict) > 0:
+                        ## find a suitable position so we don't land on previous objects
+                        #if cType.type & pgui.PlanarGraphicsType.vertical_cursor or \
+                            #cType.type & pgui.PlanarGraphicsType.crosshair_cursor or \
+                                #cType.type & pgui.PlanarGraphicsType.point_cursor:
+                            
+                            ## NOTE: 2020-11-18 10:46:23
+                            ## o is a GraphicsObject, not PlanarGraphicsObject!
+                            #max_x = max([o.x for o in cDict.values()])
+                            #min_x = min([o.x for o in cDict.values()])
+                            
+                            #valx = (self.__scene__.rootImage.boundingRect().width() + max_x) / 2
+                            
+                        #if cType.type & pgui.PlanarGraphicsType.horizontal_cursor or \
+                            #cType.type & pgui.PlanarGraphicsType.crosshair_cursor or \
+                                #cType.type & pgui.PlanarGraphicsType.point_cursor:
+                        
+                            ## NOTE: 2020-11-18 10:46:23
+                            ## o is a GraphicsObject, not PlanarGraphicsObject!
+                            #max_y = max([o.y for o in cDict.values()])
+                            #valy = (self.__scene__.rootImage.boundingRect().height() + max_y) / 2
+                            
+                    #if cType.x is None:
+                        #cType.x = valx
+                        
+                    #if cType.y is None:
+                        #cType.y = valy
+                    
+            #if cType.width is None:
+                #cType.width = self.__scene__.sceneRect().width()
+                
+            #if cType.height is None:
+                #cType.height = self.__scene__.sceneRect().height()
+            
+            #if cType.radius is None:
+                #cType.radius = self.__cursorRadius__
+                
+            #if isinstance(label, str) and len(label) > 0:
+                #crsId = label
+                
+            #else:
+                #tryName = cType.name
+                #if tryName in cDict.keys():
+                    #tryName = utilities.counter_suffix(tryName, [s for s in cDict.keys()])
+                    
+                #crsId = tryName
+                
+            #if crsId in self.__cursors__.keys():
+                #crsId +="%d" % len(cDict)
+                
+            #if frameVisibility is None:
+                #if len(cType.frameIndices) == 0:
+                    #frameVisibility = [f for f in range(nFrames)]
+                    
+                #else:
+                    #frameVisibility = cType.frameIndices
+                
+            #else:
+                #if isinstance(frameVisibility, (tuple, list)):
+                    #if len(frameVisibility):
+                        #if len(frameVisibility) == 1 and frameVisibility[0] is None:
+                            #frameVisibility.clear()
+                            
+                        #else:
+                            #if not all([isinstance(f, int) for f in frameVisibility]):
+                                #raise TypeError("frameVisibility expected to be a sequence of int, an empty sequence, the sequence [None], or just None; got %s instead" % frameVisibility)
+                            
+                    #else:
+                        #frameVisibility = [0]
+                            
+                #else:
+                    #raise TypeError("frame visibility must be specified as a list of ints or an empty list, or None; got %s instead" % frameVisibility)
+                
+            #qcursor = pgui.GraphicsObject(obj                 = cType,
+                                          #showLabel           = showLabel,
+                                          #labelShowsPosition  = labelShowsPosition,
+                                          #parentWidget        = parentWidget)
+            
+        #else:              # parametric c'tor :
+            ## NOTE: 2018-09-28 10:20:29
+            ## cType is a PlanarGraphicsType enum value
+            #cTypeStr = ""
+            
+            #if cType & pgui.PlanarGraphicsType.vertical_cursor:
+                #cTypeStr = "v"
+                #cursor_factory = pgui.VerticalCursor
+
+            #elif cType & pgui.PlanarGraphicsType.horizontal_cursor:
+                #cTypeStr = "h"
+                #cursor_factory = pgui.HorizontalCursor
+
+            #elif cType & pgui.PlanarGraphicsType.point_cursor:
+                #cTypeStr = "p"
+                #cursor_factory = pgui.PointCursor
+
+            #elif cType & pgui.PlanarGraphicsType.crosshair_cursor:
+                #cTypeStr = "c"
+                #cursor_factory = pgui.CrosshairCursor
+
+            #else:
+                #return
+            
+            ## NOTE: 2018-09-28 10:21:32
+            ## because it can be an enum value or an int resulted from
+            ## logical OR between several enum values, 
+            ## see NOTE: 2018-09-28 10:20:29
+            #if isinstance(cType, int):
+                #cDict = self._graphicsObjects_[cType]
+                
+            #else:
+                #cDict = self._graphicsObjects_[cType.value]
+            
+            #if label is None or (isinstance(label, str) and len(label) == 0):
+                #crsId = "%s%d" % (cTypeStr, len(cDict))
+                
+            #elif instance(label, str) and len(label):
+                #crsId = "%s%d" % (label, len(cDict))
+                
+            #else:
+                #raise TypeError("label expected to be a non-empty str or None; got %s instead" % type(name).__name__)
+                
+            #if isinstance(pos, (tuple, list)) and \
+                #len(pos) == 2 and all([isinstance(a, (numbers.Real, pq.Quantity)) for a in pos]):
+                #point = QtCore.QPointF(pos[0], pos[1])
+                    
+            #elif isinstance(pos, (QtCore.QPoint, QtCore.QPointF)):
+                #point = QtCore.QPointF(pos)
+            
+            #else:
+                ## no pos specified
+                
+                ## NOTE: 2018-09-28 11:20:32
+                ## cursor() is reimplemented as access method for a pictgui.Cursor!
+                ## must use the superclass instance method
+                #currentTopLabelText = self._topLabel.text()
+                
+                #self._topLabel.setText(currentTopLabelText + " Double-click left mouse button for cursor position")
+                
+                ##currentCursor = super(GraphicsImageViewerWidget, self).cursor()
+                #currentCursor = self._imageGraphicsView.viewport().cursor()
+                
+                ##print("currentCursor shape:", currentCursor.shape())
+                
+                #self._imageGraphicsView.viewport().setCursor(QtCore.Qt.CrossCursor)
+                ##self.setCursor(QtCore.Qt.CrossCursor)
+                
+                #mouseEventFilters = [pgui.MouseEventSink(c) for c in cDict.values()]
+                
+                #if len(cDict) > 0:
+                    ## install mouse event filter for all other cursors
+                    #for ck, c in enumerate(cDict.values()):
+                        #c.installEventFilter(mouseEventFilters[ck])
+                    
+                #while not self.__escape_pressed___ and not self.__mouse_pressed___:
+                    #QtCore.QCoreApplication.processEvents()
+                    
+                #self.__escape_pressed___ = False
+                #self.__mouse_pressed___  = False
+                
+                #if len(cDict) > 0:
+                    #for ck, c in enumerate(cDict.values()):
+                        #c.removeEventFilter(mouseEventFilters[ck])
+                
+                #self._imageGraphicsView.viewport().setCursor(currentCursor)
+                
+                #self._topLabel.setText(currentTopLabelText)
+                
+                #if isinstance(self.__last_mouse_click_lmb__, (QtCore.QPoint, QtCore.QPointF)):
+                    #point = QtCore.QPointF(self.__last_mouse_click_lmb__)
+                    
+                #else:
+                
+                    #valx = np.floor(self.__scene__.rootImage.boundingRect().center().x())
+                    #valy = np.floor(self.__scene__.rootImage.boundingRect().center().y())
+                    
+                    #if len(cDict) > 0:
+                        ## find a suitable position so we don't land on previous objects
+                        #if cType & pgui.PlanarGraphicsType.vertical_cursor or \
+                            #cType & pgui.PlanarGraphicsType.crosshair_cursor or \
+                                #cType & pgui.PlanarGraphicsType.point_cursor:
+                            
+                            #max_x = max([o.x for o in cDict.values()])
+                            #valx = (self.__scene__.rootImage.boundingRect().width() + max_x) / 2
+                            
+                        #if cType & pgui.PlanarGraphicsType.horizontal_cursor or \
+                            #cType & pgui.PlanarGraphicsType.crosshair_cursor or \
+                                #cType & pgui.PlanarGraphicsType.point_cursor:
+                        
+                            #max_y = max([o.y for o in cDict.values()])
+                            #valy = (self.__scene__.rootImage.boundingRect().height() + max_y) / 2
+                            
+                    #point = QtCore.QPointF(valx, valy)
+            
+            #if not self.__scene__.sceneRect().contains(point) or point == QtCore.QPointF(0,0):
+                #point.setX(np.floor(self.__scene__.rootImage.boundingRect().center().x()))
+                #point.setY(np.floor(self.__scene__.rootImage.boundingRect().center().y()))
+                
+            #width = self.__scene__.sceneRect().width()
+            #height = self.__scene__.sceneRect().height()
+            
+            #if frameVisibility is None:
+                #frameVisibility = []
+                
+            #elif isinstance(frameVisibility, (tuple, list)):
+                #if len(frameVisibility):
+                    #if len(frameVisibility) == 1 and frameVisibility[0] is None:
+                        #frameVisibility.clear()
+                        
+                    #else:
+                        #if not all([isinstance(f, int) for f in frameVisibility]):
+                            #raise TypeError("frameVisibility expected a sequence of int, [], or [None], or just None; got %s instead" % frameVisibility)
+                        
+            #pcursor = cursor_factory(point.x(), point.y(), width, height, window, window, radius,
+                                     #name = crsId, frameindex = frameVisibility,
+                                     #currentframe=frame)
+            
+            #qcursor = pgui.GraphicsObject(obj                   = pcursor,
+                                          #showLabel             = showLabel,
+                                          #labelShowsPosition    = labelShowsPosition,
+                                          #parentWidget          = parentWidget)
+            
+            ##qcursor = pgui.GraphicsObject(parameters = (width, height, window, window, radius),
+                                            ##pos                 = point, 
+                                            ##objectType          = cType,
+                                            ##currentFrame        = frame,
+                                            ##visibleFrames       = frameVisibility, 
+                                            ##label               = crsId,
+                                            ##showLabel           = showLabel,
+                                            ##labelShowsPosition  = labelShowsPosition,
+                                            ##parentWidget        = parentWidget)
+            
+        #qcursor.canMove = movable
+            
+        ## NOTE: 2021-04-18 12:13:21 FIXME
+        ## do I reallly need guiClient, here? rois and cursors should always be 
+        ## notified of frame change, right?
+        #if isinstance(parentWidget, ImageViewer):# and not parentWidget.guiClient:
+            #parentWidget.frameChanged[int].connect(qcursor.slotFrameChanged)
+            
+        #self.__scene__.addItem(qcursor)
+
+        #if autoSelect:
+            #for c in self.__cursors__.values():
+                #c.setSelected(False)
+                
+            #qcursor.setSelected(True)
+            
+        #qcursor.signalPosition.connect(self.slot_reportCursorPos)
+        #qcursor.selectMe[str, bool].connect(self.slot_setSelectedCursor)
+        #qcursor.requestContextMenu.connect(self.slot_graphicsObjectMenuRequested)
+        #qcursor.signalBackendChanged.connect(self.slot_cursorChanged)
+        
+        #cDict[crsId] = qcursor
+        
+        #self.scene.update(self.scene.sceneRect().x(), \
+                          #self.scene.sceneRect().y(), \
+                          #self.scene.sceneRect().width(), \
+                          #self.scene.sceneRect().height())
+        
+        #if qcursor.backend.hasStateForFrame():
+            #qcursor.show()
+            
+        ##self.signalCursorAdded.emit(cursor.backend)
+        
+        #return qcursor
     
     def clear(self):
         """Clears the contents of the viewer.
@@ -1788,20 +1890,22 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @pyqtSlot()
     @safeWrapper
     def slot_editCursor(self):
-        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in self.__cursors__.keys():
+        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.cursors, "name"):
             self._cursorEditor(self._cursorContextMenuSourceId)
             
         return
     
     def propagateCursorState(self):
-        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in self.__cursors__.keys():
-            cursor = self.__cursors__[self._cursorContextMenuSourceId]
+        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.cursors, "name"):
+            cursor = [o for o in filter(lambda x: isinstance(x.backend, pgui.Cursor) and x.backend.name == self._cursorContextMenuSourceId, self.graphicsObjects)]
+            if len(cursor) == 0:
+                return
             
+            cursor = cursor[0]
+
             if cursor.backend.hasHardFrameAssociations and cursor.backend.hasStateForCurrentFrame:
                 cursor.backend.propagateFrameState(cursor.backend.currentFrame, cursor.backend.frameIndices)
                 cursor.backend.updateFrontends()
-                
-        
     
     @pyqtSlot()
     @safeWrapper
@@ -1826,13 +1930,12 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
 
     @pyqtSlot(str, QtCore.QPoint)
     @safeWrapper
-    def slot_graphicsObjectMenuRequested(self, crsId, pos):
-        #if crsId in self.__cursors__.keys() and self.__cursors__[crsId].objectType & pgui.PlanarGraphicsType.allCursorTypes:
-        if crsId in self.__cursors__.keys() and self.__cursors__[crsId].backend.type & pgui.PlanarGraphicsType.allCursorTypes:
-            self._cursorContextMenuSourceId = crsId 
+    def slot_graphicsObjectMenuRequested(self, objId, pos):
+        if objId in iter_attribute(self.cursors,"name"):
+            self._cursorContextMenuSourceId = objId
             
             cm = QtWidgets.QMenu("Cursor Menu", self)
-            crsEditAction = cm.addAction("Edit properties for %s cursor" % crsId)
+            crsEditAction = cm.addAction("Edit properties for %s cursor" % objId)
             crsEditAction.triggered.connect(self.slot_editCursor)
             
             crsPropagateStateToAllFrames = cm.addAction("Propagate current state to all frames")
@@ -1840,96 +1943,123 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
             crsLinkCursorAction = cm.addAction("Link...")
             crsUnlinkCursorAction = cm.addAction("Unlink...")
-            crsRemoveAction = cm.addAction("Remove %s cursor" % crsId)
+            crsRemoveAction = cm.addAction("Remove %s cursor" % objId)
             crsRemoveAction.triggered.connect(self.slot_removeCursor)
             cm.exec(pos)
             
-        #elif crsId in self.__rois__.keys() and self.__rois__[crsId].objectType & pgui.PlanarGraphicsType.allObjectTypes:
-        elif crsId in self.__rois__.keys() and self.__rois__[crsId].backend.type & pgui.PlanarGraphicsType.allObjectTypes:
-            self._roiContextMenuSourceId = crsId
+        elif objId in [o.name for o in self.rois]:
+            self._roiContextMenuSourceId = objId
             
             cm = QtWidgets.QMenu("ROI Menu", self)
-            crsEditAction = cm.addAction("Edit properties for %s ROI" % crsId)
+            crsEditAction = cm.addAction("Edit properties for %s ROI" % objId)
             crsEditAction.triggered.connect(self.slot_editRoi)
             
-            pathEditAction = cm.addAction("Edit path for %s" % crsId)
+            pathEditAction = cm.addAction("Edit path for %s" % objId)
             pathEditAction.triggered.connect(self.slot_editRoiShape)
             
             crsLinkCursorAction = cm.addAction("Link...")
             crsUnlinkCursorAction = cm.addAction("Unlink...")
-            crsRemoveAction = cm.addAction("Remove %s ROI" % crsId)
+            crsRemoveAction = cm.addAction("Remove %s ROI" % objId)
             crsRemoveAction.triggered.connect(self.slot_removeRoi)
             cm.exec(pos)
+            
+    @pyqtSlot(str, bool)
+    @safeWrapper
+    def slot_setSelectedGraphicsObject(self, objId:str, sel:bool):
+        # TODO 2021-05-10 13:31:27
+        # do we want to have an unique selection among ALL the graphics items, 
+        # or a unique selection PER GROUP of graphics object type (i.e. cursors
+        # vs rois)?
+        # I'm partial to the second option...'
+        if objId in iter_attribute(self.cursors, "name"):
+            obj = [o for o in self.graphicsObjects if isinstance(o.backend, pgui.Cursor) and o.backend.name == objId]
+            if len(obj):
+                self.selectedCursor = obj[0]
+                self.signalGraphicsObjectSelected.emit(self.selectedCursor.backend)
+            else:
+                self.selectedCursor = None
+                self.signalGraphicsDeselected.emit()
+                
+        elif objId in iter_attribute(self.rois, "name"):
+            obj = [o for o in self.graphicsObjects if not isinstance(o.backend, pgui.Cursor) and o.backend.name == objId]
+            if len(obj):
+                self.selectedRoi = obj[0]
+                self.signalGraphicsObjectSelected.emit(self.selectedRoi.backend)
+            else:
+                self.selectedRoi = None
+                self.signalGraphicsDeselected.emit()
+            
+        #else:
 
     @pyqtSlot(str, bool)
     @safeWrapper
-    def slot_setSelectedCursor(self, cId, sel):
+    def slot_setSelectedCursor(self, cId:str, sel:bool):
         """To keep track of what cursor is selected, 
         independently of the underlying graphics view fw.
         """
-        if len(self.__cursors__) == 0 or cId not in self.__cursors__.keys():
-            self.selectedCursor = None
-            self.signalGraphicsDeselected.emit()
-            return
-        
-        if sel:
-            self.selectedCursor = self.__cursors__[cId]
-            
-            self.signalCursorSelected.emit(self.selectedCursor.backend)
-            
-        else:
-            self.selectedCursor = None
-            self.signalGraphicsDeselected.emit()
+        if cId in iter_attribute(self.cursors, "name"):
+            if sel:
+                c = [o for o in self.graphicsObjects if o.backend.name == cId]
+                if len(c):
+                    self.selectedCursor = c[0]
+                    self.signalGraphicsObjectSelected.emit(self.selectedCursor.backend)
+                    return
+                
+        self.selectedCursor = None
+        self.signalGraphicsDeselected.emit()
             
     @pyqtSlot(str, bool)
     @safeWrapper
-    def slot_setSelectedRoi(self, rId, sel):
-        if len(self.__rois__) == 0 or rId not in self.__rois__.keys():
-            self.selectedRoi = None
-            self.signalGraphicsDeselected.emit()
-            return
-        
-        if sel:
-            self.selectedRoi = self.__rois__[rId]
-            self.signalCursorSelected.emit(self.selectedRoi.backend)
+    def slot_setSelectedRoi(self, rId:str, sel:bool):
+        if rId in iter_attribute(self.rois, "name"):
+            if sel:
+                r = [o for o in self.graphicsObjects if o.backend.name == rId]
+                if len(r):
+                    self.selectedRoi = r[0]
+                    self.signalGraphicsObjectSelected.emit(self.selectedRoi.backend)
+                    return
             
-        else:
-            self.selectedRoi = None
-            self.signalGraphicsDeselected.emit()
+        self.selectedRoi = None
+        self.signalGraphicsDeselected.emit()
             
     @pyqtSlot()
     @safeWrapper
     def slot_newHorizontalCursor(self):
-        obj = self.createNewCursor(pgui.PlanarGraphicsType.horizontal_cursor)
+        obj = self.newGraphicsObject(pgui.HorizontalCursor)
         if obj is not None:
             self.signalCursorAdded.emit(obj.backend)
 
     @pyqtSlot()
     @safeWrapper
     def slot_newPointCursor(self):
-        obj = self.createNewCursor(pgui.PlanarGraphicsType.point_cursor)
+        obj = self.newGraphicsObject(pgui.PointCursor)
         if obj is not None:
             self.signalCursorAdded.emit(obj.backend)
     
     @pyqtSlot()
     @safeWrapper
     def slot_newVerticalCursor(self):
-        obj = self.createNewCursor(pgui.PlanarGraphicsType.vertical_cursor)
+        obj = self.newGraphicsObject(pgui.VerticalCursor)
         if obj is not None:
             self.signalCursorAdded.emit(obj.backend)
     
     @pyqtSlot()
     @safeWrapper
     def slot_newCrosshairCursor(self):
-        obj = self.createNewCursor(pgui.PlanarGraphicsType.crosshair_cursor)
+        obj = self.newGraphicsObject(pgui.CrosshairCursor)
         if obj is not None:
             self.signalCursorAdded.emit(obj.backend)
     
     @pyqtSlot(str)
     @safeWrapper
     def slot_selectCursor(self, crsId):
-        if crsId in self.__cursors__.keys():
+        if crsId in iter_attribute(self.cursors, "name"):
             self.slot_setSelectedCursor(crsId, True)
+      
+    @pyqtSlot(str)
+    @safeWrapper
+    def slot_selectGraphicsObject(self, objId):
+        self.slot_setSelectedGraphicsObject(objId)
       
     @pyqtSlot()
     @safeWrapper
@@ -1941,57 +2071,74 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def slot_receiveCursorLinkRequest(self):
         pass
     
-    #@pyqtSlot(int, str, "QPointF")
     @pyqtSlot(str, "QPointF")
     @safeWrapper
-    #def slot_reportCursorPos(self, cType, crsId, pos):
     def slot_reportCursorPos(self, crsId, pos):
-        obj = self.__cursors__.get(crsId, None)
-        if obj is not None:
-            #if cType & pgui.PlanarGraphicsType.vertical_cursor:
+        if crsId in iter_attribute(self.cursors, "name"):
+            obj = [o for o in self.cursors]
+            if len(obj) == 0:
+                return
+            
+            obj = obj[0]
             if isinstance(obj, pgui.VerticalCursor):
                 self.signalCursorAt[str, list].emit(crsId, \
                     [np.floor(pos.x()), None, obj.xwindow])
                 
-            #elif cType & pgui.PlanarGraphicsType.horizontal_cursor:
             elif isinstance(obj, pgui.HorizontalCursor):
                 self.signalCursorAt[str, list].emit(crsId, \
                     [None, np.floor(pos.y()), self.__cursors__[crsId].ywindow])
                 
-            #elif cType & (pgui.PlanarGraphicsType.crosshair_cursor | pgui.PlanarGraphicsType.point_cursor):
             elif isinstance(obj, (pgui.CrosshairCursor, pgui.PointCursor)):
                 self.signalCursorAt[str, list].emit(crsId, \
                     [np.floor(pos.x()), np.floor(pos.y()), self.__cursors__[crsId].xwindow, self.__cursors__[crsId].ywindow])
-                        
+                
     @pyqtSlot()
     @safeWrapper
     def slot_removeCursors(self):
-        if len(self.__cursors__) == 0:
+        if len([o for o in self.cursors]) == 0:
             return
         
-        cursors = [c for c in self.__cursors__.values()]
-                
-        for crs in cursors:
-            self.scene.removeItem(crs)
-            
-            if crs in crs.backend.frontends:
-                crs.backend.frontends.remove(crs)
-            
-        cursorTypeInts = [t.value for t in pgui.PlanarGraphicsType if \
-            t.value < pgui.PlanarGraphicsType.allCursorTypes]
+        cselectDlg = pgui.ItemsListDialog(self, sorted([c.name for c in self.cursors]), 
+                                          title="Remove cursor",
+                                          selectmode=QtWidgets.QAbstractItemView.MultiSelection)
         
-        for k in cursorTypeInts:
-            self._graphicsObjects_[k].clear()
+        a = cselectDlg.exec_()
+        
+        if a == QtWidgets.QDialog.Accepted:
+            crsIds = cselectDlg._selectedItemText_ # this is a list of str here!
+        else:
+            return
+        
+        cursors = [o for o in filter(lambda x: isinstance(x.backend, pgui.Cursor) and x.backend.name in crsIds, self.graphicsObjects)]
+
+        if self.selectedCursor in cursors:
+            self.selectedCursor = None
+            
+        for c in cursors:
+            c.backend.frontends.clear()
+            self.scene.removeItem(c)
+            
+        self.update(self._imageGraphicsView.childrenRegion())
+        
+        self.scene.update(self.scene.sceneRect().x(), 
+                          self.scene.sceneRect().y(), 
+                          self.scene.sceneRect().width(), 
+                          self.scene.sceneRect().height())
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_removeAllCursors(self):
+        for crs in filter(lambda x: isinstance(x.backend, pgui.Cursor), self.graphicsObjects):
+            crs.backend.frontends.clear()
+            self.scene.removeItem(crs)
             
         self.selectedCursor = None
         
-        self.__cursors__.clear()
-        
         self.update(self._imageGraphicsView.childrenRegion())
         
-        self.scene.update(self.scene.sceneRect().x(), \
-                          self.scene.sceneRect().y(), \
-                          self.scene.sceneRect().width(), \
+        self.scene.update(self.scene.sceneRect().x(), 
+                          self.scene.sceneRect().y(), 
+                          self.scene.sceneRect().width(), 
                           self.scene.sceneRect().height())
         
     @pyqtSlot()
@@ -2000,60 +2147,43 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         if self.selectedCursor is None:
             return
         
-        self.slot_removeCursorByName(self.selectedCursor.name)
+        self.selectedCursor.backend.frontends.clear()
+        self.scene.removeItem(self.selectedCursor)
+        self.signalCursorRemoved.emit(self.selectedCursor.backend)
+        
+        self.selectedCursor = None
+        
+        self.update(self._imageGraphicsView.childrenRegion())
+        
+        self.scene.update(self.scene.sceneRect().x(), 
+                          self.scene.sceneRect().y(), 
+                          self.scene.sceneRect().width(), 
+                          self.scene.sceneRect().height())
         
     @pyqtSlot()
     @safeWrapper
     def slot_removeCursor(self):
-        if len(self.__cursors__) == 0:
+        if len([o for o in self.cursors]) == 0:
             return
         
-        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in self.__cursors__.keys():
+        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.cursors, "name"):
             self.slot_removeCursorByName(self._cursorContextMenuSourceId)
         
     @pyqtSlot(str)
     @safeWrapper
     def slot_removeCursorByName(self, crsId):
-        #if isinstance(self.__image_viewer__, ImageViewer):
-            #print("GraphicsImageViewerWidget of %s slot_removeCursorByName %s" % (self.__image_viewer__.windowTitle(), crsId))
-        #else:
-            #print("GraphicsImageViewerWidget slot_removeCursorByName %s" % crsId)
-            
-        if len(self.__cursors__) == 0:
-            return
-        
-        if crsId in self.__cursors__.keys():
-            cursor = self.__cursors__[crsId]
-            
-            self.scene.removeItem(cursor)
-            
-            if self.selectedCursor == cursor:
-                self.selectedCursor = None
-                
-            cType = cursor.backend.type.value
-            
-            #if isinstance(cursor.objectType, pgui.PlanarGraphicsType):
-                #cType = cursor.objectType.value
-                
-            #else:
-                #cType = cursor.objectType
-
-            #removed_cursor = self._graphicsObjects_[cType].pop(crsId, None)
-            self._graphicsObjects_[cType].pop(crsId, None)
-            
-            if cursor in cursor.backend.frontends:
-                cursor.backend.frontends.remove(cursor)
-
-            self.signalCursorRemoved.emit(cursor.backend)
-            
-            #del cursor
-            #del removed_cursor
+        if crsId in iter_attribute(self.cursors, "name"):
+            c = [o for o in self.graphicsObjects if isinstance(o.backend, pgui.Cursor) and o.backend.name == crsId]
+            if len(c):
+                c[0].backend.frontends.clear()
+                self.scene.removeItem(c[0])
+                self.signalCursorRemoved.emit(c[0].backend)
             
         self.update(self._imageGraphicsView.childrenRegion())
         
-        self.scene.update(self.scene.sceneRect().x(), \
-                          self.scene.sceneRect().y(), \
-                          self.scene.sceneRect().width(), \
+        self.scene.update(self.scene.sceneRect().x(), 
+                          self.scene.sceneRect().y(), 
+                          self.scene.sceneRect().width(), 
                           self.scene.sceneRect().height())
         
     @pyqtSlot()
@@ -2081,9 +2211,9 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.selectedRoi = None
         
         self.update(self._imageGraphicsView.childrenRegion())
-        self.scene.update(self.scene.sceneRect().x(), \
-                          self.scene.sceneRect().y(), \
-                          self.scene.sceneRect().width(), \
+        self.scene.update(self.scene.sceneRect().x(), 
+                          self.scene.sceneRect().y(),
+                          self.scene.sceneRect().width(), 
                           self.scene.sceneRect().height())
         
     @pyqtSlot()
@@ -2193,7 +2323,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
         """
         return filter_type(self.scene.items(), pgui.GraphicsObject)
-        #return filter(lambda x: isinstance(x, pgui.GraphicsObject), self.scene.items())
         
     @property
     def planarGraphics(self) -> typing.Iterator:
@@ -2875,8 +3004,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @pyqtSlot()
     @safeWrapper
-    def slot_removeCursors(self):
-        self.viewerWidget.slot_removeCursors()
+    def slot_removeAllCursors(self):
+        self.viewerWidget.slot_removeAllCursors()
 
     @pyqtSlot()
     @safeWrapper
@@ -3763,7 +3892,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.viewerWidget.signalCursorAdded[object].connect(self.slot_graphicsObjectAdded)
         self.viewerWidget.signalCursorChanged[object].connect(self.slot_graphicsObjectChanged)
         self.viewerWidget.signalCursorRemoved[object].connect(self.slot_graphicsObjectRemoved)
-        self.viewerWidget.signalCursorSelected[object].connect(self.slot_graphicsObjectSelected)
+        self.viewerWidget.signalGraphicsObjectSelected[object].connect(self.slot_graphicsObjectSelected)
         #self.viewerWidget.signalCursorDeselected[object].connect(self.slot_graphicsObjectDeselected)
         
         self.viewerWidget.signalRoiAdded[object].connect(self.slot_graphicsObjectAdded)
@@ -3886,8 +4015,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.removeCursorAction = self.removeCursorsMenu.addAction("Remove Selected Cursor")
         self.removeCursorAction.triggered.connect(self.viewerWidget.slot_removeSelectedCursor)
         
+        self.removeCursorsAction = self.removeCursorsMenu.addAction("Remove cursors ...")
+        self.removeCursorsAction.triggered.connect(self.viewerWidget.slot_removeCursors)
+        
         self.removeAllCursorsAction = self.removeCursorsMenu.addAction("Remove All Cursors")
-        self.removeAllCursorsAction.triggered.connect(self.viewerWidget.slot_removeCursors)
+        self.removeAllCursorsAction.triggered.connect(self.viewerWidget.slot_removeAllCursors)
         
         self.cursorsMenu.addMenu(self.removeCursorsMenu)
         
@@ -4715,10 +4847,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._scaleBarLength_ = length
         self._scaleBarOrigin_ = origin
         
-    def addPlanarGraphics(self, item:pgui.PlanarGraphics, pos=None, movable=True, editable=True, 
-                          label=None, window=None, radius=None, 
-                          frame=None, framesVisible=None,
-                          showLabel=True, labelShowsPosition=True):
+    def addPlanarGraphics(self, item:pgui.PlanarGraphics, movable=True, editable=True, 
+                          showLabel=True, labelShowsPosition=True, autoSelect=True):
         """Programmatically add a roi or a cursor to the underlying scene.
         
         Parameters:
@@ -4729,53 +4859,19 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         Keyword parameters:
         ==================
         Passed to GraphicsObject constructor via GraphicsImageViewerWidget 
-        createNewRoi() or createnewCursor() methods.
+        newGraphicsObject(...) method.
         
         NOTE: To manually add a roi or cursor in the window, use the window menu
         
         """
+        obj = self.viewerWidget.newGraphicsObject(item, 
+                                                movable             = movable,
+                                                editable            = editable, 
+                                                showLabel           = showLabel,
+                                                labelShowsPosition  = labelShowsPosition,
+                                                autoSelect          = autoSelect)
         
-        if isinstance(item, pgui.Cursor):
-            #print("window %s adds cursor %s in frame %s\n" % (self.__repr__(), item.type, framesVisible))
-            
-            if framesVisible is None:
-                framesVisible = item.frameIndices
-                
-            
-            obj = self.viewerWidget.createNewCursor(item, 
-                                                    pos                 = pos,
-                                                    movable             = movable,
-                                                    editable            = editable, 
-                                                    frame               = frame,
-                                                    label               = label,
-                                                    frameVisibility     = framesVisible,
-                                                    showLabel           = showLabel,
-                                                    labelShowsPosition  = labelShowsPosition,
-                                                    parentWidget        = self)
-            
-        elif isinstance(item, pgui.PlanarGraphics):
-            #print("ImageViewer %s addPlanarGraphics pgui.PlanarGraphics" % self.windowTitle(), item)
-            roiType = item.type
-
-            if framesVisible is None:
-                framesVisible = item.frameIndices
-                
-            obj = self.viewerWidget.createNewRoi(params                 = item, 
-                                                 roiType                = roiType, 
-                                                 label                  = label, 
-                                                 frame                  = frame, 
-                                                 pos                    = pos,
-                                                 movable                =  movable, 
-                                                 editable               = editable, 
-                                                 frameVisibility        = framesVisible,
-                                                 showLabel              = showLabel,
-                                                 labelShowsPosition     = labelShowsPosition,
-                                                 parentWidget           = self)
-            
-        else:
-            raise TypeError("Unexpected item parameter: %s" % type(item).__name__)
-
-        if isinstance(obj, pgui.PlanarGraphics) and obj.objectType & pgui.PlanarGraphicsType.allCursorTypes:
+        if isinstance(obj.backend, pgui.Cursor):
             if isinstance(self.cursorsColor, QtGui.QColor) and self.cursorsColor.isValid():
                 obj.color = self.cursorsColor
                 
@@ -4783,7 +4879,55 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             if isinstance(self.roisColor, QtGui.QColor) and self.roisColor.isValid():
                 obj.color = self.roisColor
                 
-        return obj
+        return obj.backend
+        
+        #if isinstance(item, pgui.Cursor):
+            #if framesVisible is None:
+                #framesVisible = item.frameIndices
+                
+            
+            #obj = self.viewerWidget.createNewCursor(item, 
+                                                    #pos                 = pos,
+                                                    #movable             = movable,
+                                                    #editable            = editable, 
+                                                    #frame               = frame,
+                                                    #label               = label,
+                                                    #frameVisibility     = framesVisible,
+                                                    #showLabel           = showLabel,
+                                                    #labelShowsPosition  = labelShowsPosition,
+                                                    #parentWidget        = self)
+            
+        #elif isinstance(item, pgui.PlanarGraphics):
+            ##print("ImageViewer %s addPlanarGraphics pgui.PlanarGraphics" % self.windowTitle(), item)
+            #roiType = item.type
+
+            #if framesVisible is None:
+                #framesVisible = item.frameIndices
+                
+            #obj = self.viewerWidget.createNewRoi(params                 = item, 
+                                                 #roiType                = roiType, 
+                                                 #label                  = label, 
+                                                 #frame                  = frame, 
+                                                 #pos                    = pos,
+                                                 #movable                =  movable, 
+                                                 #editable               = editable, 
+                                                 #frameVisibility        = framesVisible,
+                                                 #showLabel              = showLabel,
+                                                 #labelShowsPosition     = labelShowsPosition,
+                                                 #parentWidget           = self)
+            
+        #else:
+            #raise TypeError("Unexpected item parameter: %s" % type(item).__name__)
+
+        #if isinstance(obj, pgui.PlanarGraphics) and obj.objectType & pgui.PlanarGraphicsType.allCursorTypes:
+            #if isinstance(self.cursorsColor, QtGui.QColor) and self.cursorsColor.isValid():
+                #obj.color = self.cursorsColor
+                
+        #else:
+            #if isinstance(self.roisColor, QtGui.QColor) and self.roisColor.isValid():
+                #obj.color = self.roisColor
+                
+        #return obj
     
     @pyqtSlot()
     @safeWrapper

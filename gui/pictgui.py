@@ -346,14 +346,17 @@ class MouseEventSink(QtCore.QObject):
         super(MouseEventSink, self).__init__(*args, **kwargs)
         
     def eventFilter(self, obj, evt):
-        if evt.type() in (QtCore.QEvent.GraphicsSceneMouseDoubleClick, QtCore.QEvent.GraphicsSceneMousePress, QtCore.QEvent.GraphicsSceneMouseRelease, \
-                          QtCore.QEvent.GraphicsSceneHoverEnter, QtCore.QEvent.GraphicsSceneHoverLeave, QtCore.QEvent.GraphicsSceneHoverMove, \
+        if evt.type() in (QtCore.QEvent.GraphicsSceneMouseDoubleClick, 
+                          QtCore.QEvent.GraphicsSceneMousePress, 
+                          QtCore.QEvent.GraphicsSceneMouseRelease,
+                          QtCore.QEvent.GraphicsSceneHoverEnter, 
+                          QtCore.QEvent.GraphicsSceneHoverLeave, 
+                          QtCore.QEvent.GraphicsSceneHoverMove,
                           QtCore.QEvent.GraphicsSceneMouseMove):
             return True
         
         else:
             return False
-            #return QtCore.QObject.eventFilter(obj, evt)
     
 class ColorMapList(QtWidgets.QListWidget):
     """
@@ -411,7 +414,7 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         super(ItemsListDialog, self).__init__(parent)
         self.setupUi(self)
         self.setModal(modal)
-        self._selectedItemText_ = list()
+        self._selectedItemText_ = ""
         self.preSelected = list()
         
         self.searchLineEdit.undoAvailable=True
@@ -439,9 +442,10 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
                 
             self.setItems(itemsList)
             
+        self.selectionMode = selectmode
+            
     @pyqtSlot(str)
     def slot_locateSelectName(self, txt):
-        #found_items = self.listWidget.findItems(txt, QtCore.Qt.MatchContains | QtCore.Qt.MatchWildcard)
         found_items = self.listWidget.findItems(txt, QtCore.Qt.MatchContains)
         for row in range(self.listWidget.count()):
             self.listWidget.item(row).setSelected(False)
@@ -449,9 +453,12 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         if self.selectionMode == QtWidgets.QAbstractItemView.SingleSelection:
             if len(found_items):
                 found_items[-1].setSelected(True)
+                self._selectedItemText_ = found_items[-1].text()
                 self.itemSelected.emit(str(found_items[-1].text()))
         else:
+            self._selectedItemText_ = list()
             for item in found_items:
+                self._selectedItemText_.append(item.text())
                 item.setSelected(True)
                 self.itemSelected.emit(str(item.text()))
       
@@ -466,6 +473,15 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
     @property
     def selectionMode(self):
         return self.listWidget.selectionMode()
+    
+    @property
+    def selectedItemText(self):
+        """A str for single selection mode, else a list of str.
+        
+        By default the dialog operates in single selection mode.
+        
+        """
+        return self._selectedItemText_
     
     @selectionMode.setter
     def selectionMode(self, selectmode):
@@ -512,10 +528,6 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
                 if k == 0:
                     self.listWidget.setCurrentRow(ndx)
                 
-                #items = self.listWidget.findItems(s, QtCore.Qt.MatchExactly)
-                #for i in items:
-                    #i.setSelected(True)
-            
             fm = QtGui.QFontMetrics(self.listWidget.font())
             w = fm.width(longestItem) * 1.1
             
@@ -526,8 +538,14 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
 
     @pyqtSlot(QtWidgets.QListWidgetItem)
     def selectItem(self, item):
-        #self._selectedItemText_ = item.text()
+        self._selectedItemText_ = item.text()
         self.itemSelected.emit(str(item.text())) # this is a QString !!!
+        
+    @pyqtSlot(QtWidgets.QListWidgetItem)
+    def selectAndGo(self, item):
+        self._selectedItemText_ = item.text()
+        self.itemSelected.emit(item.text())
+        self.accept()
         
     @property
     def selectedItems(self):
@@ -545,12 +563,6 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         if len(items):
             return items[0].text()
     
-    @pyqtSlot(QtWidgets.QListWidgetItem)
-    def selectAndGo(self, item):
-        self._selectedItemText_ = item.text()
-        self.itemSelected.emit(item.text())
-        self.accept()
-        
 class SelectablePlotItem(pg.PlotItem):
     itemClicked = pyqtSignal()
     

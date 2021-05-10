@@ -633,6 +633,8 @@ class PlanarGraphics():
     
     _qt_path_composition_call_ = ""
     
+    _default_label_ = ""
+   
     # NOTE: properties (descriptor names) do not belong here
     _required_attributes_ = ("_states_", "_currentframe_", "_currentstates_",
                              "_ID_", "_linked_objects_",)
@@ -948,11 +950,17 @@ class PlanarGraphics():
                 however, it is highly recommended to pass a non-empty string here.
                 
                 The default naming rule is as follows:
+                NOTE: 2021-05-10 11:28:52 implemented in the :class: attribute
+                "_default_label_"
+                
+                PlanarGraphics: ""
+                
                 * for cursors:
                     CrosshairCursor:    "cc"
                     HorizontalCursor:   "hc"
                     PointCursor:        "pc"
                     VerticalCursor:     "vc"
+                    Cursor:             "cr"
                     
                 * for non-cursors:
                     Arc:                "a"
@@ -962,7 +970,8 @@ class PlanarGraphics():
                     Line:               "l"
                     Move/Start/Point:   "m"
                     Path:               "p"
-                        NOTE: this includes polylines and polygons
+                        NOTE: for polylines and polygons this is overridden in
+                        __init__, to "pl" and "pg"
                     Quad:               "q"
                     Rect:               "r"
                     Text:               "t"
@@ -1018,9 +1027,9 @@ class PlanarGraphics():
         # NOTE: 2021-05-08 10:07:01 - automatic ID assignment rule
         # CAUTION: should be overruled in subclasses; better to assign a valid
         # non-empty string here
-        if name is None or (isinstance(name, str) and len(name.strip()) == 0):
-            name = self.__class__.__name__[0].lower()
-        
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            name = self.__class__._default_label_
+
         #print("PlanarGraphics (%s).__init__ *args" % self.__class__.__name__, *args)
         
         self.apiversion = (0,3)
@@ -4435,6 +4444,8 @@ class Cursor(PlanarGraphics):
     
     _qt_path_composition_call_ = None
     
+    _default_label_ = "cr"
+
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
                  graphicstype=PlanarGraphicsType.crosshair_cursor, closed=False,
                  linked_objects=dict()):
@@ -4468,10 +4479,6 @@ class Cursor(PlanarGraphics):
         When width or height are None, they will use the full size of their 
         corresponding image axes.
         """
-        
-        if name is None or (isinstance(name, str) and len(name.strip()) == 0):
-            name = "cr"
-        
         super().__init__(*args, name=name, frameindex=frameindex, 
                          currentframe=currentframe, 
                          graphicstype=graphicstype, 
@@ -4539,12 +4546,10 @@ class Cursor(PlanarGraphics):
 class VerticalCursor(Cursor):
     _planar_graphics_type_ = PlanarGraphicsType.vertical_cursor
     
+    _default_label_ = "vc"
+   
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
                  linked_objects=dict(), **kwargs):
-        
-        if not isinstance(name, str) or len(name.strip()) == 0:
-            name = "vc"
-        
         super().__init__(*args, name=name, frameindex=frameindex, 
                          currentframe=currentframe, 
                          graphicstype=PlanarGraphicsType.vertical_cursor, 
@@ -4570,13 +4575,11 @@ class VerticalCursor(Cursor):
         
 class HorizontalCursor(Cursor):
     _planar_graphics_type_ = PlanarGraphicsType.horizontal_cursor
+
+    _default_label_ = "hc"
    
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
                  linked_objects=dict(), **kwargs):
-        
-        if not isinstance(name, str) or len(name.strip()) == 0:
-            name = "hc"
-        
         super().__init__(*args, name=name, frameindex=frameindex, 
                          currentframe=currentframe, 
                          graphicstype=PlanarGraphicsType.horizontal_cursor, 
@@ -4603,13 +4606,11 @@ class HorizontalCursor(Cursor):
         
 class CrosshairCursor(Cursor):
     _planar_graphics_type_ = PlanarGraphicsType.crosshair_cursor
+    
+    _default_label_ = "cc"
    
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
                  linked_objects=dict(), **kwargs):
-        
-        if not isinstance(name, str) or len(name.strip()) == 0:
-            name = "cc"
-        
         super().__init__(*args, name=name, frameindex=frameindex, 
                          currentframe=currentframe, 
                          graphicstype=PlanarGraphicsType.crosshair_cursor, 
@@ -4638,6 +4639,8 @@ class CrosshairCursor(Cursor):
         
 class PointCursor(Cursor):
     _planar_graphics_type_ = PlanarGraphicsType.point_cursor
+   
+    _default_label_ = "pc"
    
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
                  linked_objects=dict(), **kwargs):
@@ -4694,6 +4697,8 @@ class Arc(PlanarGraphics):
     _planar_graphics_type_ = PlanarGraphicsType.arc
     
     _qt_path_composition_call_ = "arcTo"
+    
+    _default_label_ = "a"
     
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, graphicstype=None, 
                  closed=False, linked_objects=dict()):
@@ -4856,6 +4861,8 @@ class ArcMove(PlanarGraphics):
     
     _qt_path_composition_call_ = "arcMoveTo"
     
+    _default_label_ = "av"
+    
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
                  graphicstype=None, closed=False,
                  linked_objects=dict()):
@@ -5015,7 +5022,8 @@ class Line(PlanarGraphics):
     
     _qt_path_composition_call_ = "lineTo"
 
-    #"def" __init__(self, x, y, name=None, frameindex=[], currentframe=0):
+    _default_label_ = "l"
+   
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, graphicstype=None,
                  closed=False,
                  linked_objects=dict()):
@@ -5088,6 +5096,8 @@ class Move(PlanarGraphics):
     
     _qt_path_composition_call_ = "moveTo"
 
+    _default_label_ = "m"
+   
     #"def" __init__(self, x, y, name=None, frameindex=[], currentframe=0):
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
                  graphicstype=None, closed=False,
@@ -5173,6 +5183,8 @@ class Cubic(PlanarGraphics):
     _planar_graphics_type_ = PlanarGraphicsType.cubic
     
     _qt_path_composition_call_ = "cubicTo"
+
+    _default_label_ = "c"
 
     #"def" __init__(self, x, y, c1x, c1y, c2x, c2y, name=None, frameindex=[], currentframe=0):
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, graphicstype=None,
@@ -5321,7 +5333,8 @@ class Quad(PlanarGraphics):
     
     _qt_path_composition_call_ = "quadTo"
 
-    #"def" __init__(self, x, y, cx, cy, name=None, frameindex=[]):
+    _default_label_ = "q"
+   
     def __init__(self, *args, name=None, frameindex=[], currentFrame=0, 
                  graphicstype=None, closed=False,
                  linked_objects=dict()):
@@ -5435,7 +5448,8 @@ class Ellipse(PlanarGraphics):
     
     _qt_path_composition_call_ = "addEllipse"
     
-    #"def" __init__(self, x, y, w, h, name=None, frameindex=[], currentframe=0):
+    _default_label_ = "e"
+
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, graphicstype=None, 
                  closed=False,
                  linked_objects=dict()):
@@ -5560,6 +5574,8 @@ class Rect(PlanarGraphics):
     
     _qt_path_composition_call_ = "addRect"
 
+    _default_label_ = "r"
+   
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, graphicstype=None,
                  closed=False, linked_objects=dict()):
         """
@@ -5748,6 +5764,8 @@ class Text(PlanarGraphics):
     
     _required_attributes_ = ("_ID_")
     
+    _default_label_ = "t"
+   
     @classmethod
     def defaultState(cls):
         return DataBag(text="", x=0, y=0, z_frame=None, 
@@ -5936,6 +5954,8 @@ class Path(PlanarGraphics):
     
     _qt_path_composition_call_ = "addPath"
     
+    _default_label_ = "p"
+   
     _required_attributes_ = ("_ID_", "_linked_objects_", "_segment_lengths_", 
                              "_objects_")
 
@@ -7550,7 +7570,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     
     # it is up to the cursor manager (a graphics viewer widget) to decide what 
     # to do with this (i.e., what menu & actions to generate)
-    requestContextMenu = pyqtSignal(str,QtCore.QPoint, name="requestContextMenu")
+    requestContextMenu = pyqtSignal(str, QtCore.QPoint, name="requestContextMenu")
     
     signalROIConstructed = pyqtSignal(int, str, name="signalROIConstructed")
     
@@ -7715,11 +7735,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self._c_activePoint         = -1 # shape point editing - used in edit & build modes
         self._c_activeControlPoint  = -1 # path control point editing; valid values are 0 and 1
         self._control_points        = [None, None]  # used in curve (cubic, quad) segment building for path ROIs
-        self._constrainedPoint      = None
         self._hover_point           = None    # because a null QPointF is still valid:
+        self._constrainedPoint      = None
         self._movePoint             = False
-        
-
         self._cachedPath_ = Path() # used in build mode
         
         # NOTE: 2017-06-29 08:32:11
@@ -8515,6 +8533,26 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         # instead of "__paint__" in self.paint(...) - see NOTE: 2021-03-07 18:30:02
         self.__paint__(painter, styleOption, widget)
         
+    #def __getattr__(self, name:str):
+        #backend = object.__getattribute__(self, "_backend_")
+        #if backend and name in backend.__class__._planar_descriptors_:
+            #state = backend.getState()
+            #if isinstance(state, dict):
+                #return state[name]
+            
+        #return object.__getattribute__(self, name)
+    
+    #def __setattr__(self, name:str, value:typing.Any):
+        #backend = object.__getattribute__(self, "_backend_")
+        #if backend and name in backend.__class__._planar_descriptors_:
+            #state = backend.getState()
+            #if isinstance(state, dict):
+                #state[name] = value
+                
+        #else:
+            #object.__setattr__(self, name, value)
+        
+        
     #@safeWrapper
     def __paint__(self, painter, styleOption, widget):
         """Does the actual painting of the item.
@@ -8532,40 +8570,40 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             if not self._buildMode_:
                 if self._backend_ is None or not self._backend_.hasStateForFrame():
                     return
-                
-                #if not self._backend_.hasStateForFrame():
-                    #return
+                    
+            linePen = QtGui.QPen(self.defaultPen)
+            textPen = QtGui.QPen(self.defaultTextPen)
                 
             if self._buildMode_: # in build mode; not a cursor
-                painter.setPen(self._selectedCursorPen)
-                textPen = self._textPen
+                painter.setPen(QtGui.QPen(self._selectedCursorPen))
+                textPen = QtGui.QPen(self._textPen)
                 
             else: # not in build mode; may be a cursor
                 if self.isSelected(): # inherited from QGraphicsItem via QGraphicsObject
                     if self.isLinked:
-                        painter.setPen(self._linkedSelectedPen)
-                        textPen = self._linkedTextPen
+                        linePen = QtGui.QPen(self._cBSelectedPen)
+                        textPen = QtGui.QPen(self._textCBPen)
                         
-                    elif len(self._backend_.frontends) > 0:
-                        painter.setPen(self._cBSelectedPen)
-                        textPen = self._textCBPen
+                    elif len(self._backend_.frontends) > 1:
+                        linePen = QtGui.QPen(self._linkedSelectedPen)
+                        textPen = QtGui.QPen(self._linkedTextPen)
                         
                     else:
-                        painter.setPen(self._selectedCursorPen)
-                        textPen = self._textPen
+                        linePen = QtGui.QPen(self._selectedCursorPen)
+                        textPen = QtGui.QPen(self._textPen)
                         
                 else:
                     if self.isLinked:
-                        painter.setPen(self._linkedPen)
-                        textPen = self._linkedTextPen
+                        linePen = QtGui.QPen(self._cBPen)
+                        textPen = QtGui.QPen(self._textCBPen)
                         
-                    elif len(self._backend_.frontends) > 0:
-                        painter.setPen(self._cBPen)
-                        textPen = self._textCBPen
+                    elif len(self._backend_.frontends) > 1:
+                        linePen = QtGui.QPen(self._linkedPen)
+                        textPen = QtGui.QPen(self._linkedTextPen)
                         
                     else:
-                        painter.setPen(self._cursorPen)
-                        textPen = self._textPen
+                        linePen = QtGui.QPen(self._cursorPen)
+                        textPen = QtGui.QPen(self._textPen)
 
             labelPos = None         # NOTE: 2017-06-23 09:41:24
                                     # below I calculate a default label position
@@ -8587,9 +8625,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 rects = list()
                 
                 state = self._backend_.currentState
-                
-                #if state is None or len(state) == 0:
-                    #return
                 
                 if "GraphicsImageViewerScene" in type(self.scene()).__name__:
                     sceneWidth  = self.scene().rootImage.boundingRect().width()
@@ -8670,6 +8705,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     
                     labelY = max([min([state.y - self._labelRect.height(), labelYmax]), labelYmin])
                     
+                painter.setPen(linePen)
                 if len(lines):
                     painter.drawLines(lines)
                     
@@ -8908,7 +8944,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                                        self._backend_.h)
                             
                             painter.drawPoint(p_)
-
                             painter.drawEllipse(r_)
                             
                         else: # general Path backend, including polyline, polygon
@@ -10155,17 +10190,11 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         for f in self._backend_.frontends:
             if f != self:
                 f.redraw()
+                
+        for  o in self._backend_.linkedObjects:
+            for f in o.frontends:
+                f.frameVisibility = value
         
-        if len(self._linkedGraphicsObjects):
-            # NOTE: this is now a list of backends!
-            for c in self._linkedGraphicsObjects:
-                if c != self._backend_:
-                    c.frameIndices = value
-                    
-                    for f in c.frontends:
-                        if f != self:
-                            f.redraw()
-
     @property
     def currentFrame(self):
         return self._currentframe_
@@ -10463,8 +10492,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             self._cursorPen.setColor(qcolor)
             self._selectedCursorPen.setColor(qcolor)
             self._textPen.setColor(qcolor)
-            self.update()
-    
+            self.redraw()
+            
     @property
     def linkedColor(self):
         return self.penColor
