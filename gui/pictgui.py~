@@ -84,10 +84,10 @@ from core.workspacefunctions import debug_scipyen
 from . import quickdialog
 from . import resources_rc
 from .planargraphics import (Arc, ArcMove, Cubic, Cursor, Ellipse, Line, Move, Path,
-                           PlanarGraphics, Point, Quad, Rect, Text,
-                           __new_planar_graphic__,
-                           GraphicsObject, GraphicsObjectType, 
-                           printQPainterPath)
+                           PlanarGraphics, Point, Quad, Rect, Text, VerticalCursor,
+                           HorizontalCursor, CrosshairCursor, PointCursor,
+                           PlanarGraphicsType, GraphicsObjectType, GraphicsObject, 
+                           __new_planar_graphic__, printQPainterPath)
 
 #### END pict.gui modules
 
@@ -346,41 +346,44 @@ class MouseEventSink(QtCore.QObject):
         super(MouseEventSink, self).__init__(*args, **kwargs)
         
     def eventFilter(self, obj, evt):
-        if evt.type() in (QtCore.QEvent.GraphicsSceneMouseDoubleClick, QtCore.QEvent.GraphicsSceneMousePress, QtCore.QEvent.GraphicsSceneMouseRelease, \
-                          QtCore.QEvent.GraphicsSceneHoverEnter, QtCore.QEvent.GraphicsSceneHoverLeave, QtCore.QEvent.GraphicsSceneHoverMove, \
+        if evt.type() in (QtCore.QEvent.GraphicsSceneMouseDoubleClick, 
+                          QtCore.QEvent.GraphicsSceneMousePress, 
+                          QtCore.QEvent.GraphicsSceneMouseRelease,
+                          QtCore.QEvent.GraphicsSceneHoverEnter, 
+                          QtCore.QEvent.GraphicsSceneHoverLeave, 
+                          QtCore.QEvent.GraphicsSceneHoverMove,
                           QtCore.QEvent.GraphicsSceneMouseMove):
             return True
         
         else:
             return False
-            #return QtCore.QObject.eventFilter(obj, evt)
     
-class ColorMapList(QtWidgets.QListWidget):
-    """
-    DEPRECATED
-    Use ItemsListDialog
-    """
-    def __init__(self, parent=None, itemsList=None):
-        QtWidgets.QListWidget.__init__(self, parent)
-        self.selectedColorMap = None
+#class ColorMapList(QtWidgets.QListWidget):
+    #"""
+    #DEPRECATED
+    #Use ItemsListDialog
+    #"""
+    #def __init__(self, parent=None, itemsList=None):
+        #QtWidgets.QListWidget.__init__(self, parent)
+        #self.selectedColorMap = None
         
-        if self.validateItems(itemsList):
-            self.addItems(itemsList)
+        #if self.validateItems(itemsList):
+            #self.addItems(itemsList)
       
-        self.itemClicked.connect(self.selectItem)
-        self.itemDoubleClicked.connect(self.selectAndGo)
+        #self.itemClicked.connect(self.selectItem)
+        #self.itemDoubleClicked.connect(self.selectAndGo)
     
-        # wrong:
-        #self.connect(self, SIGNAL("itemClicked('qt.QListWidgetItem')"), self.mySlot);
+        ## wrong:
+        ##self.connect(self, SIGNAL("itemClicked('qt.QListWidgetItem')"), self.mySlot);
     
-    itemSelected = QtCore.pyqtSignal(str)
+    #itemSelected = QtCore.pyqtSignal(str)
 
 
-    def setItems(self, itemsList):
-        if self.validateItems(itemsList):
-            #self.itemsList = itemsList
-            self.clear()
-            self.addItems(itemsList)
+    #def setItems(self, itemsList):
+        #if self.validateItems(itemsList):
+            ##self.itemsList = itemsList
+            #self.clear()
+            #self.addItems(itemsList)
   
   
 # don't use validate as this overrides a QWidget method and breaks the dialog code below
@@ -411,7 +414,6 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         super(ItemsListDialog, self).__init__(parent)
         self.setupUi(self)
         self.setModal(modal)
-        self._selectedItemText_ = list()
         self.preSelected = list()
         
         self.searchLineEdit.undoAvailable=True
@@ -439,22 +441,18 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
                 
             self.setItems(itemsList)
             
+        self.selectionMode = selectmode
+            
     @pyqtSlot(str)
     def slot_locateSelectName(self, txt):
-        #found_items = self.listWidget.findItems(txt, QtCore.Qt.MatchContains | QtCore.Qt.MatchWildcard)
         found_items = self.listWidget.findItems(txt, QtCore.Qt.MatchContains)
         for row in range(self.listWidget.count()):
             self.listWidget.item(row).setSelected(False)
             
-        if self.selectionMode == QtWidgets.QAbstractItemView.SingleSelection:
-            if len(found_items):
-                found_items[-1].setSelected(True)
-                self.itemSelected.emit(str(found_items[-1].text()))
-        else:
-            for item in found_items:
-                item.setSelected(True)
-                self.itemSelected.emit(str(item.text()))
-      
+        for item in found_items:
+            item.setSelected(True)
+            self.itemSelected.emit(str(item.text()))
+            
     def validateItems(self, itemsList):
         # 2016-08-10 11:51:07
         # NOTE: in python3 all str are unicode
@@ -463,6 +461,12 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
             return False
         return True
 
+    @property
+    def selectedItemsText(self):
+        """A a list of str - text of selected items, which may be empty
+        """
+        return [str(i.text()) for i in self.listWidget.selectedItems()]
+        
     @property
     def selectionMode(self):
         return self.listWidget.selectionMode()
@@ -512,10 +516,6 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
                 if k == 0:
                     self.listWidget.setCurrentRow(ndx)
                 
-                #items = self.listWidget.findItems(s, QtCore.Qt.MatchExactly)
-                #for i in items:
-                    #i.setSelected(True)
-            
             fm = QtGui.QFontMetrics(self.listWidget.font())
             w = fm.width(longestItem) * 1.1
             
@@ -526,30 +526,16 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
 
     @pyqtSlot(QtWidgets.QListWidgetItem)
     def selectItem(self, item):
-        #self._selectedItemText_ = item.text()
         self.itemSelected.emit(str(item.text())) # this is a QString !!!
+        
+    @pyqtSlot(QtWidgets.QListWidgetItem)
+    def selectAndGo(self, item):
+        self.itemSelected.emit(item.text())
+        self.accept()
         
     @property
     def selectedItems(self):
-        items = self.listWidget.selectedItems()
-        
-        if len(items):
-            return [i.text() for i in items]
-            
-        else:
-            return []
-        
-    @property
-    def selectedItem(self):
-        items = self.listWidget.selectedItems()
-        if len(items):
-            return items[0].text()
-    
-    @pyqtSlot(QtWidgets.QListWidgetItem)
-    def selectAndGo(self, item):
-        self._selectedItemText_ = item.text()
-        self.itemSelected.emit(item.text())
-        self.accept()
+        return self.listWidget.selectedItems()
         
 class SelectablePlotItem(pg.PlotItem):
     itemClicked = pyqtSignal()

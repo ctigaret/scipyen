@@ -4986,13 +4986,16 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         else:
             pre_selected = None
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, title="Import Data-wide Descriptors From:", itemsList = name_list, preSelected = pre_selected)
+        choiceDialog = pgui.ItemsListDialog(parent=self, 
+                                            title="Import Data-wide Descriptors From:", 
+                                            itemsList = name_list, 
+                                            preSelected = pre_selected)
         
         ans = choiceDialog.exec()
         
-        if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
+        if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
 
-            lsdata = scandata_name_vars[choiceDialog.selectedItem]
+            lsdata = scandata_name_vars[choiceDialog.selectedItemsText[0]]
             
             for attribute in ("sourceID", "cell", "field", "age", "gender", "genotype"):
                 if hasattr(lsdata, attribute):
@@ -5427,12 +5430,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
 
         name_list = sorted([name for name in scandata_name_vars.keys() if self._check_for_linescan_data_(scandata_name_vars[name])])
         
-        choiceDialog = pgui.ItemsListDialog(title="Append ScanData Object", parent=self, itemsList = name_list)
+        choiceDialog = pgui.ItemsListDialog(title="Append ScanData Object", 
+                                            parent=self, 
+                                            itemsList = name_list)
         
         ans = choiceDialog.exec()
         
-        if ans == QtWidgets.QDialog.Accepted or len(choiceDialog.selectedItems) == 0:
-            lsdata = scandata_name_vars[choiceDialog.selectedItem]
+        if ans == QtWidgets.QDialog.Accepted or len(choiceDialog.selectedItemsText):
+            lsdata = scandata_name_vars[choiceDialog.selectedItemsText[0]]
             
             try:
                 self._data_.concatenate(lsdata)
@@ -5468,18 +5473,16 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
 
         name_list = sorted([name for name in scandata_name_vars.keys() if self._check_for_linescan_data_(scandata_name_vars[name])])
         
-        choiceDialog = pgui.ItemsListDialog(title="Concatenate ScanData Objects", parent=self, itemsList = name_list, 
+        choiceDialog = pgui.ItemsListDialog(title="Concatenate ScanData Objects", 
+                                            parent=self, itemsList = name_list, 
                                             selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
         
         ans = choiceDialog.exec()
         
-        if ans != QtWidgets.QDialog.Accepted or len(choiceDialog.selectedItems) == 0:
+        if ans != QtWidgets.QDialog.Accepted or len(choiceDialog.selectedItemsText) == 0:
             return
         
-        selected_names = choiceDialog.selectedItems
-        
-        if len(selected_names) == 0:
-            return
+        selected_names = choiceDialog.selectedItemsText
         
         self._generic_work_idle_ = False
         
@@ -5513,12 +5516,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         else:
             pre_selected = None
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = name_list, preSelected = pre_selected)
+        choiceDialog = pgui.ItemsListDialog(parent=self, 
+                                            itemsList = name_list, 
+                                            preSelected = pre_selected)
         
         ans = choiceDialog.exec()
         
-        if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
-            lsdata = scandata_name_vars[choiceDialog.selectedItem]
+        if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
+            lsdata = scandata_name_vars[choiceDialog.selectedItemsText[0]]
             if len(lsdata.analysisOptions):
                 if "TriggerEventDetection" not in lsdata.analysisOptions.keys():
                     default_options = scanDataOptions()
@@ -5554,12 +5559,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             else:
                 pre_selected = None
             
-            choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = name_list, preSelected = pre_selected)
+            choiceDialog = pgui.ItemsListDialog(parent=self, 
+                                                itemsList = name_list, 
+                                                preSelected = pre_selected)
             
             ans = choiceDialog.exec()
             
-            if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
-                lsdata = scandata_name_vars[choiceDialog.selectedItem]
+            if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
+                lsdata = scandata_name_vars[choiceDialog.selectedItemsText[0]]
                 self._data_.adoptTriggerProtocols(lsdata)
                 self.displayFrame()
                 #self.displayFrame(alldata=True)
@@ -5603,12 +5610,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             else:
                 pre_selected = None
             
-            choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = name_list, preSelected = pre_selected)
+            choiceDialog = pgui.ItemsListDialog(parent=self, 
+                                                itemsList = name_list, 
+                                                preSelected = pre_selected)
             
             ans = choiceDialog.exec()
             
-            if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
-                lsdata = scandata_name_vars[choiceDialog.selectedItem]
+            if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
+                lsdata = scandata_name_vars[choiceDialog.selectedItemsText[0]]
                 self._data_.adoptTriggerProtocols(lsdata.scansBlock, imaging_source=True)
                 self.displayFrame()
                 #self.displayFrame(alldata = True)
@@ -5651,12 +5660,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             else:
                 pre_selected = None
             
-            choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = name_list, preSelected = pre_selected)
+            choiceDialog = pgui.ItemsListDialog(parent=self, 
+                                                itemsList = name_list, 
+                                                preSelected = pre_selected)
             
             ans = choiceDialog.exec()
             
-            if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
-                lsdata = scandata_name_vars[choiceDialog.selectedItem]
+            if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
+                lsdata = scandata_name_vars[choiceDialog.selectedItemsText[0]]
                 self._data_.adoptAnalysisUnits(lsdata)
                 for c in self._data_.scansCursors.values():
                     c.currentFrame = self.currentFrame
@@ -5704,8 +5715,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
         ans = choiceDialog.exec()
         
-        if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
-            ephysData = neo_block_name_vars[choiceDialog.selectedItem]
+        if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
+            ephysData = neo_block_name_vars[choiceDialog.selectedItemsText[0]]
+            
             ephys_varname = choiceDialog.selectedItem
             
             if len(ephysData.segments) == 0:
@@ -7154,13 +7166,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
         ans = choiceDialog.exec()
         
-        if ans != QtWidgets.QDialog.Accepted or len(choiceDialog.selectedItems) == 0:
+        if ans != QtWidgets.QDialog.Accepted or len(choiceDialog.selectedItemsText) == 0:
             return
         
-        selected_names = choiceDialog.selectedItems
-        
-        if len(selected_names) == 0:
-            return
+        selected_names = choiceDialog.selectedItemsText
         
         # see NOTE: 2018-09-25 22:19:58
         signalBlockers = [QtCore.QSignalBlocker(w) for w in self.scansviewers + self.sceneviewers]
@@ -7514,13 +7523,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
         ans = choiceDialog.exec()
         
-        if ans != QtWidgets.QDialog.Accepted or len(choiceDialog.selectedItems) == 0:
+        if ans != QtWidgets.QDialog.Accepted or len(choiceDialog.selectedItemsText) == 0:
             return
         
-        selected_names = choiceDialog.selectedItems
-        
-        if len(selected_names) == 0:
-            return
+        selected_names = choiceDialog.selectedItemsText
         
         self.statusBar().showMessage("Generating reports ...")
         
@@ -7595,7 +7601,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             
             ans = choiceDialog.exec()
             
-            if ans != QtWidgets.QDialog.Accepted or len(choiceDialog.selectedItems) == 0:
+            if ans != QtWidgets.QDialog.Accepted or len(choiceDialog.selectedItemsText):
                 return
             
             selected_names = choiceDialog.selectedItems
@@ -7690,53 +7696,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
         except Exception as e:
             traceback.print_exc()
-        
-        
-    #"def" slot_export_workspace_result_df_to_csv(self):
-        #"""Writes EPSCaT results (pandas.DataFrame objects) from workspace to csv files.
-        
-        #Each object is exported individually to a *.csv file, with the file named
-        #by appending "*.csv" to the variable name
-        
-        #To collate several EPSCaT result lists into one, use slot_collate_reports()
-        #"""
-        #from workspacefunctions import getvarsbytype
-        
-        #mandatory_keys = ['Data', 'Cell', 'Field', 'Unit', 'Unit_Type', \
-                          #'averaged', 'Protocol', 'Segment', 'Analysis_Date_Time']
-        
-        #dataframe_dict = dict(getvarsbytype(pd.DataFrame, ws = self._scipyenWindow_.workspace))
-        
-        #if len(dataframe_dict) == 0:
-            #return
-        
-        #suitable_items = [item for item in dataframe_dict.items() if \
-                          #all([k in item[1].columns for k in mandatory_keys])]
-                
-        #vars_list = sorted(suitable_items, key=lambda x: x[0])
-        
-        
-        #if len(vars_list) == 0:
-            #return
-        
-        #choiceDialog = pgui.ItemsListDialog(parent=self, itemsList = [item[0] for item in vars_list], 
-                                            #selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
-        
-        
-        #ans = choiceDialog.exec()
-        
-        #if ans != QtWidgets.QDialog.Accepted or len(choiceDialog.selectedItems) == 0:
-            #return
-        
-        #selected_names = choiceDialog.selectedItems
-        
-        #if len(selected_names) == 0:
-            #return
-        
-        #for name in selected_names:
-            #filename = "%s.csv" % name
-            #dataframe_dict[name].to_csv(filename, na_rep = "NA")
-            
         
     @safeWrapper
     @pyqtSlot()
@@ -7837,13 +7796,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
         ans = choiceDialog.exec()
         
-        if ans != QtWidgets.QDialog.Accepted or len(choiceDialog.selectedItems) == 0:
+        if ans != QtWidgets.QDialog.Accepted or len(choiceDialog.selectedItemsText) == 0:
             return
         
-        selected_names = choiceDialog.selectedItems
-        
-        if len(selected_names) == 0:
-            return
+        selected_names = choiceDialog.selectedItemsText
         
         self._generic_work_idle_ = False
         
@@ -9875,15 +9831,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             
         #print("name_list", name_list)
         
-        choiceDialog = pgui.ItemsListDialog(parent=self, title="Load ScanData Object", itemsList = name_list, preSelected = pre_selected)
+        choiceDialog = pgui.ItemsListDialog(parent=self, title="Load ScanData Object", 
+                                            itemsList = name_list, preSelected = pre_selected)
         
         ans = choiceDialog.exec()
         
-        if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
-            #if self._data_ is not None:
-                #self._clear_contents_()
-                
-            lsdata = scandata_name_vars[choiceDialog.selectedItem]
+        if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
+            lsdata = scandata_name_vars[choiceDialog.selectedItemsText[0]]
             lsdata_varname = choiceDialog.selectedItem
             
             self.setData(newdata=lsdata, doc_title=lsdata_varname)

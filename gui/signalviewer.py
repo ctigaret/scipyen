@@ -1404,7 +1404,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                        selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
             
             if dlg.exec() == 1:
-                sel_items = dlg.selectedItems
+                sel_items = dlg.selectedItemsText
                 
                 if len(sel_items):
                     self.guiSelectedSignalNames[:] = sel_items[:]
@@ -1730,7 +1730,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                        selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
             
             if dlg.exec() == 1:
-                sel_items = dlg.selectedItems
+                sel_items = dlg.selectedItemsText
                 
                 if len(sel_items):
                     self.guiSelectedIrregularSignalNames[:] = sel_items[:]
@@ -1740,46 +1740,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
         self.displayFrame()
          
-    #@pyqtSlot(str)
-    #@safeWrapper
-    #def slot_displayedIrregularSignalNameChoiceChanged(self, name):
-        #if name.lower() in ("all"):
-            #self.guiSelectedIrregularSignals.clear()
-            
-        #elif name.lower() == "choose":
-            #self.guiSelectedIrregularSignalNames.clear()
-        ## TODO call GUI chooser dialog
-            #self.guiSelectedIrregularSignalNames.clear()
-            
-            #current_txt = self.selectIrregularSignalComboBox.currentText()
-        
-            #available = [self.selectIrregularSignalComboBox.itemText(k) for k in range(1, self.selectIrregularSignalComboBox.count()-1)]
-            
-            #if current_txt in available:
-                #preSelected = current_txt
-                
-            #else:
-                #preSelected=None
-            
-            #dlg = pgui.ItemsListDialog(parent=self, 
-                                       #itemsList = available, 
-                                       #preSelected = preSelected,
-                                       #title="Select Irregular Signals", 
-                                       #modal=True,
-                                       #selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
-            
-            #if dlg.exec() == 1:
-                #sel_items = dlg.selectedItems()
-                
-                #if len(sel_items):
-                    #self.guiSelectedIrregularSignalNames[:] = sel_items[:]
-                    
-        
-        #else:
-            #self.guiSelectedIrregularSignals = [name]
-            
-        #self.displayFrame()
-
     def linkCursors(self, id1, *ids):
         """ Bidirectionally links cursors of the same type.
         Linked cursors move together when either of them is moved by the user.

@@ -580,6 +580,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         super().__init__(data=y, parent=parent, pWin=pWin, ID=ID,
                          win_title=win_title, doc_title=doc_title,
                          frameIndex=frameIndex, *args, **kwargs)
+        
+        self.loadSettings()
 
         if self.y is not None:
             if self.x is None:
@@ -614,8 +616,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 doc_title = doc_title,
                                 *args, **kwargs)
                 
-
-    def _save_viewer_settings_(self):
+    def saveSettings(self):
+        self.saveWindowSettings()
+        self.saveViewerSettings()
+        
+    def saveViewerSettings(self):
         if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
             self.settings.setValue("/".join([self.__class__.__name__, "CursorsShowValue"]), 
                                    self.setCursorsShowValue.isChecked())
@@ -623,8 +628,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             for dw in self.dockWidgets:
                 self.settings.setValue("/".join([self.__class__.__name__, dw[0]]), dw[1].isVisible())
                 
-            
-    def _load_viewer_settings_(self):
+    def loadSettings(self):
+        self.loadWindowSetings()
+        self.loadViewerSettings()
+        
+    def loadViewerSettings(self):
         if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
             val = self.settings.value("/".join([self.__class__.__name__, "CursorsShowValue"]),"false")
             

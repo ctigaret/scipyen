@@ -358,35 +358,7 @@ class MouseEventSink(QtCore.QObject):
         else:
             return False
     
-class ColorMapList(QtWidgets.QListWidget):
-    """
-    DEPRECATED
-    Use ItemsListDialog
-    """
-    def __init__(self, parent=None, itemsList=None):
-        QtWidgets.QListWidget.__init__(self, parent)
-        self.selectedColorMap = None
-        
-        if self.validateItems(itemsList):
-            self.addItems(itemsList)
-      
-        self.itemClicked.connect(self.selectItem)
-        self.itemDoubleClicked.connect(self.selectAndGo)
-    
-        # wrong:
-        #self.connect(self, SIGNAL("itemClicked('qt.QListWidgetItem')"), self.mySlot);
-    
-    itemSelected = QtCore.pyqtSignal(str)
-
-
-    def setItems(self, itemsList):
-        if self.validateItems(itemsList):
-            #self.itemsList = itemsList
-            self.clear()
-            self.addItems(itemsList)
-  
-  
-# don't use validate as this overrides a QWidget method and breaks the dialog code below
+    # don't use validate as this overrides a QWidget method and breaks the dialog code below
     def validateItems(self, itemsList):
         if itemsList is None or not all([isinstance(x,(str,unicode)) for x in itemsList]):
             QtWidgets.QMessageBox.critical(None, "Error", QtCore.QString("Argument must be a list of string or unicode items."))
@@ -462,18 +434,11 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         return True
 
     @property
-    def selectedItemText(self):
-        """A str for single selection mode, else a list of str.
-        
-        By default the dialog operates in single selection mode.
-        
+    def selectedItemsText(self):
+        """A a list of str - text of selected items, which may be empty
         """
-        txt_list = [str(i.text()) for i in self.listWidget.selectedItems()]
-        if len(txt_list) > 1:
-            return txt_list
-        elif len(txt_list) == 1:
-            return txt_list[0]
-    
+        return [str(i.text()) for i in self.listWidget.selectedItems()]
+        
     @property
     def selectionMode(self):
         return self.listWidget.selectionMode()
@@ -542,20 +507,8 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         
     @property
     def selectedItems(self):
-        items = self.listWidget.selectedItems()
+        return self.listWidget.selectedItems()
         
-        if len(items):
-            return [i.text() for i in items]
-            
-        else:
-            return []
-        
-    @property
-    def selectedItem(self):
-        items = self.listWidget.selectedItems()
-        if len(items):
-            return items[0].text()
-    
 class SelectablePlotItem(pg.PlotItem):
     itemClicked = pyqtSignal()
     

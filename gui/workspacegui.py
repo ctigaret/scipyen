@@ -194,7 +194,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):
         ans = dialog.exec()
         
         if ans == QtWidgets.QDialog.Accepted:
-            return [self._scipyenWindow_.workspace[i] for i in dialog.selectedItems]
+            return [self._scipyenWindow_.workspace[i] for i in dialog.selectedItemsText]
             
         return list()
             

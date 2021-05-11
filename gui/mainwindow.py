@@ -2383,7 +2383,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                                    title="Viewer type", modal=True)
         
         if dlg.exec() == 1:
-            selected_viewer_type_name = dlg.selectedItem
+            seltxt = dlg.selectedItemsText
+            if len(seltxt) == 0:
+                return
+            
+            selected_viewer_type_name = seltxt[0]
             
             win = self._newViewer(selected_viewer_type_name)# , name=win_name)
             

@@ -1097,8 +1097,8 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
             ans = choiceDialog.exec()
             
-            if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
-                data_index = nameList.index(choiceDialog.selectedItem)
+            if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText)e:
+                data_index = nameList.index(choiceDialog.selectedItemsText[0])
                 data = self._baseline_source_data_[data_index]
 
 
@@ -1127,8 +1127,8 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
             ans = choiceDialog.exec()
             
-            if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
-                data_index = nameList.index(choiceDialog.selectedItem)
+            if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
+                data_index = nameList.index(choiceDialog.selectedItemsText[0])
                 data = self._chase_source_data_[data_index]
 
 
@@ -1158,8 +1158,8 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
             ans = choiceDialog.exec()
             
-            if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
-                data_index = nameList.index(choiceDialog.selectedItem)
+            if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
+                data_index = nameList.index(choiceDialog.selectedItemsText[0])
                 data = self._conditioning_source_data_[data_index]
 
 
@@ -1188,8 +1188,8 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
             ans = choiceDialog.exec()
             
-            if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
-                data_index = nameList.index(choiceDialog.selectedItem)
+            if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
+                data_index = nameList.index(choiceDialog.selectedItemsText[0])
                 data = self._path_xtalk_source_data_[data_index]
 
 

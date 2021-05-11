@@ -726,6 +726,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 self.__scene__.rootImage = QtWidgets.QGraphicsPixmapItem(img)
 
         self.__image_viewer__ = imageViewer
+        
     ####
     # private methods
     ####
@@ -757,19 +758,9 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def _removeSelectedPlanarGraphics(self, cursors:bool=True):
         if cursors and self.selectedCursor:
             self._removeGraphicsObject(self.selectedCursor)
-            #self.selectedCursor.backend.frontends.clear()
-            #self.scene.removeItem(self.selectedCursor)
-            #self.signalCursorRemoved.emit(self.selectedCursor.backend)
-            
-            #self.selectedCursor = None
             
         elif self.selectedRoi:
             self._removeGraphicsObject(self.selectedRoi)
-            #self.selectedRoi.backend.frontends.clear()
-            #self.scene.removeItem(self.selectedRoi)
-            #self.signalRoiRemoved.emit(self.selectedRoi.backend)
-            
-            #self.selectedRoi = None
             
     def _removeAllPlanarGraphics(self, cursors:typing.Optional[bool] = None):
         predicate = lambda x: isinstance(x.backend, pgui.Cursor)
@@ -785,26 +776,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
         for o in objs:
             self._removeGraphicsObject(o)
-            #o.backend.frontends.clear()
-            #self.scene.removeItem(o)
-            #if isinstance(o.backend, pgui.Cursor):
-                #self.signalCursorRemoved.emit(o.backend)
-                #self.selectedCursor = None
-            #else:
-                #self.signalRoiRemoved.emit(o.backend)
-                #self.selectedRoi = None
-                
-            
-        #for o in objs:
-            #o.backend.frontends.clear()
-            #self.scene.removeItem(o)
-            #if isinstance(o.backend, pgui.Cursor):
-                #self.signalCursorRemoved.emit(o.backend)
-                #self.selectedCursor =  None
-            #else:
-                #self.signalRoiRemoved.emit(o.backend)
-                #self.selectedRoi = None
-                
+
     def _removePlanarGraphicsByName(self, name, cursors:bool=True):
         objs = []
         if cursors:
@@ -825,11 +797,13 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         if cursors:
             if len([o for o in self.cursors]) == 0:
                 return
+            
             objNames = sorted([o.name for o in self.cursors])
 
         else:
             if len([o for o in self.rois]) == 0:
                 return
+            
             objNames = sorted([o.name for o in self.rois])
             
         if isinstance(name, (tuple, list)) and len(name) and all([isinstance(n, str) and len(n.strip())]):
@@ -840,6 +814,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
         else:
             dlgTitle = "Remove %ss" % "cursor" if cursors else "ROI"
+            
             selectionDialog = pgui.ItemsListDialog(self, objNames,
                                                 title = dlgTitle,
                                                 selectmode = QtWidgets.QAbstractItemView.MultiSelection)
@@ -849,8 +824,11 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             if ans != QtWidgets.QDialog.Accepted:
                 return
             
-            objIds = selectionDialog.selectedItemText # this is a list of str
+            objIds = selectionDialog.selectedItemsText # this is a list of str
             
+        if len(objIds) == 0:
+            return
+        
         if cursors:
             objs = [o for o in filter(lambda x: isinstance(x.backend, pgui.Cursor) and x.backend.name in objIds, self.graphicsObjects)]
         else:
@@ -867,19 +845,24 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             self._removeGraphicsObject(o)
                 
         
-    def _cursorEditor(self, crsId=None):
+    def _cursorEditor(self, crsId:str=None):
         if len([o for o in self.cursors]) == 0:
             return
         
-        if crsId is None:
+        if not isinstance(crsId, str) or len(crsId.strip()) == 0:
             selectionDialog = pgui.ItemsListDialog(self, sorted([c.name for c in self.cursors]), "Select cursor")
             
             a = selectionDialog.exec_()
             
             if a == QtWidgets.QDialog.Accepted:
-                crsId = selectionDialog._selectedItemText_
+                crsId = selectionDialog.selectedItemsText
             else:
                 return
+
+            if len(crsId) == 0:
+                return
+        
+            crsId = crsId[0]
         
         cursor = [o for o in filter(lambda x: isinstance(x.backend, pgui.Cursor) and x.backend.name == crsId, self.graphicsObjects)]
         
@@ -1148,11 +1131,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             else:
                 parentWidget = self
                 
-        #print("GraphicsImageViewerWidget.createNewRoi params", params, "roiType", roiType)
-            
-        #if roiType is None or params is None:  # this would create an infinite loop
-                                                # because when either are None
-                                                # delegates to buildROI
         if all([v is None for v in (params, roiType, )]):
             self.buildROI()
             
@@ -1166,8 +1144,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 
             else:
                 raise TypeError("Cannot build a ROI with this PlanarGraphics type: %s" % params.type)
-            
-            
+
         if roiType & pgui.PlanarGraphicsType.point:
             rTypeStr = "p"
         elif roiType & pgui.PlanarGraphicsType.line:
@@ -1610,25 +1587,19 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @safeWrapper
     def slot_editAnyCursor(self):
         self._cursorEditor()
-        
-        return
-    
+
     @pyqtSlot()
     @safeWrapper
     def slot_editSelectedCursor(self):
         if self.selectedCursor is not None:
             self._cursorEditor(self.selectedCursor.ID)
             
-        return
-                    
     @pyqtSlot()
     @safeWrapper
     def slot_editCursor(self):
         if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.cursors, "name"):
             self._cursorEditor(self._cursorContextMenuSourceId)
             
-        return
-    
     def propagateCursorState(self):
         if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.cursors, "name"):
             cursor = [o for o in filter(lambda x: isinstance(x.backend, pgui.Cursor) and x.backend.name == self._cursorContextMenuSourceId, self.graphicsObjects)]
@@ -2959,44 +2930,36 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             #print("def_y_len", def_y_len)
             
             dlg = quickdialog.QuickDialog(self, "Display scale bars")
-            #dlg = vigra.pyqt.quickdialog.QuickDialog(self, "Display scale bars")
             
             display_group = quickdialog.HDialogGroup(dlg)
-            #display_group = vigra.pyqt.quickdialog.HDialogGroup(dlg)
             
             show_x = quickdialog.CheckBox(display_group, "Horizontal")
-            #show_x = vigra.pyqt.quickdialog.CheckBox(display_group, "Horizontal")
             show_x.setToolTip("Show horizontal scalebar")
             show_x.setChecked(self._display_horizontal_scalebar_)
             
             show_y = quickdialog.CheckBox(display_group, "Vertical")
-            #show_y = vigra.pyqt.quickdialog.CheckBox(display_group, "Vertical")
             show_y.setToolTip("Show vertical scalebar")
             show_y.setChecked(self._display_vertical_scalebar_)
             
             x_prompt = quickdialog.FloatInput(dlg, "X coordinate (in %s)" % x_units)
-            #x_prompt = vigra.pyqt.quickdialog.FloatInput(dlg, "X coordinate (in %s)" % x_units)
             x_prompt.variable.setClearButtonEnabled(True)
             x_prompt.variable.redoAvailable = True
             x_prompt.variable.undoAvailable = True
             x_prompt.setValue(def_x)
             
             y_prompt = quickdialog.FloatInput(dlg, "Y coordinate (in %s)" % y_units)
-            #y_prompt = vigra.pyqt.quickdialog.FloatInput(dlg, "Y coordinate (in %s)" % y_units)
             y_prompt.variable.setClearButtonEnabled(True)
             y_prompt.variable.redoAvailable = True
             y_prompt.variable.undoAvailable = True
             y_prompt.setValue(def_y)
             
             x_len_prompt = quickdialog.FloatInput(dlg, "Length on X axis (in %s)" % x_units)
-            #x_len_prompt = vigra.pyqt.quickdialog.FloatInput(dlg, "Length on X axis (in %s)" % x_units)
             x_len_prompt.variable.setClearButtonEnabled(True)
             x_len_prompt.variable.redoAvailable = True
             x_len_prompt.variable.undoAvailable = True
             x_len_prompt.setValue(def_x_len)
             
             y_len_prompt = quickdialog.FloatInput(dlg, "Length on Y axis (in %s)" % y_units)
-            #y_len_prompt = vigra.pyqt.quickdialog.FloatInput(dlg, "Length on Y axis (in %s)" % y_units)
             y_len_prompt.variable.setClearButtonEnabled(True)
             y_len_prompt.variable.redoAvailable = True
             y_len_prompt.variable.undoAvailable = True
@@ -3020,9 +2983,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     cal_x       = x
                     cal_x_len   = y_len
                     
-                #print("x", x)
-                #print("x_len", x_len)
-                    
                 if ycal is not None:
                     cal_y       = y_prompt.value() * ycal.getUnits(img.axistags[1].key)
                     cal_y_len   = y_len_prompt.value() * ycal.getUnits(img.axistags[1].key)
@@ -3036,9 +2996,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     
                     cal_y       = y
                     cal_y_len   = y_len
-                    
-                #print("y", y)
-                #print("y_len", y_len)
                     
                 self._scaleBarOrigin_ = (x, y)
                 self._scaleBarLength_ = (x_len, y_len)
@@ -3086,33 +3043,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             except:
                 return
             
-    #@pyqtSlot()
-    #def slot_refreshDisplayedWorkspaceImage(self):
-        #"""Refreshes the data display.
-        #Requires that self._scipyenWindow_ is of the appropriate type
-        #and that self._data_var_name_ is a valid identifier for the data
-        #in self._scipyenWindow_.workspace namespace
-        #"""
-        #from workspacefunctions import getvarsbytype
-        
-        #if self._scipyenWindow_ is None:
-            #return
-        
-        #if isinstance(self._data_var_name_, str):
-            #img_vars = dict(getvarsbytype(vigra.VigraArray, ws = self._scipyenWindow_.workspace))
-            
-            #if self._data_var_name_ not in img_vars.keys():
-                #return
-            
-            #image = img_vars[self._data_var_name_]
-            
-            #if isinstance(self._displayedChannel_, int):
-                #if self._displayedChannel_ >= image.channels:
-                    #self._displayedChannel_ = "all"
-            
-            #self.view(image, title = self._data_var_name_, displayChannel = self._displayedChannel_)
-            
-        
     @pyqtSlot()
     def slot_loadImageFromWorkspace(self):
         from core.workspacefunctions import getvarsbytype
@@ -3131,10 +3061,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         ans = choiceDialog.exec()
         
-        if ans == QtWidgets.QDialog.Accepted and choiceDialog.selectedItem is not None:
-            image = img_vars[choiceDialog.selectedItem]
-            image_title = choiceDialog.selectedItem
-            self._data_var_name_ = choiceDialog.selectedItem
+        if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
+            image = img_vars[choiceDialog.selectedItemsText[0]]
+            image_title = choiceDialog.selectedItemsText[0]
+            self._data_var_name_ = choiceDialog.selectedItemsText[0]
             
             if isinstance(self._displayedChannel_, int):
                 if self._displayedChannel_ >= image.channels:

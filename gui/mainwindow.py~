@@ -167,6 +167,9 @@ from core.utilities import (summarize_object_properties,
                             standard_obj_summary_headers,
                             safe_identity_test, unique, index_of,
                             )
+from core.prog import (safeWrapper, deprecation, iter_attribute,
+                       filter_type, filterfalse_type, 
+                       filter_attribute, filterfalse_attribute)
 
 # NOTE: 2020-09-28 11:37:25
 # ### BEGIN expose important data types
