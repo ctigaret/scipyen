@@ -1097,7 +1097,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
             
             ans = choiceDialog.exec()
             
-            if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText)e:
+            if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
                 data_index = nameList.index(choiceDialog.selectedItemsText[0])
                 data = self._baseline_source_data_[data_index]
 
