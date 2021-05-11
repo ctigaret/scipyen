@@ -2181,6 +2181,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.cursorsColor               = None
         self.roisColor                  = None
+        self.labelTextColor             = None
         
         self.sharedCursorsColor         = None
         self.sharedRoisColor            = None
@@ -3499,6 +3500,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
         self.chooseCBRoiColorAction = self.cursorsRoisColorMenu.addAction("Set color for shared rois")
         self.chooseCBRoiColorAction.triggered.connect(self.slot_chooseCBRoisColor)
+        
+        self.chooseLabelTextColorAction = self.cursorsRoisColorMenu.addAction("Set label text color")
+        self.chooseLabelTextColorAction.triggered.connect(self.slot_chooseLabelTextColor)
     
         self.brightContrastGammaMenu = QtWidgets.QMenu("Brightness Contrast Gamma", self)
         self.displayMenu.addMenu(self.brightContrastGammaMenu)
@@ -4046,6 +4050,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         else:
             self.colorMap = None
         
+        color = self.settings.value("/".join([self.__class__.__name__, "LabelColor"]), None)
+        if isinstance(color, QtGui.QColor) and color.isValid():
+            self.labelTextColor = color
+            
         #color = self.settings.value("ImageViewer/CursorsColor", None)
         color = self.settings.value("/".join([self.__class__.__name__, "CursorColor"]), None)
         if isinstance(color, QtGui.QColor) and color.isValid():
@@ -4087,6 +4095,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         else:
             self.settings.setValue("/".join([self.__class__.__name__, "ColorMap"]), None)
+        
+        self.settings.setValue("/".join([self.__class__.__name__, "LabelColor"]), self.labelTextColor)
         
         self.settings.setValue("/".join([self.__class__.__name__, "CursorColor"]), self.cursorsColor)
         
@@ -4435,54 +4445,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 
         return obj.backend
         
-        #if isinstance(item, pgui.Cursor):
-            #if framesVisible is None:
-                #framesVisible = item.frameIndices
-                
-            
-            #obj = self.viewerWidget.createNewCursor(item, 
-                                                    #pos                 = pos,
-                                                    #movable             = movable,
-                                                    #editable            = editable, 
-                                                    #frame               = frame,
-                                                    #label               = label,
-                                                    #frameVisibility     = framesVisible,
-                                                    #showLabel           = showLabel,
-                                                    #labelShowsPosition  = labelShowsPosition,
-                                                    #parentWidget        = self)
-            
-        #elif isinstance(item, pgui.PlanarGraphics):
-            ##print("ImageViewer %s addPlanarGraphics pgui.PlanarGraphics" % self.windowTitle(), item)
-            #roiType = item.type
-
-            #if framesVisible is None:
-                #framesVisible = item.frameIndices
-                
-            #obj = self.viewerWidget.createNewRoi(params                 = item, 
-                                                 #roiType                = roiType, 
-                                                 #label                  = label, 
-                                                 #frame                  = frame, 
-                                                 #pos                    = pos,
-                                                 #movable                =  movable, 
-                                                 #editable               = editable, 
-                                                 #frameVisibility        = framesVisible,
-                                                 #showLabel              = showLabel,
-                                                 #labelShowsPosition     = labelShowsPosition,
-                                                 #parentWidget           = self)
-            
-        #else:
-            #raise TypeError("Unexpected item parameter: %s" % type(item).__name__)
-
-        #if isinstance(obj, pgui.PlanarGraphics) and obj.objectType & pgui.PlanarGraphicsType.allCursorTypes:
-            #if isinstance(self.cursorsColor, QtGui.QColor) and self.cursorsColor.isValid():
-                #obj.color = self.cursorsColor
-                
-        #else:
-            #if isinstance(self.roisColor, QtGui.QColor) and self.roisColor.isValid():
-                #obj.color = self.roisColor
-                
-        #return obj
-    
     @pyqtSlot()
     @safeWrapper
     def slot_chooseCursorsColor(self):
@@ -4497,6 +4459,21 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                                 options=QtWidgets.QColorDialog.ShowAlphaChannel)
             
         self.setCursorsColor(color)
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_chooseLabelTextColor(self):
+        if isinstance(self.cursorsColor, QtGui.QColor):
+            initial = self.cursorsColor
+            
+        else:
+            initial = QtCore.Qt.white
+
+        color = QtWidgets.QColorDialog.getColor(initial=initial, 
+                                                title="Choose label text color",
+                                                options=QtWidgets.QColorDialog.ShowAlphaChannel)
+            
+        self.setLabelTextColor(color)
         
     @pyqtSlot()
     @safeWrapper
@@ -4542,33 +4519,45 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                                 options=QtWidgets.QColorDialog.ShowAlphaChannel)
         
         self.setSharedRoisColor(color)
+        
+    def setLabelTextColor(self, color):
+        if isinstance(color, QtGui.QColor) and color.isValid():
+            self.labelTextColor = color
+            for obj in filter(lambda x: isinstance(x.backend, pgui.Cursor), 
+                              self.viewerWidget.graphicsObjects):
+                obj.textColor = self.labelTextColor
+        
             
     def setCursorsColor(self, color):
         #print("ImageViewer.setCursorsColor", color)
         if isinstance(color, QtGui.QColor) and color.isValid():
             self.cursorsColor = color
-            for obj in self.graphicsObjects(rois=False).values():
+            for obj in filter(lambda x: isinstance(x.backend, pgui.Cursor), 
+                              self.viewerWidget.graphicsObjects):
                 obj.color = self.cursorsColor
         
     def setRoisColor(self, color):
         #print("ImageViewer.setRoisColor", color)
         if isinstance(color, QtGui.QColor) and color.isValid():
             self.roisColor = color
-            for obj in self.graphicsObjects(rois=True).values():
+            for obj in filter(lambda x: not isinstance(x.backend, pgui.Cursr), 
+                              self.viewerWidget.graphicsObjects):
                 obj.color = self.roisColor
     
     def setSharedCursorsColor(self, color):
         #print("ImageViewer.setSharedCursorsColor", color.name())
         if isinstance(color, QtGui.QColor) and color.isValid():
             self.sharedCursorsColor = color
-            for obj in self.graphicsObjects(rois=False).values():
+            for obj in filter(lambda x: isinstance(x.backend, pgui.Cursor), 
+                              self.viewerWidget.graphicsObjects):
                 obj.colorForSharedBackend = self.sharedCursorsColor
         
     def setSharedRoisColor(self, color):
         #print("ImageViewer.setRoisColor", color)
         if isinstance(color, QtGui.QColor) and color.isValid():
             self.sharedRoisColor = color
-            for obj in self.graphicsObjects(rois=True).values():
+            for obj in filter(lambda x: not isinstance(x.backend, pgui.Cursor), 
+                              self.viewerWidget.graphicsObjects):
                 obj.colorForSharedBackend = self.sharedRoisColor
         
     

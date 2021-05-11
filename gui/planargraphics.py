@@ -7648,25 +7648,25 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self._c_penWidth = 1
         self._c_penStyle = QtCore.Qt.SolidLine
         
-        self._textPen               = self.defaultTextPen
-        self._textBrush             = self.defaultTextBrush
-        self._textBackgroundBrush   = self.defaultTextBackgroundBrush
-        self._textCBPen             = self.defaultCBTextPen
-        self._textCBBrush           = self.defaultCBTextBrush
+        self._textPen               = QtGui.QPen(self.defaultTextPen)
+        self._textBrush             = QtGui.QBrush(self.defaultTextBrush)
+        self._textBackgroundBrush   = QtGui.QBrush(self.defaultTextBackgroundBrush)
+        self._textCBPen             = QtGui.QPen(self.defaultCBTextPen)
+        self._textCBBrush           = QtGui.QBrush(self.defaultCBTextBrush)
         
         self._textFont              = self.defaultTextFont
         
-        self._linkedTextPen         = self.defaultLinkedTextPen
-        self._linkedTextBrush       = self.defaultLinkedTextBrush
+        self._linkedTextPen         = QtGui.QPen(self.defaultLinkedTextPen)
+        self._linkedTextBrush       = QtGui.QBrush(self.defaultLinkedTextBrush)
         
-        self._cursorPen             = self.defaultPen
-        self._selectedCursorPen     = self.defaultSelectedPen
+        self._cursorPen             = QtGui.QPen(self.defaultPen)
+        self._selectedCursorPen     = QtGui.QPen(self.defaultSelectedPen)
         
-        self._linkedPen             = self.defaultLinkedPen
-        self._linkedSelectedPen     = self.defaultLinkedSelectedPen
+        self._linkedPen             = QtGui.QPen(self.defaultLinkedPen)
+        self._linkedSelectedPen     = QtGui.QPen(self.defaultLinkedSelectedPen)
         
-        self._cBPen                 = self.defaultCBPen
-        self._cBSelectedPen         = self.defaultCBSelectedPen
+        self._cBPen                 = QtGui.QPen(self.defaultCBPen)
+        self._cBSelectedPen         = QtGui.QPen(self.defaultCBSelectedPen)
         
         self._controlPointPen       = QtGui.QPen(QtGui.QColor(50, 100, 120, 200))
         self._controlPointBrush     = QtGui.QBrush(QtGui.QColor(200, 200, 210, 120))
@@ -10461,12 +10461,12 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         if isinstance(qcolor, QtGui.QColor) and qcolor.isValid():
             self._cursorPen.setColor(qcolor)
             self._selectedCursorPen.setColor(qcolor)
-            self._textPen.setColor(qcolor)
+            #self._textPen.setColor(qcolor)
             self.redraw()
             
     @property
     def linkedColor(self):
-        return self.penColor
+        return self._linkedPen.color()
     
     @linkedColor.setter
     def linkedColor(self, qcolor):
@@ -10474,7 +10474,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         """
         if isinstance(qcolor, QtGui.QColor) and qcolor.isValid():
             self._linkedPen.setColor(qcolor)
-            self._linkedTextPen.setColor(qcolor)
+            #self._linkedTextPen.setColor(qcolor)
             self._linkedSelectedPen.setColor(qcolor)
             self.update()
     
@@ -10500,7 +10500,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             #print("GraphicsObject.colorForSharedBackend", qcolor.name())
             self._cBPen.setColor(qcolor)
             self._cBSelectedPen.setColor(qcolor)
-            self._textCBPen.setColor(qcolor)
+            #self._textCBPen.setColor(qcolor)
             #print("colorForSharedBackend %s" % self.name)
             self.update()
         
@@ -10513,7 +10513,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         if isinstance(qcolor, QtGui.QColor) and qcolor.isValid():
             self._linkedPen.setColor(qcolor)
             self._linkedSelectedPen.setColor(qcolor)
-            self._linkedTextPen.setColor(qcolor)
+            #self._linkedTextPen.setColor(qcolor)
             self.update()
         
     @property
@@ -10543,7 +10543,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     @textBackground.setter
     def textBackground(self, brush):
         self._textBackgroundBrush = brush
-        self._drawObject_
+        #self._drawObject_
         self.update()
         
     @property
@@ -10553,7 +10553,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     @opaqueLabel.setter
     def opaqueLabel(self, val):
         self._opaqueLabel_ = val
-        self._drawObject_
+        #self._drawObject_
         self.update()
         
     @property
@@ -10563,7 +10563,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     @labelFont.setter
     def labelFont(self, font):
         self._textFont = font
-        self._drawObject_
+        #self._drawObject_
         self.update()
         
     @property
