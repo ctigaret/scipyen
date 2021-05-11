@@ -821,9 +821,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         for o in objs:
             self._removeGraphicsObject(o)
                 
-    def _removePlanarGraphics(self, cursors:bool=True):
-        dlgTitle = "Remove %ss" % "cursor" if cursors else "ROI"
-        
+    def _removePlanarGraphics(self, name:typing.Optional[str]=None, cursors:bool=True):
         if cursors:
             if len([o for o in self.cursors]) == 0:
                 return
@@ -834,16 +832,24 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 return
             objNames = sorted([o.name for o in self.rois])
             
-        selectionDialog = pgui.ItemsListDialog(self, objNames,
-                                            title = dlgTitle,
-                                            selectmode = QtWidgets.QAbstractItemView.MultiSelection)
-        
-        ans = selectionDialog.exec_()
-        
-        if ans != QtWidgets.QDialog.Accepted:
-            return
-        
-        objIds = selectionDialog._selectedItemText_ # this is a list of str
+        if isinstance(name, (tuple, list)) and len(name) and all([isinstance(n, str) and len(n.strip())]):
+            objIds = name
+            
+        elif isinstance(name, str) and len(name.strip()):
+            objIds = [name]
+            
+        else:
+            dlgTitle = "Remove %ss" % "cursor" if cursors else "ROI"
+            selectionDialog = pgui.ItemsListDialog(self, objNames,
+                                                title = dlgTitle,
+                                                selectmode = QtWidgets.QAbstractItemView.MultiSelection)
+            
+            ans = selectionDialog.exec_()
+            
+            if ans != QtWidgets.QDialog.Accepted:
+                return
+            
+            objIds = selectionDialog.selectedItemText # this is a list of str
             
         if cursors:
             objs = [o for o in filter(lambda x: isinstance(x.backend, pgui.Cursor) and x.backend.name in objIds, self.graphicsObjects)]
@@ -858,12 +864,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 self.selectedRoi = None
             
         for o in objs:
-            o.backend.frontends.clear()
-            self.scene.removeItem(o)
-            if isinstance(o.backend, pgui.Cursor):
-                self.signalCursorRemoved.emit(o.backend)
-            else:
-                self.signalRoiRemoved.emit(o.backend)
+            self._removeGraphicsObject(o)
                 
         
     def _cursorEditor(self, crsId=None):
@@ -1846,14 +1847,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @safeWrapper
     def slot_removeSelectedCursor(self):
         self._removeSelectedPlanarGraphics(cursors=True)
-        #if self.selectedCursor is None:
-            #return
-        
-        #self.selectedCursor.backend.frontends.clear()
-        #self.scene.removeItem(self.selectedCursor)
-        #self.signalCursorRemoved.emit(self.selectedCursor.backend)
-        
-        #self.selectedCursor = None
         
     @pyqtSlot()
     @safeWrapper
@@ -1867,14 +1860,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @pyqtSlot(str)
     @safeWrapper
     def slot_removeCursorByName(self, crsId):
-        self._removePlanarGraphicsByName(self, crsId, cursors=True)
-        #if crsId in iter_attribute(self.cursors, "name"):
-            #c = [o for o in self.graphicsObjects if isinstance(o.backend, pgui.Cursor) and o.backend.name == crsId]
-            #if len(c):
-                #self._removeGraphicsObject(c[0])
-                #c[0].backend.frontends.clear()
-                #self.scene.removeItem(c[0])
-                #self.signalCursorRemoved.emit(c[0].backend)
+        self._removePlanarGraphics(name=crsId, cursors=True)
             
     @pyqtSlot()
     @safeWrapper
@@ -1885,26 +1871,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @safeWrapper
     def slot_removeAllRois(self):
         self._removeAllPlanarGraphics(cursors=False)
-        #if len([o for o in self.rois]) == 0 :
-            #return
-        
-        #rois = [r for r in self.__rois__.values()]
-        
-        #for roi in rois:
-            #self.scene.removeItem(roi)
-            
-            #if roi in roi.backend.frontends:
-                #roi.backend.frontends.remove(roi)
-            
-        #roiTypeInts = [t.value for t in pgui.PlanarGraphicsType if \
-            #t.value > pgui.PlanarGraphicsType.allCursorTypes]
-        
-        #for k in roiTypeInts:
-            #self._graphicsObjects_[k].clear()
-            
-        #self.__rois__.clear()
-        
-        #self.selectedRoi = None
         
     @pyqtSlot()
     @safeWrapper
@@ -1915,47 +1881,11 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @safeWrapper
     def slot_removeSelectedRoi(self):
         self._removeSelectedPlanarGraphics(cursors=False)
-        #if self.selectedRoi is None:
-            #return
-        
-        #self.slot_removeRoiByName(self.selectedRoi.name)
         
     @pyqtSlot(str)
     @safeWrapper
     def slot_removeRoiByName(self, roiId):
         self._removePlanarGraphicsByName(self, roiId, cursors=False)
-        ##print("GraphicsImageViewerWidget slot_removeRoiByName %s" % roiId)
-        #if len(self.__rois__) == 0:
-            #return
-        
-        #if roiId in self.__rois__.keys():
-            #roi = self.__rois__[roiId]
-            
-            #self.scene.removeItem(roi)
-            
-            #if self.selectedRoi == roi:
-                #self.selectedRoi = None
-            
-            #if isinstance(roi.objectType, pgui.PlanarGraphicsType):
-                #rType = roi.objectType.value
-                
-            #else:
-                #rType = roi.objectType
-
-            ##removed_roi = self._graphicsObjects_[rType].pop(roiId, None)
-            #self._graphicsObjects_[rType].pop(roiId, None)
-            
-            #if roi in roi.backend.frontends:
-                #roi.backend.frontends.remove(roi)
-            
-            #self.signalRoiRemoved.emit(roi.backend)
-            
-        #self.update(self._imageGraphicsView.childrenRegion())
-        
-        #self.scene.update(self.scene.sceneRect().x(), \
-                          #self.scene.sceneRect().y(), \
-                          #self.scene.sceneRect().width(), \
-                          #self.scene.sceneRect().height())
 
     @pyqtSlot()
     @safeWrapper

@@ -414,7 +414,6 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         super(ItemsListDialog, self).__init__(parent)
         self.setupUi(self)
         self.setModal(modal)
-        self._selectedItemText_ = ""
         self.preSelected = list()
         
         self.searchLineEdit.undoAvailable=True
@@ -450,18 +449,10 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         for row in range(self.listWidget.count()):
             self.listWidget.item(row).setSelected(False)
             
-        if self.selectionMode == QtWidgets.QAbstractItemView.SingleSelection:
-            if len(found_items):
-                found_items[-1].setSelected(True)
-                self._selectedItemText_ = found_items[-1].text()
-                self.itemSelected.emit(str(found_items[-1].text()))
-        else:
-            self._selectedItemText_ = list()
-            for item in found_items:
-                self._selectedItemText_.append(item.text())
-                item.setSelected(True)
-                self.itemSelected.emit(str(item.text()))
-      
+        for item in found_items:
+            item.setSelected(True)
+            self.itemSelected.emit(str(item.text()))
+            
     def validateItems(self, itemsList):
         # 2016-08-10 11:51:07
         # NOTE: in python3 all str are unicode
@@ -471,17 +462,21 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         return True
 
     @property
-    def selectionMode(self):
-        return self.listWidget.selectionMode()
-    
-    @property
     def selectedItemText(self):
         """A str for single selection mode, else a list of str.
         
         By default the dialog operates in single selection mode.
         
         """
-        return self._selectedItemText_
+        txt_list = [str(i.text()) for i in self.listWidget.selectedItems()]
+        if len(txt_list) > 1:
+            return txt_list
+        elif len(txt_list) == 1:
+            return txt_list[0]
+    
+    @property
+    def selectionMode(self):
+        return self.listWidget.selectionMode()
     
     @selectionMode.setter
     def selectionMode(self, selectmode):
@@ -538,12 +533,10 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
 
     @pyqtSlot(QtWidgets.QListWidgetItem)
     def selectItem(self, item):
-        self._selectedItemText_ = item.text()
         self.itemSelected.emit(str(item.text())) # this is a QString !!!
         
     @pyqtSlot(QtWidgets.QListWidgetItem)
     def selectAndGo(self, item):
-        self._selectedItemText_ = item.text()
         self.itemSelected.emit(item.text())
         self.accept()
         
