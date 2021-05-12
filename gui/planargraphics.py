@@ -7578,6 +7578,94 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     
     signalIDChanged = pyqtSignal(str, name="signalIDChanged")
     
+    # 
+    # NOTE: 2021-05-12 14:29:39 look-and-feel matrix:
+    #           isolated/linked                   selected/unselected
+    # what is   ----------------------------------------------------------------
+    # changed:  line pen color                    line (pen) style and width   
+    #           label (text) pen color(*)  
+    #           label background brush color(**)  label background brush style(**)
+    #          
+    # (*)  text pen style is always the solid line
+    # (**) only for opaque labels
+    
+    # NOTE: 2021-05-12 14:33:03
+    # for cursor and roi lines use QPen; for label background use QBrush
+    # Pen and Brush style changes between selected/unselected item (except for text pen)
+    # Pen and Brush color changes between linked and not linked items
+    
+    # NOTE: 2021-05-12 14:34:27
+    # a "linked" item has a backend linked with the backed of another item
+    # ATTENTION the linkage is in the backend; the item doesn't necessarily know
+    # about the othr backends (although it can gain access)
+    lnfNotSel_def = DataBag({ # values are all enums or int
+        "penStyle"      : QtCore.Qt.SolidLine,
+        "penWidth"      : 1,
+        "brushStyle"    : QtCore.Qt.SolidPattern,
+        })
+    
+    lnfSel_def = DataBag({# values are all enums or int
+        "penStyle"      : QtCore.Qt.DashLine,
+        "penWidth"      : 1,
+        "brushStyle"    : QtCore.Qt.SolidPattern,
+        })
+    
+    lnfNotLink_def = DataBag({
+        "color"     : QtCore.Qt.red,
+        "textColor" : QtCore.Qt.red,
+        "bgColor"   : QtCore.Qt.white,
+        })
+    
+    lnfLink_def = DataBag({
+        "color"     : QtCore.Qt.magenta,
+        "textColor" : QtCore.Qt.magenta,
+        "bgColor"   : QtCore.Qt.white,
+        })
+    
+    lnf_def = DataBag({      # default pens/brushes
+        "brush"                 : QtGui.QBrush(lnfNotLink_def.bgColor, 
+                                               lnfNotSel_def.brushStyle),
+        
+        "brushSelected"         : QtGui.QBrush(lnfNotLink_def.bgColor, 
+                                               lnfNotSel_def.brushStyle),
+
+        "brushLinked"           : QtGui.QBrush(lnfLink_def.bgColor, 
+                                               lnfNotSel_def.brushStyle),
+        
+        "selectedLinkedBrush"   : QtGui.QBrush(lnfLink_def.bgColor, 
+                                               lnfSel_def.brushStyle),
+
+        "pen"                   : QtGui.QPen(lnfNotLink_def.color, 
+                                             lnfNotSel_def.penWidth, lnfNotSel_def.penStyle, 
+                                             QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin),
+        
+        "selectedPen"           : QtGui.QPen(lnfNotLink_def.color, 
+                                             lnfSel_def.penWidth, lnfSel_def.penStyle, 
+                                             QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin),
+        
+        "linkedPen"             : QtGui.QPen(lnfLink_def.color, 
+                                             lnfNotSel_def.penWidth, lnfNotSel_def.penStyle,
+                                             QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin),
+        
+        "selectedLinkedPen"     : QtGui.QPen(lnfLink_def.color, 
+                                             lnfSel_def.penWidth, lnfSel_def.penStyle,
+                                             QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin),
+        
+        "textPen"               : QtGui.QPen(lnfNotLink_def.color, lnfNotSel_def.penWidth, 
+                                             QtCore.Qt.SolidLine,  QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin),
+        
+        "selectedTextPen"       : QtGui.QPen(lnfNotLink_def.color, lnfSel_def.penWidth, 
+                                             QtCore.Qt.SolidLine,  QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin),
+        
+        "linkedTextPen"         : QtGui.QPen(lnfLink_def.color, lnfNotSel_def.penWidth, 
+                                             QtCore.Qt.SolidLine,  QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin),
+        
+        "selectedLinkedTextPen" : QtGui.QPen(lnfLink_def.color, lnfSel_def.penWidth, 
+                                             QtCore.Qt.SolidLine,  QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin),
+        
+        
+        })
+    
     def _setup_default_appearance_(self):
         self.defaultTextBackgroundBrush = QtGui.QBrush(QtCore.Qt.white, QtCore.Qt.SolidPattern)
         self.defaultBrush = QtGui.QBrush(QtCore.Qt.white, QtCore.Qt.SolidPattern)
@@ -7722,6 +7810,30 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         # it may be suffixed with the position if labelShowsPosition is True
         self._displayStr_= "" 
         
+        lnfNotSel = DataBag({
+            "penStyle"      : self.lnfNotSel_def.penStyle,
+            "penWidth"      : self.lnfNotSel_def.penWidth,
+            "brushStyle"    : self.lnfNotSel_def.brushStyle,
+            })
+        
+        lnfSel = DataBag({
+            "penStyle"      : self.lnfSel_def.penStyle,
+            "penWidth"      : self.lnfSel_def.penWidth,
+            "brushStyle"    : self.lnfSel_def.brushStyle,
+            })
+        
+        lnfNotLink = DataBag({
+            "color"     : QtGui.QColor(QtCore.Qt.red),
+            "textColor" : QtGui.QColor(QtCore.Qt.red),
+            "bgColor"   : QtGui.QColor(QtCore.Qt.white),
+            })
+        
+        lnfLink = DataBag({
+            "color"     : QtGui.QColor(QtCore.Qt.magenta),
+            "textColor" : QtGui.QColor(QtCore.Qt.magenta),
+            "bgColor"   : QtGui.QColor(QtCore.Qt.white),
+            })
+    
         self._setup_default_appearance_()
         # NOT: 2017-11-24 22:30:00
         # assign this early
@@ -8532,26 +8644,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         # timed version of the painter; to time the painter, call this function
         # instead of "__paint__" in self.paint(...) - see NOTE: 2021-03-07 18:30:02
         self.__paint__(painter, styleOption, widget)
-        
-    #def __getattr__(self, name:str):
-        #backend = object.__getattribute__(self, "_backend_")
-        #if backend and name in backend.__class__._planar_descriptors_:
-            #state = backend.getState()
-            #if isinstance(state, dict):
-                #return state[name]
-            
-        #return object.__getattribute__(self, name)
-    
-    #def __setattr__(self, name:str, value:typing.Any):
-        #backend = object.__getattribute__(self, "_backend_")
-        #if backend and name in backend.__class__._planar_descriptors_:
-            #state = backend.getState()
-            #if isinstance(state, dict):
-                #state[name] = value
-                
-        #else:
-            #object.__setattr__(self, name, value)
-        
         
     #@safeWrapper
     def __paint__(self, painter, styleOption, widget):
@@ -9907,36 +9999,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
 
         super(GraphicsObject, self).keyPressEvent(evt)
         
-    def setDefaultAppearance(self):
-        self._textPen                = self.defaultTextPen
-        self._textBrush              = self.defaultTextBrush
-        self._textBackgroundBrush    = self.defaultTextBackgroundBrush
-        
-        self._textFont           = self.defaultTextFont
-        
-        self._linkedTextPen      = self.defaultLinkedTextPen
-        self._linkedTextBrush    = self.defaultLinkedTextBrush
-        
-        self._cursorPen          = self.defaultPen
-        self._selectedCursorPen  = self.defaultSelectedPen
-        
-        self._linkedPen          = self.defaultLinkedPen
-        self._linkedSelectedPen  = self.defaultLinkedSelectedPen
-        
-        self._cBPen              = self.defaultCBPen
-        self._cBSelectedPen      = self.defaultCBSelectedPen
-        
-        self._opaqueLabel_ = True
-        
-        self._labelShowsCoordinates_ = False
-        
-        self._drawObject_()
-        
-        self.update()
-        
-    #def sharesBackendWith(self, other):
-        #return other in self._backend_.frontends and self._backend_ == other.backend
-    
     @property
     def hasTransparentLabel(self):
         return not self._opaqueLabel_
@@ -10367,9 +10429,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         if isinstance(self._backend_, Cursor):
             return self._backend_.currentState.ywindow
-            #stateDescriptor = self._backend_.getState(self._currentframe_)
-            #if stateDescriptor is not None and len(stateDescriptor):
-                #return stateDescriptor.ywindow
     
     @verticalWindow.setter
     def verticalWindow(self, val):
@@ -10385,17 +10444,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             for f in self._backend_.frontends:
                 if f != self:
                     f.update()
-                    #f.redraw()
-    
-            #if len(self._linkedGraphicsObjects):
-                #for c in self._linkedGraphicsObjects:
-                    #if c != self._backend_:
-                        #c.ywindow = val
-                        
-                        #for f in c.frontends:
-                            #if f != self:
-                                #f.update()
-                                ##f.redraw()
                             
     @property
     def ywindow(self):
@@ -10489,21 +10537,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             self._selectedCursorPen.setColor(qcolor)
             self.update()
         
-    #@property
-    #def colorForLinkedBackend(self):
-        #return self._cBPen.color()
-    
-    #@colorForLinkedBackend.setter
-    #def colorForLinkedBackend(self, qcolor):
-        ##print("GraphicsObject.colorForLinkedBackend", qcolor)
-        #if isinstance(qcolor, QtGui.QColor) and qcolor.isValid():
-            ##print("GraphicsObject.colorForLinkedBackend", qcolor.name())
-            #self._cBPen.setColor(qcolor)
-            #self._cBSelectedPen.setColor(qcolor)
-            ##self._textCBPen.setColor(qcolor)
-            ##print("colorForLinkedBackend %s" % self.name)
-            #self.update()
-        
     @property
     def linkedPenColor(self):
         return self._linkedPen.color()
@@ -10513,7 +10546,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         if isinstance(qcolor, QtGui.QColor) and qcolor.isValid():
             self._linkedPen.setColor(qcolor)
             self._linkedSelectedPen.setColor(qcolor)
-            #self._linkedTextPen.setColor(qcolor)
             self.update()
         
     @property
