@@ -9934,8 +9934,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         self.update()
         
-    def sharesBackendWith(self, other):
-        return other in self._backend_.frontends and self._backend_ == other.backend
+    #def sharesBackendWith(self, other):
+        #return other in self._backend_.frontends and self._backend_ == other.backend
     
     @property
     def hasTransparentLabel(self):
@@ -9947,9 +9947,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self.redraw()
         #self.update()
         
-    @property
-    def sharesBackend(self):
-        return len(self._backend_.frontends) > 0
+    #@property
+    #def sharesBackend(self):
+        #return len(self._backend_.frontends) > 0
         
     #@property
     #"def" linked(self):
@@ -10461,7 +10461,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         if isinstance(qcolor, QtGui.QColor) and qcolor.isValid():
             self._cursorPen.setColor(qcolor)
             self._selectedCursorPen.setColor(qcolor)
-            #self._textPen.setColor(qcolor)
+            self._textPen.setColor(qcolor)
             self.redraw()
             
     @property
@@ -10474,7 +10474,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         """
         if isinstance(qcolor, QtGui.QColor) and qcolor.isValid():
             self._linkedPen.setColor(qcolor)
-            #self._linkedTextPen.setColor(qcolor)
+            self._linkedTextPen.setColor(qcolor)
             self._linkedSelectedPen.setColor(qcolor)
             self.update()
     
@@ -10489,20 +10489,20 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             self._selectedCursorPen.setColor(qcolor)
             self.update()
         
-    @property
-    def colorForSharedBackend(self):
-        return self._cBPen.color()
+    #@property
+    #def colorForLinkedBackend(self):
+        #return self._cBPen.color()
     
-    @colorForSharedBackend.setter
-    def colorForSharedBackend(self, qcolor):
-        #print("GraphicsObject.colorForSharedBackend", qcolor)
-        if isinstance(qcolor, QtGui.QColor) and qcolor.isValid():
-            #print("GraphicsObject.colorForSharedBackend", qcolor.name())
-            self._cBPen.setColor(qcolor)
-            self._cBSelectedPen.setColor(qcolor)
-            #self._textCBPen.setColor(qcolor)
-            #print("colorForSharedBackend %s" % self.name)
-            self.update()
+    #@colorForLinkedBackend.setter
+    #def colorForLinkedBackend(self, qcolor):
+        ##print("GraphicsObject.colorForLinkedBackend", qcolor)
+        #if isinstance(qcolor, QtGui.QColor) and qcolor.isValid():
+            ##print("GraphicsObject.colorForLinkedBackend", qcolor.name())
+            #self._cBPen.setColor(qcolor)
+            #self._cBSelectedPen.setColor(qcolor)
+            ##self._textCBPen.setColor(qcolor)
+            ##print("colorForLinkedBackend %s" % self.name)
+            #self.update()
         
     @property
     def linkedPenColor(self):
@@ -10523,6 +10523,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     @textColor.setter
     def textColor(self, qcolor):
         if isinstance(qcolor, QtGui.QColor) and qcolor.isValid():
+            print (qcolor.name())
             self._textPen.setColor(qcolor)
             self.update()
         
@@ -10545,6 +10546,16 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self._textBackgroundBrush = brush
         #self._drawObject_
         self.update()
+        
+    @property
+    def textBackgroundColor(self):
+        return self._textBackgroundBrush.color()
+    
+    @textBackground.setter
+    def textBackgroundColor(self, qcolor):
+        if isinstance(qcolor, QtGui.QColor) and qcolor.isValid():
+            self._textBackgroundBrush.setColor(qcolor)
+            self.update()
         
     @property
     def opaqueLabel(self):

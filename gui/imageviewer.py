@@ -2166,8 +2166,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                  displayChannel = None, normalize: (bool, ) = False, gamma: (float, ) = 1.0, 
                  *args, **kwargs):
 
-        super().__init__(data=data, parent=parent, pWin=pWin, ID=ID, win_title=win_title, doc_title=doc_title, frame=frame, *args, *kwargs)
-        
         self._image_width_ = 0
         self._image_height_ = 0
         self.imageNormalize             = None
@@ -2180,16 +2178,17 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         #self._separateChannels           = False
         
         self.cursorsColor               = None
+        self.linkedCursorsColor         = None
+        self.cursorLabelTextColor       = None
+        self.linkedCursorLabelTextColor = None
+        self.cursorLabelBackgroundColor = None
         self.roisColor                  = None
-        self.labelTextColor             = None
-        
-        self.sharedCursorsColor         = None
-        self.sharedRoisColor            = None
-        
-        #self._defaultCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
-        
-        #self.fallbackCursorsColor       = pgui.GraphicsObject.defaultColor
-        #self.fallbackRoisColor          = pgui.GraphicsObject.defaultColor
+        self.linkedROIsColor            = None
+        self.roiLabelTextColor          = None
+        self.linkedROILabelTextColor    = None
+        self.roiLabelBackgroundColor    = None
+        self.opaqueCursorLabel          = True
+        self.opaqueROILabel             = True
         
         if displayChannel is None:
             self._displayedChannel_      = "all"
@@ -2245,6 +2244,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self._scaleBarOrigin_            = (0, 0)
         self._scaleBarLength_            = (10,10)
+        
+        super().__init__(data=data, parent=parent, pWin=pWin, ID=ID, win_title=win_title, doc_title=doc_title, frame=frame, *args, *kwargs)
         
         self.loadSettings()
         
@@ -3442,24 +3443,20 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.viewerWidget.signalCursorAt[str, list].connect(self.slot_displayCursorPos)
         
         self.viewerWidget.scene.signalMouseAt[int, int].connect(self.slot_displayMousePos)
-        #self.viewerWidget.scene.signalMouseLeave.connect(self._sceneMouseLeave)
         
         self.viewerWidget.signalCursorAdded[object].connect(self.slot_graphicsObjectAdded)
         self.viewerWidget.signalCursorChanged[object].connect(self.slot_graphicsObjectChanged)
         self.viewerWidget.signalCursorRemoved[object].connect(self.slot_graphicsObjectRemoved)
         self.viewerWidget.signalGraphicsObjectSelected[object].connect(self.slot_graphicsObjectSelected)
-        #self.viewerWidget.signalCursorDeselected[object].connect(self.slot_graphicsObjectDeselected)
         
         self.viewerWidget.signalRoiAdded[object].connect(self.slot_graphicsObjectAdded)
         self.viewerWidget.signalRoiChanged[object].connect(self.slot_graphicsObjectChanged)
         self.viewerWidget.signalRoiRemoved[object].connect(self.slot_graphicsObjectRemoved)
         self.viewerWidget.signalRoiSelected[object].connect(self.slot_graphicsObjectSelected)
-        #self.viewerWidget.signalRoiDeselected[object].connect(self.slot_graphicsObjectDeselected)
         
         self.viewerWidget.signalGraphicsDeselected.connect(self.slot_graphicsObjectDeselected)
         
         self.actionView.triggered.connect(self.slot_loadImageFromWorkspace)
-        #self.actionRefresh.triggered.connect(self.slot_refreshDisplayedWorkspaceImage)
         self.actionRefresh.triggered.connect(self.slot_refreshDataDisplay)
         
         self.actionExportAsPNG.triggered.connect(self.slot_exportSceneAsPNG)
@@ -3480,33 +3477,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.displayIndividualChannelActions = list()
         
-        self.colorMapMenu = QtWidgets.QMenu("Color Map", self)
-        self.displayMenu.addMenu(self.colorMapMenu)
-        
-        self.cursorsRoisColorMenu = QtWidgets.QMenu("Colors for Cursor and Rois", self)
-        self.displayMenu.addMenu(self.cursorsRoisColorMenu)
-        
-        self.colorMapAction = self.colorMapMenu.addAction("Choose Color Map")
-        self.editColorMapAction = self.colorMapMenu.addAction("Edit Color Map")
-        
-        self.chooseCursorColorAction = self.cursorsRoisColorMenu.addAction("Set cursors color")
-        self.chooseCursorColorAction.triggered.connect(self.slot_chooseCursorsColor)
-        
-        self.chooseCBCursorColorAction = self.cursorsRoisColorMenu.addAction("Set color for shared cursors")
-        self.chooseCBCursorColorAction.triggered.connect(self.slot_chooseCBCursorsColor)
-        
-        self.chooseRoiColorAction = self.cursorsRoisColorMenu.addAction("Set rois color")
-        self.chooseRoiColorAction.triggered.connect(self.slot_chooseRoisColor)
-    
-        self.chooseCBRoiColorAction = self.cursorsRoisColorMenu.addAction("Set color for shared rois")
-        self.chooseCBRoiColorAction.triggered.connect(self.slot_chooseCBRoisColor)
-        
-        self.chooseLabelTextColorAction = self.cursorsRoisColorMenu.addAction("Set label text color")
-        self.chooseLabelTextColorAction.triggered.connect(self.slot_chooseLabelTextColor)
-    
-        self.brightContrastGammaMenu = QtWidgets.QMenu("Brightness Contrast Gamma", self)
-        self.displayMenu.addMenu(self.brightContrastGammaMenu)
-        
         self.displayScaleBarAction = self.displayMenu.addAction("Scale bar")
         self.displayScaleBarAction.setCheckable(True)
         self.displayScaleBarAction.setChecked(False)
@@ -3517,8 +3487,69 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.displayColorBarAction.setChecked(False)
         self.displayColorBarAction.toggled[bool].connect(self.slot_displayColorBar)
         
+        self.brightContrastGammaMenu = QtWidgets.QMenu("Brightness Contrast Gamma", self)
+        self.displayMenu.addMenu(self.brightContrastGammaMenu)
+        
         self.imageBrightnessAction = self.brightContrastGammaMenu.addAction("Brightness")
         self.imageGammaAction = self.brightContrastGammaMenu.addAction("Gamma")
+        
+        self.cursorsAppearanceMenu = QtWidgets.QMenu("Cursor appearance", self)
+        self.displayMenu.addMenu(self.cursorsAppearanceMenu)
+        
+        self.chooseCursorColorAction = self.cursorsAppearanceMenu.addAction("Line")
+        self.chooseCursorColorAction.triggered.connect(self.slot_chooseCursorsColor)
+        
+        self.chooseCursorLabelTextColorAction = self.cursorsAppearanceMenu.addAction("Label text")
+        self.chooseCursorLabelTextColorAction.triggered.connect(self.slot_chooseCursorLabelTextColor)
+        
+        self.chooseCursorLabelBGColorAction = self.cursorsAppearanceMenu.addAction("Label background")
+        self.chooseCursorLabelBGColorAction.triggered.connect(self.slot_chooseCursorLabelBGColor)
+        
+        self.linkedCursorColorsMenu = QtWidgets.QMenu("Linked cursors", self)
+        self.cursorsAppearanceMenu.addMenu(self.linkedCursorColorsMenu)
+        
+        self.chooseLinkedCursorColorAction = self.linkedCursorColorsMenu.addAction("Line")
+        self.chooseLinkedCursorColorAction.triggered.connect(self.slot_chooseLinkedCursorsColor)
+        
+        self.chooseLinkedCursorLabelTextColorAction = self.linkedCursorColorsMenu.addAction("Label text")
+        self.chooseLinkedCursorLabelTextColorAction.triggered.connect(self.slot_chooseLinkedCursorLabelTextColor)
+        
+        self.chooseLinkedCursorLabelBGColorAction = self.linkedCursorColorsMenu.addAction("Label background")
+        self.chooseLinkedCursorLabelBGColorAction.triggered.connect(self.slot_chooseLinkedCursorBGColor)
+        
+        self.opaqueCursorLabelAction = self.cursorsAppearanceMenu.addAction("Opaque cursor labels")
+        self.opaqueCursorLabelAction.setCheckable(True)
+        self.opaqueCursorLabelAction.setChecked(self.opaqueCursorLabel)
+        self.opaqueCursorLabelAction.toggled[bool].connect(self.slot_setOpaqueCursorLabels)
+    
+        self.roisAppearanceMenu = QtWidgets.QMenu("ROI appearance", self)
+        self.displayMenu.addMenu(self.roisAppearanceMenu)
+        
+        self.chooseRoiColorAction = self.roisAppearanceMenu.addAction("Set rois color")
+        self.chooseRoiColorAction.triggered.connect(self.slot_chooseRoisColor)
+    
+        self.chooseROILabelTextColorAction = self.roisAppearanceMenu.addAction("Set text color for ROI labels")
+        self.chooseROILabelTextColorAction.triggered.connect(self.slot_chooseRoisLabelTextColor)
+    
+        self.linkedROIColorsMenu = QtWidgets.QMenu("Linked ROIs", self)
+        self.cursorsAppearanceMenu.addMenu(self.linkedROIColorsMenu)
+        
+        self.chooseLinkedRoiColorAction = self.linkedROIColorsMenu.addAction("Set color for linked rois")
+        self.chooseLinkedRoiColorAction.triggered.connect(self.slot_chooseLinkedRoisColor)
+        
+        self.chooseLinkedROILabelTextColorAction = self.linkedROIColorsMenu.addAction("Set text color for linked ROI labels")
+        self.chooseLinkedROILabelTextColorAction.triggered.connect(self.slot_chooseLinkedRoisLabelTextColor)
+    
+        self.opaqueROILabelAction = self.cursorsAppearanceMenu.addAction("Opaque ROI labels")
+        self.opaqueROILabelAction.setCheckable(True)
+        self.opaqueROILabelAction.setChecked(self.opaqueCursorLabel)
+        self.opaqueROILabelAction.toggled[bool].connect(self.slot_setOpaqueROILabels)
+    
+        self.colorMapMenu = QtWidgets.QMenu("Color Map", self)
+        self.displayMenu.addMenu(self.colorMapMenu)
+        
+        self.colorMapAction = self.colorMapMenu.addAction("Choose Color Map")
+        self.editColorMapAction = self.colorMapMenu.addAction("Edit Color Map")
         
         self.framesQSlider.setMinimum(0)
         self.framesQSlider.setMaximum(0)
@@ -3533,7 +3564,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self._frames_spinner_ = self.framesQSpinBox
 
-        #self.actionOpen.triggered.connect(self._openImageFile)
         self.editColorMapAction.triggered.connect(self._editColorMap)
 
         self.colorMapAction.triggered.connect(self.slot_chooseColorMap)
@@ -3637,8 +3667,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.zoomOriginalAction = self.zoomToolBar.addAction(QtGui.QIcon.fromTheme("zoom-original"), "Original Zoom")
         self.zoomInAction = self.zoomToolBar.addAction(QtGui.QIcon.fromTheme("zoom-in"), "Zoom In")
         self.zoomAction = self.zoomToolBar.addAction(QtGui.QIcon.fromTheme("zoom"), "Zoom")
-        
-        #self.zoomToolBar.widgetForAction(self.zoomAction).setCheckable(True)
         
         self.zoomOutAction.triggered.connect(self.slot_zoomOut)
         self.zoomOriginalAction.triggered.connect(self.slot_zoomOriginal)
@@ -4050,61 +4078,81 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         else:
             self.colorMap = None
         
-        color = self.settings.value("/".join([self.__class__.__name__, "LabelColor"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.labelTextColor = color
-            
-        #color = self.settings.value("ImageViewer/CursorsColor", None)
         color = self.settings.value("/".join([self.__class__.__name__, "CursorColor"]), None)
         if isinstance(color, QtGui.QColor) and color.isValid():
             self.cursorsColor = color
             
-        #color = self.settings.value("ImageViewer/RoisColor", None)
-        color = self.settings.value("/".join([self.__class__.__name__, "RoisColor"]), None)
+        color = self.settings.value("/".join([self.__class__.__name__, "CursorLabelTextColor"]), None)
+        if isinstance(color, QtGui.QColor) and color.isValid():
+            self.cursorLabelTextColor = color
+            
+        color = self.settings.value("/".join([self.__class__.__name__, "LinkedCursorColor"]), None)
+        if isinstance(color, QtGui.QColor) and color.isValid():
+            self.linkedCursorsColor = color
+            
+        color = self.settings.value("/".join([self.__class__.__name__, "LinkedCursorLabelTextColor"]), None)
+        if isinstance(color, QtGui.QColor) and color.isValid():
+            self.linkedCursorLabelTextColor = color
+            
+        color = self.settings.value("/".join([self.__class__.__name__, "CursorLabelBackgroundColor"]), None)
+        if isinstance(color, QtGui.QColor) and color.isValid():
+            self.linkedCursorLabelTextColor = color
+            
+        color = self.settings.value("/".join([self.__class__.__name__, "OpaqueCursorLabel"]), None)
+        if isinstance(color, QtGui.QColor) and color.isValid():
+            self.opaqueCursorLabel = color
+            
+        color = self.settings.value("/".join([self.__class__.__name__, "RoiColor"]), None)
         if isinstance(color, QtGui.QColor) and color.isValid():
             self.roisColor = color
         
-        #color = self.settings.value("ImageViewer/SharedCursorsColor", None)
-        color = self.settings.value("/".join([self.__class__.__name__, "SharedCursorsColor"]), None)
+        color = self.settings.value("/".join([self.__class__.__name__, "ROILabelTextColor"]), None)
         if isinstance(color, QtGui.QColor) and color.isValid():
-            self.sharedCursorsColor = color
+            self.roiLabelTextColor = color
             
-        #color = self.settings.value("ImageViewer/SharedRoisColor", None)
-        color = self.settings.value("/".join([self.__class__.__name__, "SharedRoisColor"]), None)
+        color = self.settings.value("/".join([self.__class__.__name__, "LinkedROIColor"]), None)
         if isinstance(color, QtGui.QColor) and color.isValid():
-            self.sharedRoisColor = roiscolor
+            self.linkedROIsColor = color
+        
+        color = self.settings.value("/".join([self.__class__.__name__, "LinkedROILabelTextColor"]), None)
+        if isinstance(color, QtGui.QColor) and color.isValid():
+            self.linkedROILabelTextColor = color
             
-        #if self.colorMap:
-            #print("ImageViewer %s loadViewerSettings got colorMap" % self, self.colorMap, self.colorMap.name)
-        #else:
-            #print("ImageViewer %s loadViewerSettings got colorMap" % self, self.colorMap)
+        color = self.settings.value("/".join([self.__class__.__name__, "ROILabelBackgroundColor"]), None)
+        if isinstance(color, QtGui.QColor) and color.isValid():
+            self.roiLabelBackgroundColor = color
+            
+        color = self.settings.value("/".join([self.__class__.__name__, "OpaqueROILabel"]), None)
+        if isinstance(color, QtGui.QColor) and color.isValid():
+            self.opaqueROILabel = color
             
     def saveSettings(self):
         self.saveWindowSettings()
         self.saveViewerSettings()
         
     def saveViewerSettings(self):
-        #if self.colorMap:
-            #print("ImageViewer %s saveViewerSettings self.colorMap" % self, self.colorMap, ":", self.colorMap.name)
-            
-        #else:
-            #print("ImageViewer %s saveViewerSettings self.colorMap" % self, self.colorMap)
-            
         if isinstance(self.colorMap, colormaps.colors.Colormap):
             self.settings.setValue("/".join([self.__class__.__name__, "ColorMap"]), self.colorMap.name)
             
         else:
             self.settings.setValue("/".join([self.__class__.__name__, "ColorMap"]), None)
         
-        self.settings.setValue("/".join([self.__class__.__name__, "LabelColor"]), self.labelTextColor)
-        
         self.settings.setValue("/".join([self.__class__.__name__, "CursorColor"]), self.cursorsColor)
+        self.settings.setValue("/".join([self.__class__.__name__, "CursorLabelTextColor"]), self.cursorLabelTextColor)
+        self.settings.setValue("/".join([self.__class__.__name__, "LinkedCursorColor"]), self.linkedCursorsColor)
+        self.settings.setValue("/".join([self.__class__.__name__, "LinkedCursorLabelTextColor"]), self.linkedCursorLabelTextColor)
+        self.settings.setValue("/".join([self.__class__.__name__, "CursorLabelBackgroundColor"]), self.cursorLabelBackgroundColor)
+        self.settings.setValue("/".join([self.__class__.__name__, "LinkedCursorLabelBackgroundColor"]), self.LinkedCursorLabelBackgroundColor)
+        self.settings.setValue("/".join([self.__class__.__name__, "OpaqueCursorLabel"]), self.opaqueCursorLabel)
         
-        self.settings.setValue("/".join([self.__class__.__name__, "RoisColor"]), self.roisColor)
+        self.settings.setValue("/".join([self.__class__.__name__, "RoiColor"]), self.roisColor)
+        self.settings.setValue("/".join([self.__class__.__name__, "ROILabelTextColor"]), self.roiLabelTextColor)
+        self.settings.setValue("/".join([self.__class__.__name__, "LinkedROIColor"]), self.linkedROIsColor)
+        self.settings.setValue("/".join([self.__class__.__name__, "LinkedROILabelTextColor"]), self.linkedROILabelTextColor)
+        self.settings.setValue("/".join([self.__class__.__name__, "ROILabelBackgroundColor"]), self.roiLabelBackgroundColor)
+        self.settings.setValue("/".join([self.__class__.__name__, "OpaqueROILabel"]), self.opaqueROILabel)
         
-        self.settings.setValue("/".join([self.__class__.__name__, "SharedCursorsColor"]), self.sharedCursorsColor)
         
-        self.settings.setValue("/".join([self.__class__.__name__, "SharedRoisColor"]), self.sharedRoisColor)
             
     def setImage(self, image, doc_title=None, normalize=True, colormap=None, gamma=None,
                  frameAxis=None, displayChannel=None):
@@ -4458,23 +4506,75 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                                 title="Choose cursors color",
                                                 options=QtWidgets.QColorDialog.ShowAlphaChannel)
             
-        self.setCursorsColor(color)
-        
+        self.setGraphicsObjectColor(color, "cursor")
+
     @pyqtSlot()
     @safeWrapper
-    def slot_chooseLabelTextColor(self):
+    def slot_chooseLinkedCursorsColor(self):
         if isinstance(self.cursorsColor, QtGui.QColor):
             initial = self.cursorsColor
             
         else:
             initial = QtCore.Qt.white
 
-        color = QtWidgets.QColorDialog.getColor(initial=initial, 
-                                                title="Choose label text color",
-                                                options=QtWidgets.QColorDialog.ShowAlphaChannel)
-            
-        self.setLabelTextColor(color)
+        color = self._showColorChooser(initial, "Choose color for linked Cursors")
         
+        self.setGraphicsObjectColor(color, "linkedcursor")
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_chooseCursorLabelTextColor(self):
+        if isinstance(self.cursorLabelTextColor, QtGui.QColor):
+            initial = self.cursorLabelTextColor
+            
+        else:
+            initial = QtCore.Qt.white
+
+        color = self._showColorChooser(initial, "Choose color cursor labels text")
+        self.setGraphicsObjectColor(color, "cursorLabelText")
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_chooseLinkedCursorLabelTextColor(self):
+        if isinstance(self.linkedCursorLabelTextColor, QtGui.QColor):
+            initial = self.linkedCursorLabelTextColor
+            
+        else:
+            initial = QtCore.Qt.white
+
+        color = self._showColorChooser(initial, "Choose color cursor labels text")
+        self.setGraphicsObjectColor(color, "linkedcursorlabeltext")
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_chooseCursorLabelBGColor(self):
+        # TODO/FIXME: 2021-05-12 09:33:30
+        # not used yet
+        if isinstance(self.cursorLabelBackgroundColor, QtGui.QColor):
+            initial = self.cursorLabelBackgroundColor
+            
+        else:
+            initial = QtCore.Qt.white
+
+        color = self._showColorChooser(initial, "Choose color cursor labels background")
+        
+        self.setGraphicsObjectColor(color, "cursorLabelBackground")
+            
+    @pyqtSlot()
+    @safeWrapper
+    def slot_chooseLinkedCursorBGColor(self):
+        # TODO/FIXME: 2021-05-12 09:33:30
+        # not used yet
+        if isinstance(self.cursorLabelBackgroundColor, QtGui.QColor):
+            initial = self.cursorLabelBackgroundColor
+            
+        else:
+            initial = QtCore.Qt.white
+
+        color = self._showColorChooser(initial, "Choose color cursor labels background")
+        
+        self.setGraphicsObjectColor(color, "cursorLabelBackground")
+            
     @pyqtSlot()
     @safeWrapper
     def slot_chooseRoisColor(self):
@@ -4484,80 +4584,151 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         else:
             initial = QtCore.Qt.white
 
-        color = QtWidgets.QColorDialog.getColor(initial=initial, 
-                                                title="Choose cursors color",
-                                                options=QtWidgets.QColorDialog.ShowAlphaChannel)
+        color = self._showColorChooser(initial, "Choose color for ROIs")
         
-        self.setRoisColor(color)
+        self.setGraphicsObjectColor(color, "rois")
             
+        
     @pyqtSlot()
     @safeWrapper
-    def slot_chooseCBCursorsColor(self):
-        if isinstance(self.cursorsColor, QtGui.QColor):
-            initial = self.cursorsColor
+    def slot_chooseLinkedRoisColor(self):
+        if isinstance(self.linkedROIsColor, QtGui.QColor):
+            initial = self.linkedROIsColor
             
         else:
             initial = QtCore.Qt.white
 
-        color = QtWidgets.QColorDialog.getColor(initial=initial, 
-                                                title="Choose cursors color",
-                                                options=QtWidgets.QColorDialog.ShowAlphaChannel)
-            
-        self.setSharedCursorsColor(color)
+        color = self._showColorChooser(initial, "Choose color for linked ROIs")
+        
+        self.setGraphicsObjectColor(color, "linkedroi")
         
     @pyqtSlot()
     @safeWrapper
-    def slot_chooseCBRoisColor(self):
-        if isinstance(self.sharedRoisColor, QtGui.QColor):
-            initial = self.sharedRoisColor
+    def slot_chooseRoisLabelTextColor(self):
+        if isinstance(self.roiLabelTextColor, QtGui.QColor):
+            initial = self.roiLabelTextColor
             
         else:
             initial = QtCore.Qt.white
 
-        color = QtWidgets.QColorDialog.getColor(initial=initial, 
-                                                title="Choose cursors color",
-                                                options=QtWidgets.QColorDialog.ShowAlphaChannel)
+        color = self._showColorChooser(initial, "Choose color for linked ROIs")
         
-        self.setSharedRoisColor(color)
+        self.setGraphicsObjectColor(color, "roilabeltext")
         
-    def setLabelTextColor(self, color):
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.labelTextColor = color
-            for obj in filter(lambda x: isinstance(x.backend, pgui.Cursor), 
-                              self.viewerWidget.graphicsObjects):
-                obj.textColor = self.labelTextColor
-        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_chooseLinkedRoisLabelTextColor(self):
+        if isinstance(self.linkedROILabelTextColor, QtGui.QColor):
+            initial = self.linkedROILabelTextColor
             
-    def setCursorsColor(self, color):
-        #print("ImageViewer.setCursorsColor", color)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.cursorsColor = color
-            for obj in filter(lambda x: isinstance(x.backend, pgui.Cursor), 
-                              self.viewerWidget.graphicsObjects):
-                obj.color = self.cursorsColor
+        else:
+            initial = QtCore.Qt.white
+
+        color = self._showColorChooser(initial, "Choose color for linked ROIs")
         
-    def setRoisColor(self, color):
-        #print("ImageViewer.setRoisColor", color)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.roisColor = color
-            for obj in filter(lambda x: not isinstance(x.backend, pgui.Cursr), 
-                              self.viewerWidget.graphicsObjects):
-                obj.color = self.roisColor
-    
-    def setSharedCursorsColor(self, color):
-        #print("ImageViewer.setSharedCursorsColor", color.name())
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.sharedCursorsColor = color
-            for obj in filter(lambda x: isinstance(x.backend, pgui.Cursor), 
-                              self.viewerWidget.graphicsObjects):
-                obj.colorForSharedBackend = self.sharedCursorsColor
+        self.setGraphicsObjectColor(color, "linkedroilabeltext")
         
-    def setSharedRoisColor(self, color):
-        #print("ImageViewer.setRoisColor", color)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.sharedRoisColor = color
-            for obj in filter(lambda x: not isinstance(x.backend, pgui.Cursor), 
-                              self.viewerWidget.graphicsObjects):
-                obj.colorForSharedBackend = self.sharedRoisColor
+    @pyqtSlot()
+    @safeWrapper
+    def slot_chooseROILabelBGColor(self):
+        # TODO/FIXME: 2021-05-12 09:33:30
+        # not used yet
+        if isinstance(self.roiLabelBackgroundColor, QtGui.QColor):
+            initial = self.roiLabelBackgroundColor
+            
+        else:
+            initial = QtCore.Qt.white
+
+        color = self._showColorChooser(initial, "Choose color cursor labels background")
         
-    
+        self.setGraphicsObjectColor(color, "roilabelbackground")
+        
+    @pyqtSlot(bool)
+    @safeWrapper
+    def slot_setOpaqueCursorLabels(self, value):
+        self.setOpaqueGraphicsLabel(cursors=True, opaque=value)
+            
+    @pyqtSlot(bool)
+    @safeWrapper
+    def slot_setOpaqueROILabels(self, value):
+        self.setOpaqueGraphicsLabel(cursors=False, opaque=value)
+            
+    def _showColorChooser(self, initial:QtGui.QColor, title:str="Choose color") -> typing.Optional[QtGui.QColor]:
+        return QtWidgets.QColorDialog.getColor(initial=initial, 
+                                                title=title,
+                                                options=QtWidgets.QColorDialog.ShowAlphaChannel,
+                                                parent=self)
+        
+    def setGraphicsObjectColor(self, color:QtGui.QColor, what:str):
+        cursor = what.lower() in ("cursor", "linkedcursor",
+                                  "cursorlabeltext", "linkedcursorlabeltext",
+                                  "cursorlabelbackground")
+        
+        if cursor:
+            filtfn = partial(filter, lambda x: isinstance(x.backend, pgui.Cursor))
+        else:
+            filtfn = partial(itertools.filterfalse, lambda x: isinstance(x.backend, pgui.Cursor))
+            
+        if isinstance(color, QtGui.QColor) and color.isValid():
+            if what.lower() == "cursor":
+                self.cursorsColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.penColor = self.cursorsColor
+                    
+            elif what.lower() == "linkedcursor":
+                self.linkedCursorsColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.linkedPenColor = self.linkedCursorsColor
+                    
+            elif what.lower() == "cursorlabeltext":
+                self.cursorLabelTextColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.textColor = self.cursorLabelTextColor
+                    
+            elif what.lower() == "linkedcursorlabeltext":
+                self.linkedCursorLabelTextColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.linkedTextColor = self.linkedCursorLabelTextColor
+                    
+            elif what.lower() == "cursorlabelbackground":
+                self.cursorLabelBackgroundColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.textBackgroundColor = self.cursorLabelBackgroundColor
+                    
+            elif what.lower() == "roi":
+                self.roisColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.penColor = self.roisColor
+                    
+            elif what.lower() == "linkedroi":
+                self.linkedROIsColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.linkedPenColor = self.linkedROIsColor
+                    
+            elif what.lower() == "roilabeltext":
+                self.roiLabelTextColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.textColor = self.roiLabelTextColor
+                    
+            elif what.lower() == "linkedroilabeltext":
+                self.linkedROILabelTextColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.linkedTextColor = self.linkedROILabelTextColor
+                    
+            elif what.lower() == "roilabelbackground":
+                self.roiLabelBackgroundColor = color
+                for obj in filtfn(self.viewerWidget.graphicsObjects):
+                    obj.textBackgroundColor = self.roiLabelBackgroundColor
+        
+    def setOpaqueGraphicsLabel(cursors:bool=False, opaque:bool=True):
+        if cursors:
+            self.opaqueCursorLabel = opaque
+            objs = [o for o in filter(lambda x: isinstance(x.backend, pgui.Cursor), 
+                                        self.viewerWidget.graphicsObjects)]
+        else:
+            self.opaqueROILabel = opaque
+            objs = [o for o in itertools.filterfalse(lambda x: isinstance(x.backend, pgui.Cursor), 
+                                                    self.viewerWidget.graphicsObjects)]
+        for obj in objs:
+            obj.opaqueLabel = opaque
+            
