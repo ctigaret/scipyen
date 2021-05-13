@@ -7602,58 +7602,60 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     lnf_control_default = DataBag(
         pen   = DataBag(style = QtCore.Qt.DotLine, width = 1,
                         cap =   QtCore.Qt.RoundCap,  join =  QtCore.Qt.RoundJoin,
-                        color = QtCore.Qt.lightGray,),
+                        color = QtCore.Qt.lightGray,), # lineart pen
         point  = DataBag(style = QtCore.Qt.SolidLine, width = 1,
                         cap =   QtCore.Qt.RoundCap,  join =  QtCore.Qt.RoundJoin,
-                        color = QtGui.QColor(50, 100, 120, 200),),
+                        color = QtGui.QColor(50, 100, 120, 200),), # lineart point pen !
         brush = DataBag(style = QtCore.Qt.SolidPattern, pattern = None, 
                         gradient = None, texture = None, textureImage = None,
-                        color = QtGui.QColor(200, 200, 210, 120),
+                        color = QtGui.QColor(200, 200, 210, 120), # label point fill
                         alow_none = True),
         text   = DataBag(style = QtCore.Qt.SolidLine, width = 1,
                          cap =   QtCore.Qt.RoundCap,  join =  QtCore.Qt.RoundJoin,
-                         color = QtCore.Qt.black),
+                         color = QtCore.Qt.black), # label text
         )
     
     lnf_selected_styles_default = DataBag({
         "False": DataBag(
-            pen   = DataBag(style = QtCore.Qt.DashLine, width = 1,
-                            cap =   QtCore.Qt.RoundCap, join = QtCore.Qt.RoundJoin),
-            text   = DataBag(style = QtCore.Qt.SolidLine, width = 1,
-                            cap =   QtCore.Qt.RoundCap,  join =  QtCore.Qt.RoundJoin),
             brush = DataBag(style = QtCore.Qt.SolidPattern, pattern = None, 
                             gradient = None, texture = None, textureImage = None,
-                            alow_none = True),
+                            alow_none = True), # label background
+            pen   = DataBag(style = QtCore.Qt.DashLine, width = 1,
+                            cap =   QtCore.Qt.RoundCap, join = QtCore.Qt.RoundJoin), # lineart pen
             point = DataBag(style = QtCore.Qt.SolidPattern, pattern = None, 
                             gradient = None, texture = None, textureImage = None,
-                            alow_none = True),
+                            alow_none = True), # point fill
+            text   = DataBag(style = QtCore.Qt.SolidLine, width = 1, 
+                            cap =   QtCore.Qt.RoundCap,  join =  QtCore.Qt.RoundJoin), # label text pen
+            pointBrushAlpha = 0.5, # for point fill colours
             ),
         "True" : DataBag(
-            pen   = DataBag(style = QtCore.Qt.SolidLine, width = 1,
-                            cap =   QtCore.Qt.RoundCap,  join =  QtCore.Qt.RoundJoin),
-            text   = DataBag(style = QtCore.Qt.SolidLine, width = 1,
-                            cap =   QtCore.Qt.RoundCap,  join =  QtCore.Qt.RoundJoin),
             brush = DataBag(style = QtCore.Qt.SolidPattern, pattern = None, 
                             gradient = None, texture = None, textureImage = None,
                             allow_none = True),
+            pen   = DataBag(style = QtCore.Qt.SolidLine, width = 1,
+                            cap =   QtCore.Qt.RoundCap,  join =  QtCore.Qt.RoundJoin),
             point = DataBag(style = QtCore.Qt.SolidPattern, pattern = None, 
                             gradient = None, texture = None, textureImage = None,
                             allow_none = True),
+            text   = DataBag(style = QtCore.Qt.SolidLine, width = 1,
+                            cap =   QtCore.Qt.RoundCap,  join =  QtCore.Qt.RoundJoin),
+            pointBrushAlpha = 0.5,
             ),
         })
         
     lnf_linked_colors_default = DataBag({
         "False": DataBag(
-            pen             = QtCore.Qt.red,
-            text            = QtCore.Qt.black,
-            brush           = QtCore.Qt.white,
-            point           = QtCore.Qt.red,
+            brush           = QtCore.Qt.white, # label text background
+            pen             = QtCore.Qt.red,   # lineart pen
+            point           = QtCore.Qt.red,   # point fills (when used)
+            text            = QtCore.Qt.black, # label text pen
             ),
         "True" : DataBag(
+            brush           = QtCore.Qt.white,
             pen             = QtCore.Qt.magenta,
             point           = QtCore.Qt.magenta,
-            text            = QtCore.Qt.magenta,
-            brush           = QtCore.Qt.white,
+            text            = QtCore.Qt.black,
             ),
         })
     
@@ -7804,34 +7806,45 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         return "%s, type %s, backend %s" \
             % (self.__repr__(), type(self.backend).__name__, self.backend.__repr__())
             
-    def _setup_appearance_(self):
+    def _setup_appearance_(self, cosmeticPen:bool=True):
         appearance = DataBag()
-        self._linePen                           = QtGui.QPen(self._defaultLinePen())
-        self._linePenSelected                   = QtGui.QPen(self._defaultLinePen(selected=True))
-        self._linePenLinked                     = QtGui.QPen(self._defaultLinePen(linked=True))
-        self._linePenLinkedSelected             = QtGui.QPen(self._defaultLinePen(selected=True, linked=True))
-        self._textPen                           = QtGui.QPen(self._defaultTextPen())
-        self._textPenSelected                   = QtGui.QPen(self._defaultTextPen(selected=True))
-        self._textPenLinked                     = QtGui.QPen(self._defaultTextPen(linked=True))
-        self._textPenLinkedSelected             = QtGui.QPen(self._defaultTextPen(selected=True, linked=True))
+        # pen for lineart including the points in non-cursors: style depends on selection; color on whether it is linked
+        self._linePen                           = QtGui.QPen(self._defaultLinePen(cosmetic=cosmeticPen))
+        self._linePenSelected                   = QtGui.QPen(self._defaultLinePen(selected=True,cosmetic=cosmeticPen))
+        self._linePenLinked                     = QtGui.QPen(self._defaultLinePen(linked=True,cosmetic=cosmeticPen))
+        self._linePenLinkedSelected             = QtGui.QPen(self._defaultLinePen(selected=True, linked=True,cosmetic=cosmeticPen))
+        # labels text
+        self._textPen                           = QtGui.QPen(self._defaultTextPen(cosmetic=cosmeticPen))
+        self._textPenSelected                   = QtGui.QPen(self._defaultTextPen(selected=True,cosmetic=cosmeticPen))
+        self._textPenLinked                     = QtGui.QPen(self._defaultTextPen(linked=True,cosmetic=cosmeticPen))
+        self._textPenLinkedSelected             = QtGui.QPen(self._defaultTextPen(selected=True, linked=True,cosmetic=cosmeticPen))
+        # labels background brush
         self._labelBrush                        = QtGui.QBrush(self._defaultLabelBrush())
         self._labelBrushSelected                = QtGui.QBrush(self._defaultLabelBrush(selected=True))
         self._labelBrushLinked                  = QtGui.QBrush(self._defaultLabelBrush(linked=True))
         self._labelBrushLinkedSelected          = QtGui.QBrush(self._defaultLabelBrush(selected=True, linked=True))
         
-        self._controlLinePen                    = QtGui.QPen(self._defaultControlLinePen())
+        # control lineart for ROIs in build or edit mode
+        # pen for control lines
+        self._controlLinePen                    = QtGui.QPen(self._defaultControlLinePen(cosmetic=cosmeticPen))
+        # pen for control points
+        self._controlPointPen                   = QtGui.QPen(self._defaultControlPointPen(cosmetic=cosmeticPen))
+        # fill (background) for control points
+        self._controlPointBrush                 = QtGui.QBrush(self._defaultControlPointBrush())
+        # control lineart label text
+        self._controlTextPen                    = QtGui.QPen(self._defaultControlTextPen(cosmetic=cosmeticPen))
+        # brush for control lineart labels
+        self._controlLabelBrush                 = QtGui.QBrush(self._defaultControlLabelBrush())
         
-        self._controlPointPen                   = QtGui.QPen(self._defaultControlPointPen())
-        
-        self._controlPointBrush                 = QtGui.QPen(self._defaultControlPointBrush())
-        
-        self._textFont = self.defaultTextFont
-        
+        # diameter (in pixels) of points and control points
         self._pointSize = 5
+        
+        # label font
+        self._textFont = self.defaultTextFont
         
     @safeWrapper
     def _defaultLinePen(self, selected:bool=False, linked:bool=False, cosmetic:bool=True):
-        pen = QtGui.QPen(self.lnf_linked_colors_default["%s" % linked].color,
+        pen = QtGui.QPen(self.lnf_linked_colors_default["%s" % linked].pen,
                          self.lnf_selected_styles_default["%s" % selected].pen.style,
                          self.lnf_selected_styles_default["%s" % selected].pen.width,
                          self.lnf_selected_styles_default["%s" % selected].pen.cap,
@@ -7843,35 +7856,12 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         return pen
     
     @safeWrapper
-    def _defaultControlLinePen(self, cosmetic:bool=True):
-        pen = QtGui.QPen(self.lnf_control_default.pen.color,
-                         self.lnf_control_default.pen.style,
-                         self.lnf_control_default.pen.width,
-                         self.lnf_control_default.pen.cap,
-                         self.lnf_control_default.pen.join,
-                         )
+    def _defaultPointBrush(self, selected:bool=False, linked:bool=False):
+        brush = QtGui.QBrush(QtGui.QColor(self.lnf_linked_colors_default["%s" % linked].point).setAlpha(self.lnf_selected_styles_default["%s" % selected].pointBrushAlpha),
+                             self.lnf_selected_styles_default["%s" % selected].point.style,
+                             )
         
-        pen.setCosmetic(cosmetic)
-        
-        return pen
-    
-    @safeWrapper
-    def _defaultControlPointPen(self, selected:bool=False, linked:bool=False, cosmetic:bool=True):
-        pen = QtGui.QPen(self.lnf_control_default.point.color,
-                         self.lnf_control_default.point.style,
-                         self.lnf_control_default.point.width,
-                         self.lnf_control_default.point.cap,
-                         self.lnf_control_default.point.join,
-                         )
-        
-        pen.setCosmetic(cosmetic)
-        
-        return pen
-    
-    @safeWrapper
-    def _defaultControlPointBrush(self, selected:bool=False, linked:bool=False):
-        brush = QtGui.QBrush(self.lnf_control_default.brush.style,
-                             self.lnf_control_default.brush.color)
+        return brush
         
     @safeWrapper
     def _defaultTextPen(self, selected:bool=False, linked:bool=False, cosmetic:bool=True):
@@ -7888,8 +7878,63 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     
     @safeWrapper
     def _defaultLabelBrush(self, selected:bool=False, linked:bool=False):
-        brush = QtGui.QBrush(self.lnf_linked_colors_default["%s" % linked].background,
+        brush = QtGui.QBrush(self.lnf_linked_colors_default["%s" % linked].brush,
                              self.lnf_selected_styles_default["%s" % selected].brush.style,
+                             )
+        
+        return brush
+        
+    @safeWrapper
+    def _defaultControlLinePen(self, cosmetic:bool=True):
+        pen = QtGui.QPen(self.lnf_control_default.pen.color,
+                         self.lnf_control_default.pen.style,
+                         self.lnf_control_default.pen.width,
+                         self.lnf_control_default.pen.cap,
+                         self.lnf_control_default.pen.join,
+                         )
+        
+        pen.setCosmetic(cosmetic)
+        
+        return pen
+    
+    @safeWrapper
+    def _defaultControlPointPen(self, cosmetic:bool=True):
+        pen = QtGui.QPen(self.lnf_control_default.point.color,
+                         self.lnf_control_default.point.style,
+                         self.lnf_control_default.point.width,
+                         self.lnf_control_default.point.cap,
+                         self.lnf_control_default.point.join,
+                         )
+        
+        pen.setCosmetic(cosmetic)
+        
+        return pen
+    
+    @safeWrapper
+    def _defaultControlPointBrush(self):
+        brush = QtGui.QBrush(self.lnf_control_default.brush.color,
+                             self.lnf_control_default.brush.style,
+                             )
+        
+        return brush
+        
+    @safeWrapper
+    def _defaultControlTextPen(self, cosmetic:bool=True):
+        pen = QtGui.Pen(self.lnf_control_default.text.color,
+                        self.lnf_control_default.text.style,
+                        self.lnf_control_default.text.width,
+                        self.lnf_control_default.text.cap,
+                        self.lnf_control_default.text.join,
+                        )
+        
+        pen.setCosmetic(cosmetic)
+        
+        return pen
+        
+    @safeWrapper
+    def _defaultControlLabelBrush(self):
+        brush = QtGui.QBrush(self.lnf_control_default.brush.color,
+                             self.lnf_control_default.brush.style,
                              )
         
         return brush
@@ -10446,11 +10491,13 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             
     #### BEGIN Appearance properties & methods
     def getPen(self, selected:bool=False, linked:bool=False, text:bool=False,
-               control:bool=False, controlpoint:bool=False):
+               control:bool=False, controlpoint:bool=False, controltext:bool=False):
         if control:
             return self._controlLinePen
         elif controlpoint:
             return self._controlPointPen
+        elif controltext:
+            return self._controlTextPen
         else:
             if linked:
                 if selected:
@@ -10464,7 +10511,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     return self._textPen if text else self._linePen
                 
     def setPen(self, pen:QtGui.QPen, selected:bool=False, linked:bool=False, text:bool=False,
-               control:bool=False, controlpoint:bool=False):
+               control:bool=False, controlpoint:bool=False, controltext:bool=False):
         if not isinstance(pen, QtGui.QPen):
             raise TypeError("Expecting a QPen (Qt GUI); got %s instead" % type(pen).__name__)
         
@@ -10472,6 +10519,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             self._controlLinePen = pen
         elif controlpoint:
             self._controlPointPen = pen
+        elif controltext:
+            self._controlTextPen = pen
         else:
             if linked:
                 if selected:
@@ -10498,9 +10547,14 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             
         self.update()
         
-    def getBrush(self, selected:bool=False, linked:bool=False, control:bool=False):
+    def getBrush(self, selected:bool=False, linked:bool=False,
+                 control:bool=False, controlpoint:bool=False, controllabel:bool=False):
         if control:
+            return self._controlLabelBrush
+        elif controlpoint:
             return self._controlPointBrush
+        elif controllabel:
+            return self._controlLabelBrush
         else:
             if linked:
                 if selected:
@@ -10513,12 +10567,17 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 else:
                     return self._labelBrush
                 
-    def setBrush(self, brush:QtGui.QBrush, selected:bool=False, linked:bool=False, control:bool=False):
+    def setBrush(self, brush:QtGui.QBrush, selected:bool=False, linked:bool=False, 
+                 control:bool=False, controlpoint:bool=False, controllabel:bool=False):
         if not isinstance(brush, QtGui.QBrush):
             raise TypeError("Expecting a QBrush (Qt GUI); got %s instead" % type(brush).__name__)
         
         if control:
+            self._controlLabelBrush = brush
+        elif controlpoint:
             self._controlPointBrush = brush
+        elif controllabel:
+            self._controlLabelBrush = brush
         else:
             if linked:
                 if selected:
@@ -10534,11 +10593,17 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self.update()
         
     def getColor(self, pen:bool=True, linked:bool=False, text:bool=False,
-                 control:bool=False, controlpoint:bool=False):
+                 control:bool=False, controlpoint:bool=False, controltext:bool=False):
+        """Colors for pen or brush.
+        For main graphics, color depends on whether the backend is linked or not.
+        For control lineart, there are different colors for control line pen,
+        control point pen, control point fill, control label text and control 
+        label background
+        """
         if pen:
             return self.getPen(linked=linked, text=text, control=control, controlpoint=controlpoint).color()
         else:
-            return self.getBrush(linked=linked, control=control).color()
+            return self.getBrush(linked=linked, control=control, controlpoint=controlpoint, controllabel=controltext).color()
         
     def setColor(self, qcolor, pen:bool=True, selected:bool=False, linked:bool=False, text:bool=False,
                  control:bool=False, controlpoint:bool=False):
@@ -10557,8 +10622,23 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         self.update()
         
-    def getStyle(self, pen:bool=True, selected:bool=False,)
-            
+    def getStyle(self, pen:bool=True, selected:bool=False, text:bool=False,
+                 control:bool=False,controlpoint:bool=False, controltext:bool=False):
+        if pen:
+            return self.getPen(linked=linked, text=text, control=control, controlpoint=controlpoint).style()
+        else:
+            return self.getBrush(linked=linked, control=control, controlpoint=controlpoint, controllabel=controltext).style()
+        
+    def setStyle(self, style:typing.Union[QtCore.Qt.PenStyle, QtCore.Qt.BrushStyle],
+                 selected:bool=False, text:bool=False,
+                 control:bool=False,controlpoint:bool=False, controltext:bool=False):
+        if isinstance(style, QtCore.Qt.PenStyle):
+            self.getPen(linked=linked, text=text, control=control, controlpoint=controlpoint).setStyle(style)
+        elif isinstance(style, QtCore.Qt.BrushStyle):
+            self.getBrush(linked=linked, control=control, controlpoint=controlpoint, controllabel=controltext).setStyle(style)
+        else:
+            raise TypeError("Expecting a Qt Core Qt.PenStyle or Qt.BrushStyle; got %s instead" % type(style.__name__))
+        
     @property
     def linkedColor(self):
         return self._linePenLinked.color()
