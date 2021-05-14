@@ -154,8 +154,6 @@ class DataBagTraitsObserver(HasTraits):
         #print("self.changed: change['old']:\n",change["old"], "\n")
         #print("self.changed: change['new']:\n",change["new"], "\n")
 
-
-        
 class DataBag(Bunch):
     """Dictionary with semantics for direct attribute reference and attribute change observer.
     NOTE 2020-07-04 17:48:10
@@ -189,8 +187,6 @@ class DataBag(Bunch):
     customize link & directional link
     deep copy
     
-    Originally defined in Scipyen.core.datatypes using self.__dict__ = self paradigm
-
     """
     # Acquire HasTraits functionality through composition:
     

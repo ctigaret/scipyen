@@ -42,11 +42,11 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 
 from . import xmlutils
 from . import strutils
-
 from .utilities import (counter_suffix, unique, )
 from .prog import safeWrapper
 
 from imaging.imageprocessing import *
+
 
 #import patchneo
 #from .patchneo import neo
@@ -215,7 +215,7 @@ custom_unit_symbols[Mohm.symbol] = Mohm
 gigaohm = Gohm = make_scaled_unit_quantity(pq.ohm, "giga")
 custom_unit_symbols[Gohm.symbol] = Gohm
 
-# some other useful units TODO
+# TODO some other useful units TODO
 
 def isVector(x):
     """Returns True if x is a numpy array encapsulating a vector.
@@ -276,6 +276,29 @@ def isRowVector(x):
         
     else:
         return False
+    
+def reverse_dict(x:dict)->dict:
+    """Returns a reverse mapping (values->keys) from x
+    
+    Parameters:
+    ==========
+    x:dict
+        CAUTION: the keys in 'x' must be mapped to unique values, and 
+                 the values in 'x' must be of hashable types
+    
+    """
+    from .traitcontainers import (DataBag, Bunch, )
+    from collections import OrderedDict
+    if isinstance(x, DataBag):
+        ret = DataBag((v,i) for i,v in x.items())
+    elif isinstance(x, Bunch):
+        ret = Bunch((v,i) for i,v in x.items())
+    elif isinstance(x, OrderedDict):
+        ret = OrderedDict((v,i) for i,v in x.items())
+    else:
+        ret = dict((v,i) for i,v in x.items())
+        
+    return ret
     
 def arraySlice(data:np.ndarray, slicing:(dict, type(None))):
     """Dynamic slicing of nD arrays and introducing new axis in the array.
