@@ -41,6 +41,7 @@ def createDrag(color:QtGui.QColor, dragSource:QtCore.QObject) -> QtGui.QDrag:
     painter.setPen(QtCore.Qt.black)
     painter.drawRect(0, 0, 24, 19)
     painter.end() # not in Python!
+    drag.setMimeData(mime)
     drag.setPixmap(colorPix)
     drag.setHotSpot(QtCore.QPoint(-5, -7))
     return drag
@@ -86,6 +87,7 @@ class ColorButton(QtWidgets.QPushButton):
     @color.setter
     def color(self, qcolor:QtGui.QColor):
         self._color = QtGui.QColor(qcolor)
+        self.update()
         self.changedColor.emit(self._color)
         
     @property
@@ -188,12 +190,12 @@ class ColorButton(QtWidgets.QPushButton):
     def mouseMoveEvent(self, ev:QtGui.QMouseEvent):
         if ev.buttons() & QtCore.Qt.LeftButton and \
             (ev.pos() - self._mPos).manhattanLength() > QtWidgets.QApplication.startDragDistance():
-            createDrag(self.color, self).exec()
+            createDrag(self.color, self).exec_()
             self.setDown(False)
             
     @pyqtSlot()
     def _chooseColor(self):
-        if (self._dialog):
+        if self._dialog:
             self._dialog.show()
             self._dialog.raise_()
             self._dialog.activateWindow()
@@ -202,8 +204,8 @@ class ColorButton(QtWidgets.QPushButton):
         self._dialog = QtWidgets.QColorDialog(self)
         self._dialog.setCurrentColor(self.color)
         self._dialog.setOption(QtWidgets.QColorDialog.ShowAlphaChannel, self._alphaChannelEnabled)
-        self._dialog.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-        self._dialog.accepted.connect(self._colorChosen())
+        #self._dialog.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+        self._dialog.accepted.connect(self._colorChosen)
         self._dialog.show()
         
     @pyqtSlot()
