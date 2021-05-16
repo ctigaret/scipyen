@@ -347,6 +347,31 @@ def processtimefunc(func):
         return r
     return wrapper
 
+def no_sip_autoconversion(klass):
+    """Decorator that suppresses sip autoconversion from Qt (C++) to Python
+    types.
+    
+    Mostly useful to prevent sip to convert QVariant to a python type when
+    a QVariant is passed as argument to methods of Qt objects, inside the
+    decorated function or method.
+    
+    Parameter:
+    ==========
+    klass: a Qt :class:
+    
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            import sip
+            sip.enableautoconversion(klass, False)
+            ret = func(*args, *kwargs)
+            sip.enableautoconversion(klass, True)
+            return ret
+        return wrapper
+    return decorator
+        
+
 # ### END Decorators
 
 # ### BEGIN Context managers
