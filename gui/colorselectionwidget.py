@@ -88,3 +88,5 @@ class ColorSelectionWidget(QtWidgets.QWidget):
     @palette.setter
     def palette(self, value):
         self._colorComboBox.colors = palette
+        
+        

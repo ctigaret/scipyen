@@ -103,7 +103,7 @@ def fromMimeData(mimeData:QtCore.QMimeData) -> QtGui.QColor:
     return QtGui.QColor()
 
 @no_sip_autoconversion(QtCore.QVariant)
-def colorComboDelegateBrush(index:QtCore.QModelIndex, role:int) -> QtGui.QBrush:
+def comboDelegateBrush(index:QtCore.QModelIndex, role:int) -> QtGui.QBrush:
     brush = QtGui.QBrush()
     v = QtCore.QVariant(index.data(role))
     if v.type() == QtCore.QVariant.Brush:
@@ -417,7 +417,7 @@ class ColorComboDelegate(QtWidgets.QAbstractItemDelegate):
               index:QtCore.QModelIndex):
         innerColor = QtGui.QColor(QtCore.Qt.white)
         isSelected = (option.state and QtWidgets.QStyle.State_Selected)
-        paletteBrush = colorComboDelegateBrush(index, QtCore.Qt.BackgroundRole).style() == QtCore.Qt.NoBrush
+        paletteBrush = comboDelegateBrush(index, QtCore.Qt.BackgroundRole).style() == QtCore.Qt.NoBrush
         
         if isSelected:
             innerColor = option.palette.color(QtGui.QPalette.Highlight)
@@ -481,6 +481,7 @@ class ColorComboDelegate(QtWidgets.QAbstractItemDelegate):
 class ColorComboBox(QtWidgets.QComboBox):
     activated = pyqtSignal(QtGui.QColor, name="activated") # overloads QComboBox.activated[int] signal
     highlighted = pyqtSignal(QtGui.QColor, name="highlighted")
+    colorChanged = pyqtSignal(QtGui.QColor, name="colorChanged")
 
     def __init__(self, color:typing.Optional[QtGui.QColor]=None, 
                  palette:typing.Optional[typing.Union[list, tuple, dict, str]]=None,
@@ -488,8 +489,7 @@ class ColorComboBox(QtWidgets.QComboBox):
                  transparentPixmap:typing.Optional[QtGui.QPixmap]=None,
                  keepAlphaOnDropPaste=False,
                  parent:typing.Optional[QtWidgets.QWidget]=None):
-        super().__init__()
-        QtWidgets.QComboBox.__init__(self, parent=parent)
+        super().__init__(self, parent=parent)
         self._colorList = []
         self._colorDict = {}
         
@@ -628,11 +628,14 @@ class ColorComboBox(QtWidgets.QComboBox):
         self._internalColor = color
         self._customColor = color
         self.setItemData(0, self._customColor, ColorComboDelegate.ItemRoles.ColorRole)
+        self.colorChanged.emit(color)
         
     @pyqtSlot(QtGui.QColor)
     def slot_setColor(self, value:QtGui.QColor):
-        self._setCustomColor(value)
-        self.update()
+        if isinstance(value, QtGui.QColor) and value.isValid():
+            sigblock = QtCore.QSignalBlocker(self)
+            self._setCustomColor(value)
+            self.update()
     
     @pyqtSlot(int)
     @safeWrapper
