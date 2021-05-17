@@ -18,18 +18,19 @@ What is new/different from the KWidgetsAddons classes:
        
        Useful to retrieve the Qt enum object as a symbol given its int value.
        For example, given PyQt5.QtCore imported as QtCore:
-       reverse_dict(qtGLobalColors)[7] -> 'QtCore.Qt.red'
+       reverse_dict(qtGlobalColors)[7] -> 'QtCore.Qt.red'
        
        and 
        
-       eval(reverse_dict(qtGLobalColors)[7]) -> 7
+       eval(reverse_dict(qtGlobalColors)[7]) -> 7
        
        Furthermore this can be used to populate a combo box (see ColorCombo); to
        retrieve the actual color name, use (following the example above):
        
        reverse_dict(qtGlobalColors)[7].split('.')[-1] -> 'red'
     
-        
+    NOTE: 2021-05-17 14:00:51
+    Color palettes moves to gui.scipyen_colormaps module
 """
 import array, os, typing
 import numpy as np
@@ -43,98 +44,15 @@ from PyQt5.uic import loadUiType as __loadUiType__
 
 from core.prog import (safeWrapper, no_sip_autoconversion)
 
+from .scipyen_colormaps import (qtGlobalColors, standardPalette,
+                                standardPaletteDict, svgPalette,
+                                getPalette, paletteQColors, paletteQColor, 
+                                standardQColor, svgQColor,
+                                qtGlobalColors, mplColors)
+
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-qtGlobalColors = dict(("QtCore.Qt.%s" % x,n) for x, n in vars(QtCore.Qt).items() if isinstance(n, QtCore.Qt.GlobalColor))
 
-standardPalette = [
-    [255, 255, 255], # white
-    [192, 192, 192], # light gray
-    [160, 160, 160], # gray
-    [128, 128, 128], # dark gray
-    [  0,   0,   0], # black
-    [255, 128, 128], # light red
-    [255, 192, 128], # light orange
-    [255, 255, 128], # light yellow
-    [128, 255, 128], # light green
-    [128, 255, 255], # cyan blue
-    [128, 128, 255], # light blue
-    [255, 128, 255], # light violet
-    [255,   0,   0], # red
-    [255, 128,   0], # orange
-    [255, 255,   0], # yellow
-    [  0, 255,   0], # green
-    [  0, 255, 255], # light blue
-    [  0,   0, 255], # blue
-    [255,   0, 255], # violet
-    [128,   0,   0], # dark red
-    [128,  64,   0], # dark orange
-    [128, 128,   0], # dark yellow
-    [  0, 128,   0], # dark green
-    [  0, 128, 128], # dark light blue
-    [  0,   0, 128], # dark blue
-    [128,   0, 128] # dark violet
-]
-
-#standardPalette = np.array( 
-#[
-    #[255, 255, 255], # white
-    #[192, 192, 192], # light gray
-    #[160, 160, 160], # gray
-    #[128, 128, 128], # dark gray
-    #[0, 0, 0], # black
-
-    #[255, 128, 128], # light red
-    #[255, 192, 128], # light orange
-    #[255, 255, 128], # light yellow
-    #[128, 255, 128], # light green
-    #[128, 255, 255], # cyan blue
-    #[128, 128, 255], # light blue
-    #[255, 128, 255], # light violet
-    #[255, 0, 0], # red
-    #[255, 128, 0], # orange
-    #[255, 255, 0], # yellow
-    #[0, 255, 0], # green
-    #[0, 255, 255], # light blue
-    #[0, 0, 255], # blue
-    #[255, 0, 255], # violet
-    #[128, 0, 0], # dark red
-    #[128, 64, 0], # dark orange
-    #[128, 128, 0], # dark yellow
-    #[0, 128, 0], # dark green
-    #[0, 128, 128], # dark light blue
-    #[0, 0, 128], # dark blue
-    #[128, 0, 128] # dark violet
-#],
-#dtype = np.dtype(int))
-##dtype = np.dtype(bytes))
-
-def standardColor(i:int) -> QtGui.QColor:
-    return paletteColor(standardPalette, i)
-    #if i < len(standardPalette):
-        #entry = standardPalette[i]
-        #return QtGui.QColor(entry[0], entry[1], entry[2])
-    
-    #return QtGui.QColor()
-
-def paletteColor(palette:list, i:int) -> QtGui.QColor:
-    if not isinstance(i, int):
-        raise TypeError("expecting an int index; got %s instead" % type(i).__name__)
-    
-    if not isinstance(palette, (tuple, list)):
-        raise TypeError("palette expected to be a sequence; got %s instead" % type(palette).__name__)
-        
-    if not all([isinstance(e, (tuple, list)) and len(e) in (3,4) and all([isinstance(v, int) and v >= 0 and v < 256 for v in e]) for e in palette]):
-        raise ValueError("Palette must contain sequences of 3 or 4 int elements with values in [0 .. 256)")
-        
-    if i >=0 and i < len(palette):
-        entry = palette[i]
-        if not isinstance(entry, (tuple, list)) or not all([isinstance(v, int) for v in entry] or len(entry) not in (3,4)):
-            raise TypeError("palette entries expected to be sequences of 3 or 4 int; insteasd, got %s for %dth entry" % (entry, i))
-        return QtGui.QColor(*entry) # QColor(r,g,b a=255) - NOTE will raise appropriate Error if entry is wrong
-    else:
-        raise ValueError("index expected an int in the semi-open interval [0 .. %d); got %s instead" % (len(palette), i))
-        
 def populateMimeData(mimeData:QtCore.QMimeData, color:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]):
     from core.datatypes import reverse_dict
     mimeData.setColorData(color)
@@ -186,8 +104,6 @@ def fromMimeData(mimeData:QtCore.QMimeData) -> QtGui.QColor:
 
 @no_sip_autoconversion(QtCore.QVariant)
 def colorComboDelegateBrush(index:QtCore.QModelIndex, role:int) -> QtGui.QBrush:
-    #import sip
-    #sip.enableautoconversion(QtCore.QVariant, False)
     brush = QtGui.QBrush()
     v = QtCore.QVariant(index.data(role))
     if v.type() == QtCore.QVariant.Brush:
@@ -195,7 +111,6 @@ def colorComboDelegateBrush(index:QtCore.QModelIndex, role:int) -> QtGui.QBrush:
         
     elif v.type() == QtCore.QVariant.Color:
         brush = QtGui.QBrush(v.value())
-    #sip.enableautoconversion(QtCore.QVariant, True)
     return brush
 
 @safeWrapper
@@ -214,6 +129,23 @@ def createDrag(color:QtGui.QColor, dragSource:QtCore.QObject) -> QtGui.QDrag:
     drag.setHotSpot(QtCore.QPoint(-5, -7))
     return drag
 
+def make_transparent_pattern(strong:bool=False, size:int=16) -> QtGui.QPixmap:
+    ret = QtGui.QPixmap(size, size)
+    patternPainter = QtGui.QPainter(ret)
+    if strong:
+        patternPainter.fillRect(0,          0,          size//2,    size//2, QtCore.Qt.black)
+        patternPainter.fillRect(size//2,    size//2,    size//2,    size//2, QtCore.Qt.black)
+        patternPainter.fillRect(0,          size//2,    size//2,    size//2, QtCore.Qt.white)
+        patternPainter.fillRect(size//2,    0,          size//2,    size//2, QtCore.Qt.white)
+    else:
+        patternPainter.fillRect(0,          0,          size//2,    size//2, QtCore.Qt.darkGray)
+        patternPainter.fillRect(size//2,    size//2,    size//2,    size//2, QtCore.Qt.darkGray)
+        patternPainter.fillRect(0,          size//2,    size//2,    size//2, QtCore.Qt.lightGray)
+        patternPainter.fillRect(size//2,    0,          size//2,    size//2, QtCore.Qt.lightGray)
+    patternPainter.end()
+    
+    return ret
+    
 
 #class ColorButtonMixin(QtWidgets.QAbstractButton):
 class ColorPushButton(QtWidgets.QPushButton):
@@ -227,7 +159,8 @@ class ColorPushButton(QtWidgets.QPushButton):
     
     def __init__(self, color:QtGui.QColor, defaultColor:QtGui.QColor,
                  alphaChannelEnabled:bool = True, useDefaultColor=True,
-                 strongTransparentPattern:bool=False, keepAlphaOnDropPaste=False,
+                 transparentPixmap:typing.Optional[QtGui.QPixmap]=None, 
+                 keepAlphaOnDropPaste=False,
                  parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent=parent)
         
@@ -237,7 +170,10 @@ class ColorPushButton(QtWidgets.QPushButton):
         self._alphaChannelEnabled = alphaChannelEnabled
         self._useDefaultColor = useDefaultColor
         self._mPos = QtCore.QPoint()
-        self._strongTransparentPattern = strongTransparentPattern
+        self._tPmap = transparentPixmap
+        if not self._tPmap:
+            self._tPmap = make_transparent_pattern()
+        #self._strongTransparentPattern = strongTransparentPattern
         self._alpha = 255
         self._keepAlpha = keepAlphaOnDropPaste
         self._dialog = None
@@ -304,6 +240,12 @@ class ColorPushButton(QtWidgets.QPushButton):
     @alphaChannelEnabled.setter
     def alphaChannelEnabled(self, value:bool):
         self._alphaChannelEnabled = value
+        
+    @pyqtSlot(QtGui.QColor)
+    def slot_setColor(self, value):
+        if isinstance(value, QtGui.QColor) and value.isValid():
+            sigblock = QtCore.QSignalBlocker(self)
+            self.color = value
     
     @safeWrapper
     def paintEvent(self, ev:QtGui.QPaintEvent):
@@ -330,23 +272,8 @@ class ColorPushButton(QtWidgets.QPushButton):
         
         if fillColor.isValid():
             rect = QtCore.QRect(x+1, y+1, w-2, h-2)
-            if fillColor.alpha() < 255:
-                chessboardPattern = QtGui.QPixmap(16,16)
-                patternPainter = QtGui.QPainter(chessboardPattern)
-                # NOTE: 2021-05-14 21:36:53
-                # keep this as an option!
-                if self._strongTransparentPattern:
-                    patternPainter.fillRect(0,0,8,8, QtCore.Qt.black)
-                    patternPainter.fillRect(8,8,8,8, QtCore.Qt.black)
-                    patternPainter.fillRect(0,8,8,8, QtCore.Qt.white)
-                    patternPainter.fillRect(8,0,8,8, QtCore.Qt.white)
-                else:
-                    patternPainter.fillRect(0,0,8,8, QtCore.Qt.darkGray)
-                    patternPainter.fillRect(8,8,8,8, QtCore.Qt.darkGray)
-                    patternPainter.fillRect(0,8,8,8, QtCore.Qt.lightGray)
-                    patternPainter.fillRect(8,0,8,8, QtCore.Qt.lightGray)
-                patternPainter.end()
-                painter.fillRect(rect, QtGui.QBrush(chessboardPattern))
+            if fillColor.alpha() < 255 and isinstance(self._tPmap, QtGui.QPixmap):
+                painter.fillRect(rect, QtGui.QBrush(self._tPmap))
             painter.fillRect(rect, fillColor)
             
         if self.hasFocus():
@@ -480,8 +407,10 @@ class ColorComboDelegate(QtWidgets.QAbstractItemDelegate):
     LayoutMetrics = IntEnum(value="LayoutMetrics", names={"FrameMargin":3},
                             module=__name__, qualname="ColorComboDelegate.LayoutMetrics")
     
-    def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
+    def __init__(self, parent:typing.Optional[QtCore.QObject]=None, 
+                 transparentPixmap:typing.Optional[QtGui.QPixmap] = None):
         super().__init__(parent)
+        self._tPmap = transparentPixmap
     
     @no_sip_autoconversion(QtCore.QVariant)
     def paint(self, painter:QtGui.QPainter, option:QtWidgets.QStyleOptionViewItem,
@@ -511,17 +440,21 @@ class ColorComboDelegate(QtWidgets.QAbstractItemDelegate):
             if cv.isValid():
                 innerColor = cv
                 paletteBrush = False
-                painter.setPen(QtCore.Qt.transparent)
-                painter.setBrush(innerColor)
                 tmpRenderHints = painter.renderHints()
                 painter.setRenderHint(QtGui.QPainter.Antialiasing)
-                painter.drawRoundedRect(innerRect, 2, 2)
+                painter.setPen(QtCore.Qt.transparent)
+                if innerColor.alpha() < 255 and isinstance(self._tPmap, QtGui.QPixmap):
+                    painter.setBrush(QtCore.Qt.NoBrush)
+                    painter.drawRoundedRect(innerRect, 2, 2)
+                    painter.fillRect(innerRect, QtGui.QBrush(self._tPmap))
+                    painter.fillRect(innerRect, innerColor)
+                else:
+                    painter.setBrush(innerColor)
+                    painter.drawRoundedRect(innerRect, 2, 2)
                 painter.setRenderHints(tmpRenderHints)
                 painter.setBrush(QtCore.Qt.NoBrush)
                 
         tv = index.data(QtCore.Qt.DisplayRole)
-        #if tv.type() == QtCore.QVariant.String:
-        #print(type(tv))
         if isinstance(tv, str):
             textColor = QtGui.QColor()
             if paletteBrush:
@@ -548,43 +481,98 @@ class ColorComboDelegate(QtWidgets.QAbstractItemDelegate):
 class ColorComboBox(QtWidgets.QComboBox):
     activated = pyqtSignal(QtGui.QColor, name="activated") # overloads QComboBox.activated[int] signal
     highlighted = pyqtSignal(QtGui.QColor, name="highlighted")
-    #_activated = pyqtSignal(int, name="_activated")
-    #_highlighted = pyqtSignal(int, name="_highlighted")
+
     def __init__(self, color:typing.Optional[QtGui.QColor]=None, 
-                 defaultColor:typing.Optional[QtGui.QColor]=None,
-                 palette:typing.Optional[list]=None,
+                 palette:typing.Optional[typing.Union[list, tuple, dict, str]]=None,
                  alphaChannelEnabled:bool=True,
+                 transparentPixmap:typing.Optional[QtGui.QPixmap]=None,
+                 keepAlphaOnDropPaste=False,
                  parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__()
         QtWidgets.QComboBox.__init__(self, parent=parent)
         self._colorList = []
+        self._colorDict = {}
+        
+        
+        if isinstance(palette, str):
+            palette = getPalette(palette)
+                
+        if isinstance(palette, (tuple, list)):
+            self._colorList = [paletteQColor(palette, k) for k in range(len(palette))]
+            
+        if isinstance(palette, dict):
+            self._colorDict = dict([(k, paletteQColor(palette, k)) for k in palette.keys()])
+                
         self._customColor = QtGui.QColor(QtCore.Qt.white)
         self._internalColor = QtGui.QColor()
+
+        self._tPmap = transparentPixmap
+        if not self._tPmap:
+            self._tPmap = make_transparent_pattern()
+            
+        self._keepAlpha = keepAlphaOnDropPaste
+        self._alpha = 255
+        
         self._alphaChannelEnabled = alphaChannelEnabled
         
-        if palette is not None:
-            if not isinstance(palette, (tuple, list)):
-                raise TypeError("palette expected to be a sequence, or None; got %s instead" % type(palette).__name__)
-            
-            elif not all([isinstance(e, (tuple, list)) and len(e) in (3,4) and all([isinstance(v, int) and v >= 0 and v < 256 for v in e]) for e in palette]):
-                raise ValueError("palette must contain sequences of 3 or 4 int with values in the semi-open interval [0 .. 256)")
-            
-        self._palette = palette
-        
-        self.setItemDelegate(ColorComboDelegate(self))
+        self.setItemDelegate(ColorComboDelegate(self, self._tPmap))
         self._addColors()
         super().activated[int].connect(self._slotActivated)
         super().highlighted[int].connect(self._slotHighlighted)
-        #self._activated[int].connect(self._slotActivated) 
-        #self._highlighted[int].connect(self._slotHighlighted)
         self.setCurrentIndex(1)
         self._slotActivated(1)
         self.setMaxVisibleItems(13)
+        self.setAcceptDrops(True)
         
+    @safeWrapper
+    def dragEnterEvent(self, ev:QtGui.QDragEnterEvent):
+        ev.setAccepted(canDecode(ev.mimeData()) and self.isEnabled())
+    
+    @safeWrapper
+    def dropEvent(self, ev:QtGui.QDropEvent):
+        # NOTE: 2021-05-14 21:39:47
+        # is mimeData.hasColor() is a QVariant<QColor> which is converted by
+        # Qt into a QColor argument for the constructor below
+        # ATTENTION:  DO NOT use sip-converted QVariant here
+        # (see also NOTE: 2021-05-14 21:26:16)
+        c = QtGui.QColor(fromMimeData(ev.mimeData()))
+        if c.isValid():
+            if self._keepAlpha:
+                c.setAlpha(self._alpha)
+            self.color = c
+    
+    @safeWrapper
+    def mousePressEvent(self, ev:QtGui.QMouseEvent):
+        self._mPos = ev.pos()
+        super().mousePressEvent(ev)
+    
+    @safeWrapper
+    def mouseMoveEvent(self, ev:QtGui.QMouseEvent):
+        if ev.buttons() & QtCore.Qt.LeftButton and \
+            (ev.pos() - self._mPos).manhattanLength() > QtWidgets.QApplication.startDragDistance():
+            createDrag(self.color, self).exec_()
+            self.setDown(False)
+            
+    @safeWrapper
+    def keyPressEvent(self, ev:QtGui.QKeyEvent):
+        key = ev.key() | int(ev.modifiers())
+        
+        if key in QtGui.QKeySequence.keyBindings(QtGui.QKeySequence.Copy):
+            mime = QtCore.QMimeData()
+            populateMimeData(mime, self.color)
+            QtWidgets.QApplication.clipboard().setMimeData(mime, QtGui.QClipboard.Clipboard)
+            
+        elif key in  QtGui.QKeySequence.keyBindings(QtGui.QKeySequence.Paste):
+            color = fromMimeData(QtWidgets.QApplication.clipboard().mimeData(QtGui.QClipboard.Clipboard))
+            if self._keepAlpha:
+                color.setAlpha(self._alpha)
+            self.color = color
+            
+        else:
+            super().keyPressEvent(ev)
+    
     def _addColors(self):
         self.addItem(self.tr("Custom...", "@item:inlistbox Custom color"))
-        
-        palette = self._palette if self._palette else standardPalette
         
         if len(self._colorList):
             for k in range(len(self._colorList)):
@@ -592,20 +580,27 @@ class ColorComboBox(QtWidgets.QComboBox):
                 if c.isValid():
                     self.addItem("")
                     self.setItemData(k + 1, c, ColorComboDelegate.ItemRoles.ColorRole)
+                    
+        elif len(self._colorDict):
+            for k, (name, c) in enumerate(self._colorDict.items()):
+                if c.isValid():
+                    self.addItem(name)
+                    self.setItemData(k + 1, self._colorDict[name], 
+                                     ColorComboDelegate.ItemRoles.ColorRole)
                 
         else:
-            for k in range(len(palette)):
-                c = paletteColor(palette, k)
+            for k in range(len(standardPalette)):
+                c = standardQColor(k)
                 if c.isValid():
                     self.addItem("")
                     self.setItemData(k + 1, c, ColorComboDelegate.ItemRoles.ColorRole)
-        pass
     
     def _setCustomColor(self, color:QtGui.QColor, lookupInPresets:bool=True):
+        from core.datatypes import reverse_mapping_lookup
         if not color.isValid():
             return 
         
-        palette = self._palette if self._palette else standardPalette
+        self._alpha = color.alpha()
         
         if lookupInPresets:
             if len(self._colorList) and color in self._colorList:
@@ -613,11 +608,19 @@ class ColorComboBox(QtWidgets.QComboBox):
                 self.setCurrentIndex(i+1)
                 self._internalColor = color
                 return
+            
+            elif len(self._colorDict) and color in self._colorDict.values():
+                name = reverse_mapping_lookup(self._colorDict, color)
+                if isinstance(name, tuple) and len(name):
+                    name = name[0]
+                i  = [k for k in self._colorDict.keys()].index(name)
+                self.setCurrentIndex(i+1)
+                self._internalColor = color
+                return
+                
             else:
-                #for i in range(len(standardPalette)):
-                for i in range(len(palette)):
-                    #if standardColor(i) == color:
-                    if paletteColor(palette, i) == color:
+                for i in range(len(standardPalette)):
+                    if standardQColor(i) == color:
                         self.setCurrentIndex(i+1)
                         self._internalColor = color
                         return
@@ -625,12 +628,15 @@ class ColorComboBox(QtWidgets.QComboBox):
         self._internalColor = color
         self._customColor = color
         self.setItemData(0, self._customColor, ColorComboDelegate.ItemRoles.ColorRole)
+        
+    @pyqtSlot(QtGui.QColor)
+    def slot_setColor(self, value:QtGui.QColor):
+        self._setCustomColor(value)
+        self.update()
     
     @pyqtSlot(int)
     @safeWrapper
     def _slotActivated(self, index:int):
-        palette = self._palette if self._palette else standardPalette
-        
         if index == 0:
             if self._alphaChannelEnabled:
                 c = QtWidgets.QColorDialog.getColor(initial=self._customColor, 
@@ -644,16 +650,21 @@ class ColorComboBox(QtWidgets.QComboBox):
                 self._customColor = c
                 self._setCustomColor(self._customColor, False)
                 
-        elif len(self._colorList) == 0:
-            #c = standardColor(index-1)
-            c = paletteColor(palette, index-1)
-            if c.isValid():
-                self._internalColor = c
-            
-        elif index <= len(self._colorList):
+        elif len(self._colorList) and index <= len(self._colorList):
             c = self._colorList[index - 1]
             if c.isValid():
                 self._internalColor = c
+                
+        elif len(self._colorDict) and index <= len(self._colorDict):
+            c = [v for v in self._colorDict.values()][index - 1]
+            if c.isValid():
+                self._internalColor = c
+                
+        elif index <= len(standardPalette):
+            c = standardQColor(index-1)
+            if c.isValid():
+                self._internalColor = c
+            
         else:
             return
         
@@ -662,19 +673,28 @@ class ColorComboBox(QtWidgets.QComboBox):
     @pyqtSlot(int)
     @safeWrapper
     def _slotHighlighted(self, index:int):
-        palette = self._palette if self._palette else standardPalette
-        
         if index == 0:
             self._internalColor = self._customColor
-        elif len(self._colorList) == 0:
-            #c = standardColor(index - 1)
-            c = paletteColor(palette, index - 1)
+            
+        elif len(self._colorList) and index <= len(self._colorList):
+            c = self._colorList[index-1]
             if c.isValid():
                 self._internalColor = c
-        elif index <= len(self._colorList):
-            c = self._colorList[index - 1]
+                
+        elif len(self._colorDict) and index <= len(self._colorDict):
+            c = [v for v in self._colorDict.values()][index - 1]
             if c.isValid():
                 self._internalColor = c
+            
+        elif index <= len(standardPalette):
+            c = standardQColor(index - 1)
+            if c.isValid():
+                self._internalColor = c
+                
+        #elif index <= len(self._colorList):
+            #c = self._colorList[index - 1]
+            #if c.isValid():
+                #self._internalColor = c
         else:
             return
         
@@ -683,7 +703,6 @@ class ColorComboBox(QtWidgets.QComboBox):
     @property
     def isCustomColor(self):
         return self._internalColor == self._customColor
-        #return self._isCustomColor
     
     @property
     def color(self) -> QtGui.QColor:
@@ -701,16 +720,77 @@ class ColorComboBox(QtWidgets.QComboBox):
     
     @property
     def colors(self) -> typing.List[QtGui.QColor]:
+        """The list of currently displayed colors (beginning with the custom one)
+        """
         if len(self._colorList):
+            if self.color.isValid():
+                return [self.color] + self._colorList
             return self._colorList
+        elif len(self._colorDict):
+            if self.color.isValid():
+                return [self.color] + [c for c in self._colorDict.values()]
+            return [c for c in self._colorDict.values()]
         else:
-            return [QtGui.QColor(c[0],c[1],c[2]) for c in standardPalette]
+            if self.color.isValid():
+                return [self.color] + [QtGui.QColor(*c) for c in standardPalette]
+            return [QtGui.QColor(*c) for c in standardPalette]
+            #return [QtGui.QColor(c[0],c[1],c[2]) for c in standardPalette]
     
     @colors.setter
-    def colors(self, colorList:typing.Sequence[QtGui.QColor]):
+    def colors(self, value:typing.Union[dict,list, str]):
+        """WARNING: Does NOT check the contents of value!
+        """
+        if isinstance(value, str):
+            value = getPalette(value)
+            
+        if isinstance(value, (tuple, list)):
+            self._colorList = [paletteQColor(value, k) for k in range(len(value))]
+        elif isinstance(value, dict):
+            self._colorDict = dict([(k, paletteQColor(value, k)) for k in value.keys()])
+        else:
+            return
+        
         self.clear()
-        self._colorList[:] = colorList
         self._addColors()
+        
+    @property
+    def keepAlphaOnDropPaste(self) -> bool:
+        return self._keepAlpha
+    
+    @keepAlphaOnDropPaste.setter
+    def keepAlphaOnDropPaste(self, value:bool):
+        self._keepAlpha = value
+        
+    @property
+    def colorNames(self) -> typing.List[str]:
+        """The list of color names in "#rrggbb" format
+        """
+        if len(self._colorList):
+            if self.color.isValid():
+                return [self.color.name()] + [c.name() for c in self._colorList]
+            return [c.name() for c in self._colorList]
+        
+        elif len(self._colorDict):
+            if self.color.isValid():
+                return [self.color.name()] + [c.name() for c in self._colorDict.values()]
+            return [c.name() for c in self._colorDict.values()]
+        
+        else:
+            if self.color.valid():
+                return p[self.color.name()] + [QtGui.QColor(*c).name() for c in standardPalette]
+            
+    @property
+    def qualifiedColorNames(self) -> typing.List[str]:
+        """the list of qualified color names (if they exist), else #rgb names
+        """
+        if len(self._colorDict):
+            if self.color().isValid():
+                return [self.color.name()] + [name for name in self._colorDict.keys()]
+            
+            return [name for name in self._colorDict.keys()]
+        
+        else:
+            return self.colorNames
     
     def showEmptyList(self):
         self.clear()
@@ -727,6 +807,12 @@ class ColorComboBox(QtWidgets.QComboBox):
                                                         QtWidgets.QStyle.SC_ComboBoxEditField, self))
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         painter.setPen(QtCore.Qt.transparent)
-        painter.setBrush(QtGui.QBrush(self._internalColor))
-        painter.drawRoundedRect(frame.adjusted(1, 1, -1, -1), 2, 2)
+        if self._internalColor.alpha() < 255 and isinstance(self._tPmap, QtGui.QPixmap):
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawRoundedRect(frame.adjusted(1, 1, -1, -1), 2, 2)
+            painter.fillRect(frame.adjusted(1, 1, -1, -1), QtGui.QBrush(self._tPmap))
+            painter.fillRect(frame.adjusted(1, 1, -1, -1), self._internalColor)
+        else:
+            painter.setBrush(QtGui.QBrush(self._internalColor))
+            painter.drawRoundedRect(frame.adjusted(1, 1, -1, -1), 2, 2)
         painter.end()
