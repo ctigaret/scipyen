@@ -38,11 +38,11 @@
 # Adaptation for use with PyQt5
 # Copyright 209-2021 by Cezar M. Tigaret (cezar.tigaret@gmail.com, TigaretC@cardiff.ac.uk)
 #########################################################################
+import os, typing
 import PyQt5.QtCore as QtCore
 import PyQt5.QtGui as QtGui
 import PyQt5.QtWidgets as QtWidgets
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
-import os
 
 def alignLabels(*args):
     m = 0
@@ -402,7 +402,7 @@ class VariableNameStringInput(StringInput):
         return True
     
 class QuickDialog(QtWidgets.QDialog):
-    def __init__(self, parent, title):
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, title:typing.Optional[str]=None):
         QtWidgets.QDialog.__init__(self, parent)
 
         self.layout = QtWidgets.QVBoxLayout(self)
@@ -412,6 +412,8 @@ class QuickDialog(QtWidgets.QDialog):
         self.insertButtons()
         
         self.widgets = []
+        if not isinstance(title, str) or len(title.strip()) == 0:
+            title = "QuickDialog"
         self.setWindowTitle(title)
         #self.setOrientation(QtCore.Qt.Vertical)
         self.resize(500,-1)
