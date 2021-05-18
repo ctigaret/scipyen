@@ -489,7 +489,8 @@ class ColorComboBox(QtWidgets.QComboBox):
                  transparentPixmap:typing.Optional[QtGui.QPixmap]=None,
                  keepAlphaOnDropPaste=False,
                  parent:typing.Optional[QtWidgets.QWidget]=None):
-        super().__init__(self, parent=parent)
+        super().__init__(parent=parent)
+        #QtWidgets.QComboBox._init__(self, parent=parent)
         self._colorList = []
         self._colorDict = {}
         
