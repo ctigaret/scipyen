@@ -1,6 +1,6 @@
 import array, os, typing, numbers
 import numpy as np
-
+from collections import OrderedDict
 from enum import IntEnum
 from functools import partial
 
@@ -20,16 +20,35 @@ from .colorwidgets import (make_transparent_pattern, comboDelegateBrush)
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-standardQtPenStyles = dict(sorted([(name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenStyle) and val < 10],
+standardQtPenStyles = OrderedDict(sorted([(name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenStyle) and val < 10],
                            key = lambda x: x[1]))
 
-standardQtPenJoinStyles = dict(sorted([(name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenJoinStyle) and val <= 256],
+standardQtPenJoinStyles = OrderedDict(sorted([(name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenJoinStyle) and val <= 256],
                            key = lambda x: x[1]))
 
-standardQtPenCapStyles = dict(sorted([(name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenJoinStyle) and val <= 32],
+standardQtPenCapStyles = OrderedDict(sorted([(name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenCapStyle) and val <= 32],
                            key = lambda x: x[1]))
 
 customDashStyles = {"Custom": [10., 5., 10., 5., 10., 5., 1., 5., 1., 5., 1., 5.]}
+
+standardQtGradientPresets = OrderedDict(sorted([(name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Preset)]))
+
+standardQtGradientSpreads = OrderedDict(sorted([(name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Spread)]))
+
+standardQtGradientTypes = OrderedDict(sorted([(name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type) and value < 3],
+                                      key = lambda x: x[1]))
+
+standardQtBrushStyles = OrderedDict(sorted([(name, value) for name, value in vars(QtCore.Qt).items() if isinstance(value, QtCore.Qt.BrushStyle)],
+                                           key = lambda x: x[1]))
+
+standardQtBrushPatterns = OrderedDict(sorted([(name, value) for name, value in standardQtBrushStyles.items() if all([s not in name for s in ("Gradient", "Texture")])],
+                                           key = lambda x: x[1]))
+
+standardQtBrushGradients = OrderedDict(sorted([(name, value) for name, value in standardQtBrushStyles.items() if "Gradient" in name],
+                                           key = lambda x: x[1]))
+
+standardQtBrushTextures = OrderedDict(sorted([(name, value) for name, value in standardQtBrushStyles.items() if "Texture" in name],
+                                           key = lambda x: x[1]))
 
 @safeWrapper
 def makeCustomPathStroke(path:QtGui.QPainterPath,
@@ -116,7 +135,7 @@ class PenStyleComboDelegate(QtWidgets.QAbstractItemDelegate):
 
     def sizeHint(self, option:QtWidgets.QStyleOptionViewItem, 
                  index:QtCore.QModelIndex) -> QtCore.QSize:
-        return QtCore.QSize(100, option.fontMetrics.height() + 2 * self.LayoutMetrics.FrameMargin)
+        return QtCore.QSize(50, option.fontMetrics.height() + 2 * self.LayoutMetrics.FrameMargin)
     
 class PenStyleComboBox(QtWidgets.QComboBox):
     # FIXME/TODO/ see qt examples/widgets/painting/pathstroke
@@ -273,9 +292,13 @@ class PenStyleComboBox(QtWidgets.QComboBox):
             #painter.drawRoundedRect(frame.adjusted(1, 1, -1, -1), 2, 2)
         painter.end()
 
-class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
+class BrushStyleComboDelegate(QtWidgets.QAbstractItemDelegate):
     pass
 
-class BrushComboBox(QtWidgets.QComboBox):
+class BrushStyleComboBox(QtWidgets.QComboBox):
+    activated = pyqtSignal(object, name="activated") # overloads QComboBox.activated[int] signal
+    highlighted = pyqtSignal(object, name="highlighted")
+    styleChanged = pyqtSignal(object, name="styleChanged")
+    
     pass
 

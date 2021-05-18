@@ -13,7 +13,7 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <widget class="KColorButton" name="kcolorbutton">
+  <widget class="KColorButton" name="colorbutton">
    <property name="geometry">
     <rect>
      <x>50</x>
@@ -26,7 +26,7 @@
     <bool>true</bool>
    </property>
   </widget>
-  <widget class="KColorCombo" name="kcolorcombo">
+  <widget class="KColorCombo" name="colorcombo">
    <property name="geometry">
     <rect>
      <x>130</x>
