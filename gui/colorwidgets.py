@@ -629,7 +629,8 @@ class ColorComboBox(QtWidgets.QComboBox):
         self._internalColor = color
         self._customColor = color
         self.setItemData(0, self._customColor, ColorComboDelegate.ItemRoles.ColorRole)
-        self.colorChanged.emit(color)
+        #self.colorChanged.emit(color)
+        #self.activated[QtGui.QColor].emit(color)
         
     @pyqtSlot(QtGui.QColor)
     def slot_setColor(self, value:QtGui.QColor):
