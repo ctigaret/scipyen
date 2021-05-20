@@ -228,7 +228,10 @@ class PenComboDelegate(QtWidgets.QAbstractItemDelegate):
             return QtCore.QSize(50, option.fontMetrics.height() + 2 * self.LayoutMetrics.FrameMargin)
     
 class PenComboBox(QtWidgets.QComboBox):
-    # FIXME/TODO/ see qt examples/widgets/painting/pathstroke
+    # see 
+    #   qt examples/widgets/painting/pathstroke
+    #   qt examples/widgets/painting/pinterpaths
+    
     activated = pyqtSignal(object, name="activated") # overloads QComboBox.activated[int] signal
     highlighted = pyqtSignal(object, name="highlighted")
     styleChanged = pyqtSignal(object, name="styleChanged")
@@ -536,6 +539,11 @@ class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
         return QtCore.QSize(50, option.fontMetrics.height() + 2 * self.LayoutMetrics.FrameMargin)
     
 class BrushComboBox(QtWidgets.QComboBox):
+    # NOTE: 2021-05-20 21:22:12
+    # brush gradients: see 
+    #   qt examples/widgets/painting/gradients
+    #   qt examples/widgets/painting/pathstroke
+    #   qt examples/widgets/painting/painterpaths
     activated = pyqtSignal(object, name="activated") # overloads QComboBox.activated[int] signal
     highlighted = pyqtSignal(object, name="highlighted")
     styleChanged = pyqtSignal(object, name="styleChanged")
