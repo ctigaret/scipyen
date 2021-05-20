@@ -9,7 +9,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 from .colorwidgets import (ColorComboBox, ColorPushButton,
                            paletteQColor, standardQColor, standardPalette,)
 
-from .stylewidgets import PenStyleComboBox
+from .stylewidgets import PenComboBox
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 

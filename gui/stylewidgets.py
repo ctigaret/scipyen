@@ -29,7 +29,7 @@ standardQtPenJoinStyles = OrderedDict(sorted([(name,val) for name, val in vars(Q
 standardQtPenCapStyles = OrderedDict(sorted([(name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenCapStyle) and val <= 32],
                            key = lambda x: x[1]))
 
-PenStyleType = typing.Union[tuple, list, QtCore.Qt.PenStyle]
+PenStyleType = typing.Union[tuple, list, QtCore.Qt.PenStyle, int]
 
 customDashStyles = {"Custom": [10., 5., 10., 5., 10., 5., 1., 5., 1., 5., 1., 5.]}
 
@@ -57,7 +57,7 @@ standardQtBrushTextures = OrderedDict(sorted([(name, value) for name, value in s
 # Iterate through the types INSIDE this union with BrushStyleType._subs_tree()[1:]
 # _subs_tree() returns a tuple of types where the first element is always
 # typing.Union, so we leave it out.
-BrushStyleType = typing.Union[QtCore.Qt.BrushStyle, QtGui.QGradient,
+BrushStyleType = typing.Union[int, QtCore.Qt.BrushStyle, QtGui.QGradient,
                               QtGui.QBitmap, QtGui.QPixmap, QtGui.QImage]
 
 @safeWrapper
@@ -80,13 +80,13 @@ def makeCustomPathStroke(path:QtGui.QPainterPath,
     return path
     
 
-class PenStyleComboDelegate(QtWidgets.QAbstractItemDelegate):
+class PenComboDelegate(QtWidgets.QAbstractItemDelegate):
     ItemRoles = IntEnum(value="ItemRoles", names=[("PenRole", QtCore.Qt.UserRole +1),
                                                   ], 
-                        module=__name__, qualname="PenStyleComboDelegate.ItemRoles")
+                        module=__name__, qualname="PenComboDelegate.ItemRoles")
     
     LayoutMetrics = IntEnum(value="LayoutMetrics", names={"FrameMargin":3},
-                            module=__name__, qualname="PenStyleComboDelegate.LayoutMetrics")
+                            module=__name__, qualname="PenComboDelegate.LayoutMetrics")
     
     def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
         super().__init__(parent)
@@ -120,38 +120,55 @@ class PenStyleComboDelegate(QtWidgets.QAbstractItemDelegate):
         else:
             penColor = QtGui.QColor(QtCore.Qt.white)
 
+        #### Draw item widget
         opt = QtWidgets.QStyleOptionViewItem(option)
         opt.showDecorationSelected=True
         style = opt.widget.style() if opt.widget else QtWidgets.QApplication.style()
         style.drawPrimitive(QtWidgets.QStyle.PE_PanelItemViewItem, opt, painter, opt.widget)
+        
         innerRect = option.rect.adjusted(self.LayoutMetrics.FrameMargin,
                                          self.LayoutMetrics.FrameMargin,
                                          -self.LayoutMetrics.FrameMargin,
                                          -self.LayoutMetrics.FrameMargin)
         
+        tmpRenderHints = painter.renderHints()
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+
+        #### Draw stroke/cap/join
         lineRect = innerRect.adjusted(2, 2, -2, -2)
 
         style = index.data(self.ItemRoles.PenRole) # NOTE:2021-05-15 21:18:24Q QVariant
-        #text = index.data(QtCore.Qt.ToolTipRole)
         
         path = QtGui.QPainterPath()
-        #print("PenStyleComboDelegate.paint: style", style, type(style))
             
-        #### Draw item delegate widget
-        tmpRenderHints = painter.renderHints()
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        painter.setPen(QtCore.Qt.NoPen)
-        painter.setBrush(innerColor)
-        painter.drawRoundedRect(innerRect, 2, 2)
-        
-        #### Draw pen stroke/cap/join
-        #### build path and set custom pen accordingly
         if self._styling == "stroke":
             path.moveTo(lineRect.x(), lineRect.y() + lineRect.height()//2)
             path.lineTo(lineRect.x()+lineRect.width(), lineRect.y() + lineRect.height()//2)
             
-            if style is None:
+            if style is None: # request custom stroke
                 # revert painter & return
+                painter.setPen(QtCore.Qt.NoPen)
+                painter.setBrush(innerColor)
+                painter.drawRoundedRect(innerRect, 2, 2)
+                
+                if paletteBrush:
+                    if isSelected:
+                        textColor = option.palette.color(QtGui.QPalette.HighlightedText)
+                    else:
+                        textColor = option.palette.color(QtGui.QPalette.Text)
+                else:
+                    _, _, v, _ = innerColor.getHsv()
+                    if v > 128:
+                        textColor = QtGui.QColor(QtCore.Qt.black)
+                    else:
+                        textColor = QtGui.QColor(QtCore.Qt.white)
+                        
+                if textColor.isValid():
+                    painter.setPen(textColor)
+                    painter.drawText(innerRect.adjusted(1, 1, -1, -1), QtCore.Qt.AlignCenter, "Customize ...")
+    
+                
+                
                 painter.setRenderHints(tmpRenderHints)
                 painter.setBrush(QtCore.Qt.NoBrush)
                 return
@@ -210,7 +227,7 @@ class PenStyleComboDelegate(QtWidgets.QAbstractItemDelegate):
         else:
             return QtCore.QSize(50, option.fontMetrics.height() + 2 * self.LayoutMetrics.FrameMargin)
     
-class PenStyleComboBox(QtWidgets.QComboBox):
+class PenComboBox(QtWidgets.QComboBox):
     # FIXME/TODO/ see qt examples/widgets/painting/pathstroke
     activated = pyqtSignal(object, name="activated") # overloads QComboBox.activated[int] signal
     highlighted = pyqtSignal(object, name="highlighted")
@@ -245,7 +262,7 @@ class PenStyleComboBox(QtWidgets.QComboBox):
             
         self._customStyle = QtCore.Qt.NoPen
         
-        self.setItemDelegate(PenStyleComboDelegate(self))
+        self.setItemDelegate(PenComboDelegate(self))
         self.itemDelegate().styling = self._styling
         
         self._addStyles()
@@ -279,7 +296,7 @@ class PenStyleComboBox(QtWidgets.QComboBox):
                     
             return
 
-        self._internalStyle = self.itemData(index, PenStyleComboDelegate.ItemRoles.PenRole)
+        self._internalStyle = self.itemData(index, PenComboDelegate.ItemRoles.PenRole)
         self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
         self.activated[object].emit(self._internalStyle)
 
@@ -291,7 +308,7 @@ class PenStyleComboBox(QtWidgets.QComboBox):
             self.setToolTip("Custom dashes")
             return
 
-        self._internalStyle = self.itemData(index, PenStyleComboDelegate.ItemRoles.PenRole)
+        self._internalStyle = self.itemData(index, PenComboDelegate.ItemRoles.PenRole)
         self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
     
     def _addStyles(self):
@@ -316,7 +333,7 @@ class PenStyleComboBox(QtWidgets.QComboBox):
         for k, (name, val) in enumerate(styles):
             self.addItem("")
             ndx = k + 1 if self._styling == "stroke" else k
-            self.setItemData(ndx, val, PenStyleComboDelegate.ItemRoles.PenRole)
+            self.setItemData(ndx, val, PenComboDelegate.ItemRoles.PenRole)
             self.setItemData(ndx, name, QtCore.Qt.ToolTipRole)
             
     def _setCustomStyle(self, name:str, value:typing.Union[list, tuple], 
@@ -344,7 +361,7 @@ class PenStyleComboBox(QtWidgets.QComboBox):
         self._internalStyle = value
         self._customStyle = value
         self.setItemData(0, name, QtCore.Qt.ToolTipRole)
-        self.setItemData(0, self._internalStyle, PenStyleComboDelegate.ItemRoles.PenRole)
+        self.setItemData(0, self._internalStyle, PenComboDelegate.ItemRoles.PenRole)
     
     @no_sip_autoconversion(QtCore.QVariant)
     def paintEvent(self, ev:QtGui.QPaintEvent):
@@ -434,17 +451,17 @@ class PenStyleComboBox(QtWidgets.QComboBox):
             self._styling = value
             self.itemDelegate().styling = value
         
-class BrushStyleComboDelegate(QtWidgets.QAbstractItemDelegate):
+class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
     ItemRoles = IntEnum(value="ItemRoles", names=[("BrushRole", QtCore.Qt.UserRole +1)], 
-                        module=__name__, qualname="BrushStyleComboDelegate.ItemRoles")
+                        module=__name__, qualname="BrushComboDelegate.ItemRoles")
     
     LayoutMetrics = IntEnum(value="LayoutMetrics", names={"FrameMargin":3},
-                            module=__name__, qualname="BrushStyleComboDelegate.LayoutMetrics")
+                            module=__name__, qualname="BrushComboDelegate.LayoutMetrics")
     
     def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
         super().__init__(parent)
         
-    @no_sip_autoconversion(QtCore.QVariant)
+    #@no_sip_autoconversion(QtCore.QVariant)
     def paint(self, painter:QtGui.QPainter, option:QtWidgets.QStyleOptionViewItem,
               index:QtCore.QModelIndex):
 
@@ -464,27 +481,49 @@ class BrushStyleComboDelegate(QtWidgets.QAbstractItemDelegate):
         else:
             penColor = QtGui.QColor(QtCore.Qt.white)
 
+        #### Draw item widget
         opt = QtWidgets.QStyleOptionViewItem(option)
         opt.showDecorationSelected=True
         style = opt.widget.style() if opt.widget else QtWidgets.QApplication.style()
         style.drawPrimitive(QtWidgets.QStyle.PE_PanelItemViewItem, opt, painter, opt.widget)
+        
         innerRect = option.rect.adjusted(self.LayoutMetrics.FrameMargin,
                                          self.LayoutMetrics.FrameMargin,
                                          -self.LayoutMetrics.FrameMargin,
                                          -self.LayoutMetrics.FrameMargin)
         
-        brushStyle = index.data(self.ItemRoles.BrushRole)
         tmpRenderHints = painter.renderHints()
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        #painter.setPen(penColor)
+        #painter.setPen(QtCore.Qt.NoPen)
+        #painter.setBrush(innerColor)
+        #painter.drawRoundedRect(innerRect, 2, 2)
+        
+        #### Draw brush
+        brushStyle = index.data(self.ItemRoles.BrushRole)
         painter.setPen(QtCore.Qt.transparent)
         if isinstance(brushStyle, BrushStyleType._subs_tree()[1:]):
-            brush = QtGui.QBrush(brushStyle)
-            brush.setColor(QtCore.Qt.black) # makes a difference only for patterns and bitmaps
+            #print("brushSyle", brushStyle)
+            if brushStyle in standardQtBrushPatterns.values():
+                brush = QtGui.QBrush(brushStyle)
+                brush.setColor(penColor) 
+            elif brushStyle in standardQtBrushGradients.values():
+                # TODO: 2021-05-20 13:17:00
+                # set a default preset & call GUI to cohoose one and/or edit gradient
+                # then construct a QGradient on that and construct the brush on that
+                return
+            elif brushStyle in standardQtBrushTextures.values():
+                # TODO: 2021-05-20 13:17:55
+                # set a default texture & call GUI to choose an image or pixmap
+                # then create a brush on that!
+                return
             painter.setBrush(brush)
         else:
             painter.setBrush(QtCore.Qt.NoBrush)
-        painter.drawRoundedRect(innerRect, 2, 2)
             
+        painter.drawRoundedRect(innerRect, 2, 2)
+          
+        #### Reset painter
         painter.setRenderHints(tmpRenderHints)
         painter.setBrush(QtCore.Qt.NoBrush)
 
@@ -492,7 +531,7 @@ class BrushStyleComboDelegate(QtWidgets.QAbstractItemDelegate):
                  index:QtCore.QModelIndex) -> QtCore.QSize:
         return QtCore.QSize(50, option.fontMetrics.height() + 2 * self.LayoutMetrics.FrameMargin)
     
-class BrushStyleComboBox(QtWidgets.QComboBox):
+class BrushComboBox(QtWidgets.QComboBox):
     activated = pyqtSignal(object, name="activated") # overloads QComboBox.activated[int] signal
     highlighted = pyqtSignal(object, name="highlighted")
     styleChanged = pyqtSignal(object, name="styleChanged")
@@ -510,29 +549,57 @@ class BrushStyleComboBox(QtWidgets.QComboBox):
             self._internalStyle = QtCore.Qt.NoBrush
             self._customStyle = QtCore.Qt.NoBrush
         
-        if len(customStyles) and all([isinstance(v, BrushStyleType._subs_tree()[1:]) for v in customStyles.values()]):
+        if isinstance(customStyles, dict) and len(customStyles) and all([isinstance(v, BrushStyleType._subs_tree()[1:]) for v in customStyles.values()]):
             self._customStyles.update(customStyles)
         
-        self.setItemDelegate(BrushStyleComboDelegate(self))
+        self.setItemDelegate(BrushComboDelegate(self))
+        
+        super().activated[int].connect(self._slotActivated)
+        super().highlighted[int].connect(self._slotHighlighted)
+        self.setCurrentIndex(1)
+        self._slotActivated(1)
+        self.setMaxVisibleItems(13)
+        
+        self._addStyles()
 
     def paintEvent(self, ev:QtGui.QPaintEvent):
         painter = QtWidgets.QStylePainter(self)
+
+        #### Draw styled widget
         painter.setPen(self.palette().color(QtGui.QPalette.Text))
         
         opt = QtWidgets.QStyleOptionComboBox()
         self.initStyleOption(opt) # inherited from QtWidgets.QComboBox
         painter.drawComplexControl(QtWidgets.QStyle.CC_ComboBox, opt)
         
+        #### Draw brush
         frame = QtCore.QRect(self.style().subControlRect(QtWidgets.QStyle.CC_ComboBox, opt,
                                                          QtWidgets.QStyle.SC_ComboBoxEditField, self))
         
+        isSelected = (opt.state and QtWidgets.QStyle.State_Selected)
+        
+        if isSelected:
+            innerColor = opt.palette.color(QtGui.QPalette.Highlight)
+        else:
+            innerColor = opt.palette.color(QtGui.QPalette.Base)
+            
+        _, _, v, _ = innerColor.getHsv()
+        
+        if v > 128:
+            penColor = QtGui.QColor(QtCore.Qt.black)
+        else:
+            penColor = QtGui.QColor(QtCore.Qt.white)
+            
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         painter.setPen(QtCore.Qt.transparent)
+        #painter.setPen(penColor)
         if isinstance(self._internalStyle, BrushStyleType._subs_tree()[1:]):
             brush = QtGui.QBrush(self._internalStyle)
-            brush.setColor(QtCore.Qt.black) 
+            #brush.setColor(QtCore.Qt.black) 
+            brush.setColor(penColor) 
             painter.setBrush(brush)
         else:
+            #painter.setPen(QtCore.Qt.transparent)
             painter.setBrush(QtCore.Qt.NoBrush)
             
         painter.drawRoundedRect(frame.adjusted(1, 1, -1, -1), 2, 2)
@@ -540,7 +607,7 @@ class BrushStyleComboBox(QtWidgets.QComboBox):
         
     @pyqtSlot(int)
     @safeWrapper
-    def _slotActivated(slf, index:int):
+    def _slotActivated(self, index:int):
         if index == 0:
             filePathName, _ = QtWidgets.QFileDialog.getOpenFileName(self, caption="Open image or pixmap file",
                                                              filter="Images (*.png *.xpm *.jpg *.jpeg *.gif *.tif *.tiff);;Vector drawing (*.svg);; All files (*.*)")
@@ -588,7 +655,7 @@ class BrushStyleComboBox(QtWidgets.QComboBox):
                 
             return
         
-        self._internalStyle = self.itemData(index, BrushStyleComboDelegate.ItemRoles.BrushRole)
+        self._internalStyle = self.itemData(index, BrushComboDelegate.ItemRoles.BrushRole)
         self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
         self.activated[object].emit(self._internalStyle)
             
@@ -600,20 +667,20 @@ class BrushStyleComboBox(QtWidgets.QComboBox):
             self.setToolTip("Custom brush")
             return
         
-        self._internalStyle = self.itemData(index, BrushStyleComboDelegate.ItemRoles.BrushRole)
+        self._internalStyle = self.itemData(index, BrushComboDelegate.ItemRoles.BrushRole)
         self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
         
     def _addStyles(self):
         self.addItem(self.tr("Custom brush...", "@item:inlistbox Custom brush style"))
         self.setItemData(0, "Custom brush...", QtCore.Qt.ToolTipRole)
         
-        styles =  [(name, val) for name, val in standardQtBrushStyles.items() if value > 0]
-        styles += ["No Brush", QtCore.Qt.NoBrush]
+        styles =  [(name, val) for name, val in standardQtBrushStyles.items() if val > 0]
+        styles += [("No Brush", QtCore.Qt.NoBrush)]
         styles += [(name, val) for name , val in self._customStyles.items()]
         
         for k, (name, val) in enumerate(styles):
             self.addItem("")
-            self.setItemData(k+1, val, BrushStyleComboDelegate.ItemRoles.BrushRole)
+            self.setItemData(k+1, val, BrushComboDelegate.ItemRoles.BrushRole)
             self.setItemData(k+1, name, QtCore.Qt.ToolTipRole)
         
 
@@ -643,7 +710,7 @@ class BrushStyleComboBox(QtWidgets.QComboBox):
         self._internalStyle = value
         self._customStyle = value
         self.setItemData(0, name, QtCore.Qt.ToolTipRole)
-        self.setItemData(0, self._internalStyle, BrushStyleComboDelegate.ItemRoles.BrushRole)
+        self.setItemData(0, self._internalStyle, BrushComboDelegate.ItemRoles.BrushRole)
         #self.activated[object].emit(self._internalStyle)
         
             
