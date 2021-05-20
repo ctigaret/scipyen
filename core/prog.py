@@ -364,9 +364,9 @@ def no_sip_autoconversion(klass):
         @wraps(func)
         def wrapper(*args, **kwargs):
             import sip
-            sip.enableautoconversion(klass, False)
+            oldValue = sip.enableautoconversion(klass, False)
             ret = func(*args, *kwargs)
-            sip.enableautoconversion(klass, True)
+            sip.enableautoconversion(klass, oldValue)
             return ret
         return wrapper
     return decorator

@@ -90,11 +90,20 @@ class PenStyleComboDelegate(QtWidgets.QAbstractItemDelegate):
     
     def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
         super().__init__(parent)
+        self._styling = "stroke"
         
-    @no_sip_autoconversion(QtCore.QVariant)
+    @property
+    def styling(self) -> str:
+        return self._styling
+    
+    @styling.setter
+    def styling(self, value:str):
+        if isinstance(value, str) and value.lower() in ("cap", "join", "stroke"):
+            self._styling = value
+
+    #@no_sip_autoconversion(QtCore.QVariant)
     def paint(self, painter:QtGui.QPainter, option:QtWidgets.QStyleOptionViewItem,
               index:QtCore.QModelIndex):
-        #color = QtGui.QColor(QtCore.Qt.white)
         isSelected = (option.state and QtWidgets.QStyle.State_Selected)
         
         paletteBrush = comboDelegateBrush(index, QtCore.Qt.BackgroundRole).style() == QtCore.Qt.NoBrush
@@ -123,55 +132,83 @@ class PenStyleComboDelegate(QtWidgets.QAbstractItemDelegate):
         lineRect = innerRect.adjusted(2, 2, -2, -2)
 
         style = index.data(self.ItemRoles.PenRole) # NOTE:2021-05-15 21:18:24Q QVariant
+        #text = index.data(QtCore.Qt.ToolTipRole)
         
         path = QtGui.QPainterPath()
+        #print("PenStyleComboDelegate.paint: style", style, type(style))
+            
+        #### Draw item delegate widget
+        tmpRenderHints = painter.renderHints()
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(innerColor)
+        painter.drawRoundedRect(innerRect, 2, 2)
         
-        if isinstance(style, (QtCore.Qt.PenStyle, tuple, list, QtCore.Qt.PenCapStyle, QtCore.Qt.PenJoinStyle)):
-            #paletteBrush = False
-            tmpRenderHints = painter.renderHints()
-            painter.setRenderHint(QtGui.QPainter.Antialiasing)
-            painter.setPen(QtCore.Qt.NoPen)
-            painter.setBrush(innerColor)
-            painter.drawRoundedRect(innerRect, 2, 2)
-            if isinstance(style, (QtCore.Qt.PenStyle, tuple, list)):
-                path.moveTo(lineRect.x(), lineRect.y() + lineRect.height()//2)
-                path.lineTo(lineRect.x()+lineRect.width(), lineRect.y() + lineRect.height()//2)
+        #### Draw pen stroke/cap/join
+        #### build path and set custom pen accordingly
+        if self._styling == "stroke":
+            path.moveTo(lineRect.x(), lineRect.y() + lineRect.height()//2)
+            path.lineTo(lineRect.x()+lineRect.width(), lineRect.y() + lineRect.height()//2)
             
-                if isinstance(style, (tuple, list)):# custom stroke
-                    pen = QtGui.QPen(penColor, 2, style=QtCore.Qt.CustomDashLine)
-                    pen.setDashPattern(style)
-                    
-                    #painter.fillPath(makeCustomPathStroke(path, style, 2), penColor)
-                else:
-                    painter.setPen(QtGui.QPen(penColor, 2, style=style))
-                    #painter.drawPath(path)
-            
-            elif isinstance(style, QtCore.Qt.PenCapStyle):
-                path.moveTo(lineRect.x() + lineRect.width()//4, 
-                            lineRect.y() + lineRect.height()//2)
+            if style is None:
+                # revert painter & return
+                painter.setRenderHints(tmpRenderHints)
+                painter.setBrush(QtCore.Qt.NoBrush)
+                return
+        
+            elif isinstance(style, (tuple, list)):# custom stroke
+                pen = QtGui.QPen(penColor, 2, style=QtCore.Qt.CustomDashLine)
+                pen.setDashPattern(style)
+                painter.setPen(pen)
                 
-                path.lineTo(lineRect.x() + 3*lineRect.width()//4, 
-                            lineRect.y() + lineRect.height()//2)
+            else:
+                painter.setPen(QtGui.QPen(penColor, 2, style=style)) # avoid style = None
+                
+        
+        elif self._styling == "cap":
+            path.moveTo(lineRect.x() + lineRect.width()//4, 
+                        lineRect.y() + lineRect.height()//2)
+            
+            path.lineTo(lineRect.x() + 3*lineRect.width()//4, 
+                        lineRect.y() + lineRect.height()//2)
 
-                painter.setPen(QtGui.QPen(penColor, 2, cap=style))
+            painter.setPen(QtGui.QPen(penColor, 6, cap=style))
+        
+        elif self._styling == "join":
+            path.moveTo(lineRect.x() + lineRect.width()//4,
+                        lineRect.y() + 3*lineRect.height()//4)
+            path.lineTo(lineRect.x() + lineRect.width()//2,
+                        lineRect.y() + lineRect.height()//4)
+            path.lineTo(lineRect.x() + 3*lineRect.width()//4,
+                        lineRect.y() + 3*lineRect.height()//4)
             
-            elif isinstance(style, QtCore.Qt.PenJoinStyle):
-                path.moveTo(lineRect.x() + lineRect.width()//4,
-                            lineRect.y() + 3*lineRect.height()//4)
-                path.lineTo(lineRect.x() + lineRect.width()//2,
-                            lineRect.y() + lineRect.height()//4)
-                path.lineTo(lineRect.x() + 3*lineRect.width()//4,
-                            lineRect.y() + 3*lineRect.height()//4)
-                
-                painter.setPen(QtGui.QPen(penColor, 2, join=style))
+            painter.setPen(QtGui.QPen(penColor, 4, join=style))
             
-            painter.drawPath(path)
+        else:
+            # revert painter & return
             painter.setRenderHints(tmpRenderHints)
             painter.setBrush(QtCore.Qt.NoBrush)
+            return
+        
+        #### draw specific path with custom pen
+        painter.drawPath(path)
+        if self._styling == "stroke" and style in (0, QtCore.Qt.NoPen):
+            painter.setPen(penColor)
+            painter.drawText(innerRect.adjusted(1, 1, -1, -1), QtCore.Qt.AlignCenter, "No Pen")
+            
+        painter.setRenderHints(tmpRenderHints)
+        painter.setBrush(QtCore.Qt.NoBrush)
 
     def sizeHint(self, option:QtWidgets.QStyleOptionViewItem, 
                  index:QtCore.QModelIndex) -> QtCore.QSize:
-        return QtCore.QSize(50, option.fontMetrics.height() + 2 * self.LayoutMetrics.FrameMargin)
+        if self._styling == "join":
+            return QtCore.QSize(50, 3 * option.fontMetrics.height() + 2 * self.LayoutMetrics.FrameMargin)
+        
+        if self._styling == "cap":
+            return QtCore.QSize(50, 2 * option.fontMetrics.height() + 2 * self.LayoutMetrics.FrameMargin)
+            
+        else:
+            return QtCore.QSize(50, option.fontMetrics.height() + 2 * self.LayoutMetrics.FrameMargin)
     
 class PenStyleComboBox(QtWidgets.QComboBox):
     # FIXME/TODO/ see qt examples/widgets/painting/pathstroke
@@ -179,30 +216,37 @@ class PenStyleComboBox(QtWidgets.QComboBox):
     highlighted = pyqtSignal(object, name="highlighted")
     styleChanged = pyqtSignal(object, name="styleChanged")
     
-    def __init__(self, styles:dict=standardQtPenStyles,
-                 customStyles:typing.Optional[dict]=customDashStyles,
+    def __init__(self, style:typing.Optional[QtCore.Qt.PenStyle]=None,
+                 customStyles:typing.Optional[dict]=customDashStyles, # only for custom strokes
+                 styling:str = "stroke",
                  parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent=parent)
-        self._styles = styles
+        
         self._customStyles = {}
-        #if isinstance(styling, str) and styling.lower() in ("cap", "join", "stroke"):
-            #self._styling = styling
-        #else:
-            #self._styling = "stroke" # other acceptable values are "cap" and "join"
         
-        #if isinstance(style, QtCore.Qt.PenStyle):
-            #self._internalStyle = style
-            #self._customStyle = style
-        #else:
-        self._internalStyle = QtCore.Qt.SolidLine
-        self._customStyle = QtCore.Qt.NoPen
+        if isinstance(styling, str) and styling.lower() in ("cap", "join", "stroke"):
+            self._styling = styling
+        else:
+            self._styling = "stroke" # other acceptable values are "cap" and "join"
         
-        if all([isinstance(v, QtCore.Qt.PenStyle) for v in self._styles.values()]):
+        if self._styling == "cap":
+            self._styles = standardQtPenCapStyles
+            self._internalStyle = QtCore.Qt.FlatCap
+            
+        elif self._styling == "join":
+            self._styles = standardQtPenJoinStyles
+            self._internalStyle = QtCore.Qt.MiterJoin
+            
+        else:
+            self._styles = standardQtPenStyles
             if len(customStyles) and all ([isinstance(v, PenStyleType._subs_tree()[1:]) for v in customStyles]):
                 self._customStyles.update(customStyles)
+            self._internalStyle = QtCore.Qt.SolidLine
             
+        self._customStyle = QtCore.Qt.NoPen
+        
         self.setItemDelegate(PenStyleComboDelegate(self))
-        #self.itemDelegate().styling = self._styling
+        self.itemDelegate().styling = self._styling
         
         self._addStyles()
         super().activated[int].connect(self._slotActivated)
@@ -214,7 +258,7 @@ class PenStyleComboBox(QtWidgets.QComboBox):
     @pyqtSlot(int)
     @safeWrapper
     def _slotActivated(self, index:int):
-        if index == 0:
+        if self.styling == "stroke" and index == 0:
             from .quickdialog import (QuickDialog, OptionalStringInput)
             dlg  = QuickDialog(self, "Custom Dash Pattern")
             namePrompt = OptionalStringInput(dlg, "Name:")
@@ -251,31 +295,33 @@ class PenStyleComboBox(QtWidgets.QComboBox):
         self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
     
     def _addStyles(self):
-        if all([isinstance(v, QtCore.Qt.PenStyle) for v in self._styles.values()]):
-            self.addItem(self.tr("Custom dashes...", "@item:inlistbox Custom stroke style"))
-            self.setItemData(0, "Custom dashes...", QtCore.Qt.ToolTipRole)
+        #if all([isinstance(v, QtCore.Qt.PenStyle) for v in self._styles.values()]):
+        #elif all([isinstance(v, QtCore.Qt.PenCapStyle, QtCore.Qt.PenJoinStyle) for v in self._styles.values()]):
+        styles =  [(name, val) for name, val in self._styles.items()]
         
+        #if self._styling in ("cap", "join"):
+            #styles =  [(name, val) for name, val in self._styles.items()]
+
+        if self._styling == "stroke":
             styles =  [(name, val) for name, val in self._styles.items() if val > QtCore.Qt.NoPen and val < QtCore.Qt.CustomDashLine]
             #styles =  [(name, val) for name, val in standardQtPenStyles.items() if val > QtCore.Qt.NoPen and val < QtCore.Qt.CustomDashLine]
         
             styles += [("No Pen", QtCore.Qt.NoPen)]
         
             styles += [(name, val) for name, val in self._customStyles.items()]
-            
-        elif all([isinstance(v, QtCore.Qt.PenCapStyle, QtCore.Qt.PenJoinStyle) for v in self._styles.values()]):
-            styles =  [(name, val) for name, val in self._styles.items()]
-
-        else:
-            return
+        
+            self.addItem(self.tr("Custom dashes...", "@item:inlistbox Custom stroke style"))
+            self.setItemData(0, "Custom dashes...", QtCore.Qt.ToolTipRole)
         
         for k, (name, val) in enumerate(styles):
             self.addItem("")
-            self.setItemData(k + 1, val, PenStyleComboDelegate.ItemRoles.PenRole)
-            self.setItemData(k + 1, name, QtCore.Qt.ToolTipRole)
+            ndx = k + 1 if self._styling == "stroke" else k
+            self.setItemData(ndx, val, PenStyleComboDelegate.ItemRoles.PenRole)
+            self.setItemData(ndx, name, QtCore.Qt.ToolTipRole)
             
-    def _setCustomStyle(self, name:str, value:typing.Union[list, tuple, QtCore.Qt.PenStyle], 
+    def _setCustomStyle(self, name:str, value:typing.Union[list, tuple], 
                         lookup:bool=True):
-        if not isinstance(value, (list, tuple, QtCore.Qt.PenStyle)):
+        if not isinstance(value, (list, tuple)) or self._styling in ("cap", "join"):
             return
         
         if len(self._customStyles):
@@ -293,24 +339,25 @@ class PenStyleComboBox(QtWidgets.QComboBox):
                     self._customStyle = self._internalStyle
                     self.setCurrentIndex(i+1)
                 
-                #self.activated[object].emit(self._internalStyle)
-                
                 return
                 
         self._internalStyle = value
         self._customStyle = value
         self.setItemData(0, name, QtCore.Qt.ToolTipRole)
         self.setItemData(0, self._internalStyle, PenStyleComboDelegate.ItemRoles.PenRole)
-        #self.activated[object].emit(self._internalStyle)
     
+    @no_sip_autoconversion(QtCore.QVariant)
     def paintEvent(self, ev:QtGui.QPaintEvent):
-        painter = QtWidgets.QStylePainter(self)
+        painter = QtWidgets.QStylePainter(self) # CAUTION Must call end() before returning
+        
+        #### Draw styled widget
         painter.setPen(self.palette().color(QtGui.QPalette.Text))
         
         opt = QtWidgets.QStyleOptionComboBox()
         self.initStyleOption(opt) # inherited from QtWidgets.QComboBox
         painter.drawComplexControl(QtWidgets.QStyle.CC_ComboBox, opt)
         
+        #### Draw pen
         frame = QtCore.QRect(self.style().subControlRect(QtWidgets.QStyle.CC_ComboBox, opt,
                                                          QtWidgets.QStyle.SC_ComboBoxEditField, self))
         
@@ -319,8 +366,6 @@ class PenStyleComboBox(QtWidgets.QComboBox):
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         
         isSelected = (opt.state and QtWidgets.QStyle.State_Selected)
-        
-        #paletteBrush = comboDelegateBrush(index, QtCore.Qt.BackgroundRole).style() == QtCore.Qt.NoBrush
         
         if isSelected:
             innerColor = opt.palette.color(QtGui.QPalette.Highlight)
@@ -336,43 +381,28 @@ class PenStyleComboBox(QtWidgets.QComboBox):
             
         path = QtGui.QPainterPath()
 
-        #if self._styling == "stroke":
-        print(type(self._internalStyle))
-        if isinstance(self._internalStyle, (QtCore.Qt.PenStyle, tuple, list)):
+        if self.styling == "stroke":
             path.moveTo(lineRect.x(), lineRect.y() + lineRect.height()//2)
             path.lineTo(lineRect.x()+lineRect.width(), lineRect.y() + lineRect.height()//2)
             
-            #penStyle = self._internalStyle
-            
-            if isinstance(self._internalStyle, (tuple, list)) and all([isinstance(v, numbers.Real) for v in penStyle]):
+            if isinstance(self._internalStyle, (tuple, list)) and all([isinstance(v, numbers.Real) for v in self._internalStyle]):
                 #painter.fillPath(makeCustomPathStroke(path, self._internalStyle, 2), penColor)
                 pen = QtGui.QPen(penColor, 2, style=QtCore.Qt.CustomDashLine)
                 pen.setDashPattern(self._internalStyle)
                 painter.setPen(pen)
             else:
                 painter.setPen(QtGui.QPen(penColor, 2, style=self._internalStyle))
-                #painter.drawPath(path)
-
-            #if isinstance(penStyle, (tuple, list)):
-                #painter.fillPath(makeCustomPathStroke(path, penStyle, 2), penColor)
-            #else:
-                #painter.setPen(QtGui.QPen(penColor, 2, style=penStyle))
-                #painter.drawPath(path)
                 
-        #elif self.styling == "cap":
-        elif isinstance(self._internalStyle, QtCore.Qt.PenCapStyle):# self.styling == "cap":
+        elif self.styling == "cap":
             path.moveTo(lineRect.x() + lineRect.width()//4, 
                         lineRect.y() + lineRect.height()//2)
             
             path.lineTo(lineRect.x() + 3*lineRect.width()//4, 
                         lineRect.y() + lineRect.height()//2)
             
-            #capStyle = self._internalStyle
-
-            painter.setPen(QtGui.QPen(penColor, 2, cap=self._internalStyle))
-            #painter.drawPath(path)
+            painter.setPen(QtGui.QPen(penColor, 6, cap=self._internalStyle))
             
-        elif isinstance(self._internalStyle, QtCore.Qt.PenJoinStyle):
+        elif self.styling == "join":
             path.moveTo(lineRect.x() + lineRect.width()//4,
                         lineRect.y() + 3*lineRect.height()//4)
             path.lineTo(lineRect.x() + lineRect.width()//2,
@@ -380,23 +410,29 @@ class PenStyleComboBox(QtWidgets.QComboBox):
             path.lineTo(lineRect.x() + 3*lineRect.width()//4,
                         lineRect.y() + 3*lineRect.height()//4)
                 
-            #joinStyle = self._internalStyle
-
-            painter.setPen(QtGui.QPen(penColor, 2, join=self._internalStyle))
+            painter.setPen(QtGui.QPen(penColor, 4, join=self._internalStyle))
+            
+        else:
+            painter.end()
+            return
             
         painter.drawPath(path)
+        
+        if self.styling == "stroke" and self._internalStyle in (0, QtCore.Qt.NoPen):
+            painter.setPen(penColor)
+            painter.drawText(frame.adjusted(1, 1, -1, -1), QtCore.Qt.AlignCenter, "No Pen")
             
         painter.end()
 
-    #@property
-    #def styling(self) -> str:
-        #return self._styling
+    @property
+    def styling(self) -> str:
+        return self._styling
     
-    #@styling.setter
-    #def styling(self, value:str):
-        #if isinstance(value, str) and value.lower() in ("cap", "join", "stroke"):
-            #self._styling = value
-            #self.itemDelegate().styling = value
+    @styling.setter
+    def styling(self, value:str):
+        if isinstance(value, str) and value.lower() in ("cap", "join", "stroke"):
+            self._styling = value
+            self.itemDelegate().styling = value
         
 class BrushStyleComboDelegate(QtWidgets.QAbstractItemDelegate):
     ItemRoles = IntEnum(value="ItemRoles", names=[("BrushRole", QtCore.Qt.UserRole +1)], 
