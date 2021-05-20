@@ -508,15 +508,19 @@ class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
                 brush = QtGui.QBrush(brushStyle)
                 brush.setColor(penColor) 
             elif brushStyle in standardQtBrushGradients.values():
+                brush = QtGui.QBrush(QtGui.QGradient(standardQtGradientPresets["AboveTheSky"]))
+                #if brushStyle QtCore.Qt.LinearGradientPattern:
+                    #gradient = QtGui.QLinearGradient()
                 # TODO: 2021-05-20 13:17:00
-                # set a default preset & call GUI to cohoose one and/or edit gradient
+                # set a default preset & call GUI to choose one and/or edit gradient
                 # then construct a QGradient on that and construct the brush on that
-                return
+                #return
             elif brushStyle in standardQtBrushTextures.values():
+                brush = QtGui.QBrush(make_transparent_pattern(strong=True))
                 # TODO: 2021-05-20 13:17:55
                 # set a default texture & call GUI to choose an image or pixmap
                 # then create a brush on that!
-                return
+                #return
             painter.setBrush(brush)
         else:
             painter.setBrush(QtCore.Qt.NoBrush)
@@ -674,8 +678,9 @@ class BrushComboBox(QtWidgets.QComboBox):
         self.addItem(self.tr("Custom brush...", "@item:inlistbox Custom brush style"))
         self.setItemData(0, "Custom brush...", QtCore.Qt.ToolTipRole)
         
-        styles =  [(name, val) for name, val in standardQtBrushStyles.items() if val > 0]
+        styles =  [(name, val) for name, val in standardQtBrushPatterns.items() if val > 0]
         styles += [("No Brush", QtCore.Qt.NoBrush)]
+        styles += [("Gradient ...", QtCore.QtNoBrush)]
         styles += [(name, val) for name , val in self._customStyles.items()]
         
         for k, (name, val) in enumerate(styles):
