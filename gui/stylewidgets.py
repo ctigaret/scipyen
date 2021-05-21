@@ -16,7 +16,7 @@ from .scipyen_colormaps import (qtGlobalColors, standardPalette,
                                 standardQColor, svgQColor,
                                 qtGlobalColors, mplColors)
 
-from .colorwidgets import (make_transparent_pattern, comboDelegateBrush)
+from .colorwidgets import (transparent_painting_bg, comboDelegateBrush)
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -519,11 +519,14 @@ class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
                 # then construct a QGradient on that and construct the brush on that
                 #return
             elif brushStyle in standardQtBrushTextures.values():
-                brush = QtGui.QBrush(make_transparent_pattern(strong=True))
+                brush = QtGui.QBrush(transparent_painting_bg(strong=True))
                 # TODO: 2021-05-20 13:17:55
                 # set a default texture & call GUI to choose an image or pixmap
                 # then create a brush on that!
                 #return
+            else:
+                brush = QtGui.QBrush(QtCore.Qt.NoBrush)
+                
             painter.setBrush(brush)
         else:
             painter.setBrush(QtCore.Qt.NoBrush)
@@ -688,7 +691,7 @@ class BrushComboBox(QtWidgets.QComboBox):
         
         styles =  [(name, val) for name, val in standardQtBrushPatterns.items() if val > 0]
         styles += [("No Brush", QtCore.Qt.NoBrush)]
-        styles += [("Gradient ...", QtCore.QtNoBrush)]
+        styles += [("Gradient ...", QtCore.Qt.NoBrush)]
         styles += [(name, val) for name , val in self._customStyles.items()]
         
         for k, (name, val) in enumerate(styles):

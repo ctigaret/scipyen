@@ -129,25 +129,71 @@ def createDrag(color:QtGui.QColor, dragSource:QtCore.QObject) -> QtGui.QDrag:
     drag.setHotSpot(QtCore.QPoint(-5, -7))
     return drag
 
-def make_transparent_pattern(strong:bool=False, size:int=16) -> QtGui.QPixmap:
+def transparent_painting_bg(strong:bool=False, size:int=16) -> QtGui.QPixmap:
     ret = QtGui.QPixmap(size, size)
     patternPainter = QtGui.QPainter(ret)
     if strong:
-        patternPainter.fillRect(0,          0,          size//2,    size//2, QtCore.Qt.black)
-        patternPainter.fillRect(size//2,    size//2,    size//2,    size//2, QtCore.Qt.black)
-        patternPainter.fillRect(0,          size//2,    size//2,    size//2, QtCore.Qt.white)
-        patternPainter.fillRect(size//2,    0,          size//2,    size//2, QtCore.Qt.white)
+        color0 = QtCore.Qt.black
+        color1 = QtCore.Qt.white
     else:
-        patternPainter.fillRect(0,          0,          size//2,    size//2, QtCore.Qt.darkGray)
-        patternPainter.fillRect(size//2,    size//2,    size//2,    size//2, QtCore.Qt.darkGray)
-        patternPainter.fillRect(0,          size//2,    size//2,    size//2, QtCore.Qt.lightGray)
-        patternPainter.fillRect(size//2,    0,          size//2,    size//2, QtCore.Qt.lightGray)
+        color0 = QtCore.Qt.darkGray
+        color1 = QtCore.Qt.lightGray
+
+    return make_checkers(color0, color1, size)
+
+    #if strong:
+        #patternPainter.fillRect(0,          0,          size//2,    size//2, QtCore.Qt.black)
+        #patternPainter.fillRect(size//2,    size//2,    size//2,    size//2, QtCore.Qt.black)
+        #patternPainter.fillRect(0,          size//2,    size//2,    size//2, QtCore.Qt.white)
+        #patternPainter.fillRect(size//2,    0,          size//2,    size//2, QtCore.Qt.white)
+    #else:
+        #patternPainter.fillRect(0,          0,          size//2,    size//2, QtCore.Qt.darkGray)
+        #patternPainter.fillRect(size//2,    size//2,    size//2,    size//2, QtCore.Qt.darkGray)
+        #patternPainter.fillRect(0,          size//2,    size//2,    size//2, QtCore.Qt.lightGray)
+        #patternPainter.fillRect(size//2,    0,          size//2,    size//2, QtCore.Qt.lightGray)
+    #patternPainter.end()
+    
+    #return ret
+
+def make_checkers(color0:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor], 
+                  color1:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor],
+                  size:int=16) -> QtGui.QPixmap:
+    """Makes square checkers pattern as background for transparent graphics.
+    
+    The checkers pattern is: ▄▀  with color0 at the top left. The color roles
+    can be inverted by swapping color0 and color1: ▀▄
+    
+    Parameters:
+    ===========
+    color0, color1: Qt colors (either QColor objects or Qt.GlobalColor enum values)
+        They should be distinct from each other, not necessarily black & white.
+        However, when they are Qt.color0 and Qt.color1, respectively, the function
+        generates a bitmap (1-depth pixmap, made of 0s and 1s).
+        NOTE that a QBitmap is a specialization of QPixmap.
+        
+        Otherwise, the function generates a pixmap.
+        
+        NOTE: color0 is used for the top-left square of the pixmap
+        
+    size: int - the length & width of the generated pixmap
+    
+    """
+    if all ([c in (QtCore.Qt.color0, QtCore.qt.color1) for c in (color0, color1)]): # make bitmap
+        ret = QtGui.QBitmap(size, size)
+        
+    else:
+        ret = QtGui.QPixmap(size, size)
+
+    patternPainter = QtGui.QPainter(ret)
+    
+    patternPainter.fillRect(0,          0,          size//2,    size//2, color0)
+    patternPainter.fillRect(size//2,    size//2,    size//2,    size//2, color0)
+    patternPainter.fillRect(0,          size//2,    size//2,    size//2, color1)
+    patternPainter.fillRect(size//2,    0,          size//2,    size//2, color1)
     patternPainter.end()
     
     return ret
-    
 
-#class ColorButtonMixin(QtWidgets.QAbstractButton):
 class ColorPushButton(QtWidgets.QPushButton):
     """Blunt port (read "almost verbatim code translation") of KColorButton
     
@@ -172,7 +218,7 @@ class ColorPushButton(QtWidgets.QPushButton):
         self._mPos = QtCore.QPoint()
         self._tPmap = transparentPixmap
         if not self._tPmap:
-            self._tPmap = make_transparent_pattern()
+            self._tPmap = transparent_painting_bg()
         #self._strongTransparentPattern = strongTransparentPattern
         self._alpha = 255
         self._keepAlpha = keepAlphaOnDropPaste
@@ -509,7 +555,7 @@ class ColorComboBox(QtWidgets.QComboBox):
 
         self._tPmap = transparentPixmap
         if not self._tPmap:
-            self._tPmap = make_transparent_pattern()
+            self._tPmap = transparent_painting_bg()
             
         self._keepAlpha = keepAlphaOnDropPaste
         self._alpha = 255
