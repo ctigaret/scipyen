@@ -1,8 +1,6 @@
 import array, os, typing, numbers
 import numpy as np
-from collections import OrderedDict
 from enum import IntEnum
-from functools import partial
 
 from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
@@ -10,75 +8,28 @@ from PyQt5.uic import loadUiType as __loadUiType__
 
 from core.prog import (safeWrapper, no_sip_autoconversion)
 
-from .scipyen_colormaps import (qtGlobalColors, standardPalette,
-                                standardPaletteDict, svgPalette,
-                                getPalette, paletteQColors, paletteQColor, 
-                                standardQColor, svgQColor,
-                                qtGlobalColors, mplColors)
-
-from .colorwidgets import (transparent_painting_bg, comboDelegateBrush)
+from .painting_shared import (transparent_painting_bg,
+                              standardQtPenStyles,
+                              standardQtPenJoinStyles,
+                              standardQtPenCapStyles,
+                              PenStyleType,
+                              BrushStyleType,
+                              customDashStyles,
+                              standardQtGradientPresets,
+                              standardQtGradientSpreads,
+                              standardQtGradientTypes,
+                              standardQtBrushStyles,
+                              standardQtBrushPatterns
+                              standardQtBrushGradients,
+                              standardQtBrushTextures,
+                              standardPalette, standardPaletteDict, svgPalette,
+                              getPalette, paletteQColors, paletteQColor, 
+                              standardQColor, svgQColor, mplColors,
+                              qtGlobalColors,
+                              makeCustomPathStroke,
+                              comboDelegateBrush,)
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-
-standardQtPenStyles = OrderedDict(sorted([(name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenStyle) and val < 10],
-                           key = lambda x: x[1]))
-
-standardQtPenJoinStyles = OrderedDict(sorted([(name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenJoinStyle) and val <= 256],
-                           key = lambda x: x[1]))
-
-standardQtPenCapStyles = OrderedDict(sorted([(name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenCapStyle) and val <= 32],
-                           key = lambda x: x[1]))
-
-PenStyleType = typing.Union[tuple, list, QtCore.Qt.PenStyle, int]
-
-customDashStyles = {"Custom": [10., 5., 10., 5., 10., 5., 1., 5., 1., 5., 1., 5.]}
-
-standardQtGradientPresets = OrderedDict(sorted([(name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Preset)]))
-
-standardQtGradientSpreads = OrderedDict(sorted([(name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Spread)]))
-
-standardQtGradientTypes = OrderedDict(sorted([(name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type) and value < 3],
-                                      key = lambda x: x[1]))
-
-standardQtBrushStyles = OrderedDict(sorted([(name, value) for name, value in vars(QtCore.Qt).items() if isinstance(value, QtCore.Qt.BrushStyle)],
-                                           key = lambda x: x[1]))
-
-standardQtBrushPatterns = OrderedDict(sorted([(name, value) for name, value in standardQtBrushStyles.items() if all([s not in name for s in ("Gradient", "Texture")])],
-                                           key = lambda x: x[1]))
-
-standardQtBrushGradients = OrderedDict(sorted([(name, value) for name, value in standardQtBrushStyles.items() if "Gradient" in name],
-                                           key = lambda x: x[1]))
-
-standardQtBrushTextures = OrderedDict(sorted([(name, value) for name, value in standardQtBrushStyles.items() if "Texture" in name],
-                                           key = lambda x: x[1]))
-
-
-# NOTE: 2021-05-19 10:00:27
-# Iterate through the types INSIDE this union with BrushStyleType._subs_tree()[1:]
-# _subs_tree() returns a tuple of types where the first element is always
-# typing.Union, so we leave it out.
-BrushStyleType = typing.Union[int, QtCore.Qt.BrushStyle, QtGui.QGradient,
-                              QtGui.QBitmap, QtGui.QPixmap, QtGui.QImage]
-
-@safeWrapper
-def makeCustomPathStroke(path:QtGui.QPainterPath,
-                     dashes:list, width:numbers.Real=1.,
-                     join:QtCore.Qt.PenJoinStyle=QtCore.Qt.MiterJoin,
-                     cap:QtCore.Qt.PenCapStyle=QtCore.Qt.FlatCap,
-                     ) -> QtGui.QPainterPath:
-    
-    if isinstance(dashes, (tuple, list)) and len(dashes):
-        stroker = QtGui.QPainterPathStroker()
-        stroker.setWidth(width)
-        stroker.setJoinStyle(join)
-        stroker.setCapStyle(cap)
-    
-        stroker.setDashPattern(dashes)
-        
-        return stroker.createStroke(path)
-    
-    return path
-    
 
 class PenComboDelegate(QtWidgets.QAbstractItemDelegate):
     ItemRoles = IntEnum(value="ItemRoles", names=[("PenRole", QtCore.Qt.UserRole +1),
@@ -406,6 +357,7 @@ class PenComboBox(QtWidgets.QComboBox):
             path.lineTo(lineRect.x()+lineRect.width(), lineRect.y() + lineRect.height()//2)
             
             if isinstance(self._internalStyle, (tuple, list)) and all([isinstance(v, numbers.Real) for v in self._internalStyle]):
+                # NOTE: 2021-05-23 09:05:17 alternative also works; don't delete next line
                 #painter.fillPath(makeCustomPathStroke(path, self._internalStyle, 2), penColor)
                 pen = QtGui.QPen(penColor, 2, style=QtCore.Qt.CustomDashLine)
                 pen.setDashPattern(self._internalStyle)

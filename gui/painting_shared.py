@@ -1,20 +1,237 @@
-import numbers, typing
+import numbers, os, typing
 from enum import IntEnum, auto
+from collections import OrderedDict
 
 from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from PyQt5.uic import loadUiType as __loadUiType__
 
-import sip
+import sip # for sip.cast
+
+from core.prog import (safeWrapper, no_sip_autoconversion)
+
+from .scipyen_colormaps import (qtGlobalColors, standardPalette,
+                                standardPaletteDict, svgPalette,
+                                getPalette, paletteQColors, paletteQColor, 
+                                standardQColor, svgQColor,
+                                qtGlobalColors, mplColors)
+
+# NOTE: 2021-05-19 10:00:27
+# Iterate through the types INSIDE this union with BrushStyleType._subs_tree()[1:]
+# _subs_tree() returns a tuple of types where the first element is always
+# typing.Union, so we leave it out.
+BrushStyleType = typing.Union[int, QtCore.Qt.BrushStyle, QtGui.QGradient,
+                              QtGui.QBitmap, QtGui.QPixmap, QtGui.QImage]
+
+PenStyleType = typing.Union[tuple, list, QtCore.Qt.PenStyle, int]
+
+standardQtPenStyles = OrderedDict(sorted([(name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenStyle) and val < 10],
+                           key = lambda x: x[1]))
+
+standardQtPenJoinStyles = OrderedDict(sorted([(name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenJoinStyle) and val <= 256],
+                           key = lambda x: x[1]))
+
+standardQtPenCapStyles = OrderedDict(sorted([(name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenCapStyle) and val <= 32],
+                           key = lambda x: x[1]))
+
+customDashStyles = {"Custom": [10., 5., 10., 5., 10., 5., 1., 5., 1., 5., 1., 5.]}
+
+standardQtGradientPresets = OrderedDict(sorted([(name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Preset)]))
+
+standardQtGradientSpreads = OrderedDict(sorted([(name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Spread)]))
+
+standardQtGradientTypes = OrderedDict(sorted([(name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type) and value < 3],
+                                      key = lambda x: x[1]))
+
+standardQtBrushStyles = OrderedDict(sorted([(name, value) for name, value in vars(QtCore.Qt).items() if isinstance(value, QtCore.Qt.BrushStyle)],
+                                           key = lambda x: x[1]))
+
+standardQtBrushPatterns = OrderedDict(sorted([(name, value) for name, value in standardQtBrushStyles.items() if all([s not in name for s in ("Gradient", "Texture")])],
+                                           key = lambda x: x[1]))
+
+standardQtBrushGradients = OrderedDict(sorted([(name, value) for name, value in standardQtBrushStyles.items() if "Gradient" in name],
+                                           key = lambda x: x[1]))
+
+standardQtBrushTextures = OrderedDict(sorted([(name, value) for name, value in standardQtBrushStyles.items() if "Texture" in name],
+                                           key = lambda x: x[1]))
+
+def populateMimeData(mimeData:QtCore.QMimeData, color:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]):
+    from core.datatypes import reverse_dict
+    mimeData.setColorData(color)
+    
+    if isinstance(color, QtCore.Qt.GlobalColor):
+        color = QtGui.QColor(color)
+    mimeData.setText(color.name())
+    # NOTE: 2021-05-14 23:27:20
+    # The code below doesn't do what is intended: it should pass a color string
+    # (format '#rrggbb) to mimeData's text attribute
+    # However, DO NOT DELETE: this is an example of key lookup by value in enumerations
+    # in the Qt namespace
+    #if isinstance(color, QtCore.Qt.GlobalColor):
+        #name = reverse_dict(qtGlobalColors)[color]
+    #else:
+        #name = color.name()
+        
+    #mimeData.setText(name)
+    
+def bound_point(point:QtCore.QPointF, bounds:QtCore.QRectF, lock:int) -> QtCore.QPointF:
+    p = point
+    
+    left    = bounds.left()
+    right   = bounds.right()
+    top     = bounds.top()
+    bottom  = bounds.bottom()
+    
+    if p.x() < left or (lock & HoverPoints.LockType.LockToLeft):
+        p.setX(left)
+        
+    elif p.x() > right or (lock & HoverPoints.LockType.LockToRight):
+        p.setX(right)
+        
+    if p.y() < top or (lock & HoverPoints.LockType.LockToTop):
+        p.setY(top)
+        
+    elif p.y() > bottom or (lock & HoverPoints.LockType.LockToBottom):
+        p.setY(bottom)
+        
+    return p
+    
+def canDecode(mimeData:QtCore.QMimeData) -> bool:
+    if mimeData.hasColor():
+        return True
+    
+    if mimeData.hasText():
+        colorName = mimeData.text()
+        if len(colorName) >= 4 and colorName.startswith("#"):
+            return True
+        
+    return False
+
+@no_sip_autoconversion(QtCore.QVariant)
+def fromMimeData(mimeData:QtCore.QMimeData) -> QtGui.QColor:
+    if mimeData.hasColor():
+        # NOTE: 2021-05-14 21:26:16 ATTENTION
+        #return mimeData.colorData().value() 
+        # sip "autoconverts" QVariant<QColor> to an int, therefore constructing
+        # a QColor from that results in an unintended color!
+        # Therefore we temporarily suppress autoconversion of QVariant here
+        # NOTE: 2021-05-15 14:06:57 temporary sip diabling by means of the 
+        # decorator core.prog.no_sip_autoconversion
+        #import sip
+        #sip.enableautoconversion(QtCore.QVariant, False)
+        ret = mimeData.colorData().value() # This is a python-wrapped QVariant<QColor>
+        #sip.enableautoconversion(QtCore.QVariant, True)
+        return ret
+    if canDecode(mimeData):
+        return QtGui.QColor(mimeData.text())
+    return QtGui.QColor()
+
+
+@safeWrapper
+def createDrag(color:QtGui.QColor, dragSource:QtCore.QObject) -> QtGui.QDrag:
+    drag = QtGui.QDrag(dragSource)
+    mime = QtCore.QMimeData()
+    populateMimeData(mime, color)
+    colorPix = QtGui.QPixmap(25, 20)
+    colorPix.fill(color)
+    painter = QtGui.QPainter(colorPix)
+    painter.setPen(QtCore.Qt.black)
+    painter.drawRect(0, 0, 24, 19)
+    painter.end()
+    drag.setMimeData(mime)
+    drag.setPixmap(colorPix)
+    drag.setHotSpot(QtCore.QPoint(-5, -7))
+    return drag
+
+def transparent_painting_bg(strong:bool=False, size:int=16) -> QtGui.QPixmap:
+    ret = QtGui.QPixmap(size, size)
+    patternPainter = QtGui.QPainter(ret)
+    if strong:
+        color0 = QtCore.Qt.black
+        color1 = QtCore.Qt.white
+    else:
+        color0 = QtCore.Qt.darkGray
+        color1 = QtCore.Qt.lightGray
+
+    return make_checkers(color0, color1, size)
+
+def make_checkers(color0:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor], 
+                  color1:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor],
+                  size:int=16) -> QtGui.QPixmap:
+    """Makes square checkers pattern as background for transparent graphics.
+    
+    The checkers pattern is: ▄▀  with color0 at the top left. The color roles
+    can be inverted by swapping color0 and color1: ▀▄
+    
+    Parameters:
+    ===========
+    color0, color1: Qt colors (either QColor objects or Qt.GlobalColor enum values)
+        They should be distinct from each other, not necessarily black & white.
+        However, when they are Qt.color0 and Qt.color1, respectively, the function
+        generates a bitmap (1-depth pixmap, made of 0s and 1s).
+        NOTE that a QBitmap is a specialization of QPixmap.
+        
+        Otherwise, the function generates a pixmap.
+        
+        NOTE: color0 is used for the top-left square of the pixmap
+        
+    size: int - the length & width of the generated pixmap
+    
+    """
+    if all ([c in (QtCore.Qt.color0, QtCore.Qt.color1) for c in (color0, color1)]): # make bitmap
+        ret = QtGui.QBitmap(size, size)
+        
+    else:
+        ret = QtGui.QPixmap(size, size)
+
+    patternPainter = QtGui.QPainter(ret)
+    
+    patternPainter.fillRect(0,          0,          size//2,    size//2, color0)
+    patternPainter.fillRect(size//2,    size//2,    size//2,    size//2, color0)
+    patternPainter.fillRect(0,          size//2,    size//2,    size//2, color1)
+    patternPainter.fillRect(size//2,    0,          size//2,    size//2, color1)
+    patternPainter.end()
+    
+    return ret
 
 def x_less_than(p1:QtCore.QPointF, p2:QtCore.QPointF) -> bool:
     return p1.x() < p2.x()
 
-def y_less_than(p1:QtCore.QpointF, p2:QtCore.QPointF) -> bool:
+@safeWrapper
+def makeCustomPathStroke(path:QtGui.QPainterPath,
+                     dashes:list, width:numbers.Real=1.,
+                     join:QtCore.Qt.PenJoinStyle=QtCore.Qt.MiterJoin,
+                     cap:QtCore.Qt.PenCapStyle=QtCore.Qt.FlatCap,
+                     ) -> QtGui.QPainterPath:
+    
+    if isinstance(dashes, (tuple, list)) and len(dashes):
+        stroker = QtGui.QPainterPathStroker()
+        stroker.setWidth(width)
+        stroker.setJoinStyle(join)
+        stroker.setCapStyle(cap)
+    
+        stroker.setDashPattern(dashes)
+        
+        return stroker.createStroke(path)
+    
+    return path
+    
+@no_sip_autoconversion(QtCore.QVariant)
+def comboDelegateBrush(index:QtCore.QModelIndex, role:int) -> QtGui.QBrush:
+    brush = QtGui.QBrush()
+    v = QtCore.QVariant(index.data(role))
+    if v.type() == QtCore.QVariant.Brush:
+        brush = v.value()
+        
+    elif v.type() == QtCore.QVariant.Color:
+        brush = QtGui.QBrush(v.value())
+    return brush
+
+def y_less_than(p1:QtCore.QPointF, p2:QtCore.QPointF) -> bool:
     return p1.y() < p2.y()
 
 class HoverPoints(QtCore.QObject):
-    pointsChanged = pyqtSignal(QtGui.QPolygonF, named = "pointsChanged")
+    pointsChanged = pyqtSignal(QtGui.QPolygonF, name = "pointsChanged")
     
     class PointShape(IntEnum):
         CircleShape=auto()
@@ -38,31 +255,7 @@ class HoverPoints(QtCore.QObject):
         LineConnection = auto()
         CurveConnection = auto()
         
-    @staticmethod
-    def bound_point(point:QtCore.QPointF, bounds:QtCore.QRectF, lock:int) -> QtCore.QPointF:
-        p = point
-        
-        left = bounds.left()
-        right = bounds.right()
-        top = bounds.top()
-        bottom= bountds.bottom()
-        
-        if p.x() < left or (lock & HoverPoints.LockType.LockToLeft):
-            p.setX(left)
-            
-        elif p.x() > right or (lock & HoverPoints.LockType.LockToRight):
-            p.setX(right)
-            
-        if p.y() < top or (lock & HoverPoints.LockType.LockToTop):
-            p.setY(top)
-            
-        elif p.y() > bottom or (lock & HoverPoints.LockType.LockToBottom):
-            p.setY(bottom)
-            
-        return p
-        
-        
-    def __init__(widget:QtWidgets.QWidget, shape:HoverPoints.PointShape):
+    def __init__(self, widget:QtWidgets.QWidget, shape:PointShape):
         super().__init__(widget)
         
         self._widget = widget
@@ -70,13 +263,13 @@ class HoverPoints(QtCore.QObject):
         
         # NOTE 2021-05-21 21:29:33 touchscreens
         # I don't think is needed
-        widget.setAttribute(QtCore.Qt.WA_AcceptTouchgEvents) 
+        widget.setAttribute(QtCore.Qt.WA_AcceptTouchEvents) 
         
         self._connectionType = HoverPoints.ConnectionType.CurveConnection
         self._sortType = HoverPoints.SortType.NoSort
         self._shape = shape
-        self._pointPen = QtGui.QPen(QtGui.QCOlor(255, 255, 255, 191), 1)
-        self._connectionPen = QtGui.QPen(QtGui.QCOlor(255, 255, 255, 127), 2)
+        self._pointPen = QtGui.QPen(QtGui.QColor(255, 255, 255, 191), 1)
+        self._connectionPen = QtGui.QPen(QtGui.QColor(255, 255, 255, 127), 2)
         self._pointBrush = QtGui.QBrush(QtGui.QColor(191, 191, 191, 127))
         self._pointSize = QtCore.QSize(11, 11)
         self._currentIndex = -1
@@ -84,7 +277,7 @@ class HoverPoints(QtCore.QObject):
         self._enabled = True
         self._points = QtGui.QPolygonF()
         self._bounds = QtCore.QRectF()
-        self._locks = list()
+        self._locks = list() # of QPoint/QPointF
         
         self._fingerPointMapping = dict() # see NOTE 2021-05-21 21:29:33 touchscreens
         
@@ -142,45 +335,62 @@ class HoverPoints(QtCore.QObject):
         self._bounds = boundingRect
         
     @property
-    def points(self) -> QtCore.QPolygonF:
+    def points(self) -> QtGui.QPolygonF:
         return self._points
     
     @points.setter
     def points(self, points:typing.Union[QtGui.QPolygonF,typing.Iterable[typing.Union[QtCore.QPointF, QtCore.QPoint]]]) -> None:
-        if isinstance(points, (list, tuple)):
-            self._points = QtGui.QPolygonF(*points)
-        else:
-            self._points = points
+        if isinstance(points, (list, tuple)) and len(points) and all([isinstance(v, (QtCore.QPoint, QtCore.QPointF)) for v in points]):
+            points = QtGui.QPolygonF(points)
+        elif not isinstance(points, QtGui.QPolygonF):
+            raise TypeError("points expected a QtGui.QPolygonF, or a sequence of QtCore.QPointF or QtCore.QPoint; got %s instead" % type(points).__name__)
         
-    #def setPoints(self, points:QtGui.QPolygonF):
-        #self._points = points
+        # NOTE: 2021-05-23 20:57:59
+        # QPolygonF has API compatible with list() (on C++ side is a QVector<QPointF>)
+        #if points.size() != self._points.size():
+        if len(points) != len(self._points):
+            self._fingerPointMapping.clear() # see NOTE 2021-05-21 21:29:33 touchscreens
         
+        #self._points.clear() # just so that refs to QPointF are garbage-collected
+        
+        self._points = QtGui.QPolygonF([bound_point(p, self.boundingRect(), 0) for p in points])
+        #boundedPoints = [bound_point(points.at(i), self.boundingRect(), 0) for i in range(points.size())]
+        
+        #self._points = QtGui.QPolygonF(boundedPoints)
+        
+        self._locks.clear()
+        
+        #if self._points.size():
+        if len(self._points):
+            self._locks = [0] * len(self._points)
+            #self._locks = [0] * self._points.size()
+            
     @property
     def pointSize(self) -> QtCore.QSize:
         return self._pointSize
         
     @pointSize.setter
-    def pointSize(self, size:typing.Union[QtCore.QSizeF, typing.Tuple[numbers.Real, numbers.Real]]) -> None:
-        if isinstance(size, (QtCore.Qt.QSize, QtCore.Qt.QSizeF)):
+    def pointSize(self, size:typing.Union[QtCore.QSize, QtCore.QSizeF, typing.Tuple[numbers.Real, numbers.Real]]) -> None:
+        if isinstance(size, (QtCore.QSize, QtCore.QSizeF)):
             self._pointSize = size
         else:
             self._pointSize = QtCoreQt.QSizeF(*size)
             
         
     @property
-    def sortType(self) -> HoverPoints.SortType:
+    def sortType(self) -> SortType:
         return self._sortType
     
     @sortType.setter
-    def sortType(self, sortType:HoverPoints.SortType) -> None:
+    def sortType(self, sortType:SortType) -> None:
         self._sortType = sortType
         
     @property
-    def connectionType(self) -> HoverPoints.ConnectionType:
+    def connectionType(self) -> ConnectionType:
         return self._connectionType
     
     @connectionType.setter
-    def connectionType(self, connectionType:HoverPoints.ConnectionType) -> None:
+    def connectionType(self, connectionType:ConnectionType) -> None:
         self._connectionType = connectionType
         
     @property
@@ -215,9 +425,8 @@ class HoverPoints(QtCore.QObject):
     def editable(self, value:bool) -> None:
         self._editable = value
     
-    def setPointLock(self, pos:int, lock:HoverPoints.LockType) -> None:
-        self._lock[pos] = lock
-        
+    def setPointLock(self, pos:int, lock:LockType) -> None:
+        self._locks[pos] = lock
         
     def eventFilter(self, obj:QtCore.QObject, ev:QtCore.QEvent) -> bool:
         if obj == self._widget and self._enabled:
@@ -314,7 +523,7 @@ class HoverPoints(QtCore.QObject):
                 
             elif ev.type() == QtCore.QEvent.Paint:
                 that_widget = self._widget
-                self._widget = NOne
+                self._widget = None
                 QtCore.QCoreApplication.sendEvent(obj, ev)
                 self._widget = that_widget
                 self._paintPoints()
@@ -349,43 +558,35 @@ class HoverPoints(QtCore.QObject):
         p.setBrush(self._pointBrush)
         
         #for i, p in enumerate(self._points):
-        for in self._points:
-            bounds = self._pointBoundingRect(p)
+        for point in self._points:
+            bounds = self._pointBoundingRect(point)
             if self._shape == HoverPoints.PointShape.CircleShape:
                 p.drawEllipse(bounds)
             else:
                 p.drawRect(bounds)
                     
-    def setPoints(points:QtGui.QPolygonF) -> None:
-        if points.size() != self._points.size():
-            self._fingerPointMapping.clear()
+    def setPoints(self, points:QtGui.QPolygonF) -> None:
+        self.points = points
             
-        self._points.clear()
-        
-        for p in points:
-            self._points.append(self.bound_point(p, self.boundingRect(), 0))
-            
-        self._locks.clear()
-        if self._points.size():
-            self._locks = [0] * self._points.size()
-            
-    def _movePoint(index:int, point:QtCore.QPointF, emitUpdate:bool) -> None:
-        self._points[index] = self.bound_point(point, self.boundingRect(), self._locks[index])
+    def _movePoint(self, index:int, point:QtCore.QPointF, emitUpdate:bool) -> None:
+        self._points[index] = bound_point(point, self.boundingRect(), self._locks[index])
         if emitUpdate:
             self.firePointChange()
         
     
     def firePointChange(self):
-        if self._sortType != HoverPoints.SortType.noSort:
+        if self._sortType != HoverPoints.SortType.NoSort:
             oldCurrent = QtCore.QPointF()
             if self._currentIndex != -1:
                 oldCurrent = self._points[self._currentIndex]
                 
             if self._sortType == HoverPoints.SortType.XSort:
-                self._points = QtCore.QPolygonF(sortedPoints = sorted([p for p in self._points], key = x_less_than))
+                sortedPoints = sorted([p for p in self._points], key = lambda x: x.x())
             elif self._sortType == HoverPoints.SortType.YSort:
-                self._points = QtCore.QPolygonF(sortedPoints = sorted([p for p in self._points], key = y_less_than))
+                sortedPoints = sorted([p for p in self._points], key = lambda x: x.y())
                 
+            self._points = QtGui.QPolygonF(sortedPoints)
+            
             if self._currentIndex != -1:
                 for i, p in enumerate(self._points):
                     if p == oldCurrent:

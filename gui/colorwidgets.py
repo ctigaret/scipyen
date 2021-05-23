@@ -32,7 +32,7 @@ What is new/different from the KWidgetsAddons classes:
     NOTE: 2021-05-17 14:00:51
     Color palettes moves to gui.scipyen_colormaps module
 """
-import array, os, typing
+import os, typing
 import numpy as np
 
 from enum import IntEnum
@@ -44,155 +44,15 @@ from PyQt5.uic import loadUiType as __loadUiType__
 
 from core.prog import (safeWrapper, no_sip_autoconversion)
 
-from .scipyen_colormaps import (qtGlobalColors, standardPalette,
-                                standardPaletteDict, svgPalette,
-                                getPalette, paletteQColors, paletteQColor, 
-                                standardQColor, svgQColor,
-                                qtGlobalColors, mplColors)
+from .painting_shared import (standardPalette, standardPaletteDict, svgPalette,
+                              getPalette, paletteQColors, paletteQColor, 
+                              standardQColor, svgQColor, mplColors, qtGlobalColors, 
+                              canDecode, populateMimeData, fromMimeData,
+                              createDrag, transparent_painting_bg, make_checkers,
+                              comboDelegateBrush,)
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-
-def populateMimeData(mimeData:QtCore.QMimeData, color:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]):
-    from core.datatypes import reverse_dict
-    mimeData.setColorData(color)
-    
-    if isinstance(color, QtCore.Qt.GlobalColor):
-        color = QtGui.QColor(color)
-    mimeData.setText(color.name())
-    # NOTE: 2021-05-14 23:27:20
-    # The code below doesn't do what is intended: it should pass a color string
-    # (format '#rrggbb) to mimeData's text attribute
-    # However, DO NOT DELETE: this is an example of key lookup by value in enumerations
-    # in the Qt namespace
-    #if isinstance(color, QtCore.Qt.GlobalColor):
-        #name = reverse_dict(qtGlobalColors)[color]
-    #else:
-        #name = color.name()
-        
-    #mimeData.setText(name)
-    
-def canDecode(mimeData:QtCore.QMimeData) -> bool:
-    if mimeData.hasColor():
-        return True
-    
-    if mimeData.hasText():
-        colorName = mimeData.text()
-        if len(colorName) >= 4 and colorName.startswith("#"):
-            return True
-        
-    return False
-
-@no_sip_autoconversion(QtCore.QVariant)
-def fromMimeData(mimeData:QtCore.QMimeData) -> QtGui.QColor:
-    if mimeData.hasColor():
-        # NOTE: 2021-05-14 21:26:16 ATTENTION
-        #return mimeData.colorData().value() 
-        # sip "autoconverts" QVariant<QColor> to an int, therefore constructing
-        # a QColor from that results in an unintended color!
-        # Therefore we temporarily suppress autoconversion of QVariant here
-        # NOTE: 2021-05-15 14:06:57 temporary sip diabling by means of the 
-        # decorator core.prog.no_sip_autoconversion
-        #import sip
-        #sip.enableautoconversion(QtCore.QVariant, False)
-        ret = mimeData.colorData().value() # This is a python-wrapped QVariant<QColor>
-        #sip.enableautoconversion(QtCore.QVariant, True)
-        return ret
-    if canDecode(mimeData):
-        return QtGui.QColor(mimeData.text())
-    return QtGui.QColor()
-
-@no_sip_autoconversion(QtCore.QVariant)
-def comboDelegateBrush(index:QtCore.QModelIndex, role:int) -> QtGui.QBrush:
-    brush = QtGui.QBrush()
-    v = QtCore.QVariant(index.data(role))
-    if v.type() == QtCore.QVariant.Brush:
-        brush = v.value()
-        
-    elif v.type() == QtCore.QVariant.Color:
-        brush = QtGui.QBrush(v.value())
-    return brush
-
-@safeWrapper
-def createDrag(color:QtGui.QColor, dragSource:QtCore.QObject) -> QtGui.QDrag:
-    drag = QtGui.QDrag(dragSource)
-    mime = QtCore.QMimeData()
-    populateMimeData(mime, color)
-    colorPix = QtGui.QPixmap(25, 20)
-    colorPix.fill(color)
-    painter = QtGui.QPainter(colorPix)
-    painter.setPen(QtCore.Qt.black)
-    painter.drawRect(0, 0, 24, 19)
-    painter.end()
-    drag.setMimeData(mime)
-    drag.setPixmap(colorPix)
-    drag.setHotSpot(QtCore.QPoint(-5, -7))
-    return drag
-
-def transparent_painting_bg(strong:bool=False, size:int=16) -> QtGui.QPixmap:
-    ret = QtGui.QPixmap(size, size)
-    patternPainter = QtGui.QPainter(ret)
-    if strong:
-        color0 = QtCore.Qt.black
-        color1 = QtCore.Qt.white
-    else:
-        color0 = QtCore.Qt.darkGray
-        color1 = QtCore.Qt.lightGray
-
-    return make_checkers(color0, color1, size)
-
-    #if strong:
-        #patternPainter.fillRect(0,          0,          size//2,    size//2, QtCore.Qt.black)
-        #patternPainter.fillRect(size//2,    size//2,    size//2,    size//2, QtCore.Qt.black)
-        #patternPainter.fillRect(0,          size//2,    size//2,    size//2, QtCore.Qt.white)
-        #patternPainter.fillRect(size//2,    0,          size//2,    size//2, QtCore.Qt.white)
-    #else:
-        #patternPainter.fillRect(0,          0,          size//2,    size//2, QtCore.Qt.darkGray)
-        #patternPainter.fillRect(size//2,    size//2,    size//2,    size//2, QtCore.Qt.darkGray)
-        #patternPainter.fillRect(0,          size//2,    size//2,    size//2, QtCore.Qt.lightGray)
-        #patternPainter.fillRect(size//2,    0,          size//2,    size//2, QtCore.Qt.lightGray)
-    #patternPainter.end()
-    
-    #return ret
-
-def make_checkers(color0:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor], 
-                  color1:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor],
-                  size:int=16) -> QtGui.QPixmap:
-    """Makes square checkers pattern as background for transparent graphics.
-    
-    The checkers pattern is: ▄▀  with color0 at the top left. The color roles
-    can be inverted by swapping color0 and color1: ▀▄
-    
-    Parameters:
-    ===========
-    color0, color1: Qt colors (either QColor objects or Qt.GlobalColor enum values)
-        They should be distinct from each other, not necessarily black & white.
-        However, when they are Qt.color0 and Qt.color1, respectively, the function
-        generates a bitmap (1-depth pixmap, made of 0s and 1s).
-        NOTE that a QBitmap is a specialization of QPixmap.
-        
-        Otherwise, the function generates a pixmap.
-        
-        NOTE: color0 is used for the top-left square of the pixmap
-        
-    size: int - the length & width of the generated pixmap
-    
-    """
-    if all ([c in (QtCore.Qt.color0, QtCore.qt.color1) for c in (color0, color1)]): # make bitmap
-        ret = QtGui.QBitmap(size, size)
-        
-    else:
-        ret = QtGui.QPixmap(size, size)
-
-    patternPainter = QtGui.QPainter(ret)
-    
-    patternPainter.fillRect(0,          0,          size//2,    size//2, color0)
-    patternPainter.fillRect(size//2,    size//2,    size//2,    size//2, color0)
-    patternPainter.fillRect(0,          size//2,    size//2,    size//2, color1)
-    patternPainter.fillRect(size//2,    0,          size//2,    size//2, color1)
-    patternPainter.end()
-    
-    return ret
 
 class ColorPushButton(QtWidgets.QPushButton):
     """Blunt port (read "almost verbatim code translation") of KColorButton
