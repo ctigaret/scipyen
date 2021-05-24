@@ -19,7 +19,7 @@ from .painting_shared import (transparent_painting_bg,
                               standardQtGradientSpreads,
                               standardQtGradientTypes,
                               standardQtBrushStyles,
-                              standardQtBrushPatterns
+                              standardQtBrushPatterns,
                               standardQtBrushGradients,
                               standardQtBrushTextures,
                               standardPalette, standardPaletteDict, svgPalette,

@@ -16,6 +16,8 @@ from .scipyen_colormaps import (qtGlobalColors, standardPalette,
                                 standardQColor, svgQColor,
                                 qtGlobalColors, mplColors)
 
+__module_path__ = os.path.abspath(os.path.dirname(__file__))
+
 # NOTE: 2021-05-19 10:00:27
 # Iterate through the types INSIDE this union with BrushStyleType._subs_tree()[1:]
 # _subs_tree() returns a tuple of types where the first element is always
@@ -215,6 +217,129 @@ def makeCustomPathStroke(path:QtGui.QPainterPath,
         return stroker.createStroke(path)
     
     return path
+
+def gradient2radial(gradient:QtGui.QGradient, 
+                   centerRadius:float = 0., 
+                   focalRadius:float = 0.,
+                   distance:float= 1.) -> QtGui.QRadialGradient:
+    if isinstance(gradient, QtGui.QRadialGradient):
+        return gradient
+    
+    if isinstance(gradient, QtGui.QLinearGradient):
+        center = gradient.start()
+        focalPoint = gradient.finalStop()
+        ret = QtGui.QRadialGradient(center, centerRadius, focalPoint, focalRadius)
+    
+    elif isinstance(gradient, QtGui.QConicalGradient):
+        center = gradient.center()
+        l = QtCore.QLineF.fromPolar(distance, gradient.angle())
+        focalPoint = l.p2()
+        ret = QtGui.QRadialGradient(center, centerRadius, focalPoint, focalRadius)
+
+    elif isinstance(gradient, QtGui.QGradient):
+        if gradient.type() == QtGui.QGradient.RadialGradient:
+            return sip.cast(gradient, QtGui.QGradient.RadialGradient)
+        
+        if gradient.type() == QtGui.QGradient.LinearGradient:
+            g = sip.cast(gradient, QtGui.QLinearGradient)
+            
+            center = g.start()
+            focalPoint = g.finalStop()
+            ret = QtGui.QRadialGradient(center, centerRadius, focalPoint, focalRadius)
+            #l = QtGui.QLineF(QtCore.QPointF(0,0), QtCore.QPointF(0,10))
+            #l.setLength(distance)
+            #l.setAngle(0)
+            ret = QtGui.QRadialGradient(l.p1(), centerRadius, l.p2(), focalRadius)
+            
+        elif gradient.type() == QtGui.QGradient.ConicalGradient:
+            g = sip.cast(gradient, QtGui.QGradient.ConicalGradient)
+            
+            center = gradient.center()
+            l = QtCore.QLineF.fromPolar(distance, g.angle())
+            focalPoint = l.p2()
+            ret = QtGui.QRadialGradient(center, centerRadius, focalPoint, focalRadius)
+
+        else:
+            ret = QtGui.QRadialGradient()
+            
+    else:
+        ret = QtGui.QRadialGradient()
+            
+    ret.setStops(gradient.stops())
+            
+    return ret
+    
+def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
+    if isinstance(gradient, QtGui.QLinearGradient):
+        return gradient
+    
+    if isinstance(gradient, QtGui.QRadialGradient):
+        ret = QtGui.QLinearGradient(gradient.center(), gradient.focalPoint())
+        
+    elif isinstance(gradient, QtGui.QConicalGradient):
+        l = QtCore.QLineF.fromPolar(distance, gradient.angle())
+        l.setP1(gradient.center())
+        ret = QtGui.QLinearGradient(l.p1(), l.p2())
+
+    elif instance(gradient, QGradient):
+        if gradient.type() == QtGui.QGradient.LinearGradient:
+            return sip.cast(gradient, QtGui.QLinearGradient)
+        
+        if gradient.type() == QtGui.QGradient.RadialGradient:
+            g = sip.cast(gradient, QtGui.QRadialGradient)
+            ret = QtGui.QLinearGradient(g.center(), g.focalPoint())
+            
+        elif gradient.type() == QtGui.QGradient.ConicalGradient:
+            g = sip.cast(gradient, QtGui.QConicalGradient)
+            l = QtCore.QLineF.fromPolar(distance, g.angle())
+            l.setP1(g.center())
+            ret = QtGui.QLinearGradient(l.p1(), l.p2())
+            
+        else:
+            ret = QtGui.QLinearGradient()
+            
+    else:
+        ret = QtGui.QLinearGradient()
+            
+    ret.setStops(gradient.stops())
+    
+    return ret
+    
+def gradient2conical(gradient:QtGui.QGradient) -> QtGui.QConicalGradient:
+    if isinstance(gradient, QtGui.QConicalGradient):
+        return gradient
+    
+    if isinstance(gradient, QtGui.QLinearGradient):
+        l = QtCore.QLineF(gradient.start(), gradient.finalStop())
+        ret = QtGui.QConicalGradient(l.p1(), l.angle())
+        
+    elif isinstance(gradient, QtGui.QRadialGradient):
+        l = QtCore.QLineF(gradient.center(), gradient.focalPoint())
+        ret = QtGui.QConicalGradient(l.p1(), l.angle())
+        
+    elif isinstance(gradient, QtGui.QGradient):
+        if gradient.type() == QtGui.QGradient.ConicalGradient:
+            return sip.cast(gradient, QtGui.QConicalGradient)
+        
+        if gradient.type() == QtGui.QGradient.LinearGradient:
+            g = sip.cast(gradient, QtGui.QLinearGradient)
+            l = QtCore.QLineF(g.start(), g.finalStop())
+            ret = QtGui.QConicalGradient(l.p1(), l.angle())
+            
+        elif gradient.type() == QtGui.QGradient.RadialGradient:
+            g = sip.cast(gradient, QtGui.QRadialGradient)
+            l = QtCore.QLineF(g.center(), g.focalPoint())
+            ret = QtGui.QConicalGradient(l.p1(), l.angle())
+        
+        else:
+            ret = QtGui.QConicalGradient()
+        
+    else:
+        ret = QtGui.QConicalGradient()
+        
+    ret.setStops(gradient.stops())
+    
+    return ret
     
 @no_sip_autoconversion(QtCore.QVariant)
 def comboDelegateBrush(index:QtCore.QModelIndex, role:int) -> QtGui.QBrush:
@@ -374,7 +499,7 @@ class HoverPoints(QtCore.QObject):
         if isinstance(size, (QtCore.QSize, QtCore.QSizeF)):
             self._pointSize = size
         else:
-            self._pointSize = QtCoreQt.QSizeF(*size)
+            self._pointSize = QtCore.QSizeF(*size)
             
         
     @property
@@ -431,8 +556,8 @@ class HoverPoints(QtCore.QObject):
     def eventFilter(self, obj:QtCore.QObject, ev:QtCore.QEvent) -> bool:
         if obj == self._widget and self._enabled:
             if ev.type() == QtCore.QEvent.MouseButtonPress:
-                if len(self._fingerPointMapping) == 0: # see # NOTE 2021-05-21 21:29:33 touchscreens
-                    return True
+                #if len(self._fingerPointMapping) == 0: # see # NOTE 2021-05-21 21:29:33 touchscreens
+                    #return True
                 
                 me = sip.cast(ev, QtGui.QMouseEvent)
                 #me = QtGui.QMouseEvent(ev)
@@ -441,7 +566,12 @@ class HoverPoints(QtCore.QObject):
                 
                 index = -1
                 
-                for i in range(self._points.size()):
+                # NOTE: 2021-05-24 10:50:53
+                # check if event os is on a point
+                #for i in range(self._points.size(
+                # NOTE: 2021-05-24 10:44:48
+                # Use Python list API for QPolygon/QPolygonF
+                for i in range(len(self._points)):
                     path = QtGui.QPainterPath()
                     if self._shape == HoverPoints.PointShape.CircleShape:
                         path.addEllipse(self._pointBoundingRect(i))
@@ -449,28 +579,48 @@ class HoverPoints(QtCore.QObject):
                         path.addRect(self._pointBoundingRect(i))
 
                     if path.contains(clickPos):
+                        # NOTE: 2021-05-24 10:51:46 if clicked on a point then
+                        # set indes to that point's index; else leave index -1
                         index = i
                         break
                 
-                if me.button() == QtCore.Qt.LeftButton: # add new point or select clicked one & propagate event
-                    if index == -1: # new point added (index is unchanged from -1 because clickPos is not on path)
-                        if not self._editable: # non-editable => don't propagate event
+                if me.button() == QtCore.Qt.LeftButton: 
+                    # add new point or select clicked one & filter event
+                    if index == -1: 
+                        # new point added (index is unchanged from -1 because 
+                        # clickPos is not any points - see  NOTE: 2021-05-24 10:50:53)
+                        if not self._editable: # non-editable => don't block (filter) event
                             return False
                         
                         pos = 0
                         
                         if self._sortType == HoverPoints.SortType.XSort:
-                            for i in range(self._points.size()):
-                                if self._points.at(i).x() > clickPos.x():
-                                    pos = i
+                            #for i in range(self._points.size()):
+                            # see  NOTE: 2021-05-24 10:44:48
+                            for k, p in enumerate(self._points):
+                                if p.x() > clickPos.x():
+                                    pos = k
                                     break
+                            #for i in range(len(self._points)):
+                                ##if self._points.at(i).x() > clickPos.x():
+                                #if self._points[i].x() > clickPos.x():
+                                    #pos = i
+                                    #break
                                 
                         elif self._sortType == HoverPoints.SortType.YSort:
-                            for i in range(self._points.size()):
-                                if self._points.at(i).y() > clickPos.y():
-                                    pos = i
+                            #for i in range(self._points.size()):
+                            # see  NOTE: 2021-05-24 10:44:48
+                            for k, p in enumerate(self._points):
+                                if p.y() > clickPos.y():
+                                    pos = k
                                     break
+                            #for i in range(len(self._points)):
+                                ##if self._points.at(i).y() > clickPos.y():
+                                #if self._points[i].y() > clickPos.y():
+                                    #pos = i
+                                    #break
                                 
+                        # add point at index pos
                         self._points.insert(pos, clickPos)
                         self._locks.insert(pos, 0)
                         self._currentIndex = pos
@@ -479,7 +629,7 @@ class HoverPoints(QtCore.QObject):
                     else:
                         self._currentIndex = index
                         
-                    return True # propagate event
+                    return True # stop (filter) event
                 
                 elif me.button() == QtCore.Qt.RightButton: # remove point if editable & propagate event
                     if index >= 0 and self._editable: 
@@ -490,25 +640,31 @@ class HoverPoints(QtCore.QObject):
                         self.firePointChange()
                         return True
                     
+                    return False
+                    
             elif ev.type() == QtCore.QEvent.MouseButtonRelease:
-                if len(self._fingerPointMapping):
-                    return True
+                #if len(self._fingerPointMapping):
+                    #return True
                 self._currentIndex = -1
                 
+                return False
+                
             elif ev.type() == QtCore.QEvent.MouseMove:
-                if len(self._fingerPointMapping):
-                    return True
+                #if len(self._fingerPointMapping):
+                    #return True
                 
                 if self._currentIndex >= 0:
-                    self._movePoint(self._currentIndex, event.pos())
+                    self._movePoint(self._currentIndex, ev.pos(), True)
+                    
+                return False
                 
-            elif ev.type() == QtCore.QEvent.TouchBegin:
-                pass # see NOTE 2021-05-21 21:29:33 touchscreens
+            #elif ev.type() == QtCore.QEvent.TouchBegin:
+                #pass # see NOTE 2021-05-21 21:29:33 touchscreens
             
-            elif ev.type() == QtCore.QEvent.TouchUpdate:
-                pass # see NOTE 2021-05-21 21:29:33 touchscreens - skipped code
-            elif ev.type() == QtCore.QEvent.TouchEnd:
-                pass # see NOTE 2021-05-21 21:29:33 touchscreens - skipped code
+            #elif ev.type() == QtCore.QEvent.TouchUpdate:
+                #pass # see NOTE 2021-05-21 21:29:33 touchscreens - skipped code
+            #elif ev.type() == QtCore.QEvent.TouchEnd:
+                #pass # see NOTE 2021-05-21 21:29:33 touchscreens - skipped code
             elif ev.type() == QtCore.QEvent.Resize:
                 e = sip.cast(ev, QtGui.QResizeEvent)
                 if e.oldSize().width() != 0 and e.oldSize().height() != 0:
@@ -520,6 +676,8 @@ class HoverPoints(QtCore.QObject):
                     self.firePointChange()
                     #for i in range(self._points.size()):
                         #p = self._points[i]
+                        
+                return False
                 
             elif ev.type() == QtCore.QEvent.Paint:
                 that_widget = self._widget
@@ -568,7 +726,7 @@ class HoverPoints(QtCore.QObject):
     def setPoints(self, points:QtGui.QPolygonF) -> None:
         self.points = points
             
-    def _movePoint(self, index:int, point:QtCore.QPointF, emitUpdate:bool) -> None:
+    def _movePoint(self, index:int, point:QtCore.QPointF, emitUpdate:typing.Optional[bool]=False) -> None:
         self._points[index] = bound_point(point, self.boundingRect(), self._locks[index])
         if emitUpdate:
             self.firePointChange()
@@ -577,11 +735,13 @@ class HoverPoints(QtCore.QObject):
     def firePointChange(self):
         if self._sortType != HoverPoints.SortType.NoSort:
             oldCurrent = QtCore.QPointF()
+            
             if self._currentIndex != -1:
                 oldCurrent = self._points[self._currentIndex]
                 
             if self._sortType == HoverPoints.SortType.XSort:
                 sortedPoints = sorted([p for p in self._points], key = lambda x: x.x())
+                
             elif self._sortType == HoverPoints.SortType.YSort:
                 sortedPoints = sorted([p for p in self._points], key = lambda x: x.y())
                 
