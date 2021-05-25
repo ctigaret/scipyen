@@ -423,6 +423,7 @@ class GradientRenderer(QtWidgets.QWidget):
         self._useRelativeFocalRadius = False
         self.update()
     
+    @safeWrapper
     def paintEvent(self, e:QtGui.QPaintEvent) -> None:
         # NOTE: 2021-05-24 08:24:10 ArthurWidget
         static_image = QtGui.QImage()
@@ -620,13 +621,14 @@ class GradientRenderer(QtWidgets.QWidget):
         
         return QtGui.QPolygonF((logicalStopsLine.p1(), logicalStopsLine.p2()))
 
+    @safeWrapper
     def paint(self, p:QtGui.QPainter) -> None:
         if not isinstance(self._gradient, (QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient)):
-            self._gradient = QtGui.QGradient()
+            g = QtGui.QGradient()
             pts = self._hoverPoints.points
         
             if self._gradientBrushType == QtCore.Qt.LinearGradientPattern:
-                self._gradient = QtGui.QLinearGradient(pts[0], pts[1])
+                g = QtGui.QLinearGradient(pts[0], pts[1])
                 
             elif self._gradientBrushType == QtCore.Qt.RadialGradientPattern:
                 #g = QtGui.QRadialGradient(pts[0], min([self.width(), self.height()]) / 3.0, pts[1])
@@ -654,7 +656,7 @@ class GradientRenderer(QtWidgets.QWidget):
                 else:
                     focalRadius = self._focalRadius
                 
-                self._gradient = QtGui.QRadialGradient(pts[0], centerRadius, pts[1], focalRadius)
+                g = QtGui.QRadialGradient(pts[0], centerRadius, pts[1], focalRadius)
                 
             else: # conical gradient pattern
                 l = QtCore.QLineF(pts[0], pts[1])
@@ -665,25 +667,26 @@ class GradientRenderer(QtWidgets.QWidget):
                 angle = QtCore.QLineF(0,0,1,0).angleTo(l)
                 #g = QtGui.QConicalGradient(pts[0], angle)
                 #QConicalGradient(const QPointF &center, qreal angle)
-                self._gradient = QtGui.QConicalGradient(pts[0], angle)
+                g = QtGui.QConicalGradient(pts[0], angle)
                 
             for stop in self._stops:
                 #g.setColorAt(stop[0], QtGui.QColor(stop[1]))
-                self._gradient.setColorAt(stop[0], QtGui.QColor(stop[1]))
+                g.setColorAt(stop[0], QtGui.QColor(stop[1]))
                 
             #g.setSpread(self._spread)
-            self._gradient.setSpread(self._spread)
+            g.setSpread(self._spread)
             
         else:
-            if isinstance(self._gradient, QtGui.QLinearGradient):
+            g = self._gradient
+            if isinstance(g, QtGui.QLinearGradient):
                 self._gradientBrushType = QtCore.Qt.LinearGradientPattern
-            elif isinstance(self._gradient, QtGui.QRadialGradient):
+            elif isinstance(g, QtGui.QRadialGradient):
                 self._gradientBrushType = QtCore.Qt.RadialGradientPattern
             else:
                 self._gradientBrushType = QtCore.Qt.ConicalGradientPattern
             
-        #p.setBrush(g)
-        p.setBrush(self._gradient)
+        p.setBrush(g)
+        #p.setBrush(self._gradient)
         p.setPen(QtCore.Qt.NoPen)
         p.drawRect(self.rect())
         

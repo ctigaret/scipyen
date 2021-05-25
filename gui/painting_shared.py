@@ -559,7 +559,8 @@ class HoverPoints(QtCore.QObject):
     
     def setPointLock(self, pos:int, lock:LockType) -> None:
         self._locks[pos] = lock
-        
+       
+    @safeWrapper
     def eventFilter(self, obj:QtCore.QObject, ev:QtCore.QEvent) -> bool:
         if obj == self._widget and self._enabled:
             if ev.type() == QtCore.QEvent.MouseButtonPress:
@@ -687,6 +688,7 @@ class HoverPoints(QtCore.QObject):
                 return False
                 
             elif ev.type() == QtCore.QEvent.Paint:
+                #print("HoverPoints.eventFilter: paint event")
                 that_widget = self._widget
                 self._widget = None
                 QtCore.QCoreApplication.sendEvent(obj, ev)
@@ -696,6 +698,7 @@ class HoverPoints(QtCore.QObject):
             
         return False
     
+    @safeWrapper
     def _paintPoints(self) -> None:
         p = QtGui.QPainter()
         p.begin(self._widget)
