@@ -238,7 +238,9 @@ def gradient2radial(gradient:QtGui.QGradient,
 
     elif isinstance(gradient, QtGui.QGradient):
         if gradient.type() == QtGui.QGradient.RadialGradient:
-            return sip.cast(gradient, QtGui.QGradient.RadialGradient)
+            ret = sip.cast(gradient, QtGui.QGradient.RadialGradient)
+            ret.setCenterRadius(centerRadius)
+            ret.setFocalRadius(focalRadius)
         
         if gradient.type() == QtGui.QGradient.LinearGradient:
             g = sip.cast(gradient, QtGui.QLinearGradient)
@@ -268,6 +270,8 @@ def gradient2radial(gradient:QtGui.QGradient,
     ret.setStops(gradient.stops())
             
     return ret
+
+g2r = gradient2radial
     
 def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
     if isinstance(gradient, QtGui.QLinearGradient):
@@ -281,7 +285,7 @@ def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
         l.setP1(gradient.center())
         ret = QtGui.QLinearGradient(l.p1(), l.p2())
 
-    elif instance(gradient, QGradient):
+    elif isinstance(gradient, QtGui.QGradient):
         if gradient.type() == QtGui.QGradient.LinearGradient:
             return sip.cast(gradient, QtGui.QLinearGradient)
         
@@ -305,6 +309,8 @@ def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
     
     return ret
     
+g2l = gradient2linear
+
 def gradient2conical(gradient:QtGui.QGradient) -> QtGui.QConicalGradient:
     if isinstance(gradient, QtGui.QConicalGradient):
         return gradient
@@ -340,6 +346,8 @@ def gradient2conical(gradient:QtGui.QGradient) -> QtGui.QConicalGradient:
     ret.setStops(gradient.stops())
     
     return ret
+
+g2c = gradient2conical
     
 @no_sip_autoconversion(QtCore.QVariant)
 def comboDelegateBrush(index:QtCore.QModelIndex, role:int) -> QtGui.QBrush:
@@ -404,7 +412,7 @@ class HoverPoints(QtCore.QObject):
         self._bounds = QtCore.QRectF()
         self._locks = list() # of QPoint/QPointF
         
-        self._fingerPointMapping = dict() # see NOTE 2021-05-21 21:29:33 touchscreens
+        #self._fingerPointMapping = dict() # see NOTE 2021-05-21 21:29:33 touchscreens
         
         self.pointsChanged.connect(self._widget.update)
         
@@ -473,15 +481,14 @@ class HoverPoints(QtCore.QObject):
         # NOTE: 2021-05-23 20:57:59
         # QPolygonF has API compatible with list() (on C++ side is a QVector<QPointF>)
         #if points.size() != self._points.size():
-        if len(points) != len(self._points):
-            self._fingerPointMapping.clear() # see NOTE 2021-05-21 21:29:33 touchscreens
+        #if len(points) != len(self._points):
+            #self._fingerPointMapping.clear() # see NOTE 2021-05-21 21:29:33 touchscreens
         
         #self._points.clear() # just so that refs to QPointF are garbage-collected
-        
+        #print("HoverPoints.points", [p for p in points])
         self._points = QtGui.QPolygonF([bound_point(p, self.boundingRect(), 0) for p in points])
         #boundedPoints = [bound_point(points.at(i), self.boundingRect(), 0) for i in range(points.size())]
-        
-        #self._points = QtGui.QPolygonF(boundedPoints)
+        #print("HoverPoints._points", [p for p in self._points])
         
         self._locks.clear()
         

@@ -22,7 +22,9 @@ from .painting_shared import (HoverPoints, x_less_than, y_less_than,
                               comboDelegateBrush,
                               standardQtGradientPresets,
                               standardQtGradientSpreads,
-                              standardQtGradientTypes,)
+                              standardQtGradientTypes,
+                              standardQtBrushGradients,
+                              g2l, g2c, g2r,)
 
 class ShadeWidget(QtWidgets.QWidget):
     colorsChanged = pyqtSignal(QtGui.QPolygonF, name="colorsChanged")
@@ -281,7 +283,7 @@ class GradientRenderer(QtWidgets.QWidget):
         # related to on-ascreen help/description - not needed here
         #self._document = None
         #self._show_doc = False
-        # FIXME/TODO 2021-05-23 22:23:16 use make_checkers instead
+        # NOTE 2021-05-23 22:23:16 use make_checkers instead
         #self._tile = QtGui.QPixmap(128,128)
         ##self._tile.fill(QtCore.Qt.white)
         #self._tile.fill(QtCore.Qt.lightGray)
@@ -311,7 +313,7 @@ class GradientRenderer(QtWidgets.QWidget):
         self._stops = list()
         
         self._spread = QtGui.QGradient.PadSpread
-        self._gradientType = QtCore.Qt.LinearGradientPattern # this is a Qt.BrushStyle enum value
+        self._gradientBrushType = QtCore.Qt.LinearGradientPattern # this is a Qt.BrushStyle enum value
         self._gradient = None # NOTE: 2021-05-24 13:15:41 Cezar Tigaret
         self._centerRadius = centerRadius
         self._useAutoCenterRadius = autoCenterRadius
@@ -508,96 +510,191 @@ class GradientRenderer(QtWidgets.QWidget):
     
     @pyqtSlot()
     def setPadSpread(self) -> None:
-        self._spread = QtGui.QGradient.PadSpread
-        self.update()
+        self.spread = QtGui.QGradient.PadSpread
+        #self._spread = QtGui.QGradient.PadSpread
+        #self.update()
         
     @pyqtSlot()
     def setRepeatSpread(self) -> None:
-        self._spread = QtGui.QGradient.RepeatSpread
-        self.update()
+        self.spread = QtGui.QGradient.RepeatSpread
+        #self._spread = QtGui.QGradient.RepeatSpread
+        #self.update()
         
     @pyqtSlot()
     def setReflectSpread(self) -> None:
-        self._spread = QtGui.QGradient.ReflectSpread
+        self.spread = QtGui.QGradient.ReflectSpread
+        #self._spread = QtGui.QGradient.ReflectSpread
+        #self.update()
+        
+    @property
+    def gradientBrushType(self) -> typing.Union[QtCore.Qt.BrushStyle, int]:
+        return self._gradientBrushType
+    
+    @gradientBrushType.setter
+    def gradientBrushType(self, val:typing.Union[QtCore.Qt.BrushStyle, int]) -> None:
+        #print("renderer.gradientBrushType val=",val)
+        if val not in standardQtBrushGradients.values():
+            return
+        
+        self._gradientBrushType = val
         self.update()
         
+    @property
+    def gradient(self) -> QtGui.QGradient:
+        return self._gradient
+    
+    @gradient.setter
+    def gradient(self, g:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient]) -> None:
+        if isinstance(g, (QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient)):
+            self._gradient = g
+            self.hoverPoints.points = self._getLogicalStops(g)
+            self._stops[:] = g.stops()
+
+            if isinstance(g, QtGui.QRadialGradient):
+                self._gradientBrushType = QtCore.Qt.RadialGradientPattern
+
+            elif isinstance(g, QtGui.QConicalGradient):
+                self._gradientBrushType = QtCore.Qt.ConicalGradientPattern
+
+            else:
+                self._gradientBrushType = QtCore.Qt.LinearGradientPattern
+                #self.setLinearGradient()
+                
+            self.update()
+    
     @pyqtSlot()
     def setLinearGradient(self) -> None:
-        self._gradientType = QtCore.Qt.LinearGradientPattern
-        self.update()
+        self.gradientBrushType = QtCore.Qt.LinearGradientPattern
         
     @pyqtSlot()
     def setRadialGradient(self) -> None:
-        self._gradientType = QtCore.Qt.RadialGradientPattern
-        self.update()
+        self.gradientBrushType = QtCore.Qt.RadialGradientPattern
         
     @pyqtSlot()
     def setConicalGradient(self) -> None:
-        self._gradientType = QtCore.Qt.ConicalGradientPattern
-        self.update()
+        self.gradientBrushType = QtCore.Qt.ConicalGradientPattern
         
     @pyqtSlot(object)
     def setGradientStops(self, stops:typing.Iterable[typing.Tuple[float, typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]]]) -> None:
-        self._stops[:] = stops
+        self.gradientStops = stops
+        
+    def _checkStop(self, val) -> bool:
+        return isinstance(val, (tuple, list)) and len(val) == 2 and isinstance(val[0], numbers.Real) and isinstance(val[1], (QtGui.QColor, QtCore.Qt.GlobalColor))
+        
+    @property
+    def gradientStops(self) -> typing.Iterable[typing.Tuple[float, typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]]]:
+        return self._stops
+    
+    @gradientStops.setter
+    def gradientStops(self, val:typing.Iterable[typing.Tuple[float, typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]]]) -> None:
+        if not isinstance(val, (tuple, list)) or not all([self._checkStop(s) for s in val]):
+            return
+        self._stops[:] = val
         self.update()
         
+    def _getStopsLine(self, gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient])-> QtGui.QPolygonF:
+        if isinstance(gradient, QtGui.QLinearGradient):
+            return QtCore.QLineF(gradient.start(), gradient.finalStop())
+
+        elif isinstance(gradient, QtGui.QRadialGradient):
+            return QtCore.QLineF(gradient.center(), gradient.focalPoint())
+
+        elif isinstance(gradient, QtGui.QConicalGradient):
+            rect = QtCore.QRectF(self.rect())
+            centerPoint = rect.center()
+            rect.setWidth(rect.width()/3.)
+            rect.setHeight(rect.height()/3.)
+            diagLine = QtCore.QLineF(rect.topLeft(), rect.bottomRight())
+            return QtCore.QLineF.fromPolar(diagLine, gradient.angle()).translate(centerPoint)
+            
+        return QtCore.QLineF(QtCore.QPointF(0,0), QtCore.QPointF(self.width(), self.height()))
+            
+    def _getLogicalStops(self, gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient]):
+        objectStopsLine = self._getStopsLine(gradient)
+        
+        scaleX = 1. if np.isclose(objectStopsLine.dx(), 0.) else 0.8 * self.width()  / abs(objectStopsLine.dx())
+        scaleY = 1. if np.isclose(objectStopsLine.dy(), 0.) else 0.8 * self.height() / abs(objectStopsLine.dy())
+        
+        logicalStopsLine = QtGui.QTransform.fromScale(scaleX, scaleY).map(objectStopsLine)
+        logicalStopsLine.translate(self.rect().center() - logicalStopsLine.center())
+        
+        return QtGui.QPolygonF((logicalStopsLine.p1(), logicalStopsLine.p2()))
+
     def paint(self, p:QtGui.QPainter) -> None:
-        pts = self._hoverPoints.points
-        #pts = QtGui.QPolygonF(self._hoverPoints.points)
+        if not isinstance(self._gradient, (QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient)):
+            self._gradient = QtGui.QGradient()
+            pts = self._hoverPoints.points
         
-        #g = QtGui.QGradient()
-        self._gradient = QtGui.QGradient()
-        
-        if self._gradientType == QtCore.Qt.LinearGradientPattern:
-            #g = QtGui.QLinearGradient(pts[0], pts[1])
-            self._gradient = QtGui.QLinearGradient(pts[0], pts[1])
+            if self._gradientBrushType == QtCore.Qt.LinearGradientPattern:
+                self._gradient = QtGui.QLinearGradient(pts[0], pts[1])
+                
+            elif self._gradientBrushType == QtCore.Qt.RadialGradientPattern:
+                #g = QtGui.QRadialGradient(pts[0], min([self.width(), self.height()]) / 3.0, pts[1])
+                #QRadialGradient(const QPointF &center, qreal centerRadius, const QPointF &focalPoint, qreal focalRadius)
+                # center is the first hover point (hover point [0])
+                # center radius is 1/3 of minimal side (width or height)
+                # focal point is 2nd hover point 
+                # focal radius is 0 in the original code
+                
+                if self._centerRadius is None or self._useAutoCenterRadius:
+                    centerRadius = min([self.width(), self.height()]) / 3.0
+                    
+                elif self._useRelativeCenterRadius:
+                    centerRadius = self._centerRadius * min([self.width(), self.height()])
+                    
+                else:
+                    centerRadius = self._centerRadius
+                
+                if self._focalRadius is None or self._useAutoFocalRadius:
+                    focalRadius = 0.
+                    
+                elif self._useRelativeFocalRadius:
+                    focalRadius = self._focalRadius * min([self.width(), self.height()])
+                    
+                else:
+                    focalRadius = self._focalRadius
+                
+                self._gradient = QtGui.QRadialGradient(pts[0], centerRadius, pts[1], focalRadius)
+                
+            else: # conical gradient pattern
+                l = QtCore.QLineF(pts[0], pts[1])
+                
+                # NOTE: 2021-05-24 14:18:59
+                # line (0,0,1,0) = horizontal line
+                # line.angleTo(l) = angle from horizontal line to line 'l'
+                angle = QtCore.QLineF(0,0,1,0).angleTo(l)
+                #g = QtGui.QConicalGradient(pts[0], angle)
+                #QConicalGradient(const QPointF &center, qreal angle)
+                self._gradient = QtGui.QConicalGradient(pts[0], angle)
+                
+            for stop in self._stops:
+                #g.setColorAt(stop[0], QtGui.QColor(stop[1]))
+                self._gradient.setColorAt(stop[0], QtGui.QColor(stop[1]))
+                
+            #g.setSpread(self._spread)
+            self._gradient.setSpread(self._spread)
             
-        elif self._gradientType == QtCore.Qt.RadialGradientPattern:
-            #g = QtGui.QRadialGradient(pts[0], min([self.width(), self.height()]) / 3.0, pts[1])
-            #QRadialGradient(const QPointF &center, qreal centerRadius, const QPointF &focalPoint, qreal focalRadius)
-            # center is the first hover point (hover point [0])
-            # center radiius is 1/3 of minimal side (width or height)
-            # focal point is 2nd hover point 
-            # focal radius is 0 in the original code
-            
-            if self._centerRadius is None or self._useAutoCenterRadius:
-                centerRadius = min([self.width(), self.height()]) / 3.0
-            elif self._useRelativeCenterRadius:
-                centerRadius = self._centerRadius * min([self.width(), self.height()])
+        else:
+            if isinstance(self._gradient, QtGui.QLinearGradient):
+                self._gradientBrushType = QtCore.Qt.LinearGradientPattern
+            elif isinstance(self._gradient, QtGui.QRadialGradient):
+                self._gradientBrushType = QtCore.Qt.RadialGradientPattern
             else:
-                centerRadius = self._centerRadius
+                self._gradientBrushType = QtCore.Qt.ConicalGradientPattern
             
-            if self._focalRadius is None or self._useAutoFocalRadius:
-                focalRadius = 0.
-            elif self._useRelativeFocalRadius:
-                focalRadius = self._focalRadius * min([self.width(), self.height()])
-            else:
-                focalRadius = self._focalRadius
-            
-            self._gradient = QtGui.QRadialGradient(pts[0], centerRadius, pts[1], focalRadius)
-            
-        else: # conical gradient
-            l = QtCore.QLineF(pts[0], pts[1])
-            
-            # NOTE: 2021-05-24 14:18:59
-            # line (0,0,1,0) = horizontal line
-            # line.angleTo(l) = angle from horizontal line to line 'l'
-            angle = QtCore.QLineF(0,0,1,0).angleTo(l)
-            #g = QtGui.QConicalGradient(pts[0], angle)
-            #QConicalGradient(const QPointF &center, qreal angle)
-            self._gradient = QtGui.QConicalGradient(pts[0], angle)
-            
-        for stop in self._stops:
-            #g.setColorAt(stop[0], QtGui.QColor(stop[1]))
-            self._gradient.setColorAt(stop[0], QtGui.QColor(stop[1]))
-            
-        #g.setSpread(self._spread)
-        self._gradient.setSpread(self._spread)
-        
         #p.setBrush(g)
         p.setBrush(self._gradient)
         p.setPen(QtCore.Qt.NoPen)
         p.drawRect(self.rect())
+        
+    @property
+    def spread(self) -> typing.Union[QtGui.QGradient.Spread, int]:
+        return self._spread
+    
+    @spread.setter
+    def spread(self, val:typing.Union[QtGui.QGradient.Spread, int]) -> None:
+        self._spread = val
+        self.update()
         
 class GradientWidget(QtWidgets.QWidget):
     def __init__(self, gradient:typing.Optional[QtGui.QGradient]=None,
@@ -607,9 +704,18 @@ class GradientWidget(QtWidgets.QWidget):
         
         self._presetIndex = 0
         self._defaultGradient = None
+        #self._gradient = None
+        self._title = title
+        self._configureUI_()
+            
+        self._autoFocalRadiusButton.animateClick()
+        self._autoCenterRadiusButton.animateClick()
+            
         self._setDefaultGradient(gradient)
         
-
+        QtCore.QTimer.singleShot(50, self._showDefault)
+        
+    def _configureUI_(self):
         self._renderer = GradientRenderer(self)
         
         self.mainContentWidget = QtWidgets.QWidget()
@@ -701,6 +807,7 @@ class GradientWidget(QtWidgets.QWidget):
         self._reflectSpreadButton = QtWidgets.QRadioButton("Reflect", self.spreadGroup)
         self._repeatSpreadButton = QtWidgets.QRadioButton("Repeat", self.spreadGroup)
         
+        
         self.presetsGroup = QtWidgets.QGroupBox(self.mainGroup)
         self.presetsGroup.setTitle("Presets")
         self.prevPresetButton = QtWidgets.QPushButton("", self.presetsGroup)
@@ -722,8 +829,10 @@ class GradientWidget(QtWidgets.QWidget):
         self.mainGroupLayout = QtWidgets.QVBoxLayout(self.mainGroup)
         self.mainGroupLayout.addWidget(self.editorGroup)
         self.mainGroupLayout.addWidget(self.typeGroup)
-        self.mainGroupLayout.addWidget(self.radialParamsGroup)
         self.mainGroupLayout.addWidget(self.spreadGroup)
+        
+        self.mainGroupLayout.addWidget(self.radialParamsGroup)
+
         self.mainGroupLayout.addWidget(self.presetsGroup)
         
         self.editorGroupLayout = QtWidgets.QVBoxLayout(self.editorGroup)
@@ -739,6 +848,9 @@ class GradientWidget(QtWidgets.QWidget):
         self.spreadGroupLayout.addWidget(self._reflectSpreadButton)
         self.spreadGroupLayout.addWidget(self._repeatSpreadButton)
         
+        self._linearButton.setChecked(True)
+        self._padSpreadButton.setChecked(True)
+
         self.presetsGroupLayout = QtWidgets.QHBoxLayout(self.presetsGroup)
         self.presetsGroupLayout.addWidget(self.prevPresetButton)
         self.presetsGroupLayout.addWidget(self._presetButton, 1)
@@ -779,13 +891,8 @@ class GradientWidget(QtWidgets.QWidget):
         self._presetButton.clicked.connect(self.setPreset)
         self.nextPresetButton.clicked.connect(self.setNextPreset)
         
-        if isinstance(title, str) and len(title.strip()):
-            self.setWindowTitle(title)
-            
-        self._autoFocalRadiusButton.animateClick()
-        self._autoCenterRadiusButton.animateClick()
-            
-        QtCore.QTimer.singleShot(50, self._showDefault)
+        if isinstance(self._title, str) and len(self._title.strip()):
+            self.setWindowTitle(self._title)
         
     @property
     def defaultGradient(self) -> typing.Optional[QtGui.QGradient]:
@@ -796,35 +903,45 @@ class GradientWidget(QtWidgets.QWidget):
         self._setDefaultGradient(val)
         
     def _setDefaultGradient(self, val:typing.Optional[QtGui.QGradient]=None) -> None:
-        # FIXME: 2021-05-24 16:23:17 TODO
-        if isinstance(val, QtGui.QLinearGradient):
-            self._defaultGradient = val
-            #self._setLinearGradient(self._defaultGradient)
-            #self._linearButton.animateClick()
-            #self._padSpreadButton.animateClick()
-            
-        #elif isinstance(val, QtGui.QRadialGradient):
-        #elif isinstance(val, QtGui.QConicalGradient):
-        elif isinstance(val, QtGui.QGradient):
-            self._defaultGradient = sip.cast(val, QtGui.QLinearGradient)
-            
-        if self.isVisible():
-            self._showDefault()
-            
-        #else:
-            #self._changePresetBy(0)
-            
+        #print("GradientWidget._setDefaultGradient: val = ", val)
+        if not isinstance(val, QtGui.QGradient):
+            return 
         
+        if not isinstance(val, (QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient)):
+            if val.type() == QtGui.QGradient.LinearGradient:
+                self._defaultGradient = g2l(val)
+                
+            elif val.type() == QtGui.QGradient.RadialGradient:
+                self._defaultGradient = g2r(val, 
+                                            centerRadius = min([self.width(), self.height()])/3.,
+                                            focalRadius = 0.,
+                                            )
+                
+            elif val.type() == QtGui.QGradient.ConicalGradient:
+                self._defaultGradient = g2c(val)
+                
+            else:
+                self._defaultGradient = val
+                
+        else:
+            self._defaultGradient= val
+            
+        #print("GradientWidget _defaultGradient: ", self._defaultGradient)
         
+        self._setGradient(self._defaultGradient)
+            
+        #if self.isVisible():
+            #self.update()
+            #self._showDefault()
+            
     @pyqtSlot()
     def _showDefault(self,) -> None:
         if not isinstance(self._defaultGradient, QtGui.QGradient):
             self._changePresetBy(0)
-        elif not isinstance(self._defaultGradient, QtGui.QLinearGradient):
-            self._setLinearGradient(gradient)
-            
-        self._linearButton.animateClick()
-        self._padSpreadButton.animateClick()
+        elif isinstance(self._defaultGradient, QtGui.QLinearGradient):
+            self._setGradient(self._defaultGradient)
+            self._linearButton.animateClick()
+            self._padSpreadButton.animateClick()
             
         self.update()
         
@@ -852,90 +969,80 @@ class GradientWidget(QtWidgets.QWidget):
         # NOTE: 2021-05-24 12:48:43
         # leave this in for strict browing between min & max preset
         #self._presetIndex = max([0, min([self._presetIndex + indexOffset, len(standardQtGradientPresets)-1])])
-        
+
+        # NOTE: 2021-05-25 13:16:27
+        # the presets are all linear gradients; choosing a the preset should NOT
+        # enforce linear gradient display
         preset = [(name, val) for name, val in standardQtGradientPresets.items()][self._presetIndex][1]
         
         gradient = QtGui.QGradient(preset)
         
-        if gradient.type() != QtGui.QGradient.LinearGradient: # NOTE 2021-05-23 09:34:29 why?
+        #if gradient.type() != QtGui.QGradient.LinearGradient: # NOTE 2021-05-23 09:34:29 why?
+            #return
+        
+        if self._radialButton.isChecked():
+            g = g2r(gradient)
+            
+        elif self._conicalButton.isChecked():
+            g = g2c(gradient)
+            
+        else:
+            g = g2l(gradient)
+        
+        self._setGradient(g)
+        
+        #self._linearButton.animateClick()
+        self._padSpreadButton.animateClick()
+
+        self._updatePresetName()
+        
+        
+    def _setGradient(self, gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient]) -> None:
+        if not isinstance(gradient, (QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient)):
             return
         
-        linearGradient = sip.cast(gradient, QtGui.QLinearGradient)
+        #print("GradientWidget._setGradient: gradient =", gradient)
         
-        self._setLinearGradient(linearGradient)
+        #logicalStops = self._getLogicalStops(gradient)
+        #print("GradientWidget._setGradient:\n\tgradient stops =", gradient.stops())
+        #print("GradientWidget._setGradient:\n\tlogical stops =", [p for p in logicalStops])
         
-        #objectStopsLine = QtCore.QLineF(linearGradient.start(), linearGradient.finalStop())
-        
-        #scaleX = 1. if np.isclose(objectStopsLine.dx(), 0.) else 0.8 * self._renderer.width()  / abs(objectStopsLine.dx())
-        #scaleY = 1. if np.isclose(objectStopsLine.dy(), 0.) else 0.8 * self._renderer.height() / abs(objectStopsLine.dy())
-        
-        #logicalStopsLine = QtGui.QTransform.fromScale(scaleX, scaleY).map(objectStopsLine)
-        #logicalStopsLine.translate(self._renderer.rect().center() - logicalStopsLine.center())
-        #logicalStops = QtGui.QPolygonF((logicalStopsLine.p1(), logicalStopsLine.p2()))
-        
-        self._linearButton.animateClick()
-        self._padSpreadButton.animateClick()
-        #self._editor.setGradientStops(gradient.stops())
+        self._editor.setGradientStops(gradient.stops())
+        self._renderer.gradient = gradient
         #self._renderer.hoverPoints.points = logicalStops
         #self._renderer.setGradientStops(gradient.stops())
         
-        self._updatePresetName()
-        
-    def _setLinearGradient(self, gradient) -> None:
-        objectStopsLine = QtCore.QLineF(gradient.start(), gradient.finalStop())
-        
-        scaleX = 1. if np.isclose(objectStopsLine.dx(), 0.) else 0.8 * self._renderer.width()  / abs(objectStopsLine.dx())
-        scaleY = 1. if np.isclose(objectStopsLine.dy(), 0.) else 0.8 * self._renderer.height() / abs(objectStopsLine.dy())
-        
-        logicalStopsLine = QtGui.QTransform.fromScale(scaleX, scaleY).map(objectStopsLine)
-        logicalStopsLine.translate(self._renderer.rect().center() - logicalStopsLine.center())
-        logicalStops = QtGui.QPolygonF((logicalStopsLine.p1(), logicalStopsLine.p2()))
-        
-        self._editor.setGradientStops(gradient.stops())
-        self._renderer.hoverPoints.points = logicalStops
-        self._renderer.setGradientStops(gradient.stops())
-        
-    def _setGradient(self, gradient:QtGui.QGradient) -> None:
         if isinstance(gradient, QtGui.QLinearGradient):
-            objectStopsLine = QtCore.QLineF(gradient.start(), gradient.finalStop())
-            
-            scaleX = 1. if np.isclose(objectStopsLine.dx(), 0.) else 0.8 * self._renderer.width()  / abs(objectStopsLine.dx())
-            scaleY = 1. if np.isclose(objectStopsLine.dy(), 0.) else 0.8 * self._renderer.height() / abs(objectStopsLine.dy())
-            
-            logicalStopsLine = QtGui.QTransform.fromScale(scaleX, scaleY).map(objectStopsLine)
-            logicalStopsLine.translate(self._renderer.rect().center() - logicalStopsLine.center())
-            logicalStops = QtGui.QPolygonF((logicalStopsLine.p1(), logicalStopsLine.p2()))
-            
-            self._editor.setGradientStops(gradient.stops())
-            self._renderer.hoverPoints.points = logicalStops
-            self._renderer.setGradientStops(gradient.stops())
+            self._linearButton.setChecked(True)
+            self._renderer.setLinearGradient()
             
         elif isinstance(gradient, QtGui.QRadialGradient):
+            self._radialButton.setChecked(True)
+            self._renderer.setRadialGradient()
             
-            pass
-        
         elif isinstance(gradient, QtGui.QConicalGradient):
-            pass
-    
-        elif isinstance(gradient, QtGui.QGradient):
-            objectStopsLine = QtCore.QLineF(gradient.stops()[0], gradient.stops()[-1])
+            self._conicalButton.setChecked(True)
+            self._renderer.setConicalGradient()
             
-            scaleX = 1. if np.isclose(objectStopsLine.dx(), 0.) else 0.8 * self._renderer.width()  / abs(objectStopsLine.dx())
-            scaleY = 1. if np.isclose(objectStopsLine.dy(), 0.) else 0.8 * self._renderer.height() / abs(objectStopsLine.dy())
+        if gradient.spread() == QtGui.QGradient.RepeatSpread:
+            self._renderer.setRepeatSpread()
             
-            logicalStopsLine = QtGui.QTransform.fromScale(scaleX, scaleY).map(objectStopsLine)
-            logicalStopsLine.translate(self._renderer.rect().center() - logicalStopsLine.center())
-            logicalStops = QtGui.QPolygonF((logicalStopsLine.p1(), logicalStopsLine.p2()))
-            
-            self._editor.setGradientStops(gradient.stops())
-            self._renderer.hoverPoints.points = logicalStops
-            self._renderer.setGradientStops(gradient.stops())
-            
+        elif gradient.spread() == QtGui.QGradient.ReflectSpread:
+            self._renderer.setReflectSpread()
             
         else:
-            return
+            self._renderer.setPadSpread()
             
-        
+        self.update()
+            
+    @property
+    def gradient(self) -> QtGui.QGradient:
+        return self._renderer._gradient
+    
+    @gradient.setter
+    def gradient(self, val:QtGui.QGradient) -> None:
+        self._setGradient(val)
+            
     @pyqtSlot()
     def setAutoCenterRadius(self)-> None:
         self._centerRadiusSpinBox.setEnabled(False)
