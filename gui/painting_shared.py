@@ -562,142 +562,146 @@ class HoverPoints(QtCore.QObject):
        
     @safeWrapper
     def eventFilter(self, obj:QtCore.QObject, ev:QtCore.QEvent) -> bool:
-        if obj == self._widget and self._enabled:
-            if ev.type() == QtCore.QEvent.MouseButtonPress:
-                #if len(self._fingerPointMapping) == 0: # see # NOTE 2021-05-21 21:29:33 touchscreens
-                    #return True
-                
-                me = sip.cast(ev, QtGui.QMouseEvent)
-                #me = QtGui.QMouseEvent(ev)
-                
-                clickPos = me.pos()
-                
-                index = -1
-                
-                # NOTE: 2021-05-24 10:50:53
-                # check if event os is on a point
-                #for i in range(self._points.size(
-                # NOTE: 2021-05-24 10:44:48
-                # Use Python list API for QPolygon/QPolygonF
-                for i in range(len(self._points)):
-                    path = QtGui.QPainterPath()
-                    if self._shape == HoverPoints.PointShape.CircleShape:
-                        path.addEllipse(self._pointBoundingRect(i))
-                    else:
-                        path.addRect(self._pointBoundingRect(i))
-
-                    if path.contains(clickPos):
-                        # NOTE: 2021-05-24 10:51:46 if clicked on a point then
-                        # set indes to that point's index; else leave index -1
-                        index = i
-                        break
-                
-                if me.button() == QtCore.Qt.LeftButton: 
-                    # add new point or select clicked one & filter event
-                    if index == -1: 
-                        # new point added (index is unchanged from -1 because 
-                        # clickPos is not any points - see  NOTE: 2021-05-24 10:50:53)
-                        if not self._editable: # non-editable => don't block (filter) event
-                            return False
-                        
-                        pos = 0
-                        
-                        if self._sortType == HoverPoints.SortType.XSort:
-                            #for i in range(self._points.size()):
-                            # see  NOTE: 2021-05-24 10:44:48
-                            for k, p in enumerate(self._points):
-                                if p.x() > clickPos.x():
-                                    pos = k
-                                    break
-                            #for i in range(len(self._points)):
-                                ##if self._points.at(i).x() > clickPos.x():
-                                #if self._points[i].x() > clickPos.x():
-                                    #pos = i
-                                    #break
-                                
-                        elif self._sortType == HoverPoints.SortType.YSort:
-                            #for i in range(self._points.size()):
-                            # see  NOTE: 2021-05-24 10:44:48
-                            for k, p in enumerate(self._points):
-                                if p.y() > clickPos.y():
-                                    pos = k
-                                    break
-                            #for i in range(len(self._points)):
-                                ##if self._points.at(i).y() > clickPos.y():
-                                #if self._points[i].y() > clickPos.y():
-                                    #pos = i
-                                    #break
-                                
-                        # add point at index pos
-                        self._points.insert(pos, clickPos)
-                        self._locks.insert(pos, 0)
-                        self._currentIndex = pos
-                        self.firePointChange()
+        try:
+            if obj == self._widget and self._enabled:
+                if ev.type() == QtCore.QEvent.MouseButtonPress:
+                    #if len(self._fingerPointMapping) == 0: # see # NOTE 2021-05-21 21:29:33 touchscreens
+                        #return True
                     
-                    else:
-                        self._currentIndex = index
-                        
-                    return True # stop (filter) event
-                
-                elif me.button() == QtCore.Qt.RightButton: # remove point if editable & propagate event
-                    if index >= 0 and self._editable: 
-                        if self._locks[index] == 0:
-                            self._locks.pop(index)
-                            self._points.remove(index)
+                    me = sip.cast(ev, QtGui.QMouseEvent)
+                    #me = QtGui.QMouseEvent(ev)
+                    
+                    clickPos = me.pos()
+                    
+                    index = -1
+                    
+                    # NOTE: 2021-05-24 10:50:53
+                    # check if event os is on a point
+                    #for i in range(self._points.size(
+                    # NOTE: 2021-05-24 10:44:48
+                    # Use Python list API for QPolygon/QPolygonF
+                    for i in range(len(self._points)):
+                        path = QtGui.QPainterPath()
+                        if self._shape == HoverPoints.PointShape.CircleShape:
+                            path.addEllipse(self._pointBoundingRect(i))
+                        else:
+                            path.addRect(self._pointBoundingRect(i))
+
+                        if path.contains(clickPos):
+                            # NOTE: 2021-05-24 10:51:46 if clicked on a point then
+                            # set indes to that point's index; else leave index -1
+                            index = i
+                            break
+                    
+                    if me.button() == QtCore.Qt.LeftButton: 
+                        # add new point or select clicked one & filter event
+                        if index == -1: 
+                            # new point added (index is unchanged from -1 because 
+                            # clickPos is not any points - see  NOTE: 2021-05-24 10:50:53)
+                            if not self._editable: # non-editable => don't block (filter) event
+                                return False
                             
-                        self.firePointChange()
-                        return True
+                            pos = 0
+                            
+                            if self._sortType == HoverPoints.SortType.XSort:
+                                #for i in range(self._points.size()):
+                                # see  NOTE: 2021-05-24 10:44:48
+                                for k, p in enumerate(self._points):
+                                    if p.x() > clickPos.x():
+                                        pos = k
+                                        break
+                                #for i in range(len(self._points)):
+                                    ##if self._points.at(i).x() > clickPos.x():
+                                    #if self._points[i].x() > clickPos.x():
+                                        #pos = i
+                                        #break
+                                    
+                            elif self._sortType == HoverPoints.SortType.YSort:
+                                #for i in range(self._points.size()):
+                                # see  NOTE: 2021-05-24 10:44:48
+                                for k, p in enumerate(self._points):
+                                    if p.y() > clickPos.y():
+                                        pos = k
+                                        break
+                                #for i in range(len(self._points)):
+                                    ##if self._points.at(i).y() > clickPos.y():
+                                    #if self._points[i].y() > clickPos.y():
+                                        #pos = i
+                                        #break
+                                    
+                            # add point at index pos
+                            self._points.insert(pos, clickPos)
+                            self._locks.insert(pos, 0)
+                            self._currentIndex = pos
+                            self.firePointChange()
+                        
+                        else:
+                            self._currentIndex = index
+                            
+                        return True # stop (filter) event
+                    
+                    elif me.button() == QtCore.Qt.RightButton: # remove point if editable & propagate event
+                        if index >= 0 and self._editable: 
+                            if self._locks[index] == 0:
+                                self._locks.pop(index)
+                                self._points.remove(index)
+                                
+                            self.firePointChange()
+                            return True
+                        
+                        return False
+                        
+                elif ev.type() == QtCore.QEvent.MouseButtonRelease:
+                    #if len(self._fingerPointMapping):
+                        #return True
+                    self._currentIndex = -1
                     
                     return False
                     
-            elif ev.type() == QtCore.QEvent.MouseButtonRelease:
-                #if len(self._fingerPointMapping):
-                    #return True
-                self._currentIndex = -1
-                
-                return False
-                
-            elif ev.type() == QtCore.QEvent.MouseMove:
-                #if len(self._fingerPointMapping):
-                    #return True
-                
-                if self._currentIndex >= 0:
-                    self._movePoint(self._currentIndex, ev.pos(), True)
+                elif ev.type() == QtCore.QEvent.MouseMove:
+                    #if len(self._fingerPointMapping):
+                        #return True
                     
-                return False
-                
-            #elif ev.type() == QtCore.QEvent.TouchBegin:
-                #pass # see NOTE 2021-05-21 21:29:33 touchscreens
-            
-            #elif ev.type() == QtCore.QEvent.TouchUpdate:
-                #pass # see NOTE 2021-05-21 21:29:33 touchscreens - skipped code
-            #elif ev.type() == QtCore.QEvent.TouchEnd:
-                #pass # see NOTE 2021-05-21 21:29:33 touchscreens - skipped code
-            elif ev.type() == QtCore.QEvent.Resize:
-                e = sip.cast(ev, QtGui.QResizeEvent)
-                if e.oldSize().width() != 0 and e.oldSize().height() != 0:
-                    stretch_x = e.size().width()  / e.oldSize().width()
-                    stretch_y = e.size().height() / e.oldSize().height()
-                    for i,p in enumerate(self._points):
-                        self._movePoint(i, QtCore.QPointF(p.x() * stretch_x, p.y() * stretch_y), False)
+                    if self._currentIndex >= 0:
+                        self._movePoint(self._currentIndex, ev.pos(), True)
                         
-                    self.firePointChange()
-                    #for i in range(self._points.size()):
-                        #p = self._points[i]
-                        
-                return False
+                    return False
+                    
+                #elif ev.type() == QtCore.QEvent.TouchBegin:
+                    #pass # see NOTE 2021-05-21 21:29:33 touchscreens
                 
-            elif ev.type() == QtCore.QEvent.Paint:
-                #print("HoverPoints.eventFilter: paint event")
-                that_widget = self._widget
-                self._widget = None
-                QtCore.QCoreApplication.sendEvent(obj, ev)
-                self._widget = that_widget
-                self._paintPoints()
-                return True
-            
-        return False
-    
+                #elif ev.type() == QtCore.QEvent.TouchUpdate:
+                    #pass # see NOTE 2021-05-21 21:29:33 touchscreens - skipped code
+                #elif ev.type() == QtCore.QEvent.TouchEnd:
+                    #pass # see NOTE 2021-05-21 21:29:33 touchscreens - skipped code
+                elif ev.type() == QtCore.QEvent.Resize:
+                    e = sip.cast(ev, QtGui.QResizeEvent)
+                    if e.oldSize().width() != 0 and e.oldSize().height() != 0:
+                        stretch_x = e.size().width()  / e.oldSize().width()
+                        stretch_y = e.size().height() / e.oldSize().height()
+                        for i,p in enumerate(self._points):
+                            self._movePoint(i, QtCore.QPointF(p.x() * stretch_x, p.y() * stretch_y), False)
+                            
+                        self.firePointChange()
+                        #for i in range(self._points.size()):
+                            #p = self._points[i]
+                            
+                    return False
+                    
+                elif ev.type() == QtCore.QEvent.Paint:
+                    #print("HoverPoints.eventFilter: paint event")
+                    that_widget = self._widget
+                    self._widget = None
+                    QtCore.QCoreApplication.sendEvent(obj, ev)
+                    self._widget = that_widget
+                    self._paintPoints()
+                    return True
+                
+            return False
+        
+        except:
+            traceback.print_exc()
+            return False
     @safeWrapper
     def _paintPoints(self) -> None:
         p = QtGui.QPainter()
