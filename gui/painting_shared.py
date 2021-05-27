@@ -219,7 +219,7 @@ def makeCustomPathStroke(path:QtGui.QPainterPath,
     return path
 
 def gradient2radial(gradient:QtGui.QGradient, 
-                   centerRadius:float = 0., 
+                   centerRadius:float = 1., 
                    focalRadius:float = 0.,
                    distance:float= 1.) -> QtGui.QRadialGradient:
     if isinstance(gradient, QtGui.QRadialGradient):

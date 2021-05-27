@@ -321,7 +321,7 @@ class GradientRenderer(QtWidgets.QWidget):
         else:
             self._hoverPoints.points = hoverPoints
             
-        
+        self._gradient = None
         
         #self._stops = list()
         
@@ -507,77 +507,20 @@ class GradientRenderer(QtWidgets.QWidget):
     
     @safeWrapper
     def paintEvent(self, e:QtGui.QPaintEvent) -> None:
-        #print("\n--> GradientRenderer.paintEvent: hoverPoints", self._hoverPoints,
-              #[p for p in self._hoverPoints.points])
-        # NOTE: 2021-05-24 08:24:10 ArthurWidget
-        #static_image = QtGui.QImage()
         painter = QtGui.QPainter()
-        
-        #if self.preferImage:
-            #if static_image.isNull() or static_image.size() != self.size():
-                #static_image = QtGui.Qimage(self.size(), QtGui.QImage.Format_RGB32)
-                
-            #painter.begin(static_image)
-            
-            #o = 10
-            ## NOTE: 2021-05-24 08:57:00 TODO use make_checkers
-            #bg = self.palette().brush(QtGui.QPalette.Window)
-            #painter.fillRect(0,0, o, o, bg)
-            #painter.fillrect(self.width() - o, 0, o, o, bg)
-            #painter.fillRect(0, self.height() - o, o, o, bg)
-            #painter.fillRect(self.width() -o, self.height() - o, o, o, bg)
-            
-        #else:
-            #painter.begin(self)
         painter.begin(self)
-            
         painter.setClipRect(e.rect())
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        
-        #clipPath = QtGui.QPainterPath()
-        #r = self.rect() # QtCore.QRect
-        #left = r.x() +1
-        #top = r.y() + 1
-        #right = r.right()
-        #bottom = r.bottom()
-        #radius2 = 8 *2
-        
-        #clipPath.moveTo(right - radius2, top)
-        #clipPath.arcTo(right - radius2, top,                radius2, radius2,  90, -90)
-        #clipPath.arcTo(right - radius2, bottom - radius2,   radius2, radius2,  90, -90)
-        #clipPath.arcTo(left,            bottom - radius2,   radius2, radius2, 270, -90)
-        #clipPath.arcTo(left,            top,                radius2, radius2, 180, -90)
-        
-        #clipPath.closeSubpath()
         painter.save()
-        #painter.setClipPath(clipPath, QtCore.Qt.IntersectClip)
-        
         painter.drawTiledPixmap(self.rect(), self._tile)
-        
         self.paint(painter)
-        
         painter.restore()
         
-        #level = 180
-        #painter.setPen(QtGui.QPen(QtGui.QColor(level, level, level), 2))
-        #painter.setBrush(QtCore.Qt.NoBrush)
-        #painter.drawPath(clipPath)
-        
-        #if self.preferImage:
-            #painter.end()
-            #painter.begin(self)
-            #painter.drawImage(e.rect(), static_image, e.rect())
-            #painter.end()
-        
     def resizeEvent(self, e:QtGui.QResizeEvent) -> None:
-        # NOTE: 2021-05-24 10:21:13 ArthurWidget
-        # modified in ArthurWidget for open gl case - not needed here?
-        #self._centerRadius = min([self.width(), self.height()]) / 3.0
         super().resizeEvent(e)
         
     def sizeHint(self) -> QtCore.QSize:
         return QtCore.QSize(self._def_width, self._def_height) # contemplate smaller sizes
-        #return QtCore.QSize(400,400) # contemplate smaller sizes
     
     @property
     def hoverPoints(self) -> HoverPoints:
@@ -586,19 +529,16 @@ class GradientRenderer(QtWidgets.QWidget):
     @pyqtSlot()
     def setPadSpread(self) -> None:
         self.spread = QtGui.QGradient.PadSpread
-        #self._spread = QtGui.QGradient.PadSpread
         self.update()
         
     @pyqtSlot()
     def setRepeatSpread(self) -> None:
         self.spread = QtGui.QGradient.RepeatSpread
-        #self._spread = QtGui.QGradient.RepeatSpread
         self.update()
         
     @pyqtSlot()
     def setReflectSpread(self) -> None:
         self.spread = QtGui.QGradient.ReflectSpread
-        #self._spread = QtGui.QGradient.ReflectSpread
         self.update()
         
     @pyqtSlot()
@@ -625,7 +565,6 @@ class GradientRenderer(QtWidgets.QWidget):
         return isinstance(val, (tuple, list)) and len(val) == 2 and isinstance(val[0], numbers.Real) and isinstance(val[1], (QtGui.QColor, QtCore.Qt.GlobalColor))
         
     def _getStopsLine(self, gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient])-> QtGui.QPolygonF:
-        #print("renderer._getStopsLine gradient:", type(gradient).__name__)
         if isinstance(gradient, QtGui.QLinearGradient):
             return QtCore.QLineF(gradient.start(), gradient.finalStop())
 
@@ -633,13 +572,10 @@ class GradientRenderer(QtWidgets.QWidget):
             return QtCore.QLineF(gradient.center(), gradient.focalPoint())
 
         elif isinstance(gradient, QtGui.QConicalGradient):
-            #rect = QtCore.QRectF(self.rect())
-            #centerPoint = rect.center()
-            #rect.setWidth(rect.width()/3.)
-            #rect.setHeight(rect.height()/3.)
-            #diagLine = QtCore.QLineF(rect.topLeft(), rect.bottomRight())
-            #print("renderer._getStopsLine gradient center:", gradient.center())
-            gradCenter = gradient.center()
+            # NOTE: 2021-05-27 15:31:42 
+            # this is in logical coordinates i.e.
+            # normalized to whatever size the paint device (widget/pimap, etc) has
+            gradCenter = gradient.center() 
             centerPoint = QtCore.QPointF(gradCenter.x() * self.rect().width(),
                                          gradCenter.y() * self.rect().height())
             # NOTE: 2021-05-27 09:28:27
@@ -652,9 +588,8 @@ class GradientRenderer(QtWidgets.QWidget):
             # this should keep the gradient's centre where is meant to be ?
             l = QtCore.QLineF(centerPoint, self.rect().topRight())
             ret = QtCore.QLineF.fromPolar(l.length(), gradient.angle())
-            #print("renderer._getStopsLine l:", l)
-            #print("renderer._getStopsLine stopsLine:", ret)
             return ret
+
         return QtCore.QLineF(QtCore.QPointF(0,0), QtCore.QPointF(self.width(), self.height()))
             
     def _getLogicalStops(self, gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient]):
@@ -691,15 +626,12 @@ class GradientRenderer(QtWidgets.QWidget):
         
         g = QtGui.QGradient()
         pts = self._hoverPoints.points
-        #print("GradientRenderer.paint: self._hoverPoints", self._hoverPoints, 
-              #[p for p in pts])
     
         if self._gradientBrushType == QtCore.Qt.LinearGradientPattern:
             g = QtGui.QLinearGradient(pts[0], pts[1])
             
         elif self._gradientBrushType == QtCore.Qt.RadialGradientPattern:
-            #g = QtGui.QRadialGradient(pts[0], min([self.width(), self.height()]) / 3.0, pts[1])
-            #QRadialGradient(const QPointF &center, qreal centerRadius, const QPointF &focalPoint, qreal focalRadius)
+            # NOTE: 2021-05-27 15:32:23
             # center is the first hover point (hover point [0])
             # center radius is 1/3 of minimal side (width or height)
             # focal point is 2nd hover point 
@@ -732,8 +664,6 @@ class GradientRenderer(QtWidgets.QWidget):
             # line (0,0,1,0) = horizontal line
             # line.angleTo(l) = angle from horizontal line to line 'l'
             angle = QtCore.QLineF(0,0,1,0).angleTo(l)
-            #g = QtGui.QConicalGradient(pts[0], angle)
-            #QConicalGradient(const QPointF &center, qreal angle)
             g = QtGui.QConicalGradient(pts[0], angle)
             
         for stop in self._stops:
@@ -745,34 +675,73 @@ class GradientRenderer(QtWidgets.QWidget):
         p.setPen(QtCore.Qt.NoPen)
         p.drawRect(self.rect())
         
+        self._gradient = g # so it can be returned
+        
 class GradientWidget(QtWidgets.QWidget):
+    # TODO: 2021-05-27 15:40:49
+    # make a gradient combobox to choose from the list of gradients
+    # instead of the current "Preset" group
     def __init__(self, gradient:typing.Optional[QtGui.QGradient]=None,
+                 customGradients:dict=dict(),
                  parent:typing.Optional[QtWidgets.QWidget] = None, 
                  title:typing.Optional[str]="Scipyen Gradient Editor") -> None:
         super().__init__(parent=parent)
         
+        self._title = title
+        
+        self._useRelativeCenterRadius = False
+        self._useRelativeFocalRadius = False
+        self._useAutoCenterRadius = True
+        self._useAutoFocalRadius = True
+        
+        self._configureUI_()
+        
+        if self._useAutoCenterRadius:
+            self._autoCenterRadiusButton.setChecked(True)
+            self._centerRadiusSpinBox.setEnabled(False)
+            
+        elif self._useRelativeCenterRadius:
+            self._relativeCenterRadiusButton.setChecked(True)
+            self._centerRadiusSpinBox.setEnabled(True)
+            self._centerRadiusSpinBox.setMinimum(0.)
+            self._centerRadiusSpinBox.setMaximum(1.)
+            
+        else:
+            self._absoluteCenterRadiusButton.setChecked(True)
+            self._centerRadiusSpinBox.setEnabled(True)
+            self._centerRadiusSpinBox.setMinimum(0.)
+            self._centerRadiusSpinBox.setMaximum(min([self._renderer.width(), self._renderer.height()]))
+        
+        if self._useAutoFocalRadius:
+            self._autoFocalRadiusButton.setChecked(True)
+            self._focalRadiusSpinBox.setEnabled(False)
+            
+        elif self._useRelativeFocalRadius:
+            self._relativeFocalRadiusButton.setChecked(True)
+            self._focalRadiusSpinBox.setEnabled(True)
+            
+        else:
+            self._absoluteFocalRadiusButton.setChecked(True)
+            self._focalRadiusSpinBox.setEnabled(True)
+        
+        
         self._presetIndex = 0
         self._defaultGradient = None
         self._gradients = dict()
-        self._gradients.update(standardQtGradientPresets)
-        self._title = title
-        #self._gradient = gradient
-        self._configureUI_()
-        
+        if len(customGradients):
+            self._gradients = dict([(name, val) for name, val in customGradients.items()] + 
+                                   [(name, val) for name, val in standardQtGradientPresets.items()])
+        else:
+            self._gradients.update(standardQtGradientPresets)
+            
         self._setDefaultGradient(gradient)
         
         self._updatePresetName()
         self._changePresetBy(0)
             
-        
-        
-        #if self.isVisible():
-            #self._setDefaultGradient(gradient)
             
         #self._autoFocalRadiusButton.animateClick()
         #self._autoCenterRadiusButton.animateClick()
-            
-        
         #QtCore.QTimer.singleShot(50, self._showDefault)
         
     def showEvent(self, ev):
@@ -830,6 +799,7 @@ class GradientWidget(QtWidgets.QWidget):
         
         self._autoFocalRadiusButton = QtWidgets.QRadioButton("Automatic", 
                                                         self.gradientFocalRadiusGroup)
+        
         self._autoFocalRadiusButton.clicked.connect(self.setAutoFocalRadius)
         
         self._relativeFocalRadiusButton = QtWidgets.QRadioButton("Relative",
@@ -873,7 +843,8 @@ class GradientWidget(QtWidgets.QWidget):
         
         
         self.presetsGroup = QtWidgets.QGroupBox(self.mainGroup)
-        self.presetsGroup.setTitle("Presets")
+        self.presetsGroup.setTitle("Gradients")
+        self.presetsGroup.setToolTip("Available Gradients (including Qt's presets)")
         self.prevPresetButton = QtWidgets.QPushButton("", self.presetsGroup)
         self.prevPresetButton.setIcon(QtGui.QIcon.fromTheme("go-previous"))
         self.prevPresetButton.setSizePolicy(QtWidgets.QSizePolicy.Fixed,
@@ -886,9 +857,7 @@ class GradientWidget(QtWidgets.QWidget):
         self.nextPresetButton.setSizePolicy(QtWidgets.QSizePolicy.Fixed,
                                             QtWidgets.QSizePolicy.Fixed)
         
-        self._updatePresetName()
-        
-        #self.mainGroup.setFixedWidth(200)
+        #self._updatePresetName()
         
         self.mainGroupLayout = QtWidgets.QVBoxLayout(self.mainGroup)
         self.mainGroupLayout.addWidget(self.editorGroup)
@@ -931,16 +900,12 @@ class GradientWidget(QtWidgets.QWidget):
         self.mainScrollArea.setWidgetResizable(True)
         self.mainScrollArea.setSizePolicy(QtWidgets.QSizePolicy.Preferred, 
                                         QtWidgets.QSizePolicy.Preferred)
-        #self.mainScrollArea.setSizePolicy(QtWidgets.QSizePolicy.Fixed, 
-                                        #QtWidgets.QSizePolicy.Preferred)
 
         self.vSplitter = QtWidgets.QSplitter(self)
         self.vSplitter.addWidget(self._renderer)
         self.vSplitter.addWidget(self.mainScrollArea)
         self.mainLayout = QtWidgets.QHBoxLayout(self)
         self.mainLayout.addWidget(self.vSplitter)
-        #self.mainLayout.addWidget(self._renderer)
-        #self.mainLayout.addWidget(self.mainScrollArea)
         
         self._editor.gradientStopsChanged.connect(self._renderer.setGradientStops)
         self._linearButton.clicked.connect(self._renderer.setLinearGradient)
@@ -967,7 +932,6 @@ class GradientWidget(QtWidgets.QWidget):
         self._setDefaultGradient(val)
         
     def _setDefaultGradient(self, val:typing.Optional[QtGui.QGradient]=None) -> None:
-        #print("GradientWidget._setDefaultGradient: val = ", val)
         if not isinstance(val, QtGui.QGradient):
             return 
         
@@ -994,14 +958,6 @@ class GradientWidget(QtWidgets.QWidget):
         
         self._presetIndex = [n for n in self._gradients.keys()].index("Default")
         
-        #print("GradientWidget _defaultGradient: ", self._defaultGradient)
-        
-        #self._setGradient(self._defaultGradient)
-            
-        #if self.isVisible():
-            #self.update()
-            #self._showDefault()
-            
     @pyqtSlot()
     def _showDefault(self,) -> None:
         if not isinstance(self._defaultGradient, QtGui.QGradient):
@@ -1027,7 +983,6 @@ class GradientWidget(QtWidgets.QWidget):
         self._changePresetBy(1)
         
     def _updatePresetName(self) -> None:
-        #currentPreset = [(name, val) for name, val in standardQtGradientPresets.items()][self._presetIndex]
         currentPreset = [(name, val) for name, val in self._gradients.items()][self._presetIndex]
         self._presetButton.setText(currentPreset[0])
         self._presetButton.setToolTip(currentPreset[0])
@@ -1041,7 +996,7 @@ class GradientWidget(QtWidgets.QWidget):
         #self._presetIndex = max([0, min([self._presetIndex + indexOffset, len(standardQtGradientPresets)-1])])
 
         # NOTE: 2021-05-25 13:16:27
-        # the presets are all linear gradients; choosing a the preset should NOT
+        # the presets should apply to all types gradients; choosing a the preset should NOT
         # enforce linear gradient display
         #preset = [(name, val) for name, val in standardQtGradientPresets.items()][self._presetIndex][1]
         preset = [(name, val) for name, val in self._gradients.items()][self._presetIndex][1]
@@ -1134,72 +1089,98 @@ class GradientWidget(QtWidgets.QWidget):
     @pyqtSlot()
     def setAutoCenterRadius(self)-> None:
         self._centerRadiusSpinBox.setEnabled(False)
-        #self._centerRadiusSpinBox.valueChanged[float].disconnect()
         self._renderer.setAutoCenterRadius()
+        self._useAutoCenterRadius = True
+        #self._useRelativeCenterRadius = False
     
     @pyqtSlot()
     def setRelativeCenterRadius(self) -> None:
-        #self._centerRadiusSpinBox.valueChanged[float].disconnect()
         self._centerRadiusSpinBox.setEnabled(True)
         val = self._centerRadiusSpinBox.value()
-        if val < 0. or val > 1.:
-            val /= min([self._renderer.width(), self._renderer.height()])
-            self._centerRadiusSpinBox.setValue(val)
         self._centerRadiusSpinBox.setMinimum(0.)
         self._centerRadiusSpinBox.setMaximum(1.)
+        if self._useAutoCenterRadius:
+            if isinstance(self.gradient, QtGui.QRadialGradient):
+                val = self.gradient.centerRadius() 
+                val /= min([self._renderer.width(), self._renderer.height()])
+                self._centerRadiusSpinBox.setValue(val)
+        elif not self._useRelativeCenterRadius:
+            if val < 0. or val > 1.:
+                val /= min([self._renderer.width(), self._renderer.height()])
+                self._centerRadiusSpinBox.setValue(val)
+                
+        self._useRelativeCenterRadius = True
+        self._useAutoCenterRadius = False
         self._renderer.setRelativeCenterRadius()
-        #self._centerRadiusSpinBox.valueChanged[float].connect(self._renderer.setCenterRadius)
     
     @pyqtSlot()
     def setAbsoluteCenterRadius(self) -> None:
-        #self._centerRadiusSpinBox.valueChanged[float].disconnect()
         self._centerRadiusSpinBox.setEnabled(True)
         val = self._centerRadiusSpinBox.value()
-        if val < 1.:
-            if val < 0.:
-                val = 0
-            else:
-                val *= min([self._renderer.width(), self._renderer.height()])
-            self._centerRadiusSpinBox.setValue(val)
         self._centerRadiusSpinBox.setMinimum(0.)
         self._centerRadiusSpinBox.setMaximum(min([self._renderer.width(), self._renderer.height()]))
+        if self._useAutoCenterRadius:
+            if isinstance(self.gradient, QtGui.QRadialGradient):
+                val = self.gradient.centerRadius()
+                self._centerRadiusSpinBox.setValue(val)
+            
+        elif self._useRelativeCenterRadius:
+            if val < 1.:
+                if val < 0.:
+                    val = 0
+                else:
+                    val *= min([self._renderer.width(), self._renderer.height()])
+                self._centerRadiusSpinBox.setValue(val)
+        self._useRelativeCenterRadius = False
+        self._useAutoCenterRadius = False
         self._renderer.setAbsoluteCenterRadius()
-        #self._centerRadiusSpinBox.valueChanged[float].connect(self._renderer.setCenterRadius)
     
     @pyqtSlot()
     def setAutoFocalRadius(self) -> None:
         self._focalRadiusSpinBox.setEnabled(False)
-        #self._focalRadiusSpinBox.valueChanged[float].disconnect()
         self._renderer.setAutoFocalRadius()
+        self._useAutoFocalRadius = True
     
     @pyqtSlot()
     def setRelativeFocalRadius(self) -> None:
-        #self._focalRadiusSpinBox.valueChanged[float].disconnect()
         self._focalRadiusSpinBox.setEnabled(True)
         val = self._focalRadiusSpinBox.value()
-        if val < 0. or val > 1.:
-            val /= min([self._renderer.width(), self._renderer.height()])
-            self._focalRadiusSpinBox.setValue(val)
         self._focalRadiusSpinBox.setMinimum(0.)
         self._focalRadiusSpinBox.setMaximum(1.)
+        if self._useAutoFocalRadius:
+            if isinstance(self.gradient, QtGui.QRadialGradient):
+                val = self.gradient.focalRadius() 
+                val /= min([self._renderer.width(), self._renderer.height()])
+                self._focalRadiusSpinBox.setValue(val)
+        elif not self._useRelativeFocalRadius:
+            if val < 0. or val > 1.:
+                val /= min([self._renderer.width(), self._renderer.height()])
+                self._focalRadiusSpinBox.setValue(val)
+        self._useRelativeFocalRadius = True
+        self._useAutoFocalRadius = False
         self._renderer.setRelativeFocalRadius()
-        #self._focalRadiusSpinBox.valueChanged[float].connect(self._renderer.setFocalRadius)
     
     @pyqtSlot()
     def setAbsoluteFocalRadius(self) -> None:
-        #self._focalRadiusSpinBox.valueChanged[float].disconnect()
         self._focalRadiusSpinBox.setEnabled(True)
         val = self._focalRadiusSpinBox.value()
-        if val < 1.:
-            if val < 0.:
-                val = 0
-            else:
-                val *= min([self._renderer.width(), self._renderer.height()])
-            self._focalRadiusSpinBox.setValue(val)
         self._focalRadiusSpinBox.setMinimum(0.)
         self._focalRadiusSpinBox.setMaximum(min([self._renderer.width(), self._renderer.height()]))
+        if self._useAutoFocalRadius:
+            if isinstance(self.gradient, QtGui.QRadialGradient):
+                val = self.gradient.focalRadius()
+                self._focalRadiusSpinBox.setValue(val)
+        elif self._useRelativeFocalRadius:
+            if val < 1.:
+                if val < 0.:
+                    val = 0
+                else:
+                    val *= min([self._renderer.width(), self._renderer.height()])
+                self._focalRadiusSpinBox.setValue(val)
+        
+        self._useRelativeFocalRadius = False
+        self._useAutoFocalRadius = False
         self._renderer.setAbsoluteFocalRadius()
-        #self._focalRadiusSpinBox.valueChanged[float].connect(self._renderer.setFocalRadius)
         
     @pyqtSlot(float)
     def setCenterRadius(self, val:float) -> None:
