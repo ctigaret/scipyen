@@ -388,8 +388,9 @@ class HoverPoints(QtCore.QObject):
         LineConnection = auto()
         CurveConnection = auto()
         
-    def __init__(self, widget:QtWidgets.QWidget, shape:PointShape):
+    def __init__(self, widget:QtWidgets.QWidget, shape:PointShape, debug:bool=False):
         super().__init__(widget)
+        self._debug = debug
         
         self._widget = widget
         widget.installEventFilter(self)
@@ -471,22 +472,25 @@ class HoverPoints(QtCore.QObject):
     def points(self) -> QtGui.QPolygonF:
         return self._points
     
+    #def points(self, points:typing.Union[QtGui.QPolygonF,typing.Iterable[typing.Union[QtCore.QPointF, QtCore.QPoint]]]) -> None:
+        #if isinstance(points, (list, tuple)) and len(points) and all([isinstance(v, (QtCore.QPoint, QtCore.QPointF)) for v in points]):
+            #points = QtGui.QPolygonF(points)
+        #elif not isinstance(points, QtGui.QPolygonF):
+            #raise TypeError("points expected a QtGui.QPolygonF, or a sequence of QtCore.QPointF or QtCore.QPoint; got %s instead" % type(points).__name__)
     @points.setter
-    def points(self, points:typing.Union[QtGui.QPolygonF,typing.Iterable[typing.Union[QtCore.QPointF, QtCore.QPoint]]]) -> None:
-        if isinstance(points, (list, tuple)) and len(points) and all([isinstance(v, (QtCore.QPoint, QtCore.QPointF)) for v in points]):
-            points = QtGui.QPolygonF(points)
-        elif not isinstance(points, QtGui.QPolygonF):
-            raise TypeError("points expected a QtGui.QPolygonF, or a sequence of QtCore.QPointF or QtCore.QPoint; got %s instead" % type(points).__name__)
-        
+    def points(self, points:QtGui.QPolygonF) -> None:
         # NOTE: 2021-05-23 20:57:59
         # QPolygonF has API compatible with list() (on C++ side is a QVector<QPointF>)
         #if points.size() != self._points.size():
         #if len(points) != len(self._points):
             #self._fingerPointMapping.clear() # see NOTE 2021-05-21 21:29:33 touchscreens
         
-        #self._points.clear() # just so that refs to QPointF are garbage-collected
-        #print("HoverPoints.points", [p for p in points])
+        #print("HoverPoints.points =", self, [p for p in points])
+        self._points.clear() # just so that refs to QPointF are garbage-collected
         self._points = QtGui.QPolygonF([bound_point(p, self.boundingRect(), 0) for p in points])
+        if self._debug:
+            print("HoverPoints._points =", self, [p for p in self._points])
+        #self._points = QtGui.QPolygonF([bound_point(p, self.rect(), 0) for p in points])
         #boundedPoints = [bound_point(points.at(i), self.boundingRect(), 0) for i in range(points.size())]
         #print("HoverPoints._points", [p for p in self._points])
         
