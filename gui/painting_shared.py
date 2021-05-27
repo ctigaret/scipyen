@@ -268,6 +268,7 @@ def gradient2radial(gradient:QtGui.QGradient,
         ret = QtGui.QRadialGradient()
             
     ret.setStops(gradient.stops())
+    ret.setSpread(gradient.spread())
             
     return ret
 
@@ -293,6 +294,7 @@ def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
             g = sip.cast(gradient, QtGui.QRadialGradient)
             ret = QtGui.QLinearGradient(g.center(), g.focalPoint())
             
+            
         elif gradient.type() == QtGui.QGradient.ConicalGradient:
             g = sip.cast(gradient, QtGui.QConicalGradient)
             l = QtCore.QLineF.fromPolar(distance, g.angle())
@@ -306,6 +308,7 @@ def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
         ret = QtGui.QLinearGradient()
             
     ret.setStops(gradient.stops())
+    ret.setSpread(gradient.spread())
     
     return ret
     
@@ -344,6 +347,7 @@ def gradient2conical(gradient:QtGui.QGradient) -> QtGui.QConicalGradient:
         ret = QtGui.QConicalGradient()
         
     ret.setStops(gradient.stops())
+    ret.setSpread(gradient.spread())
     
     return ret
 
