@@ -38,7 +38,7 @@ standardQtPenCapStyles = OrderedDict(sorted([(name,val) for name, val in vars(Qt
 
 customDashStyles = {"Custom": [10., 5., 10., 5., 10., 5., 1., 5., 1., 5., 1., 5.]}
 
-standardQtGradientPresets = OrderedDict(sorted([(name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Preset)]))
+standardQtGradientPresets = OrderedDict(sorted([(name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Preset) and name != "NumPresets"]))
 
 standardQtGradientSpreads = OrderedDict(sorted([(name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Spread)]))
 
@@ -251,7 +251,7 @@ def gradient2radial(gradient:QtGui.QGradient,
             #l = QtGui.QLineF(QtCore.QPointF(0,0), QtCore.QPointF(0,10))
             #l.setLength(distance)
             #l.setAngle(0)
-            ret = QtGui.QRadialGradient(l.p1(), centerRadius, l.p2(), focalRadius)
+            #ret = QtGui.QRadialGradient(l.p1(), centerRadius, l.p2(), focalRadius)
             
         elif gradient.type() == QtGui.QGradient.ConicalGradient:
             g = sip.cast(gradient, QtGui.QGradient.ConicalGradient)

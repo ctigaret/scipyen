@@ -326,7 +326,7 @@ def reverse_mapping_lookup(x:dict, y:typing.Any)->typing.Optional[typing.Any]:
     from collections import OrderedDict
     
     if y in x.values():
-        ret = (name for name, val in x.items() if y == val)
+        ret = [name for name, val in x.items() if y == val]
         
         if len(ret) == 1:
             return ret[0]

@@ -14,6 +14,8 @@ import sip
 
 from core.prog import (safeWrapper, no_sip_autoconversion)
 
+from core.datatypes import (reverse_dict, reverse_mapping_lookup)
+
 from .painting_shared import (HoverPoints, x_less_than, y_less_than,
                               qtGlobalColors, standardPalette, standardPaletteDict, 
                               svgPalette, getPalette, paletteQColors, paletteQColor, 
@@ -608,6 +610,7 @@ class GradientRenderer(QtWidgets.QWidget):
         return isinstance(val, (tuple, list)) and len(val) == 2 and isinstance(val[0], numbers.Real) and isinstance(val[1], (QtGui.QColor, QtCore.Qt.GlobalColor))
         
     def _getStopsLine(self, gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient])-> QtGui.QPolygonF:
+        #print("renderer._getStopsLine gradient:", type(gradient).__name__)
         if isinstance(gradient, QtGui.QLinearGradient):
             return QtCore.QLineF(gradient.start(), gradient.finalStop())
 
@@ -615,13 +618,28 @@ class GradientRenderer(QtWidgets.QWidget):
             return QtCore.QLineF(gradient.center(), gradient.focalPoint())
 
         elif isinstance(gradient, QtGui.QConicalGradient):
-            rect = QtCore.QRectF(self.rect())
-            centerPoint = rect.center()
-            rect.setWidth(rect.width()/3.)
-            rect.setHeight(rect.height()/3.)
-            diagLine = QtCore.QLineF(rect.topLeft(), rect.bottomRight())
-            return QtCore.QLineF.fromPolar(diagLine, gradient.angle()).translate(centerPoint)
-            
+            #rect = QtCore.QRectF(self.rect())
+            #centerPoint = rect.center()
+            #rect.setWidth(rect.width()/3.)
+            #rect.setHeight(rect.height()/3.)
+            #diagLine = QtCore.QLineF(rect.topLeft(), rect.bottomRight())
+            #print("renderer._getStopsLine gradient center:", gradient.center())
+            gradCenter = gradient.center()
+            centerPoint = QtCore.QPointF(gradCenter.x() * self.rect().width(),
+                                         gradCenter.y() * self.rect().height())
+            # NOTE: 2021-05-27 09:28:27
+            # this paints the hover point symmetrically around the renderer's centre
+            #l = QtCore.QLineF(self.rect().topLeft(), self.rect().topRight())
+            #centerPoint = self.rect().center()
+            #ret = QtCore.QLineF.fromPolar(l.length(), gradient.angle())
+            #ret.translate(centerPoint)
+            # NOTE: 2021-05-27 09:28:33
+            # this should keep the gradient's centre where is meant to be ?
+            l = QtCore.QLineF(centerPoint, self.rect().topRight())
+            ret = QtCore.QLineF.fromPolar(l.length(), gradient.angle())
+            #print("renderer._getStopsLine l:", l)
+            #print("renderer._getStopsLine stopsLine:", ret)
+            return ret
         return QtCore.QLineF(QtCore.QPointF(0,0), QtCore.QPointF(self.width(), self.height()))
             
     def _getLogicalStops(self, gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient]):
@@ -1006,7 +1024,7 @@ class GradientWidget(QtWidgets.QWidget):
         else:
             g = g2l(gradient)
         
-        #print("GradientWidget._changePresetBy g", g, "type", g.type())
+        #print("GradientWidget._changePresetBy g", g, "type", reverse_mapping_lookup(standardQtGradientTypes, g.type()))
         self._setGradient(g)
         
         #self._linearButton.animateClick()
