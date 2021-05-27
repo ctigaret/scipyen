@@ -238,7 +238,7 @@ def gradient2radial(gradient:QtGui.QGradient,
 
     elif isinstance(gradient, QtGui.QGradient):
         if gradient.type() == QtGui.QGradient.RadialGradient:
-            ret = sip.cast(gradient, QtGui.QGradient.RadialGradient)
+            ret = sip.cast(gradient, QtGui.QRadialGradient)
             ret.setCenterRadius(centerRadius)
             ret.setFocalRadius(focalRadius)
         
@@ -254,7 +254,7 @@ def gradient2radial(gradient:QtGui.QGradient,
             #ret = QtGui.QRadialGradient(l.p1(), centerRadius, l.p2(), focalRadius)
             
         elif gradient.type() == QtGui.QGradient.ConicalGradient:
-            g = sip.cast(gradient, QtGui.QGradient.ConicalGradient)
+            g = sip.cast(gradient, QtGui.QConicalGradient)
             
             center = gradient.center()
             l = QtCore.QLineF.fromPolar(distance, g.angle())

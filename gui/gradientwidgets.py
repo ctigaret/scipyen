@@ -988,8 +988,17 @@ class GradientWidget(QtWidgets.QWidget):
         self._presetButton.setToolTip(currentPreset[0])
         
     def _changePresetBy(self, indexOffset:int) -> None:
+        if len(self._gradients) == 0:
+            return
         # NOTE: enable circular browsing
         self._presetIndex += indexOffset
+        
+        if self._presetIndex >= len(self._gradients):
+            self._presetIndex = 0
+            
+        elif self._presetIndex < -1 * len(self._gradients):
+            self._presetIndex = len(self._gradients) - 1
+            
         
         # NOTE: 2021-05-24 12:48:43
         # leave this in for strict browing between min & max preset
@@ -999,14 +1008,15 @@ class GradientWidget(QtWidgets.QWidget):
         # the presets should apply to all types gradients; choosing a the preset should NOT
         # enforce linear gradient display
         #preset = [(name, val) for name, val in standardQtGradientPresets.items()][self._presetIndex][1]
-        preset = [(name, val) for name, val in self._gradients.items()][self._presetIndex][1]
+        preset = [(name, val) for name, val in self._gradients.items()][self._presetIndex]
+        #if len(preset):
+            #preset = preset[1]
         
-        gradient = QtGui.QGradient(preset)
-        
-        #print("GradientWidget._changePresetBy gradient", gradient, "type", gradient.type())
-        
-        #if gradient.type() != QtGui.QGradient.LinearGradient: # NOTE 2021-05-23 09:34:29 why?
-            #return
+        if preset[0] in standardQtGradientPresets.keys():
+            gradient = QtGui.QGradient(preset[1])
+            
+        else:
+            gradient = preset[1]
         
         if self._radialButton.isChecked():
             g = g2r(gradient)
@@ -1026,64 +1036,72 @@ class GradientWidget(QtWidgets.QWidget):
         self._updatePresetName()
         
         
-    def _setGradient(self, gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient]) -> None:
+    def _setGradient(self, gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient],
+                     gradientType:typing.Optional[QtGui.QGradient.Type]=QtGui.QGradient.LinearGradient) -> None:
         if not isinstance(gradient, (QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient)):
-            return
-        
-        #print("GradientWidget._setGradient: gradient =", gradient)
+            if not isinstance(gradientType, QtGui.QGradient.Type):
+                return
+            
+            if gradientType == QtGui.QGradient.LinearGradient:
+                gradient = g2l(gradient)
+                
+            elif gradientType == QtGui.QGradient.RadialGradient:
+                gradient = g2l(gradient)
+                
+            elif gradientType == QtGui.QGradient.ConicalGradient:
+                gradient = g2c(gradient)
+                
+            else:
+                return
         
         stops = gradient.stops()
         logicalStops = self._renderer._getLogicalStops(gradient)
-        #print("GradientWidget._setGradient: gradient stops", stops)
-        #print("GradientWidget._setGradient: logical stops", [p for p in logicalStops],
-              #"\n ***")
-        #print("GradientWidget._setGradient:\n\tgradient stops =", gradient.stops())
-        #print("GradientWidget._setGradient:\n\tlogical stops =", [p for p in logicalStops])
-        
         self._editor.setGradientStops(stops)
-        #self._renderer.gradient = gradient
         self._renderer.hoverPoints.points = logicalStops
 
-        #print("GradientWidget._setGradient: ._renderer.hoverPoints:", self._renderer.hoverPoints,
-              #[p for p in self._renderer.hoverPoints.points])
-        #self._renderer.setGradientStops(stops)
         self._renderer.gradientStops = stops
         
         if isinstance(gradient, QtGui.QLinearGradient):
             self._linearButton.setChecked(True)
             self._renderer.gradientBrushType = QtCore.Qt.LinearGradientPattern
-            #self._renderer.setLinearGradient()
             
         elif isinstance(gradient, QtGui.QRadialGradient):
             self._radialButton.setChecked(True)
             self._renderer.gradientBrushType = QtCore.Qt.RadialGradientPattern
-            #self._renderer.setRadialGradient()
             
         elif isinstance(gradient, QtGui.QConicalGradient):
             self._conicalButton.setChecked(True)
             self._renderer.gradientBrushType = QtCore.Qt.ConicalGradientPattern
-            #self._renderer.setConicalGradient()
             
         if gradient.spread() == QtGui.QGradient.RepeatSpread:
             self._renderer.spread = QtGui.QGradient.RepeatSpread
-            #self._renderer.setRepeatSpread()
             
         elif gradient.spread() == QtGui.QGradient.ReflectSpread:
             self._renderer.spread = QtGui.QGradient.ReflectSpread
-            #self._renderer.setReflectSpread()
             
         else:
             self._renderer.spread = QtGui.QGradient.PadSpread
-            #self._renderer.setPadSpread()
             
-        #self.update()
+    @pyqtSlot(QtGui.QGradient)
+    def setGradient(self, val:QtGui.QGradient) -> None:
+        """Qt slot for setting a cusotm gradient
+        """
+        self.gradient = val
+        self.update()
             
     @property
     def gradient(self) -> QtGui.QGradient:
+        """The RENDERED gradient property.
+        NOTE: This is dynamically generated by rendering; however, a new gradient
+        can be specified indirectly via the setGradient Qt slot, or via the 
+        private method _setGradient (whichis what this property getter does.)
+        """
         return self._renderer._gradient
     
     @gradient.setter
     def gradient(self, val:QtGui.QGradient) -> None:
+        if not isinstance(val, QtGui.QGradient):
+            return
         self._setGradient(val)
             
     @pyqtSlot()
@@ -1091,7 +1109,6 @@ class GradientWidget(QtWidgets.QWidget):
         self._centerRadiusSpinBox.setEnabled(False)
         self._renderer.setAutoCenterRadius()
         self._useAutoCenterRadius = True
-        #self._useRelativeCenterRadius = False
     
     @pyqtSlot()
     def setRelativeCenterRadius(self) -> None:
