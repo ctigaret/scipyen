@@ -48,7 +48,7 @@ from .painting_shared import (standardPalette, standardPaletteDict, svgPalette,
                               getPalette, paletteQColors, paletteQColor, 
                               standardQColor, svgQColor, mplColors, qtGlobalColors, 
                               canDecode, populateMimeData, fromMimeData,
-                              createDrag, transparent_painting_bg, make_checkers,
+                              createDrag, make_transparent_bg, make_checkers,
                               comboDelegateBrush,)
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -78,7 +78,7 @@ class ColorPushButton(QtWidgets.QPushButton):
         self._mPos = QtCore.QPoint()
         self._tPmap = transparentPixmap
         if not self._tPmap:
-            self._tPmap = transparent_painting_bg()
+            self._tPmap = make_transparent_bg()
         #self._strongTransparentPattern = strongTransparentPattern
         self._alpha = 255
         self._keepAlpha = keepAlphaOnDropPaste
@@ -318,7 +318,7 @@ class ColorComboDelegate(QtWidgets.QAbstractItemDelegate):
         super().__init__(parent)
         self._tPmap = transparentPixmap
     
-    @no_sip_autoconversion(QtCore.QVariant)
+    #@no_sip_autoconversion(QtCore.QVariant)
     def paint(self, painter:QtGui.QPainter, option:QtWidgets.QStyleOptionViewItem,
               index:QtCore.QModelIndex):
         innerColor = QtGui.QColor(QtCore.Qt.white)
@@ -342,8 +342,10 @@ class ColorComboDelegate(QtWidgets.QAbstractItemDelegate):
 
         # inner color
         cv = index.data(self.ItemRoles.ColorRole) # NOTE:2021-05-15 21:18:24Q QVariant
+        #print(cv)
         if isinstance(cv, QtGui.QColor):
             if cv.isValid():
+                #print(cv.name())
                 innerColor = cv
                 paletteBrush = False
                 tmpRenderHints = painter.renderHints()
@@ -375,9 +377,9 @@ class ColorComboDelegate(QtWidgets.QAbstractItemDelegate):
                 else:
                     textColor = QtGui.QColor(QtCore.Qt.white)
                     
-        if textColor.isValid():
-            painter.setPen(textColor)
-            painter.drawText(innerRect.adjusted(1, 1, -1, -1), QtCore.Qt.AlignCenter, tv)
+            if textColor.isValid():
+                painter.setPen(textColor)
+                painter.drawText(innerRect.adjusted(1, 1, -1, -1), QtCore.Qt.AlignCenter, tv)
     
     def sizeHint(self, option:QtWidgets.QStyleOptionViewItem, 
                  index:QtCore.QModelIndex) -> QtCore.QSize:
@@ -389,8 +391,8 @@ class ColorComboBox(QtWidgets.QComboBox):
     highlighted = pyqtSignal(QtGui.QColor, name="highlighted")
     colorChanged = pyqtSignal(QtGui.QColor, name="colorChanged")
 
-    def __init__(self, color:typing.Optional[QtGui.QColor]=None, 
-                 palette:typing.Optional[typing.Union[list, tuple, dict, str]]=None,
+    def __init__(self, color:typing.Optional[typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor, str]]=None, 
+                 palette:typing.Optional[typing.Union[list, tuple, dict, str]]=standardPalette,
                  alphaChannelEnabled:bool=True,
                  transparentPixmap:typing.Optional[QtGui.QPixmap]=None,
                  keepAlphaOnDropPaste=False,
@@ -409,13 +411,36 @@ class ColorComboBox(QtWidgets.QComboBox):
             
         if isinstance(palette, dict):
             self._colorDict = dict([(k, paletteQColor(palette, k)) for k in palette.keys()])
+            
+        #print(self._colorList)
+        #print(self._colorDict)
                 
-        self._customColor = QtGui.QColor(QtCore.Qt.white)
+        if isinstance(color, QtCore.Qt.GlobalColor):
+            color = QtGui.QColor(color)
+            colorName= color.name()
+        elif isinstance(color, str):
+            colorName = color
+            allColors = getPalette("a")
+            if colorName in allColors.keys():
+                color = QtGui.QColor(allColors[colorName])
+            if not color.isValid():
+                color = QtGui.QColor(QtCore.Qt.white)
+                colorName = color.name()
+            else:
+                colorName += " (%s)" % color.name()
+                
+        elif not isinstance(color, QtGui.QColor) or not color.isValid():
+            color = QtGui.QColor(QtCore.Qt.white)
+            colorName = color.name()
+            
+        self._customColor = color
+        self.setToolTip(colorName)
+        #self._customColor = QtGui.QColor(QtCore.Qt.white)
         self._internalColor = QtGui.QColor()
 
         self._tPmap = transparentPixmap
         if not self._tPmap:
-            self._tPmap = transparent_painting_bg()
+            self._tPmap = make_transparent_bg()
             
         self._keepAlpha = keepAlphaOnDropPaste
         self._alpha = 255
@@ -487,6 +512,7 @@ class ColorComboBox(QtWidgets.QComboBox):
                 if c.isValid():
                     self.addItem("")
                     self.setItemData(k + 1, c, ColorComboDelegate.ItemRoles.ColorRole)
+                    self.setItemData(k + 1, c.name(), QtCore.Qt.ToolTipRole)
                     
         elif len(self._colorDict):
             for k, (name, c) in enumerate(self._colorDict.items()):
@@ -494,6 +520,8 @@ class ColorComboBox(QtWidgets.QComboBox):
                     self.addItem(name)
                     self.setItemData(k + 1, self._colorDict[name], 
                                      ColorComboDelegate.ItemRoles.ColorRole)
+                    self.setItemData(k + 1, self._colorDict[name], 
+                                     QtCore.Qt.ToolTipRole)
                 
         else:
             for k in range(len(standardPalette)):
@@ -501,6 +529,7 @@ class ColorComboBox(QtWidgets.QComboBox):
                 if c.isValid():
                     self.addItem("")
                     self.setItemData(k + 1, c, ColorComboDelegate.ItemRoles.ColorRole)
+                    self.setItemData(k + 1, c.name(), QtCore.Qt.ToolTipRole)
     
     def _setCustomColor(self, color:QtGui.QColor, lookupInPresets:bool=True):
         from core.datatypes import reverse_mapping_lookup
@@ -514,6 +543,7 @@ class ColorComboBox(QtWidgets.QComboBox):
                 i = self._colorList.index(color)
                 self.setCurrentIndex(i+1)
                 self._internalColor = color
+                self.setToolTip(color.name())
                 return
             
             elif len(self._colorDict) and color in self._colorDict.values():
@@ -523,6 +553,7 @@ class ColorComboBox(QtWidgets.QComboBox):
                 i  = [k for k in self._colorDict.keys()].index(name)
                 self.setCurrentIndex(i+1)
                 self._internalColor = color
+                self.setToolTip("%s (%s)" % (name, color.name()))
                 return
                 
             else:
@@ -530,11 +561,14 @@ class ColorComboBox(QtWidgets.QComboBox):
                     if standardQColor(i) == color:
                         self.setCurrentIndex(i+1)
                         self._internalColor = color
+                        self.setToolTip(color.name())
                         return
                     
         self._internalColor = color
         self._customColor = color
         self.setItemData(0, self._customColor, ColorComboDelegate.ItemRoles.ColorRole)
+        self.setItemData(0, self._customColor.name(), QtCore.Qt.ToolTipRole)
+        self.setToolTip(color.name())
         #self.colorChanged.emit(color)
         #self.activated[QtGui.QColor].emit(color)
         

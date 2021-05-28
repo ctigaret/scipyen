@@ -145,9 +145,9 @@ def createDrag(color:QtGui.QColor, dragSource:QtCore.QObject) -> QtGui.QDrag:
     drag.setHotSpot(QtCore.QPoint(-5, -7))
     return drag
 
-def transparent_painting_bg(strong:bool=False, size:int=16) -> QtGui.QPixmap:
-    ret = QtGui.QPixmap(size, size)
-    patternPainter = QtGui.QPainter(ret)
+def make_transparent_bg(strong:bool=False, size:int=16) -> QtGui.QPixmap:
+    #ret = QtGui.QPixmap(size, size)
+    #patternPainter = QtGui.QPainter(ret)
     if strong:
         color0 = QtCore.Qt.black
         color1 = QtCore.Qt.white

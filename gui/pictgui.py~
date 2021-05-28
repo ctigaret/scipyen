@@ -358,35 +358,7 @@ class MouseEventSink(QtCore.QObject):
         else:
             return False
     
-#class ColorMapList(QtWidgets.QListWidget):
-    #"""
-    #DEPRECATED
-    #Use ItemsListDialog
-    #"""
-    #def __init__(self, parent=None, itemsList=None):
-        #QtWidgets.QListWidget.__init__(self, parent)
-        #self.selectedColorMap = None
-        
-        #if self.validateItems(itemsList):
-            #self.addItems(itemsList)
-      
-        #self.itemClicked.connect(self.selectItem)
-        #self.itemDoubleClicked.connect(self.selectAndGo)
-    
-        ## wrong:
-        ##self.connect(self, SIGNAL("itemClicked('qt.QListWidgetItem')"), self.mySlot);
-    
-    #itemSelected = QtCore.pyqtSignal(str)
-
-
-    #def setItems(self, itemsList):
-        #if self.validateItems(itemsList):
-            ##self.itemsList = itemsList
-            #self.clear()
-            #self.addItems(itemsList)
-  
-  
-# don't use validate as this overrides a QWidget method and breaks the dialog code below
+    # don't use validate as this overrides a QWidget method and breaks the dialog code below
     def validateItems(self, itemsList):
         if itemsList is None or not all([isinstance(x,(str,unicode)) for x in itemsList]):
             QtWidgets.QMessageBox.critical(None, "Error", QtCore.QString("Argument must be a list of string or unicode items."))

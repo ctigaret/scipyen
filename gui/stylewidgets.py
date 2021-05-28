@@ -8,7 +8,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 
 from core.prog import (safeWrapper, no_sip_autoconversion)
 
-from .painting_shared import (transparent_painting_bg,
+from .painting_shared import (make_transparent_bg,
                               standardQtPenStyles,
                               standardQtPenJoinStyles,
                               standardQtPenCapStyles,
@@ -471,7 +471,7 @@ class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
                 # then construct a QGradient on that and construct the brush on that
                 #return
             elif brushStyle in standardQtBrushTextures.values():
-                brush = QtGui.QBrush(transparent_painting_bg(strong=True))
+                brush = QtGui.QBrush(make_transparent_bg(strong=True))
                 # TODO: 2021-05-20 13:17:55
                 # set a default texture & call GUI to choose an image or pixmap
                 # then create a brush on that!
