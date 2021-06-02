@@ -12,7 +12,9 @@
 
 #py_source_files = [os.path.join(os.path.dirname(__file__), e.name) for e in os.scandir(os.path.dirname(__file__)) if e.is_file() and 'text/x-python' in mimetypes.guess_type(e.name) and "_ui" not in e.name]
 
+import matplotlib as mpl
 
+from .scipyenviewer import (ScipyenViewer, ScipyenFrameViewer,)
 from .dictviewer import DataViewer
 from .matrixviewer import MatrixViewer
 from .imageviewer import ImageViewer
@@ -23,3 +25,5 @@ from .xmlviewer import XMLViewer
 
 gui_viewers = [DataViewer, MatrixViewer, ImageViewer, SignalViewer, 
                TableEditor, TextViewer, XMLViewer]
+#gui_viewers = [ScipyenViewer, ScipyenFrameViewer, DataViewer, MatrixViewer, ImageViewer, SignalViewer, 
+               #TableEditor, TextViewer, XMLViewer]

@@ -9,6 +9,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 import sip # for sip.cast
 
 from core.prog import (safeWrapper, no_sip_autoconversion)
+from core.traitcontainers import DataBag
 
 from .scipyen_colormaps import (qtGlobalColors, standardPalette,
                                 standardPaletteDict, svgPalette,
@@ -367,6 +368,65 @@ def comboDelegateBrush(index:QtCore.QModelIndex, role:int) -> QtGui.QBrush:
 def y_less_than(p1:QtCore.QPointF, p2:QtCore.QPointF) -> bool:
     return p1.y() < p2.y()
 
+class ColorGradient():
+    # TODO
+    def __init__(self, gradient:typing.Optional[QtGui.QGradient]=None,
+                 stops:typing.Optional[typing.List[typing.Tuple[float, QtGui.QColor]]]=None,
+                 gradientType:typing.Optional[typing.Union[QtGui.QGradient.Type, int]=None, 
+                 coordinates:typing.Optional[typing.Iterable[typing.Union[typing.Tuple(float, float),typing.Tuple(float, float, float), float]]]=None,
+                 coordinateMode:typing.Optional[typing.Union[QtGui.QGradient.CoordinateMode, int]]=None, 
+                 spreadMode:typing.Optional[typing.Union[QtGui.QGradient.Spread, int]]=None):
+                     
+        if isinstance(gradient, QtGui.QGradient):
+            self.stops = gradient.stops
+            self.spreadMode = gradient.spread()
+            self.coordinateMode = gradient.coordinateMode
+            
+            if isinstance(gradient, QtGui.QLinearGradient):
+                self.gradientType = QtGui.QGradient.LinearGradient
+                # linear gradient: [[x0,y0], [x1,y1]] coords, respectively, for the
+                # start & final stop points
+                self.coordinates = [[gradient.start.x(), gradient.start.y()],
+                            [gradient.finalStop().x(), gradient.finalStop().y()]]
+                
+            elif isinstance(gradient, QtGui.QRadialGradient):
+                self.gradientType = QtGui.QGradient.RadialGradient
+                # radial gradient: [[x0, y0, r0], [x1, y1, r1]]: x, y, radius, respectively,
+                # for the center and focal point
+                self.coordinates = [[gradient.center().x(), gradient.center().y(), gradient.centerRadius()],
+                            [gradient.focalPoint().x(), gradient.focalPoint().y(), gradient.focalRadius()]]
+                
+            elif isinstance(gradient, QtGui.QConicalGradient):
+                self.gradientType = QtGui.QGradient.ConicalGradient
+                # conical gradient: [x0, y0, theta]: center coords and angle
+                self.coordinates = [[gradient.center().x(), gradient.center().y(), gradient.angle()]]
+                
+            else:
+                self.gradientType = gradient.type()
+                if gradient.type() == QtGui.QGradient.LinearGradient:
+                    g = sip.cast(gradient, QtGui.QLinearGradient)
+                    self.coordinates = [[g.start.x(), g.start.y()],
+                                [g.finalStop().x(), g.finalStop().y()]]
+                    
+                elif gradient.type() == QtGui.QGradient.RadialGradient:
+                    g = sip.cast(gradient, QtGui.QRadialGradient)
+                    self.coordinates = [[g.center().x(), g.center().y(), g.centerRadius()],
+                                [g.focalPoint().x(), g.focalPoint().y(), g.focalRadius()]]
+                elif gradient.type() == QtGui.QGradient.ConicalGradient:
+                    g = sip.cast(gradient, QtGui.QConicalGradient)
+                    self.coordinates = [[g.center().x(), g.center().y(), g.angle()]]
+                
+        else:
+            self.stops = stops
+            self.gradientType = gradientType
+            if gradientType & QtGui.QGradient.LinearGradient:
+                self.coordinates = DataBag({"x0":0})
+            self.coordinates = coordinates
+            self.coordinateMode = coordinateMde
+                
+    
+    def qGradient(self):
+        
 class HoverPoints(QtCore.QObject):
     pointsChanged = pyqtSignal(QtGui.QPolygonF, name = "pointsChanged")
     

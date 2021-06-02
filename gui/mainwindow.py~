@@ -213,7 +213,7 @@ from . import textviewer as tv
 from . import xmlviewer as xv
 from . import pictgui as pgui
 from . import resources_rc as resources_rc
-from . import quickdialog
+from . import quickdialog as qd
 from . import scipyenviewer
 from . import consoles
 from . import gui_viewers
@@ -1266,7 +1266,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                             
                         # prepare the dialog (see vigra.pyqt.QuickDialog)
                         #d = vigra.pyqt.quickdialog.QuickDialog(self, "Enter Arguments")
-                        d = quickdialog.QuickDialog(self, "Enter Arguments")
+                        d = qd.QuickDialog(self, "Enter Arguments")
                         d.promptWidgets=[]
                         d.varPromptWidget = None
                         d.kwPromptWidget = None
@@ -1276,19 +1276,19 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         for (a,b,c) in zip(in_types, arg_names, arg_defaults):
                             if isinstance(a, type):
                                 if a.__name__ in ('int', 'long'):
-                                    widgetClass = quickdialog.IntegerInput
+                                    widgetClass = qd.IntegerInput
                                     #widgetClass = vigra.pyqt.quickdialog.IntegerInput
                                 elif a.__name__ == 'float':
-                                    widgetClass = quickdialog.FloatInput
-                                    #widgetClass = vigra.pyqt.quickdialog.FloatInput
+                                    widgetClass = qd.FloatInput
+                                    #widgetClass = vigra.pyqt.qd.FloatInput
                                 elif a.__name__ == 'str':
-                                    widgetClass = quickdialog.StringInput
+                                    widgetClass = qd.StringInput
                                     #widgetClass = vigra.pyqt.quickdialog.StringInput
                                 elif a.__name__ == 'bool':
-                                    widgetClass = quickdialog.CheckBox
+                                    widgetClass = qd.CheckBox
                                     #widgetClass = vigra.pyqt.quickdialog.CheckBox
                                 else:
-                                    widgetClass = quickdialog.InputVariable
+                                    widgetClass = qd.InputVariable
                                     #widgetClass = vigra.pyqt.quickdialog.InputVariable
 
                                 promptWidget = widgetClass(d, b + " (" + a.__name__ +")")
@@ -1314,11 +1314,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                             d.promptWidgets.append(promptWidget)
                             
                         if var_args is not None:
-                            d.varPromptWidget = quickdialog.InputVariable(d, "Variadic arguments: ")
+                            d.varPromptWidget = qd.InputVariable(d, "Variadic arguments: ")
                             #d.varPromptWidget = vigra.pyqt.quickdialog.InputVariable(d, "Variadic arguments: ")
                             
                         if kw_args is not None:
-                            d.kwPromptWidget = quickdialog.InputVariable(d, "Keyword arguments: ")
+                            d.kwPromptWidget = qd.InputVariable(d, "Keyword arguments: ")
                             #d.kwPromptWidget = vigra.pyqt.quickdialog.InputVariable(d, "Keyword arguments: ")
                             
                         if nOutputs > 0:
@@ -1333,7 +1333,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                             srt_nm = [i for i in suggested_ret_names]
                             
                             for k in range(nOutputs):
-                                widget = quickdialog.OutputVariable(d, rt_nm[k])
+                                widget = qd.OutputVariable(d, rt_nm[k])
                                 #widget = vigra.pyqt.quickdialog.OutputVariable(d, rt_nm[k])
                                 widget.setText(srt_nm[k])
                                 d.returnWidgets.append(widget)
@@ -1412,13 +1412,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 else:
                     def inner_f():
                         if nOutputs > 0:
-                            d = quickdialog.QuickDialog(self, "Enter Return Variable Names")
+                            d = qd.QuickDialog(self, "Enter Return Variable Names")
                             #d = vigra.pyqt.quickdialog.QuickDialog(self, "Enter Return Variable Names")
                             d.returnWidgets=[]
                             ret_names = map(fs, ['var '] * nOutputs, map(str, range(nOutputs)))
                             suggested_ret_names = map(fs, ['var_'] * nOutputs, map(str, range(nOutputs)))
                             for k in range(nOutputs):
-                                widget = quickdialog.OutputVariable(d, ret_names[k])
+                                widget = qd.OutputVariable(d, ret_names[k])
                                 #widget = vigra.pyqt.quickdialog.OutputVariable(d, ret_names[k])
                                 widget.setText(suggested_ret_names[k])
                                 d.returnWidgets.append(widget)
@@ -2383,7 +2383,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                                    title="Viewer type", modal=True)
         
         if dlg.exec() == 1:
-            selected_viewer_type_name = dlg.selectedItem
+            seltxt = dlg.selectedItemsText
+            if len(seltxt) == 0:
+                return
+            
+            selected_viewer_type_name = seltxt[0]
             
             win = self._newViewer(selected_viewer_type_name)# , name=win_name)
             
@@ -2844,10 +2848,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             return
         
         varName = self.workspaceModel.item(indexList[0].row(),0).text()
-        dlg = quickdialog.QuickDialog(self, "Rename variable")
+        dlg = qd.QuickDialog(self, "Rename variable")
         #dlg = vigra.pyqt.quickdialog.QuickDialog(self, "Rename variable")
         dlg.addLabel("Rename '%s'" % varName)
-        pw = quickdialog.StringInput(dlg, "To :")
+        pw = qd.StringInput(dlg, "To :")
         #pw = vigra.pyqt.quickdialog.StringInput(dlg, "To :")
         #pw = VariableNameStringInput(dlg, "To:")
         pw.variable.undoAvailable=True

@@ -105,21 +105,6 @@ class ShadeWidget(QtWidgets.QWidget):
                 return 0
         return 0
     
-        #pts = QtGui.QPolygonF(self._hoverPoints.points)
-        #for pt in pts:
-            #print("ShadeWidget.colorAt x %s:" % x, pt.x(), pt.y())
-            
-        #for i in range(1, pts.size()):
-            ##print("ShadeWidget.colorAt x %s: point at %d, %s, at %d, %s" % (x, i-1, pts.at(i-1).x(), i, pts.at(i).x()))
-            #if pts.at(i-1).x() <= x and pts.at(i).x() >= x:
-                #l = QtCore.QLineF(pts.at(i-1), pts.at(i))
-                #if l.dx() > 0:
-                    #l.setLength(l.length() * ((x - l.x1()) / l.dx()))
-                    #return self._shade.pixel(round(min([l.x2(), float(self._shade.width()  - 1)])),
-                                            #round(min([l.y2(), float(self._shade.height() - 1)])))
-                #return 0
-        #return 0
-    
     def setGradientStops(self, stops:typing.Iterable[typing.Tuple[float, typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]]]) -> None:
         if self._shadeType == ShadeWidget.ShadeType.ARGBShade:
             self._alphaGradient = QtGui.QLinearGradient(0, 0, self.width(), 0)
@@ -278,7 +263,8 @@ class GradientRenderer(QtWidgets.QWidget):
                  focalRadius:typing.Optional[float]=None, 
                  hoverPoints:typing.Optional[QtGui.QPolygonF]=QtGui.QPolygonF(), 
                  gradientStops:list = list(),
-                 gradientSpread = QtGui.QGradient.PadSpread,
+                 gradientSpread:typing.Union[QtGui.QGradient.Spread, int] = QtGui.QGradient.PadSpread,
+                 coordinateMode:typing.Union[QtGui.QGradient.CoordinateMode, int] = QtGui.QGradient.LogicalMode,
                  ) -> None:
         super().__init__(parent=parent)
         
@@ -328,6 +314,7 @@ class GradientRenderer(QtWidgets.QWidget):
         self._stops = gradientStops
         #self._spread = QtGui.QGradient.PadSpread
         self._spread = gradientSpread
+        self._coordinateMode = coordinateMode
         self._gradientBrushType = QtCore.Qt.LinearGradientPattern # this is a Qt.BrushStyle enum value
         #self._gradient = None # NOTE: 2021-05-24 13:15:41 Cezar Tigaret
         self._centerRadius = centerRadius
@@ -447,6 +434,14 @@ class GradientRenderer(QtWidgets.QWidget):
     def spread(self, val:typing.Union[QtGui.QGradient.Spread, int]) -> None:
         self._spread = val
         #self.update()
+        
+    @property
+    def coordinateMode(self) -> typing.Union[QtGui.QGradient.CoordinateMode, int]:
+        return self._coordinateMode
+    
+    @coordinateMode.setter
+    def coordinateMode(self, val:typing.Union[QtGui.QGradient.CoordinateMode, int]) -> None:
+        self._coordinateMode = val
 
     @property
     def gradientStops(self) -> typing.Iterable[typing.Tuple[float, typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]]]:
@@ -539,6 +534,21 @@ class GradientRenderer(QtWidgets.QWidget):
     @pyqtSlot()
     def setReflectSpread(self) -> None:
         self.spread = QtGui.QGradient.ReflectSpread
+        self.update()
+        
+    @pyqtSlot()
+    def setLogicalCoordinateMode(self) -> None:
+        self.coordinateMode = QtGui.QGradient.LogicalMode
+        self.update()
+        
+    @pyqtSlot()
+    def setDeviceCoordinateMode(self) -> None:
+        self.coordinateMode = QtGui.QGradient.StretchToDeviceMode
+        self.update()
+        
+    @pyqtSlot()
+    def setObjectCoordinateMode(self) -> None:
+        self.coordinateMode = QtGui.QGradient.ObjectMode
         self.update()
         
     @pyqtSlot()
@@ -670,6 +680,7 @@ class GradientRenderer(QtWidgets.QWidget):
             g.setColorAt(stop[0], QtGui.QColor(stop[1]))
             
         g.setSpread(self._spread)
+        g.setCoordinateMode(self._coordinateMode)
         
         p.setBrush(g)
         p.setPen(QtCore.Qt.NoPen)
@@ -843,8 +854,28 @@ class GradientWidget(QtWidgets.QWidget):
         self.spreadGroup.setTitle("Spread")
         #self.spreadGroup.setTitle("Spread Method")
         self._padSpreadButton = QtWidgets.QRadioButton("Pad", self.spreadGroup)
+        self._padSpreadButton.setToolTip("Fill area with closest stop color")
         self._reflectSpreadButton = QtWidgets.QRadioButton("Reflect", self.spreadGroup)
+        self._reflectSpreadButton.setToolTip("Reflect gradient outside its area")
         self._repeatSpreadButton = QtWidgets.QRadioButton("Repeat", self.spreadGroup)
+        self._repeatSpreadButton.setToolTip("Repeat gradient outside its area")
+        
+        self.coordinateModeGroup = QtWidgets.QGroupBox(self.mainGroup)
+        self.coordinateModeGroup.setTitle("Coordinate Mode")
+        self._logicalCoordinateButton = QtWidgets.QRadioButton("Logical", self.coordinateModeGroup)
+        self._logicalCoordinateButton.setToolTip("Logical")
+        self._logicalCoordinateButton.clicked.connect(self._renderer.setLogicalCoordinateMode)
+        self._deviceCoordinateButton = QtWidgets.QRadioButton("Device", self.coordinateModeGroup)
+        self._deviceCoordinateButton.setToolTip("Stretch to Device")
+        self._deviceCoordinateButton.clicked.connect(self._renderer.setDeviceCoordinateMode)
+        self._objectCoordinateButton = QtWidgets.QRadioButton("Object", self.coordinateModeGroup)
+        self._objectCoordinateButton.setToolTip("Object")
+        self._objectCoordinateButton.clicked.connect(self._renderer.setObjectCoordinateMode)
+        
+        self.coordinateModeLayout = QtWidgets.QHBoxLayout(self.coordinateModeGroup)
+        self.coordinateModeLayout.addWidget(self._logicalCoordinateButton)
+        self.coordinateModeLayout.addWidget(self._deviceCoordinateButton)
+        self.coordinateModeLayout.addWidget(self._objectCoordinateButton)
         
         
         self.presetsGroup = QtWidgets.QGroupBox(self.mainGroup)
@@ -872,6 +903,7 @@ class GradientWidget(QtWidgets.QWidget):
         self.typeSpreadLayout.addWidget(self.typeGroup)
         self.typeSpreadLayout.addWidget(self.spreadGroup)
         self.mainGroupLayout.addWidget(self.typeSpreadGroup)
+        self.mainGroupLayout.addWidget(self.coordinateModeGroup)
         #self.mainGroupLayout.addWidget(self.typeGroup)
         #self.mainGroupLayout.addWidget(self.spreadGroup)
         
@@ -895,6 +927,7 @@ class GradientWidget(QtWidgets.QWidget):
         
         self._linearButton.setChecked(True)
         self._padSpreadButton.setChecked(True)
+        self._logicalCoordinateButton.setChecked(True)
 
         self.presetsGroupLayout = QtWidgets.QHBoxLayout(self.presetsGroup)
         self.presetsGroupLayout.addWidget(self.prevPresetButton)
@@ -1290,6 +1323,18 @@ class GradientWidget(QtWidgets.QWidget):
     def setFocalRadius(self, val:float) -> None:
         if not self._autoFocalRadiusButton.isChecked():
             self._renderer.setFocalRadius(val)
+            
+    #@pyqtSlot()
+    #def setLogicalCoordinateMode(self) -> None:
+        #pass
+        
+    #@pyqtSlot()
+    #def setDeviceCoordinateMode(self) -> None:
+        #pass
+        
+    #@pyqtSlot()
+    #def setObjectCoordinateMode(self) -> None:
+        #pass
         
         
 def set_shade_points(points:typing.Union[QtGui.QPolygonF, list], shade:ShadeWidget) -> None:
