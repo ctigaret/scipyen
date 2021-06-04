@@ -10854,7 +10854,7 @@ class _ColorGradient():
     _qtclass_ = QtGui.QGradient
     
     def _checkQtGradient_(self, x):
-        print(self._qtclass_, type(x))
+        #print(self._qtclass_, type(x))
         return isinstance(x, self._qtclass_) or (isinstance(x, QtGui.QGradient) and x.type() & self._gradient_type_)
     
     def _init_parametric_(self, *args, stops, spread, coordinateMode, name):
@@ -10900,10 +10900,10 @@ class _ColorGradient():
         name = kwargs.get("name", "")
         
         if len(args):
-            print("args", args)
+            #print("args", args)
             if len(args) == 1:
                 if self._checkQtGradient_(args[0]):
-                    self._init_parametric_(self.getCoordinates(args[0]),
+                    self._init_parametric_(*self.getCoordinates(args[0]),
                                            stops = args[0].stops(),
                                            spread = args[0].spread(),
                                            coordinateMode = args[0].coordinateMode(), 
