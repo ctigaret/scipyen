@@ -25,6 +25,7 @@ from .painting_shared import (HoverPoints, x_less_than, y_less_than,
                               standardQtGradientPresets,
                               standardQtGradientSpreads,
                               standardQtGradientTypes,
+                              validQtGradientTypes,
                               standardQtBrushGradients,
                               g2l, g2c, g2r,)
 

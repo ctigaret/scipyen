@@ -43,7 +43,9 @@ standardQtGradientPresets = OrderedDict(sorted([(name, value) for name, value in
 
 standardQtGradientSpreads = OrderedDict(sorted([(name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Spread)]))
 
-standardQtGradientTypes = OrderedDict(sorted([(name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type) and value < 3],
+standardQtGradientTypes = OrderedDict(sorted([(name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type)],
+                                      key = lambda x: x[1]))
+validQtGradientTypes = OrderedDict(sorted([(name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type) and value < 3],
                                       key = lambda x: x[1]))
 
 standardQtBrushStyles = OrderedDict(sorted([(name, value) for name, value in vars(QtCore.Qt).items() if isinstance(value, QtCore.Qt.BrushStyle)],
@@ -368,96 +370,6 @@ def comboDelegateBrush(index:QtCore.QModelIndex, role:int) -> QtGui.QBrush:
 def y_less_than(p1:QtCore.QPointF, p2:QtCore.QPointF) -> bool:
     return p1.y() < p2.y()
 
-class ColorGradient(DataBag):
-    # TODO
-    def __init__(self, gradient:typing.Optional[QtGui.QGradient]=None,
-                 stops:typing.Optional[typing.Union[typing.List[typing.Tuple[float, QtGui.QColor]]]]=None,
-                 gradientType:typing.Optional[typing.Union[QtGui.QGradient.Type, int]]=None, 
-                 coordinates:typing.Optional[typing.Iterable[float]]=None,
-                 coordinateMode:typing.Optional[typing.Union[QtGui.QGradient.CoordinateMode, int]]=None, 
-                 spreadMode:typing.Optional[typing.Union[QtGui.QGradient.Spread, int]]=None):
-                     
-        super().__init__(mutable_types=True, use_casting=False, allow_none=True)
-        
-        self.coordinates = DataBag(mutable_types=True, use_casting=False, allow_none=True)
-        
-        if isinstance(gradient, QtGui.QGradient):
-            self.stops = gradient.stops
-            self.spreadMode = gradient.spread()
-            self.coordinateMode = gradient.coordinateMode
-            
-            if isinstance(gradient, QtGui.QLinearGradient):
-                self.gradientType = QtGui.QGradient.LinearGradient
-                # linear gradient: [[x0,y0], [x1,y1]] coords, respectively, for the
-                # start & final stop points
-                self.coordinates.start = DataBag(x = gradient.start.x(),
-                                                 y = gradient.start.y())
-                self.coordinates.finalStop = DataBag(x = gradient.finalStop.x(),
-                                                     y = gradient.finalStop.y())
-                #self.coordinates = [[gradient.start.x(), gradient.start.y()],
-                            #[gradient.finalStop().x(), gradient.finalStop().y()]]
-                
-            elif isinstance(gradient, QtGui.QRadialGradient):
-                self.gradientType = QtGui.QGradient.RadialGradient
-                # radial gradient: [[x0, y0, r0], [x1, y1, r1]]: x, y, radius, respectively,
-                # for the center and focal point
-                self.coordinates.center = DataBag(x = gradient.center().x(),
-                                                  y = gradient.center().y(),
-                                                  radius = gradient.centerRadius())
-                self.coordinates.focalPoint = DataBag(x = gradient.focalPoint().x(),
-                                                  y = gradient.focalPoint().y(),
-                                                  radius = gradient.focalRadius())
-                #self.coordinates = [[gradient.center().x(), gradient.center().y(), gradient.centerRadius()],
-                            #[gradient.focalPoint().x(), gradient.focalPoint().y(), gradient.focalRadius()]]
-                
-            elif isinstance(gradient, QtGui.QConicalGradient):
-                self.gradientType = QtGui.QGradient.ConicalGradient
-                # conical gradient: [x0, y0, theta]: center coords and angle
-                self.coordinates.center = DataBag(x = gradient.center().x(),
-                                                  y = gradient.center().y())
-                self.coordinates.angle = gradient.angle()
-                #self.coordinates = [[gradient.center().x(), gradient.center().y(), gradient.angle()]]
-                
-            else:
-                self.gradientType = gradient.type()
-                if gradient.type() == QtGui.QGradient.LinearGradient:
-                    g = sip.cast(gradient, QtGui.QLinearGradient)
-                    self.coordinates.start = DataBag(x = g.start.x(),
-                                                     y = g.start.y())
-                    self.coordinates.finalStop = DataBag(x = g.finalStop.x(),
-                                                         y = g.finalStop.y())
-                    #self.coordinates = [[g.start.x(), g.start.y()],
-                                #[g.finalStop().x(), g.finalStop().y()]]
-                    
-                elif gradient.type() == QtGui.QGradient.RadialGradient:
-                    g = sip.cast(gradient, QtGui.QRadialGradient)
-                    self.coordinates.center = DataBag(x = g.center().x(),
-                                                      y = g.center().y(),
-                                                      radius = g.centerRadius())
-                    self.coordinates.focalPoint = DataBag(x = g.focalPoint().x(),
-                                                          y = g.focalPoint().y(),
-                                                          radius = g.focalRadius())
-                    #self.coordinates = [[g.center().x(), g.center().y(), g.centerRadius()],
-                                #[g.focalPoint().x(), g.focalPoint().y(), g.focalRadius()]]
-                elif gradient.type() == QtGui.QGradient.ConicalGradient:
-                    g = sip.cast(gradient, QtGui.QConicalGradient)
-                    self.coordinates.center = DataBag(x = g.center().x(),
-                                                      y = g.center().y())
-                    self.coordinates.angle = gradient.angle()
-                    #self.coordinates = [[g.center().x(), g.center().y(), g.angle()]]
-                
-        else:
-            self.stops = stops
-            self.gradientType = gradientType
-            if gradientType & QtGui.QGradient.LinearGradient:
-                self.coordinates = DataBag({"x0":0})
-            self.coordinates = coordinates
-            self.coordinateMode = coordinateMde
-                
-    
-    def qGradient(self):
-        pass
-        
 class HoverPoints(QtCore.QObject):
     pointsChanged = pyqtSignal(QtGui.QPolygonF, name = "pointsChanged")
     
