@@ -29,6 +29,8 @@ from .painting_shared import (HoverPoints, x_less_than, y_less_than,
                               standardQtBrushGradients,
                               g2l, g2c, g2r,)
 
+from . import quickdialog as qd
+
 class ShadeWidget(QtWidgets.QWidget):
     colorsChanged = pyqtSignal(QtGui.QPolygonF, name="colorsChanged")
     
@@ -1036,7 +1038,7 @@ class GradientWidget(QtWidgets.QWidget):
             
         
         # NOTE: 2021-05-24 12:48:43
-        # leave this in for strict browing between min & max preset
+        # leave this in for strict browsing between min & max preset
         #self._gradientIndex = max([0, min([self._gradientIndex + indexOffset, len(standardQtGradientPresets)-1])])
 
         # NOTE: 2021-05-25 13:16:27
@@ -1330,19 +1332,35 @@ class GradientWidget(QtWidgets.QWidget):
         if not self._autoFocalRadiusButton.isChecked():
             self._renderer.setFocalRadius(val)
             
-    #@pyqtSlot()
-    #def setLogicalCoordinateMode(self) -> None:
-        #pass
+class GradientDialog(QtWidgets.QDialog):
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None,
+                 title:str="Select/Edit Gradient"):
+        super().__init__(parent=parent)
+        self.layout = QtWidgets.QVBoxLayout(self)
+        self.gw = GradientWidget()
+        self.gw.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.layout.addWidget(self.gw)
+        self.insertButtons()
+        if not isinstance(title, str) or len(title.strip()) == 0:
+            title = "Select/Edit Gradient"
+            
+        self.setWindowTitle(title)
         
-    #@pyqtSlot()
-    #def setDeviceCoordinateMode(self) -> None:
-        #pass
+    def insertButtons(self):
+        self.buttons = QtWidgets.QFrame(self)
+        self.buttons.OK = QtWidgets.QPushButton("OK", self.buttons)
+        self.buttons.Cancel = QtWidgets.QPushButton("Cancel", self.buttons)
+        self.buttons.OK.setDefault(1)
+        self.buttons.Cancel.clicked.connect(self.reject)
+        self.buttons.OK.clicked.connect(self.accept)
         
-    #@pyqtSlot()
-    #def setObjectCoordinateMode(self) -> None:
-        #pass
+        self.buttons.layout = QtWidgets.QHBoxLayout(self.buttons)
+        self.buttons.layout.addStretch(5)
+        self.buttons.layout.addWidget(self.buttons.OK)
+        self.buttons.layout.addWidget(self.buttons.Cancel)
+        self.layout.addWidget(self.buttons)
         
-        
+            
 def set_shade_points(points:typing.Union[QtGui.QPolygonF, list], shade:ShadeWidget) -> None:
     shade.hoverPoints.points = QtGui.QPolygonF(points)
     shade.hoverPoints.setPointLock(0, HoverPoints.LockType.LockToLeft)
