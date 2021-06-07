@@ -1,4 +1,5 @@
 import array, os, typing, numbers
+from collections import OrderedDict
 import numpy as np
 from enum import IntEnum
 
@@ -466,6 +467,7 @@ class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
         
         #### Draw brush
         brushStyle = index.data(self.ItemRoles.BrushRole)
+        print("BrushComboDelegate.paint brushStyle", brushStyle, "(type %s)" % type(brushStyle))
         painter.setPen(QtCore.Qt.transparent)
         if isinstance(brushStyle, BrushStyleType._subs_tree()[1:]):
             #print("brushSyle", brushStyle)
@@ -516,22 +518,33 @@ class BrushComboBox(QtWidgets.QComboBox):
     highlighted = pyqtSignal(object, name="highlighted")
     styleChanged = pyqtSignal(object, name="styleChanged")
     
-    def __init__(self, style:typing.Optional[BrushStyleType]=None,
+    def __init__(self, style:typing.Optional[typing.Union[BrushStyleType, QtGui.QPixmap,QtGui.QImage, QtGui.QGradient]]=None,
                   customStyles:typing.Optional[dict]=None,
                   restrict:typing.Optional[str]=None,
                   parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent=parent)
         self._customStyles = {}
-        if isinstance(style, BrushStyleType._subs_tree()[1:]):
-            self._internalStyle = style
+        self._brushes = OrderedDict([(name, val) for name, val in standardQtBrushPatterns.items() if val > 0])
+        #if isinstance(style, BrushStyleType._subs_tree()[1:]):
+        if isinstance(style, BrushStyleType._subs_tree()):
             self._customStyle = style
+        elif isinstance(style, (QtGui.QPixmap, QtGui.QImage, QtGui.QGradient)):
+            self._customStyle = brush(style)
         else:
-            self._internalStyle = QtCore.Qt.NoBrush
             self._customStyle = QtCore.Qt.NoBrush
         
-        if isinstance(customStyles, dict) and len(customStyles) and all([isinstance(v, BrushStyleType._subs_tree()[1:]) for v in customStyles.values()]):
-            self._customStyles.update(customStyles)
+        self._internalStyle = self._customStyle
         
+        if self._customStyle is not QtCore.Qt.NoBrush:
+            self._brushes["Custom"] = self._customStyle
+            
+        self._brushes.update(standardQtBrushPatterns)
+        
+        brushTypes = tuple(list(BrushStyleType._subs_tree()[1:]) + [QtGui.QPixmap, QtGui.QImage, QtGui.QGradient])
+        
+        if isinstance(customStyles, dict) and len(customStyles) and all([isinstance(v, brushTypes) for v in customStyles.values()]):
+            self._brushes.update(customStyles)
+               
         self.setItemDelegate(BrushComboDelegate(self))
         
         super().activated[int].connect(self._slotActivated)
@@ -544,7 +557,7 @@ class BrushComboBox(QtWidgets.QComboBox):
         self._slotActivated(0)
 
     def paintEvent(self, ev:QtGui.QPaintEvent):
-        print("BrushComboBox.paintEvent inner style", self._internalStyle)
+        print("BrushComboBox.paintEvent internal style", self._internalStyle, "(type %s)" % type(self._internalStyle))
         painter = QtWidgets.QStylePainter(self)
 
         #### Draw styled widget
@@ -602,9 +615,9 @@ class BrushComboBox(QtWidgets.QComboBox):
     @pyqtSlot(int)
     @safeWrapper
     def _slotActivated(self, index:int):
-        print("BrushComboBox._slotActivated: index =", index)
-        print("BrushComboBox._slotActivated: _n_brush_styles =", self._n_brush_styles)
-        print("BrushComboBox._slotActivated: _gradient_brush_item_index =", self._gradient_brush_item_index)
+        #print("BrushComboBox._slotActivated: index =", index)
+        #print("BrushComboBox._slotActivated: _n_brush_styles =", self._n_brush_styles)
+        #print("BrushComboBox._slotActivated: _gradient_brush_item_index =", self._gradient_brush_item_index)
         if self.count() == 0:
             return
         #if index == 0:
@@ -703,6 +716,7 @@ class BrushComboBox(QtWidgets.QComboBox):
             if len(gradient.stops()) > 1:
                 brush = QtGui.QBrush(gradient)
                 self._setCustomStyle("Gradient", brush, True)
+                self.update()
                 self.activated[object].emit(self._internalStyle)
         
     def _addStyles(self):
