@@ -363,7 +363,7 @@ class ColorComboDelegate(QtWidgets.QAbstractItemDelegate):
                 painter.setBrush(QtCore.Qt.NoBrush)
                 
         tv = index.data(QtCore.Qt.DisplayRole)
-        if isinstance(tv, str):
+        if isinstance(tv, str) and len(tv.strip()):
             textColor = QtGui.QColor()
             if paletteBrush:
                 if isSelected:

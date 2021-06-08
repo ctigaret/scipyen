@@ -200,7 +200,7 @@ class PenComboBox(QtWidgets.QComboBox):
                  parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent=parent)
         
-        self._customStyles = {}
+        self._styles = {}
         
         if isinstance(styling, str) and styling.lower() in ("cap", "join", "stroke"):
             self._styling = styling
@@ -218,7 +218,7 @@ class PenComboBox(QtWidgets.QComboBox):
         else:
             self._styles = standardQtPenStyles
             if len(customStyles) and all ([isinstance(v, PenStyleType._subs_tree()[1:]) for v in customStyles]):
-                self._customStyles.update(customStyles)
+                self._styles.update(customStyles)
             self._internalStyle = QtCore.Qt.SolidLine
             
         self._customStyle = QtCore.Qt.NoPen
@@ -286,7 +286,7 @@ class PenComboBox(QtWidgets.QComboBox):
         
             styles += [("No Pen", QtCore.Qt.NoPen)]
         
-            styles += [(name, val) for name, val in self._customStyles.items()]
+            styles += [(name, val) for name, val in self._styles.items()]
         
             self.addItem(self.tr("Custom dashes...", "@item:inlistbox Custom stroke style"))
             self.setItemData(0, "Custom dashes...", QtCore.Qt.ToolTipRole)
@@ -302,18 +302,18 @@ class PenComboBox(QtWidgets.QComboBox):
         if not isinstance(value, (list, tuple)) or self._styling in ("cap", "join"):
             return
         
-        if len(self._customStyles):
+        if len(self._styles):
             if lookup:
-                if name not in self._customStyles.keys():
-                    self._customStyles[name] = value
+                if name not in self._styles.keys():
+                    self._styles[name] = value
                     self.clear()
                     self._addStyles()
                     self._customStyle = value
                     self._internalStyle = value
                     self.setCurrentIndex(self.count()-1)
                 else:
-                    i = [k for k in self._customStyles.keys()].index(name)
-                    self._internalStyle = self._customStyles[name]
+                    i = [k for k in self._styles.keys()].index(name)
+                    self._internalStyle = self._styles[name]
                     self._customStyle = self._internalStyle
                     self.setCurrentIndex(i+1)
                 
@@ -460,46 +460,71 @@ class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
         
         tmpRenderHints = painter.renderHints()
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        #painter.setPen(penColor)
-        #painter.setPen(QtCore.Qt.NoPen)
-        #painter.setBrush(innerColor)
-        #painter.drawRoundedRect(innerRect, 2, 2)
         
         #### Draw brush
         brushStyle = index.data(self.ItemRoles.BrushRole)
-        print("BrushComboDelegate.paint brushStyle", brushStyle, "(type %s)" % type(brushStyle))
         painter.setPen(QtCore.Qt.transparent)
         if isinstance(brushStyle, BrushStyleType._subs_tree()[1:]):
-            #print("brushSyle", brushStyle)
-            if brushStyle in standardQtBrushPatterns.values():
-                brush = QtGui.QBrush(brushStyle)
-                brush.setColor(penColor) 
-            elif brushStyle in standardQtBrushGradients.values():
-                brush = QtGui.QBrush(QtGui.QGradient(standardQtGradientPresets["AboveTheSky"]))
-                #if brushStyle QtCore.Qt.LinearGradientPattern:
-                    #gradient = QtGui.QLinearGradient()
-                # TODO: 2021-05-20 13:17:00
-                # set a default preset & call GUI to choose one and/or edit gradient
-                # then construct a QGradient on that and construct the brush on that
-                #return
-            elif brushStyle in standardQtBrushTextures.values():
-                brush = QtGui.QBrush(make_transparent_bg(strong=True))
-                # TODO: 2021-05-20 13:17:55
-                # set a default texture & call GUI to choose an image or pixmap
-                # then create a brush on that!
-                #return
-            else:
-                brush = QtGui.QBrush(QtCore.Qt.NoBrush)
-                
-            painter.setBrush(brush)
-        elif isinstance(brushStyle, (QtGui.QPixmap, QtGui.QImage, QtGui.QGradient, QtGui.QBrush)):
+            if isinstance(brushStyle, QtGui.QGradient):
+                if isinstance(brushStyle, QtGui.QLinearGradient):
+                    pass
+                elif isinstance(brushStyle, QtGui.QRadialGradient):
+                    pass
+                elif isinstance(brushStyle, QtGui.QConicalGradient):
             brush = QtGui.QBrush(brushStyle)
             
-        else:
-            painter.setBrush(QtCore.Qt.NoBrush)
+            if brushStyle in standardQtBrushPatterns.values():
+                brush.setColor(penColor) 
+                
+            #elif brushStyle in standardQtBrushGradients.values():
+                #brush = QtGui.QBrush(brushStyle)
+                ##brush = QtGui.QBrush(QtGui.QGradient(standardQtGradientPresets["AboveTheSky"]))
+                ##if brushStyle QtCore.Qt.LinearGradientPattern:
+                    ##gradient = QtGui.QLinearGradient()
+                ## TODO: 2021-05-20 13:17:00
+                ## set a default preset & call GUI to choose one and/or edit gradient
+                ## then construct a QGradient on that and construct the brush on that
+                ##return
+            #elif brushStyle in standardQtBrushTextures.values():
+                #brush = QtGui.QBrush(make_transparent_bg(strong=True))
+                ## TODO: 2021-05-20 13:17:55
+                ## set a default texture & call GUI to choose an image or pixmap
+                ## then create a brush on that!
+                ##return
+            #else:
+                #brush = QtGui.QBrush(QtCore.Qt.NoBrush)
+                
+            painter.setBrush(brush)
+        #elif isinstance(brushStyle, (QtGui.QPixmap, QtGui.QImage, QtGui.QGradient, QtGui.QBrush)):
+            #brush = QtGui.QBrush(brushStyle)
+            
+        #else:
+            #painter.setBrush(QtCore.Qt.NoBrush)
             
         painter.drawRoundedRect(innerRect, 2, 2)
-          
+        
+        text = index.data(QtCore.Qt.DisplayRole)
+        
+        if isinstance(text, str) and len(text.strip()):
+            if paletteBrush:
+                if isSelected:
+                    textColor = option.palette.color(QtGui.QPalette.HighlightedText)
+                else:
+                    textColor = option.palette.color(QtGui.QPalette.Text)
+            else:
+                _, _, v, _ = innerColor.getHsv()
+                if v > 128:
+                    textColor = QtGui.QColor(QtCore.Qt.black)
+                else:
+                    textColor = QtGui.QColor(QtCore.Qt.white)
+                    
+            if textColor.isValid():
+                painter.setPen(textColor)
+            else:
+                painter.setPen(penColor)
+                
+            painter.drawText(innerRect.adjusted(1, 1, -1, -1), QtCore.Qt.AlignCenter, text)
+
         #### Reset painter
         painter.setRenderHints(tmpRenderHints)
         painter.setBrush(QtCore.Qt.NoBrush)
@@ -518,46 +543,56 @@ class BrushComboBox(QtWidgets.QComboBox):
     highlighted = pyqtSignal(object, name="highlighted")
     styleChanged = pyqtSignal(object, name="styleChanged")
     
-    def __init__(self, style:typing.Optional[typing.Union[BrushStyleType, QtGui.QPixmap,QtGui.QImage, QtGui.QGradient]]=None,
+    def __init__(self, style:typing.Optional[BrushStyleType]=None,
                   customStyles:typing.Optional[dict]=None,
                   restrict:typing.Optional[str]=None,
                   parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent=parent)
-        self._customStyles = {}
-        self._brushes = OrderedDict([(name, val) for name, val in standardQtBrushPatterns.items() if val > 0])
-        #if isinstance(style, BrushStyleType._subs_tree()[1:]):
-        if isinstance(style, BrushStyleType._subs_tree()):
+        
+        self._standardStyles = OrderedDict(sorted(standardQtBrushPatterns.items(), key = lambda x : x[1]))
+        self._standardStyles.move_to_end("NoBrush")
+        
+        self._customStyles = OrderedDict()
+        
+        self._interactiveStyles = OrderedDict()
+        self._interactiveStyles["Gradient..."] = QtCore.Qt.NoBrush
+        self._interactiveStyles["Pixmap..."] = QtCore.Qt.NoBrush
+        self._interactiveStyles["Image..."] = QtCore.Qt.NoBrush
+        
+        self._update_styles_()
+        self._internalStyle = [v for v in self._standardStyles.values()][0]
+        
+        if isinstance(style, (QtGui.QGradient, QtGui.QBitmap, QtGui.QPixmap, QtGui.QImage)):
+            self._presetStyle
+            self._styles["Custom"] = style
+            self._styles.move_to_end("Custom", last=False)
+            
             self._customStyle = style
-        elif isinstance(style, (QtGui.QPixmap, QtGui.QImage, QtGui.QGradient)):
-            self._customStyle = brush(style)
+            self._internalStyle = style
         else:
             self._customStyle = QtCore.Qt.NoBrush
-        
-        self._internalStyle = self._customStyle
-        
-        if self._customStyle is not QtCore.Qt.NoBrush:
-            self._brushes["Custom"] = self._customStyle
             
-        self._brushes.update(standardQtBrushPatterns)
-        
-        brushTypes = tuple(list(BrushStyleType._subs_tree()[1:]) + [QtGui.QPixmap, QtGui.QImage, QtGui.QGradient])
-        
-        if isinstance(customStyles, dict) and len(customStyles) and all([isinstance(v, brushTypes) for v in customStyles.values()]):
-            self._brushes.update(customStyles)
-               
         self.setItemDelegate(BrushComboDelegate(self))
         
         super().activated[int].connect(self._slotActivated)
         super().highlighted[int].connect(self._slotHighlighted)
+        
         self.setMaxVisibleItems(13)
-        self._gradient_brush_item_index = -1
-        self._n_brush_styles = 0
+        #self._gradient_brush_item_index = -1
+        #self._n_brush_styles = 0
         self._addStyles()
+        #self._currentIndex = 0
         self.setCurrentIndex(0)
         self._slotActivated(0)
-
+        
+    def _update_styles_(self) -> None:
+        self._styles = OrderedDict()
+        self._styles.update(self._standardStyles)
+        self._styles.update(self._customStyles)
+        self._styles.update(self._interactiveStyles)
+        
     def paintEvent(self, ev:QtGui.QPaintEvent):
-        print("BrushComboBox.paintEvent internal style", self._internalStyle, "(type %s)" % type(self._internalStyle))
+        #print("BrushComboBox.paintEvent internal style", self._internalStyle, "(type %s)" % type(self._internalStyle))
         painter = QtWidgets.QStylePainter(self)
 
         #### Draw styled widget
@@ -615,14 +650,13 @@ class BrushComboBox(QtWidgets.QComboBox):
     @pyqtSlot(int)
     @safeWrapper
     def _slotActivated(self, index:int):
-        #print("BrushComboBox._slotActivated: index =", index)
-        #print("BrushComboBox._slotActivated: _n_brush_styles =", self._n_brush_styles)
-        #print("BrushComboBox._slotActivated: _gradient_brush_item_index =", self._gradient_brush_item_index)
         if self.count() == 0:
             return
-        #if index == 0:
-        #if index == self.count()-1:
-        if index == self._n_brush_styles:
+        gradientBrushIndex = [n for n in self._styles.keys()].index("Gradient...")
+        pixmapBrushIndex = [n for n in self._styles.keys()].index("Pixmap...")
+        imageBrushIndex = [n for n in self._styles.keys()].index("Image...")
+
+        if index in (pixmapBrushIndex, imageBrushIndex):
             filePathName, _ = QtWidgets.QFileDialog.getOpenFileName(self, caption="Open image or pixmap file",
                                                              filter="Images (*.png *.xpm *.jpg *.jpeg *.gif *.tif *.tiff);;Vector drawing (*.svg);; All files (*.*)")
             if len(filePathName) == 0:
@@ -663,6 +697,7 @@ class BrushComboBox(QtWidgets.QComboBox):
                         pix = QtGui.QPixmap.fromImage(image)
                         if pix.isNull():
                             return
+                        
                         val = QtGui.QBrush(pix)
                 else:
                     return
@@ -670,114 +705,108 @@ class BrushComboBox(QtWidgets.QComboBox):
                 return # FIXME 2021-05-19 11:14:48 what to do with extension-less files?
                 
             if val is not None:
-                self._setCustomStyle(name, val, True)
+                self._setCustomStyle(name, val)
+                #self._setCustomStyle(name, val, True)
                 self.activated[object].emit(self._internalStyle)
                 
             return
         
-        elif index == self._gradient_brush_item_index:
+        elif index == gradientBrushIndex:
             dlg = GradientDialog(parent=self)
-            dlg.finished[int].connect(self._slotUpdateGradientBrush)
             dlg.open()
+            if dlg.result() & QtGui.QDialog.Accepted:
+                self._setCustomStyle("Custom", dlg.gw.gradient)
+                self.activated[object].emit(self._internalStyle)
+                return
             #gw = GradientWidget()
             #gw.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
             #gdlg.addWidget(gw)
             #gdlg.finished[int].connect(self._slotUpdateGradientBrush)
             #gdlg.open()
             
-        
         self._internalStyle = self.itemData(index, BrushComboDelegate.ItemRoles.BrushRole)
         self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
         self.activated[object].emit(self._internalStyle)
-            
+        
     @pyqtSlot(int)
     @safeWrapper
     def _slotHighlighted(self, index:int):
-        if index == self._n_brush_styles:
-            self._internalStyle = self._customStyle
-            self.setToolTip("Custom image")
-            return
+        gradientBrushIndex = [n for n in self._styles.keys()].index("Gradient...")
+        pixmapBrushIndex = [n for n in self._styles.keys()].index("Pixmap...")
+        imageBrushIndex = [n for n in self._styles.keys()].index("Image...")
         
-        if index == self._gradient_brush_item_index:
-            self._internalStyle = self._customStyle
-            self.setToolTip("Gradient")
-            return
+        #if index in (pixmapBrushIndex, imageBrushIndex):
+            #self._internalStyle = self._customStyle
+            ##self.setToolTip("Custom texture")
+            #return
+        
+        #if index == gradientBrushIndex:
+            #self._internalStyle = self._customStyle
+            ##self.setToolTip("Gradient")
+            #return
         
         self._internalStyle = self.itemData(index, BrushComboDelegate.ItemRoles.BrushRole)
         self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
         
-    @pyqtSlot(int)
-    @safeWrapper
-    def _slotUpdateGradientBrush(self, value:typing.Union[int, QtWidgets.QDialog.DialogCode]):
-        dlg = self.sender()
-        if isinstance(dlg, GradientDialog) and value == QtWidgets.QDialog.Accepted:
-            gradient = dlg.gw.gradient
-            
-            if len(gradient.stops()) > 1:
-                brush = QtGui.QBrush(gradient)
-                self._setCustomStyle("Gradient", brush, True)
-                self.update()
-                self.activated[object].emit(self._internalStyle)
-        
     def _addStyles(self):
-        styles =  [(name, val) for name, val in standardQtBrushPatterns.items() if val > 0]
-        styles += [("No Brush", QtCore.Qt.NoBrush)]
-        styles += [("Gradient ...", QtCore.Qt.NoBrush)]
-        self._gradient_brush_item_index = len(styles)-1
-        styles += [(name, val) for name , val in self._customStyles.items()]
-        self._n_brush_styles = len(styles)
-        
-        #ndx = 0
-        for k, (name, val) in enumerate(styles):
-            self.addItem("")
-            self.setItemData(k, val, BrushComboDelegate.ItemRoles.BrushRole)
-            self.setItemData(k, name, QtCore.Qt.ToolTipRole)
-            #ndx = k
-        
-        self.addItem(self.tr("Custom pixmap...", "@item:inlistbox Custom pixmap brush"))
-        #ndx += 1
-        self.setItemData(len(styles), "Custom pixmap...", QtCore.Qt.ToolTipRole)
-        
-        #self.addItem(self.tr("Custom brush...", "@item:inlistbox Custom brush style"))
-        #self.setItemData(0, "Custom brush...", QtCore.Qt.ToolTipRole)
-        
-        #styles =  [(name, val) for name, val in standardQtBrushPatterns.items() if val > 0]
-        #styles += [("No Brush", QtCore.Qt.NoBrush)]
-        #styles += [("Gradient ...", QtCore.Qt.NoBrush)]
-        #styles += [(name, val) for name , val in self._customStyles.items()]
-        
-        #for k, (name, val) in enumerate(styles):
-            #self.addItem("")
-            #self.setItemData(k+1, val, BrushComboDelegate.ItemRoles.BrushRole)
-            #self.setItemData(k+1, name, QtCore.Qt.ToolTipRole)
-        
-
-    def _setCustomStyle(self, name:str, value:typing.Union[BrushStyleType, QtGui.QPixmap, QtGui.QImage, QtGui.QGradient], lookup:bool=True):
-        if not isinstance(value, BrushStyleType._subs_tree()[1:]) and not isinstance(value, (QtGui.QPixmap, QtGui.QImage, QtGui.QGradient)):
-            return
-        
-        if len(self._customStyles):
-            if lookup:
-                if name not in self._customStyles.keys():
-                    self._customStyles[name] = value
-                    self.clear()
-                    self._addStyles()
-                    self._customStyle = value
-                    self._internalStyle = value
-                    self._setCurrentIndex(self.count()-1)
-                else:
-                    i = [k for k in self._customStyles.key()].index(name)
-                    self._internalStyle = self._customStyles[name]
-                    self._customStyle = self._internalStyle
-                    self.setCurrentIndex(i+1)
-                    
-                return
+        for k, (name, value) in enumerate(self._styles.items()):
+            if name in ("Gradient...", "Pixmap...", "Image..."):
+                self.addItem(name)
+                self.setItemData(k, name, QtCore.Qt.DisplayRole)
+                if name in ("Pixmap...", "Image..."):
+                    self.setItemData(k, make_transparent_bg(strong=True), BrushComboDelegate.ItemRoles.BrushRole)
+                
+            elif name=="NoBrush":
+                self.addItem("No Brush")
+                self.setItemData(k, name, QtCore.Qt.DisplayRole)
             
-        self._internalStyle = value
+            else:
+                self.addItem("")
+                
+            self.setItemData(k, value, BrushComboDelegate.ItemRoles.BrushRole)
+            self.setItemData(k, name, QtCore.Qt.ToolTipRole)
+            
+    #def _setCustomStyle(self, name:str, value:typing.Union[BrushStyleType, QtGui.QPixmap, QtGui.QImage, QtGui.QGradient], lookup:bool=True):
+    def _setCustomStyle(self, name:str, value:typing.Union[BrushStyleType, QtGui.QPixmap, QtGui.QImage, QtGui.QGradient]):
+        if not isinstance(value, BrushStyleType._subs_tree()[1:]): #and not isinstance(value, (QtGui.QPixmap, QtGui.QImage, QtGui.QGradient)):
+            return
+        print("BrushComboBox._setCustomStyle", name, value)
+
+        self._customStyles[name] = value # adds or changes
+        self._update_styles_()
+        self.clear()
+        self._addStyles()
         self._customStyle = value
-        self.setItemData(0, name, QtCore.Qt.ToolTipRole)
-        self.setItemData(0, self._internalStyle, BrushComboDelegate.ItemRoles.BrushRole)
-        #self.activated[object].emit(self._internalStyle)
+        self._internalStyle = value
+        index = [n for n in self._styles.keys()].index(name)
+        self.setItemData(index, name, QtCore.Qt.ToolTipRole)
+        self.setItemData(index, self._internalStyle, BrushComboDelegate.ItemRoles.BrushRole)
+        
+        #self.setCurrentIndex(index)
+        #if len(self._styles):
+            #if lookup:
+                #self._customStyles[name] = value # adds or changes
+                #self.clear()
+                #self._addStyles()
+                #self._customStyle = value
+                #self._internalStyle = value
+                #index = [n for n in self._styles.keys()].index(name)
+                #self.setCurrentIndex(index)
+                ##if name not in self._customStyles.keys():
+                ##else:
+                    ##self._customStyles[name] = value
+                    ##self._internalStyle = self._styles[name]
+                    ##self._customStyle = self._internalStyle
+                    ##i = [k for k in self._customStyles.key()].index(name)
+                    ##self.setCurrentIndex(i)
+                    
+                #return
+            
+        #self._internalStyle = value
+        #self._customStyle = value
+        #self.setItemData(0, name, QtCore.Qt.ToolTipRole)
+        #self.setItemData(0, self._internalStyle, BrushComboDelegate.ItemRoles.BrushRole)
+        ##self.activated[object].emit(self._internalStyle)
         
             
         

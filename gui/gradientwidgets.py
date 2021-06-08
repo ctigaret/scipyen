@@ -27,7 +27,9 @@ from .painting_shared import (HoverPoints, x_less_than, y_less_than,
                               standardQtGradientTypes,
                               validQtGradientTypes,
                               standardQtBrushGradients,
-                              g2l, g2c, g2r,)
+                              g2l, g2c, g2r,
+                              gradientCoordinates,
+                              scaleGradient,)
 
 from . import quickdialog as qd
 
@@ -1206,6 +1208,16 @@ class GradientWidget(QtWidgets.QWidget):
         
         self._changePresetBy(0)
             
+    @property
+    def normalizedGradient(self) -> QtGui.QGradient:
+        """The currently displayed gradient normalized to the renderer's size
+        """
+        
+        g = self.gradient
+        coords = gradientCoordinates(g)
+        
+        if isinstance(g, QtGui.QLinearGradient):
+            g.setStart(coords[0]/)
         
             
     @property
@@ -1219,7 +1231,7 @@ class GradientWidget(QtWidgets.QWidget):
         Hence, setting this property to a gradient will NOT store a reference to
         the gradient object argument, but will generate a new one
         """
-        return self._renderer._gradient
+        return scaleGradient(self._renderer._gradient, self._renderer.sizeHint()
     
     @gradient.setter
     def gradient(self, val:typing.Union[QtGui.QGradient, QtGui.QGradient.Preset, str]) -> None:

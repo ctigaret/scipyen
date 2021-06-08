@@ -165,7 +165,7 @@ from core.workspacefunctions import debug_scipyen
 #### END core modules
 
 #### BEGIN other gui stuff
-from .painting_shared import (standardQtGradientTypes, g2l, g2c, g2r,)
+from .painting_shared import (standardQtGradientTypes, g2l, g2c, g2r, gradientCoordinates)
 #### END other gui stuff
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -10907,7 +10907,7 @@ class _ColorGradient():
             if len(args) == 1:
                 if self._checkQtGradient_(args[0]):
                     if args[0].type() == self._gradient_type_:
-                        self._init_parametric_(*self.getCoordinates(args[0]),
+                        self._init_parametric_(*gradientCoordinates(args[0]),
                                             stops = args[0].stops(),
                                             spread = args[0].spread(),
                                             coordinateMode = args[0].coordinateMode(), 
@@ -10922,7 +10922,7 @@ class _ColorGradient():
                         else:
                             raise TypeError("Unsupported gradient type: %s" % reverse_mapping_lookup(standardQtGradientTypes, args[0].type()))
                         
-                        self._init_parametric_(*self.getCoordinates(g), 
+                        self._init_parametric_(*gradientCoordinates(g), 
                                                stops = g.stops(), 
                                                spread = g.spread(),
                                                coordinateMode = g.coordinateMode(),
@@ -10976,27 +10976,27 @@ class _ColorGradient():
     def _conicalcoords(x):
         return (x.center().x(), x.center().y(), x.angle())
         
-    @staticmethod
-    def getCoordinates(x:QtGui.QGradient):
-        if isinstance(x, QtGui.QLinearGradient):
-            return _ColorGradient._linearcoords(x)
-        elif isinstance(x, QtGui.QRadialGradient):
-            return _ColorGradient._radialcoords(x)
-        elif isinstance(x, QtGui.QConicalGradient):
-            return _ColorGradient._conicalcoords(x)
+    #@staticmethod
+    #def gradientCoordinates(x:QtGui.QGradient):
+        #if isinstance(x, QtGui.QLinearGradient):
+            #return _ColorGradient._linearcoords(x)
+        #elif isinstance(x, QtGui.QRadialGradient):
+            #return _ColorGradient._radialcoords(x)
+        #elif isinstance(x, QtGui.QConicalGradient):
+            #return _ColorGradient._conicalcoords(x)
         
-        elif isinstance(x, QtGui.QGradient):
-            if x.type() & QtGui.QGradient.LinearGradient:
-                x_ = sip.cast(x, QtGui.QLinearGradient)
-                return _ColorGradient._linearcoords(x_)
-            elif x.type() & QtGui.QGradient.RadialGradient:
-                x_ = sip.cast(x, QtGui.QRadialGradient)
-                return _ColorGradient._radialcoords(x_)
-            elif x.type() & QtGui.QGradient.ConicalGradient:
-                x_ = sip.cast(x, QtGui.QConicalGradient)
-                return _ColorGradient._conicalcoords(x_)
+        #elif isinstance(x, QtGui.QGradient):
+            #if x.type() & QtGui.QGradient.LinearGradient:
+                #x_ = sip.cast(x, QtGui.QLinearGradient)
+                #return _ColorGradient._linearcoords(x_)
+            #elif x.type() & QtGui.QGradient.RadialGradient:
+                #x_ = sip.cast(x, QtGui.QRadialGradient)
+                #return _ColorGradient._radialcoords(x_)
+            #elif x.type() & QtGui.QGradient.ConicalGradient:
+                #x_ = sip.cast(x, QtGui.QConicalGradient)
+                #return _ColorGradient._conicalcoords(x_)
             
-        return (0., 0., 0., 0.)
+        #return (0., 0., 0., 0.)
         
 class LinearColorGradient(_ColorGradient):
     _descriptors_ = ("x0", "y0", "x1", "y1", )

@@ -105,11 +105,9 @@ Hereafter, optiona (a) is used.
     in the shell.
     
   The active environment will be indicated by its name in parantheses before the
-  normal shell prompt, e.g.:
-      
-      (scipyenv) user@Host:~>
+  normal shell prompt.
   
-  While the environment is active, it can be deactivated by typing 'deactivate'
+  While the environment is active, it cn be deactivated by typing 'deactivate'
   command at any time (this is a shell function defined in, and sourced from,
   the 'scipyenv/bin/activate' script).
   
@@ -281,8 +279,6 @@ Hereafter, optiona (a) is used.
     scipy
     sympy           (mpmath)
     cmocean         (for nice colormaps)
-    cmasher         (ditto)
-    viscm           matplotlib module to visualize colormaps (pip install viscm)
     scikit-learn    (joblib, threadpoolctl)
     scikit-image    (imageio, networkx, decorator, pywavelets, tifffile)
     seaborn  
@@ -340,7 +336,6 @@ Hereafter, optiona (a) is used.
     
     quantities
     pandas          (pytz)
-    nixio
     neo
     pyqtgraph
     statsmodels     (patsy)
@@ -385,11 +380,6 @@ Hereafter, optiona (a) is used.
     octave_kernel   (metakernal)
     gnuplot_kernel
     matlab_kernel   (wurlitzer)
-    
-    Other modules - functionality complementary to NEURON:
-        pyneuroml NeuroML reader
-        neurom - SWC reader
-        pylmeasure
 
   5. Install (download/clone, build/make & install) vigra
   ----------------------------------------------------------------
