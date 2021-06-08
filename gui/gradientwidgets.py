@@ -29,7 +29,10 @@ from .painting_shared import (HoverPoints, x_less_than, y_less_than,
                               standardQtBrushGradients,
                               g2l, g2c, g2r,
                               gradientCoordinates,
-                              scaleGradient,)
+                              normalizeGradient, 
+                              scaleGradient,
+                              rescaleGradient,
+                              )
 
 from . import quickdialog as qd
 
@@ -408,28 +411,27 @@ class GradientRenderer(QtWidgets.QWidget):
         self._gradientBrushType = val
         #self.update()
         
-    #@property
-    #def gradient(self) -> QtGui.QGradient:
-        #return self._gradient
+    @property
+    def gradient(self) -> QtGui.QGradient:
+        return self._gradient
     
-    #@gradient.setter
-    #def gradient(self, g:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient]) -> None:
-        #if isinstance(g, (QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient)):
-            #self._gradient = g
-            #self.hoverPoints.points = self._getLogicalStops(g)
-            #self._stops[:] = g.stops()
+    @gradient.setter
+    def gradient(self, g:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient]) -> None:
+        if isinstance(g, (QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient)):
+            self._gradient = g
+            self.hoverPoints.points = self._getLogicalStops(g)
+            self._stops[:] = g.stops()
 
-            #if isinstance(g, QtGui.QRadialGradient):
-                #self._gradientBrushType = QtCore.Qt.RadialGradientPattern
+            if isinstance(g, QtGui.QRadialGradient):
+                self._gradientBrushType = QtCore.Qt.RadialGradientPattern
 
-            #elif isinstance(g, QtGui.QConicalGradient):
-                #self._gradientBrushType = QtCore.Qt.ConicalGradientPattern
+            elif isinstance(g, QtGui.QConicalGradient):
+                self._gradientBrushType = QtCore.Qt.ConicalGradientPattern
 
-            #else:
-                #self._gradientBrushType = QtCore.Qt.LinearGradientPattern
-                ##self.setLinearGradient()
+            else:
+                self._gradientBrushType = QtCore.Qt.LinearGradientPattern
                 
-            ##self.update()
+            self.update()
             
     @property
     def spread(self) -> typing.Union[QtGui.QGradient.Spread, int]:
@@ -1212,14 +1214,9 @@ class GradientWidget(QtWidgets.QWidget):
     def normalizedGradient(self) -> QtGui.QGradient:
         """The currently displayed gradient normalized to the renderer's size
         """
+        #return normalizeGradient(self.gradient, self._renderer.sizeHint())
+        return normalizeGradient(self.gradient, self._renderer.rect())
         
-        g = self.gradient
-        coords = gradientCoordinates(g)
-        
-        if isinstance(g, QtGui.QLinearGradient):
-            g.setStart(coords[0]/)
-        
-            
     @property
     def gradient(self) -> QtGui.QGradient:
         """Accessor to the currently displayed gradient (a QGradient).
@@ -1231,7 +1228,10 @@ class GradientWidget(QtWidgets.QWidget):
         Hence, setting this property to a gradient will NOT store a reference to
         the gradient object argument, but will generate a new one
         """
-        return scaleGradient(self._renderer._gradient, self._renderer.sizeHint()
+        return self._renderer.gradient
+    
+    def scaledGradient(self, rect):
+        return scaleGradient(self.normalizedGradient, rect)
     
     @gradient.setter
     def gradient(self, val:typing.Union[QtGui.QGradient, QtGui.QGradient.Preset, str]) -> None:

@@ -10963,18 +10963,18 @@ class _ColorGradient():
         """
         return self._valid
     
-    @staticmethod
-    def _linearcoords(x):
-        return (x.start().x(), x.start().y(), x.finalStop().x(), x.finalStop().y())
+    #@staticmethod
+    #def _linearcoords(x):
+        #return (x.start().x(), x.start().y(), x.finalStop().x(), x.finalStop().y())
         
-    @staticmethod
-    def _radialcoords(x):
-        return (x.center().x(),     x.center().y(),     x.centerRadius(), 
-                x.focalPoint().x(), x.focalPoint().y(), x.focalRadius())
+    #@staticmethod
+    #def _radialcoords(x):
+        #return (x.center().x(),     x.center().y(),     x.centerRadius(), 
+                #x.focalPoint().x(), x.focalPoint().y(), x.focalRadius())
         
-    @staticmethod
-    def _conicalcoords(x):
-        return (x.center().x(), x.center().y(), x.angle())
+    #@staticmethod
+    #def _conicalcoords(x):
+        #return (x.center().x(), x.center().y(), x.angle())
         
     #@staticmethod
     #def gradientCoordinates(x:QtGui.QGradient):

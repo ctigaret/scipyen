@@ -29,7 +29,10 @@ from .painting_shared import (make_transparent_bg,
                               standardQColor, svgQColor, mplColors,
                               qtGlobalColors,
                               makeCustomPathStroke,
-                              comboDelegateBrush,)
+                              comboDelegateBrush,
+                              scaleGradient,
+                              normalizeGradient,
+                              rescaleGradient)
 
 from .quickdialog import QuickDialog
 from .gradientwidgets import GradientDialog
@@ -466,15 +469,18 @@ class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
         painter.setPen(QtCore.Qt.transparent)
         if isinstance(brushStyle, BrushStyleType._subs_tree()[1:]):
             if isinstance(brushStyle, QtGui.QGradient):
-                if isinstance(brushStyle, QtGui.QLinearGradient):
-                    pass
-                elif isinstance(brushStyle, QtGui.QRadialGradient):
-                    pass
-                elif isinstance(brushStyle, QtGui.QConicalGradient):
-            brush = QtGui.QBrush(brushStyle)
+                g = scaleGradient(brushStyle, innerRect)
+                brush = QtGui.QBrush(g)
             
-            if brushStyle in standardQtBrushPatterns.values():
+            elif brushStyle in standardQtBrushPatterns.values():
+                brush = QtGui.QBrush(brushStyle)
                 brush.setColor(penColor) 
+                
+            elif isinstance(brushStyle, (QtGui.QBitmap, QtGui.QPixmap, QtGui.Qimage)):
+                brush = QtGui.QBrush(brushStyle)
+                
+            else:
+                brush = QtGui.QBrush(make_transparent_bg(strong=True))
                 
             #elif brushStyle in standardQtBrushGradients.values():
                 #brush = QtGui.QBrush(brushStyle)
@@ -486,7 +492,6 @@ class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
                 ## then construct a QGradient on that and construct the brush on that
                 ##return
             #elif brushStyle in standardQtBrushTextures.values():
-                #brush = QtGui.QBrush(make_transparent_bg(strong=True))
                 ## TODO: 2021-05-20 13:17:55
                 ## set a default texture & call GUI to choose an image or pixmap
                 ## then create a brush on that!
@@ -495,16 +500,10 @@ class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
                 #brush = QtGui.QBrush(QtCore.Qt.NoBrush)
                 
             painter.setBrush(brush)
-        #elif isinstance(brushStyle, (QtGui.QPixmap, QtGui.QImage, QtGui.QGradient, QtGui.QBrush)):
-            #brush = QtGui.QBrush(brushStyle)
             
-        #else:
-            #painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawRoundedRect(innerRect, 2, 2)
             
-        painter.drawRoundedRect(innerRect, 2, 2)
-        
         text = index.data(QtCore.Qt.DisplayRole)
-        
         if isinstance(text, str) and len(text.strip()):
             if paletteBrush:
                 if isSelected:
@@ -577,11 +576,11 @@ class BrushComboBox(QtWidgets.QComboBox):
         super().activated[int].connect(self._slotActivated)
         super().highlighted[int].connect(self._slotHighlighted)
         
+        self._gradientDialog = GradientDialog(parent=self)
+        self._gradientDialog.finished[int].connect(self._slotGradientDialogFinished)
+        
         self.setMaxVisibleItems(13)
-        #self._gradient_brush_item_index = -1
-        #self._n_brush_styles = 0
         self._addStyles()
-        #self._currentIndex = 0
         self.setCurrentIndex(0)
         self._slotActivated(0)
         
@@ -631,20 +630,21 @@ class BrushComboBox(QtWidgets.QComboBox):
         painter.setPen(QtCore.Qt.transparent)
         #painter.setPen(penColor)
         if isinstance(self._internalStyle, BrushStyleType._subs_tree()[1:]):
-            brush = QtGui.QBrush(self._internalStyle)
-            #brush.setColor(QtCore.Qt.black) 
-            brush.setColor(penColor) 
+            if isinstance(self._internalStyle, QtGui.QGradient):
+                g = scaleGradient(self._internalStyle, frame) 
+                brush = QtGui.QBrush(g)
+            elif self._internalStyle in standardQtBrushPatterns.values():
+                brush = QtGui.QBrush(self._internalStyle)
+                brush.setColor(penColor) 
+            elif isinstance(self._internalStyle, (QtGui.QBitmap, QtGui.QPixmap, QtGui.QImage)):
+                brush = QtGui.QBrush(self._internalStyle)
+            else:
+                brush = QtGui.QBrush(make_transparent_bg(strong=True))
+                
             painter.setBrush(brush)
             
-        elif isinstance(self._internalStyle, (QtGui.QPixmap, QtGui.QImage, QtGui.QGradient, QtGui.QBrush)):
-            brush = QtGui.QBrush(self._internalStyle)
-            #brush.setColor(penColor)
-            painter.setBrush(brush)
-        else:
-            #painter.setPen(QtCore.Qt.transparent)
-            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawRoundedRect(frame.adjusted(1, 1, -1, -1), 2, 2)
             
-        painter.drawRoundedRect(frame.adjusted(1, 1, -1, -1), 2, 2)
         painter.end()
         
     @pyqtSlot(int)
@@ -712,18 +712,9 @@ class BrushComboBox(QtWidgets.QComboBox):
             return
         
         elif index == gradientBrushIndex:
-            dlg = GradientDialog(parent=self)
-            dlg.open()
-            if dlg.result() & QtGui.QDialog.Accepted:
-                self._setCustomStyle("Custom", dlg.gw.gradient)
-                self.activated[object].emit(self._internalStyle)
-                return
-            #gw = GradientWidget()
-            #gw.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-            #gdlg.addWidget(gw)
-            #gdlg.finished[int].connect(self._slotUpdateGradientBrush)
-            #gdlg.open()
-            
+            self._gradientDialog.open()
+            return
+
         self._internalStyle = self.itemData(index, BrushComboDelegate.ItemRoles.BrushRole)
         self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
         self.activated[object].emit(self._internalStyle)
@@ -735,18 +726,17 @@ class BrushComboBox(QtWidgets.QComboBox):
         pixmapBrushIndex = [n for n in self._styles.keys()].index("Pixmap...")
         imageBrushIndex = [n for n in self._styles.keys()].index("Image...")
         
-        #if index in (pixmapBrushIndex, imageBrushIndex):
-            #self._internalStyle = self._customStyle
-            ##self.setToolTip("Custom texture")
-            #return
-        
-        #if index == gradientBrushIndex:
-            #self._internalStyle = self._customStyle
-            ##self.setToolTip("Gradient")
-            #return
-        
         self._internalStyle = self.itemData(index, BrushComboDelegate.ItemRoles.BrushRole)
         self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
+        
+    @pyqtSlot(int)
+    @safeWrapper
+    def _slotGradientDialogFinished(self, value:int):
+        if value == QtGui.QDialog.Accepted:
+            self._setCustomStyle("Custom", self._gradientDialog.gw.normalizedGradient)
+            self.activated[object].emit(self._internalStyle)
+            
+        pass
         
     def _addStyles(self):
         for k, (name, value) in enumerate(self._styles.items()):
@@ -782,7 +772,7 @@ class BrushComboBox(QtWidgets.QComboBox):
         self.setItemData(index, name, QtCore.Qt.ToolTipRole)
         self.setItemData(index, self._internalStyle, BrushComboDelegate.ItemRoles.BrushRole)
         
-        #self.setCurrentIndex(index)
+        self.setCurrentIndex(index)
         #if len(self._styles):
             #if lookup:
                 #self._customStyles[name] = value # adds or changes

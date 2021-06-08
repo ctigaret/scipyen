@@ -375,44 +375,61 @@ def gradient2conical(gradient:QtGui.QGradient) -> QtGui.QConicalGradient:
 
 g2c = gradient2conical
 
+def linearcoords(x):
+    return (x.start().x(), x.start().y(), x.finalStop().x(), x.finalStop().y())
+    
+def radialcoords(x):
+    return (x.center().x(),     x.center().y(),     x.centerRadius(), 
+            x.focalPoint().x(), x.focalPoint().y(), x.focalRadius())
+    
+def conicalcoords(x):
+    return (x.center().x(), x.center().y(), x.angle())
+    
 def gradientCoordinates(x:QtGui.QGradient) -> tuple:
     if isinstance(x, QtGui.QLinearGradient):
-        return _ColorGradient._linearcoords(x)
+        return linearcoords(x)
     elif isinstance(x, QtGui.QRadialGradient):
-        return _ColorGradient._radialcoords(x)
+        return radialcoords(x)
     elif isinstance(x, QtGui.QConicalGradient):
-        return _ColorGradient._conicalcoords(x)
+        return conicalcoords(x)
     
     elif isinstance(x, QtGui.QGradient):
         if x.type() & QtGui.QGradient.LinearGradient:
             x_ = sip.cast(x, QtGui.QLinearGradient)
-            return _ColorGradient._linearcoords(x_)
+            return linearcoords(x_)
         elif x.type() & QtGui.QGradient.RadialGradient:
             x_ = sip.cast(x, QtGui.QRadialGradient)
-            return _ColorGradient._radialcoords(x_)
+            return radialcoords(x_)
         elif x.type() & QtGui.QGradient.ConicalGradient:
             x_ = sip.cast(x, QtGui.QConicalGradient)
-            return _ColorGradient._conicalcoords(x_)
+            return conicalcoords(x_)
         
     return (0., 0., 0., 0.)
+
+def rescaleGradient(gradient:QtGui.QGradient, src_rect:typing.Union[QtCore.QRect, QtCore.QRectF],
+                    dest_rect:typing.Union[QtCore.QRect, QtCore.QRectF]) -> QtGui.QGradient:
+    g = normalizeGradient(gradient, src_rect)
+    return scaleGradient(g, dest_rect)
         
-def scaleGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, QCore.QRectF]) -> QtGui.QGradient:
+def scaleGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, QtCore.QRectF]) -> QtGui.QGradient:
     """ATTENTION/WARNING gradient must have normalized coordinates!
     """
     x = rect.x()
     y = rect.y()
     w = rect.width()
     h = rect.height()
-    coordinates = gradientCoordinates(gradient)
+    coords = gradientCoordinates(gradient)
     if isinstance(gradient, QtGui.QLinearGradient):
         # x0, y0, x1, y1
         x0 = coords[0] * w + x
         y0 = coords[1] * h + y
         x1 = coords[2] * w + x
-        y2 = coords[3] * h + y
-        gradient.setStart(x0, y0)
-        gradient.setFinalStop(x1, y1)
-        return gradient
+        y1 = coords[3] * h + y
+        g = QtGui.QLinearGradient(x0,y0,x1,y1)
+        g.setStops(gradient.stops())
+        g.setSpread(gradient.spread())
+        g.setCoordinateMode(gradient.coordinateMode())
+        return g
     
     elif isinstance(gradient, QtGui.QRadialGradient):
         # x0, y0, r0, x1, y1, r1
@@ -420,42 +437,44 @@ def scaleGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, QCor
         y0 = coords[1] * h + y
         r0 = coords[2] * min([w/2, h/2])
         x1 = coords[3] * w + x
-        y2 = coords[4] * h + y
+        y1 = coords[4] * h + y
         r1 = coords[5] * min([w/2, h/2])
-        gradient.setCenter(x0, y0)
-        gradient.setCenterRadius(r0)
-        gradient.setFocalPoint(x1, y1)
-        gradient.setFocalRadius(r1)
-        return gradient
+        g = QtGui.QRadialGradient(x0, y0, r0, x1, y1, r1)
+        g.setStops(gradient.stops())
+        g.setSpread(gradient.spread())
+        g.setCoordinateMode(gradient.coordinateMode())
+        return g
         
-    elif isinstance(gradient, QtGui.QRadialGradient):
+    elif isinstance(gradient, QtGui.QConicalGradient):
         # x0, y0, alpha
         x0 = coords[0] * w + x
         y0 = coords[1] * h + y
-        gradient.setCenter(x0, y0)
-        return gradient
+        g = QtGui.QConicalGradient(x0, y0, gradient.angle())
+        g.setStops(gradient.stops())
+        g.setSpread(gradient.spread())
+        g.setCoordinateMode(gradient.coordinateMode())
+        return g
         
     else:
-        raise TypeError("Expecting a concrete QGradient subtype; got %s instead" % type(gradient).__name__)
+        raise TypeError("Expecting a concrete QGradient subtype; got %s instead" % type(g).__name__)
         
-        
-def normalizeGradient(gradient:QtGui.QGradient, rect::typing.Union[QtCore.QRect, QCore.QRectF]) -> QtGui.QGradient:
+def normalizeGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, QtCore.QRectF]) -> QtGui.QGradient:
     x = rect.x()
     y = rect.y()
     w = rect.width()
     h = rect.height()
-    #diag = QtCore.QLineF(rect.topLeft(), rect.bottomRight())
-    
     coords = gradientCoordinates(gradient)
     if isinstance(gradient, QtGui.QLinearGradient):
         # x0, y0, x1, y1
         x0 = (coords[0]-x)/w
         y0 = (coords[1]-y)/h
         x1 = (coords[2]-x)/w
-        y2 = (coords[3]-y)/h
-        gradient.setStart(x0, y0)
-        gradient.setFinalStop(x1, y1)
-        return gradient
+        y1 = (coords[3]-y)/h
+        g = QtGui.QLinearGradient(x0,y0,x1,y1)
+        g.setStops(gradient.stops())
+        g.setSpread(gradient.spread())
+        g.setCoordinateMode(gradient.coordinateMode())
+        return g
     
     elif isinstance(gradient, QtGui.QRadialGradient):
         # x0, y0, r0, x1, y1, r1
@@ -463,25 +482,27 @@ def normalizeGradient(gradient:QtGui.QGradient, rect::typing.Union[QtCore.QRect,
         y0 = (coords[1]-y)/h
         r0 = coords[2] / min([w/2, h/2])
         x1 = (coords[3]-x)/w
-        y2 = (coords[4]-y)/h
+        y1 = (coords[4]-y)/h
         r1 = coords[5] / min([w/2, h/2])
-        gradient.setCenter(x0, y0)
-        gradient.setCenterRadius(r0)
-        gradient.setFocalPoint(x1, y1)
-        gradient.setFocalRadius(r1)
-        return gradient
+        g = QtGui.QRadialGradient(x0, y0, r0, x1, y1, r1)
+        g.setStops(gradient.stops())
+        g.setSpread(gradient.spread())
+        g.setCoordinateMode(gradient.coordinateMode())
+        return g
     
-    elif isinstance(gradient, QtGui.QRadialGradient):
+    elif isinstance(g, QtGui.QConicalGradient):
         # x0, y0, alpha
         x0 = (coords[0]-x)/w
         y0 = (coords[1]-y)/h
-        gradient.setCenter(x0, y0)
-        return gradient
+        g = QtGui.QConicalGradient(x0, y0, gradient.angle())
+        g.setStops(gradient.stops())
+        g.setSpread(gradient.spread())
+        g.setCoordinateMode(gradient.coordinateMode())
+        return g
         
     else:
-        raise TypeError("Expecting a concrete QGradient subtype; got %s instead" % type(gradient).__name__)
+        raise TypeError("Expecting a concrete QGradient subtype; got %s instead" % type(g).__name__)
         
-    
 @no_sip_autoconversion(QtCore.QVariant)
 def comboDelegateBrush(index:QtCore.QModelIndex, role:int) -> QtGui.QBrush:
     brush = QtGui.QBrush()
