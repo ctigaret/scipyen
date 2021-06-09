@@ -594,9 +594,12 @@ class GradientRenderer(QtWidgets.QWidget):
             # NOTE: 2021-05-27 15:31:42 
             # this is in logical coordinates i.e.
             # normalized to whatever size the paint device (widget/pimap, etc) has
+            # NOTE: 2021-06-09 21:23:57 Not necessarily!!!
             gradCenter = gradient.center() 
-            centerPoint = QtCore.QPointF(gradCenter.x() * self.rect().width(),
-                                         gradCenter.y() * self.rect().height())
+            # NOTE: 2021-06-09 22:07:06 places the center mapped to real coordinates
+            centerPoint = QtGui.QTransform.fromScale(self.width(), self.height()).map(gradient.center())
+            #centerPoint = QtCore.QPointF(gradCenter.x() * self.rect().width(),
+                                         #gradCenter.y() * self.rect().height())
             # NOTE: 2021-05-27 09:28:27
             # this paints the hover point symmetrically around the renderer's centre
             #l = QtCore.QLineF(self.rect().topLeft(), self.rect().topRight())
@@ -604,9 +607,13 @@ class GradientRenderer(QtWidgets.QWidget):
             #ret = QtCore.QLineF.fromPolar(l.length(), gradient.angle())
             #ret.translate(centerPoint)
             # NOTE: 2021-05-27 09:28:33
-            # this should keep the gradient's centre where is meant to be ?
-            l = QtCore.QLineF(centerPoint, self.rect().topRight())
-            ret = QtCore.QLineF.fromPolar(l.length(), gradient.angle())
+            # radius of an inscribed circle is the min orthogonal distance from
+            # center to the rect sides
+            ret = QtCore.QLineF.fromPolar(min([centerPoint.x(), centerPoint.y()]), gradient.angle())
+            ret.translate(centerPoint)
+            ## this should keep the gradient's centre where is meant to be ?
+            #l = QtCore.QLineF(centerPoint, self.rect().topRight())
+            #ret = QtCore.QLineF.fromPolar(l.length(), gradient.angle())
             return ret
 
         return QtCore.QLineF(QtCore.QPointF(0,0), QtCore.QPointF(self.width(), self.height()))
@@ -614,8 +621,13 @@ class GradientRenderer(QtWidgets.QWidget):
     def _getLogicalStops(self, gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient]):
         objectStopsLine = self._getStopsLine(gradient)
         
-        scaleX = 1. if np.isclose(objectStopsLine.dx(), 0.) else 0.8 * self.width()  / abs(objectStopsLine.dx())
-        scaleY = 1. if np.isclose(objectStopsLine.dy(), 0.) else 0.8 * self.height() / abs(objectStopsLine.dy())
+        # NOTE: 2021-06-09 21:40:36
+        # this is why this works with both "normalized" and "unormalized" gradients.
+        #scaleX = 1. if np.isclose(objectStopsLine.dx(), 0.) else 0.8 * self.width()  / abs(objectStopsLine.dx())
+        #scaleY = 1. if np.isclose(objectStopsLine.dy(), 0.) else 0.8 * self.height() / abs(objectStopsLine.dy())
+        
+        scaleX = 1. if np.isclose(objectStopsLine.dx(), 0.) else self.width()  / abs(objectStopsLine.dx())
+        scaleY = 1. if np.isclose(objectStopsLine.dy(), 0.) else self.height() / abs(objectStopsLine.dy())
         
         logicalStopsLine = QtGui.QTransform.fromScale(scaleX, scaleY).map(objectStopsLine)
         logicalStopsLine.translate(self.rect().center() - logicalStopsLine.center())
@@ -1081,8 +1093,26 @@ class GradientWidget(QtWidgets.QWidget):
         self._updatePresetName()
         
         
-    def _showGradient(self, gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient, QtGui.QGradient, QtGui.QGradient.Preset, str],
-                     gradientType:typing.Optional[typing.Union[QtGui.QGradient.Type, str]]=QtGui.QGradient.LinearGradient) -> None:
+    def _showGradient(self, 
+                      gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient, QtGui.QGradient, QtGui.QGradient.Preset, str],
+                      gradientType:typing.Optional[typing.Union[QtGui.QGradient.Type, str]]=QtGui.QGradient.LinearGradient) -> None:
+        """Displays gradient.
+        
+        If gradient is generic (QtGui.QGradient) then the parameter gradientType
+        specifies the concrete gradient type for display purpose.
+        
+        Parameters:
+        ===========
+        
+        gradient: Either:
+            QtGui.QGradient (generic) or one of its subclasses: 
+                QLinearGradient, QRadialGradient, QConicalGradient,
+                
+            QtGui.QGradient.Preset enum value
+            
+            str: name of a gradient
+        
+        """
         if not isinstance(gradient, (QtGui.QGradient, QtGui.QGradient.Preset, str)):
             return
         
@@ -1230,7 +1260,10 @@ class GradientWidget(QtWidgets.QWidget):
         property.
         
         Hence, setting this property to a gradient will NOT store a reference to
-        the gradient object argument, but will generate a new one
+        the gradient object argument, but will generate a new one.
+        
+        Furthermore, the gradient is not processed in any particular way: its
+        coordinates, coordinate mode and spread are left unchanged 
         """
         return self._renderer.gradient
     
