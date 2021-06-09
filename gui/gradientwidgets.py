@@ -1161,14 +1161,16 @@ class GradientWidget(QtWidgets.QWidget):
         self._renderer.update()
             
     @pyqtSlot(object)
-    def setGradient(self, val:typing.Union[QtGui.QGradient, QtGui.QGradient.Preset]) -> None:
+    def setGradient(self, val:typing.Union[QtGui.QGradient, QtGui.QGradient.Preset, str, ColorGradient]) -> None:
         """Qt slot for setting a custom gradient; 
         Sets a new value to the 'gradient' property
         """
-        if not isinstance(val, (QtGui.QGradient, QtGui.QGradient.Preset, str)):
-            return
-        self.gradient = val
-        #self.update()
+        if isinstance(val, (QtGui.QGradient, QtGui.QGradient.Preset, str,)):
+            self.gradient = val
+
+        elif isinstance(val, ColorGradient):
+            self.gradient = val()
+        
         
     @pyqtSlot(object)
     def addGradient(self, val:typing.Union[QtGui.QGradient, QtGui.QGradient.Preset]) -> None:

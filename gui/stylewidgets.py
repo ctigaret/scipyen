@@ -36,6 +36,7 @@ from .painting_shared import (make_transparent_bg,
 
 from .quickdialog import QuickDialog
 from .gradientwidgets import GradientDialog
+from .planargraphics import ColorGradient
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -652,11 +653,14 @@ class BrushComboBox(QtWidgets.QComboBox):
     def _slotActivated(self, index:int):
         if self.count() == 0:
             return
-        gradientBrushIndex = [n for n in self._styles.keys()].index("Gradient...")
-        pixmapBrushIndex = [n for n in self._styles.keys()].index("Pixmap...")
-        imageBrushIndex = [n for n in self._styles.keys()].index("Image...")
-
-        if index in (pixmapBrushIndex, imageBrushIndex):
+        #gradientBrushIndex = [n for n in self._styles.keys()].index("Gradient...")
+        #pixmapBrushIndex = [n for n in self._styles.keys()].index("Pixmap...")
+        #imageBrushIndex = [n for n in self._styles.keys()].index("Image...")
+        
+        customTextureBrushIndices = [k for k, (name,value) in enumerate(self._styles.items()) if isinstance(value, (QtGui.QBitmap, QtGui.QPixmap, QtGui.QImage)) or name in ("Pixmap...", "Image...")]
+        customGradientBrushIndices = [k for k, (name,value) in enumerate(self._styles.items()) if isinstance(value, QtGui.QGradient) or name == "Gradient..."]
+        
+        if index in customTextureBrushIndices:
             filePathName, _ = QtWidgets.QFileDialog.getOpenFileName(self, caption="Open image or pixmap file",
                                                              filter="Images (*.png *.xpm *.jpg *.jpeg *.gif *.tif *.tiff);;Vector drawing (*.svg);; All files (*.*)")
             if len(filePathName) == 0:
@@ -711,7 +715,10 @@ class BrushComboBox(QtWidgets.QComboBox):
                 
             return
         
-        elif index == gradientBrushIndex:
+        elif index in customGradientBrushIndices:
+            if self._internalStyle is not QtGui.QGradient.NoGradient and \
+                isinstance(self._internalStyle, (ColorGradient, QtGui.QGradient, QtGui.QGradient.Preset, str)):
+                self._gradientDialog.gw.setGradient(self._internalStyle)
             self._gradientDialog.open()
             return
 
@@ -756,11 +763,10 @@ class BrushComboBox(QtWidgets.QComboBox):
             self.setItemData(k, value, BrushComboDelegate.ItemRoles.BrushRole)
             self.setItemData(k, name, QtCore.Qt.ToolTipRole)
             
-    #def _setCustomStyle(self, name:str, value:typing.Union[BrushStyleType, QtGui.QPixmap, QtGui.QImage, QtGui.QGradient], lookup:bool=True):
     def _setCustomStyle(self, name:str, value:typing.Union[BrushStyleType, QtGui.QPixmap, QtGui.QImage, QtGui.QGradient]):
         if not isinstance(value, BrushStyleType._subs_tree()[1:]): #and not isinstance(value, (QtGui.QPixmap, QtGui.QImage, QtGui.QGradient)):
             return
-        print("BrushComboBox._setCustomStyle", name, value)
+        #print("BrushComboBox._setCustomStyle", name, value)
 
         self._customStyles[name] = value # adds or changes
         self._update_styles_()
@@ -773,30 +779,12 @@ class BrushComboBox(QtWidgets.QComboBox):
         self.setItemData(index, self._internalStyle, BrushComboDelegate.ItemRoles.BrushRole)
         
         self.setCurrentIndex(index)
-        #if len(self._styles):
-            #if lookup:
-                #self._customStyles[name] = value # adds or changes
-                #self.clear()
-                #self._addStyles()
-                #self._customStyle = value
-                #self._internalStyle = value
-                #index = [n for n in self._styles.keys()].index(name)
-                #self.setCurrentIndex(index)
-                ##if name not in self._customStyles.keys():
-                ##else:
-                    ##self._customStyles[name] = value
-                    ##self._internalStyle = self._styles[name]
-                    ##self._customStyle = self._internalStyle
-                    ##i = [k for k in self._customStyles.key()].index(name)
-                    ##self.setCurrentIndex(i)
-                    
-                #return
+        
+    def setGradient(self, name:str, gradient:typing.Union[QtGui.QGradient, ColorGradient]):
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            name = "Custom"
             
-        #self._internalStyle = value
-        #self._customStyle = value
-        #self.setItemData(0, name, QtCore.Qt.ToolTipRole)
-        #self.setItemData(0, self._internalStyle, BrushComboDelegate.ItemRoles.BrushRole)
-        ##self.activated[object].emit(self._internalStyle)
+        #if isinstance(gradient)
         
             
         
