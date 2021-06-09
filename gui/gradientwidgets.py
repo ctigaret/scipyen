@@ -34,6 +34,8 @@ from .painting_shared import (HoverPoints, x_less_than, y_less_than,
                               rescaleGradient,
                               )
 
+from .planargraphics import (ColorGradient, colorGradient,)
+
 from . import quickdialog as qd
 
 class ShadeWidget(QtWidgets.QWidget):
@@ -1371,6 +1373,11 @@ class GradientDialog(QtWidgets.QDialog):
         self.buttons.layout.addWidget(self.buttons.OK)
         self.buttons.layout.addWidget(self.buttons.Cancel)
         self.layout.addWidget(self.buttons)
+        
+    @property
+    def colorGradient(self) -> ColorGradient:
+        return colorGradient(self.gradient)
+        
         
             
 def set_shade_points(points:typing.Union[QtGui.QPolygonF, list], shade:ShadeWidget) -> None:

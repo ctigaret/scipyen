@@ -13,7 +13,7 @@ import os, inspect, warnings, traceback, datetime
 
 #### BEGIN 3rd party modules
 import pandas as pd
-import xarray as xa
+#import xarray as xa
 import numpy as np
 import neo
 import vigra

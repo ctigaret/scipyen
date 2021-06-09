@@ -480,17 +480,17 @@ def normalizeGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, 
         # x0, y0, r0, x1, y1, r1
         x0 = (coords[0]-x)/w
         y0 = (coords[1]-y)/h
-        r0 = coords[2] / min([w/2, h/2])
+        r0 =  coords[2] / min([w/2, h/2])
         x1 = (coords[3]-x)/w
         y1 = (coords[4]-y)/h
-        r1 = coords[5] / min([w/2, h/2])
+        r1 =  coords[5] / min([w/2, h/2])
         g = QtGui.QRadialGradient(x0, y0, r0, x1, y1, r1)
         g.setStops(gradient.stops())
         g.setSpread(gradient.spread())
         g.setCoordinateMode(gradient.coordinateMode())
         return g
     
-    elif isinstance(g, QtGui.QConicalGradient):
+    elif isinstance(gradient, QtGui.QConicalGradient):
         # x0, y0, alpha
         x0 = (coords[0]-x)/w
         y0 = (coords[1]-y)/h

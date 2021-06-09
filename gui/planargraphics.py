@@ -165,7 +165,8 @@ from core.workspacefunctions import debug_scipyen
 #### END core modules
 
 #### BEGIN other gui stuff
-from .painting_shared import (standardQtGradientTypes, g2l, g2c, g2r, gradientCoordinates)
+from .painting_shared import (standardQtGradientTypes, standardQtGradientPresets,
+                              g2l, g2c, g2r, gradientCoordinates)
 #### END other gui stuff
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -10846,23 +10847,22 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     def canTransform(self, value):
         self._transformable_ = False if isinstance(self._backend_, Cursor) else value
         
-class _ColorGradient():
+class ColorGradient():
     # TODO
-    _descriptors_ = ()
+    _descriptors_ = ("preset")
     _gradient_type_ = QtGui.QGradient.NoGradient # QtGui.QGradient.Type enum value
     _required_attributes_ = ("_ID_","coordinates", "coordinateMode", "spreadMode", "stops", "type", )
     _qtclass_ = QtGui.QGradient
     
     def _checkQtGradient_(self, x):
-        #print(self._qtclass_, type(x))
         return isinstance(x, (self._qtclass_, QtGui.QGradient)) # or (isinstance(x, QtGui.QGradient) and x.type() & self._gradient_type_)
-        #return isinstance(x, self._qtclass_) or (isinstance(x, QtGui.QGradient) and x.type() & self._gradient_type_)
     
     def _init_parametric_(self, *args, stops, spread, coordinateMode, name):
         if len(args):
             self.coordinates = DataBag(zip(self._descriptors_, args), mutable_types=True, use_casting=False, allow_none=True)
         else:
             self.coordinates = DataBag(mutable_types=True, use_casting=False, allow_none=True)
+            
         self.stops = stops
         self.spread = spread
         self.coordinateMode = coordinateMode
@@ -10871,11 +10871,6 @@ class _ColorGradient():
         else:
             self._ID_ = type(self).__name__
         
-    # __init__(self, *args, stops:typing.Optional[typing.Union[typing.List[typing.Tuple[float, QtGui.QColor]]]]=None,
-                 #coordinateMode:typing.Optional[typing.Union[QtGui.QGradient.CoordinateMode, int]]=None, 
-                 #spread:typing.Optional[typing.Union[QtGui.QGradient.Spread, int]]=None,
-                 #name:str = ""):
-                     
     def __init__(self, *args, **kwargs):
         """Constructor:
         Variadic parameters:
@@ -10901,38 +10896,55 @@ class _ColorGradient():
         name = kwargs.get("name", "")
         
         self._valid = False
+        self._normalized = False
         
         if len(args):
             #print("args", args)
             if len(args) == 1:
-                if self._checkQtGradient_(args[0]):
-                    if args[0].type() == self._gradient_type_:
-                        self._init_parametric_(*gradientCoordinates(args[0]),
-                                            stops = args[0].stops(),
-                                            spread = args[0].spread(),
-                                            coordinateMode = args[0].coordinateMode(), 
-                                            name=name)
-                    else:
-                        if self._gradient_type_ == QtGui.QGradient.LinearGradient:
-                            g = g2l(args[0])
-                        elif self._gradient_type_ == QtGui.QGradient.RadialGradient:
-                            g = g2r(args[0])
-                        elif self._gradient_type_ == QtGui.QGradient.ConicalGradient:
-                            g = g2c(args[0])
+                if isinstance(args[0], str) and args[0] in standardQtGradientPresets.keys():
+                    # NOTE: 2021-06-09 13:27:41
+                    # constructing from a preset makes a linear gradient by default
+                    g = QtGui.QGradient(args[0])
+                    self.coordinates = DataBag(zip(self._descriptors_, (args[0],)))
+                    self.stops = g.stops()
+                    self.spread = g.spread()
+                    self.coordinateMode = g.coordinateMode()
+                    self.name = args[0]
+                    #self._init_parametric_(*gradientCoordinates(g),
+                                           #stops = g.stops(),
+                                           #spread = g.spread(),
+                                           #coordinateMode = g.coordinateMode(),
+                                           #name = args[0])
+                    
+                elif self._checkQtGradient_(args[0]):
+                    if self._gradient_type_ != QtGui.QGradient.NoGradient:
+                        if args[0].type() == self._gradient_type_:
+                            self._init_parametric_(*gradientCoordinates(args[0]),
+                                                stops = args[0].stops(),
+                                                spread = args[0].spread(),
+                                                coordinateMode = args[0].coordinateMode(), 
+                                                name=name)
                         else:
-                            raise TypeError("Unsupported gradient type: %s" % reverse_mapping_lookup(standardQtGradientTypes, args[0].type()))
-                        
-                        self._init_parametric_(*gradientCoordinates(g), 
-                                               stops = g.stops(), 
-                                               spread = g.spread(),
-                                               coordinateMode = g.coordinateMode(),
-                                               name=name)
+                            if self._gradient_type_ == QtGui.QGradient.LinearGradient:
+                                g = g2l(args[0])
+                            elif self._gradient_type_ == QtGui.QGradient.RadialGradient:
+                                g = g2r(args[0])
+                            elif self._gradient_type_ == QtGui.QGradient.ConicalGradient:
+                                g = g2c(args[0])
+                            else:
+                                raise TypeError("Unsupported gradient type: %s" % reverse_mapping_lookup(standardQtGradientTypes, args[0].type()))
+                            
+                            self._init_parametric_(*gradientCoordinates(g), 
+                                                stops = g.stops(), 
+                                                spread = g.spread(),
+                                                coordinateMode = g.coordinateMode(),
+                                                name=name)
                             
                 elif isinstance(args[0], (tuple, list)) and all([isinstance(v, numbers.Real) for v in args[0]]):
                     self._init_parametric_(args[0], stops, spread, coordinateMode, name)
                     
                 else:
-                    raise TypeError("Expecting a %s, a QGradient of %s type, or a sequence of floats; instead, got %s with type %s" % (self._qtclass_.__name__,
+                    raise TypeError("Expecting a str (QGradient preset), %s, a QGradient of %s type, or a sequence of floats; instead, got %s with type %s" % (self._qtclass_.__name__,
                                                                                                                                        reverse_mapping_lookup(standardQtGradientTypes,self._gradient_type_), 
                                                                                                                                        type(args[0]).__name__,
                                                                                                                                        reverse_mapping_lookup(standardQtGradientTypes, args[0].type())))
@@ -10946,8 +10958,106 @@ class _ColorGradient():
         else:
             self._init_parametric_(stop=stops, spread=spread,coordinateMode=coordinateMode,name=name)
             
-    
+            
+    def normalize(self, rect:typing.Union[QtCore.QRect, QtCore.QRectF]):
+        if self._normalized:
+            return
+        x = rect.x()
+        y = rect.y()
+        w = rect.width()
+        h = rect.height()
+        if isinstance(self, LinearColorGradient):
+            x0 = (self.coordinates.x0-x)/w
+            y0 = (self.coordinates.y0-y)/w
+            x1 = (self.coordinates.x1-x)/w
+            y1 = (self.coordinates.y1-y)/w
+            self.coordinates.x0 = x0
+            self.coordinates.y0 = y0
+            self.coordinates.x1 = x1
+            self.coordinates.y1 = y1
+            
+        elif isinstance(self, RadialColorGradient):
+            x0 = (self.coordinates.x0-x)/w
+            y0 = (self.coordinates.y0-y)/w
+            r0 = self.coordinates.r0 / min([w/2, h/2])
+            x1 = (self.coordinates.x1-x)/w
+            y1 = (self.coordinates.y1-y)/w
+            r1 = self.coordinates.r1 / min([w/2, h/2])
+            self.coordinates.x0 = x0
+            self.coordinates.y0 = y0
+            self.coordinates.r0 = r0
+            self.coordinates.x1 = x1
+            self.coordinates.y1 = y1
+            self.coordinates.r1 = r1
+            
+        elif isinstance(self, ConicalColorGradient):
+            x0 = (self.coordinates.x0-x)/w
+            y0 = (self.coordinates.y0-y)/w
+            self.coordinates.x0 = x0
+            self.coordinates.y0 = y0
+        else: 
+            #NOTE: 2021-06-09 13:27:28
+            # by default, when constructed from a preset this is a linear gradient
+            # see NOTE: 2021-06-09 13:27:41
+            return
+        
+        self._normalized = True
+        
+    def scale(self, rect:typing.Union[QtCore.QRect, QtCore.QRectF]):
+        if not self._normalized:
+            return
+        
+        x = rect.x()
+        y = rect.y()
+        w = rect.width()
+        h = rect.height()
+        
+        if isinstance(self, LinearColorGradient):
+            x0 = self.coordinates.x0 * w + x
+            y0 = self.coordinates.y0 * h + y
+            x1 = self.coordinates.x1 * w + x
+            y1 = self.coordinates.y1 * h + y
+            self.coordinates.x0 = x0
+            self.coordinates.y0 = y0
+            self.coordinates.x1 = x1
+            self.coordinates.y1 = y1
+            
+        elif isinstance(self, RadialColorGradient):
+            x0 = self.coordinates.x0 * w + x
+            y0 = self.coordinates.y0 * h + y
+            r0 = self.coordinates.r0 * min([w/2, h/2])
+            x1 = self.coordinates.x1 * w + x
+            y1 = self.coordinates.y1 * h + y
+            r1 = self.coordinates.r1 * min([w/2, h/2])
+            self.coordinates.x0 = x0
+            self.coordinates.y0 = y0
+            self.coordinates.r0 = r0
+            self.coordinates.x1 = x1
+            self.coordinates.y1 = y1
+            self.coordinates.r1 = r1
+            
+        elif isinstance(self, ConicalColorGradient):
+            x0 = self.coordinates.x0 * w + x
+            y0 = self.coordinates.y0 * h + y
+            self.coordinates.x0 = x0
+            self.coordinates.y0 = y0
+        else:
+            return
+        
+        self._normalized = False
+        
+    def rescale(self, src_rect, dest_rect):
+        if self._normalized:
+            self.normalize(src_rect)
+            
+        self.scale(dest_rect)
+            
     def __call__(self) -> typing.Union[QtGui.QGradient, QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient]:
+        """Factory for a concrete QGradient object based on this object's attributes
+        
+        A 'concrete' QGradient is a QLinearGradient, QRadialGradient, or a 
+        QConicalGradient object.
+        """
         coords = (v for v in self.coordinates.values())
         ret = self._qtclass_(*coords)
         ret.setStops(self.stops)
@@ -10958,47 +11068,12 @@ class _ColorGradient():
     @property
     def valid(self):
         """Read-only.
-        This is always False for _ColorGradient obejcts and True for _ColorGradient
+        This is always False for ColorGradient objects and True for ColorGradient
         subclass instances (LinearColorGradient, RadialColorGradient, ConicalColorGradient)
         """
         return self._valid
     
-    #@staticmethod
-    #def _linearcoords(x):
-        #return (x.start().x(), x.start().y(), x.finalStop().x(), x.finalStop().y())
-        
-    #@staticmethod
-    #def _radialcoords(x):
-        #return (x.center().x(),     x.center().y(),     x.centerRadius(), 
-                #x.focalPoint().x(), x.focalPoint().y(), x.focalRadius())
-        
-    #@staticmethod
-    #def _conicalcoords(x):
-        #return (x.center().x(), x.center().y(), x.angle())
-        
-    #@staticmethod
-    #def gradientCoordinates(x:QtGui.QGradient):
-        #if isinstance(x, QtGui.QLinearGradient):
-            #return _ColorGradient._linearcoords(x)
-        #elif isinstance(x, QtGui.QRadialGradient):
-            #return _ColorGradient._radialcoords(x)
-        #elif isinstance(x, QtGui.QConicalGradient):
-            #return _ColorGradient._conicalcoords(x)
-        
-        #elif isinstance(x, QtGui.QGradient):
-            #if x.type() & QtGui.QGradient.LinearGradient:
-                #x_ = sip.cast(x, QtGui.QLinearGradient)
-                #return _ColorGradient._linearcoords(x_)
-            #elif x.type() & QtGui.QGradient.RadialGradient:
-                #x_ = sip.cast(x, QtGui.QRadialGradient)
-                #return _ColorGradient._radialcoords(x_)
-            #elif x.type() & QtGui.QGradient.ConicalGradient:
-                #x_ = sip.cast(x, QtGui.QConicalGradient)
-                #return _ColorGradient._conicalcoords(x_)
-            
-        #return (0., 0., 0., 0.)
-        
-class LinearColorGradient(_ColorGradient):
+class LinearColorGradient(ColorGradient):
     _descriptors_ = ("x0", "y0", "x1", "y1", )
     _gradient_type_ = QtGui.QGradient.LinearGradient
     _qtclass_ = QtGui.QLinearGradient
@@ -11007,7 +11082,7 @@ class LinearColorGradient(_ColorGradient):
         super().__init__(*args, **kwargs)
         self._valid = True
                 
-class RadialColorGradient(_ColorGradient):
+class RadialColorGradient(ColorGradient):
     _descriptors_ = ("x0", "y0", "r0", "x1", "y1", "r1")
     _gradient_type_ = QtGui.QGradient.RadialGradient
     _qtclass_ = QtGui.QRadialGradient
@@ -11016,7 +11091,7 @@ class RadialColorGradient(_ColorGradient):
         super().__init__(*args, **kwargs)
         self._valid = True
                 
-class ConicalColorGradient(_ColorGradient):
+class ConicalColorGradient(ColorGradient):
     _descriptors_ = ("x0", "y0", "angle")
     _gradient_type_ = QtGui.QGradient.ConicalGradient
     _qtclass_ = QtGui.QConicalGradient
@@ -11025,7 +11100,7 @@ class ConicalColorGradient(_ColorGradient):
         super().__init__(*args, **kwargs)
         self._valid = True
                 
-def colorGradient(*args, **kwargs) -> _ColorGradient:
+def colorGradient(*args, **kwargs) -> ColorGradient:
     """Factory for Linear, Radial and Conical color gradient objects
     
     Variadic parameters (*args):
@@ -11037,7 +11112,7 @@ def colorGradient(*args, **kwargs) -> _ColorGradient:
     When a sequence of floats, these can be packed as a tuple or list in the first
     argument, or can be unpacked (as comma-separated arguements)
     
-    Varkeyword parameters: - see _ColorGradient.__init__
+    Varkeyword parameters: - see ColorGradient.__init__
     ======================
     stop
     spread
@@ -11046,10 +11121,10 @@ def colorGradient(*args, **kwargs) -> _ColorGradient:
     
     Returns
     ========
-    An object which is either a subclass of _ColorGradient (LinearColorGradient,
+    An object which is either a subclass of ColorGradient (LinearColorGradient,
     RadialColorGradient or ConicalColorGradient), based on the QGradient subclass
     in args[0] or on the number of float values in args.
-    When neither parameters in args make sense, returns a generic _ColorGradient object.
+    When neither parameters in args make sense, returns a generic ColorGradient object.
     """
     if len(args):
         if len(args)==1:
@@ -11081,7 +11156,8 @@ def colorGradient(*args, **kwargs) -> _ColorGradient:
                 return RadialColorGradient(*args, **kwargs)
             else:
                 raise ValueError("Unexpected number of coordinates (%d)" % len(args))
-    return _ColorGradient(**kwargs)
+            
+    return ColorGradient(**kwargs)
 
 def printQPainterPath(p):
     s = []
