@@ -1,8 +1,8 @@
 """ see qt examples/widgets/painting/gradients
 """
 import array, os, typing, numbers
-import numpy as np
 from collections import OrderedDict
+import numpy as np
 from enum import IntEnum, auto
 from functools import partial
 
@@ -710,15 +710,46 @@ class GradientRenderer(QtWidgets.QWidget):
         self._gradient = g # so it can be returned
         
 class GradientWidget(QtWidgets.QWidget):
+    def _getGradient(self, val:typing.Union[QtGui.QGradient, QtGui.QGradient.Preset, str, int,  ColorGradient]) -> QtGui.QGradient:
+        if isinstance(val, QGui.QGradient):
+            return val
+        
+        if isinstance(val, QtGui.QGradient.Preset):
+            return QtGui.QGradient(val)
+        
+        if isinstance(val, ColorGradient):
+            return val()
+        
+        if isinstance(val, int) and val in range(-len(self._gradients),len(self._gradients)):
+            return QtGui.QGradient([v for v in self._gradients.values()][val])
+        
+        if isinstance(val, str) and val in self._gradients.keys():
+            return QtGui.QGradient(self._gradients[val])
+        
+        return QtGui.QGradient() # black to white linear gradient
+        
     # TODO: 2021-05-27 15:40:49
     # make a gradient combobox to choose from the list of gradients
     # instead of the current "Preset" group
-    def __init__(self, gradient:typing.Optional[QtGui.QGradient]=None,
+    def __init__(self, gradient:typing.Optional[typing.Union[QtGui.QGradient, QtGui.QGradient.Preset, str, int, ColorGradient]]=None,
                  customGradients:dict=dict(),
                  parent:typing.Optional[QtWidgets.QWidget] = None, 
                  title:typing.Optional[str]="Scipyen Gradient Editor") -> None:
         super().__init__(parent=parent)
+        self._gradientIndex = 0
+        #self._defaultGradient = gradient
         
+        self._gradients = OrderedDict()
+        
+        if len(customGradients):
+            self._gradient.update(dict(sorted([(name, val) for name, val in customGradients.items()], key = lambda x: x[0])))
+            
+        self._gradients.update(standardQtGradientPresets)
+        
+        if isinstance(gradient, (QtGui.QGradient, QtGui.QGradient.Preset, str, ColorGradient)):
+            self._gradients["Default"] = gradient
+            self._gradients.move_to_end("Default", last=False)
+            
         self._title = title
         
         self._useRelativeCenterRadius = False
@@ -756,26 +787,11 @@ class GradientWidget(QtWidgets.QWidget):
             self._absoluteFocalRadiusButton.setChecked(True)
             self._focalRadiusSpinBox.setEnabled(True)
         
-        
-        self._gradientIndex = 0
-        self._defaultGradient = None
-        self._gradients = dict()
-        if len(customGradients):
-            self._gradients = dict([(name, val) for name, val in customGradients.items()])
-        self._gradients.update(standardQtGradientPresets)
-            
-        self._setDefaultGradient(gradient)
-        
         self._updatePresetName()
-        self._changePresetBy(0)
-            
-            
-        #self._autoFocalRadiusButton.animateClick()
-        #self._autoCenterRadiusButton.animateClick()
-        #QtCore.QTimer.singleShot(50, self._showDefault)
         
     def showEvent(self, ev):
-        self._showGradient(self._defaultGradient)
+        self._showGradient([g for g in self._gradients.values()][self._gradientIndex])
+        #self._showGradient(self._defaultGradient)
         #self.update()
         ev.accept()
         
@@ -879,22 +895,22 @@ class GradientWidget(QtWidgets.QWidget):
         self._repeatSpreadButton = QtWidgets.QRadioButton("Repeat", self.spreadGroup)
         self._repeatSpreadButton.setToolTip("Repeat gradient outside its area")
         
-        self.coordinateModeGroup = QtWidgets.QGroupBox(self.mainGroup)
-        self.coordinateModeGroup.setTitle("Coordinate Mode")
-        self._logicalCoordinateButton = QtWidgets.QRadioButton("Logical", self.coordinateModeGroup)
-        self._logicalCoordinateButton.setToolTip("Logical")
-        self._logicalCoordinateButton.clicked.connect(self._renderer.setLogicalCoordinateMode)
-        self._deviceCoordinateButton = QtWidgets.QRadioButton("Device", self.coordinateModeGroup)
-        self._deviceCoordinateButton.setToolTip("Stretch to Device")
-        self._deviceCoordinateButton.clicked.connect(self._renderer.setDeviceCoordinateMode)
-        self._objectCoordinateButton = QtWidgets.QRadioButton("Object", self.coordinateModeGroup)
-        self._objectCoordinateButton.setToolTip("Object")
-        self._objectCoordinateButton.clicked.connect(self._renderer.setObjectCoordinateMode)
+        #self.coordinateModeGroup = QtWidgets.QGroupBox(self.mainGroup)
+        #self.coordinateModeGroup.setTitle("Coordinate Mode")
+        #self._logicalCoordinateButton = QtWidgets.QRadioButton("Logical", self.coordinateModeGroup)
+        #self._logicalCoordinateButton.setToolTip("Logical")
+        #self._logicalCoordinateButton.clicked.connect(self._renderer.setLogicalCoordinateMode)
+        #self._deviceCoordinateButton = QtWidgets.QRadioButton("Device", self.coordinateModeGroup)
+        #self._deviceCoordinateButton.setToolTip("Stretch to Device")
+        #self._deviceCoordinateButton.clicked.connect(self._renderer.setDeviceCoordinateMode)
+        #self._objectCoordinateButton = QtWidgets.QRadioButton("Object", self.coordinateModeGroup)
+        #self._objectCoordinateButton.setToolTip("Object")
+        #self._objectCoordinateButton.clicked.connect(self._renderer.setObjectCoordinateMode)
         
-        self.coordinateModeLayout = QtWidgets.QHBoxLayout(self.coordinateModeGroup)
-        self.coordinateModeLayout.addWidget(self._logicalCoordinateButton)
-        self.coordinateModeLayout.addWidget(self._deviceCoordinateButton)
-        self.coordinateModeLayout.addWidget(self._objectCoordinateButton)
+        #self.coordinateModeLayout = QtWidgets.QHBoxLayout(self.coordinateModeGroup)
+        #self.coordinateModeLayout.addWidget(self._logicalCoordinateButton)
+        #self.coordinateModeLayout.addWidget(self._deviceCoordinateButton)
+        #self.coordinateModeLayout.addWidget(self._objectCoordinateButton)
         
         
         self.presetsGroup = QtWidgets.QGroupBox(self.mainGroup)
@@ -922,7 +938,7 @@ class GradientWidget(QtWidgets.QWidget):
         self.typeSpreadLayout.addWidget(self.typeGroup)
         self.typeSpreadLayout.addWidget(self.spreadGroup)
         self.mainGroupLayout.addWidget(self.typeSpreadGroup)
-        self.mainGroupLayout.addWidget(self.coordinateModeGroup)
+        #self.mainGroupLayout.addWidget(self.coordinateModeGroup)
         #self.mainGroupLayout.addWidget(self.typeGroup)
         #self.mainGroupLayout.addWidget(self.spreadGroup)
         
@@ -946,7 +962,7 @@ class GradientWidget(QtWidgets.QWidget):
         
         self._linearButton.setChecked(True)
         self._padSpreadButton.setChecked(True)
-        self._logicalCoordinateButton.setChecked(True)
+        #self._logicalCoordinateButton.setChecked(True)
 
         self.presetsGroupLayout = QtWidgets.QHBoxLayout(self.presetsGroup)
         self.presetsGroupLayout.addWidget(self.prevPresetButton)
@@ -995,25 +1011,6 @@ class GradientWidget(QtWidgets.QWidget):
     def defaultGradient(self, val:typing.Optional[QtGui.QGradient]=None) -> None:
         self._setDefaultGradient(val)
         
-    def _setDefaultGradient(self, val:typing.Optional[typing.Union[QtGui.QGradient, QtGui.QGradient.Preset, str]]=None) -> None:
-        if not isinstance(val, (QtGui.QGradient, QtGui.QGradient.Preset, str)):
-            return 
-        
-        if isinstance(val, str):
-            if val not in self._gradients.keys():
-                return
-            
-            self._defaultGradient = self._gradients[val]
-            #gradient = self._gradients[val]
-            
-        else:
-            self._defaultGradient = val
-            #gradient = val
-            
-        self._gradients["Default"] = self._defaultGradient
-        
-        self._gradientIndex = [n for n in self._gradients.keys()].index("Default")
-        
     @pyqtSlot()
     def _showDefault(self,) -> None:
         if isinstance(self._defaultGradient, (QtGui.QGradient, QtGui.QGradient.Preset)):
@@ -1035,17 +1032,17 @@ class GradientWidget(QtWidgets.QWidget):
         self._changePresetBy(1)
         
     def _updatePresetName(self) -> None:
-        currentPreset = [(name, val) for name, val in self._gradients.items()][self._gradientIndex]
-        print("GradientWidget_updatePresetName currentPreset", currentPreset)
-        self._presetButton.setText(currentPreset[0])
-        self._presetButton.setToolTip(currentPreset[0])
+        namedgrads = [(name, val) for name, val in self._gradients.items()][self._gradientIndex]
+        self._presetButton.setText(namedgrads[0])
+        self._presetButton.setToolTip(namedgrads[0])
         
     def _changePresetBy(self, indexOffset:int) -> None:
-        print("GradientWidget._changePresetBy %d gradients; offset" % len(self._gradients), indexOffset)
+        #print("GradientWidget._changePresetBy %d gradients; offset" % len(self._gradients), indexOffset)
         if len(self._gradients) == 0:
             return
         
-        # NOTE: enable circular browsing
+        # NOTE: 2021-05-25 13:16:27
+        #### BEGIN enable circular browsing
         self._gradientIndex += indexOffset
         
         if self._gradientIndex >= len(self._gradients):
@@ -1053,48 +1050,36 @@ class GradientWidget(QtWidgets.QWidget):
             
         elif self._gradientIndex < -1 * len(self._gradients):
             self._gradientIndex = len(self._gradients) - 1
-            
         
-        # NOTE: 2021-05-24 12:48:43
-        # leave this in for strict browsing between min & max preset
-        #self._gradientIndex = max([0, min([self._gradientIndex + indexOffset, len(standardQtGradientPresets)-1])])
+        #### END enable circular browsing
 
-        # NOTE: 2021-05-25 13:16:27
-        # the presets should apply to all types gradients; choosing a the preset should NOT
-        # enforce linear gradient display
-        #preset = [(name, val) for name, val in standardQtGradientPresets.items()][self._gradientIndex][1]
-        preset = [(name, val) for name, val in self._gradients.items()][self._gradientIndex]
+        # NOTE: leave this in for non-circular navigation 
+        #self._gradientIndex = max([0, min([self._gradientIndex + indexOffset, len(slf._gradients)-1])])
         
-        print("GradientWidget._changePresetBy preset", preset)
+        namedgrads = [(name, val) for name, val in self._gradients.items()][self._gradientIndex]
         
-        if preset[0] in standardQtGradientPresets.keys():
-            # NOTE: 2021-06-10 18:36:02
-            # because this is eval-ed to an int ?!?
-            gradient = eval("QtGui.QGradient(QtGui.QGradient.%s)" % preset[0])
-            #gradient = QtGui.QGradient(preset[1])
+        #print("GradientWidget._changePresetBy preset", preset)
+        
+        if namedgrads[0] in standardQtGradientPresets.keys():
+            # NOTE: 2021-06-10 22:13:38
+            # the next two lines achieve the same thing albeit differently
+            #gradient = eval("QtGui.QGradient(QtGui.QGradient.%s)" % namedgrads[0])
+            gradient = QtGui.QGradient(namedgrads[1])
             
         else:
-            if isinstance(preset[1], QtGui.QGradient.Preset):
-                gradient = QtGui.QGradient(preset[1])
+            if isinstance(namedgrads[1], QtGui.QGradient.Preset):
+                gradient = QtGui.QGradient(namedgrads[1])
                 
-            elif isinstance(preset[1], ColorGradient):
-                gradient = preset[1]()
+            elif isinstance(namedgrads[1], ColorGradient):
+                gradient = namedgrads[1]()
                 
-            elif isinstance(preset[1], QtGui.QGradient):
-                gradient = preset[1]
+            elif isinstance(namedgrads[1], QtGui.QGradient):
+                gradient = namedgrads[1]
 
             else:
                 return
-            #gradient = preset[1]
-            #if not isinstance(gradient, QtGui.QGradient):
-                #if isinstance(gradient, QtGui.QGradient.Preset):
-                    #gradient = QtGui.QGradient(gradient)
-                #elif isinstance(gradient, ColorGradient):
-                    #gradient = gradient()
-                #else:
-                    #return
                 
-        print("GradientWidget._changePresetBy gradient", gradient, type(gradient))
+        #print("GradientWidget._changePresetBy gradient", gradient, type(gradient))
         if not isinstance(gradient, QtGui.QGradient):
             return
         
@@ -1119,16 +1104,13 @@ class GradientWidget(QtWidgets.QWidget):
         # is a generic one or a preset object
         self._showGradient(g) 
         
-        #self._updatePresetName()
-        
-        
     def _showGradient(self, 
-                      gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient, QtGui.QGradient, QtGui.QGradient.Preset, str],
+                      gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient, QtGui.QGradient, QtGui.QGradient.Preset, str, ColorGradient],
                       gradientType:typing.Optional[typing.Union[QtGui.QGradient.Type, str]]=QtGui.QGradient.LinearGradient) -> None:
         """Displays gradient.
         
-        If gradient is generic (QtGui.QGradient) then the parameter gradientType
-        specifies the concrete gradient type for display purpose.
+        If gradient is generic (QtGui.QGradient) then the concrete gradient type
+        must be specified in the parameter 'gradientType'
         
         Parameters:
         ===========
@@ -1139,10 +1121,20 @@ class GradientWidget(QtWidgets.QWidget):
                 
             QtGui.QGradient.Preset enum value
             
-            str: name of a gradient
+            str: name of a gradient (either a preset name, or a name in the internal
+                mapping of gradients which includes the Qt presets and any custom
+                gradient(s) passed to the constructor)
+            
+            a planargraphics.ColorGradient object
+            
+        gradientType: optional, default: QtGui.QGradient.LinearGradient
+            A QtGui.QGradient.Type enum value, or a str indicating the type.
+            
+            Valid strings are those that contain "linear". "radial", and "conical"
+            as substrings (case-insensitive).
         
         """
-        print("GradientWidget._showGradient", gradient, gradientType)
+        #print("GradientWidget._showGradient", gradient, gradientType)
         if not isinstance(gradient, (QtGui.QGradient, QtGui.QGradient.Preset, str)):
             return
         
