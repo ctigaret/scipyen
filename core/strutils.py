@@ -17,6 +17,46 @@ __translation_table_to_identifier = str.maketrans(dict([(c_, "_") for c_ in stri
 
 __translation_table_to_R_identifier = str.maketrans(dict([(c_, ".") for c_ in string.punctuation + string.whitespace]))
 
+def get_int_sfx(s, sep = "_"):
+    """Parses an integral suffix from the string.
+    
+    The suffix needs to be delimited by the sep string.
+    
+    Returns the string base and the integer value as given by the literal suffix.
+    
+    If a literal suffix is absent, the value is None
+    
+    e.g.:
+    
+    get_int_sfx("some_name") -> ("some_name", None)
+    
+    but:
+    
+    get_int_sfx("some_name_0") -> ("some_name", 0)
+    
+    whereas:
+    
+    get_int_sfx("some_name_1") -> ("some_name", 1)
+    
+    
+    """
+    parts = s.split(sep)
+    
+    if len(parts) <= 1:
+        return s, None
+        #return s, 0
+    
+    sfx = parts[-1]
+    base = sep.join(parts[0:-1])
+    
+    try:
+        sfx = int(sfx)
+    except:
+        sfx = None
+        #sfx = 0
+        
+    return base, sfx
+    
 def str2symbol(s):
     """Returns a string that can be used as valid Python symbol (a.k.a variable name).
     

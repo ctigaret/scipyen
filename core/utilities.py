@@ -18,6 +18,8 @@ from vigra import VigraArray as VigraArray
 
 from .prog import safeWrapper
 
+from .strutils import get_int_sfx
+
 abbreviated_type_names = {'IPython.core.macro.Macro' : 'Macro'}
 sequence_types = (list, tuple, deque)
 sequence_typenames = ('list', 'tuple', "deque")
@@ -374,8 +376,9 @@ def make_file_filter_string(extList, genericName):
     
     return (fileFilterString, individualFilterStrings)
 
-def counter_suffix(x, strings):
-    """Appends a counter suffix to x is x is found in the list of strings
+
+def counter_suffix(x, strings, underscore_sfx=True):
+    """Appends a counter suffix to x if x is found in the list of strings
     
     Parameters:
     ==========
@@ -384,40 +387,107 @@ def counter_suffix(x, strings):
     
     strings = sequence of str to check for existence of x
     
+    underscore_sfx: bool default is True: and underscore separated the numeric
+     suffi from the root of the string
+     When False, the separator is space
+    
     """
+    # TODO:
     
-    if not isinstance(strings, (tuple, list)) or not all ([isinstance(s, str) for s in strings]):
-        raise TypeError("Second positional parameter was expected to be a sequence of str")
+    base = "AboveTheSky"
+    p = re.compile("^%s_{0,1}\d*$" % base)
+    items = list(filter(lambda x: p.match(x), standardQtGradientPresets.keys()))
+    items
+    names = list(standardQtGradientPresets.keys())
+    names.append("AboveTheSky_1")
+    items = list(filter(lambda x: p.match(x), names))
+    items
+
+
     
+    if not isinstance(strings, (tuple, list)) and not hasattr(strings, "__iter__"):
+        raise TypeError("Second positional parameter was expected to be an iterable; got %s instead" % type(strings).__name__)
+    
+    if not all ([isinstance(s, str) for s in strings]):
+        raise TypeError("Second positional parameter was expected to contain str elements only")
+    
+    def __find_slot__(sub, full, val=None):
+        if len(sub):
+            print("diff", full - sub)
+            print("xsect", full & sub)
+            print("symdif", full ^ sub)
+            #print("union", full | sub)
+            
+            if len(full) >= len(sub):
+                validset = full - sub
+            else:
+                validset = sub-full
+            
+            print("validset", validset)
+            if len(validset):
+                ret = min(list(validset))
+
+            else:
+                ret = len(items)
+        else:
+            ret = len(full) + 1
+        
+        return ret
+        
     count = len(strings)
     
     ret = x
     
+    #print("x: %s" % x, "; strings:", strings)
+    
     if count > 0:
-        if x in strings:
-            first   = strings[0]
-            last    = strings[-1]
+        if underscore_sfx:
+            s = "_"
+        else:
+            s = " "
             
-            m = re.match(r"([a-zA-Z_]+)(\d+)\Z", first)
+        base, cc = get_int_sfx(x, sep=s)
             
-            if m:
-                suffix = int(m.group(2))
-
-                if suffix > 0:
-                    ret = "%s_%d" % (x, suffix-1)
-                    
-            else:
-                m = re.match(r"([a-zA-Z_]+)(\d+)\Z", last)
+        
+        p = re.compile(base)
+        
+        items = list(filter(lambda x: p.match(x), strings))
+        
+        #print("items", items)
+        
+        if len(items):
+            fullndx = range(len(items))
+            sfxndx = sorted(list(filter(lambda x: x, map(lambda x: get_int_sfx(x, sep=s)[1], items))))
+            #fullset = set(range(1,len(items)))
+            #sfxset = set(filter(lambda x: x, map(lambda x: get_int_sfx(x, sep=s)[1], items)))
+            #print("fullset", fullset)
+            #print("sfxset", sfxset)
+            
+            if len(sfxndx) == 0:
+                return s.join([base, ""])
+            
+            sfx = __find_slot__(sfxset, fullset, cc)
+            
+            #print("cc", cc)
+            #if cc is not None:
+                #if cc in sfxset:
+                    #print("cc in sfxset")
+                    #sfx = __find_slot__(sfxset, fullset, cc)
+                #else:
+                    #print("cc not in sfxset")
+                    #sfx = cc
                 
-                if m:
-                    suffix = int(m.group(2))
-                    
-                    ret = "%s_%d" % (x, suffix+1)
-                    
-                else:
-                    
-                    ret = "%s_%d" % (x, count)
-                    
+            #else:
+                ## find the smallest empty slot, or assign len(sfxset)
+                #sfx = __find_slot__(sfxset, fullset)
+
+            print("sfx", sfx)
+            if sfx:
+                ret = s.join([base, "%d" % sfx])
+            
+        else:
+            ret = x
+                
     return ret
                 
 
