@@ -935,8 +935,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 for item in self.modified_vars.items(): # populated by post_execute
                     self.originalVarName = item[0] # make sure we cache this here
                     self.updateRowForVariable(item[0], item[1])
-                
                 self.originalVarName = ""
+                
                 #print("added variables:", self.new_vars)
                 
                 # variables created by code executed in the console
@@ -992,24 +992,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     if item[0] not in displayed_vars_types:
                         self.addRowForVariable(item[0], item[1])
                         
-                    #else: # NOTE: 2020-09-24 11:02:39 this is now redundant
-                        #if not safe_identity_test(item[1], self.cached_vars[item[0]]):
-                            ## NOTE: This will always fail to detect when a symbol
-                            ## that exists in user_ns has been reassigned to a variable
-                            ## of a different TYPE. This happens because cached_vars
-                            ## contains a snapshot of the user_ns, created AFTER
-                            ## the new variable/object has been bound to the same
-                            ## symbol.
-                            ##
-                            ## Hpwever it should work OK when the TYPE is the same
-                            ## but its contents have been changed
-                            
-                            #print("update row for variable", item[0])
-                            #self.updateRowForVariable(item[0], item[1])
-                            
-                        #else:
-                            #print("what to do with", item[0])
-                       
                 # is this still needed !?!
                 self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.user_ns_hidden and not item[0].startswith("_")])
 
@@ -1017,7 +999,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             print("\n\n***Exception in updateTable: ***\n")
             traceback.print_exc()
 
-        #self.update()
         self.modelContentsChanged.emit()
         
     def updateFromExternal(self, prop_dicts):
@@ -1074,7 +1055,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                             
                         else:
                             self.updateRowFromProps(r, props)
-                            
                             
     @safeWrapper
     def rowIndexForItemsWithProps(self, **kwargs):

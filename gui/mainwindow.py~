@@ -344,7 +344,6 @@ class FileSystemModel(QtWidgets.QFileSystemModel):
 
 class WorkspaceViewer(QtWidgets.QTableView):
     """Inherits QTableView with customized drag & drop
-    WARNING work in progress; not currently used
     """
     def __init__(self, mainWindow=None, parent=None):
         super().__init__(parent=parent)
@@ -2143,6 +2142,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def _helpOnConsole_(self):
         self.console.execute("console_info()")
+        
+    @pyqtSlot()
+    def slot_refreshWorkspaceView(self):
+        self.workspaceModel.updateTable(from_console=True)
+        #self.workspaceModel.pre_execute()
+        #for name, var in self.workspaceModel.cached_vars.items():
+            #self.workspaceModel.originalVarName = name
+            #self.workspaceModel.updateRowForVariable(name, var)
+            
+        #self.workspaceModel.originalVarName=""
+        #self.workspaceModel.modelContentsChanged.emit()
     
     # NOTE: 2016-03-26 17:07:17
     # as a workaround for the problem in NOTE: 2016-03-26 17:01:32
@@ -2802,7 +2812,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #print("workspace model rows: ", self.workspaceModel.rowCount())
         
         #originalVarName = self.workspaceModel.getCurrentVarName()
-        originalVarName = self.workspaceModel.currentVarName
+        # NOTE: 2021-06-12 12:10:22
+        # use cached symbol when symbol's bound data has changed
+        originalVarName = self.workspaceModel.originalVarName
+        #originalVarName = self.workspaceModel.currentVarName
         #print("ScipyenWindow slot_variableItemNameChanged originalVarName %s" % originalVarName)
         newVarName = item.text()
         #print("ScipyenWindow slot_variableItemNameChanged newVarName %s" % newVarName)
@@ -3563,6 +3576,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.scriptsAction.setMenu(self.menuScripts)
         self.applicationsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("homerun"), "Applications")
         self.applicationsAction.setMenu(self.applicationsMenu)
+        self.refreshWorkspaceAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh Workspace")
+        self.refreshWorkspaceAction.triggered.connect(self.slot_refreshWorkspaceView)
         
         tbactions = (self.newViewersAction, self.consolesAction, self.scriptsAction, self.applicationsAction)
         tw = (w for w in itertools.chain(*(a.associatedWidgets() for a in tbactions)) if w is not self.toolBar)

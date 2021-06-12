@@ -2142,6 +2142,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def _helpOnConsole_(self):
         self.console.execute("console_info()")
+        
+    @pyqtSlot()
+    def slot_refreshWorkspaceView(self):
+        self.workspaceModel.updateTable(from_console=False)
+        #self.workspaceModel.pre_execute()
+        #for name, var in self.workspaceModel.cached_vars.items():
+            #self.workspaceModel.originalVarName = name
+            #self.workspaceModel.updateRowForVariable(name, var)
+            
+        #self.workspaceModel.originalVarName=""
+        #self.workspaceModel.modelContentsChanged.emit()
     
     # NOTE: 2016-03-26 17:07:17
     # as a workaround for the problem in NOTE: 2016-03-26 17:01:32
@@ -3565,6 +3576,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.scriptsAction.setMenu(self.menuScripts)
         self.applicationsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("homerun"), "Applications")
         self.applicationsAction.setMenu(self.applicationsMenu)
+        self.refreshWorkspaceAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh Workspace")
+        self.refreshWorkspaceAction.triggered.connect(self.slot_refreshWorkspaceView)
         
         tbactions = (self.newViewersAction, self.consolesAction, self.scriptsAction, self.applicationsAction)
         tw = (w for w in itertools.chain(*(a.associatedWidgets() for a in tbactions)) if w is not self.toolBar)

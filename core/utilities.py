@@ -443,93 +443,55 @@ def counter_suffix(x, strings, sep="_"):
     if not all ([isinstance(s, str) for s in strings]):
         raise TypeError("Second positional parameter was expected to contain str elements only")
     
-    def __find_slot__(sub, full, val=None):
-        if len(sub):
-            #print("diff", full - sub)
-            #print("xsect", full & sub)
-            #print("symdif", full ^ sub)
-            #print("union", full | sub)
-            
-            if len(full) >= len(sub):
-                validset = full - sub
-            else:
-                validset = sub-full
-            
-            print("validset", validset)
-            if len(validset):
-                ret = min(list(validset))
-
-            else:
-                ret = len(items)
-        else:
-            ret = len(full) + 1
-        
-        return ret
-        
-    count = len(strings)
     
-    #ret = x
-    
-    #print("x: %s" % x, "; strings:", strings)
-    
-    if len(string):
-            
+    if len(strings):
         base, cc = get_int_sfx(x, sep=sep)
-            
         
         #p = re.compile(base)
         p = re.compile("^%s%s{0,1}\d*$" % (base, sep))
         
         items = list(filter(lambda x: p.match(x), strings))
         
-        #print("items", items)
-        
         if len(items):
             fullndx = range(1, len(items))
+            full = set(fullndx)
             currentsfx = sorted(list(filter(lambda x: x, map(lambda x: get_int_sfx(x, sep=sep)[1], items))))
+            current = set(currentsfx)
             if len(currentsfx):
                 if min(currentsfx) > 1:
+                    # first slot (base_1) is missing - fill it 
                     newsfx = 1
                     
                 else:
-                    if set(currentsfx) == set(fullndx):
+                    if current == full:
+                        # full range if indices is taken;
+                        # but the 0th slot may be missing (base)
+                        if base not in items:
+                            # 0th slot (base) is missing:
+                            return base
+                        # => get the next one up (base_x, x = len(items)
                         newsfx = len(items)
                         
-                    else:
-                        return base # FIXME/TODO
+                    else: # set cardinality may be different, or just their elements are different
+                        if len(current) == len(full):
+                            # same cardinality => different elements =>
+                            # neither is a subset of the other
+                            # check what elements from full are NOT in currentsfx
+                            # while SOME currentsfx are in full
+                            missing = full - current
+                            if len (missing):
+                                # get the minimal slot from missing
+                                newsfx = min(missing)
+                            else:
+                                # full and currentsfx are disjoint
+                                newsfx = min(full)
+                        else:
+                            return base # FIXME/TODO good default ?!?
             else:
+                # base not found: return the next available slot (base_1)
                 newsfx = 1
                 
             return sep.join([base, "%d" % newsfx])
-            
-            
-            #sfxndx = sorted(list(filter(lambda x: x, map(lambda x: get_int_sfx(x, sep=sep)[1], items))))
-            ##fullset = set(range(1,len(items)))
-            ##sfxset = set(filter(lambda x: x, map(lambda x: get_int_sfx(x, sep=s)[1], items)))
-            ##print("fullset", fullset)
-            ##print("sfxset", sfxset)
-            
-            #if len(sfxndx) == 0:
-                #return s.join([base, ""])
-            
-            #sfx = __find_slot__(sfxset, fullset, cc)
-            
-            ##print("cc", cc)
-            ##if cc is not None:
-                ##if cc in sfxset:
-                    ##print("cc in sfxset")
-                    ##sfx = __find_slot__(sfxset, fullset, cc)
-                ##else:
-                    ##print("cc not in sfxset")
-                    ##sfx = cc
-                
-            ##else:
-                ### find the smallest empty slot, or assign len(sfxset)
-                ##sfx = __find_slot__(sfxset, fullset)
-
-            #print("sfx", sfx)
-            #if sfx:
-                #ret = s.join([base, "%d" % sfx])
             
         else:
             return x
@@ -743,6 +705,20 @@ def safe_identity_test(x, y):
         if hasattr(x, "ndim"):
             ret &= x.ndim == y.ndim
         
+        if not ret:
+            return ret
+        
+        if hasattr(x, "__len__") or hasattr(x, "__iter__"):
+            ret &= len(x) == len(y)
+
+            if not ret:
+                return ret
+            
+            ret &= all(map(lambda x_,y_: safe_identity_test(x_,y_). zip(x,y)))
+            
+            if not ret:
+                return ret
+            
         ret &= eq(x,y)
         
         return ret ## good fallback, though potentially expensive
