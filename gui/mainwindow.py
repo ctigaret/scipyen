@@ -344,7 +344,6 @@ class FileSystemModel(QtWidgets.QFileSystemModel):
 
 class WorkspaceViewer(QtWidgets.QTableView):
     """Inherits QTableView with customized drag & drop
-    WARNING work in progress; not currently used
     """
     def __init__(self, mainWindow=None, parent=None):
         super().__init__(parent=parent)

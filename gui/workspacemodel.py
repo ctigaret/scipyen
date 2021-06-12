@@ -714,10 +714,15 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         return self.generateRowFromPropertiesDict(obj_props)
     
-    def generateRowFromPropertiesDict(self, obj_props:dict, background:typing.Optional[QtGui.QBrush]=None, foreground:typing.Optional[QtGui.QBrush]=None):
+    def generateRowFromPropertiesDict(self, obj_props:dict,
+                                      background:typing.Optional[QtGui.QBrush]=None,
+                                      foreground:typing.Optional[QtGui.QBrush]=None):
         """Returns a row of QStandardItems
         """
-        return [self._generate_standard_item_for_object_(obj_props[key], editable = (key=="Name"), background=background, foreground=foreground) for key in standard_obj_summary_headers]
+        return [self._generate_standard_item_for_object_(obj_props[key], 
+                                                         editable = (key=="Name"), 
+                                                         background=background, 
+                                                         foreground=foreground) for key in standard_obj_summary_headers]
         
         
     def getRowContents(self, row, asStrings=True):
@@ -780,7 +785,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
     def updateRowForVariable(self, dataname, data, ns=None):
         # CAUTION This is only for internal workspace, but 
-        # TODO 2020-07-30 22:18:35 merge & factor code for both interna and foreign
+        # TODO 2020-07-30 22:18:35 merge & factor code for both internal and foreign
         # kernels (make use of the ns parameter)
         #
         if ns is None:

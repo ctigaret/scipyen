@@ -16,9 +16,12 @@ import pandas as pd
 from quantities import Quantity as Quantity
 from vigra import VigraArray as VigraArray
 
+
 from .prog import safeWrapper
 
 from .strutils import get_int_sfx
+
+from gui.guiutils import (get_text_width, get_elided_text)
 
 abbreviated_type_names = {'IPython.core.macro.Macro' : 'Macro'}
 sequence_types = (list, tuple, deque)
@@ -115,7 +118,6 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     ordertip= ""
     memsz = ""
     memsztip = ""
-    
 
     try:
         if isinstance(obj, sequence_types):
@@ -289,7 +291,15 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         result["Memory Size"]   = {"display": memsz,        "tooltip" : "%s%s" % (memsztip, memsz)}
         
         for key, value in result.items():
-            value["tooltip"] = "\n".join([value["tooltip"], "Namespace: %s" % result["Workspace"]["display"]])
+            wspace_name = "Namespace: %s" % result["Workspace"]["display"]
+            if key == "Name":
+                wnwidth = get_text_width(wspace_name)
+                if isinstance(obj, (str, Number, sequence_types, set_types, dict_types, pd.Series, pd.DataFrame, ndarray)):
+                    ttip = get_elided_text("%s: %s" % (value["tooltip"], obj), wnwidth)
+                    value["tooltip"] = "\n".join([ttip, wspace_name])
+                    
+            else:
+                value["tooltip"] = "\n".join([value["tooltip"], wspace_name])
         
     except Exception as e:
         traceback.print_exc()
@@ -377,7 +387,7 @@ def make_file_filter_string(extList, genericName):
     return (fileFilterString, individualFilterStrings)
 
 
-def counter_suffix(x, strings, underscore_sfx=True):
+def counter_suffix(x, strings, sep="_"):
     """Appends a counter suffix to x if x is found in the list of strings
     
     Parameters:
@@ -394,14 +404,15 @@ def counter_suffix(x, strings, underscore_sfx=True):
     """
     # TODO:
     
-    base = "AboveTheSky"
-    p = re.compile("^%s_{0,1}\d*$" % base)
-    items = list(filter(lambda x: p.match(x), standardQtGradientPresets.keys()))
-    items
-    names = list(standardQtGradientPresets.keys())
-    names.append("AboveTheSky_1")
-    items = list(filter(lambda x: p.match(x), names))
-    items
+    #base = "AboveTheSky"
+    #p = re.compile("^%s_{0,1}\d*$" % base)
+    #p = re.compile("^%s_{0,1}\d*$" % base)
+    #items = list(filter(lambda x: p.match(x), standardQtGradientPresets.keys()))
+    #items
+    #names = list(standardQtGradientPresets.keys())
+    #names.append("AboveTheSky_1")
+    #items = list(filter(lambda x: p.match(x), names))
+    #items
 
 
     
@@ -413,9 +424,9 @@ def counter_suffix(x, strings, underscore_sfx=True):
     
     def __find_slot__(sub, full, val=None):
         if len(sub):
-            print("diff", full - sub)
-            print("xsect", full & sub)
-            print("symdif", full ^ sub)
+            #print("diff", full - sub)
+            #print("xsect", full & sub)
+            #print("symdif", full ^ sub)
             #print("union", full | sub)
             
             if len(full) >= len(sub):
@@ -440,16 +451,13 @@ def counter_suffix(x, strings, underscore_sfx=True):
     
     #print("x: %s" % x, "; strings:", strings)
     
-    if count > 0:
-        if underscore_sfx:
-            s = "_"
-        else:
-            s = " "
+    if len(string):
             
-        base, cc = get_int_sfx(x, sep=s)
+        base, cc = get_int_sfx(x, sep=sep)
             
         
-        p = re.compile(base)
+        #p = re.compile(base)
+        p = re.compile("^%s_{0,1}\d*$" % base)
         
         items = list(filter(lambda x: p.match(x), strings))
         
