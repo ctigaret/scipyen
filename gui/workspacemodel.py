@@ -80,7 +80,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # NOTE: 2017-09-22 21:33:47
         # cache for the current var name to allow renaming workspace variables
         # this should be updated whenever the variable name is selected/activated in the model table view
-        self.currentVarName = "" 
+        self.currentVarName = "" # name of currently selected variable
+        # NOTE: 2021-06-12 12:11:25
+        # cache symbol when the data it is bound to has changed
+        self.originalVarName = "" # varname cache for individual row changes
         self.setColumnCount(len(standard_obj_summary_headers))
         self.setHorizontalHeaderLabels(standard_obj_summary_headers) # defined in core.utilities
         
@@ -693,7 +696,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
         self.updateTable(from_console=True)
         
-    def _generate_standard_item_for_object_(self, propdict:dict, editable:typing.Optional[bool] = False, background:typing.Optional[QtGui.QBrush]=None, foreground:typing.Optional[QtGui.QBrush]=None):
+    def _generate_standard_item_for_object_(self, propdict:dict, 
+                                            editable:typing.Optional[bool] = False, 
+                                            background:typing.Optional[QtGui.QBrush]=None, 
+                                            foreground:typing.Optional[QtGui.QBrush]=None) -> QtGui.QStandardItem:
         item = QtGui.QStandardItem(propdict["display"])
         item.setToolTip(propdict["tooltip"])
         item.setStatusTip(propdict["tooltip"])
@@ -709,14 +715,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return item
     
     @safeWrapper
-    def generateRowContents2(self, dataname, data, namespace="Internal"):
+    def generateRowContents2(self, dataname:str, data:object, namespace:str="Internal") -> typing.List[QtGui.QStandardItem]:
         obj_props = summarize_object_properties(dataname, data, namespace=namespace)
-        
+        #print("generateRowContents2 obj_props", obj_props)
         return self.generateRowFromPropertiesDict(obj_props)
     
     def generateRowFromPropertiesDict(self, obj_props:dict,
                                       background:typing.Optional[QtGui.QBrush]=None,
-                                      foreground:typing.Optional[QtGui.QBrush]=None):
+                                      foreground:typing.Optional[QtGui.QBrush]=None) -> typing.List[QtGui.QStandardItem]:
         """Returns a row of QStandardItems
         """
         return [self._generate_standard_item_for_object_(obj_props[key], 
@@ -735,12 +741,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         if row is None or row >= self.rowCount() or row < 0:
             return "" if asStrings else None
+        
+        return [self.item(row, col).text() if asStrings else self.item(row, col) for col in range(self.columnCount())]
 
-        ret = []
-        for col in range(self.columnCount()):
-            ret.append(self.item(row, col).text() if asStrings else self.item(row, col))
+        #ret = []
+        #for col in range(self.columnCount()):
+            #ret.append(self.item(row, col).text() if asStrings else self.item(row, col))
                 
-        return ret
+        #return ret
 
     def getRowIndexForVarname(self, varname, regVarNames=None):
         if regVarNames is None:
@@ -824,9 +832,17 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 
     def updateRow(self, rowindex, newrowdata):
         originalRow = self.getRowContents(rowindex, asStrings=False)
-        for col in range(1, self.columnCount()):
-            if originalRow is not None and col < len(originalRow) and originalRow[col] != newrowdata[col]:
+        #print("updateRow originalRow as str", self.getRowContents(rowindex, asStrings=True))
+        if originalRow is not None:
+            for col in range(self.columnCount()):
+                #if col == 0:
+                    #self.originalVarName = newrowdata[col].text()
                 self.setItem(rowindex, col, newrowdata[col])
+                #if originalRow is not None and col < len(originalRow):# and originalRow[col] != newrowdata[col]:
+                    
+        #for col in range(1, self.columnCount()):
+            #if originalRow is not None and col < len(originalRow):# and originalRow[col] != newrowdata[col]:
+                #self.setItem(rowindex, col, newrowdata[col])
                 
 
     def removeRowForVariable(self, dataname, ns=None):
@@ -883,6 +899,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
 
             if from_console:
+                #print("WT update from console")
                 # NOTE: 2018-10-07 21:46:03
                 # added/removed/modified variables as a result of code executed
                 # in the console; 
@@ -916,8 +933,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 
                 # variables modified via code executed in the console
                 for item in self.modified_vars.items(): # populated by post_execute
+                    self.originalVarName = item[0] # make sure we cache this here
                     self.updateRowForVariable(item[0], item[1])
                 
+                self.originalVarName = ""
                 #print("added variables:", self.new_vars)
                 
                 # variables created by code executed in the console
@@ -958,11 +977,16 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                         
                     elif varname in self.cached_vars: # should also be in user_ns
                         if type(self.cached_vars[varname]).__name__ != displayed_vars_types[varname]:
+                            self.originalVarName = varname # see NOTE: 2021-06-12 12:11:25
                             self.updateRowForVariable(varname, self.shell.user_ns[varname])
                             
                         elif not safe_identity_test(self.shell.user_ns[varname], self.cached_vars[varname]):
+                            self.originalVarName = varname # see NOTE: 2021-06-12 12:11:25
                             self.updateRowForVariable(varname, self.shell.user_ns[varname])
-                            
+                
+                # NOTE: 2021-06-12 12:12:50
+                # clear symbol cache, see NOTE: 2021-06-12 12:11:25
+                self.originalVarName=""            
                 # variables CREATED by code executed outside the console
                 for item in self.cached_vars.items():
                     if item[0] not in displayed_vars_types:
@@ -993,6 +1017,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             print("\n\n***Exception in updateTable: ***\n")
             traceback.print_exc()
 
+        #self.update()
         self.modelContentsChanged.emit()
         
     def updateFromExternal(self, prop_dicts):

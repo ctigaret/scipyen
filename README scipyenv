@@ -297,6 +297,16 @@ e.g. pip install -I numpy
                     Send2Trash, prometheus-client, nbconvert, ipykernel, argon2-cffi, 
                     notebook, widgetsnbextension, qtpy, qtconsole, jupyter-console, 
                     ipywidgets)
+    
+    NOTE: 2021-06-12 15:46:34 
+    jedi 0.18.0 is incompatible with IPython<=7.19; if you have IPython<=7.19 
+    installed in scipyenv then force install an earlier jedi version:
+        pip install jedi==0.17.2
+        
+        see also here: 
+            https://github.com/davidhalter/jedi/issues/1714
+            https://github.com/ipython/ipython/issues/12740
+            https://github.com/ipython/ipython/issues/12821
                 
     jupyter_qtconsole_colorschemes
     

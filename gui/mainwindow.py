@@ -2801,7 +2801,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #print("workspace model rows: ", self.workspaceModel.rowCount())
         
         #originalVarName = self.workspaceModel.getCurrentVarName()
-        originalVarName = self.workspaceModel.currentVarName
+        # NOTE: 2021-06-12 12:10:22
+        # use cached symbol when symbol's bound data has changed
+        originalVarName = self.workspaceModel.originalVarName
+        #originalVarName = self.workspaceModel.currentVarName
         #print("ScipyenWindow slot_variableItemNameChanged originalVarName %s" % originalVarName)
         newVarName = item.text()
         #print("ScipyenWindow slot_variableItemNameChanged newVarName %s" % newVarName)

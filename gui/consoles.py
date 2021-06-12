@@ -2521,7 +2521,14 @@ class ScipyenConsole(RichJupyterWidget):
                 
             else:
                 value = QtCore.Qt.LayoutDirectionAuto
-
+                
+        elif isinstance(value, int):
+            if value not in (QtCore.Qt.LeftToRight, QtCore.Qt.RightToLeft):
+                value = QtCore.Qt.LayoutDirectionAuto
+                
+        else:
+            value = QtCore.Qt.LayoutDirectionAuto
+                
         self._control.setLayoutDirection(value)
 
     def _save_settings_(self):

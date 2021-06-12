@@ -87,7 +87,24 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     objcls = obj.__class__
     clsname = objcls.__name__
     
-    result["Name"] = {"display": objname, "tooltip":objname}
+    # NOTE: 2021-06-12 12:23:41
+    # For "Name" only, let the the tooltip display an elided version of the 
+    # object's string representation; take a space that is twice as wide as the 
+    # namespace tooltip
+    wspace_name = "Namespace: %s" % namespace
+    w = get_text_width(wspace_name) * 2
+    if isinstance(obj, str):
+        ttip = get_elided_text("'%s'" % obj, w)
+    else:
+        ttip = get_elided_text("%s" % obj, w)
+    #if isinstance(obj, (str, Number, sequence_types, set_types, dict_types, pd.Series, pd.DataFrame, ndarray)):
+        #ttip = get_elided_text("%s" % obj, w)
+    
+    #else:
+        #ttip = objname
+    
+    result["Name"] = {"display": "%s" % objname, "tooltip":"\n".join([ttip, wspace_name])}
+    #result["Name"] = {"display": objname, "tooltip":objname}
     
     tt = abbreviated_type_names.get(typename, typename)
     
@@ -290,16 +307,20 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         result["Array Order"]   = {"display": arrayorder,   "tooltip" : "%s%s" % (ordertip, arrayorder)}
         result["Memory Size"]   = {"display": memsz,        "tooltip" : "%s%s" % (memsztip, memsz)}
         
+        # NOTE: 2021-06-12 12:22:38
+        # append namespace name to the tooltip at the entries other than Name, as well
         for key, value in result.items():
-            wspace_name = "Namespace: %s" % result["Workspace"]["display"]
-            if key == "Name":
-                wnwidth = get_text_width(wspace_name)
-                if isinstance(obj, (str, Number, sequence_types, set_types, dict_types, pd.Series, pd.DataFrame, ndarray)):
-                    ttip = get_elided_text("%s: %s" % (value["tooltip"], obj), wnwidth)
-                    value["tooltip"] = "\n".join([ttip, wspace_name])
-                    
-            else:
+            if key != "Name":
                 value["tooltip"] = "\n".join([value["tooltip"], wspace_name])
+            #wspace_name = "Namespace: %s" % result["Workspace"]["display"]
+            #if key == "Name":
+                #wnwidth = get_text_width(wspace_name)
+                #if isinstance(obj, (str, Number, sequence_types, set_types, dict_types, pd.Series, pd.DataFrame, ndarray)):
+                    #ttip = get_elided_text("%s: %s" % (value["tooltip"], obj), wnwidth)
+                    #value["tooltip"] = "\n".join([ttip, wspace_name])
+                    
+            #else:
+                #value["tooltip"] = "\n".join([value["tooltip"], wspace_name])
         
     except Exception as e:
         traceback.print_exc()
@@ -447,7 +468,7 @@ def counter_suffix(x, strings, sep="_"):
         
     count = len(strings)
     
-    ret = x
+    #ret = x
     
     #print("x: %s" % x, "; strings:", strings)
     
@@ -457,46 +478,63 @@ def counter_suffix(x, strings, sep="_"):
             
         
         #p = re.compile(base)
-        p = re.compile("^%s_{0,1}\d*$" % base)
+        p = re.compile("^%s%s{0,1}\d*$" % (base, sep))
         
         items = list(filter(lambda x: p.match(x), strings))
         
         #print("items", items)
         
         if len(items):
-            fullndx = range(len(items))
-            sfxndx = sorted(list(filter(lambda x: x, map(lambda x: get_int_sfx(x, sep=s)[1], items))))
-            #fullset = set(range(1,len(items)))
-            #sfxset = set(filter(lambda x: x, map(lambda x: get_int_sfx(x, sep=s)[1], items)))
-            #print("fullset", fullset)
-            #print("sfxset", sfxset)
-            
-            if len(sfxndx) == 0:
-                return s.join([base, ""])
-            
-            sfx = __find_slot__(sfxset, fullset, cc)
-            
-            #print("cc", cc)
-            #if cc is not None:
-                #if cc in sfxset:
-                    #print("cc in sfxset")
-                    #sfx = __find_slot__(sfxset, fullset, cc)
-                #else:
-                    #print("cc not in sfxset")
-                    #sfx = cc
+            fullndx = range(1, len(items))
+            currentsfx = sorted(list(filter(lambda x: x, map(lambda x: get_int_sfx(x, sep=sep)[1], items))))
+            if len(currentsfx):
+                if min(currentsfx) > 1:
+                    newsfx = 1
+                    
+                else:
+                    if set(currentsfx) == set(fullndx):
+                        newsfx = len(items)
+                        
+                    else:
+                        return base # FIXME/TODO
+            else:
+                newsfx = 1
                 
-            #else:
-                ## find the smallest empty slot, or assign len(sfxset)
-                #sfx = __find_slot__(sfxset, fullset)
+            return sep.join([base, "%d" % newsfx])
+            
+            
+            #sfxndx = sorted(list(filter(lambda x: x, map(lambda x: get_int_sfx(x, sep=sep)[1], items))))
+            ##fullset = set(range(1,len(items)))
+            ##sfxset = set(filter(lambda x: x, map(lambda x: get_int_sfx(x, sep=s)[1], items)))
+            ##print("fullset", fullset)
+            ##print("sfxset", sfxset)
+            
+            #if len(sfxndx) == 0:
+                #return s.join([base, ""])
+            
+            #sfx = __find_slot__(sfxset, fullset, cc)
+            
+            ##print("cc", cc)
+            ##if cc is not None:
+                ##if cc in sfxset:
+                    ##print("cc in sfxset")
+                    ##sfx = __find_slot__(sfxset, fullset, cc)
+                ##else:
+                    ##print("cc not in sfxset")
+                    ##sfx = cc
+                
+            ##else:
+                ### find the smallest empty slot, or assign len(sfxset)
+                ##sfx = __find_slot__(sfxset, fullset)
 
-            print("sfx", sfx)
-            if sfx:
-                ret = s.join([base, "%d" % sfx])
+            #print("sfx", sfx)
+            #if sfx:
+                #ret = s.join([base, "%d" % sfx])
             
         else:
-            ret = x
+            return x
                 
-    return ret
+    return x
                 
 
 def get_nested_value(src, path):
