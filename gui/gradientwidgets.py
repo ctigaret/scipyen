@@ -924,9 +924,9 @@ class GradientWidget(QtWidgets.QWidget):
         self.prevPresetButton.setIcon(QtGui.QIcon.fromTheme("go-previous"))
         self.prevPresetButton.setSizePolicy(QtWidgets.QSizePolicy.Fixed,
                                             QtWidgets.QSizePolicy.Fixed)
-        self._presetButton = QtWidgets.QPushButton("(unset)", self.presetsGroup)
-        self._presetButton.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
-                                         QtWidgets.QSizePolicy.Fixed)
+        #self._presetButton = QtWidgets.QPushButton("(unset)", self.presetsGroup)
+        #self._presetButton.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                         #QtWidgets.QSizePolicy.Fixed)
         
         self._presetComboBox = QtWidgets.QComboBox(self.presetsGroup)
         self._presetComboBox.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
@@ -934,7 +934,6 @@ class GradientWidget(QtWidgets.QWidget):
         
         self._presetComboBox.setEditable(True)
         
-        self._presetComboBox.activated[int].connect(self.slotPresetActivated)
         
         
         self.nextPresetButton = QtWidgets.QPushButton("", self.presetsGroup)
@@ -980,7 +979,8 @@ class GradientWidget(QtWidgets.QWidget):
 
         self.presetsGroupLayout = QtWidgets.QHBoxLayout(self.presetsGroup)
         self.presetsGroupLayout.addWidget(self.prevPresetButton)
-        self.presetsGroupLayout.addWidget(self._presetButton, 1)
+        #self.presetsGroupLayout.addWidget(self._presetButton, 1)
+        self.presetsGroupLayout.addWidget(self._presetComboBox, 1)
         self.presetsGroupLayout.addWidget(self.nextPresetButton)
         
         self.mainGroup.setLayout(self.mainGroupLayout)
@@ -1015,7 +1015,8 @@ class GradientWidget(QtWidgets.QWidget):
         self._repeatSpreadButton.clicked.connect(self._renderer.setRepeatSpread)
         
         self.prevPresetButton.clicked.connect(self.setPrevPreset)
-        self._presetButton.clicked.connect(self.setPreset)
+        #self._presetButton.clicked.connect(self.setPreset)
+        self._presetComboBox.activated[int].connect(self.slotPresetActivated)
         self.nextPresetButton.clicked.connect(self.setNextPreset)
         
         if isinstance(self._title, str) and len(self._title.strip()):
@@ -1033,6 +1034,12 @@ class GradientWidget(QtWidgets.QWidget):
     def setPreset(self) -> None:
         self._changePresetBy(0)
         
+    @pyqtSlot(int)
+    def slotPresetActivated(self, index):
+        self._gradientIndex = index
+        g = [v for v in self._gradients.values()][self._gradientIndex]
+        self._showGradient(g)
+        
     @pyqtSlot()
     def setPrevPreset(self) -> None:
         self._changePresetBy(-1)
@@ -1048,12 +1055,6 @@ class GradientWidget(QtWidgets.QWidget):
         else:
             self.setWindowTitle("%s *" % QtWidgets.QApplication.applicationDisplayName())
         #self.update()
-        
-    @pyqtSlot(int)
-    def slotPresetActivated(self, index):
-        self._gradientIndex = index
-        g = [v for v in self._gradients.values()][self._gradientIndex]
-        self._showGradient(g)
         
     @pyqtSlot(str)
     def slotGradientNameChanged(self, val):
@@ -1081,8 +1082,9 @@ class GradientWidget(QtWidgets.QWidget):
         namedgrad = [(name, val) for name, val in self._gradients.items()][self._gradientIndex]
         cbIndex = [n for n in self._gradients.keys()].index(namedgrad[0])
         self._presetComboBox.setCurrentIndex(cbIndex)
-        self._presetButton.setText(namedgrad[0])
-        self._presetButton.setToolTip(namedgrad[0])
+        self._presetComboBox.setToolTip(namedgrad[0])
+        #self._presetButton.setText(namedgrad[0])
+        #self._presetButton.setToolTip(namedgrad[0])
         
     def _changePresetBy(self, indexOffset:int) -> None:
         #print("GradientWidget._changePresetBy %d gradients: currentIndex: %d, offset %d" % (len(self._gradients), self._gradientIndex, indexOffset))
@@ -1110,7 +1112,7 @@ class GradientWidget(QtWidgets.QWidget):
         self._presetComboBox.setCurrentIndex(cbIndex)
         
         self._showGradient(namedgrad[1]) 
-        self._updatePresetName()
+        #self._updatePresetName()
         
         #if namedgrad[0] in standardQtGradientPresets.keys():
             ## NOTE: 2021-06-10 22:13:38
