@@ -435,13 +435,17 @@ def counter_suffix(x, strings, sep="_"):
     #items = list(filter(lambda x: p.match(x), names))
     #items
 
-
-    
     if not isinstance(strings, (tuple, list)) and not hasattr(strings, "__iter__"):
         raise TypeError("Second positional parameter was expected to be an iterable; got %s instead" % type(strings).__name__)
     
     if not all ([isinstance(s, str) for s in strings]):
         raise TypeError("Second positional parameter was expected to contain str elements only")
+    
+    if not isinstance(sep, str):
+        raise TypeError("Separator must be a str; got %s instead" % type(sep).__name__)
+    
+    if len(sep) == 0:
+        raise ValueError("Separator cannot be an empty string")
     
     
     if len(strings):

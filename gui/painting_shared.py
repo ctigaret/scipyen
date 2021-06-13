@@ -457,8 +457,10 @@ def scaleGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, QtCo
         
     else:
         raise TypeError("Expecting a concrete QGradient subtype; got %s instead" % type(g).__name__)
-        
+
 def normalizeGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, QtCore.QRectF]) -> QtGui.QGradient:
+    """
+    """
     x = rect.x()
     y = rect.y()
     w = rect.width()

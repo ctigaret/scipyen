@@ -3615,7 +3615,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.removeRecentDirFromListAction.triggered.connect(self.slot_removeDirFromHistory)
         
-        self.clearRecentDirListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final-activity"), \
+        self.clearRecentDirListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final_activity"), \
                                                         "Clear history of visited paths", \
                                                         self.directoryComboBox.lineEdit())
         
@@ -3638,7 +3638,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.removeFileFilterFromListAction.triggered.connect(self.slot_removeFileFilterFromHistory)
         
-        self.clearFileFilterListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final-activity"), \
+        self.clearFileFilterListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final_activity"), \
                                                     "Clear filter list", \
                                                     self.fileSystemFilter.lineEdit())
         
