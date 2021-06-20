@@ -245,7 +245,7 @@ class GradientEditor(QtWidgets.QWidget):
         sortedPoints = sorted([p for p in points], key = lambda x: x.x())
         #sortedPoints = sorted([p for p in points], key = x_less_than)
         
-        #print("GradientEditor.pointsUpdated: " len(sortedPoints))
+        #print("GradientEditor.pointsUpdated: ", len(sortedPoints), sortedPoints)
         
         for i, point in enumerate(sortedPoints):
             k = int(point.x())
@@ -465,6 +465,7 @@ class GradientRenderer(QtWidgets.QWidget):
         if not isinstance(val, (tuple, list)) or not all([self._checkStop(s) for s in val]):
             return
         self._stops[:] = val
+        #print("GradientRenderer.gradientStops", self._stops)
         #self.update()
     
     @pyqtSlot(float)
@@ -813,14 +814,14 @@ class GradientWidget(QtWidgets.QWidget):
         
     def _configureUI_(self):
         self._renderer = GradientRenderer(self)
-        #self._renderer._hoverPoints.pointsChanged.connect(self.slotCheckGradientModified)
+        #self._renderer._hoverPoints.pointsChanged.connect(self.slot_checkGradientModified)
         
         self.mainContentWidget = QtWidgets.QWidget()
         self.mainGroup = QtWidgets.QGroupBox(self.mainContentWidget)
         self.mainGroup.setTitle("Gradients")
         
         self.editorGroup = QtWidgets.QGroupBox(self.mainGroup)
-        self.editorGroup.setTitle("Color Editor")
+        self.editorGroup.setTitle("Gradient Editor")
         
         self._editor = GradientEditor(self.editorGroup)
         
@@ -931,7 +932,7 @@ class GradientWidget(QtWidgets.QWidget):
         
         
         self.presetsGroup = QtWidgets.QGroupBox(self.mainGroup)
-        self.presetsGroup.setTitle("Gradients")
+        self.presetsGroup.setTitle("Gradient Presets")
         self.presetsGroup.setToolTip("Available Gradients (including Qt's presets)")
         self.prevPresetButton = QtWidgets.QPushButton("", self.presetsGroup)
         self.prevPresetButton.setIcon(QtGui.QIcon.fromTheme("go-previous"))
@@ -1071,13 +1072,14 @@ class GradientWidget(QtWidgets.QWidget):
         self.mainLayout.addWidget(self.vSplitter)
         
         self._editor.gradientStopsChanged.connect(self._renderer.setGradientStops)
-        self._editor.gradientStopsChanged.connect(self.slotGradientModified)
+        self._editor.gradientStopsChanged.connect(self.slot_gradientModified)
+        
         self._linearButton.clicked.connect(self._renderer.setLinearGradient)
-        self._linearButton.clicked.connect(self.slotGradientModified)
+        self._linearButton.clicked.connect(self.slot_gradientModified)
         self._radialButton.clicked.connect(self._renderer.setRadialGradient)
-        self._radialButton.clicked.connect(self.slotGradientModified)
+        self._radialButton.clicked.connect(self.slot_gradientModified)
         self._conicalButton.clicked.connect(self._renderer.setConicalGradient)
-        self._conicalButton.clicked.connect(self.slotGradientModified)
+        self._conicalButton.clicked.connect(self.slot_gradientModified)
         
         self._padSpreadButton.clicked.connect(self._renderer.setPadSpread)
         self._reflectSpreadButton.clicked.connect(self._renderer.setReflectSpread)
@@ -1085,9 +1087,10 @@ class GradientWidget(QtWidgets.QWidget):
         
         self.prevPresetButton.clicked.connect(self.setPrevPreset)
         #self._presetButton.clicked.connect(self.setPreset)
-        self._presetComboBox.activated[int].connect(self.slotPresetActivated)
-        #self._presetComboBox.currentTextChanged[str].connect(self.slotGradientNameChanged)
-        self._presetComboBox.editTextChanged[str].connect(self.slotGradientNameChanged)
+        self._presetComboBox.activated[int].connect(self.slot_presetActivated)
+        #self._presetComboBox.currentTextChanged[str].connect(self.slot_gradientNameChanged)
+        #self._presetComboBox.editTextChanged[str].connect(self.slot_gradientNameChanged)
+        self._presetComboBox.lineEdit().editingFinished.connect(self.slot_gradientNameChanged)
         self.nextPresetButton.clicked.connect(self.setNextPreset)
         self.addPresetButton.clicked.connect(self.slot_addGradientToPresets)
         self.removePresetButton.clicked.connect(self.slot_removeGradientFromPresets)
@@ -1112,7 +1115,7 @@ class GradientWidget(QtWidgets.QWidget):
         self._changePresetBy(0)
         
     @pyqtSlot(int)
-    def slotPresetActivated(self, index):
+    def slot_presetActivated(self, index):
         sigBlocker = QtCore.QSignalBlocker(self._presetComboBox)
         self._gradientIndex = index
         namedgrad = list(self._gradients.items())[self._gradientIndex]
@@ -1131,7 +1134,7 @@ class GradientWidget(QtWidgets.QWidget):
         self._changePresetBy(1)
         
     @pyqtSlot()
-    def slotCheckGradientModified(self):
+    def slot_checkGradientModified(self):
         line = self._calculateGradientLine()
 
         if isinstance(self._gradientLine, QtCore.QLineF):
@@ -1141,7 +1144,7 @@ class GradientWidget(QtWidgets.QWidget):
             
             
             if not is_same:
-                self.slotGradientModified()
+                self.slot_gradientModified()
                 
             else:
                 if isinstance(self._title, str) and len(self._title.strip()):
@@ -1152,7 +1155,7 @@ class GradientWidget(QtWidgets.QWidget):
         self._gradientLine = line
         
     @pyqtSlot()
-    def slotGradientModified(self) -> None:
+    def slot_gradientModified(self) -> None:
         if isinstance(self._title, str) and len(self._title.strip()):
             self.setWindowTitle("%s *" % self._title)
         else:
@@ -1312,9 +1315,14 @@ class GradientWidget(QtWidgets.QWidget):
             
         stops = gradient.stops()
         hoverStops = self._renderer._calculateHoverPointCoordinates(gradient)
-        self._editor.setGradientStops(stops)
         self._renderer.hoverPoints.points = hoverStops
         self._renderer.gradientStops = stops
+        self._editor.setGradientStops(stops)
+        
+        ##### print stops for debugging
+        #for shade in (self._editor._redShade, self._editor._greenShade, self._editor._blueShade, self._editor._alphaShade):
+            #print("shade %d" % shade._shadeType, "stops:")
+            #print("\t", [p for p in shade.hoverPoints.points])
         
         if isinstance(gradient, QtGui.QLinearGradient):
             if not self._linearButton.isChecked():
@@ -1354,7 +1362,7 @@ class GradientWidget(QtWidgets.QWidget):
         
         self._renderer.update()
         
-        self.slotCheckGradientModified()
+        self.slot_checkGradientModified()
         
         #normalizedStops = 
         
@@ -1478,9 +1486,11 @@ class GradientWidget(QtWidgets.QWidget):
         self._setupGradients()
         self._changePresetBy(0)
         
-    @pyqtSlot(str)
-    def slotGradientNameChanged(self, val):
+    #@pyqtSlot(str)
+    @pyqtSlot()
+    def slot_gradientNameChanged(self):
         sigBlocker = QtCore.QSignalBlocker(self._presetComboBox)
+        val = self._presetComboBox.lineEdit().text()
         #self.renameCurrentGradient(val)
         
         if len(self._gradients) == 0:
@@ -1523,6 +1533,8 @@ class GradientWidget(QtWidgets.QWidget):
             
         namedgrad = list(self._gradients.items())[index]
         
+        print("namedgrad", namedgrad)
+        
         if namedgrad[0] in standardQtGradientPresets.keys() or namedgrad[0] not in self._customGradients.keys():
             # cannot recycle a standard preset name
             newname = counter_suffix(newname, self._gradients.keys())
@@ -1539,7 +1551,7 @@ class GradientWidget(QtWidgets.QWidget):
             return 
         
         self._setupGradients()
-        self._gradientIndex = list(self._gradients.keys()).index(namedgrad[0])
+        self._gradientIndex = list(self._gradients.keys()).index(newname)
         self._updatePresetsCombo()
         
         self._showGradient(list(self._gradients.values())[self._gradientIndex])
@@ -1607,7 +1619,7 @@ class GradientWidget(QtWidgets.QWidget):
             
         ret.setStops(g.stops())
         ret.setSpread(g.spread())
-        ret.setCoordinateMode(g.coordinateMode)
+        ret.setCoordinateMode(g.coordinateMode())
         
         return ret
         
@@ -1628,7 +1640,7 @@ class GradientWidget(QtWidgets.QWidget):
         return self.normalizedGradient()
     
     @property
-    def customGradients:
+    def customGradients(self):
         ret = OrderedDict(sorted(list(self._customGradients.items()), key = lambda x: x[0]))
         if isinstance(self._defaultGradient, QtGui.QGradient):
             ret["Default"] = self._defaultGradient
