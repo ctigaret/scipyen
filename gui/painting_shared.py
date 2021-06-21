@@ -544,7 +544,28 @@ class HoverPoints(QtCore.QObject):
         LineConnection = auto()
         CurveConnection = auto()
         
-    def __init__(self, widget:QtWidgets.QWidget, shape:PointShape, debug:bool=False):
+    def __init__(self, widget:QtWidgets.QWidget, shape:PointShape=PointShape.CircleShape,
+                 size:typing.Union[int, typing.Tuple[int]]=11, debug:bool=False):
+        """HoverPoints constructor
+        
+        Parameters:
+        -----------
+        widgets: QWidget = the widgets where the hover points are drawn
+        shape: HoverPoints.PointShape enum value = the shape of the hover point.
+            Either:
+                HoverPoints.PointShape.CircleShape (default)
+                HoverPoints.Pointshape.RectangleShape
+            
+        size: int or a pair (tuple, list) of int (default: 11) = Size (in pixels)
+            of the hover point.
+            When an int: 
+                CircleShape points use this as their diameter;
+                RectangleShape points use this as the width and height (i.e. squares)
+                
+            When a tuple of int, the values are the width and height of the shaped point
+            (if unequal, they will be drawn as ellipse or rectangles, depending on
+            the PointShape)
+        """
         super().__init__(widget)
         self._debug = debug
         
@@ -561,7 +582,12 @@ class HoverPoints(QtCore.QObject):
         self._pointPen = QtGui.QPen(QtGui.QColor(255, 255, 255, 191), 1)
         self._connectionPen = QtGui.QPen(QtGui.QColor(255, 255, 255, 127), 2)
         self._pointBrush = QtGui.QBrush(QtGui.QColor(191, 191, 191, 127))
-        self._pointSize = QtCore.QSize(11, 11)
+        if isinstance(size, (tuple, list)) and len(size) == 2 and all([isinstance(v, int) for v in size]):
+            self._pointSize = QtCore.QSize(*size)
+        elif isinstance(size, int):
+            self._pointSize = QtCore.QSize(size, size)
+        else:
+            self._pointSize = QtCore.QSize(11, 11)
         self._currentIndex = -1
         self._editable = True
         self._enabled = True
@@ -606,6 +632,8 @@ class HoverPoints(QtCore.QObject):
         
         w = self._pointSize.width()
         h = self._pointSize.height()
+        # NOTE: 2021-06-21 08:52:20
+        # point's x,y are th CENTER of the shape, i.e. it is at w/2 and h/2
         x = p.x() - w/2 
         y = p.y() - h/2
         return QtCore.QRectF(x, y, w, h)
@@ -736,7 +764,7 @@ class HoverPoints(QtCore.QObject):
                     index = -1
                     
                     # NOTE: 2021-05-24 10:50:53
-                    # check if event os is on a point
+                    # check if event is is on a point => select that point
                     #for i in range(self._points.size(
                     # NOTE: 2021-05-24 10:44:48
                     # Use Python list API for QPolygon/QPolygonF
@@ -752,6 +780,12 @@ class HoverPoints(QtCore.QObject):
                             # set indes to that point's index; else leave index -1
                             index = i
                             break
+                        
+                    # NOTE: 2021-06-21 08:53:59
+                    # index stays at -1 if no point bounding rect containing 
+                    # clickPos is found
+                    
+                    print("HoverPoints.eventFilter: index =", index)
                     
                     if me.button() == QtCore.Qt.LeftButton: 
                         # add new point or select clicked one & filter event

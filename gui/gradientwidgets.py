@@ -198,6 +198,7 @@ class GradientEditor(QtWidgets.QWidget):
     
     @pyqtSlot(object)
     def setGradientStops(self, stops:typing.Iterable[typing.Tuple[float, typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]]]) -> None:
+        print("GradientEditor.setGradientStops:", len(stops))
         pts_red = list() 
         pts_green = list() 
         pts_blue = list() 
@@ -210,6 +211,8 @@ class GradientEditor(QtWidgets.QWidget):
         
         for i in range(len(stops)):
             pos = float(stops[i][0])
+            
+            print("\ti: %d; pos:" % i, pos)
             
             qrgb = QtGui.QColor(stops[i][1]).rgba()
             
@@ -1315,9 +1318,13 @@ class GradientWidget(QtWidgets.QWidget):
             
         stops = gradient.stops()
         hoverStops = self._renderer._calculateHoverPointCoordinates(gradient)
-        self._renderer.hoverPoints.points = hoverStops
-        self._renderer.gradientStops = stops
+        # NOTE: 2021-06-21 08:33:39
+        # renderer doesn't know about the editor, and editor doesn't know about
+        # renderer; therefore, the gradient stops must be sent to both
         self._editor.setGradientStops(stops)
+        self._renderer.gradientStops = stops
+        self._renderer.hoverPoints.points = hoverStops
+        self._renderer.update()
         
         ##### print stops for debugging
         #for shade in (self._editor._redShade, self._editor._greenShade, self._editor._blueShade, self._editor._alphaShade):
@@ -1391,6 +1398,10 @@ class GradientWidget(QtWidgets.QWidget):
             
         else:
             gradname = counter_suffix(name, list(self._gradients.keys()), sep = " ")
+            
+        print("GradientWidget.addGradient: %d stops =" % len(val.stops()))#, val.stops())
+        for k, s in enumerate(val.stops()):
+            print(k, s[0])
             
         self._customGradients[gradname] = val
                 
@@ -1804,7 +1815,10 @@ class GradientDialog(QtWidgets.QDialog):
         
             
 def set_shade_points(points:typing.Union[QtGui.QPolygonF, list], shade:ShadeWidget) -> None:
+    print("set_shade_points %d points" % len(points))
     shade.hoverPoints.points = QtGui.QPolygonF(points)
     shade.hoverPoints.setPointLock(0, HoverPoints.LockType.LockToLeft)
-    shade.hoverPoints.setPointLock(points.size() - 1, HoverPoints.LockType.LockToRight)
+    shade.hoverPoints.setPointLock(-1, HoverPoints.LockType.LockToRight)
+    #shade.hoverPoints.setPointLock(len(points) - 1, HoverPoints.LockType.LockToRight)
+    #shade.hoverPoints.setPointLock(points.size() - 1, HoverPoints.LockType.LockToRight)
     shade.update()
