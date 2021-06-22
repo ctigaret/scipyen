@@ -50,7 +50,8 @@ class ShadeWidget(QtWidgets.QWidget):
         ARGBShade = auto()
         
     def __init__(self, shadeType:ShadeType, 
-                 parent:typing.Optional[QtWidgets.QWidget]=None) -> None:
+                 parent:typing.Optional[QtWidgets.QWidget]=None,
+                 debug:bool=False) -> None:
         
         super().__init__(parent=parent)
         
@@ -184,7 +185,7 @@ class GradientEditor(QtWidgets.QWidget):
         self._redShade = ShadeWidget(ShadeWidget.ShadeType.RedShade, self)
         self._greenShade = ShadeWidget(ShadeWidget.ShadeType.GreenShade, self)
         self._blueShade = ShadeWidget(ShadeWidget.ShadeType.BlueShade, self)
-        self._alphaShade = ShadeWidget(ShadeWidget.ShadeType.ARGBShade, self)
+        self._alphaShade = ShadeWidget(ShadeWidget.ShadeType.ARGBShade, self ,True)
         
         vbox.addWidget(self._redShade)
         vbox.addWidget(self._greenShade)
