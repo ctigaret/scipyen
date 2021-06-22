@@ -55,6 +55,7 @@ class ShadeWidget(QtWidgets.QWidget):
         
         super().__init__(parent=parent)
         
+        self._debug = debug
         self._shade = QtGui.QImage()
         
         #print("ShadeWidget.__init__ shadeType", shadeType)
@@ -119,12 +120,22 @@ class ShadeWidget(QtWidgets.QWidget):
         return 0
     
     def setGradientStops(self, stops:typing.Iterable[typing.Tuple[float, typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]]]) -> None:
+        if self._debug:
+            print("%s.setGradientStops %d stops" % (self._shadeType.name, len(stops)))
+            for k, s in enumerate(stops):
+                print("\t%d: %s, %s", (k,s[0], s[1].name()))
         if self._shadeType == ShadeWidget.ShadeType.ARGBShade:
             self._alphaGradient = QtGui.QLinearGradient(0, 0, self.width(), 0)
             
-            for stop in stops:
-                c = QtGui.QColor(stop[1])
-                self._alphaGradient.setColorAt(stop[0], QtGui.QColor(c.red(), c.green(), c.blue()))
+            if self._debug:
+                for k, s in enumerate(stops):
+                    c = QtGui.QColor(s[1])
+                    print("\t %d %s color", (k, s[0], c.name()))
+                    self._alphaGradient.setColorAt(s[0], QtGui.QColor(c.red(), c.green(), c.blue()))
+            else:
+                for stop in stops:
+                    c = QtGui.QColor(stop[1])
+                    self._alphaGradient.setColorAt(stop[0], QtGui.QColor(c.red(), c.green(), c.blue()))
                 
             self._shade = QtGui.QImage()
             self._generateShade()
@@ -185,7 +196,7 @@ class GradientEditor(QtWidgets.QWidget):
         self._redShade = ShadeWidget(ShadeWidget.ShadeType.RedShade, self)
         self._greenShade = ShadeWidget(ShadeWidget.ShadeType.GreenShade, self)
         self._blueShade = ShadeWidget(ShadeWidget.ShadeType.BlueShade, self)
-        self._alphaShade = ShadeWidget(ShadeWidget.ShadeType.ARGBShade, self ,True)
+        self._alphaShade = ShadeWidget(ShadeWidget.ShadeType.ARGBShade, self,True)
         
         vbox.addWidget(self._redShade)
         vbox.addWidget(self._greenShade)
@@ -266,6 +277,9 @@ class GradientEditor(QtWidgets.QWidget):
                 return
             
             stops.append((k/w, color))
+            
+        #if self._debug:
+            #print("pointsUpdated")
         
         self._alphaShade.setGradientStops(stops)
         

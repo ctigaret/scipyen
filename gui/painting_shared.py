@@ -785,7 +785,7 @@ class HoverPoints(QtCore.QObject):
                     # index stays at -1 if no point bounding rect containing 
                     # clickPos is found
                     
-                    print("HoverPoints.eventFilter: index =", index)
+                    print("HoverPoints.%s.eventFilter: index =" % self._sortType.name, index)
                     
                     if me.button() == QtCore.Qt.LeftButton: 
                         # add new point or select clicked one & filter event
@@ -823,9 +823,13 @@ class HoverPoints(QtCore.QObject):
                                         #pos = i
                                         #break
                                     
+                            print("\t HoverPoints.eventFilter: pos", pos, clickPos)
                             # add point at index pos
-                            self._points.insert(pos, clickPos)
-                            self._locks.insert(pos, 0)
+                            #if me.flags() & QtCore.Qt.MouseEventCreatedDoubleClick:
+                            if me.modifiers() & QtCore.Qt.ShiftModifier:
+                                print("\t HoverPoints.eventFilter: add stop at pos", pos, clickPos)
+                                self._points.insert(pos, clickPos)
+                                self._locks.insert(pos, 0)
                             self._currentIndex = pos
                             self.firePointChange()
                         
