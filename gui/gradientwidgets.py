@@ -105,18 +105,40 @@ class ShadeWidget(QtWidgets.QWidget):
         return self._hoverPoints.points
         
     def colorAt(self, x:int) -> int:
+        """Returns the color of the pixel in the shade's image at index 'x'.
+        'x' is a 'pixel counter' in shade's image.
+        
+        """
+        # NOTE: 2021-06-23 22:21:09
+        # QImage.pixel(x,y) returns the color of the pixel at (x,y) as a Qrgb
+        # (an unsigned int)
         self._generateShade()
         
         pts = self._hoverPoints.points
         for k in range(1, len(pts)):
             #print("ShadeWidget.colorAt x %s: point at %d, %s, at %d, %s" % (x, i-1, pts.at(i-1).x(), i, pts.at(i).x()))
             if pts[k-1].x() <= x and pts[k].x() >= x:
+                # NOTE: 2021-06-23 22:08:18
+                # 'x' is between the x coordinates of two successive hover points
+                # pts[k-1] and pts[k];
+                # calculate the interpolating line between the first hover point
+                # and the virtual point at x
+                # first generate the line interpolating the two successive hover
+                # points
                 l = QtCore.QLineF(pts[k-1], pts[k])
                 if l.dx() > 0:
-                    l.setLength(l.length() * ((x - l.x1()) / l.dx()))
+                    # there is a finite difference (distance) between the ends of
+                    # the hover points line 'l', then scale this line by the fraction
+                    # of the horizontal distance from first hover point to x, to
+                    # the full dx (horizontal distance between the two hover points)
+                    l.setLength(l.length() * (x - l.x1()) / l.dx())
+                    # Now, x coordinate of the second point of the line is the
+                    # same as 'x'
+                    # we take the pixel at the coordinates of this new end point
+                    # (making sure they don't fall beyond the image boundaries)
                     return self._shade.pixel(round(min([l.x2(), float(self._shade.width()  - 1)])),
-                                            round(min([l.y2(), float(self._shade.height() - 1)])))
-                return 0
+                                             round(min([l.y2(), float(self._shade.height() - 1)])))
+        # otherwise return black
         return 0
     
     def setGradientStops(self, stops:typing.Iterable[typing.Tuple[float, typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]]]) -> None:
@@ -265,7 +287,7 @@ class GradientEditor(QtWidgets.QWidget):
         for i in range(len(stops)):
             pos = float(stops[i][0])
             
-            print("\ti: %d; pos:" % i, pos)
+            print("\ti: %d; pos: %s, color %s" % (i, pos, stops[i][1].name(QtGui.QColor.HexArgb)))
             
             qrgb = QtGui.QColor(stops[i][1]).rgba()
             
@@ -304,9 +326,9 @@ class GradientEditor(QtWidgets.QWidget):
         #print("GradientEditor.pointsUpdated %d points: " % len(sortedPoints))
         
         for i, point in enumerate(sortedPoints):
-            k = int(point.x())
-            #print("\ti %d, k %d: " % (i, k))
             #k = int(sortedPoints.at(i).x())
+            k = int(point.x())
+            print("\ti %d, k %d: " % (i, k))
             if i + 1 < len(sortedPoints) and k == int(sortedPoints[i+1].x()):
                 continue
             
@@ -314,6 +336,8 @@ class GradientEditor(QtWidgets.QWidget):
                                  (0x0000ff00 & self._greenShade.colorAt(k)) >> 8,  # green
                                  (0x000000ff & self._blueShade.colorAt(k)),        # blue
                                  (0xff000000 & self._alphaShade.colorAt(k)) >> 24) # transparent
+            
+            print("\tcolor at %d: %s" % (k, color.name(QtGui.QColor.HexArgb)))
             
             #print("\t\t k / w %s" % k/w)
             if k / w > 1:
@@ -1878,6 +1902,8 @@ class GradientDialog(QtWidgets.QDialog):
             
 def set_shade_points(points:typing.Union[QtGui.QPolygonF, list], shade:ShadeWidget) -> None:
     print("set_shade_points %d points for %s" % (len(points), shade._shadeType.name))
+    for k, p in enumerate(points):
+        print("\t%d: %s" % (k,p))
     shade.hoverPoints.points = QtGui.QPolygonF(points)
     shade.hoverPoints.setPointLock(0, HoverPoints.LockType.LockToLeft)
     shade.hoverPoints.setPointLock(-1, HoverPoints.LockType.LockToRight)
