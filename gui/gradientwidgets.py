@@ -124,13 +124,14 @@ class ShadeWidget(QtWidgets.QWidget):
             print("%s.setGradientStops %d stops" % (self._shadeType.name, len(stops)))
             for k, s in enumerate(stops):
                 print("\t%d: %s, %s", (k,s[0], s[1].name()))
+                
         if self._shadeType == ShadeWidget.ShadeType.ARGBShade:
             self._alphaGradient = QtGui.QLinearGradient(0, 0, self.width(), 0)
             
             if self._debug:
                 for k, s in enumerate(stops):
                     c = QtGui.QColor(s[1])
-                    print("\t %d %s color", (k, s[0], c.name()))
+                    print("\t %d %s color %s"% (k, s[0], c.name()))
                     self._alphaGradient.setColorAt(s[0], QtGui.QColor(c.red(), c.green(), c.blue()))
             else:
                 for stop in stops:
@@ -187,16 +188,56 @@ class ShadeWidget(QtWidgets.QWidget):
 class GradientEditor(QtWidgets.QWidget):
     gradientStopsChanged = pyqtSignal(object, name="gradientStopsChanged")
     
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None) -> None:
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
+                 debug:typing.Union[bool, str]=False) -> None:
         super().__init__(parent=parent)
         vbox = QtWidgets.QVBoxLayout(self)
         vbox.setSpacing(1)
         vbox.setContentsMargins(1, 1, 1, 1)
         
-        self._redShade = ShadeWidget(ShadeWidget.ShadeType.RedShade, self)
-        self._greenShade = ShadeWidget(ShadeWidget.ShadeType.GreenShade, self)
-        self._blueShade = ShadeWidget(ShadeWidget.ShadeType.BlueShade, self)
-        self._alphaShade = ShadeWidget(ShadeWidget.ShadeType.ARGBShade, self,True)
+        d = [False] * 4
+        
+        if isinstance(debug, bool):
+            d[:] = [debug] * 4
+            
+        elif isinstance(debug, str):
+            d[:] = [False] * 4
+            
+            if debug.lower().strip() in ("argb", "alpha"):
+                d[3] = True
+                
+            if debug.lower().strip() in ("red",):
+                d[0] = True
+        
+            if debug.lower().strip() in ("green",):
+                d[1] = True
+                
+            if debug.lower().strip() in ("blue",):
+                d[2] = True
+        
+        elif isinstance(debug, (tuple, list)):
+            if len(debug) == 4 and all([isinstance(v, bool) for v in debug]):
+                d = debug
+                
+            elif len(debug) in range(4) and all([isinstance(v, str) for v in debug]):
+                if any([s in ("argb", "alpha") for s in debug]):
+                    d[3] = True
+                    
+                if any([s in ("red",) for s in debug]):
+                    d[0] = True
+                    
+                if any([s in ("green",) for s in debug]):
+                    d[1] = True
+                    
+                if any([s in ("blue", ) for s in debug]):
+                    d[2] = True
+                    
+            
+        
+        self._redShade = ShadeWidget(ShadeWidget.ShadeType.RedShade, self, d[0])
+        self._greenShade = ShadeWidget(ShadeWidget.ShadeType.GreenShade, self, d[1])
+        self._blueShade = ShadeWidget(ShadeWidget.ShadeType.BlueShade, self, d[2])
+        self._alphaShade = ShadeWidget(ShadeWidget.ShadeType.ARGBShade, self,d[3])
         
         vbox.addWidget(self._redShade)
         vbox.addWidget(self._greenShade)
@@ -260,10 +301,11 @@ class GradientEditor(QtWidgets.QWidget):
         sortedPoints = sorted([p for p in points], key = lambda x: x.x())
         #sortedPoints = sorted([p for p in points], key = x_less_than)
         
-        #print("GradientEditor.pointsUpdated: ", len(sortedPoints), sortedPoints)
+        #print("GradientEditor.pointsUpdated %d points: " % len(sortedPoints))
         
         for i, point in enumerate(sortedPoints):
             k = int(point.x())
+            #print("\ti %d, k %d: " % (i, k))
             #k = int(sortedPoints.at(i).x())
             if i + 1 < len(sortedPoints) and k == int(sortedPoints[i+1].x()):
                 continue
@@ -273,13 +315,18 @@ class GradientEditor(QtWidgets.QWidget):
                                  (0x000000ff & self._blueShade.colorAt(k)),        # blue
                                  (0xff000000 & self._alphaShade.colorAt(k)) >> 24) # transparent
             
+            #print("\t\t k / w %s" % k/w)
             if k / w > 1:
                 return
             
             stops.append((k/w, color))
             
+            #print("\t\tstops appended %s %s" % (k/w, color.name(QtGui.QColor.HexArgb)))
+            
         #if self._debug:
             #print("pointsUpdated")
+            
+        print("\tGradientEditor.pointsUpdated %d stops" % len(stops))
         
         self._alphaShade.setGradientStops(stops)
         
@@ -1830,10 +1877,10 @@ class GradientDialog(QtWidgets.QDialog):
         
             
 def set_shade_points(points:typing.Union[QtGui.QPolygonF, list], shade:ShadeWidget) -> None:
-    print("set_shade_points %d points" % len(points))
+    print("set_shade_points %d points for %s" % (len(points), shade._shadeType.name))
     shade.hoverPoints.points = QtGui.QPolygonF(points)
     shade.hoverPoints.setPointLock(0, HoverPoints.LockType.LockToLeft)
     shade.hoverPoints.setPointLock(-1, HoverPoints.LockType.LockToRight)
-    #shade.hoverPoints.setPointLock(len(points) - 1, HoverPoints.LockType.LockToRight)
+    #shade.hoverPoints.setPointLock(len(points) - 1, HoverPoints.LockType.LockToLeft)
     #shade.hoverPoints.setPointLock(points.size() - 1, HoverPoints.LockType.LockToRight)
     shade.update()

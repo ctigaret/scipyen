@@ -10855,7 +10855,7 @@ class ColorGradient():
     _qtclass_ = QtGui.QGradient
     
     def _checkQtGradient_(self, x):
-        return isinstance(x, (self._qtclass_, QtGui.QGradient)) # or (isinstance(x, QtGui.QGradient) and x.type() & self._gradient_type_)
+        return isinstance(x, (self._qtclass_, QtGui.QGradient.Preset)) # or (isinstance(x, QtGui.QGradient) and x.type() & self._gradient_type_)
     
     def _init_parametric_(self, *args, stops, spread, coordinateMode, name):
         if len(args):
@@ -10917,12 +10917,27 @@ class ColorGradient():
                                            #name = args[0])
                     
                 elif self._checkQtGradient_(args[0]):
+                    if isinstance(args[0], QtGui.QGradient.Preset):
+                        g = QtGui.QGradient(args[0])
+                    else:
+                        if not isinstance(args[0], (QtGui.QLinearGradient, QtGui.QConicalGradient, QtGui.QRadialGradient)):
+                            if self._gradient_type_ == QtGui.QGradient.LinearGradient:
+                                g = g2l(args[0])
+                            elif self._gradient_type_ == QtGui.QGradient.RadialGradient:
+                                g = g2r(args[0])
+                            elif self._gradient_type_ == QtGui.QGradient.ConicalGradient:
+                                g = g2c(args[0])
+                            else:
+                                raise TypeError("Unsupported gradient type: %s" % reverse_mapping_lookup(standardQtGradientTypes, args[0].type()))
+                        else:
+                            g = args[0]
+                            
                     if self._gradient_type_ != QtGui.QGradient.NoGradient:
-                        if args[0].type() == self._gradient_type_:
-                            self._init_parametric_(*gradientCoordinates(args[0]),
-                                                stops = args[0].stops(),
-                                                spread = args[0].spread(),
-                                                coordinateMode = args[0].coordinateMode(), 
+                        if g.type() == self._gradient_type_:
+                            self._init_parametric_(*gradientCoordinates(g),
+                                                stops = g.stops(),
+                                                spread = g.spread(),
+                                                coordinateMode = g.coordinateMode(), 
                                                 name=name)
                         else:
                             if self._gradient_type_ == QtGui.QGradient.LinearGradient:
