@@ -80,7 +80,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     #print("summarize_object_properties", objname)
     
     result = dict(map(lambda x: (x, {"display":"", "tooltip":""}), standard_obj_summary_headers))
-    
+    #print("obj", obj)
     objtype = type(obj)
     typename = objtype.__name__
     
@@ -95,6 +95,8 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     w = get_text_width(wspace_name) * 2
     if isinstance(obj, str):
         ttip = get_elided_text("'%s'" % obj, w)
+    elif isinstance(obj, (tuple, list)):
+        ttip = get_elided_text("%s" % (obj,), w)
     else:
         ttip = get_elided_text("%s" % obj, w)
     #if isinstance(obj, (str, Number, sequence_types, set_types, dict_types, pd.Series, pd.DataFrame, ndarray)):
