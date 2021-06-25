@@ -1,4 +1,4 @@
-import numbers, os, typing
+import numbers, os, typing, inspect, traceback
 from enum import IntEnum, auto
 from collections import OrderedDict
 
@@ -545,7 +545,7 @@ class HoverPoints(QtCore.QObject):
         CurveConnection = auto()
         
     def __init__(self, widget:QtWidgets.QWidget, shape:PointShape=PointShape.CircleShape,
-                 size:typing.Union[int, typing.Tuple[int]]=11, debug:bool=False):
+                 size:typing.Union[int, typing.Tuple[int]]=11):
         """HoverPoints constructor
         
         Parameters:
@@ -567,7 +567,6 @@ class HoverPoints(QtCore.QObject):
             the PointShape)
         """
         super().__init__(widget)
-        self._debug = debug
         
         self._widget = widget
         widget.installEventFilter(self)
@@ -661,6 +660,7 @@ class HoverPoints(QtCore.QObject):
             #points = QtGui.QPolygonF(points)
         #elif not isinstance(points, QtGui.QPolygonF):
             #raise TypeError("points expected a QtGui.QPolygonF, or a sequence of QtCore.QPointF or QtCore.QPoint; got %s instead" % type(points).__name__)
+            
     @points.setter
     def points(self, points:QtGui.QPolygonF) -> None:
         # NOTE: 2021-05-23 20:57:59
@@ -669,15 +669,16 @@ class HoverPoints(QtCore.QObject):
         #if len(points) != len(self._points):
             #self._fingerPointMapping.clear() # see NOTE 2021-05-21 21:29:33 touchscreens
         
-        #print("HoverPoints.points =", self, [p for p in points])
         self._points.clear() # just so that refs to QPointF are garbage-collected
         self._points = QtGui.QPolygonF([bound_point(p, self.boundingRect(), 0) for p in points])
-        if self._debug:
-            print("HoverPoints._points =", self, [p for p in self._points])
         #self._points = QtGui.QPolygonF([bound_point(p, self.rect(), 0) for p in points])
         #boundedPoints = [bound_point(points.at(i), self.boundingRect(), 0) for i in range(points.size())]
-        #print("HoverPoints._points", [p for p in self._points])
-        
+
+        #if hasattr(self._widget, "_shadeType"):
+            #printPoints(points, 1, caller = self.points, prefix = self._widget._shadeType.name)
+        #else:
+            #printPoints(points, 1, caller = self.points)
+            
         self._locks.clear()
         
         #if self._points.size():
@@ -785,18 +786,22 @@ class HoverPoints(QtCore.QObject):
                     # index stays at -1 if no point bounding rect containing 
                     # clickPos is found
                     
-                    print("HoverPoints.%s.eventFilter: index =" % self._sortType.name, index)
+                    #if hasattr(self._widget, "_shadeType"):
+                        #print("%s HoverPoints.%s.eventFilter: index = %d, x = %s, y = %s" % (self._widget._shadeType.name, self._sortType.name, index, self._points[index].x(), self._points[index].y()))
+                    #else:
+                        #print("HoverPoints.%s.eventFilter: index = %d, x = %s, y = %s" % (self._sortType.name, index, self._points[index].x(), self._points[index].y()))
                     
                     if me.button() == QtCore.Qt.LeftButton: 
                         # add new point or select clicked one & filter event
                         if index == -1: 
-                            # new point added (index is unchanged from -1 because 
-                            # clickPos is not any points - see  NOTE: 2021-05-24 10:50:53)
+                            # new point added (index is left as -1 because 
+                            # clickPos was not any points - see  NOTE: 2021-05-24 10:50:53)
                             if not self._editable: # non-editable => don't block (filter) event
                                 return False
                             
                             pos = 0
                             
+                            # figure out where to insert the new point
                             if self._sortType == HoverPoints.SortType.XSort:
                                 #for i in range(self._points.size()):
                                 # see  NOTE: 2021-05-24 10:44:48
@@ -804,11 +809,6 @@ class HoverPoints(QtCore.QObject):
                                     if p.x() > clickPos.x():
                                         pos = k
                                         break
-                                #for i in range(len(self._points)):
-                                    ##if self._points.at(i).x() > clickPos.x():
-                                    #if self._points[i].x() > clickPos.x():
-                                        #pos = i
-                                        #break
                                     
                             elif self._sortType == HoverPoints.SortType.YSort:
                                 #for i in range(self._points.size()):
@@ -817,26 +817,39 @@ class HoverPoints(QtCore.QObject):
                                     if p.y() > clickPos.y():
                                         pos = k
                                         break
-                                #for i in range(len(self._points)):
-                                    ##if self._points.at(i).y() > clickPos.y():
-                                    #if self._points[i].y() > clickPos.y():
-                                        #pos = i
-                                        #break
                                     
-                            print("\t HoverPoints.eventFilter: pos", pos, clickPos)
+                            #if hasattr(self._widget, "_shadeType"):
+                                #print("\t %s HoverPoints.eventFilter: pos = %s, clickPos = %s" % (self._widget._shadeType.name, pos, clickPos))
+                            #else:
+                                #print("\t HoverPoints.eventFilter: pos = %s, clickPos = %s" % (pos, clickPos))
+                                
                             # add point at index pos
+                            
                             #if me.flags() & QtCore.Qt.MouseEventCreatedDoubleClick:
-                            if me.modifiers() & QtCore.Qt.ShiftModifier:
-                                print("\t HoverPoints.eventFilter: add stop at pos", pos, clickPos)
-                                self._points.insert(pos, clickPos)
-                                self._locks.insert(pos, 0)
+                            #if me.modifiers() & QtCore.Qt.ShiftModifier:
+                                #if hasattr(self._widget, "_shadeType"):
+                                    #print("\t %s HoverPoints.eventFilter: add stop at pos = %s, clickPos = %s" % (self._widget._shadeType.name, pos, clickPos))
+                                #else:
+                                    #print("\t HoverPoints.eventFilter: add stop at pos = %s, clickPos = %s" % (pos, clickPos))
+                                    
+                                #self._points.insert(pos, clickPos)
+                                #self._locks.insert(pos, 0)
+                                
+                            #if hasattr(self._widget, "_shadeType"):
+                                #print("\t %s HoverPoints.eventFilter: add stop at pos = %s, clickPos = %s" % (self._widget._shadeType.name, pos, clickPos))
+                            #else:
+                                #print("\t HoverPoints.eventFilter: add stop at pos = %s, clickPos = %s" % (pos, clickPos))
+                                
+                            self._points.insert(pos, clickPos)
+                            self._locks.insert(pos, 0)
                             self._currentIndex = pos
+                            
                             self.firePointChange()
                         
                         else:
                             self._currentIndex = index
                             
-                        return True # stop (filter) event
+                        return True # propagate event
                     
                     elif me.button() == QtCore.Qt.RightButton: # remove point if editable & propagate event
                         if index >= 0 and self._editable: 
@@ -845,9 +858,9 @@ class HoverPoints(QtCore.QObject):
                                 self._points.remove(index)
                                 
                             self.firePointChange()
-                            return True
+                            return True # propagate event
                         
-                        return False
+                        return False # block event
                         
                 elif ev.type() == QtCore.QEvent.MouseButtonRelease:
                     #if len(self._fingerPointMapping):
@@ -863,15 +876,17 @@ class HoverPoints(QtCore.QObject):
                     if self._currentIndex >= 0:
                         self._movePoint(self._currentIndex, ev.pos(), True)
                         
-                    return False
+                    return False # block event
                     
                 #elif ev.type() == QtCore.QEvent.TouchBegin:
-                    #pass # see NOTE 2021-05-21 21:29:33 touchscreens
+                    #pass # see NOTE 2021-05-21 21:29:33 skipped code for touchscreens
                 
                 #elif ev.type() == QtCore.QEvent.TouchUpdate:
-                    #pass # see NOTE 2021-05-21 21:29:33 touchscreens - skipped code
+                    #pass # see NOTE 2021-05-21 21:29:33 skipped code for touchscreens
+                    
                 #elif ev.type() == QtCore.QEvent.TouchEnd:
-                    #pass # see NOTE 2021-05-21 21:29:33 touchscreens - skipped code
+                    #pass # see NOTE 2021-05-21 21:29:33 skipped code for touchscreens
+                    
                 elif ev.type() == QtCore.QEvent.Resize:
                     e = sip.cast(ev, QtGui.QResizeEvent)
                     if e.oldSize().width() != 0 and e.oldSize().height() != 0:
@@ -881,8 +896,6 @@ class HoverPoints(QtCore.QObject):
                             self._movePoint(i, QtCore.QPointF(p.x() * stretch_x, p.y() * stretch_y), False)
                             
                         self.firePointChange()
-                        #for i in range(self._points.size()):
-                            #p = self._points[i]
                             
                     return False
                     
@@ -965,5 +978,169 @@ class HoverPoints(QtCore.QObject):
                         self._currentIndex = i
                         break
                     
+        #if hasattr(self._widget, "_shadeType"):
+            #prefix = self._widget._shadeType.name
+        #else:
+            #prefix = ""
+            
+        #printPoints(self._points, 2, caller = self.firePointChange, prefix=prefix)
+        
         self.pointsChanged.emit(self._points)
 
+def printGradientStops(g:typing.Union[QtGui.QGradient, typing.Sequence[typing.Tuple[numbers.Real, QtGui.QColor]]], 
+                       nTabs:int=0, out:bool=True, 
+                       caller:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=None,
+                       prefix:str = "",
+                       suffix:str = "") -> typing.Optional[str]:
+    """Prints out gradient stops in an uniform fashion.
+    Particularly helpful for debugging
+    
+    Parameters:
+    ----------
+    g: QtGui.QGradient, or a QGradientStops (sequence of (float,QColor) tuples)
+    
+        NOTE: in Qt, QGradientStops is an alias for QVector<QGradientStop>, 
+                whereas QGradientStop is an alias for QPair<qreal, QColor>
+                
+        In Python (PyQt5), these types are "mapped" as follows:
+        
+        QVector -> list
+        QPair   -> tuple with two elements
+        
+        This means that QGradientStops are represented, in Python, as a list of 
+        two-element tuples (float, QColor). This function also accepts an 
+        n-tuple (or any iterable) containing (float, QColor) tuples.
+    
+    nTabs:int; optional, default is 0
+        How many tab characters to prepend to each line
+        
+    out:bool; optional, default True
+        When True, the function prints to console and returns None; otherwise, 
+        the function returns the string that would be printed, instead of 
+        printing it.
+        
+    caller: a callable (function or method); optional (default is None)
+        When given, the string representation of the caller will be prepended
+        
+    prefix, suffix: str (optional, default is the empty string "")
+        Text to be prepended, repsectively, appended, to the output
+    """
+    
+    if isinstance(g, QtGui.QGradient):
+        stops = g.stops()
+    elif isinstance(g, (tuple, list)) and all([isinstance(v, (tuple, list)) and len(v) == 2 and isinstance(v[0], numbers.Number) and isinstance(v[1], QtGui.QColor) for v in g]):
+        stops = g
+    else:
+        if out:
+            print("NOT A QGRADIENT")
+        else:
+            return "NOT A QGRADIENT"
+        
+    txt = list()
+    
+    tabtxt = "\t" * nTabs
+    
+    txt.append("%s%d stops:" % (tabtxt, len(stops)))
+    
+    if inspect.isfunction(caller) or inspect.ismethod(caller):
+        txt.insert(0,"%s%s" % (tabtxt, caller.__qualname__))
+        
+    elif isinstance(caller, str):
+        if caller.lower().strip() == "auto":
+            stack = inspect.stack()
+            if len(stack) > 1:
+                caller = stack[1].function
+            else:
+                caller = ""
+            
+        txt.insert(0,"%s%s" % (tabtxt, caller))
+        
+        
+    tabtxt = "\t" * (nTabs+1)
+    
+    for k, s in enumerate(stops):
+        txt.append("%s%d: %s -> %s" % (tabtxt, k, s[0], s[1].name(QtGui.QColor.HexArgb)))
+        
+    if len(prefix.strip()):
+        txt.insert(0, "%s%s" % ("\t" * (nTabs), prefix))
+
+    if len(suffix.strip()):
+        txt.appnd("%s%s" % ("\t" * (nTabs), suffix))
+        
+    ret = "\n".join(txt)
+
+    if out:
+        print(ret)
+        
+    else:
+        return ret
+        
+def printPoints(points:typing.Union[QtGui.QPolygonF, QtGui.QPolygon, typing.Sequence[typing.TypeVar("point", QtCore.QPoint, QtCore.QPointF)]],
+                nTabs:int=0, out:bool=True, 
+                caller:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=None,
+                prefix:str="",
+                suffix:str="") -> typing.Optional[str]:
+    """Prints out the x,y coordinates of a sequence of QPoint or QPointF objects
+    Particularly helpful for debugging.
+    
+    Parameters:
+    ----------
+    
+    points: a QtGui.QPolygon, QtGui.QPolygonF, or an iterable (tuple, list)
+        containing QtCore.QPoint and/or QtCore.QPointF objects
+    
+    nTabs:int; optional, default is 0
+        How many tab characters to prepend to each line
+        
+    out:bool; optional, default True
+        When True, the function prints to console and returns None; otherwise, 
+        the function returns the string that would be printed, instead of 
+        printing it.
+        
+    caller: a callable (function or method); optional (default is None)
+        When given, the string representation of the caller will be prepended
+        
+    prefix, suffix: str (optional, default is the empty string "")
+        Text to be prepended, repsectively, appended, to the output
+    
+    """
+    
+    txt = list()
+    
+    tabtxt = "\t" * nTabs
+    
+    txt.append("%s%d points:" % (tabtxt, len(points)))
+    
+    if inspect.isfunction(caller) or inspect.ismethod(caller):
+        txt.insert(0,"%s%s" % (tabtxt, caller.__qualname__))
+        
+    elif isinstance(caller, str):
+        if caller.lower().strip() == "auto":
+            stack = inspect.stack()
+            if len(stack) > 1:
+                caller = stack[0].function
+            else:
+                caller = ""
+            
+        txt.insert(0,"%s%s" % (tabtxt, caller))
+        
+    tabtxt = "\t" * (nTabs+1)
+    
+    for k, p in enumerate(points):
+        txt.append("%s%d: x = %s, y = %s" % (tabtxt, k, p.x(), p.y()))
+        
+    if len(prefix.strip()):
+        txt.insert(0, "%s%s" % ("\t" * (nTabs), prefix))
+
+    if len(suffix.strip()):
+        txt.appnd("%s%s" % ("\t" * (nTabs), suffix))
+        
+    ret = "\n".join(txt)
+    
+    if out:
+        print(ret)
+        
+    else:
+        return ret
+        
+    

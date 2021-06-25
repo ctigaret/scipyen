@@ -68,8 +68,6 @@ def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None) -> bool:
         
     elif not isinstance(arg, bool):
         raise TypeError("Expecting a str ('on' or 'off'), a bool, or None; got %s instead" % arg)
-    
-        
         
 def total_size(o, handlers={}, verbose=False):
     """ Returns the approximate memory footprint an object and all of its contents.

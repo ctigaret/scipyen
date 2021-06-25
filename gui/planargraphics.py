@@ -11325,7 +11325,7 @@ class ColorGradient():
         
         self.stops.insert(i, (x, color))
         
-    def removeStop(self, x:typinglUnion[int, float]):
+    def removeStop(self, x:typing.Union[int, float]):
         if isinstance(x, int):
             if x >= len(self.stops) or x < 0:
                 raise ValueError("When an int, 'x' must be in the half-open interval [0, %d); got %d instead" % (len(self.stops), x))
