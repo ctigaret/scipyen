@@ -1,6 +1,6 @@
 """ see qt examples/widgets/painting/gradients
 """
-import array, os, typing, numbers
+import array, os, typing, numbers, inspect
 from collections import OrderedDict
 import numpy as np
 from enum import IntEnum, auto
@@ -174,6 +174,12 @@ class ShadeWidget(QtWidgets.QWidget):
         super().resizeEvent(e)
         
     def _generateShade(self) -> None:
+        #print("%s ShadeWidget._generateShade" % self._shadeType.name)
+        #frames = inspect.getouterframes(inspect.currentframe())
+        #callers = [f.function for f in reversed(list(frames))]
+        #callers.append("%s ShadeWidget._generateShade" % self._shadeType.name)
+        #print("\n\t".join(callers))
+        #del frames
         if self._shade.isNull() or self._shade.size() != self.size():
             if self._shadeType == ShadeWidget.ShadeType.ARGBShade:
                 self._shade = QtGui.QImage(self.size(), QtGui.QImage.Format_ARGB32_Premultiplied)
@@ -222,6 +228,8 @@ class GradientEditor(QtWidgets.QWidget):
         vbox.addWidget(self._greenShade)
         vbox.addWidget(self._blueShade)
         vbox.addWidget(self._alphaShade)
+        
+        #self._alphaShade.update()
 
         self._redShade.colorsChanged.connect(self.pointsUpdated)
         self._greenShade.colorsChanged.connect(self.pointsUpdated)
@@ -263,6 +271,8 @@ class GradientEditor(QtWidgets.QWidget):
         set_shade_points(QtGui.QPolygonF(pts_blue), self._blueShade)
         set_shade_points(QtGui.QPolygonF(pts_alpha), self._alphaShade)
         
+        self._alphaShade.setGradientStops(stops) # this is essential for painting the background of the _alphaShade
+        
     @pyqtSlot(QtGui.QPolygonF)
     def pointsUpdated_new(self, points:QtGui.QPolygonF):
         # all shades by definition must have the sme number of points which is
@@ -283,116 +293,232 @@ class GradientEditor(QtWidgets.QWidget):
         
         shade = self.sender() # is None when called programmatically and not from a signal
         
+        if not isinstance(shade, ShadeWidget):
+            return
+        
         if shade:
             assert points == shade.points, "points are not from sender"
         
             if shade is self._redShade:
-                other_shades = (self._greenShade, self._blueShade, self._alphaShade)
+                reference_shades = (self._greenShade, self._blueShade, self._alphaShade)
             elif shade is self._greenShade:
-                other_shades = (self._redShade, self._blueShade, self._alphaShade)
+                reference_shades = (self._redShade, self._blueShade, self._alphaShade)
             elif shade is self._blueShade:
-                other_shades = (self._redShade, self._greenShade, self._alphaShade)
+                reference_shades = (self._redShade, self._greenShade, self._alphaShade)
             elif shade is self._alphaShade:
-                other_shades = (self._redShade, self._greenShade, self._blueShade)
+                reference_shades = (self._redShade, self._greenShade, self._blueShade)
             else:
                 return # can this even happen?
-                
-            for k in range(len(shade.points)):
-                for s in other_shades:
-                    s.points[k].setX(shade.points[k].x())
-                
-        
-        
-        #received_points = sorted(list(points), key = lambda x: x.x())
-        #printPoints(received_points, 1, caller=self.pointsUpdated_new, prefix="passed in from %s" % shade._shadeType.name)
-        
-        red_points = sorted(list(self._redShade.points), key = lambda x: x.x())
-        #printPoints(red_points, 1, caller=self.pointsUpdated_new, prefix="red shade")
-        
-        green_points = sorted(list(self._greenShade.points), key = lambda x: x.x())
-        #printPoints(green_points, 1, caller=self.pointsUpdated_new, prefix="green shade")
-        
-        blue_points = sorted(list(self._blueShade.points), key = lambda x: x.x())
-        #printPoints(blue_points, 1, caller=self.pointsUpdated_new, prefix="blue shade")
-        
-        alpha_points = sorted(list(self._alphaShade.points), key = lambda x: x.x())
-        #printPoints(alpha_points, 1, caller=self.pointsUpdated_new, prefix="alpha shade")
-        
-        
-        npoints = max([len(l) for l in [red_points, green_points, blue_points, alpha_points]])
-        
-        for i in range(npoints):
-            rk = int(red_points[i].x())
-            if rk < 0:
-                rk = 0
-            if rk > w:
-                rk = w
-                
-            gk = int(green_points[i].x())
-            if gk < 0:
-                gk = 0
-            if gk > w:
-                gk = w
-                
-            bk = int(blue_points[i].x())
-            if bk < 0:
-                bk = 0
-            if bk > w:
-                bk = w
-                
-            ak = int(alpha_points[i].x())
-            if ak < 0:
-                ak = 0
-            if ak > w:
-                ak = w
             
-            if i > 0:
-                if rk == int(red_points[i-1].x()):
-                    continue
-                if gk == int(green_points[i-1].x()):
-                    continue
-                if bk == int(blue_points[i-1].x()):
-                    continue
-                if ak == int(alpha_points[i-1].x()):
-                    continue
+            reference_points = [QtGui.QPolygonF(s.points) for s in reference_shades]
+
+            #assert len(set([len(s.points) for s in reference_shades])) == 1, "reference have different number of points"
+            assert len(set([len(pts) for pts in reference_points])) == 1, "reference have different number of points"
             
-            if i + 1 < npoints:
-                if rk == int(red_points[i-1].x()):
-                    continue
-                if gk == int(green_points[i-1].x()):
-                    continue
-                if bk == int(blue_points[i-1].x()):
-                    continue
-                if ak == int(alpha_points[i-1].x()):
-                    continue
+            #assert all([[p.x() for p in reference_shades[0].points] == [p.x() for p in reference_shades[k].points] for k in range(1, len(reference_shades))]), "reference shades have points with distinct X coordinates between them"
+            assert all([[p.x() for p in reference_points[0]] == [p.x() for p in reference_points[k]] for k in range(1, len(reference_points))]), "reference shades have points with distinct X coordinates between them"
                 
-            color = QtGui.QColor((0x00ff0000 & self._redShade.colorAt(rk))   >> 16,   # red
-                                 (0x0000ff00 & self._greenShade.colorAt(gk)) >>  8,  # green
-                                 (0x000000ff & self._blueShade.colorAt(bk)),        # blue
-                                 (0xff000000 & self._alphaShade.colorAt(ak)) >> 24) # transparent
-            
-            stops.append((i/w, color)) # FIXME 2021-06-25 16:14:36
-            
-        printGradientStops(stops, 1, caller = self.pointsUpdated_new)
-            
-        self._alphaShade.setGradientStops(stops)
+            shade_x = [p.x() for p in sorted(shade.points, key = lambda x: x.x())]
+            #refsh_x = [p.x() for p in sorted(reference_shades[0].points, lambda x: x.x()]
+            refsh_x = [p.x() for p in sorted(reference_points[0], lambda x: x.x()]
+                                             
+            if len(shade_x) > len(refsh_x):
+                # a new point was added in the sender shade
+                # figure out the x coordinate of the new point
+                
+                added_x = list(set(shade_x) - set(refsh_x))
+                
+                added_y = [p.y() for p in shade.points if p.x() in added_x]
+                
+                ndx = [np.searchsorted(refsh_x, x) for x in added_x]
+                
+                for k,i in enumerate(ndx):
+                    for s in reference_shades:
+                        s.points.insert(i, QtCore.QPointF(added_x[k], added_y[k]))
+                
+            elif len(shade_x) < len(refsh_x):
+                # a point was removed from the sender shade
+                removed_x = list(set(refsh_x) - set(shade_x))
+                
+                for s in reference_shades:
+                    removed_points = [p for p in s.points if p.x() in removed_x]
+                    for p in removed_points:
+                        s.points.remove(p)
+                
+            else:
+                # a point was moved along x, in the sender shade
+                for k, p in enumerate(shade.points):
+                    for s in reference_shades:
+                        s.points[k].setX(shade.points[k].x())
+                
         
-        self.gradientStopsChanged.emit(stops)
+        
+        ##received_points = sorted(list(points), key = lambda x: x.x())
+        ##printPoints(received_points, 1, caller=self.pointsUpdated_new, prefix="passed in from %s" % shade._shadeType.name)
+        
+        #red_points = sorted(list(self._redShade.points), key = lambda x: x.x())
+        ##printPoints(red_points, 1, caller=self.pointsUpdated_new, prefix="red shade")
+        
+        #green_points = sorted(list(self._greenShade.points), key = lambda x: x.x())
+        ##printPoints(green_points, 1, caller=self.pointsUpdated_new, prefix="green shade")
+        
+        #blue_points = sorted(list(self._blueShade.points), key = lambda x: x.x())
+        ##printPoints(blue_points, 1, caller=self.pointsUpdated_new, prefix="blue shade")
+        
+        #alpha_points = sorted(list(self._alphaShade.points), key = lambda x: x.x())
+        ##printPoints(alpha_points, 1, caller=self.pointsUpdated_new, prefix="alpha shade")
+        
+        
+        #npoints = max([len(l) for l in [red_points, green_points, blue_points, alpha_points]])
+        
+        #for i in range(npoints):
+            #rk = int(red_points[i].x())
+            #if rk < 0:
+                #rk = 0
+            #if rk > w:
+                #rk = w
+                
+            #gk = int(green_points[i].x())
+            #if gk < 0:
+                #gk = 0
+            #if gk > w:
+                #gk = w
+                
+            #bk = int(blue_points[i].x())
+            #if bk < 0:
+                #bk = 0
+            #if bk > w:
+                #bk = w
+                
+            #ak = int(alpha_points[i].x())
+            #if ak < 0:
+                #ak = 0
+            #if ak > w:
+                #ak = w
+            
+            #if i > 0:
+                #if rk == int(red_points[i-1].x()):
+                    #continue
+                #if gk == int(green_points[i-1].x()):
+                    #continue
+                #if bk == int(blue_points[i-1].x()):
+                    #continue
+                #if ak == int(alpha_points[i-1].x()):
+                    #continue
+            
+            #if i + 1 < npoints:
+                #if rk == int(red_points[i-1].x()):
+                    #continue
+                #if gk == int(green_points[i-1].x()):
+                    #continue
+                #if bk == int(blue_points[i-1].x()):
+                    #continue
+                #if ak == int(alpha_points[i-1].x()):
+                    #continue
+                
+            #color = QtGui.QColor((0x00ff0000 & self._redShade.colorAt(rk))   >> 16,   # red
+                                 #(0x0000ff00 & self._greenShade.colorAt(gk)) >>  8,  # green
+                                 #(0x000000ff & self._blueShade.colorAt(bk)),        # blue
+                                 #(0xff000000 & self._alphaShade.colorAt(ak)) >> 24) # transparent
+            
+            #stops.append((i/w, color)) # FIXME 2021-06-25 16:14:36
+            
+        #printGradientStops(stops, 1, caller = self.pointsUpdated_new)
+            
+        #self._alphaShade.setGradientStops(stops)
+        
+        #self.gradientStopsChanged.emit(stops)
             
     @pyqtSlot(QtGui.QPolygonF)
     def pointsUpdated_old(self, points:QtGui.QPolygonF):
         w = float(self._alphaShade.width())
         
-        stops = list()
+        stops = self._generateStops(self._redShade.points, self._greenShade.points, self._blueShade.points, self._alphaShade.points)
+        
+        #stops = list()
         
         
-        points = QtGui.QPolygonF()
-        points += self._redShade.points
-        points += self._greenShade.points
-        points += self._blueShade.points
-        points += self._alphaShade.points
+        #allpoints = QtGui.QPolygonF()
+        #allpoints += self._redShade.points
+        #allpoints += self._greenShade.points
+        #allpoints += self._blueShade.points
+        #allpoints += self._alphaShade.points
 
-        sortedPoints = sorted([p for p in points], key = lambda x: x.x())
+        #sortedPoints = sorted([p for p in allpoints], key = lambda x: x.x())
+        
+        ## NOTE: 2021-06-25 11:10:51
+        ## the problem with this approach is the unintended addition of gradient stops:
+        ## when a point being dragged in one of the shades changes its 'x' coordinate, 
+        ## this will result in the addition of a new gradient stop for the new 'x' 
+        ## coordinate, since the 'old' position will still generate a color stop 
+        
+        ## NOTE: 2021-06-25 13:27:16
+        ## on second thoughts, this might be the intended behaviour: for each 
+        ## point moved on the 'x' axis, generate two stops instead of the previous
+        ## stop; the new stops are :
+        ##
+        ## 1) at the new 'x' coordinate of the moved point
+        ## 2) at the old 'x' coordinate of the points that have not moved
+        ##
+        ## NOTE, however, this wil result in new stops being added over and over
+        ## which can become a nuisance (the Qt example "gradients" is not interested
+        ## is storing the new gradient after edit so this bug is not apparent there)
+        ##
+        ## The question is:
+        ## if one shade point changes its 'x' position, but the corresponding
+        ## points in the other shades do not, should this generate two gradient
+        ## stop, or just alter the original stop?
+        
+        ##printPoints(sortedPoints, 1, caller = "auto", prefix="sortedPoints")
+        
+        #for i, point in enumerate(sortedPoints):
+            #k = int(point.x())
+            
+            ## NOTE 2021-06-25 11:25:48
+            ## the second test in the if clause below is the culprit, I think, 
+            ## because it assumes the 
+            ## point (which may have been dragged though the gui) has not changed
+            ## its 'x' coordinate (hence it points to the same 'k'th pixel on the horizontal
+            ## axis of the shade widget).
+            
+            #if i + 1 < len(sortedPoints) and k == int(sortedPoints[i+1].x()):
+                ## avoids duplicating a point with same coordinate in the other shades
+                ## BUT: because of this, any point with x only slightly changed will
+                ## generate a new gradient stop (whereas the others will "fix" the prev stop
+                ## by re-adding it to the gradient 
+                #continue
+            
+            ## NOTE: 2021-06-25 11:33:31
+            ## don;t add a new point if we're only just dragging it!
+            ##ndx = i//4 # there are 4 shade widgets!
+            ##if i + 1 < len(sortedPoints) and ndx == (i+1)//4:
+                ##continue
+            
+            #color = QtGui.QColor((0x00ff0000 & self._redShade.colorAt(k))   >> 16, # red
+                                 #(0x0000ff00 & self._greenShade.colorAt(k)) >>  8, # green
+                                 #(0x000000ff & self._blueShade.colorAt(k)),        # blue
+                                 #(0xff000000 & self._alphaShade.colorAt(k)) >> 24) # transparent
+            
+            #if k / w > 1:
+                #return
+            
+            #stops.append((k/w, color))
+            
+        ##printGradientStops(stops, 1, caller = "auto")
+            
+        self._alphaShade.setGradientStops(stops)
+        
+        self.gradientStopsChanged.emit(stops)
+        
+    def _generateStops(self, r, g, b, a):
+
+        allpoints = QtGui.QPolygonF()
+        allpoints += r
+        allpoints += g
+        allpoints += b
+        allpoints += a
+
+        sortedPoints = sorted([p for p in allpoints], key = lambda x: x.x())
         
         # NOTE: 2021-06-25 11:10:51
         # the problem with this approach is the unintended addition of gradient stops:
@@ -422,24 +548,11 @@ class GradientEditor(QtWidgets.QWidget):
         for i, point in enumerate(sortedPoints):
             k = int(point.x())
             
-            # NOTE 2021-06-25 11:25:48
-            # the second test in the if clause below is the culprit, I think, 
-            # because it assumes the 
-            # point (which may have been dragged though the gui) has not changed
-            # its 'x' coordinate (hence it points to the same 'k'th pixel on the horizontal
-            # axis of the shade widget).
-            
             if i + 1 < len(sortedPoints) and k == int(sortedPoints[i+1].x()):
                 continue
             
-            # NOTE: 2021-06-25 11:33:31
-            # don;t add a new point if we're only just dragging it!
-            #ndx = i//4 # there are 4 shade widgets!
-            #if i + 1 < len(sortedPoints) and ndx == (i+1)//4:
-                #continue
-            
-            color = QtGui.QColor((0x00ff0000 & self._redShade.colorAt(k))   >> 16,   # red
-                                 (0x0000ff00 & self._greenShade.colorAt(k)) >>  8,  # green
+            color = QtGui.QColor((0x00ff0000 & self._redShade.colorAt(k))   >> 16, # red
+                                 (0x0000ff00 & self._greenShade.colorAt(k)) >>  8, # green
                                  (0x000000ff & self._blueShade.colorAt(k)),        # blue
                                  (0xff000000 & self._alphaShade.colorAt(k)) >> 24) # transparent
             
@@ -447,13 +560,9 @@ class GradientEditor(QtWidgets.QWidget):
                 return
             
             stops.append((k/w, color))
-            
-        #printGradientStops(stops, 1, caller = "auto")
-            
-        self._alphaShade.setGradientStops(stops)
         
-        self.gradientStopsChanged.emit(stops)
-        
+        return stops
+    
     @pyqtSlot(QtGui.QPolygonF)
     def pointsUpdated(self, points:QtGui.QPolygonF):
         self.pointsUpdated_old(points)
@@ -1588,9 +1697,9 @@ class GradientWidget(QtWidgets.QWidget):
         else:
             gradname = counter_suffix(name, list(self._gradients.keys()), sep = " ")
             
-        print("GradientWidget.addGradient: %d stops =" % len(val.stops()))#, val.stops())
-        for k, s in enumerate(val.stops()):
-            print(k, s[0])
+        #print("GradientWidget.addGradient: %d stops =" % len(val.stops()))#, val.stops())
+        #for k, s in enumerate(val.stops()):
+            #print(k, s[0])
             
         self._customGradients[gradname] = val
                 

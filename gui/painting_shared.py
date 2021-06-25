@@ -753,6 +753,8 @@ class HoverPoints(QtCore.QObject):
     def eventFilter(self, obj:QtCore.QObject, ev:QtCore.QEvent) -> bool:
         try:
             if obj == self._widget and self._enabled:
+                #if hasattr(self._widget, "_shadeType"):
+                    #print("HoverPoints.eventFilter %s" % self._widget._shadeType.name)
                 if ev.type() == QtCore.QEvent.MouseButtonPress:
                     #if len(self._fingerPointMapping) == 0: # see # NOTE 2021-05-21 21:29:33 touchscreens
                         #return True
@@ -900,7 +902,7 @@ class HoverPoints(QtCore.QObject):
                     return False
                     
                 elif ev.type() == QtCore.QEvent.Paint:
-                    #print("HoverPoints.eventFilter: paint event")
+                    #print("\tHoverPoints.eventFilter: paint event")
                     that_widget = self._widget
                     self._widget = None
                     QtCore.QCoreApplication.sendEvent(obj, ev)
