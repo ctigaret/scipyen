@@ -34,8 +34,6 @@ from .painting_shared import (HoverPoints, x_less_than, y_less_than,
                               normalizeGradient, 
                               scaleGradient,
                               rescaleGradient,
-                              printGradientStops,
-                              printPoints,
                               )
 
 from .planargraphics import (ColorGradient, colorGradient,)
@@ -43,7 +41,10 @@ from .planargraphics import (ColorGradient, colorGradient,)
 from . import quickdialog as qd
 
 class ShadeWidget(QtWidgets.QWidget):
-    colorsChanged = pyqtSignal(QtGui.QPolygonF, name="colorsChanged")
+    colorsChanged   = pyqtSignal(QtGui.QPolygonF, name="colorsChanged")
+    pointMovedX     = pyqtSignal(int, float, name="pointMovedX")
+    pointInserted   = pyqtSignal(int, QtCore.QPointF, name="pointInserted")
+    pointRemoved    = pyqtSignal(int, name="pointRemoved")
     
     class ShadeType(IntEnum):
         RedShade = auto()
@@ -52,15 +53,20 @@ class ShadeWidget(QtWidgets.QWidget):
         ARGBShade = auto()
         
     def __init__(self, shadeType:ShadeType, 
-                 parent:typing.Optional[QtWidgets.QWidget]=None) -> None:
+                 parent:typing.Optional[QtWidgets.QWidget]=None,
+                 size:typing.Union[int, typing.Tuple[int]]=11) -> None:
         
         super().__init__(parent=parent)
         
+        if isinstance(size, (tuple, list)) and len(size) == 2 and all([isinstance(v, int) for v in size]):
+            self._pointSize = QtCore.QSize(*size)
+        elif isinstance(size, int):
+            self._pointSize = QtCore.QSize(size, size)
+        else:
+            self._pointSize = QtCore.QSize(11, 11)
+
         self._shade = QtGui.QImage()
-        
-        #print("ShadeWidget.__init__ shadeType", shadeType)
         self._shadeType = shadeType
-        
         self._alphaGradient = QtGui.QLinearGradient(0, 0, 0, 0)
         
         if self._shadeType == ShadeWidget.ShadeType.ARGBShade:
@@ -79,9 +85,7 @@ class ShadeWidget(QtWidgets.QWidget):
         points = QtGui.QPolygonF([QtCore.QPointF(0, self.sizeHint().height()),
                                   QtCore.QPointF(self.sizeHint().width(), 0)])
         
-        #print("ShadeWidget.__init__ polygon", [p for p in points])
-        
-        self._hoverPoints = HoverPoints(self, HoverPoints.PointShape.CircleShape)
+        self._hoverPoints = HoverPoints(self, HoverPoints.PointShape.CircleShape, size = self._pointSize)
         self._hoverPoints.points = points
         self._hoverPoints.setPointLock(0, HoverPoints.LockType.LockToLeft)
         self._hoverPoints.setPointLock(1, HoverPoints.LockType.LockToRight)
@@ -96,6 +100,39 @@ class ShadeWidget(QtWidgets.QWidget):
     def sizeHint(self) -> QtCore.QSize:
         return QtCore.QSize(150,40)
     
+    @pyqtSlot(int, float)
+    def slot_syncPointX(self, index, x):
+        if index >= 0 and index < len(self.points):
+            self.points[index].setX(x)
+            self.update()
+            
+    @pyqtSlot(int, QtCore.QPointF)
+    def slot_pointInserted(self, index, p):
+        if index >= 0:
+            if index == 0:
+                y = self._hoverPoints._points[0].y()
+            elif index >= len(self._hoverPoints._points):
+                y = self._hoverPoints._points[-1].y()
+            else:
+                p0 = self._hoverPoints._points[index-1]
+                p1 = self._hoverPoints._points[index]
+                l = QtCore.QLineF(p0, p1)
+                if l.dx() > 0:
+                    y = l.dy()*(p.x()-p0.x())/l.dx() + p0.y() 
+                
+                
+            self._hoverPoints._points.insert(index,QtCore.QPointF(p.x(), y))
+            self._hoverPoints._locks.insert(index, 0) # inserts a NoLock at point index
+            self.update()
+        
+    @pyqtSlot(int)
+    def slot_pointRemoved(self, index):
+        if index >= 0:
+            self._hoverPoints._locks.pop(index)
+            self._hoverPoints._points.remove(index)
+            self.update()
+        
+        
     @property
     def hoverPoints(self) -> HoverPoints:
         return self._hoverPoints
@@ -103,7 +140,7 @@ class ShadeWidget(QtWidgets.QWidget):
     @property
     def points(self) -> QtGui.QPolygonF:
         return self._hoverPoints.points
-        
+    
     def colorAt(self, x:int) -> int:
         """Returns the color of the pixel in the shade's image at index 'x'.
         'x' is an integer 'x' coordinate in shade's image.
@@ -117,9 +154,7 @@ class ShadeWidget(QtWidgets.QWidget):
         pts = self._hoverPoints.points
         
         for k in range(1, len(pts)):
-            #print("ShadeWidget.colorAt x %s: point at %d, %s, at %d, %s" % (x, i-1, pts.at(i-1).x(), i, pts.at(i).x()))
             # check between which pair of points 'x' is located
-            #if pts[k-1].x() <= x and pts[k].x() >= x:
             if x >= pts[k-1].x() and x <= pts[k].x():
                 # NOTE: 2021-06-23 22:08:18
                 # 'x' is between the x coordinates of two successive hover points
@@ -146,8 +181,6 @@ class ShadeWidget(QtWidgets.QWidget):
         return 0
     
     def setGradientStops(self, stops:typing.Iterable[typing.Tuple[float, typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]]]) -> None:
-        #printGradientStops(stops, 1, caller="auto", prefix=self._shadeType.name)
-                
         if self._shadeType == ShadeWidget.ShadeType.ARGBShade:
             self._alphaGradient = QtGui.QLinearGradient(0, 0, self.width(), 0)
             
@@ -162,9 +195,7 @@ class ShadeWidget(QtWidgets.QWidget):
             
     def paintEvent(self, ev:QtGui.QPaintEvent) -> None:
         self._generateShade()
-        
         p = QtGui.QPainter(self)
-        
         p.drawImage(0,0,self._shade)
         p.setPen(QtGui.QColor(146, 146, 146))
         p.drawRect(0,0, self.width() - 1, self.height() - 1)
@@ -174,12 +205,6 @@ class ShadeWidget(QtWidgets.QWidget):
         super().resizeEvent(e)
         
     def _generateShade(self) -> None:
-        #print("%s ShadeWidget._generateShade" % self._shadeType.name)
-        #frames = inspect.getouterframes(inspect.currentframe())
-        #callers = [f.function for f in reversed(list(frames))]
-        #callers.append("%s ShadeWidget._generateShade" % self._shadeType.name)
-        #print("\n\t".join(callers))
-        #del frames
         if self._shade.isNull() or self._shade.size() != self.size():
             if self._shadeType == ShadeWidget.ShadeType.ARGBShade:
                 self._shade = QtGui.QImage(self.size(), QtGui.QImage.Format_ARGB32_Premultiplied)
@@ -213,32 +238,44 @@ class ShadeWidget(QtWidgets.QWidget):
 class GradientEditor(QtWidgets.QWidget):
     gradientStopsChanged = pyqtSignal(object, name="gradientStopsChanged")
     
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None) -> None:
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
+                 size:typing.Union[int, typing.Tuple[int]]=11) -> None:
         super().__init__(parent=parent)
         vbox = QtWidgets.QVBoxLayout(self)
         vbox.setSpacing(1)
         vbox.setContentsMargins(1, 1, 1, 1)
         
-        self._redShade = ShadeWidget(ShadeWidget.ShadeType.RedShade, self)
-        self._greenShade = ShadeWidget(ShadeWidget.ShadeType.GreenShade, self)
-        self._blueShade = ShadeWidget(ShadeWidget.ShadeType.BlueShade, self)
-        self._alphaShade = ShadeWidget(ShadeWidget.ShadeType.ARGBShade, self)
+        if isinstance(size, (tuple, list)) and len(size) == 2 and all([isinstance(v, int) for v in size]):
+            self._pointSize = QtCore.QSize(*size)
+        elif isinstance(size, int):
+            self._pointSize = QtCore.QSize(size, size)
+        else:
+            self._pointSize = QtCore.QSize(11, 11)
+            
+        self._redShade = ShadeWidget(ShadeWidget.ShadeType.RedShade, self, size = self.pointSize)
+        self._greenShade = ShadeWidget(ShadeWidget.ShadeType.GreenShade, self, size = self.pointSize)
+        self._blueShade = ShadeWidget(ShadeWidget.ShadeType.BlueShade, self, size = self.pointSize)
+        self._alphaShade = ShadeWidget(ShadeWidget.ShadeType.ARGBShade, self, size = self.pointSize)
         
         vbox.addWidget(self._redShade)
         vbox.addWidget(self._greenShade)
         vbox.addWidget(self._blueShade)
         vbox.addWidget(self._alphaShade)
         
-        #self._alphaShade.update()
-
         self._redShade.colorsChanged.connect(self.pointsUpdated)
         self._greenShade.colorsChanged.connect(self.pointsUpdated)
         self._blueShade.colorsChanged.connect(self.pointsUpdated)
         self._alphaShade.colorsChanged.connect(self.pointsUpdated)
+        
+        for shade in (self._redShade, self._greenShade, self._blueShade, self._alphaShade):
+            for s in (self._redShade, self._greenShade, self._blueShade, self._alphaShade):
+                if shade is not s:
+                    shade.pointMovedX.connect(s.slot_syncPointX)
+                    shade.pointInserted.connect(s.slot_pointInserted)
+                    shade.pointRemoved.connect(s.slot_pointRemoved)
     
     @pyqtSlot(object)
     def setGradientStops(self, stops:typing.Iterable[typing.Tuple[float, typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]]]) -> None:
-        #printGradientStops(stops, 1, caller=self.setGradientStops)
         pts_red = list() 
         pts_green = list() 
         pts_blue = list() 
@@ -274,251 +311,49 @@ class GradientEditor(QtWidgets.QWidget):
         self._alphaShade.setGradientStops(stops) # this is essential for painting the background of the _alphaShade
         
     @pyqtSlot(QtGui.QPolygonF)
-    def pointsUpdated_new(self, points:QtGui.QPolygonF):
-        # all shades by definition must have the sme number of points which is
-        # the same as the number of gradient points
-        #
-        # corrolaries:
-        # 1) when a point is added in HoverPoints this should be reflected in all
-        # shades
-        #
-        # 2) when a point is dragged, the change in 'x' in the shade where the move
-        # was initiated should result in the same change in  'x' coordinates of 
-        # the corresponding point in all the other shades (because that 'x' coordinate
-        # determines the gradient stop)
-        w = float(self._alphaShade.width())
-        #x0 = float(self._alphaShade.)
-        
-        stops = list()
-        
-        shade = self.sender() # is None when called programmatically and not from a signal
-        
-        if not isinstance(shade, ShadeWidget):
-            return
-        
-        if shade:
-            assert points == shade.points, "points are not from sender"
-        
-            if shade is self._redShade:
-                reference_shades = (self._greenShade, self._blueShade, self._alphaShade)
-            elif shade is self._greenShade:
-                reference_shades = (self._redShade, self._blueShade, self._alphaShade)
-            elif shade is self._blueShade:
-                reference_shades = (self._redShade, self._greenShade, self._alphaShade)
-            elif shade is self._alphaShade:
-                reference_shades = (self._redShade, self._greenShade, self._blueShade)
-            else:
-                return # can this even happen?
-            
-            reference_points = [QtGui.QPolygonF(s.points) for s in reference_shades]
-
-            #assert len(set([len(s.points) for s in reference_shades])) == 1, "reference have different number of points"
-            assert len(set([len(pts) for pts in reference_points])) == 1, "reference have different number of points"
-            
-            #assert all([[p.x() for p in reference_shades[0].points] == [p.x() for p in reference_shades[k].points] for k in range(1, len(reference_shades))]), "reference shades have points with distinct X coordinates between them"
-            assert all([[p.x() for p in reference_points[0]] == [p.x() for p in reference_points[k]] for k in range(1, len(reference_points))]), "reference shades have points with distinct X coordinates between them"
-                
-            shade_x = [p.x() for p in sorted(shade.points, key = lambda x: x.x())]
-            #refsh_x = [p.x() for p in sorted(reference_shades[0].points, lambda x: x.x()]
-            refsh_x = [p.x() for p in sorted(reference_points[0], lambda x: x.x()]
-                                             
-            if len(shade_x) > len(refsh_x):
-                # a new point was added in the sender shade
-                # figure out the x coordinate of the new point
-                
-                added_x = list(set(shade_x) - set(refsh_x))
-                
-                added_y = [p.y() for p in shade.points if p.x() in added_x]
-                
-                ndx = [np.searchsorted(refsh_x, x) for x in added_x]
-                
-                for k,i in enumerate(ndx):
-                    for s in reference_shades:
-                        s.points.insert(i, QtCore.QPointF(added_x[k], added_y[k]))
-                
-            elif len(shade_x) < len(refsh_x):
-                # a point was removed from the sender shade
-                removed_x = list(set(refsh_x) - set(shade_x))
-                
-                for s in reference_shades:
-                    removed_points = [p for p in s.points if p.x() in removed_x]
-                    for p in removed_points:
-                        s.points.remove(p)
-                
-            else:
-                # a point was moved along x, in the sender shade
-                for k, p in enumerate(shade.points):
-                    for s in reference_shades:
-                        s.points[k].setX(shade.points[k].x())
-                
-        
-        
-        ##received_points = sorted(list(points), key = lambda x: x.x())
-        ##printPoints(received_points, 1, caller=self.pointsUpdated_new, prefix="passed in from %s" % shade._shadeType.name)
-        
-        #red_points = sorted(list(self._redShade.points), key = lambda x: x.x())
-        ##printPoints(red_points, 1, caller=self.pointsUpdated_new, prefix="red shade")
-        
-        #green_points = sorted(list(self._greenShade.points), key = lambda x: x.x())
-        ##printPoints(green_points, 1, caller=self.pointsUpdated_new, prefix="green shade")
-        
-        #blue_points = sorted(list(self._blueShade.points), key = lambda x: x.x())
-        ##printPoints(blue_points, 1, caller=self.pointsUpdated_new, prefix="blue shade")
-        
-        #alpha_points = sorted(list(self._alphaShade.points), key = lambda x: x.x())
-        ##printPoints(alpha_points, 1, caller=self.pointsUpdated_new, prefix="alpha shade")
-        
-        
-        #npoints = max([len(l) for l in [red_points, green_points, blue_points, alpha_points]])
-        
-        #for i in range(npoints):
-            #rk = int(red_points[i].x())
-            #if rk < 0:
-                #rk = 0
-            #if rk > w:
-                #rk = w
-                
-            #gk = int(green_points[i].x())
-            #if gk < 0:
-                #gk = 0
-            #if gk > w:
-                #gk = w
-                
-            #bk = int(blue_points[i].x())
-            #if bk < 0:
-                #bk = 0
-            #if bk > w:
-                #bk = w
-                
-            #ak = int(alpha_points[i].x())
-            #if ak < 0:
-                #ak = 0
-            #if ak > w:
-                #ak = w
-            
-            #if i > 0:
-                #if rk == int(red_points[i-1].x()):
-                    #continue
-                #if gk == int(green_points[i-1].x()):
-                    #continue
-                #if bk == int(blue_points[i-1].x()):
-                    #continue
-                #if ak == int(alpha_points[i-1].x()):
-                    #continue
-            
-            #if i + 1 < npoints:
-                #if rk == int(red_points[i-1].x()):
-                    #continue
-                #if gk == int(green_points[i-1].x()):
-                    #continue
-                #if bk == int(blue_points[i-1].x()):
-                    #continue
-                #if ak == int(alpha_points[i-1].x()):
-                    #continue
-                
-            #color = QtGui.QColor((0x00ff0000 & self._redShade.colorAt(rk))   >> 16,   # red
-                                 #(0x0000ff00 & self._greenShade.colorAt(gk)) >>  8,  # green
-                                 #(0x000000ff & self._blueShade.colorAt(bk)),        # blue
-                                 #(0xff000000 & self._alphaShade.colorAt(ak)) >> 24) # transparent
-            
-            #stops.append((i/w, color)) # FIXME 2021-06-25 16:14:36
-            
-        #printGradientStops(stops, 1, caller = self.pointsUpdated_new)
-            
-        #self._alphaShade.setGradientStops(stops)
-        
-        #self.gradientStopsChanged.emit(stops)
-            
-    @pyqtSlot(QtGui.QPolygonF)
-    def pointsUpdated_old(self, points:QtGui.QPolygonF):
-        w = float(self._alphaShade.width())
-        
+    def pointsUpdated(self, points:QtGui.QPolygonF):
         stops = self._generateStops(self._redShade.points, self._greenShade.points, self._blueShade.points, self._alphaShade.points)
-        
-        #stops = list()
-        
-        
-        #allpoints = QtGui.QPolygonF()
-        #allpoints += self._redShade.points
-        #allpoints += self._greenShade.points
-        #allpoints += self._blueShade.points
-        #allpoints += self._alphaShade.points
-
-        #sortedPoints = sorted([p for p in allpoints], key = lambda x: x.x())
-        
-        ## NOTE: 2021-06-25 11:10:51
-        ## the problem with this approach is the unintended addition of gradient stops:
-        ## when a point being dragged in one of the shades changes its 'x' coordinate, 
-        ## this will result in the addition of a new gradient stop for the new 'x' 
-        ## coordinate, since the 'old' position will still generate a color stop 
-        
-        ## NOTE: 2021-06-25 13:27:16
-        ## on second thoughts, this might be the intended behaviour: for each 
-        ## point moved on the 'x' axis, generate two stops instead of the previous
-        ## stop; the new stops are :
-        ##
-        ## 1) at the new 'x' coordinate of the moved point
-        ## 2) at the old 'x' coordinate of the points that have not moved
-        ##
-        ## NOTE, however, this wil result in new stops being added over and over
-        ## which can become a nuisance (the Qt example "gradients" is not interested
-        ## is storing the new gradient after edit so this bug is not apparent there)
-        ##
-        ## The question is:
-        ## if one shade point changes its 'x' position, but the corresponding
-        ## points in the other shades do not, should this generate two gradient
-        ## stop, or just alter the original stop?
-        
-        ##printPoints(sortedPoints, 1, caller = "auto", prefix="sortedPoints")
-        
-        #for i, point in enumerate(sortedPoints):
-            #k = int(point.x())
-            
-            ## NOTE 2021-06-25 11:25:48
-            ## the second test in the if clause below is the culprit, I think, 
-            ## because it assumes the 
-            ## point (which may have been dragged though the gui) has not changed
-            ## its 'x' coordinate (hence it points to the same 'k'th pixel on the horizontal
-            ## axis of the shade widget).
-            
-            #if i + 1 < len(sortedPoints) and k == int(sortedPoints[i+1].x()):
-                ## avoids duplicating a point with same coordinate in the other shades
-                ## BUT: because of this, any point with x only slightly changed will
-                ## generate a new gradient stop (whereas the others will "fix" the prev stop
-                ## by re-adding it to the gradient 
-                #continue
-            
-            ## NOTE: 2021-06-25 11:33:31
-            ## don;t add a new point if we're only just dragging it!
-            ##ndx = i//4 # there are 4 shade widgets!
-            ##if i + 1 < len(sortedPoints) and ndx == (i+1)//4:
-                ##continue
-            
-            #color = QtGui.QColor((0x00ff0000 & self._redShade.colorAt(k))   >> 16, # red
-                                 #(0x0000ff00 & self._greenShade.colorAt(k)) >>  8, # green
-                                 #(0x000000ff & self._blueShade.colorAt(k)),        # blue
-                                 #(0xff000000 & self._alphaShade.colorAt(k)) >> 24) # transparent
-            
-            #if k / w > 1:
-                #return
-            
-            #stops.append((k/w, color))
-            
-        ##printGradientStops(stops, 1, caller = "auto")
-            
-        self._alphaShade.setGradientStops(stops)
-        
-        self.gradientStopsChanged.emit(stops)
+        if stops:
+            self._alphaShade.setGradientStops(stops)
+            self.gradientStopsChanged.emit(stops)
         
     def _generateStops(self, r, g, b, a):
+        w = float(self._alphaShade.width())
+        
+        stops = list()
 
         allpoints = QtGui.QPolygonF()
-        allpoints += r
-        allpoints += g
-        allpoints += b
-        allpoints += a
+        allpoints += QtGui.QPolygonF(r)
+        allpoints += QtGui.QPolygonF(g)
+        allpoints += QtGui.QPolygonF(b)
+        allpoints += QtGui.QPolygonF(a)
 
         sortedPoints = sorted([p for p in allpoints], key = lambda x: x.x())
+        
+        # NOTE: 2021-06-26 22:21:21
+        # Code in gui.painting_shared.HoverPoints.eventFilter() and a few PyQt
+        # signals/slots here solves the problem described at NOTE: 2021-06-25 11:10:51
+        #
+        # This new code ensures that the following GUI operations are correctly 
+        # represented by the hover points in the shade widgets:
+        #
+        # 1) adding a hover point in a shade triggers the insertion of a new 
+        #   hover point at the same X coordinate in the other shade widgets and
+        #   generates a new gradient stop; 
+        #   the new hover points inserted in the other shade widgets get their Y 
+        #   coordinate from the interpolation line between the points that bracket
+        #   the inserted point.
+        #
+        # 2) removing a hover point in a shade removes the corresponding hover
+        #   points in the other shade widgets, and the corresponding gradient stop
+        #
+        # 3) movement of a hover point along the X axis in a shade widget is now
+        #   reflected in the the corresponding hover point in the other shade 
+        #   widgets (these 'other' points keep their Y coordinate);
+        #   this avoids the unintended generation of new gradient stoop after a
+        #   hover point was moved - an unintended feature in the Qt example code
+        #   
+        # see also NOTE: 2021-06-26 22:46:39 in gui.painting_shared.HoverPoints.eventFilter()
         
         # NOTE: 2021-06-25 11:10:51
         # the problem with this approach is the unintended addition of gradient stops:
@@ -543,12 +378,13 @@ class GradientEditor(QtWidgets.QWidget):
         # points in the other shades do not, should this generate two gradient
         # stop, or just alter the original stop?
         
-        #printPoints(sortedPoints, 1, caller = "auto", prefix="sortedPoints")
-        
         for i, point in enumerate(sortedPoints):
             k = int(point.x())
             
-            if i + 1 < len(sortedPoints) and k == int(sortedPoints[i+1].x()):
+            #if i + 1 < len(sortedPoints) and k == int(sortedPoints[i+1].x()):
+                #continue
+            
+            if i + 1 < len(sortedPoints) and np.isclose(point.x(), sortedPoints[i+1].x()):#, atol = self.pointSize.width()/20., rtol = self.pointSize.width()/20.):
                 continue
             
             color = QtGui.QColor((0x00ff0000 & self._redShade.colorAt(k))   >> 16, # red
@@ -563,11 +399,24 @@ class GradientEditor(QtWidgets.QWidget):
         
         return stops
     
-    @pyqtSlot(QtGui.QPolygonF)
-    def pointsUpdated(self, points:QtGui.QPolygonF):
-        self.pointsUpdated_old(points)
-        #self.pointsUpdated_new(points)
-        
+    @property
+    def pointSize(self):
+        return self._pointSize
+    
+    @pointSize.setter
+    def pointSize(self, val):
+        for shade in (self._redShade, self._greenShade, self._blueShade, self._alphaShade):
+            if isinstance(val, int):
+                shade._hoverPoints._pointSize = QtCore.QSize(val, val)
+                
+            elif isinstance(val, (tuple, list)) and len(val)==2 and all([isinstance(v, int) for v in val]):
+                shade._hoverPoints._pointSize = QtCore.QSize(*val)
+                
+            else:
+                return
+            
+            shade.update()
+            
 class GradientRenderer(QtWidgets.QWidget):
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None,
                  autoCenterRadius:bool=True, relativeCenterRadius:bool=False,
@@ -705,7 +554,6 @@ class GradientRenderer(QtWidgets.QWidget):
     
     @gradientBrushType.setter
     def gradientBrushType(self, val:typing.Union[QtCore.Qt.BrushStyle, int]) -> None:
-        #print("renderer.gradientBrushType val=",val)
         if val not in standardQtBrushGradients.values():
             return
         
@@ -760,7 +608,6 @@ class GradientRenderer(QtWidgets.QWidget):
         if not isinstance(val, (tuple, list)) or not all([self._checkStop(s) for s in val]):
             return
         self._stops[:] = val
-        #print("GradientRenderer.gradientStops", self._stops)
         #self.update()
     
     @pyqtSlot(float)
@@ -898,8 +745,7 @@ class GradientRenderer(QtWidgets.QWidget):
             gradCenter = gradient.center() 
             # NOTE: 2021-06-09 22:07:06 places the center mapped to real coordinates
             mappedCenter = QtGui.QTransform.fromScale(self.width(), self.height()).map(gradient.center())
-            #mappedCenter = QtCore.QPointF(gradCenter.x() * self.rect().width(),
-                                         #gradCenter.y() * self.rect().height())
+
             # NOTE: 2021-05-27 09:28:27
             # this paints the hover point symmetrically around the renderer's centre
             #l = QtCore.QLineF(self.rect().topLeft(), self.rect().topRight())
@@ -1112,12 +958,10 @@ class GradientWidget(QtWidgets.QWidget):
         """Executed when the widget becomes visible.
         """
         self._showGradient(list(self._gradients.values())[self._gradientIndex])
-        #self._showGradient([g for g in self._gradients.values()][self._gradientIndex])
         ev.accept()
         
     def _configureUI_(self):
         self._renderer = GradientRenderer(self)
-        #self._renderer._hoverPoints.pointsChanged.connect(self.slot_checkGradientModified)
         
         self.mainContentWidget = QtWidgets.QWidget()
         self.mainGroup = QtWidgets.QGroupBox(self.mainContentWidget)
@@ -1130,7 +974,6 @@ class GradientWidget(QtWidgets.QWidget):
         
         self.typeGroup = QtWidgets.QGroupBox(self.mainGroup)
         self.typeGroup.setTitle("Type")
-        #self.typeGroup.setTitle("Gradient Type")
         
         self._linearButton = QtWidgets.QRadioButton("Linear", self.typeGroup)
         self._radialButton = QtWidgets.QRadioButton("Radial", self.typeGroup)
@@ -1138,7 +981,6 @@ class GradientWidget(QtWidgets.QWidget):
         
         self.radialParamsGroup = QtWidgets.QGroupBox(self.mainGroup)
         self.radialParamsGroup.setTitle("Radial Gradient Options")
-        #self.radialParamsGroup.setTitle("Radial Gradients")
         
         self.gradientCenterRadiusGroup = QtWidgets.QGroupBox(self.radialParamsGroup)
         self.gradientCenterRadiusGroup.setTitle("Center Radius")
@@ -1208,7 +1050,6 @@ class GradientWidget(QtWidgets.QWidget):
         
         self.spreadGroup = QtWidgets.QGroupBox(self.mainGroup)
         self.spreadGroup.setTitle("Spread")
-        #self.spreadGroup.setTitle("Spread Method")
         self._padSpreadButton = QtWidgets.QRadioButton("Pad", self.spreadGroup)
         self._padSpreadButton.setToolTip("Fill area with closest stop color")
         self._reflectSpreadButton = QtWidgets.QRadioButton("Reflect", self.spreadGroup)
@@ -1389,10 +1230,7 @@ class GradientWidget(QtWidgets.QWidget):
         self._repeatSpreadButton.clicked.connect(self._renderer.setRepeatSpread)
         
         self.prevPresetButton.clicked.connect(self.setPrevPreset)
-        #self._presetButton.clicked.connect(self.setPreset)
         self._presetComboBox.activated[int].connect(self.slot_presetActivated)
-        #self._presetComboBox.currentTextChanged[str].connect(self.slot_gradientNameChanged)
-        #self._presetComboBox.editTextChanged[str].connect(self.slot_gradientNameChanged)
         self._presetComboBox.lineEdit().editingFinished.connect(self.slot_gradientNameChanged)
         self.nextPresetButton.clicked.connect(self.setNextPreset)
         self.addPresetButton.clicked.connect(self.slot_addGradientToPresets)
@@ -1416,46 +1254,26 @@ class GradientWidget(QtWidgets.QWidget):
     @pyqtSlot()
     def setPreset(self) -> None:
         self._changePresetBy(0)
+        self._resetTitle()
         
     @pyqtSlot(int)
     def slot_presetActivated(self, index):
         sigBlocker = QtCore.QSignalBlocker(self._presetComboBox)
         self._gradientIndex = index
         namedgrad = list(self._gradients.items())[self._gradientIndex]
-        #print(namedgrad[0])
         self._presetComboBox.setToolTip(namedgrad[0])
         self._showGradient(namedgrad[1])
-        #g = [v for v in self._gradients.values()][self._gradientIndex]
-        #self._showGradient(g)
+        self._resetTitle()
         
     @pyqtSlot()
     def setPrevPreset(self) -> None:
         self._changePresetBy(-1)
+        self._resetTitle()
         
     @pyqtSlot()
     def setNextPreset(self) -> None:
         self._changePresetBy(1)
-        
-    @pyqtSlot()
-    def slot_checkGradientModified(self):
-        line = self._calculateGradientLine()
-
-        if isinstance(self._gradientLine, QtCore.QLineF):
-            delta = (line.p1() - self._gradientLine.p1(), line.p2() - self._gradientLine.p2())
-            
-            is_same = all([np.isclose(p.x(), 0., atol=1e-2, rtol=1e-2) and np.isclose(p.y(), 0., atol=1e-2, rtol=1e-2) for p in delta])
-            
-            
-            if not is_same:
-                self.slot_gradientModified()
-                
-            else:
-                if isinstance(self._title, str) and len(self._title.strip()):
-                    self.setWindowTitle("%s *" % self._title)
-                else:
-                    self.setWindowTitle("%s *" % QtWidgets.QApplication.applicationDisplayName())
-        
-        self._gradientLine = line
+        self._resetTitle()
         
     @pyqtSlot()
     def slot_gradientModified(self) -> None:
@@ -1463,8 +1281,12 @@ class GradientWidget(QtWidgets.QWidget):
             self.setWindowTitle("%s *" % self._title)
         else:
             self.setWindowTitle("%s *" % QtWidgets.QApplication.applicationDisplayName())
-        #self.update()
         
+    def _resetTitle(self):
+        if isinstance(self._title, str) and len(self._title.strip()):
+            self.setWindowTitle(self._title)
+        else:
+            self.setWindowTitle(QtWidgets.QApplication.applicationDisplayName())
         
     def _updatePresetsCombo(self):
         sigBlocker = QtCore.QSignalBlocker(self._presetComboBox)
@@ -1474,18 +1296,8 @@ class GradientWidget(QtWidgets.QWidget):
         cbIndex = list(self._gradients.keys()).index(namedgrad[0])
         self._presetComboBox.setCurrentIndex(cbIndex)
         self._presetComboBox.setToolTip(namedgrad[0])
-        #self._updatePresetName()
-        
-    #def _updatePresetName(self) -> None:
-        #namedgrad = [(name, val) for name, val in self._gradients.items()][self._gradientIndex]
-        #cbIndex = [n for n in self._gradients.keys()].index(namedgrad[0])
-        ##self._presetComboBox.setCurrentIndex(cbIndex)
-        ##self._presetComboBox.setToolTip(namedgrad[0])
-        ##self._presetButton.setText(namedgrad[0])
-        ##self._presetButton.setToolTip(namedgrad[0])
         
     def _changePresetBy(self, indexOffset:int) -> None:
-        #print("GradientWidget._changePresetBy %d gradients: currentIndex: %d, offset %d" % (len(self._gradients), self._gradientIndex, indexOffset))
         sigBlocker = QtCore.QSignalBlocker(self._presetComboBox)
         if len(self._gradients) == 0:
             return
@@ -1496,15 +1308,13 @@ class GradientWidget(QtWidgets.QWidget):
         
         if self._gradientIndex >= len(self._gradients):
             self._gradientIndex = (self._gradientIndex - 1) % len(self._gradients)
-            #self._gradientIndex = 0
             
         elif self._gradientIndex < -1 * len(self._gradients):
             self._gradientIndex = self._gradientIndex % len(self._gradients)
-            #self._gradientIndex = len(self._gradients) - 1
         
         #### END enable circular browsing
 
-        # NOTE: leave this in for non-circular navigation 
+        # NOTE: use this in for non-circular navigation 
         #self._gradientIndex = max([0, min([self._gradientIndex + indexOffset, len(slf._gradients)-1])])
         
         namedgrad = list(self._gradients.items())[self._gradientIndex] 
@@ -1591,11 +1401,9 @@ class GradientWidget(QtWidgets.QWidget):
                     
                 else:# shouldn't get here
                     gradientType = QtGui.QGradient.LinearGradient # default
-                    #return 
                 
             if gradientType == QtGui.QGradient.LinearGradient:
                 gradient = sip.cast(gradient, QtGui.QLinearGradient)
-                #gradient = g2l(gradient)
                 
             elif gradientType == QtGui.QGradient.RadialGradient:
                 gradient = sip.cast(gradient, QtGui.QRadialGradient)
@@ -1615,9 +1423,6 @@ class GradientWidget(QtWidgets.QWidget):
                 
             else:
                 return
-            
-        #print("GradientWidget._showGradient gradient:", gradient)
-        #printGradientStops(gradient, 1, caller=self._showGradient)
             
         stops = gradient.stops()
         hoverStops = self._renderer._calculateHoverPointCoordinates(gradient)
@@ -1667,10 +1472,6 @@ class GradientWidget(QtWidgets.QWidget):
         
         self._renderer.update()
         
-        self.slot_checkGradientModified()
-        
-        #normalizedStops = 
-        
         self._rendererGradient = self._renderer.gradient
             
     @pyqtSlot()
@@ -1697,20 +1498,12 @@ class GradientWidget(QtWidgets.QWidget):
         else:
             gradname = counter_suffix(name, list(self._gradients.keys()), sep = " ")
             
-        #print("GradientWidget.addGradient: %d stops =" % len(val.stops()))#, val.stops())
-        #for k, s in enumerate(val.stops()):
-            #print(k, s[0])
-            
         self._customGradients[gradname] = val
-                
         self._setupGradients()
-        
         self._gradientIndex = list(self._gradients.keys()).index(gradname)
-        
-        #self._updatePresetName()
         self._updatePresetsCombo()
-        
         self._showGradient(val) # this one might be shown already
+        self._resetTitle()
         
     @pyqtSlot()
     def slot_removeGradientFromPresets(self):
@@ -1758,12 +1551,16 @@ class GradientWidget(QtWidgets.QWidget):
         if show:
             self._showGradient(list(self._gradients.values())[self._gradientIndex])
         
+        self._resetTitle()
+        
     @pyqtSlot()
     def slot_restoreGradientFromPresets(self):
         name = self._presetComboBox.currentText()
         if name in self._gradients.keys():
             self._showGradient(self._gradients[name])
             
+        self._resetTitle()
+        
     @pyqtSlot()
     def slot_acceptGradientChange(self):
         name = self._presetComboBox.currentText()
@@ -1779,28 +1576,26 @@ class GradientWidget(QtWidgets.QWidget):
             self._defaultGradient = self.gradient
             
         self._setupGradients()
-        
         self._gradientIndex = list(self._gradients.keys()).index(name)
-        
         self._updatePresetsCombo()
-        
         self._showGradient(self._gradients[name])
+        self._resetTitle()
         
     @pyqtSlot()
     def slot_rejectGradientChange(self):
         self.slot_restoreGradientFromPresets()
+        self._resetTitle()
         
     @pyqtSlot()
     def reloadPresets(self):
         self._setupGradients()
         self._changePresetBy(0)
+        self._resetTitle()
         
-    #@pyqtSlot(str)
     @pyqtSlot()
     def slot_gradientNameChanged(self):
         sigBlocker = QtCore.QSignalBlocker(self._presetComboBox)
         val = self._presetComboBox.lineEdit().text()
-        #self.renameCurrentGradient(val)
         
         if len(self._gradients) == 0:
             return
@@ -1812,6 +1607,7 @@ class GradientWidget(QtWidgets.QWidget):
             self._presetComboBox.setCurrentIndex(newIndex)
             self._gradientIndex = newIndex
             self._showGradient(gradient)
+            self._resetTitle()
             return
         
         # NOTE: 2021-06-13 20:04:15
@@ -1842,8 +1638,6 @@ class GradientWidget(QtWidgets.QWidget):
             
         namedgrad = list(self._gradients.items())[index]
         
-        print("namedgrad", namedgrad)
-        
         if namedgrad[0] in standardQtGradientPresets.keys() or namedgrad[0] not in self._customGradients.keys():
             # cannot recycle a standard preset name
             newname = counter_suffix(newname, self._gradients.keys())
@@ -1864,7 +1658,7 @@ class GradientWidget(QtWidgets.QWidget):
         self._updatePresetsCombo()
         
         self._showGradient(list(self._gradients.values())[self._gradientIndex])
-        #self.gradient=val
+        self.slot_gradientModified()
             
     def renameCurrentGradient(self, newname:str) -> None:
         sigBlocker = QtCore.QSignalBlocker(self._presetComboBox)
@@ -1875,26 +1669,17 @@ class GradientWidget(QtWidgets.QWidget):
         
         newname = counter_suffix(newname, self._gradients.keys())
         
-        #names = [n for n in self._gradients.keys() if n.startswith(name)]
-        #if len(names):
-            #name ="%s %d" % (name, len(names))
-            
         currentName = [n for n in self._gradients.keys()][self._gradientIndex]
-        
         gradient = self._gradients.pop(currentName, None)
-        
         self._gradients[newname] = gradient
-        
         self._updatePresetsCombo()
-        
-        #self._updatePresetName
+        self.slot_gradientModified()
         
     def removeCurrentGradient(self):
         name = [n for n in self._gradients.keys()][self._gradientIndex]
-        
         self._gradients.pop(name, None)
-        
         self._changePresetBy(0)
+        self._resetTitle()
             
     @property
     def normalizedGradient1(self) -> QtGui.QGradient:
@@ -1972,6 +1757,7 @@ class GradientWidget(QtWidgets.QWidget):
         if not isinstance(val, (QtGui.QGradient, QtGui.QGradient.Preset, str, ColorGradient)):
             return
         self._showGradient(val, gradientType)
+        self.slot_gradientModified()
             
     @pyqtSlot()
     def setAutoCenterRadius(self)-> None:
@@ -2111,7 +1897,6 @@ class GradientDialog(QtWidgets.QDialog):
         return colorGradient(self.gradient)
         
 def set_shade_points(points:typing.Union[QtGui.QPolygonF, list], shade:ShadeWidget) -> None:
-    #printPoints(points, 2, caller = set_shade_points, prefix=shade._shadeType.name)
     shade.hoverPoints.points = QtGui.QPolygonF(points)
     shade.hoverPoints.setPointLock(0, HoverPoints.LockType.LockToLeft)
     shade.hoverPoints.setPointLock(-1, HoverPoints.LockType.LockToRight)

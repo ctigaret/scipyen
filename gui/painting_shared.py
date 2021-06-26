@@ -644,10 +644,6 @@ class HoverPoints(QtCore.QObject):
         else:
             return self._bounds
         
-    #@boundingRect.setter
-    #def boundingRect(self, boundingRect:QtCore.QRectF) -> None:
-        #self._bounds = boundingRect
-        
     def setBoundingRect(self, boundingRect:QtCore.QRectF) -> None:
         self._bounds = boundingRect
         
@@ -655,12 +651,6 @@ class HoverPoints(QtCore.QObject):
     def points(self) -> QtGui.QPolygonF:
         return self._points
     
-    #def points(self, points:typing.Union[QtGui.QPolygonF,typing.Iterable[typing.Union[QtCore.QPointF, QtCore.QPoint]]]) -> None:
-        #if isinstance(points, (list, tuple)) and len(points) and all([isinstance(v, (QtCore.QPoint, QtCore.QPointF)) for v in points]):
-            #points = QtGui.QPolygonF(points)
-        #elif not isinstance(points, QtGui.QPolygonF):
-            #raise TypeError("points expected a QtGui.QPolygonF, or a sequence of QtCore.QPointF or QtCore.QPoint; got %s instead" % type(points).__name__)
-            
     @points.setter
     def points(self, points:QtGui.QPolygonF) -> None:
         # NOTE: 2021-05-23 20:57:59
@@ -753,14 +743,11 @@ class HoverPoints(QtCore.QObject):
     def eventFilter(self, obj:QtCore.QObject, ev:QtCore.QEvent) -> bool:
         try:
             if obj == self._widget and self._enabled:
-                #if hasattr(self._widget, "_shadeType"):
-                    #print("HoverPoints.eventFilter %s" % self._widget._shadeType.name)
                 if ev.type() == QtCore.QEvent.MouseButtonPress:
                     #if len(self._fingerPointMapping) == 0: # see # NOTE 2021-05-21 21:29:33 touchscreens
                         #return True
                     
                     me = sip.cast(ev, QtGui.QMouseEvent)
-                    #me = QtGui.QMouseEvent(ev)
                     
                     clickPos = me.pos()
                     
@@ -787,11 +774,6 @@ class HoverPoints(QtCore.QObject):
                     # NOTE: 2021-06-21 08:53:59
                     # index stays at -1 if no point bounding rect containing 
                     # clickPos is found
-                    
-                    #if hasattr(self._widget, "_shadeType"):
-                        #print("%s HoverPoints.%s.eventFilter: index = %d, x = %s, y = %s" % (self._widget._shadeType.name, self._sortType.name, index, self._points[index].x(), self._points[index].y()))
-                    #else:
-                        #print("HoverPoints.%s.eventFilter: index = %d, x = %s, y = %s" % (self._sortType.name, index, self._points[index].x(), self._points[index].y()))
                     
                     if me.button() == QtCore.Qt.LeftButton: 
                         # add new point or select clicked one & filter event
@@ -820,32 +802,17 @@ class HoverPoints(QtCore.QObject):
                                         pos = k
                                         break
                                     
-                            #if hasattr(self._widget, "_shadeType"):
-                                #print("\t %s HoverPoints.eventFilter: pos = %s, clickPos = %s" % (self._widget._shadeType.name, pos, clickPos))
-                            #else:
-                                #print("\t HoverPoints.eventFilter: pos = %s, clickPos = %s" % (pos, clickPos))
-                                
-                            # add point at index pos
-                            
-                            #if me.flags() & QtCore.Qt.MouseEventCreatedDoubleClick:
-                            #if me.modifiers() & QtCore.Qt.ShiftModifier:
-                                #if hasattr(self._widget, "_shadeType"):
-                                    #print("\t %s HoverPoints.eventFilter: add stop at pos = %s, clickPos = %s" % (self._widget._shadeType.name, pos, clickPos))
-                                #else:
-                                    #print("\t HoverPoints.eventFilter: add stop at pos = %s, clickPos = %s" % (pos, clickPos))
-                                    
-                                #self._points.insert(pos, clickPos)
-                                #self._locks.insert(pos, 0)
-                                
-                            #if hasattr(self._widget, "_shadeType"):
-                                #print("\t %s HoverPoints.eventFilter: add stop at pos = %s, clickPos = %s" % (self._widget._shadeType.name, pos, clickPos))
-                            #else:
-                                #print("\t HoverPoints.eventFilter: add stop at pos = %s, clickPos = %s" % (pos, clickPos))
-                                
                             self._points.insert(pos, clickPos)
-                            self._locks.insert(pos, 0)
-                            self._currentIndex = pos
+                            self._locks.insert(pos, 0) # inserts a NoLock at point index pos
                             
+                            # NOTE: 2021-06-26 22:48:21
+                            # when part of a gradient editor this ensures points
+                            # are added in all shade widgets (hence consistent
+                            # with a new gradient stop)
+                            if hasattr(self._widget, "pointInserted"):
+                                self._widget.pointInserted.emit(pos, clickPos)
+                            
+                            self._currentIndex = pos
                             self.firePointChange()
                         
                         else:
@@ -859,6 +826,14 @@ class HoverPoints(QtCore.QObject):
                                 self._locks.pop(index)
                                 self._points.remove(index)
                                 
+                            # NOTE: 2021-06-26 22:49:20
+                            # when part of a gradient editor this ensures
+                            # corrsponding points in the other shade widgets are
+                            # also removed, consistent with the rempval of the
+                            # corresponding gradient stop
+                            if hasattr(self._widget, "pointRemoved"):
+                                self._widget.pointRemoved.emit(index)
+                            
                             self.firePointChange()
                             return True # propagate event
                         
@@ -874,9 +849,55 @@ class HoverPoints(QtCore.QObject):
                 elif ev.type() == QtCore.QEvent.MouseMove:
                     #if len(self._fingerPointMapping):
                         #return True
+                    pos = QtCore.QPointF(ev.pos())
                     
+                    me = sip.cast(ev, QtGui.QMouseEvent)
                     if self._currentIndex >= 0:
-                        self._movePoint(self._currentIndex, ev.pos(), True)
+                        if me.modifiers() == QtCore.Qt.ShiftModifier:
+                            # SHIFT: constrain vertical move
+                            pos.setX(self._points[self._currentIndex].x())
+                            
+                        elif me.modifiers() == QtCore.Qt.ControlModifier:
+                            pos.setY(self._points[self._currentIndex].y())
+                            # CTRL: constrain horizontal move
+                            
+                        elif me.modifiers() == (QtCore.Qt.ShiftModifier | QtCore.Qt.ControlModifier):
+                            pos0 = self._points[self._currentIndex]
+                            l = QtCore.QLineF(pos0, pos)
+                            if not l.isNull():
+                                angle = l.angle()
+                                if angle >=0. and angle < 22.5:
+                                    l.setAngle(0.0)
+                                    
+                                elif angle >= 22.5 and angle < 67.5:
+                                    l.setAngle(45.)
+                                    
+                                elif angle >= 67.5 and angle < 112.5:
+                                    l.setAngle(90.)
+                                    
+                                elif angle >= 112.5 and angle < 157.5:
+                                    l.setAngle(135.)
+                                    
+                                elif angle >= 157.5 and angle < 202.5:
+                                    l.setAngle(180.)
+                                    
+                                elif angle >= 202.5 and angle < 247.5:
+                                    l.setAngle(225.)
+                                    
+                                else:
+                                    l.setAngle(270.)
+                                    
+                                pos = l.p2()
+                                    
+                        # NOTE: 2021-06-26 22:46:39
+                        # synchronize X-coordinate of corresponding hover points
+                        # when part of gradient editor (see NOTE: 2021-06-26 22:21:21
+                        # in gui.gradientwidgets)
+                        if hasattr(self._widget, "pointMovedX"):
+                            self._widget.pointMovedX.emit(self._currentIndex, pos.x())
+                            
+                        self._movePoint(self._currentIndex, pos, True)
+                        #self._movePoint(self._currentIndex, ev.pos(), True)
                         
                     return False # block event
                     
@@ -897,12 +918,11 @@ class HoverPoints(QtCore.QObject):
                         for i,p in enumerate(self._points):
                             self._movePoint(i, QtCore.QPointF(p.x() * stretch_x, p.y() * stretch_y), False)
                             
-                        self.firePointChange()
+                        self.firePointChange(True)
                             
                     return False
                     
                 elif ev.type() == QtCore.QEvent.Paint:
-                    #print("\tHoverPoints.eventFilter: paint event")
                     that_widget = self._widget
                     self._widget = None
                     QtCore.QCoreApplication.sendEvent(obj, ev)
@@ -915,6 +935,7 @@ class HoverPoints(QtCore.QObject):
         except:
             traceback.print_exc()
             return False
+        
     @safeWrapper
     def _paintPoints(self) -> None:
         p = QtGui.QPainter()
@@ -959,7 +980,7 @@ class HoverPoints(QtCore.QObject):
             self.firePointChange()
         
     
-    def firePointChange(self):
+    def firePointChange(self, fromResize:bool=False):
         if self._sortType != HoverPoints.SortType.NoSort:
             oldCurrent = QtCore.QPointF()
             
@@ -979,15 +1000,8 @@ class HoverPoints(QtCore.QObject):
                     if p == oldCurrent:
                         self._currentIndex = i
                         break
-                    
-        #if hasattr(self._widget, "_shadeType"):
-            #prefix = self._widget._shadeType.name
-        #else:
-            #prefix = ""
-            
-        #printPoints(self._points, 2, caller = self.firePointChange, prefix=prefix)
-        
-        self.pointsChanged.emit(self._points)
+        if not fromResize:
+            self.pointsChanged.emit(self._points)
 
 def printGradientStops(g:typing.Union[QtGui.QGradient, typing.Sequence[typing.Tuple[numbers.Real, QtGui.QColor]]], 
                        nTabs:int=0, out:bool=True, 
