@@ -9199,13 +9199,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             if len(obj.frontends):
                 for f in obj.frontends:
                     if rois:
-                        #if f not in win.rois.values():
-                        if f not in win.rois:
+                        if f not in win.rois.values():
                             f.setSelected(True)
                             f.redraw()
                     else:
-                        #if f not in win.cursors.values():
-                        if f not in win.cursors:
+                        if f not in win.cursors.values():
                             f.setSelected(True)
                             f.redraw()
                     
@@ -9840,20 +9838,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
         if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
             lsdata = scandata_name_vars[choiceDialog.selectedItemsText[0]]
-            lsdata_varname = choiceDialog.selectedItems
+            lsdata_varname = choiceDialog.selectedItem
             
-            if isinstance(lsdata_varname, (tuple, list)):
-                if len(lsdata_varname) == 0:
-                    return
-                lsata_varname = lsdata_varname[0]
-                
-            elif isinstance(lsdata_varname, str) and len(lsdata_varname.strip()) == 0:
-                return
-            
-            else:
-                return
-            
-            self.setData(newdata=lsdata, doc_title=lsdata_varname[0])
+            self.setData(newdata=lsdata, doc_title=lsdata_varname)
                 
     @pyqtSlot()
     @safeWrapper
@@ -11273,14 +11260,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                     #print("_display_graphics_objects_ obj", obj)
                     if len(obj.frontends) == 0:
                         for k, win in enumerate(windows):
-                            win.addPlanarGraphics(obj, labelShowsPosition=False)
-                            # below, gobj is a PlanarGraphics!
-                            #gobj = win.addPlanarGraphics(obj, labelShowsPosition=False)
-                            #if gobj is not None:# it may be None if there is no image displayed in the window
-                                #gobj.setTransparentLabel(transparent_label)
+                            gobj = win.addPlanarGraphics(obj, labelShowsPosition=False)
                             
-                            for frontend in obj.frontends:
-                                frontend.setTransparentLabel(transparent_label)
+                            if gobj is not None:# it may be None if there is no image displayed in the window
+                                gobj.setTransparentLabel(transparent_label)
                             
     @safeWrapper
     def _update_filter_ui_fields_(self):
