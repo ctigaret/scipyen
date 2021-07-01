@@ -388,7 +388,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                  *args, **kwargs):
         """SignalViewer constructor.
         """
-        super(QMainWindow, self).__init__(parent)
+        #super(QMainWindow, self).__init__(parent)
+
         if y is None:
             if x is not None:  # only the data variable Y is passed, 
                 y = x
@@ -629,7 +630,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.settings.setValue("/".join([self.__class__.__name__, dw[0]]), dw[1].isVisible())
                 
     def loadSettings(self):
-        self.loadWindowSetings()
+        self.loadWindowSettings()
         self.loadViewerSettings()
         
     def loadViewerSettings(self):

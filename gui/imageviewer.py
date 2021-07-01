@@ -2297,10 +2297,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             # frame) followed by the backends' responsibility to update
             # their frontends
             #
-            for obj_dict in self.graphicsObjects().values():
-                for obj in obj_dict.values():
-                    if obj.backend.currentFrame != self._current_frame_index_: # check to avoid race conditions and recurrence
-                        obj.backend.currentFrame = self._current_frame_index_
+            
+            for obj in self.graphicsObjects:
+                if obj.backend.currentFrame != self._current_frame_index_:
+                    obj.backend.currentFrame = self._current_frame_index_
+            
+            #for obj_dict in self.graphicsObjects().values():
+                #for obj in obj_dict.values():
+                    #if obj.backend.currentFrame != self._current_frame_index_: # check to avoid race conditions and recurrence
+                        #obj.backend.currentFrame = self._current_frame_index_
                     
             self.frameChanged.emit(self.currentFrame)
         
@@ -4460,7 +4465,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._scaleBarOrigin_ = origin
         
     def addPlanarGraphics(self, item:pgui.PlanarGraphics, movable=True, editable=True, 
-                          showLabel=True, labelShowsPosition=True, autoSelect=True):
+                          showLabel=True, labelShowsPosition=True, autoSelect=True) -> pgui.PlanarGraphics:
         """Programmatically add a roi or a cursor to the underlying scene.
         
         Parameters:
@@ -4491,7 +4496,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             if isinstance(self.roisColor, QtGui.QColor) and self.roisColor.isValid():
                 obj.color = self.roisColor
                 
-        return obj.backend
+        return obj.backend # a PlanarGraphics, not a GraphicsObject!
         
     @pyqtSlot()
     @safeWrapper

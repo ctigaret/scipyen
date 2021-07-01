@@ -148,7 +148,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         *args, **kwargs: variadic argument and keywords specific to the constructor of the
             derived subclass.
         """
-        # should be set to True when the viewer is managed by another GUI inside Scipyen
+        #print("ScipyenViewer.__init__")
+        # should be set to True when the viewer is managed by another GUI inside Scipyen - WHAT ???
         super().__init__(parent)
         #super(WorkspaceGuiMixin, self).__init__(parent=parent, pWin=pWin)
         WorkspaceGuiMixin.__init__(self, parent=parent, pWin=pWin)
@@ -780,9 +781,6 @@ class ScipyenFrameViewer(ScipyenViewer):
                  frameIndex:(int, tuple, list, range, slice, type(None)) = None,
                  currentFrame:(int, type(None)) = None,
                  *args, **kwargs):
-        super().__init__(data=data, parent=parent, pWin=pWin, ID=ID,
-                         win_title=win_title, doc_title=doc_title,
-                         *args, **kwargs)
         """Constructor for ScipyenFrameViewer.
         
         Parameters:
@@ -813,6 +811,10 @@ class ScipyenFrameViewer(ScipyenViewer):
         *args, **kwargs: variadic argument and keywords specific to the constructor of the
             derived subclass.
         """
+        #print("ScipyenFrameViewer.__init__")
+        super().__init__(data=data, parent=parent, pWin=pWin, ID=ID,
+                         win_title=win_title, doc_title=doc_title,
+                         *args, **kwargs)
         
         self._current_frame_index_      = 0 
         self._number_of_frames_         = 1 # determined from the data

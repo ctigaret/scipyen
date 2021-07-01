@@ -7739,6 +7739,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         # it may be suffixed with the position if labelShowsPosition is True
         self._displayStr_= "" 
         
+        # FIXME/TODO 2021-07-01 11:17:36
+        # better sync with style font?
+        self.defaultTextFont = QtWidgets.QApplication.font()
     
         self._setup_appearance_()
         # NOT: 2017-11-24 22:30:00
@@ -7874,13 +7877,17 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         # label font
         self._textFont = self.defaultTextFont
         
+        self.defaultPen = self._linePen
+        self.defaultTextPen = self._textPen
+        
+    
     @safeWrapper
     def _defaultLinePen(self, selected:bool=False, linked:bool=False, cosmetic:bool=True):
-        pen = QtGui.QPen(self.lnf_link_colors_default["%s" % linked].pen,
-                         self.lnf_selection_styles_default["%s" % selected].pen.style,
-                         self.lnf_selection_styles_default["%s" % selected].pen.width,
-                         self.lnf_selection_styles_default["%s" % selected].pen.cap,
-                         self.lnf_selection_styles_default["%s" % selected].pen.join,
+        pen = QtGui.QPen(self.lnf_link_colors_default["%s" % linked].pen_line,
+                         self.lnf_selection_styles_default["%s" % selected].pen_line.style,
+                         self.lnf_selection_styles_default["%s" % selected].pen_line.width,
+                         self.lnf_selection_styles_default["%s" % selected].pen_line.cap,
+                         self.lnf_selection_styles_default["%s" % selected].pen_line.join,
                          )
         
         pen.setCosmetic(cosmetic)
@@ -7889,19 +7896,19 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     
     @safeWrapper
     def _defaultPointBrush(self, selected:bool=False, linked:bool=False):
-        brush = QtGui.QBrush(QtGui.QColor(self.lnf_link_colors_default["%s" % linked].point).setAlpha(self.lnf_selection_styles_default["%s" % selected].pointBrushAlpha),
-                             self.lnf_selection_styles_default["%s" % selected].point.style,
+        brush = QtGui.QBrush(QtGui.QColor(self.lnf_link_colors_default["%s" % linked].brush_point).setAlpha(self.lnf_selection_styles_default["%s" % selected].pointBrushAlpha),
+                             self.lnf_selection_styles_default["%s" % selected].brush_point.style,
                              )
         
         return brush
         
     @safeWrapper
     def _defaultTextPen(self, selected:bool=False, linked:bool=False, cosmetic:bool=True):
-        pen = QtGui.QPen(self.lnf_link_colors_default["%s" % linked].text,
-                         self.lnf_selection_styles_default["%s" % selected].text.style,
-                         self.lnf_selection_styles_default["%s" % selected].text.width,
-                         self.lnf_selection_styles_default["%s" % selected].text.cap,
-                         self.lnf_selection_styles_default["%s" % selected].text.join,
+        pen = QtGui.QPen(self.lnf_link_colors_default["%s" % linked].pen_label_text,
+                         self.lnf_selection_styles_default["%s" % selected].pen_label_text.style,
+                         self.lnf_selection_styles_default["%s" % selected].pen_label_text.width,
+                         self.lnf_selection_styles_default["%s" % selected].pen_label_text.cap,
+                         self.lnf_selection_styles_default["%s" % selected].pen_label_text.join,
                          )
         
         pen.setCosmetic(cosmetic)
@@ -7910,19 +7917,19 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     
     @safeWrapper
     def _defaultLabelBrush(self, selected:bool=False, linked:bool=False):
-        brush = QtGui.QBrush(self.lnf_link_colors_default["%s" % linked].brush,
-                             self.lnf_selection_styles_default["%s" % selected].brush.style,
+        brush = QtGui.QBrush(self.lnf_link_colors_default["%s" % linked].brush_label,
+                             self.lnf_selection_styles_default["%s" % selected].brush_label.style,
                              )
         
         return brush
         
     @safeWrapper
     def _defaultControlLinePen(self, cosmetic:bool=True):
-        pen = QtGui.QPen(self.lnf_control_default.pen.color,
-                         self.lnf_control_default.pen.style,
-                         self.lnf_control_default.pen.width,
-                         self.lnf_control_default.pen.cap,
-                         self.lnf_control_default.pen.join,
+        pen = QtGui.QPen(self.lnf_control_colors_default.pen_line,
+                         self.lnf_control_styles_default.pen_line.style,
+                         self.lnf_control_styles_default.pen_line.width,
+                         self.lnf_control_styles_default.pen_line.cap,
+                         self.lnf_control_styles_default.pen_line.join,
                          )
         
         pen.setCosmetic(cosmetic)
@@ -7931,11 +7938,11 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     
     @safeWrapper
     def _defaultControlPointPen(self, cosmetic:bool=True):
-        pen = QtGui.QPen(self.lnf_control_default.point.color,
-                         self.lnf_control_default.point.style,
-                         self.lnf_control_default.point.width,
-                         self.lnf_control_default.point.cap,
-                         self.lnf_control_default.point.join,
+        pen = QtGui.QPen(self.lnf_control_colors_default.pen_point,
+                         self.lnf_control_styles_default.pen_point.style,
+                         self.lnf_control_styles_default.pen_point.width,
+                         self.lnf_control_styles_default.pen_point.cap,
+                         self.lnf_control_styles_default.pen_point.join,
                          )
         
         pen.setCosmetic(cosmetic)
@@ -7944,19 +7951,19 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     
     @safeWrapper
     def _defaultControlPointBrush(self):
-        brush = QtGui.QBrush(self.lnf_control_default.brush.color,
-                             self.lnf_control_default.brush.style,
+        brush = QtGui.QBrush(self.lnf_control_colors_default.brush_point,
+                             self.lnf_control_styles_default.brush_point.style,
                              )
         
         return brush
         
     @safeWrapper
     def _defaultControlTextPen(self, cosmetic:bool=True):
-        pen = QtGui.Pen(self.lnf_control_default.text.color,
-                        self.lnf_control_default.text.style,
-                        self.lnf_control_default.text.width,
-                        self.lnf_control_default.text.cap,
-                        self.lnf_control_default.text.join,
+        pen = QtGui.QPen(self.lnf_control_colors_default.pen_label_text,
+                        self.lnf_control_styles_default.pen_label_text.style,
+                        self.lnf_control_styles_default.pen_label_text.width,
+                        self.lnf_control_styles_default.pen_label_text.cap,
+                        self.lnf_control_styles_default.pen_label_text.join,
                         )
         
         pen.setCosmetic(cosmetic)
@@ -7965,8 +7972,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
     @safeWrapper
     def _defaultControlLabelBrush(self):
-        brush = QtGui.QBrush(self.lnf_control_default.brush.color,
-                             self.lnf_control_default.brush.style,
+        brush = QtGui.QBrush(self.lnf_control_colors_default.brush_label,
+                             self.lnf_control_styles_default.brush_label.style,
                              )
         
         return brush
@@ -8541,7 +8548,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             path.addRect(sc.sceneRect()) # needed to find collisions with mouse
             
         else:
-            path.addPath(self.mapFromScene(self._backend_()))
+            backendPath = self._backend_()
+            if backendPath:
+                path.addPath(self.mapFromScene(self._backend_()))
             
             if isinstance(self._backend_, Cursor):
                 path.addRect(self._labelRect)
@@ -8702,39 +8711,47 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 if self._backend_ is None or not self._backend_.hasStateForFrame():
                     return
                     
-            linePen = QtGui.QPen(self.defaultPen)
-            textPen = QtGui.QPen(self.defaultTextPen)
+            linePen = QtGui.QPen(self.linePen)
+            textPen = QtGui.QPen(self.textPen)
+            
+            labelBg = self.getBrush(selected = self.isSelected(),
+                                    linked = self.isLinked)
                 
             if self._buildMode_: # in build mode; not a cursor
                 painter.setPen(QtGui.QPen(self._linePenSelected))
                 textPen = QtGui.QPen(self._textPen)
                 
             else: # not in build mode; may be a cursor
-                if self.isSelected(): # inherited from QGraphicsItem via QGraphicsObject
-                    if self.isLinked:
-                        linePen = QtGui.QPen(self._cBSelectedPen)
-                        textPen = QtGui.QPen(self._textCBPen)
+                linePen = self.getPen(selected = self.isSelected(),
+                                      linked=(self.isLinked or len(self._backend_.frontends) > 1))
+                
+                textPen = self.getPen(selected = self.isSelected(), text=True,
+                                      linked=(self.isLinked or len(self._backend_.frontends) > 1))
+                #if self.isSelected(): # inherited from QGraphicsItem via QGraphicsObject
+                    #if self.isLinked:
+                        #linePen = QtGui.QPen(self.getPen())
+                        #textPen = QtGui.QPen(self._textCBPen)
                         
-                    elif len(self._backend_.frontends) > 1:
-                        linePen = QtGui.QPen(self._linePenLinkedSelected)
-                        textPen = QtGui.QPen(self._textPenLinked)
+                    #elif len(self._backend_.frontends) > 1:
+                        #linePen = QtGui.QPen(self._linePenLinkedSelected)
+                        #textPen = QtGui.QPen(self._textPenLinked)
                         
-                    else:
-                        linePen = QtGui.QPen(self._linePenSelected)
-                        textPen = QtGui.QPen(self._textPen)
+                    #else:
+                        #linePen = QtGui.QPen(self._linePenSelected)
+                        #textPen = QtGui.QPen(self._textPen)
                         
-                else:
-                    if self.isLinked:
-                        linePen = QtGui.QPen(self._cBPen)
-                        textPen = QtGui.QPen(self._textCBPen)
+                #else:
+                    #if self.isLinked:
+                        #linePen = QtGui.QPen(self._cBPen)
+                        #textPen = QtGui.QPen(self._textCBPen)
                         
-                    elif len(self._backend_.frontends) > 1:
-                        linePen = QtGui.QPen(self._linePenLinked)
-                        textPen = QtGui.QPen(self._textPenLinked)
+                    #elif len(self._backend_.frontends) > 1:
+                        #linePen = QtGui.QPen(self._linePenLinked)
+                        #textPen = QtGui.QPen(self._textPenLinked)
                         
-                    else:
-                        linePen = QtGui.QPen(self._linePen)
-                        textPen = QtGui.QPen(self._textPen)
+                    #else:
+                        #linePen = QtGui.QPen(self._linePen)
+                        #textPen = QtGui.QPen(self._textPen)
 
             labelPos = None         # NOTE: 2017-06-23 09:41:24
                                     # below I calculate a default label position
@@ -9177,16 +9194,16 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     bgMode = painter.backgroundMode()
                     bg = painter.background()
                     
-                    if self._opaqueLabel_:
-                        painter.setBackgroundMode(QtCore.Qt.OpaqueMode)
-                        self._textBackgroundBrush.setStyle(QtCore.Qt.SolidPattern)
+                    #if self._opaqueLabel_:
+                        #painter.setBackgroundMode(QtCore.Qt.OpaqueMode)
+                        #self._textBackgroundBrush.setStyle(QtCore.Qt.SolidPattern)
                         
-                    else:
-                        self._textBackgroundBrush.setStyle(QtCore.Qt.NoBrush)
+                    #else:
+                        #self._textBackgroundBrush.setStyle(QtCore.Qt.NoBrush)
                         
                     painter.setPen(textPen)
                         
-                    painter.setBackground(self._textBackgroundBrush)
+                    painter.setBackground(labelBg)
                         
                     painter.drawText(labelPos, self._displayStr_)
                     
@@ -10520,6 +10537,22 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             for f in self._backend_.frontends:
                 if f != self:
                     f.redraw()
+            
+    @property
+    def linePen(self):
+        return self._linePen
+    
+    @linePen.setter
+    def linePen(self, pen):
+        self._linePen = pen
+        
+    @property
+    def textPen(self):
+        return self._textPen
+    
+    @textPen.setter
+    def textPen(self, pen):
+        self._textPen = pen
             
     #### BEGIN Appearance properties & methods
     def getPen(self, selected:bool=False, linked:bool=False, text:bool=False,
