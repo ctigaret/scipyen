@@ -629,7 +629,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.settings.setValue("/".join([self.__class__.__name__, dw[0]]), dw[1].isVisible())
                 
     def loadSettings(self):
-        self.loadWindowSetings()
+        self.loadWindowSettings()
         self.loadViewerSettings()
         
     def loadViewerSettings(self):

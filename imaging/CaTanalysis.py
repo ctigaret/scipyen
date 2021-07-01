@@ -9199,11 +9199,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             if len(obj.frontends):
                 for f in obj.frontends:
                     if rois:
-                        if f not in win.rois.values():
+                        if f not in win.rois:
+                        #if f not in win.rois.values():
                             f.setSelected(True)
                             f.redraw()
                     else:
-                        if f not in win.cursors.values():
+                        #if f not in win.cursors.values():
+                        if f not in win.cursors:
                             f.setSelected(True)
                             f.redraw()
                     
