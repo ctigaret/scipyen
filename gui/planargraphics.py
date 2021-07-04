@@ -2393,7 +2393,7 @@ class PlanarGraphics():
             else:
                 f.setVisible(True)
                     
-            f.setPos(self.x, self.y) # also calls _drawObject_() and update()
+            f.setPos(self.x, self.y) # also calls _makeObject_() and update()
             
     def removeState(self, stateOrFrame):
         """Removes a state associated with a frame index or indices specified in "stateOrFrame".
@@ -7614,7 +7614,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     # about the other backends (although it can gain access)
     
     
-    # NOTE: 2021-07-03 12:43:10
+    # NOTE: 2021-07-03 12:43:10 APPEARANCE
     # Overhaul of styling - we define five possible states:
     # 1. unlinked unselected
     # 2. unlinked selected
@@ -7642,7 +7642,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     # The same backend can be displayed by more than one frontend (GraphicsObject)
     # which are (should be) shown in different scenes with the same geometry.
     # The frontends that all display the same backend are NOT considered "linked".
-    
+    #
+    #
     
 
     lnf_control_styles_default = DataBag(
@@ -7866,7 +7867,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     #self.signalGraphicsObjectPositionChange.connect(f.slotLinkedGraphicsObjectPositionChange)
                     #f.signalGraphicsObjectPositionChange.connect(self.slotLinkedGraphicsObjectPositionChange)
                     
-        self._drawObject_() 
+        self._makeObject_() 
     
         if isinstance(self._backend_, PlanarGraphics) and self._backend_.hasStateForFrame():
             self.setPos(self._backend_.x, self._backend_.y)
@@ -8096,17 +8097,19 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         self.update()
 
-    def _drawObject_(self):
+    def _makeObject_(self):
+        """Generates the rendered graphics components.
+        """
         if self._backend_ is None:
             return
 
         if isinstance(self._backend_, Cursor):
-            self._drawCursor_()
+            self._makeCursor_()
             
         else:
-            self._drawROI_()
+            self._makeROI_()
             
-    def _drawROI_(self):
+    def _makeROI_(self):
         if self._buildMode_:
             return
         
@@ -8114,7 +8117,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
 
         self.update()
         
-    def _drawMainCursorLines_(self, state:dict, vert:bool=True, horiz:bool=True):
+    def _makeCursorLines_(self, state:dict, vert:bool=True, horiz:bool=True):
         """Draws the main cursor lines.
         state: dict (or DataBag) with x, y, height and width attributes (see Cursor)
         vert, horiz: bool (by default, both True) 
@@ -8146,13 +8149,13 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             self._hline = QtCore.QLineF(self.mapFromScene(QtCore.QPointF(0, state.y)), 
                                         self.mapFromScene(QtCore.QPointF(state.width, state.y)))
 
-    def _drawCursorWhiskers_(self, state:dict, vert:bool=False, horiz:bool=False):
+    def _makeCursorWhiskers_(self, state:dict, vert:bool=False, horiz:bool=False):
         """Draws the whisker bars orthogonal to the main cursor line(s)
         state: dict (or DataBag) with x, y, xwindow and ywindow attributes (see Cursor)
         vert:  draws the (horizontal) whisker for the vertical main line (horizontal whisker bar)
         horiz: draws the (vertical) whisker for horizontal main line (vertical whisker bar)
         
-        CAUTION Semantics is different from that in _drawMainCursorLines_:
+        CAUTION Semantics is different from that in _makeCursorLines_:
             Which whiskers to draw:
             \   Cursor  Vertical    Horizontal  Crosshair(*)   Point
              \  type:
@@ -8178,7 +8181,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                         self.mapFromScene(QtCore.QPointF(state.x + state.xwindow/2,
                                                                          state.y)))
         
-    def _drawCursor_(self):
+    def _makeCursor_(self):
         """Draws cursor.
         Creates the graphic components, which are rendered by __paint__
         """
@@ -8226,11 +8229,11 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             
             if not isinstance(self._backend_, PointCursor) and \
                 not self._backend_.type & PlanarGraphicsType.point_cursor:
-                self._drawMainCursorLines_(state, vert, horiz) # avoid noop call
+                self._makeCursorLines_(state, vert, horiz) # avoid noop call
                 
             if not isinstance(self._backend_, CrosshairCursor) and \
                 not self._backend_.type & PlanarGraphicsType.crosshair_cursor:
-                    self._drawCursorWhiskers_(state, vert, horiz)
+                    self._makeCursorWhiskers_(state, vert, horiz)
             
             if isinstance(self._backend_, (CrosshairCursor, PointCursor)) or \
                 self._backend_.type & (PlanarGraphicsType.crosshair_cursor | PlanarGraphicsType.point_cursor):
@@ -8294,24 +8297,25 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         if isinstance(self._backend_, (Cursor, type(None))):
             return
         
-        sc = self.scene()
-            
-        if self.scene() is None:
-            try:
-                sc = self._parentWidget_.scene
-            except:
-                return
-        
-        if sc is None:
-            return
-            
-        pad = self._pointSize
-        left = pad
-        right = sc.width() - pad
-        top = pad
-        bottom =sc.height() - pad
-        
         self._cachedPath_ = self._backend_.controlPath()
+        
+        #sc = self.scene()
+            
+        #if self.scene() is None:
+            #try:
+                #sc = self._parentWidget_.scene
+            #except:
+                #return
+        
+        #if sc is None:
+            #return
+            
+        #pad = self._pointSize
+        #left = pad
+        #right = sc.width() - pad
+        #top = pad
+        #bottom =sc.height() - pad
+        
         
         #if isinstance(self._backend_, (Ellipse, Rect)):
             #self._cachedPath_ = self._backend_.controlPath()
@@ -8701,7 +8705,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             super().update()
         
     def redraw(self):
-        self._drawObject_()
+        self._makeObject_()
 
         self._setDisplayStr_()
         self._updateLabelRect_()
@@ -8741,6 +8745,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             if not self._buildMode_:
                 if self._backend_ is None or not self._backend_.hasStateForFrame():
                     return
+                
+            lnf = self.linkLnF is self.linked else self.basicLnF
                     
             linePen = QtGui.QPen(self.defaultPen)
             textPen = QtGui.QPen(self.defaultTextPen)
@@ -9292,7 +9298,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 
                 # NOTE 2018-01-18 16:57:28
                 # ATTENTION This is also called by self.setPos() (inherited)
-                self._positionChangeHasBegun = True # flag used in _drawCursor_()
+                self._positionChangeHasBegun = True # flag used in _makeCursor_()
                 
                 # See NOTE: 2021-05-04 15:49:24 for the old style type checks below
                 # vertical cursors:
@@ -9343,7 +9349,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             pass
 
         elif change == QtWidgets.QGraphicsItem.ItemSceneHasChanged: # now self.scene() is the NEW scene
-            self._drawObject_()
+            self._makeObject_()
 
         return super(GraphicsObject, self).itemChange(change, value)
 
@@ -10088,17 +10094,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self.redraw()
         #self.update()
         
-    #@property
-    #def sharesBackend(self):
-        #return len(self._backend_.frontends) > 0
-        
-    #@property
-    #"def" linked(self):
-        #"""Returns a dict of GraphicsObject instances to which this object is linked with
-        #"""
-        #return self._linkedGraphicsObjects
-        
-                
     @pyqtSlot(int)
     @safeWrapper
     def slotFrameChanged(self, val):
@@ -10173,6 +10168,14 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         super(GraphicsObject, self).setVisible(value)
             
         self.update()
+        
+    #def setSelected(self, selected:bool):
+        #self._makeSelectedLnF_(selected)
+            
+        #super().setSelected(selected)
+        
+    #def _makeSelectedLnF_(self, selected:bool):
+        
             
     @safeWrapper
     def __updateBackendFromCachedPath__(self):
@@ -10186,7 +10189,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             return
         
         if self._backend_ is None:
-            self._backend_ = self._cachedPath_.copy()
+            return
+            #self._backend_ = self._cachedPath_.copy()
         
         # this is a reference; modifying state attributes effectively
         # modified self._backend_ state for _currentframe_
@@ -10395,7 +10399,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     def labelShowsPosition(self, value):
         self._labelShowsCoordinates_ = value
         #self.redraw()
-        #self._drawObject_()
+        #self._makeObject_()
         self.update()
         
         for f in self._backend_.frontends:
@@ -10775,7 +10779,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     @textBackground.setter
     def textBackground(self, brush):
         self._textBackgroundBrush = brush
-        #self._drawObject_
+        #self._makeObject_
         self.update()
         
     @property
@@ -10795,7 +10799,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     @opaqueLabel.setter
     def opaqueLabel(self, val):
         self._opaqueLabel_ = val
-        #self._drawObject_
+        #self._makeObject_
         self.update()
         
     @property
@@ -10805,7 +10809,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     @labelFont.setter
     def labelFont(self, font):
         self._textFont = font
-        #self._drawObject_
+        #self._makeObject_
         self.update()
     #### END Appearance properties
         
