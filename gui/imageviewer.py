@@ -2312,19 +2312,19 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @property
     def graphicsObjects(self):
-        return [o for o in self.viewerWidget.graphicsObjects]
+        return list(self.viewerWidget.graphicsObjects)
     
     @property
     def planarGraphics(self):
-        return [o for o in self.viewerWidget.planarGraphics]
+        return list(self.viewerWidget.planarGraphics)
     
     @property
     def cursors(self):
-        return [o for o in self.viewerWidget.cursors]
+        return list(self.viewerWidget.cursors)
     
     @safeWrapper
     def cursor(self, *args, **kwargs):
-        """Returns a pictgui.Cursor by attribute
+        """Returns a list of pictgui.Cursor by attribute
         
         Delegates to GraphicsImageViewerWidget.roi(...); by default, compares
         the value of the 'name' attribute of the PlanarGraphics to the 'value'
@@ -2354,7 +2354,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             Optional: default is the identity (lambda x,y: x==y)
         """
-        return [o for o in self.viewerWidget.cursor(*args, **kwargs)]
+        return list(self.viewerWidget.cursor(*args, **kwargs))
 
     @safeWrapper
     def hasCursor(self, *args, **kwargs):
@@ -2366,11 +2366,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @property
     def rois(self):
-        return [o for o in self.viewerWidget.rois]
+        return list(self.viewerWidget.rois)
     
     @safeWrapper
     def roi(self, *args, **kwargs):
-        """Returns a PlanarGraphics ROI roi with a specific attribute value.
+        """Returns a list of PlanarGraphics ROI roi with a specific attribute value.
         
         Delegates to GraphicsImageViewerWidget.roi(...); by default, compares
         the value of the 'name' attribute of the PlanarGraphics to the 'value'
@@ -2401,7 +2401,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             Optional: default is the identity (lambda x,y: x==y)
             
         """
-        return [o for o in self.viewerWidget.roi(*args, **kwargs)]
+        return list(self.viewerWidget.roi(*args, **kwargs))
         
     @safeWrapper
     def hasRoi(self, *args, **kwargs):
@@ -3169,7 +3169,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         try:
             # there may be a previous image stored here
-            if self._data_ is not None and len(self.viewerWidget.cursors) > 0: # parse width/height of previos image if any, to check against existing cursors
+            if self._data_ is not None and len(self.cursors) > 0: # parse width/height of previos image if any, to check against existing cursors
                 #if self._data_.width != img.width or self._data_.height != img.height:
                 if self._data_.shape[self._data_.axistags.index(self.widthAxisInfo.key)] != img.shape[img.axistags.index(widthAxisInfo.key)] or \
                     self._data_.shape[self._data_.axistags.index(self.heightAxisInfo.key)] != img.shape[img.axistags.index(heightAxisInfo.key)]:
@@ -3185,7 +3185,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     if ret == QtWidgets.QMessageBox.Cancel:
                         return False
                     
-                    for c in self.viewerWidget.cursors.values():
+                    #for c in self.viewerWidget.cursors.values():
+                    for c in self.cursors:
                         widthAxisNdx = img.axistags.index(widthAxisInfo.key)
                         heightAxisNdx = img.axistags.index(heightAxisInfo.key)
                         c.rangeX = img.shape[widthAxisNdx]

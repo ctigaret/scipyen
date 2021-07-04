@@ -1777,39 +1777,6 @@ class PlanarGraphics():
         return self.qPoints(frame=frame)[0]
     
     @property
-    def linkedObjects(self):
-        return [obj for obj in self._linked_objects_.keys()]
-    
-    @property
-    def objectLinks(self):
-        """Directly exposes the _linked_objects_ dictionary
-        """
-        return self._linked_objects_
-    
-    @safeWrapper
-    def unlinkFromObject(self, obj):
-        """ Breaks the link between this PlanarGraphics (self) and obj.
-        
-        Obj is a PlanarGraphics object to which self is linked, and is present
-        in self._linked_objects_.keys()
-        
-        CAUTION: the reverse link, if it exists, is untouched.
-        
-        """
-        
-        if obj in self._linked_objects_.keys():
-            # NOTE: 2018-06-09 08:18:35
-            # remove the link, but leave its frontends alone!
-            # deletion of the now unlinked object, if ans when necessary,
-            # must be done outside this function!
-            # ATTENTION: ONE function -> ONE task
-            
-            self._linked_objects_.pop(obj, None)
-            
-    def clearObjectLinks(self):
-        self._linked_objects_.clear()
-    
-    @property
     def currentState(self):
         """Read-only.
         
@@ -3763,6 +3730,10 @@ class PlanarGraphics():
             else:
                 raise NotImplementedError("Function is not implemented for %s PlanarGraphics" % self.type)
 
+    @property
+    def isLinked(self):
+        return len(self._linked_objects_) > 0
+    
     def linkToObject(self, other, mappingFcn, *args, **kwargs):#, inverseFcn=None, reciprocal=False):
         """ Dynamic link between two PlanarGraphics objects.
         
@@ -3802,6 +3773,42 @@ class PlanarGraphics():
         # this relies on the default Python hash() function
         self._linked_objects_[other] = (partialFcn, args, kwargs)
         #self._linked_objects_[other.name] = (mappingFcn, args, kwargs)
+    
+    @property
+    def linkedObjects(self):
+        return [obj for obj in self._linked_objects_.keys()]
+    
+    @property
+    def objectLinks(self):
+        """Directly exposes the _linked_objects_ dictionary
+        """
+        return self._linked_objects_
+    
+    @safeWrapper
+    def unlinkFromObject(self, obj):
+        """ Breaks the link between this PlanarGraphics (self) and obj.
+        
+        Obj is a PlanarGraphics object to which self is linked, and is present
+        in self._linked_objects_.keys()
+        
+        CAUTION: the reverse link, if it exists, is untouched.
+        
+        """
+        
+        if obj in self._linked_objects_.keys():
+            # NOTE: 2018-06-09 08:18:35
+            # remove the link, but leave its frontends alone!
+            # deletion of the now unlinked object, if ans when necessary,
+            # must be done outside this function!
+            # ATTENTION: ONE function -> ONE task
+            
+            self._linked_objects_.pop(obj, None)
+            
+    def clearObjectLinks(self):
+        self._linked_objects_.clear()
+        
+    def unlink(self):
+        self.clearObjectLinks()
         
     def linkFrames(self, value):
         """Associates planar descriptor state values to frame indices.
@@ -7566,12 +7573,12 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     Type = QtWidgets.QGraphicsItem.UserType + PlanarGraphicsType.allObjectTypes
     
     #signalPosition = pyqtSignal(int, str, "QPointF", name="signalPosition")
-    signalPosition = pyqtSignal(str, "QPointF", name="signalPosition")
+    signalPosition = pyqtSignal(str, QtCore.QPointF, name="signalPosition")
     
     # used to notify the cursor manager (a graphics viewer widget) that this cursor has been selected
     selectMe = pyqtSignal(str, bool, name="selectMe") 
     
-    signalGraphicsObjectPositionChange = pyqtSignal("QPointF", name="signalGraphicsObjectPositionChange")
+    signalGraphicsObjectPositionChange = pyqtSignal(QtCore.QPointF, name="signalGraphicsObjectPositionChange")
     
     # it is up to the cursor manager (a graphics viewer widget) to decide what 
     # to do with this (i.e., what menu & actions to generate)
@@ -7606,6 +7613,38 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     # ATTENTION the linkage is in the backend; the item doesn't necessarily know
     # about the other backends (although it can gain access)
     
+    
+    # NOTE: 2021-07-03 12:43:10
+    # Overhaul of styling - we define five possible states:
+    # 1. unlinked unselected
+    # 2. unlinked selected
+    # 3. linked unselected
+    # 4. linked selected
+    # 5. control - for drawing "control path" line and points of ROIs in edit mode
+    # 
+    # Each state has the following drawn parts:
+    # line_pen (color, style, cap, join, width)  -  pen for the line art
+    # label_pen (color, style, cap, join, width) -  pen for the label text
+    # point_pen (color, style, cap, join, width) -  pen for the control points
+    # label_brush (style: pattern/color/gradient/texture) - brush for the label text background
+    # point_brush (style: pattern/color/gradient/texture) - brush for the control points
+    # 
+    #
+    # Any Cursor or ROI is drawn in one of the styles 1-4 above;
+    # The decision of painting the item as "selected" or "unselected" is taken 
+    # inside self.paint by interrogating the selected status with 
+    # self.isSelected() method inherited from QGraphicsItem.
+    #
+    # The decision of painting the item as "linked" or "unlinked" is taken outside
+    # paint at the time when the PlanarGraphics backend is linked/unlinked from
+    # other PlanarGraphics.
+    #
+    # The same backend can be displayed by more than one frontend (GraphicsObject)
+    # which are (should be) shown in different scenes with the same geometry.
+    # The frontends that all display the same backend are NOT considered "linked".
+    
+    
+
     lnf_control_styles_default = DataBag(
         brush_label     = DataBag(style = QtCore.Qt.SolidPattern, gradient = None, 
                                   texture = None, textureImage = None,
@@ -7839,7 +7878,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             % (self.__repr__(), type(self.backend).__name__, self.backend.__repr__())
             
     def _setup_appearance_(self, cosmeticPen:bool=True):
-        appearance = DataBag()
+        #appearance = DataBag()
         # pen for lineart including the points in non-cursors: style depends on selection; color on whether it is linked
         self._linePen                           = QtGui.QPen(self._defaultLinePen(cosmetic=cosmeticPen))
         self._linePenSelected                   = QtGui.QPen(self._defaultLinePen(selected=True,cosmetic=cosmeticPen))
@@ -8216,7 +8255,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
     @property
     def isLinked(self):
-        return self._backend_ and self in self._backend_.frontends and len(self._backend_.frontends) > 1
+        return self._backend_.isLinked
+        #return self._backend_ and self in self._backend_.frontends and len(self._backend_.frontends) > 1
     
     # NOTE: 2017-06-30 12:04:24
     # TODO: functions/event handlers to implement/overload:
