@@ -29,3 +29,25 @@
     #
     #
     
+Implementation:
+    atomic template:
+        pen:
+            line
+            label
+            point
+        brush:
+            label
+            point
+        pointsize
+    
+    base(dict) with two bool keys: True/False for selection
+        False = atomic template for unselected
+        True  = atomic template for selected
+        
+    linked(dict) as base, but for linked objects
+
+    control = atomic template for control path
+    
+    self.lnf: a reference to either basic or linked
+    
+paint() uses self.lnf
