@@ -7645,13 +7645,9 @@ class _GraphicsObjectLnFDefaults_(object):
         if control:
             color = _GraphicsObjectLnFDefaults_.control_colors[graphic]
             style = _GraphicsObjectLnFDefaults_.control_styles[graphic]["style"]
-            #cap   = _GraphicsObjectLnFDefaults_.control_styles[graphic]["cap"]
-            #join  = _GraphicsObjectLnFDefaults_.control_styles[graphic]["join"]
         else:
             color = _GraphicsObjectLnFDefaults_.link_colors[linked][graphic]
             style = _GraphicsObjectLnFDefaults_.selection_styles[selected][graphic]["style"]
-            #cap   = _GraphicsObjectLnFDefaults_.selection_styles[selected][graphic]["cap"]
-            #join  = _GraphicsObjectLnFDefaults_.selection_styles[selected][graphic]["join"]
           
         if isinstance(color, (QtGui.QColor, QtCore.Qt.GlobalColor)):
             if isinstance(style, (QtGui.QPixmap, QtCore.Qt.BrushStyle)):

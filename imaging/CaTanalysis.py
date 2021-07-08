@@ -3789,7 +3789,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             w = self.scansblockviewers[0]
             
             self.settings.setValue("LSCaTAnalysis/ScansDataWindow_Size", w.size())
-            self.settings.setValue("LSCaTAnalysis/ScansDataWindow__Position", w.pos())
+            self.settings.setValue("LSCaTAnalysis/ScansDataWindow_Position", w.pos())
             #self.settings.setValue("LSCaTAnalysis/ScansDataWindow_Geometry", w.geometry())
             self.settings.setValue("LSCaTAnalysis/ScansDataWindow_State", w.saveState())
                 
@@ -3817,7 +3817,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             w = self.scansblockviewers[0]
             
             self.settings.setValue("LSCaTAnalysis/SceneDataWindow_Size", w.size())
-            self.settings.setValue("LSCaTAnalysis/SceneDataWindow__Position", w.pos())
+            self.settings.setValue("LSCaTAnalysis/SceneDataWindow_Position", w.pos())
             #self.settings.setValue("LSCaTAnalysis/ScansDataWindow_Geometry", w.geometry())
             self.settings.setValue("LSCaTAnalysis/SceneDataWindow_State", w.saveState())
                 
@@ -11405,8 +11405,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
         if self._selected_analysis_unit_ is not None:
             unit = self._selected_analysis_unit_
-            cursor = self._selected_analysis_unit_.landmark
-            self._selected_analysis_cursor_ = self._selected_analysis_unit_.landmark
+            if not isinstance(unit, pgui.PlanarGraphics) and hasattr(unit, "landmark"):
+                cursor = self._selected_analysis_unit_.landmark
+            else:
+                cursor = self._selected_analysis_unit_
+                
             self.defineAnalysisUnitCheckBox.setCheckState(QtCore.Qt.Checked)
             
         else:

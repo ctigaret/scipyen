@@ -109,10 +109,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     supported_types = (object, )
     view_action_name = None
     
-    ####def __init__(self, data: (object, type(None))=None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 ####pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
-                 ####win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
-                 ####*args, **kwargs) -> None:
     def __init__(self, data: (object, type(None))=None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
                  ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
