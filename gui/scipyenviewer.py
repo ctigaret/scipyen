@@ -343,7 +343,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
         # NOTE: 2021-07-08 09:07:14
         # window setings are saved only when parent is Scipyen's main window
-        #if type(self.parent()).__name__ == "ScipyenWindow":
         if self.isTopLevel:
             self.settings.setValue("/".join([self.__class__.__name__, "WindowSize"]), self.size())
                 
@@ -394,7 +393,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
         # NOTE: 2021-07-08 09:06:32
         # window settings are loaded here only if parent is Scipyen's main window
-        #if type(self.parent()).__name__ == "ScipyenWindow":
         if self.isTopLevel:
             windowSize = self.settings.value("/".join([self.__class__.__name__, "WindowSize"]), None)
             if windowSize is not None:
@@ -611,7 +609,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """All viewers in Scipyen should behave consistently.
         However, this may by overridden in derived classes.
         """
-        print("ScipyenViewer.closeEvent %s: isTopLevel %s" % (self.winTitle, self.isTopLevel))
+        #print("ScipyenViewer.closeEvent %s: isTopLevel %s" % (self.winTitle, self.isTopLevel))
         # NOTE: 2021-05-04 21:53:04
         # Here saveSettings will have access to all the subclass attributes (it
         # is fully initialized, etc)

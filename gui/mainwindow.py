@@ -556,10 +556,6 @@ class WindowManager(__QMainWindow__):
         #if "pWin" not in kwargs:
             #kwargs["pWin"] = self
             
-        #print("winClass", winClass)
-        
-        #print("WindowManager._newViewer constructor kwargs", kwargs)
-            
         if winClass is mpl.figure.Figure:
             fig_kwargs = dict()
             fig_init_params = inspect.signature(mpl.figure.Figure).parameters
@@ -2459,8 +2455,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_launchCaTAnalysis(self):
-        
-        lscatWindow = CaTanalysis.LSCaTWindow(parent=self, win_title="LSCaT")
+        lscatWindow = self._newViewer(CaTanalysis.LSCaTWindow, parent=self, win_title="LSCaT")
+        #lscatWindow = CaTanalysis.LSCaTWindow(parent=self, win_title="LSCaT")
         lscatWindow.show()
         
     def _getHistoryBlockAsCommand_(self, magic=None):
@@ -5737,10 +5733,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         Parameters:
         ------------
-        obj: the python variable
+        obj: a python variable
         
-        objname: str, the name used in the viewer's window title (not necessarily the 
-                    object's name)
+        objname: str, the symbol name used in the viewer's window title (this is 
+                not necessarily the symbol bound to the object in the workspace)
                     
         newWindow: bool (default False). When False, displays the object in the
                 currently active viewer window, is a suitable one exists, or
@@ -5750,7 +5746,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 
         useSignalViewerForNdArrays when true, plot signals in signal viewer
         """
-        # TODO: accommodate new viewer types
+        # TODO: accommodate new viewer types - nearly DONE via VTH
         
         if isinstance(winType, str) and winType in [v.__name__ for v in self.viewers.keys()]:
             if winType not in self.viewers.keys():

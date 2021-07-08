@@ -3709,7 +3709,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         self.saveViewerSettings()
     
     def loadSettings(self):
-        print("%s.loadSetting" % self.winTitle)
+        #print("%s.loadSetting" % self.winTitle)
         # NOTE: 2021-07-08 10:13:54
         # loadWindowSettings is inherited from ScipyenViewer and will ONLY load
         # LSCaTWindow settings for its main GUI window. 
@@ -3761,7 +3761,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
     def saveWindowSettings(self):
         """Overrides saveWindowSettings inherited from ScipyenViewer
         """
-        print("%s.saveWindowSettings" % self.winTitle)
+        #print("%s.saveWindowSettings" % self.winTitle)
         for k, w in enumerate(self.sceneviewers):
             self.settings.setValue("LSCaTAnalysis/SceneWindow_%d_Size" % k, w.size())
             self.settings.setValue("LSCaTAnalysis/SceneWindow_%d_Position" % k, w.pos())
@@ -3823,6 +3823,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 
             for dw in w.dockWidgets:
                 self.settings.setValue("LSCaTAnalysis/SceneDataWindow_%s" % dw[0], dw[1].isVisible())
+                
+        super().saveWindowSettings() # to save LSCaT window pos, geometry & statwe
             
     def loadViewerSettings(self):
         """Loads settings unrelated to QMainWindowe instance.
@@ -9886,7 +9888,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
         if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
             lsdata = scandata_name_vars[choiceDialog.selectedItemsText[0]]
-            lsdata_varname = choiceDialog.selectedItem
+            lsdata_varname = choiceDialog.selectedItems[0]
             
             self.setData(newdata=lsdata, doc_title=lsdata_varname)
                 
@@ -12902,15 +12904,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         self.closeEvent(evt)
 
     def closeEvent(self, evt):
-        """Overrides ScipyenFrameViewer.closeEvent() for clean up in slot_Quit.
+        """Overrides ScipyenFrameViewer.closeEvent() for clean up.
         """
-        print("LSCaTWindow.closeEvent: isTopLevel", self.isTopLevel)
-        #self.slot_Quit()
-        #super().closeEvent(evt)
-        #evt.accept()
+        #print("LSCaTWindow.closeEvent: isTopLevel", self.isTopLevel)
         
-        #self.saveSettings() # invoked by super().closeEvent()
-        #print("LSCaTWindow.slot_Quit")
         self._clear_contents_()
         
         # NOTE: 2021-07-08 10:27:14
