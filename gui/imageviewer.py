@@ -18,13 +18,13 @@ matplotlib for colormaps & colors
 # TODO:
 # 1. colormap editor
 # 
-# 2. remember last applied colormap or rather make a default colormap configurable
+# 2. DONE remember last applied colormap or rather make a default colormap configurable
 # 
 # 3. cursors:
 #
 # 3.1. really constrain the movement of cursors within the image boundaries; -- DONE
 # 
-# 3.2. implement edit cursor properties dialog
+# 3.2. implement edit cursor properties dialog NEARLY DONE
 # 
 # 3.3. streamline cursor creation from a neo.Epoch -- check if they support
 #      spatial units, not just time -- it apparently DOES WORK:
@@ -1234,7 +1234,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         #print("GraphicsImageViewerWidget.createNewRoi params %s" % params)
         #print("GraphicsImageViewerWidget.createNewRoi frameVisibility %s" % frameVisibility)
         
-        roi = pgui.GraphicsObject(obj            = params,
+        roi = pgui.GraphicsObject(obj                 = params,
                                   showLabel           = showLabel,
                                   labelShowsPosition  = labelShowsPosition,
                                   parentWidget        = parentWidget)
@@ -1259,7 +1259,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         roi.signalPosition.connect(self.slot_reportCursorPos)
         roi.selectMe[str, bool].connect(self.slot_setSelectedRoi)
         roi.requestContextMenu.connect(self.slot_graphicsObjectMenuRequested)
-        roi.signalBackendChanged[object].connect(self.slot_roiChanged)
+        #roi.signalBackendChanged[object].connect(self.slot_roiChanged)
         
         rDict[roiId] = roi
         
@@ -1473,7 +1473,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
         qobj.selectMe[str, bool].connect(self.slot_setSelectedCursor)
         qobj.requestContextMenu.connect(self.slot_graphicsObjectMenuRequested)
-        qobj.signalBackendChanged.connect(self.slot_cursorChanged)
+        #qobj.signalBackendChanged.connect(self.slot_cursorChanged)
         
         #self.scene.update(self.scene.sceneRect().x(), 
                           #self.scene.sceneRect().y(),
@@ -2160,7 +2160,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
   
     def __init__(self, data: (vigra.VigraArray, vigra.filters.Kernel2D, np.ndarray, QtGui.QImage, QtGui.QPixmap, tuple, list) = None,
                  parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
+                 ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
                  frame:(int, type(None)) = None, 
                  displayChannel = None, normalize: (bool, ) = False, gamma: (float, ) = 1.0, 
@@ -2245,7 +2245,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._scaleBarOrigin_            = (0, 0)
         self._scaleBarLength_            = (10,10)
         
-        super().__init__(data=data, parent=parent, pWin=pWin, ID=ID, win_title=win_title, doc_title=doc_title, frame=frame, *args, *kwargs)
+        super().__init__(data=data, parent=parent, ID=ID, win_title=win_title, doc_title=doc_title, frame=frame, *args, *kwargs)
         
         self.loadSettings()
         
@@ -2297,10 +2297,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             # frame) followed by the backends' responsibility to update
             # their frontends
             #
-            for obj_dict in self.graphicsObjects().values():
-                for obj in obj_dict.values():
-                    if obj.backend.currentFrame != self._current_frame_index_: # check to avoid race conditions and recurrence
-                        obj.backend.currentFrame = self._current_frame_index_
+            for o in self.graphicsObjects:
+                if o.backend.currentFrame != self._current_frame_index_: # check to avoid race conditions and recurrence
+                    o.backend.currentFrame = self._current_frame_index_
+                    
+            # NOTE: 2021-07-08 10:53:01
+            # Alternatively:
+            for o in self.planarGraphics:
+                if o.currentFrame != self._current_frame_index_: # check to avoid race conditions and recurrence
+                    o.currentFrame = self._current_frame_index_
                     
             self.frameChanged.emit(self.currentFrame)
         
@@ -2316,10 +2321,14 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @property
     def planarGraphics(self):
-        return list(self.viewerWidget.planarGraphics)
+        return list(set(self.viewerWidget.planarGraphics))
     
     @property
     def cursors(self):
+        """List of Cursor planar graphics.
+        This is the list of unique planar graphics cursor backends for the 
+        displayed cursors
+        """
         return list(self.viewerWidget.cursors)
     
     @safeWrapper
@@ -2362,11 +2371,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         Delegates to self.cursor(...)
         """
-        return len(self.cursor(*args, **kwargs)) > 0
+        return len(set(self.cursor(*args, **kwargs))) > 0
     
     @property
     def rois(self):
-        return list(self.viewerWidget.rois)
+        """List of non-Cursor planargraphics
+        This is the list of unique planar graphics cursor backends for the 
+        displayed cursors
+        """
+        return list(set(self.viewerWidget.rois))
     
     @safeWrapper
     def roi(self, *args, **kwargs):
@@ -2401,7 +2414,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             Optional: default is the identity (lambda x,y: x==y)
             
         """
-        return list(self.viewerWidget.roi(*args, **kwargs))
+        return list(set(self.viewerWidget.roi(*args, **kwargs)))
         
     @safeWrapper
     def hasRoi(self, *args, **kwargs):
@@ -2410,7 +2423,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         Delegates to self.roi(...)
         
         """
-        return len(self.roi(*args, **kwargs)) > 0
+        return len(set(self.roi(*args, **kwargs))) > 0
     
     @property
     def colorBarWidth(self):
@@ -3446,12 +3459,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.viewerWidget.scene.signalMouseAt[int, int].connect(self.slot_displayMousePos)
         
         self.viewerWidget.signalCursorAdded[object].connect(self.slot_graphicsObjectAdded)
-        self.viewerWidget.signalCursorChanged[object].connect(self.slot_graphicsObjectChanged)
+        #self.viewerWidget.signalCursorChanged[object].connect(self.slot_graphicsObjectChanged)
         self.viewerWidget.signalCursorRemoved[object].connect(self.slot_graphicsObjectRemoved)
         self.viewerWidget.signalGraphicsObjectSelected[object].connect(self.slot_graphicsObjectSelected)
         
         self.viewerWidget.signalRoiAdded[object].connect(self.slot_graphicsObjectAdded)
-        self.viewerWidget.signalRoiChanged[object].connect(self.slot_graphicsObjectChanged)
+        #self.viewerWidget.signalRoiChanged[object].connect(self.slot_graphicsObjectChanged)
         self.viewerWidget.signalRoiRemoved[object].connect(self.slot_graphicsObjectRemoved)
         self.viewerWidget.signalRoiSelected[object].connect(self.slot_graphicsObjectSelected)
         
@@ -4061,7 +4074,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.viewerWidget.slot_removeCursorByName(name)
             
     def loadSettings(self):
-        self.loadWindowSettings()
+        # NOTE: 2021-07-08 09:52:11
+        # loadWindowSettings is inheritd from ScipyenViewer and does nothing if
+        # self.parent() is not Scipyen's main window
+        self.loadWindowSettings() # inherited from ScipyenViewer
         self.loadViewerSettings()
             
     def loadViewerSettings(self):
@@ -4079,56 +4095,59 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         else:
             self.colorMap = None
         
-        color = self.settings.value("/".join([self.__class__.__name__, "CursorColor"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.cursorsColor = color
+        #color = self.settings.value("/".join([self.__class__.__name__, "CursorColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.cursorsColor = color
             
-        color = self.settings.value("/".join([self.__class__.__name__, "CursorLabelTextColor"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.cursorLabelTextColor = color
+        #color = self.settings.value("/".join([self.__class__.__name__, "CursorLabelTextColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.cursorLabelTextColor = color
             
-        color = self.settings.value("/".join([self.__class__.__name__, "LinkedCursorColor"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.linkedCursorsColor = color
+        #color = self.settings.value("/".join([self.__class__.__name__, "LinkedCursorColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.linkedCursorsColor = color
             
-        color = self.settings.value("/".join([self.__class__.__name__, "LinkedCursorLabelTextColor"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.linkedCursorLabelTextColor = color
+        #color = self.settings.value("/".join([self.__class__.__name__, "LinkedCursorLabelTextColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.linkedCursorLabelTextColor = color
             
-        color = self.settings.value("/".join([self.__class__.__name__, "CursorLabelBackgroundColor"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.linkedCursorLabelTextColor = color
+        #color = self.settings.value("/".join([self.__class__.__name__, "CursorLabelBackgroundColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.linkedCursorLabelTextColor = color
             
-        color = self.settings.value("/".join([self.__class__.__name__, "OpaqueCursorLabel"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.opaqueCursorLabel = color
+        #color = self.settings.value("/".join([self.__class__.__name__, "OpaqueCursorLabel"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.opaqueCursorLabel = color
             
-        color = self.settings.value("/".join([self.__class__.__name__, "RoiColor"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.roisColor = color
+        #color = self.settings.value("/".join([self.__class__.__name__, "RoiColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.roisColor = color
         
-        color = self.settings.value("/".join([self.__class__.__name__, "ROILabelTextColor"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.roiLabelTextColor = color
+        #color = self.settings.value("/".join([self.__class__.__name__, "ROILabelTextColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.roiLabelTextColor = color
             
-        color = self.settings.value("/".join([self.__class__.__name__, "LinkedROIColor"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.linkedROIsColor = color
+        #color = self.settings.value("/".join([self.__class__.__name__, "LinkedROIColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.linkedROIsColor = color
         
-        color = self.settings.value("/".join([self.__class__.__name__, "LinkedROILabelTextColor"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.linkedROILabelTextColor = color
+        #color = self.settings.value("/".join([self.__class__.__name__, "LinkedROILabelTextColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.linkedROILabelTextColor = color
             
-        color = self.settings.value("/".join([self.__class__.__name__, "ROILabelBackgroundColor"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.roiLabelBackgroundColor = color
+        #color = self.settings.value("/".join([self.__class__.__name__, "ROILabelBackgroundColor"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.roiLabelBackgroundColor = color
             
-        color = self.settings.value("/".join([self.__class__.__name__, "OpaqueROILabel"]), None)
-        if isinstance(color, QtGui.QColor) and color.isValid():
-            self.opaqueROILabel = color
+        #color = self.settings.value("/".join([self.__class__.__name__, "OpaqueROILabel"]), None)
+        #if isinstance(color, QtGui.QColor) and color.isValid():
+            #self.opaqueROILabel = color
             
     def saveSettings(self):
-        self.saveWindowSettings()
+        # NOTE: 2021-07-08 09:51:30
+        # saveWindowSettings is inherited rom ScipyenViewer and does nothing if
+        # self.parent() is not Scipyen's main window
+        self.saveWindowSettings() # inherited from ScipyenViewer
         self.saveViewerSettings()
         
     def saveViewerSettings(self):
@@ -4138,23 +4157,22 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         else:
             self.settings.setValue("/".join([self.__class__.__name__, "ColorMap"]), None)
         
-        self.settings.setValue("/".join([self.__class__.__name__, "CursorColor"]), self.cursorsColor)
-        self.settings.setValue("/".join([self.__class__.__name__, "CursorLabelTextColor"]), self.cursorLabelTextColor)
-        self.settings.setValue("/".join([self.__class__.__name__, "LinkedCursorColor"]), self.linkedCursorsColor)
-        self.settings.setValue("/".join([self.__class__.__name__, "LinkedCursorLabelTextColor"]), self.linkedCursorLabelTextColor)
-        self.settings.setValue("/".join([self.__class__.__name__, "CursorLabelBackgroundColor"]), self.cursorLabelBackgroundColor)
-        #self.settings.setValue("/".join([self.__class__.__name__, "LinkedCursorLabelBackgroundColor"]), self.LinkedCursorLabelBackgroundColor)
-        self.settings.setValue("/".join([self.__class__.__name__, "OpaqueCursorLabel"]), self.opaqueCursorLabel)
+        #self.settings.setValue("/".join([self.__class__.__name__, "CursorColor"]), self.cursorsColor)
+        #self.settings.setValue("/".join([self.__class__.__name__, "CursorLabelTextColor"]), self.cursorLabelTextColor)
+        #self.settings.setValue("/".join([self.__class__.__name__, "LinkedCursorColor"]), self.linkedCursorsColor)
+        #self.settings.setValue("/".join([self.__class__.__name__, "LinkedCursorLabelTextColor"]), self.linkedCursorLabelTextColor)
+        #self.settings.setValue("/".join([self.__class__.__name__, "CursorLabelBackgroundColor"]), self.cursorLabelBackgroundColor)
+        ##self.settings.setValue("/".join([self.__class__.__name__, "LinkedCursorLabelBackgroundColor"]), self.LinkedCursorLabelBackgroundColor)
+        #self.settings.setValue("/".join([self.__class__.__name__, "OpaqueCursorLabel"]), self.opaqueCursorLabel)
         
-        self.settings.setValue("/".join([self.__class__.__name__, "RoiColor"]), self.roisColor)
-        self.settings.setValue("/".join([self.__class__.__name__, "ROILabelTextColor"]), self.roiLabelTextColor)
-        self.settings.setValue("/".join([self.__class__.__name__, "LinkedROIColor"]), self.linkedROIsColor)
-        self.settings.setValue("/".join([self.__class__.__name__, "LinkedROILabelTextColor"]), self.linkedROILabelTextColor)
-        self.settings.setValue("/".join([self.__class__.__name__, "ROILabelBackgroundColor"]), self.roiLabelBackgroundColor)
-        self.settings.setValue("/".join([self.__class__.__name__, "OpaqueROILabel"]), self.opaqueROILabel)
+        #self.settings.setValue("/".join([self.__class__.__name__, "RoiColor"]), self.roisColor)
+        #self.settings.setValue("/".join([self.__class__.__name__, "ROILabelTextColor"]), self.roiLabelTextColor)
+        #self.settings.setValue("/".join([self.__class__.__name__, "LinkedROIColor"]), self.linkedROIsColor)
+        #self.settings.setValue("/".join([self.__class__.__name__, "LinkedROILabelTextColor"]), self.linkedROILabelTextColor)
+        #self.settings.setValue("/".join([self.__class__.__name__, "ROILabelBackgroundColor"]), self.roiLabelBackgroundColor)
+        #self.settings.setValue("/".join([self.__class__.__name__, "OpaqueROILabel"]), self.opaqueROILabel)
         
         
-            
     def setImage(self, image, doc_title=None, normalize=True, colormap=None, gamma=None,
                  frameAxis=None, displayChannel=None):
         self.setData(image, doc_title=doc_title, normalize=normalize, colormap=colormap, gamma=gamma,

@@ -368,7 +368,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                  x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
                  y: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
                  parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 pWin: (QtWidgets.QMainWindow, type(None))= None, 
                  ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, 
                  doc_title: (str, type(None)) = None,
@@ -577,7 +576,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                    "vertical":pg.mkColor(self.cursorColors["vertical"]).darker()}
         #### END generic plot options
         
-        super().__init__(data=y, parent=parent, pWin=pWin, ID=ID,
+        super().__init__(data=y, parent=parent, ID=ID,
                          win_title=win_title, doc_title=doc_title,
                          frameIndex=frameIndex, *args, **kwargs)
         
@@ -617,7 +616,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 *args, **kwargs)
                 
     def saveSettings(self):
-        self.saveWindowSettings()
+        # NOTE 2021-07-08 09:48:48
+        # saveWindowSettings is inherited from ScipyenViewer and does noting if
+        # self.parent() is not Scipyen's main window
+        self.saveWindowSettings() # inherited from ScipyenViewer
         self.saveViewerSettings()
         
     def saveViewerSettings(self):
@@ -629,7 +631,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.settings.setValue("/".join([self.__class__.__name__, dw[0]]), dw[1].isVisible())
                 
     def loadSettings(self):
-        self.loadWindowSettings()
+        # NOTE 2021-07-08 09:47:25
+        # loadWindowSettings is inherited from ScipyenViewer and does nothing if
+        # self.parent() is not Scypien's main window
+        self.loadWindowSettings() # inherited from ScipyenViewer
         self.loadViewerSettings()
         
     def loadViewerSettings(self):

@@ -512,10 +512,15 @@ class WindowManager(__QMainWindow__):
             above (i.e. the value of their __name__ attribute).
             
         *args, **kwargs: passed directly to the constructor (__init__ function)
-            of the winClass.
+            of the winClass
             
         
         """
+        # NOTE: 2021-07-08 14:52:44
+        # called by ScipyenWindow.slot_newViewerMenuAction
+        
+        #print("WindowManager._newViewer winClass = %s" % winClass)
+        #print("WindowManager._newViewer **kwargs", **kwargs)
         if isinstance(winClass, str) and len(winClass.replace("&","").strip()):
             wClass = winClass.replace("&","")
             
@@ -539,15 +544,21 @@ class WindowManager(__QMainWindow__):
             
         win_title = self._set_new_viewer_window_name_(winClass, name=kwargs.pop("win_title", None))
         
+        #print("WindowManager._newViewer win_title = %s" % win_title)
+        
         kwargs["win_title"] = win_title
         
         if "parent" not in kwargs:
             kwargs["parent"] = self
             
-        if "pWin" not in kwargs:
-            kwargs["pWin"] = self
+        # NOTE: 2021-07-08 08:41:41
+        # do away with "pWin" in scipyen viewers; this is taken over by "parent"
+        #if "pWin" not in kwargs:
+            #kwargs["pWin"] = self
             
         #print("winClass", winClass)
+        
+        #print("WindowManager._newViewer constructor kwargs", kwargs)
             
         if winClass is mpl.figure.Figure:
             fig_kwargs = dict()
@@ -2353,18 +2364,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # inverse lookup the key mapped to this value
             objects = [(name, obj) for (name, obj) in self.workspace.items() if obj is value]
             if len(objects):
-                #print("ScipyenWindow.removeFromWorkspace", objects)
                 for o in objects:
                     self.workspace.pop(o[0], None)
-            #if value in self.workspace.values():
-                #names=[name for name, val in self.workspace.items() if val is value]
-                #if len(names):
-                    #self.workspace.pop(names[0], None)
                     
             self.slot_updateWorkspaceTable(from_console)
         
     def assignToWorkspace(self, name:str, val:object, from_console:bool = False):
-        #print("MainWindow.assignToWorkspace", name, val)
         self.workspace[name] = val
         self.slot_updateWorkspaceTable(from_console)
         
@@ -2412,7 +2417,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_newViewerMenuAction(self):
         """Slot for creating new viewer directly from Windows/Create New menu
         """
-        win = self._newViewer(self.sender().text())
+        win = self._newViewer(self.sender().text()) # inherited: WindowManager._newViewer
         
     @pyqtSlot(QtCore.QPoint)
     @safeWrapper
@@ -2454,9 +2459,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_launchCaTAnalysis(self):
-        lscatWindow = CaTanalysis.LSCaTWindow(parent=self, pWin=self, win_title="LSCaT")
+        
+        lscatWindow = CaTanalysis.LSCaTWindow(parent=self, win_title="LSCaT")
         lscatWindow.show()
-        #self.lscatWindow.show()
         
     def _getHistoryBlockAsCommand_(self, magic=None):
         cmd = ""
@@ -3416,7 +3421,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: 2017-11-10 14:17:11 TODO
         # factor-out the following (BEGIN ... END) in a plugin-like framework
         # BEGIN
-        #self.lscatWindow = CaTanalysis.LSCaTWindow(parent=self, pWin=self, win_title="LSCaT")
         
         # NOTE: 2017-11-11 21:30:58 add this as a menu command, and open it in a
         # separate window, rather than tabbed window, which is more useful for

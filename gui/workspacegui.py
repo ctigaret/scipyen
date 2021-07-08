@@ -115,11 +115,11 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):
     Also provides common functionality needed in Scipyen's windows. 
     """
     
+    ####def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
+                 ####pWin: (QtWidgets.QMainWindow, type(None))= None , title="",
+                 ####**kwargs):
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
-                 pWin: (QtWidgets.QMainWindow, type(None))= None , title="",
-                 **kwargs):
-        #super(GuiMessages, self).__init__(**kwargs)
-        #super(FileIOGui, self).__init__(**kwargs)
+                 title="", **kwargs):
         self._scipyenWindow_ = None
         
         # NOTE: 2020-12-05 21:12:43:
@@ -129,40 +129,44 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):
         #ws = user_workspace()
         #print(ws)
         
-        #exec_frame = inspect.currentframe()
-        #print("currentframe:\n", "\t\n".join([k for k in exec_frame.f_globals.keys()]))
-        #frame_records = inspect.getouterframes(exec_frame)
-        #for (n,f) in enumerate(frame_records):
-            #print("\n*** Exec frame %d:\n" % n, "\t\n".join([k for k in f[0].f_globals.keys()]))
-        
-        if isinstance(pWin, QtWidgets.QMainWindow) and type(pWin).__name__ == "ScipyenWindow":
-            self._scipyenWindow_  = pWin
-        
+        if isinstance(parent, QtWidgets.QMainWindow) and type(parent).__name__ == "ScipyenWindow":
+            self._scipyenWindow_   = parent
+            
         else:
-            if isinstance(parent, QtWidgets.QMainWindow) and type(parent).__name__ == "ScipyenWindow":
-                self._scipyenWindow_   = parent
+            # NOTE: 2020-12-05 21:24:45
+            # this successfully returns the user workspace ONLY when the 
+            # constructor is invoked (directly or indirectly) from within
+            # the console; otherwise, it is None
+            ws = user_workspace()
+            
+            if ws is not None:
+                self._scipyenWindow_ = ws["mainWindow"]
                 
             else:
-                # NOTE: 2020-12-05 21:24:45
-                # this successfully returns the user workspace ONLY when the 
-                # constructor is invoked (directly or indirectly) from within
-                # the console; otherwise, it is None
-                ws = user_workspace()
-                if ws is not None:
-                    self._scipyenWindow_ = ws["mainWindow"]
-                    
-                else:
-                    frame_records = inspect.getouterframes(inspect.currentframe())
-                    for (n,f) in enumerate(frame_records):
-                        if "ScipyenWindow" in f[0].f_globals:
-                            self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"].instance()
-                            break
-                    
+                frame_records = inspect.getouterframes(inspect.currentframe())
+                for (n,f) in enumerate(frame_records):
+                    if "ScipyenWindow" in f[0].f_globals:
+                        self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"].instance()
+                        break
                 
         if isinstance(title, str) and len(title.strip()):
             self.setWindowTitle(title)
+            
+    @property
+    def isTopLevel(self):
+        return self.appWindow is self.parent()
                 
         
+    @property
+    def appWindow(self):
+        """The application main window.
+        This is a reference to the  Scipyen main window, unless explicitly given
+        as something else at the viewer's initiation.
+        
+        appWindow gives access to Scipyen main window API (e.g. the workspace).
+        """
+        return self._scipyenWindow_
+    
     @safeWrapper
     def importWorkspaceData(self, dataTypes:typing.Union[typing.Type[typing.Any], typing.Sequence[typing.Type[typing.Any]]],
                             title:str="Import from workspace",

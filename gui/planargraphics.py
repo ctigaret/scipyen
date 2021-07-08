@@ -7966,11 +7966,11 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     def _setAppearance_(self, cosmeticPen:bool=True):
         self.controlLnF = {"pen": {"line": _GraphicsObjectLnFDefaults_.pen(graphic ="pen_line", 
                                                                            control=True),
-                                   "label": _GraphicsObjectLnFDefaults_.pen(graphic="pen_text",
+                                   "text": _GraphicsObjectLnFDefaults_.pen(graphic="pen_text",
                                                                             control=True),
                                    "point": _GraphicsObjectLnFDefaults_.pen(graphic="pen_point",
                                                                             control=True)}, 
-                           "brush": {"label": _GraphicsObjectLnFDefaults_.brush(graphic="brush_label",
+                           "brush": {"text": _GraphicsObjectLnFDefaults_.brush(graphic="brush_label",
                                                                                 control=True),
                                      "point": _GraphicsObjectLnFDefaults_.brush(graphic="brush_point",
                                                                                 control=True)},
@@ -7978,20 +7978,20 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                            "pointsize": _GraphicsObjectLnFDefaults_.pointsize["control"]}
         
         self.basicLnF = {False: {"pen": {"line" : _GraphicsObjectLnFDefaults_.pen(graphic="pen_line"),
-                                         "label": _GraphicsObjectLnFDefaults_.pen(graphic="pen_text"),
+                                         "text": _GraphicsObjectLnFDefaults_.pen(graphic="pen_text"),
                                          "point": _GraphicsObjectLnFDefaults_.pen(graphic="pen_point")},
-                                 "brush": {"label": _GraphicsObjectLnFDefaults_.brush(graphic="brush_label"),
+                                 "brush": {"text": _GraphicsObjectLnFDefaults_.brush(graphic="brush_label"),
                                            "point": _GraphicsObjectLnFDefaults_.brush(graphic="brush_point")},
                                 "font":QtWidgets.QApplication.font(),
                                  "pointsize": _GraphicsObjectLnFDefaults_.pointsize["basic"]}, 
         
                          True: {"pen": {"line" : _GraphicsObjectLnFDefaults_.pen(graphic="pen_line",
                                                                                  selected=True),
-                                         "label": _GraphicsObjectLnFDefaults_.pen(graphic="pen_text",
+                                         "text": _GraphicsObjectLnFDefaults_.pen(graphic="pen_text",
                                                                                  selected=True),
                                          "point": _GraphicsObjectLnFDefaults_.pen(graphic="pen_point",
                                                                                  selected=True)},
-                                "brush": {"label": _GraphicsObjectLnFDefaults_.brush(graphic="brush_label",
+                                "brush": {"text": _GraphicsObjectLnFDefaults_.brush(graphic="brush_label",
                                                                                  selected=True),
                                            "point": _GraphicsObjectLnFDefaults_.brush(graphic="brush_point",
                                                                                  selected=True)},
@@ -8000,11 +8000,11 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                     
         self.linkedLnF  = {False: {"pen": {"line" : _GraphicsObjectLnFDefaults_.pen(graphic="pen_line",
                                                                                  linked=True),
-                                         "label": _GraphicsObjectLnFDefaults_.pen(graphic="pen_text",
+                                         "text": _GraphicsObjectLnFDefaults_.pen(graphic="pen_text",
                                                                                  linked=True),
                                          "point": _GraphicsObjectLnFDefaults_.pen(graphic="pen_point",
                                                                                  linked=True)},
-                                   "brush": {"label": _GraphicsObjectLnFDefaults_.brush(graphic="brush_label",
+                                   "brush": {"text": _GraphicsObjectLnFDefaults_.brush(graphic="brush_label",
                                                                                  linked=True),
                                            "point": _GraphicsObjectLnFDefaults_.brush(graphic="brush_point",
                                                                                  linked=True)},
@@ -8014,13 +8014,13 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                            True:  {"pen": {"line" : _GraphicsObjectLnFDefaults_.pen(graphic="pen_line",
                                                                                  linked=True,
                                                                                  selected=True),
-                                         "label": _GraphicsObjectLnFDefaults_.pen(graphic="pen_text",
+                                         "text": _GraphicsObjectLnFDefaults_.pen(graphic="pen_text",
                                                                                  linked=True,
                                                                                  selected=True),
                                          "point": _GraphicsObjectLnFDefaults_.pen(graphic="pen_point",
                                                                                  linked=True,
                                                                                  selected=True)},
-                                   "brush": {"label": _GraphicsObjectLnFDefaults_.brush(graphic="brush_label",
+                                   "brush": {"text": _GraphicsObjectLnFDefaults_.brush(graphic="brush_label",
                                                                                  linked=True,
                                                                                  selected=True),
                                            "point": _GraphicsObjectLnFDefaults_.brush(graphic="brush_point",
@@ -8895,42 +8895,11 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 if self._backend_ is None or not self._backend_.hasStateForFrame():
                     return
                 
-            lnf = self.linkLnF if self.linked else self.basicLnF
+            lnf = self.linkedLnF if self._backend_.isLinked else self.basicLnF
                     
-            linePen = QtGui.QPen(self.defaultPen)
-            textPen = QtGui.QPen(self.defaultTextPen)
+            linePen = lnf[self.isSelected()]["pen"]["line"]
+            textPen = lnf[self.isSelected()]["pen"]["text"]
                 
-            if self._buildMode_: # in build mode; not a cursor
-                painter.setPen(QtGui.QPen(self._linePenSelected))
-                textPen = QtGui.QPen(self._textPen)
-                
-            else: # not in build mode; may be a cursor
-                if self.isSelected(): # inherited from QGraphicsItem via QGraphicsObject
-                    if self.isLinked:
-                        linePen = QtGui.QPen(self._cBSelectedPen)
-                        textPen = QtGui.QPen(self._textCBPen)
-                        
-                    elif len(self._backend_.frontends) > 1:
-                        linePen = QtGui.QPen(self._linePenLinkedSelected)
-                        textPen = QtGui.QPen(self._textPenLinked)
-                        
-                    else:
-                        linePen = QtGui.QPen(self._linePenSelected)
-                        textPen = QtGui.QPen(self._textPen)
-                        
-                else:
-                    if self.isLinked:
-                        linePen = QtGui.QPen(self._cBPen)
-                        textPen = QtGui.QPen(self._textCBPen)
-                        
-                    elif len(self._backend_.frontends) > 1:
-                        linePen = QtGui.QPen(self._linePenLinked)
-                        textPen = QtGui.QPen(self._textPenLinked)
-                        
-                    else:
-                        linePen = QtGui.QPen(self._linePen)
-                        textPen = QtGui.QPen(self._textPen)
-
             labelPos = None         # NOTE: 2017-06-23 09:41:24
                                     # below I calculate a default label position
                                     # based on cursor type
@@ -9053,7 +9022,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     # NOTE: 2018-01-24 15:57:16 
                     # THE SHAPE IN BUILD MODE = cached path
                     # first draw the shape
-                    painter.setPen(self._linePenSelected)
+                    painter.setPen(self.controlLnF["pen"]["line"])
+                    #painter.setPen(self._linePenSelected)
                     
                     if isinstance(self._backend_, Path):
                         if self._backend_.type == PlanarGraphicsType.polygon:
@@ -9104,11 +9074,14 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         
 
                     # NOTE: 2018-01-24 15:56:51 
-                    # CONTROL POINTS AND LINES IN BUILD MODE
+                    # CONTROL (HOVER) POINTS AND LINES IN BUILD MODE
                     # now draw control points and lines
                     # draw control points
-                    painter.setPen(self._controlPointPen) 
-                    painter.setBrush(self._controlPointBrush)
+                    painter.setPen(self.controlLnF["pen"]["point"]) 
+                    painter.setBrush(self.controlLnF["brush"]["point"])
+                    
+                    #painter.setPen(self._controlPointPen) 
+                    #painter.setBrush(self._controlPointBrush)
                     
                     for k, element in enumerate(self._cachedPath_):
                         painter.drawEllipse(element.x - self._pointSize,
@@ -9204,36 +9177,12 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     
                     # NOTE: 2018-01-24 16:12:43
                     # SELECT PEN & BRUSH FIRST
-                    if self.isSelected():
-                        if self.isLinked: # linked to other GraphicsObjects !!!
-                            painter.setPen(self._linePenLinkedSelected)
-                            
-                        elif self.sharesBackend:
-                            painter.setPen(self._cBSelectedPen)
-                            
-                        else:
-                            painter.setPen(self._linePenSelected)
-                            
-                    else:
-                        if self.isLinked:# linked to other GraphicsObjects !!!
-                            painter.setPen(self._linePenLinked)
-                            
-                        elif self.sharesBackend:
-                            painter.setPen(self._cBPen)
-                            
-                        else:
-                            painter.setPen(self._linePen)
-                            
-                    #if self.objectType & PlanarGraphicsType.point:
+                    
+                    painter.setPen(linePen)
+                    
                     if self._backend_.type & PlanarGraphicsType.point:
-                        if self.isLinked:# linked to other GraphicsObjects !!!
-                            brush = QtGui.QBrush(self.defaultLinkedCursorColor)
-                            
-                        else:
-                            brush = QtGui.QBrush(self.defaultColor)
-                            
-                        painter.setBrush(brush)
-                            
+                        painter.setBrush(lnf[self.isSelected()]["brush"]["text"])
+
                     # NOTE: 2018-01-24 16:13:03
                     # DRAW THE ACTUAL SHAPE
                     # NOTE: 2018-01-24 17:17:05
@@ -9289,9 +9238,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                         # NOTE: 2018-01-24 16:14:15
                         # CONTROL AND HOVER POINTS AND CONTROL LINES IN EDIT MODE
                         
-                        painter.setPen(self._controlPointPen)
-                        painter.setBrush(self._controlPointBrush)
-                        
+                        painter.setPen(self.controlLnF["pen"]["point"]) 
+                        painter.setBrush(self.controlLnF["brush"]["point"])
+                    
                         # ATTENTION for paths, curves have extra control points!
                         
                         if self._cachedPath_ is not None and len(self._cachedPath_) > 0:
@@ -9360,8 +9309,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             # this paints the boundingRect() and shape() of the thing when
             # debugging
             #### BEGIN DEBUGGING
-            #painter.fillRect(self.boundingRect(), self._controlPointBrush)
-            #painter.fillPath(self.shape(), self._testBrush)
+            #painter.fillRect(self.boundingRect(), self._controlPointBrush) # FIXME
+            #painter.fillPath(self.shape(), self._testBrush) # FIXME
             #painter.setPen(QtCore.Qt.darkRed)
             #painter.drawPath(self.shape())
             #### END DEBUGGING
@@ -9374,14 +9323,12 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                     
                     if self._opaqueLabel_:
                         painter.setBackgroundMode(QtCore.Qt.OpaqueMode)
-                        self._textBackgroundBrush.setStyle(QtCore.Qt.SolidPattern)
+                        painter.setBackground(lnf[self.isSelected()]["brush"]["text"])
                         
                     else:
-                        self._textBackgroundBrush.setStyle(QtCore.Qt.NoBrush)
+                        painter.setBackgroundMode(QtCore.Qt.TransparentMode)
                         
                     painter.setPen(textPen)
-                        
-                    painter.setBackground(self._textBackgroundBrush)
                         
                     painter.drawText(labelPos, self._displayStr_)
                     
@@ -9928,7 +9875,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 #if self._backend_ is not None:
                 if isinstance(self._backend_, PlanarGraphics):
                     #self.__updateBackendFromCachedPath__() # just DON'T
-                    self.signalBackendChanged.emit(self._backend_)
+                    #self.signalBackendChanged.emit(self._backend_)
                     
                     for f in self._backend_.frontends:
                         if f != self:

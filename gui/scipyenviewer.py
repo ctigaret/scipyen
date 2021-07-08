@@ -109,8 +109,12 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     supported_types = (object, )
     view_action_name = None
     
+    ####def __init__(self, data: (object, type(None))=None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
+                 ####pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
+                 ####win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
+                 ####*args, **kwargs) -> None:
     def __init__(self, data: (object, type(None))=None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
+                 ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
                  *args, **kwargs) -> None:
         """Constructor.
@@ -126,6 +130,14 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
         pWin: QMainWindow, or None (default) - the instance of the Scipyen main
             window.
+            
+            When pWin is the Scipyen's main window, the viewer will have access to
+            the user's workspace and will manage the viewer settings as part of
+            the Scipyen's global Scipyen Qt configuration (i.e. save/load using
+            the Scipyen configuration file).
+            
+            When pWin is any other QMainWindow, the viewer settings will be
+            managed by pWin, if it has the capabilities to do so.
             
             If present, the viewer will have access to the user's workspace, and
             will manage its own settings (save/load to/from the Scipyen 
@@ -151,12 +163,10 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # should be set to True when the viewer is managed by another GUI inside Scipyen
         super().__init__(parent)
         #super(WorkspaceGuiMixin, self).__init__(parent=parent, pWin=pWin)
-        WorkspaceGuiMixin.__init__(self, parent=parent, pWin=pWin)
+        WorkspaceGuiMixin.__init__(self, parent=parent)
         
         self.settings = QtCore.QSettings()
 
-        #self._scipyenWindow_ = None
-        
         self._docTitle_ = None
         self._winTitle_ = None # force auto-set in update_title()
         self._custom_viewer_name_ = None
@@ -308,7 +318,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     
     @abstractmethod
     def saveSettings(self):
-        """
+        """ Must override in subclasses
         NOTE: 2021-05-04 21:53:04
         This saveSettings has access to all the subclass attributes (which is
         fully initialized by the time this is called).
@@ -330,7 +340,11 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         The configuration file is determined at application (Scipyen) level.
         See also QtCore.QSettings()
         """
-        if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
+        #if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
+        # NOTE: 2021-07-08 09:07:14
+        # window setings are saved only when parent is Scipyen's main window
+        #if type(self.parent()).__name__ == "ScipyenWindow":
+        if self.isTopLevel:
             self.settings.setValue("/".join([self.__class__.__name__, "WindowSize"]), self.size())
                 
             self.settings.setValue("/".join([self.__class__.__name__, "WindowPos"]), self.pos())
@@ -339,11 +353,13 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             
     @abstractmethod
     def saveViewerSettings(self):
+        """Must be implemented in the subclass
+        """
         pass
     
     @abstractmethod
     def loadSettings(self):
-        """
+        """Must override in subclasses
         NOTE: 2021-05-04 21:42:12 About settings
         Handling settings in the superclass only works for window geometry
         and related stuff on the Qt side.
@@ -375,7 +391,11 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         The configuration file is determined at application (Scipyen) level.
         See also QtCore.QSettings()
         """
-        if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
+        #if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
+        # NOTE: 2021-07-08 09:06:32
+        # window settings are loaded here only if parent is Scipyen's main window
+        #if type(self.parent()).__name__ == "ScipyenWindow":
+        if self.isTopLevel:
             windowSize = self.settings.value("/".join([self.__class__.__name__, "WindowSize"]), None)
             if windowSize is not None:
                 self.resize(windowSize)
@@ -391,6 +411,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
     @abstractmethod
     def loadViewerSettings(self):
+        """Must be implemented in the subclass
+        """
         pass
     
     def view(self, data: (object, type(None)), 
@@ -515,67 +537,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             self.update_title()
             
     @property
-    def appWindow(self):
-        """The application main window.
-        This is a reference to the  Scipyen main window, unless explicitly given
-        as something else at the viewer's initiation.
-        
-        appWindow gives access to Scipyen main window API (e.g. the workspace).
-        """
-        return self._scipyenWindow_;
-    
-    #@appWindow.setter
-    #def appWindow(self, val: QtWidgets.QMainWindow):
-        ## NOTE: 2021-04-16 09:47:59 FIXME
-        ## This is wrong, as it results in appWindow being ALWAYS
-        ## ScipyenWindow
-        #if type(val).__name__ == "ScipyenWindow":
-            #self._scipyenWindow_ =val
-        #else:
-            #raise TypeError("Unexpected type for appWindow setter argument; a ScipyenWindow is required with attribute 'workspace'; instead we've got %s" % type(val).__name__)
-    
-    #@property
-    #def guiClient(self):
-        #"""NOTE: 2021-04-16 09:54:37 DEPRECATED 
-        #Boolean (default False) indicating whether this window is managed 
-        #by Scipyen's Main window, or not.
-        
-        #When True, the viewer objects is subordinated to another GUI window
-        #which controls and manages the settings of the viewer, and for frame-enabled
-        #viewers, frame navigation (to avoid race conditions and infinite recurring
-        #loops).
-        
-        #When False, the viewer is managed by SCipyen's Main Window (as window 
-        #manager).
-        
-        #When the viewer is used as a standalone window, this property should be
-        #set to False (its default value).
-        
-        #guiClient is also useful for a managing Main Window instance to 
-        #control other aspects of the viewer's functionality, e.g. management of
-        #PlanarGraphics objects in an ImageViewer.
-        
-        #This property also has a setter.
-        
-        #ATTENTION: When guiClient is True, appWindow must be a reference to the
-        #Scipyen's MainWindow instance.
-        #"""
-        #return type(self._scipyenWindow_).__name__ != "ScipyenWindow"
-    
-    #@guiClient.setter
-    #def guiClient(self, value: bool):
-        #"""Sets up this viewer as a GUI client.
-        
-        #When a GUI client, the viewer has a slightly restricted functionality:
-        
-        
-        #"""
-        #if not isinstance(value, bool):
-            #raise TypeError("Expecting a bool; got %s instead" % type(value).__name__)
-        
-        #self._gui_client_ = value
-        
-    @property
     def winTitle(self):
         """The prefix of the window title.
         
@@ -650,21 +611,22 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """All viewers in Scipyen should behave consistently.
         However, this may by overridden in derived classes.
         """
+        print("ScipyenViewer.closeEvent %s: isTopLevel %s" % (self.winTitle, self.isTopLevel))
         # NOTE: 2021-05-04 21:53:04
         # Here saveSettings will have access to all the subclass attributes (it
         # is fully initialized, etc)
         # see NOTE: 2019-11-09 09:30:38 for details
-        self.saveSettings()
+        self.saveSettings() # should be overridden in subclasses
         evt.accept()
-        if type(self.appWindow).__name__ == "ScipyenWindow":
-            #print(self)
-            #print(self in [v for v in self.appWindow.workspace.values()])
-            #print(any([v is self for v in self.appWindow.workspace.values()]))
-            #if self in self.appWindow.workspace.values():
+        
+        # NOTE: 2021-07-08 12:07:35
+        # also de-register the viewer with Scipyen's main window, if this viewer
+        # is NOT a client (child) of another Scypen app (e.g. LSCaTWindow)
+        if self.isTopLevel:
             if any([v is self for v in self.appWindow.workspace.values()]):
                 self.appWindow.deRegisterViewer(self) # this will also save settings and close the viewer window
                 self.appWindow.removeFromWorkspace(self, from_console=False, by_name=False)
-        #else:
+
         self.close()
     
     def event(self, evt:QtCore.QEvent):
@@ -773,14 +735,13 @@ class ScipyenFrameViewer(ScipyenViewer):
     
     def __init__(self, data: (object, type(None)) = None, 
                  parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 pWin: (QtWidgets.QMainWindow, type(None))= None, 
                  ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, 
                  doc_title: (str, type(None)) = None,
                  frameIndex:(int, tuple, list, range, slice, type(None)) = None,
                  currentFrame:(int, type(None)) = None,
                  *args, **kwargs):
-        super().__init__(data=data, parent=parent, pWin=pWin, ID=ID,
+        super().__init__(data=data, parent=parent, ID=ID,
                          win_title=win_title, doc_title=doc_title,
                          *args, **kwargs)
         """Constructor for ScipyenFrameViewer.
@@ -793,7 +754,13 @@ class ScipyenFrameViewer(ScipyenViewer):
 
         pWin: QMainWindow, or None (default) - the instance of the Scipyen main
             window.
-            If present, the viewer will have access to the user's workspace.
+            When pWin is the Scipyen's main window, the viewer will have access to
+            the user's workspace and will manage the viewer settings as part of
+            the Scipyen's global Scipyen Qt configuration (i.e. save/load using
+            the Scipyen configuration file).
+            
+            When pWin is any other QMainWindow, the viewer settings will be
+            managed by pWin, if it has the capabilities to do so.
             
         win_title: str or None (default). The display name of the viewer, to be 
             used as part of the window title according to the pattern
