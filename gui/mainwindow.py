@@ -429,13 +429,6 @@ class WindowManager(__QMainWindow__):
         
         assert viewer.ID == wid
         
-    # NOTE: 2020-02-05 00:13:29
-    # obsolete herte: cloding of mpl figures must be handled by MainWindow
-    # as it needs to update the workspace table once figure has been removed
-    #@safeWrapper
-    #def handle_mpl_figure_close(self, evt):
-        #self.deRegisterViewer(evt.canvas.figure)
-        
     @safeWrapper
     def handle_mpl_figure_click(self, evt):
         self._raiseCurrentWindow(evt.canvas.figure)
@@ -604,7 +597,6 @@ class WindowManager(__QMainWindow__):
         
         ATTENTION: This function neither removes the viewer object from the 
         workspace, nor unbinds it from its symbol in the workspace!!!
-        
         """
         if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             return
@@ -618,12 +610,16 @@ class WindowManager(__QMainWindow__):
                 old_viewer_index = self.viewers[viewer_type].index(win)
                 self.viewers[viewer_type].remove(win)
             
-        if isinstance(win, mpl.figure.Figure):
-            plt.close(win) # also removes figure number from pyplot figure manager
+        ## FIXME 2021-07-11 15:09:16
+        ## this is problematic when deRegisterViewer is called during a closeEvent
+        # and therefore land on a dead PyQt5 object which hasn't garbage collected
+        # yey
+        #if isinstance(win, mpl.figure.Figure):
+            #plt.close(win) # also removes figure number from pyplot figure manager
             
-        else:
-            win.saveSettings()
-            win.close()
+        #else:
+            #win.saveSettings()
+            #win.close()
             
         if viewer_type in self.currentViewers:
             if len(self.viewers[viewer_type]) == 0:
@@ -2376,6 +2372,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         fig_number = evt.canvas.figure.number
         fig_varname = "Figure%d" % fig_number
+        plt.close(evt.canvas.figure)
         # NOTE: 2020-02-05 00:53:51
         # this also closes the figure window and removes it from self.currentViewers
         self.deRegisterViewer(evt.canvas.figure) 
@@ -2976,8 +2973,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             return
         
         for n in varNames:
-            if isinstance(self.workspace[n], (QtWidgets.QMainWindow, mpl.figure.Figure)):
-                self.deRegisterViewer(self.workspace[n])
+            obj = self.workspace[n]
+            if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+                #print("%s.slot_deleteSelectedVars %s: %s" % (self.__class__.__name__, n, obj.__class__.__name__))
+                if isinstance(obj, mpl.figure.Figure):
+                    plt.close(obj)
+                    
+                else:
+                    obj.close()
+                    #obj.closeEvent(QtGui.QCloseEvent())
+                self.deRegisterViewer(obj)
                 
             self.workspace.pop(n, None)
             
@@ -3133,8 +3138,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @pyqtSlot()
     def slot_Quit(self):
-        evt = QtGui.QCloseEvent()
-        self.closeEvent(evt)
+        self.close()
+        #evt = QtGui.QCloseEvent()
+        #self.closeEvent(evt)
         
     def closeEvent(self, evt):
         if self.external_console is not None:
@@ -3152,21 +3158,22 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             #del self.console
             self.console = None
             
-        #self.lscatWindow.slot_Quit()
-        
         if not self._save_settings_guard_:
             self._save_settings_()
             self._save_settings_guard_ = True
             
-        lscatWindows = [w for w in self.app.allWidgets() if isinstance(w, CaTanalysis.LSCaTWindow)]
-        for w in lscatWindows:
-            w.slot_Quit()
+        # NOTE: this mustn't happen anymore
+        #lscatWindows = [w for w in self.app.allWidgets() if isinstance(w, CaTanalysis.LSCaTWindow)]
+        #for w in lscatWindows:
+            #w.slot_Quit()
             
-        self.app.closeAllWindows()
+        #self.app.closeAllWindows()
         
         evt.accept()
         
     def _save_settings_(self):
+        self.settings.endGroup()
+        
         self.settings.beginGroup("ScipyenWindow")
         self.settings.setValue("Size", self.size())
         self.settings.setValue("Position", self.pos())
@@ -3203,7 +3210,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         #### NOTE: user-defined gui handlers (viewers) for variable types, or user-changed
         # configuration of gui handlers
-        self.settings.beginGroup("Custom GUI Handlers")
+        self.settings.beginGroup("Custom_GUI_Handlers")
         for viewerClass in VTH.gui_handlers.keys():
             self.settings.beginGroup(viewerClass.__name__)
             if viewerClass not in VTH.default_handlers.keys():

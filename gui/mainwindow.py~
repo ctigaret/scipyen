@@ -429,13 +429,6 @@ class WindowManager(__QMainWindow__):
         
         assert viewer.ID == wid
         
-    # NOTE: 2020-02-05 00:13:29
-    # obsolete herte: cloding of mpl figures must be handled by MainWindow
-    # as it needs to update the workspace table once figure has been removed
-    #@safeWrapper
-    #def handle_mpl_figure_close(self, evt):
-        #self.deRegisterViewer(evt.canvas.figure)
-        
     @safeWrapper
     def handle_mpl_figure_click(self, evt):
         self._raiseCurrentWindow(evt.canvas.figure)
@@ -512,10 +505,15 @@ class WindowManager(__QMainWindow__):
             above (i.e. the value of their __name__ attribute).
             
         *args, **kwargs: passed directly to the constructor (__init__ function)
-            of the winClass.
+            of the winClass
             
         
         """
+        # NOTE: 2021-07-08 14:52:44
+        # called by ScipyenWindow.slot_newViewerMenuAction
+        
+        #print("WindowManager._newViewer winClass = %s" % winClass)
+        #print("WindowManager._newViewer **kwargs", **kwargs)
         if isinstance(winClass, str) and len(winClass.replace("&","").strip()):
             wClass = winClass.replace("&","")
             
@@ -539,15 +537,17 @@ class WindowManager(__QMainWindow__):
             
         win_title = self._set_new_viewer_window_name_(winClass, name=kwargs.pop("win_title", None))
         
+        #print("WindowManager._newViewer win_title = %s" % win_title)
+        
         kwargs["win_title"] = win_title
         
         if "parent" not in kwargs:
             kwargs["parent"] = self
             
-        if "pWin" not in kwargs:
-            kwargs["pWin"] = self
-            
-        #print("winClass", winClass)
+        # NOTE: 2021-07-08 08:41:41
+        # do away with "pWin" in scipyen viewers; this is taken over by "parent"
+        #if "pWin" not in kwargs:
+            #kwargs["pWin"] = self
             
         if winClass is mpl.figure.Figure:
             fig_kwargs = dict()
@@ -597,7 +597,6 @@ class WindowManager(__QMainWindow__):
         
         ATTENTION: This function neither removes the viewer object from the 
         workspace, nor unbinds it from its symbol in the workspace!!!
-        
         """
         if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             return
@@ -611,12 +610,16 @@ class WindowManager(__QMainWindow__):
                 old_viewer_index = self.viewers[viewer_type].index(win)
                 self.viewers[viewer_type].remove(win)
             
-        if isinstance(win, mpl.figure.Figure):
-            plt.close(win) # also removes figure number from pyplot figure manager
+        ## FIXME 2021-07-11 15:09:16
+        ## this is problematic when deRegisterViewer is called during a closeEvent
+        # and therefore land on a dead PyQt5 object which hasn't garbage collected
+        # yey
+        #if isinstance(win, mpl.figure.Figure):
+            #plt.close(win) # also removes figure number from pyplot figure manager
             
-        else:
-            win.saveSettings()
-            win.close()
+        #else:
+            #win.saveSettings()
+            #win.close()
             
         if viewer_type in self.currentViewers:
             if len(self.viewers[viewer_type]) == 0:
@@ -2353,18 +2356,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # inverse lookup the key mapped to this value
             objects = [(name, obj) for (name, obj) in self.workspace.items() if obj is value]
             if len(objects):
-                #print("ScipyenWindow.removeFromWorkspace", objects)
                 for o in objects:
                     self.workspace.pop(o[0], None)
-            #if value in self.workspace.values():
-                #names=[name for name, val in self.workspace.items() if val is value]
-                #if len(names):
-                    #self.workspace.pop(names[0], None)
                     
             self.slot_updateWorkspaceTable(from_console)
         
     def assignToWorkspace(self, name:str, val:object, from_console:bool = False):
-        #print("MainWindow.assignToWorkspace", name, val)
         self.workspace[name] = val
         self.slot_updateWorkspaceTable(from_console)
         
@@ -2375,6 +2372,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         fig_number = evt.canvas.figure.number
         fig_varname = "Figure%d" % fig_number
+        plt.close(evt.canvas.figure)
         # NOTE: 2020-02-05 00:53:51
         # this also closes the figure window and removes it from self.currentViewers
         self.deRegisterViewer(evt.canvas.figure) 
@@ -2412,7 +2410,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_newViewerMenuAction(self):
         """Slot for creating new viewer directly from Windows/Create New menu
         """
-        win = self._newViewer(self.sender().text())
+        win = self._newViewer(self.sender().text()) # inherited: WindowManager._newViewer
         
     @pyqtSlot(QtCore.QPoint)
     @safeWrapper
@@ -2454,9 +2452,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_launchCaTAnalysis(self):
-        lscatWindow = CaTanalysis.LSCaTWindow(parent=self, pWin=self, win_title="LSCaT")
+        lscatWindow = self._newViewer(CaTanalysis.LSCaTWindow, parent=self, win_title="LSCaT")
+        #lscatWindow = CaTanalysis.LSCaTWindow(parent=self, win_title="LSCaT")
         lscatWindow.show()
-        #self.lscatWindow.show()
         
     def _getHistoryBlockAsCommand_(self, magic=None):
         cmd = ""
@@ -2975,8 +2973,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             return
         
         for n in varNames:
-            if isinstance(self.workspace[n], (QtWidgets.QMainWindow, mpl.figure.Figure)):
-                self.deRegisterViewer(self.workspace[n])
+            obj = self.workspace[n]
+            if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+                #print("%s.slot_deleteSelectedVars %s: %s" % (self.__class__.__name__, n, obj.__class__.__name__))
+                if isinstance(obj, mpl.figure.Figure):
+                    plt.close(obj)
+                    
+                else:
+                    obj.close()
+                    #obj.closeEvent(QtGui.QCloseEvent())
+                self.deRegisterViewer(obj)
                 
             self.workspace.pop(n, None)
             
@@ -3132,8 +3138,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @pyqtSlot()
     def slot_Quit(self):
-        evt = QtGui.QCloseEvent()
-        self.closeEvent(evt)
+        self.close()
+        #evt = QtGui.QCloseEvent()
+        #self.closeEvent(evt)
         
     def closeEvent(self, evt):
         if self.external_console is not None:
@@ -3151,54 +3158,87 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             #del self.console
             self.console = None
             
-        #self.lscatWindow.slot_Quit()
-        
         if not self._save_settings_guard_:
             self._save_settings_()
             self._save_settings_guard_ = True
             
-        lscatWindows = [w for w in self.app.allWidgets() if isinstance(w, CaTanalysis.LSCaTWindow)]
-        for w in lscatWindows:
-            w.slot_Quit()
+        # NOTE: this mustn't happen anymore
+        #lscatWindows = [w for w in self.app.allWidgets() if isinstance(w, CaTanalysis.LSCaTWindow)]
+        #for w in lscatWindows:
+            #w.slot_Quit()
             
-        self.app.closeAllWindows()
+        #self.app.closeAllWindows()
         
         evt.accept()
         
     def _save_settings_(self):
-        self.settings.beginGroup("ScipyenWindow")
-        self.settings.setValue("Size", self.size())
-        self.settings.setValue("Position", self.pos())
-        self.settings.setValue("Geometry", self.geometry())
-        self.settings.setValue("State", self.saveState())
+        #self.settings.beginGroup("ScipyenWindow")
+        self.settings.setValue("/".join(["ScipyenWindow", "Size"]), self.size())
+        self.settings.setValue("/".join(["ScipyenWindow", "Position"]), self.pos())
+        self.settings.setValue("/".join(["ScipyenWindow", "Geometry"]), self.geometry())
+        self.settings.setValue("/".join(["ScipyenWindow", "State"]), self.saveState())
         
         #consoleFont = self.console.font
         #self.settings.setValue("ConsoleFont", consoleFont)
         #self.settings.setValue("ConsoleFontSize", consoleFont.pointSizeF())
         #self.settings.setValue("ScipyenWindow/Editor", self.scipyenEditor)
         
-        self.settings.setValue("RecentFiles", self.recentFiles)
-        self.settings.setValue("RecentDirectories", self.recentDirectories)
-        self.settings.setValue("RecentScripts", self.recentlyRunScripts)
+        self.settings.setValue("/".join(["ScipyenWindow", "RecentFiles"]), self.recentFiles)
+        self.settings.setValue("/".join(["ScipyenWindow", "RecentDirectories"]), self.recentDirectories)
+        self.settings.setValue("/".join(["ScipyenWindow", "RecentScripts"]), self.recentlyRunScripts)
         
         if len(self.fileSystemFilterHistory) > 0:
-            self.settings.setValue("RecentFileSystemFilters", self.fileSystemFilterHistory)
+            self.settings.setValue("/".join(["ScipyenWindow", "RecentFileSystemFilters"]), self.fileSystemFilterHistory)
 
-        self.settings.setValue("LastFileSystemFilter", self.lastFileSystemFilter)
+        self.settings.setValue("/".join(["ScipyenWindow", "LastFileSystemFilter"]), self.lastFileSystemFilter)
         
         if len(self.recentVariablesList) > 0:
-            self.settings.setValue("VariableSearch", self.recentVariablesList)
+            self.settings.setValue("/".join(["ScipyenWindow", "VariableSearch"]), self.recentVariablesList)
             
-        self.settings.setValue("LastVariableSearch", self.lastVariableFind)
+        self.settings.setValue("/".join(["ScipyenWindow", "LastVariableSearch"]), self.lastVariableFind)
         
         if len(self.commandHistoryFinderList) > 0:
-            self.settings.setValue("CommandSearch", self.commandHistoryFinderList)
+            self.settings.setValue("/".join(["ScipyenWindow", "CommandSearch"]), self.commandHistoryFinderList)
             
-        self.settings.setValue("LastCommandSearch", self.lastCommandFind)
+        self.settings.setValue("/".join(["ScipyenWindow", "LastCommandSearch"]), self.lastCommandFind)
         
-        self.settings.setValue("FilesFilterVisible", self.filesFilterFrame.isVisible())
+        self.settings.setValue("/".join(["ScipyenWindow", "FilesFilterVisible"]), self.filesFilterFrame.isVisible())
         
-        self.settings.endGroup()
+        #self.settings.endGroup()
+        
+        #self.settings.beginGroup("ScipyenWindow")
+        #self.settings.setValue("Size", self.size())
+        #self.settings.setValue("Position", self.pos())
+        #self.settings.setValue("Geometry", self.geometry())
+        #self.settings.setValue("State", self.saveState())
+        
+        ##consoleFont = self.console.font
+        ##self.settings.setValue("ConsoleFont", consoleFont)
+        ##self.settings.setValue("ConsoleFontSize", consoleFont.pointSizeF())
+        ##self.settings.setValue("ScipyenWindow/Editor", self.scipyenEditor)
+        
+        #self.settings.setValue("RecentFiles", self.recentFiles)
+        #self.settings.setValue("RecentDirectories", self.recentDirectories)
+        #self.settings.setValue("RecentScripts", self.recentlyRunScripts)
+        
+        #if len(self.fileSystemFilterHistory) > 0:
+            #self.settings.setValue("RecentFileSystemFilters", self.fileSystemFilterHistory)
+
+        #self.settings.setValue("LastFileSystemFilter", self.lastFileSystemFilter)
+        
+        #if len(self.recentVariablesList) > 0:
+            #self.settings.setValue("VariableSearch", self.recentVariablesList)
+            
+        #self.settings.setValue("LastVariableSearch", self.lastVariableFind)
+        
+        #if len(self.commandHistoryFinderList) > 0:
+            #self.settings.setValue("CommandSearch", self.commandHistoryFinderList)
+            
+        #self.settings.setValue("LastCommandSearch", self.lastCommandFind)
+        
+        #self.settings.setValue("FilesFilterVisible", self.filesFilterFrame.isVisible())
+        
+        #self.settings.endGroup()
         
         #### NOTE: user-defined gui handlers (viewers) for variable types, or user-changed
         # configuration of gui handlers
@@ -3416,7 +3456,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: 2017-11-10 14:17:11 TODO
         # factor-out the following (BEGIN ... END) in a plugin-like framework
         # BEGIN
-        #self.lscatWindow = CaTanalysis.LSCaTWindow(parent=self, pWin=self, win_title="LSCaT")
         
         # NOTE: 2017-11-11 21:30:58 add this as a menu command, and open it in a
         # separate window, rather than tabbed window, which is more useful for
@@ -3615,7 +3654,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.removeRecentDirFromListAction.triggered.connect(self.slot_removeDirFromHistory)
         
-        self.clearRecentDirListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final-activity"), \
+        self.clearRecentDirListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final_activity"), \
                                                         "Clear history of visited paths", \
                                                         self.directoryComboBox.lineEdit())
         
@@ -3638,7 +3677,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.removeFileFilterFromListAction.triggered.connect(self.slot_removeFileFilterFromHistory)
         
-        self.clearFileFilterListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final-activity"), \
+        self.clearFileFilterListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final_activity"), \
                                                     "Clear filter list", \
                                                     self.fileSystemFilter.lineEdit())
         
@@ -5733,10 +5772,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         Parameters:
         ------------
-        obj: the python variable
+        obj: a python variable
         
-        objname: str, the name used in the viewer's window title (not necessarily the 
-                    object's name)
+        objname: str, the symbol name used in the viewer's window title (this is 
+                not necessarily the symbol bound to the object in the workspace)
                     
         newWindow: bool (default False). When False, displays the object in the
                 currently active viewer window, is a suitable one exists, or
@@ -5746,7 +5785,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 
         useSignalViewerForNdArrays when true, plot signals in signal viewer
         """
-        # TODO: accommodate new viewer types
+        # TODO: accommodate new viewer types - nearly DONE via VTH
         
         if isinstance(winType, str) and winType in [v.__name__ for v in self.viewers.keys()]:
             if winType not in self.viewers.keys():

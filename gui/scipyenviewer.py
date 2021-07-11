@@ -10,7 +10,7 @@ from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 
 from core.utilities import safeWrapper
 from . import pictgui as pgui
-from .workspacegui import WorkspaceGuiMixin
+from .workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 
 class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     """Base type for all Scipyen viewers.
@@ -336,15 +336,14 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         The configuration file is determined at application (Scipyen) level.
         See also QtCore.QSettings()
         """
-        #if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-        # NOTE: 2021-07-08 09:07:14
-        # window setings are saved only when parent is Scipyen's main window
-        if self.isTopLevel:
-            self.settings.setValue("/".join([self.__class__.__name__, "WindowSize"]), self.size())
+        print("ScipyenViewer[%s].saveWindowSettings for %s top level:%s" % (self.__class__.__name__, self.winTitle, self.isTopLevel))
+        if self.isTopLevel and self.isVisible():
+            saveWindowSettings(self.settings, self, self.__class__.__name__)
+            #self.settings.setValue("/".join([self.__class__.__name__, "WindowSize"]), self.size())
                 
-            self.settings.setValue("/".join([self.__class__.__name__, "WindowPos"]), self.pos())
+            #self.settings.setValue("/".join([self.__class__.__name__, "WindowPosition"]), self.pos())
                 
-            self.settings.setValue("/".join([self.__class__.__name__, "WindowState"]), self.saveState())
+            #self.settings.setValue("/".join([self.__class__.__name__, "WindowState"]), self.saveState())
             
     @abstractmethod
     def saveViewerSettings(self):
@@ -605,22 +604,25 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """All viewers in Scipyen should behave consistently.
         However, this may by overridden in derived classes.
         """
-        #print("ScipyenViewer.closeEvent %s: isTopLevel %s" % (self.winTitle, self.isTopLevel))
-        # NOTE: 2021-05-04 21:53:04
-        # Here saveSettings will have access to all the subclass attributes (it
-        # is fully initialized, etc)
-        # see NOTE: 2019-11-09 09:30:38 for details
-        self.saveSettings() # should be overridden in subclasses
-        evt.accept()
-        
+        print("ScipyenViewer[%s].closeEvent %s: isTopLevel %s" % (self.__class__.__name__, self.winTitle, self.isTopLevel))
         # NOTE: 2021-07-08 12:07:35
         # also de-register the viewer with Scipyen's main window, if this viewer
         # is NOT a client (child) of another Scypen app (e.g. LSCaTWindow)
         if self.isTopLevel:
+            # NOTE: 2021-07-11 09:48:50
+            # Save window settings only for top level viewer windows
+            # NOTE: 2021-05-04 21:53:04
+            # Here saveSettings will have access to all the subclass attributes (it
+            # is fully initialized, etc)
+            # see NOTE: 2019-11-09 09:30:38 for details
+            self.saveSettings() # should be overridden in subclasses
+        
             if any([v is self for v in self.appWindow.workspace.values()]):
                 self.appWindow.deRegisterViewer(self) # this will also save settings and close the viewer window
                 self.appWindow.removeFromWorkspace(self, from_console=False, by_name=False)
 
+            evt.accept()
+            
         self.close()
     
     def event(self, evt:QtCore.QEvent):
