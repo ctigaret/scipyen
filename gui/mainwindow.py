@@ -747,7 +747,7 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
         
         self.setWindowTitle("Scipyen Script Manager")
         
-        self.settings = QtCore.QSettings()
+        self.qsettings = QtCore.QSettings()
         
         self._load_settings_()
         
@@ -762,26 +762,26 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
         
         
     def _load_settings_(self):
-        loadWindowSettings(self.settings, self)
-        #windowSize = self.settings.value("/".join([self.__class__.__name__, "WindowSize"]), None)
+        loadWindowSettings(self.qsettings, self)
+        #windowSize = self.qsettings.value("/".join([self.__class__.__name__, "WindowSize"]), None)
         #if windowSize is not None:
             #self.resize(windowSize)
             
-        #windowPos = self.settings.value("/".join([self.__class__.__name__, "WindowPos"]), None)
+        #windowPos = self.qsettings.value("/".join([self.__class__.__name__, "WindowPos"]), None)
         #if windowPos is not None:
             #self.move(windowPos)
             
-        #windowState = self.settings.value("/".join([self.__class__.__name__, "WindowState"]), None)
+        #windowState = self.qsettings.value("/".join([self.__class__.__name__, "WindowState"]), None)
         #if windowState is not None:
             #self.restoreState(windowState)
             
     def _save_settings_(self):
-        saveWindowSettings(self.settings, self)
-        #self.settings.setValue("/".join([self.__class__.__name__, "WindowSize"]), self.size())
+        saveWindowSettings(self.qsettings, self)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "WindowSize"]), self.size())
             
-        #self.settings.setValue("/".join([self.__class__.__name__, "WindowPos"]), self.pos())
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "WindowPos"]), self.pos())
             
-        #self.settings.setValue("/".join([self.__class__.__name__, "WindowState"]), self.saveState())
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "WindowState"]), self.saveState())
             
     def setData(self, scriptsDict):
         if not isinstance(scriptsDict, dict):
@@ -3180,49 +3180,49 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         evt.accept()
         
     def _save_settings_(self):
-        #self.settings.endGroup()
-        saveWindowSettings(self.settings, self)#, group_name=self.__class__.__name__)
+        #self.qsettings.endGroup()
+        saveWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
         
-        self.settings.beginGroup(self.__class__.__name__)
+        self.qsettings.beginGroup(self.__class__.__name__)
         
         #consoleFont = self.console.font
-        #self.settings.setValue("ConsoleFont", consoleFont)
-        #self.settings.setValue("ConsoleFontSize", consoleFont.pointSizeF())
-        #self.settings.setValue("ScipyenWindow/Editor", self.scipyenEditor)
+        #self.qsettings.setValue("ConsoleFont", consoleFont)
+        #self.qsettings.setValue("ConsoleFontSize", consoleFont.pointSizeF())
+        #self.qsettings.setValue("ScipyenWindow/Editor", self.scipyenEditor)
         
-        self.settings.setValue("RecentFiles", self.recentFiles)
-        self.settings.setValue("RecentDirectories", self.recentDirectories)
-        self.settings.setValue("RecentScripts", self.recentlyRunScripts)
+        self.qsettings.setValue("RecentFiles", self.recentFiles)
+        self.qsettings.setValue("RecentDirectories", self.recentDirectories)
+        self.qsettings.setValue("RecentScripts", self.recentlyRunScripts)
         
         if len(self.fileSystemFilterHistory) > 0:
-            self.settings.setValue("RecentFileSystemFilters", self.fileSystemFilterHistory)
+            self.qsettings.setValue("RecentFileSystemFilters", self.fileSystemFilterHistory)
 
-        self.settings.setValue("LastFileSystemFilter", self.lastFileSystemFilter)
+        self.qsettings.setValue("LastFileSystemFilter", self.lastFileSystemFilter)
         
         if len(self.recentVariablesList) > 0:
-            self.settings.setValue("VariableSearch", self.recentVariablesList)
+            self.qsettings.setValue("VariableSearch", self.recentVariablesList)
             
-        self.settings.setValue("LastVariableSearch", self.lastVariableFind)
+        self.qsettings.setValue("LastVariableSearch", self.lastVariableFind)
         
         if len(self.commandHistoryFinderList) > 0:
-            self.settings.setValue("CommandSearch", self.commandHistoryFinderList)
+            self.qsettings.setValue("CommandSearch", self.commandHistoryFinderList)
             
-        self.settings.setValue("LastCommandSearch", self.lastCommandFind)
+        self.qsettings.setValue("LastCommandSearch", self.lastCommandFind)
         
-        self.settings.setValue("FilesFilterVisible", self.filesFilterFrame.isVisible())
+        self.qsettings.setValue("FilesFilterVisible", self.filesFilterFrame.isVisible())
         
-        self.settings.endGroup()
+        self.qsettings.endGroup()
         
         #### NOTE: user-defined gui handlers (viewers) for variable types, or user-changed
         # configuration of gui handlers
         # FIXME 2021-07-17 22:55:17 
         # Not written to Scipyen.conf 
-        self.settings.beginGroup("Custom_GUI_Handlers")
+        self.qsettings.beginGroup("Custom_GUI_Handlers")
         for viewerClass in VTH.gui_handlers.keys():
-            self.settings.beginGroup(viewerClass.__name__)
+            self.qsettings.beginGroup(viewerClass.__name__)
             if viewerClass not in VTH.default_handlers.keys():
                 # store user-define handlers
-                self.settings.setValue("action", VTH.gui_handlers[viewerClass]["action"])
+                self.qsettings.setValue("action", VTH.gui_handlers[viewerClass]["action"])
                 
                 if isinstance(VTH.gui_handlers[viewerClass]["types"], type):
                     type_names = [VTH.gui_handlers[viewerClass]["types"]._name__]
@@ -3230,7 +3230,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 else:
                     type_names = [t.__name__ for t in VTH.gui_handlers[viewerClass]["types"]] 
                     
-                self.settings.setValue("types", type_names)
+                self.qsettings.setValue("types", type_names)
                 
             else:
                 # store customizations for built-in handlers:
@@ -3244,14 +3244,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     else:
                         type_names = [t.__name__ for t in VTH.gui_handlers[viewerClass]["types"]]
                         
-                    self.settings.setValue("types", VTH.gui_handlers[viewerClass]["types"])
+                    self.qsettings.setValue("types", VTH.gui_handlers[viewerClass]["types"])
                 
                 if VTH.gui_handlers[viewerClass]["action"] is not default_action_name:
-                    self.settings.setValue("action", VTH.gui_handlers[viewerClass]["action"])
+                    self.qsettings.setValue("action", VTH.gui_handlers[viewerClass]["action"])
         
-            self.settings.endGroup()
+            self.qsettings.endGroup()
             
-        self.settings.endGroup()
+        self.qsettings.endGroup()
         
     def _setup_console_pygments_(self):
         from qtconsole.jupyter_widget import JupyterWidget
@@ -3268,45 +3268,45 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
     #@processtimefunc
     def _load_settings_(self):
-        self.settings                   = QtCore.QSettings("Scipyen", "Scipyen")
-        loadWindowSettings(self.settings, self)#, group_name = self.__class__.__name__)
+        self.qsettings                   = QtCore.QSettings("Scipyen", "Scipyen")
+        loadWindowSettings(self.qsettings, self)#, group_name = self.__class__.__name__)
         
-        self.settings.beginGroup(self.__class__.__name__)
+        self.qsettings.beginGroup(self.__class__.__name__)
             
-        #consoleFontSize = self.settings.value("ConsoleFontSize",8.)
-        #consoleFont = self.settings.value("ConsoleFont", QtGui.QFont("Monospace"))
+        #consoleFontSize = self.qsettings.value("ConsoleFontSize",8.)
+        #consoleFont = self.qsettings.value("ConsoleFont", QtGui.QFont("Monospace"))
         
         #consoleFont.setPointSizeF(float(consoleFontSize))
         
         #self.console._set_font(consoleFont)
         
-        self.recentVariablesList        = self.settings.value("VariableSearch", collections.deque())
+        self.recentVariablesList        = self.qsettings.value("VariableSearch", collections.deque())
         
         if len(self.recentVariablesList) > 0:
             for item in self.recentVariablesList:
                 self.varNameFilterFinderComboBox.addItem(item)
                 
-        self.lastVariableFind           = self.settings.value("LastVariableSearch", str())
+        self.lastVariableFind           = self.qsettings.value("LastVariableSearch", str())
         
-        self.commandHistoryFinderList   = self.settings.value("CommandSearch", collections.deque())
+        self.commandHistoryFinderList   = self.qsettings.value("CommandSearch", collections.deque())
         
-        self.lastCommandFind            = self.settings.value("LastCommandSearch", str())
+        self.lastCommandFind            = self.qsettings.value("LastCommandSearch", str())
         
-        used_file_filters = [s for s in self.settings.value("RecentFileSystemFilters", collections.deque()) if isinstance(s, str)]
+        used_file_filters = [s for s in self.qsettings.value("RecentFileSystemFilters", collections.deque()) if isinstance(s, str)]
         
         self.fileSystemFilterHistory    = collections.deque(sorted(used_file_filters))
         
-        self.lastFileSystemFilter       = self.settings.value("LastFileSystemFilter", str())
+        self.lastFileSystemFilter       = self.qsettings.value("LastFileSystemFilter", str())
         
         try:
-            self.recentFiles = self.settings.value("RecentFiles", collections.OrderedDict())
+            self.recentFiles = self.qsettings.value("RecentFiles", collections.OrderedDict())
             
         except:
             self.recentFiles = collections.OrderedDict()
         
-        self.recentDirectories = self.settings.value("RecentDirectories", collections.deque())
+        self.recentDirectories = self.qsettings.value("RecentDirectories", collections.deque())
         
-        recentScripts = self.settings.value("RecentScripts", collections.deque())
+        recentScripts = self.qsettings.value("RecentScripts", collections.deque())
         
         for script_file in recentScripts:
             if os.path.isfile(script_file):
@@ -3354,7 +3354,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if len(self.recentDirectories):
             self.slot_changeDirectory(self.recentDirectories[0])
             
-        showFilesFilter = self.settings.value("FilesFilterVisible", False)
+        showFilesFilter = self.qsettings.value("FilesFilterVisible", False)
         
         #print("showFilesFilter %s" % showFilesFilter)
         
@@ -3369,34 +3369,34 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #if showFilesFilter:
             #self.filesFilterFrame.show()
             
-        self.settings.endGroup() # settings for ScipyenWindow group
+        self.qsettings.endGroup() # settings for ScipyenWindow group
         
-        self.settings.beginGroup("Custom_GUI_Handlers")
+        self.qsettings.beginGroup("Custom_GUI_Handlers")
         
         # FIXME: 2019-11-03 22:56:20 -- inconsistency
         # what if a viewer doesn't have any types defined?
         # by default it would be skipped from the auto-menus, but
         # if one uses VTH.register() then types must be defined!
-        for viewerGroup in self.settings.childGroups():
+        for viewerGroup in self.qsettings.childGroups():
             customViewer = [v for v in VTH.gui_handlers.keys() if v.__name__ == viewerGroup]
             if len(customViewer):
                 viewerClass = customViewer[0]
-                self.settings.beginGroup(viewerGroup)
-                if "action" in self.settings.childKeys():
-                    action = self.settings.value("action", "View")
+                self.qsettings.beginGroup(viewerGroup)
+                if "action" in self.qsettings.childKeys():
+                    action = self.qsettings.value("action", "View")
                     
-                if "types" in self.settings.childKeys():
-                    type_names_list = self.settings.value("types", ["type(None)"])
+                if "types" in self.qsettings.childKeys():
+                    type_names_list = self.qsettings.value("types", ["type(None)"])
                     types = [eval(t_name) for t_name in type_names_list]
                     
                 if len(types) == 0: # see FIXME: 2019-11-03 22:56:20
-                    self.settings.endGroup()
+                    self.qsettings.endGroup()
                     continue
                 
                 VTH.register(viewerClass, types, actionName=action)
-                self.settings.endGroup()
+                self.qsettings.endGroup()
             
-        self.settings.endGroup()
+        self.qsettings.endGroup()
     
     #@processtimefunc
     def _configureUI_(self):

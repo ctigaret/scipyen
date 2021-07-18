@@ -842,11 +842,11 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
         
     def _save_viewer_settings_(self):
         if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-            self.settings.setValue("/".join([self.__class__.__name__, "UseMatplotlib"]), "%s" % self._use_matplotlib_)
+            self.qsettings.setValue("/".join([self.__class__.__name__, "UseMatplotlib"]), "%s" % self._use_matplotlib_)
             
     def _load_viewer_settings_(self):
         if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-            use_mpl = self.settings.value("/".join([self.__class__.__name__, "UseMatplotlib"]), True)
+            use_mpl = self.qsettings.value("/".join([self.__class__.__name__, "UseMatplotlib"]), True)
             
             if isinstance(use_mpl, bool):
                 self._use_matplotlib_ = use_mpl

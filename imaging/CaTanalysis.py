@@ -3485,7 +3485,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
     def __init__(self, *args, parent:(QtWidgets.QMainWindow, type(None)) = None,
                  win_title="LSCaT", **kwargs):
         
-        #self.settings = QtCore.QSettings() # dealt with by ScipyenViewer superclass
+        #self.qsettings = QtCore.QSettings() # dealt with by ScipyenViewer superclass
         
         self.threadpool = QtCore.QThreadPool()
         #self.timer = QtCore.QTimer()
@@ -3728,45 +3728,45 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         # settings for LnF of cursors & rois
         from matplotlib.colors import Colormap
         
-        self.settings.setValue("LSCaTAnalysis/Use_Opaque_Labels", self.actionOpaque_cursor_labels.isChecked())
+        self.qsettings.setValue("LSCaTAnalysis/Use_Opaque_Labels", self.actionOpaque_cursor_labels.isChecked())
         
-        self.settings.setValue("LSCaTAnalysis/Link_Scan_Vertical_Cursors_to_Scene_Point_Cursors", self.actionLink_vertical_scan_cursors_to_scene_point_cursors.isChecked())
+        self.qsettings.setValue("LSCaTAnalysis/Link_Scan_Vertical_Cursors_to_Scene_Point_Cursors", self.actionLink_vertical_scan_cursors_to_scene_point_cursors.isChecked())
         
-        self.settings.setValue("LSCaTAnalysis/Plot_long_fits", self.actionPlot_long_fits.isChecked())
+        self.qsettings.setValue("LSCaTAnalysis/Plot_long_fits", self.actionPlot_long_fits.isChecked())
 
         for k, w in enumerate(self.sceneviewers):
             if isinstance(w.colorMap, Colormap):
-                self.settings.setValue("LSCaTAnalysis/SceneWindow_%d_ColorMap" % k, w.colorMap.name)
+                self.qsettings.setValue("LSCaTAnalysis/SceneWindow_%d_ColorMap" % k, w.colorMap.name)
                 
             else:
-                self.settings.setValue("LSCaTAnalysis/SceneWindow_%d_ColorMap" % k, None)
+                self.qsettings.setValue("LSCaTAnalysis/SceneWindow_%d_ColorMap" % k, None)
                 
         for k, w in enumerate(self.scansviewers):
             if isinstance(w.colorMap, Colormap):
-                self.settings.setValue("LSCaTAnalysis/ScansWindow_%d_ColorMap" % k, w.colorMap.name)
+                self.qsettings.setValue("LSCaTAnalysis/ScansWindow_%d_ColorMap" % k, w.colorMap.name)
                 
             else:
-                self.settings.setValue("LSCaTAnalysis/ScansWindow_%d_ColorMap" % k, None)
+                self.qsettings.setValue("LSCaTAnalysis/ScansWindow_%d_ColorMap" % k, None)
                 
         if len(self.profileviewers):
             w = self.profileviewers[0]
             for dw in w.dockWidgets:
-                self.settings.setValue("LSCaTAnalysis/ProfileWindow_%s" % dw[0], dw[1].isVisible())
+                self.qsettings.setValue("LSCaTAnalysis/ProfileWindow_%s" % dw[0], dw[1].isVisible())
             
         if len(self.scansblockviewers):
             w = self.scansblockviewers[0]
             for dw in w.dockWidgets:
-                self.settings.setValue("LSCaTAnalysis/ScansDataWindow_%s" % dw[0], dw[1].isVisible())
+                self.qsettings.setValue("LSCaTAnalysis/ScansDataWindow_%s" % dw[0], dw[1].isVisible())
             
         if len(self.ephysviewers):
             w = self.ephysviewers[0]
             for dw in w.dockWidgets:
-                self.settings.setValue("LSCaTAnalysis/EphysWindow_%s" % dw[0], dw[1].isVisible())
+                self.qsettings.setValue("LSCaTAnalysis/EphysWindow_%s" % dw[0], dw[1].isVisible())
             
         if len(self.scansblockviewers):
             w = self.scansblockviewers[0]
             for dw in w.dockWidgets:
-                self.settings.setValue("LSCaTAnalysis/SceneDataWindow_%s" % dw[0], dw[1].isVisible())
+                self.qsettings.setValue("LSCaTAnalysis/SceneDataWindow_%s" % dw[0], dw[1].isVisible())
                 
             
     def saveWindowSettings(self):
@@ -3775,57 +3775,57 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         print("%s.saveWindowSettings %s" % (self.__class__.__name__, self.winTitle))
         print("%s.saveWindowSettings %s save client windows settings" % (self.__class__.__name__, self.winTitle))
         for k, w in enumerate(self.sceneviewers):
-            saveWindowSettings(self.settings, w, "LSCaTAnalysis/SceneWindow_%d" % k)
-            #self.settings.setValue("LSCaTAnalysis/SceneWindow_%d_Size" % k, w.size())
-            #self.settings.setValue("LSCaTAnalysis/SceneWindow_%d_Position" % k, w.pos())
-            ##self.settings.setValue("LSCaTAnalysis/SceneWindow_%d_Geometry" % k, w.geometry())
-            #self.settings.setValue("LSCaTAnalysis/SceneWindow_%d_State" % k, w.saveState())
+            saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/SceneWindow_%d" % k)
+            #self.qsettings.setValue("LSCaTAnalysis/SceneWindow_%d_Size" % k, w.size())
+            #self.qsettings.setValue("LSCaTAnalysis/SceneWindow_%d_Position" % k, w.pos())
+            ##self.qsettings.setValue("LSCaTAnalysis/SceneWindow_%d_Geometry" % k, w.geometry())
+            #self.qsettings.setValue("LSCaTAnalysis/SceneWindow_%d_State" % k, w.saveState())
                 
         for k, w in enumerate(self.scansviewers):
-            saveWindowSettings(self.settings, w, "LSCaTAnalysis/ScansWindow_%d" % k)
-            #self.settings.setValue("LSCaTAnalysis/ScansWindow_%d_Size" % k, w.size())
-            #self.settings.setValue("LSCaTAnalysis/ScansWindow_%d_Position" % k, w.pos())
-            ##self.settings.setValue("LSCaTAnalysis/ScansWindow_%d_Geometry" % k, w.geometry())
-            #self.settings.setValue("LSCaTAnalysis/ScansWindow_%d_State" % k, w.saveState())
+            saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/ScansWindow_%d" % k)
+            #self.qsettings.setValue("LSCaTAnalysis/ScansWindow_%d_Size" % k, w.size())
+            #self.qsettings.setValue("LSCaTAnalysis/ScansWindow_%d_Position" % k, w.pos())
+            ##self.qsettings.setValue("LSCaTAnalysis/ScansWindow_%d_Geometry" % k, w.geometry())
+            #self.qsettings.setValue("LSCaTAnalysis/ScansWindow_%d_State" % k, w.saveState())
                     
         if len(self.profileviewers):
             w = self.profileviewers[0]
-            saveWindowSettings(self.settings, w, "LSCaTAnalysis/ProfileWindow")
-            #self.settings.setValue("LSCaTAnalysis/ProfileWindow_Size", w.size())
-            #self.settings.setValue("LSCaTAnalysis/ProfileWindow_Position", w.pos())
-            ##self.settings.setValue("LSCaTAnalysis/ProfileWindow_Geometry", w.geometry())
-            #self.settings.setValue("LSCaTAnalysis/ProfileWindow_State", w.saveState())
+            saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/ProfileWindow")
+            #self.qsettings.setValue("LSCaTAnalysis/ProfileWindow_Size", w.size())
+            #self.qsettings.setValue("LSCaTAnalysis/ProfileWindow_Position", w.pos())
+            ##self.qsettings.setValue("LSCaTAnalysis/ProfileWindow_Geometry", w.geometry())
+            #self.qsettings.setValue("LSCaTAnalysis/ProfileWindow_State", w.saveState())
                 
         if len(self.scansblockviewers):
             w = self.scansblockviewers[0]
-            saveWindowSettings(self.settings, w, "LSCaTAnalysis/ScansDataWindow")
-            #self.settings.setValue("LSCaTAnalysis/ScansDataWindow_Size", w.size())
-            #self.settings.setValue("LSCaTAnalysis/ScansDataWindow_Position", w.pos())
-            ##self.settings.setValue("LSCaTAnalysis/ScansDataWindow_Geometry", w.geometry())
-            #self.settings.setValue("LSCaTAnalysis/ScansDataWindow_State", w.saveState())
+            saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/ScansDataWindow")
+            #self.qsettings.setValue("LSCaTAnalysis/ScansDataWindow_Size", w.size())
+            #self.qsettings.setValue("LSCaTAnalysis/ScansDataWindow_Position", w.pos())
+            ##self.qsettings.setValue("LSCaTAnalysis/ScansDataWindow_Geometry", w.geometry())
+            #self.qsettings.setValue("LSCaTAnalysis/ScansDataWindow_State", w.saveState())
                 
         if self.reportWindow.isVisible():
-            saveWindowSettings(self.settings, w, "LSCaTAnalysis/ReportWindow")
-            #self.settings.setValue("LSCaTAnalysis/ReportWindow_Size", self.reportWindow.size())
-            #self.settings.setValue("LSCaTAnalysis/ReportWindow_Position", self.reportWindow.pos())
-            ##self.settings.setValue("LSCaTAnalysis/ReportWindow_Geometry", self.reportWindow.geometry())
-            #self.settings.setValue("LSCaTAnalysis/ReportWindow_State", self.reportWindow.saveState())
+            saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/ReportWindow")
+            #self.qsettings.setValue("LSCaTAnalysis/ReportWindow_Size", self.reportWindow.size())
+            #self.qsettings.setValue("LSCaTAnalysis/ReportWindow_Position", self.reportWindow.pos())
+            ##self.qsettings.setValue("LSCaTAnalysis/ReportWindow_Geometry", self.reportWindow.geometry())
+            #self.qsettings.setValue("LSCaTAnalysis/ReportWindow_State", self.reportWindow.saveState())
             
         if len(self.ephysviewers):
             w = self.ephysviewers[0]
-            saveWindowSettings(self.settings, w, "LSCaTAnalysis/EphysWindow")
-            #self.settings.setValue("LSCaTAnalysis/EphysWindow_Size", w.size())
-            #self.settings.setValue("LSCaTAnalysis/EphysWindow_Position", w.pos())
-            ##self.settings.setValue("LSCaTAnalysis/EphysWindow_Geometry", w.geometry())
-            #self.settings.setValue("LSCaTAnalysis/EphysWindow_State", w.saveState())
+            saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/EphysWindow")
+            #self.qsettings.setValue("LSCaTAnalysis/EphysWindow_Size", w.size())
+            #self.qsettings.setValue("LSCaTAnalysis/EphysWindow_Position", w.pos())
+            ##self.qsettings.setValue("LSCaTAnalysis/EphysWindow_Geometry", w.geometry())
+            #self.qsettings.setValue("LSCaTAnalysis/EphysWindow_State", w.saveState())
             
         if len(self.scansblockviewers):
             w = self.scansblockviewers[0]
-            saveWindowSettings(self.settings, w, "LSCaTAnalysis/SceneDataWindow")
-            #self.settings.setValue("LSCaTAnalysis/SceneDataWindow_Size", w.size())
-            #self.settings.setValue("LSCaTAnalysis/SceneDataWindow_Position", w.pos())
-            ##self.settings.setValue("LSCaTAnalysis/ScansDataWindow_Geometry", w.geometry())
-            #self.settings.setValue("LSCaTAnalysis/SceneDataWindow_State", w.saveState())
+            saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/SceneDataWindow")
+            #self.qsettings.setValue("LSCaTAnalysis/SceneDataWindow_Size", w.size())
+            #self.qsettings.setValue("LSCaTAnalysis/SceneDataWindow_Position", w.pos())
+            ##self.qsettings.setValue("LSCaTAnalysis/ScansDataWindow_Geometry", w.geometry())
+            #self.qsettings.setValue("LSCaTAnalysis/SceneDataWindow_State", w.saveState())
                 
         print("%s.saveWindowSettings %s Call super().saveWindowSettings" % (self.__class__.__name__, self.winTitle))
         super().saveWindowSettings() # to save LSCaT window pos, geometry & statwe
@@ -3834,7 +3834,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         """Loads settings unrelated to QMainWindowe instance.
         Concerns only the LSCaTWindow and not its client image/signal viewers
         """
-        use_opaque_labels = self.settings.value("LSCaTAnalysis/Use_Opaque_Labels", False)
+        use_opaque_labels = self.qsettings.value("LSCaTAnalysis/Use_Opaque_Labels", False)
         
         if isinstance(use_opaque_labels, str):
             self.actionOpaque_cursor_labels.setChecked(use_opaque_labels.lower().strip() == "true")
@@ -3842,7 +3842,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         else:
             self.actionOpaque_cursor_labels.setChecked(use_opaque_labels)
         
-        link_scan_vc_to_scene_pc = self.settings.value("LSCaTAnalysis/Link_Scan_Vertical_Cursors_to_Scene_Point_Cursors", False)
+        link_scan_vc_to_scene_pc = self.qsettings.value("LSCaTAnalysis/Link_Scan_Vertical_Cursors_to_Scene_Point_Cursors", False)
         
         if isinstance(link_scan_vc_to_scene_pc, str):
             self.actionLink_vertical_scan_cursors_to_scene_point_cursors.setChecked(link_scan_vc_to_scene_pc.lower().strip() == "true")
@@ -3850,7 +3850,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         else:
             self.actionLink_vertical_scan_cursors_to_scene_point_cursors.setChecked(link_scan_vc_to_scene_pc)
             
-        plot_long_fits = self.settings.value("LSCaTAnalysis/Plot_long_fits", False)
+        plot_long_fits = self.qsettings.value("LSCaTAnalysis/Plot_long_fits", False)
         
         if isinstance(plot_long_fits, str):
             self.actionPlot_long_fits.setChecked(plot_long_fits.lower().strip() == "true")
@@ -6820,17 +6820,17 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         self.reportWindow.show()
         #self.reportWindow.view(self._report_dataframe_)
         
-        windowSize = self.settings.value("LSCaTAnalysis/ReportWindow_Size", None)
+        windowSize = self.qsettings.value("LSCaTAnalysis/ReportWindow_Size", None)
         
         if windowSize is not None:
             self.reportWindow.resize(windowSize)
             
-        windowPos = self.settings.value("LSCaTAnalysis/ReportWindow_Position", None)
+        windowPos = self.qsettings.value("LSCaTAnalysis/ReportWindow_Position", None)
         
         if windowPos is not None:
             self.reportWindow.move(windowPos)
             
-        windowState = self.settings.value("LSCaTAnalysis/ReportWindow_State", None)
+        windowState = self.qsettings.value("LSCaTAnalysis/ReportWindow_State", None)
         
         if windowState is not None:
             self.reportWindow.restoreState(windowState)
@@ -7902,10 +7902,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             
     @pyqtSlot()
     def slot_report_window_closing(self):
-        self.settings.setValue("LSCaTAnalysis/ReportWindow_Size", self.reportWindow.size())
-        self.settings.setValue("LSCaTAnalysis/ReportWindow_Position", self.reportWindow.pos())
-        self.settings.setValue("LSCaTAnalysis/ReportWindow_Geometry", self.reportWindow.geometry())
-        self.settings.setValue("LSCaTAnalysis/ReportWindow_State", self.reportWindow.saveState())
+        self.qsettings.setValue("LSCaTAnalysis/ReportWindow_Size", self.reportWindow.size())
+        self.qsettings.setValue("LSCaTAnalysis/ReportWindow_Position", self.reportWindow.pos())
+        self.qsettings.setValue("LSCaTAnalysis/ReportWindow_Geometry", self.reportWindow.geometry())
+        self.qsettings.setValue("LSCaTAnalysis/ReportWindow_State", self.reportWindow.saveState())
                 
     @safeWrapper
     @pyqtSlot()
@@ -9980,48 +9980,48 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 #### BEGIN load window & viewer settings
                 winSettingsStrPrefix = "LSCaTAnalysis/SceneWindow_%d" % k
                 
-                if self.settings.contains("%s_Size" % winSettingsStrPrefix):
-                    windowSize = self.settings.value("%s_Size" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
+                    windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
                     if windowSize is not None:
                         win.resize(windowSize)
                     
-                if self.settings.contains("%s_Position" %  winSettingsStrPrefix):
-                    windowPos = self.settings.value("%s_Position" %  winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
+                    windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
                     if windowPos is not None:
                         win.move(windowPos)
                         
-                if self.settings.contains("%s_State" % winSettingsStrPrefix):
-                    windowState = self.settings.value("%s_State" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
+                    windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
                     if windowState is not None:
                         win.restoreState(windowState)
                         
-                if self.settings.contains("%s_ColorMap" % winSettingsStrPrefix):
-                    cmapname = self.settings.value("%s_ColorMap" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_ColorMap" % winSettingsStrPrefix):
+                    cmapname = self.qsettings.value("%s_ColorMap" % winSettingsStrPrefix, None)
                     if isinstance(cmapname, str):
                         win.setColorMap(cmapname)
                     
                 # TODO/FIXME: 2021-07-08 10:29:31
                 # must check/revisit these below
-                if self.settings.contains("%s_CursorsColor" % winSettingsStrPrefix):
-                    cursorscolor = self.settings.value("%s_CursorsColor" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_CursorsColor" % winSettingsStrPrefix):
+                    cursorscolor = self.qsettings.value("%s_CursorsColor" % winSettingsStrPrefix, None)
                     
                     if isinstance(cursorscolor, QtGui.QColor) and cursorscolor.isValid():
                         win.setCursorsColor(cursorscolor)
                 
-                if self.settings.contains("%s_RoisColor" % winSettingsStrPrefix):
-                    roiscolor = self.settings.value("%s_RoisColor" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_RoisColor" % winSettingsStrPrefix):
+                    roiscolor = self.qsettings.value("%s_RoisColor" % winSettingsStrPrefix, None)
                     
                     if isinstance(roiscolor, QtGui.QColor) and roiscolor.isValid():
                         win.setRoisColor(roiscolor)
                 
-                if self.settings.contains("%s_SharedCursorsColor" % winSettingsStrPrefix):
-                    cursorscolor = self.settings.value("%s_SharedCursorsColor" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_SharedCursorsColor" % winSettingsStrPrefix):
+                    cursorscolor = self.qsettings.value("%s_SharedCursorsColor" % winSettingsStrPrefix, None)
                     
                     if isinstance(cursorscolor, QtGui.QColor) and cursorscolor.isValid():
                         win.setSharedCursorsColor(cursorscolor)
                 
-                if self.settings.contains("%s_SharedRoisColor" % winSettingsStrPrefix):
-                    roiscolor = self.settings.value("%s_SharedRoisColor" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_SharedRoisColor" % winSettingsStrPrefix):
+                    roiscolor = self.qsettings.value("%s_SharedRoisColor" % winSettingsStrPrefix, None)
                     
                     if isinstance(roiscolor, QtGui.QColor) and roiscolor.isValid():
                         win.setSharedRoisColor(roiscolor)
@@ -10089,48 +10089,48 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 #### BEGIN load window & viewer settings
                 winSettingsStrPrefix = "LSCaTAnalysis/ScansWindow_%d" % k
                 
-                if self.settings.contains("%s_Size" % winSettingsStrPrefix):
-                    windowSize = self.settings.value("%s_Size" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
+                    windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
                     if windowSize is not None:
                         win.resize(windowSize)
                     
-                if self.settings.contains("%s_Position" %  winSettingsStrPrefix):
-                    windowPos = self.settings.value("%s_Position" %  winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
+                    windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
                     if windowPos is not None:
                         win.move(windowPos)
                         
-                if self.settings.contains("%s_State" % winSettingsStrPrefix):
-                    windowState = self.settings.value("%s_State" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
+                    windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
                     if windowState is not None:
                         win.restoreState(windowState)
                         
-                if self.settings.contains("%s_ColorMap" % winSettingsStrPrefix):
-                    cmapname = self.settings.value("%s_ColorMap" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_ColorMap" % winSettingsStrPrefix):
+                    cmapname = self.qsettings.value("%s_ColorMap" % winSettingsStrPrefix, None)
                     if isinstance(cmapname, str):
                         win.setColorMap(cmapname)
                     
                 # TODO/FIXME: 2021-07-08 10:30:10
                 # must check/revisit these below
-                if self.settings.contains("%s_CursorsColor" % winSettingsStrPrefix):
-                    cursorscolor = self.settings.value("%s_CursorsColor" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_CursorsColor" % winSettingsStrPrefix):
+                    cursorscolor = self.qsettings.value("%s_CursorsColor" % winSettingsStrPrefix, None)
                     
                     if isinstance(cursorscolor, QtGui.QColor) and cursorscolor.isValid():
                         win.setCursorsColor(cursorscolor)
                 
-                if self.settings.contains("%s_RoisColor" % winSettingsStrPrefix):
-                    roiscolor = self.settings.value("%s_RoisColor" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_RoisColor" % winSettingsStrPrefix):
+                    roiscolor = self.qsettings.value("%s_RoisColor" % winSettingsStrPrefix, None)
                     
                     if isinstance(roiscolor, QtGui.QColor) and roiscolor.isValid():
                         win.setRoisColor(roiscolor)
                 
-                if self.settings.contains("%s_SharedCursorsColor" % winSettingsStrPrefix):
-                    cursorscolor = self.settings.value("%s_SharedCursorsColor" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_SharedCursorsColor" % winSettingsStrPrefix):
+                    cursorscolor = self.qsettings.value("%s_SharedCursorsColor" % winSettingsStrPrefix, None)
                     
                     if isinstance(cursorscolor, QtGui.QColor) and cursorscolor.isValid():
                         win.setSharedCursorsColor(cursorscolor)
                 
-                if self.settings.contains("%s_SharedRoisColor" % winSettingsStrPrefix):
-                    roiscolor = self.settings.value("%s_SharedRoisColor" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_SharedRoisColor" % winSettingsStrPrefix):
+                    roiscolor = self.qsettings.value("%s_SharedRoisColor" % winSettingsStrPrefix, None)
                     
                     if isinstance(roiscolor, QtGui.QColor) and roiscolor.isValid():
                         win.setSharedRoisColor(roiscolor)
@@ -10183,25 +10183,25 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 #### BEGIN Load window and viewer settings
                 winSettingsStrPrefix = "LSCaTAnalysis/EphysWindow_"
                                             
-                if self.settings.contains("%s_Size" % winSettingsStrPrefix):
-                    windowSize = self.settings.value("%s_Size" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
+                    windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
                     if windowSize is not None:
                         win.resize(windowSize)
                     
-                if self.settings.contains("%s_Position" %  winSettingsStrPrefix):
-                    windowPos = self.settings.value("%s_Position" %  winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
+                    windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
                     if windowPos is not None:
                         win.move(windowPos)
                         
-                if self.settings.contains("%s_State" % winSettingsStrPrefix):
-                    windowState = self.settings.value("%s_State" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
+                    windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
                     if windowState is not None:
                         win.restoreState(windowState)
                 
                 for dw in win.dockWidgets:
                     dock_visible=False
                     
-                    dock_visibility = self.settings.value("LSCaTAnalysis/EphysWindow_%s" % dw[0], "false")
+                    dock_visibility = self.qsettings.value("LSCaTAnalysis/EphysWindow_%s" % dw[0], "false")
                     
                     if isinstance(dock_visibility, str):
                         dock_visible = dock_visibility.lower().strip() == "true"
@@ -10292,25 +10292,25 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 #### BEGIN Load window and viewer settings
                 winSettingsStrPrefix = "LSCaTAnalysis/ProfileWindow_"
                                             
-                if self.settings.contains("%s_Size" % winSettingsStrPrefix):
-                    windowSize = self.settings.value("%s_Size" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
+                    windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
                     if windowSize is not None:
                         win.resize(windowSize)
                     
-                if self.settings.contains("%s_Position" %  winSettingsStrPrefix):
-                    windowPos = self.settings.value("%s_Position" %  winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
+                    windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
                     if windowPos is not None:
                         win.move(windowPos)
                         
-                if self.settings.contains("%s_State" % winSettingsStrPrefix):
-                    windowState = self.settings.value("%s_State" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
+                    windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
                     if windowState is not None:
                         win.restoreState(windowState)
                 
                 for dw in win.dockWidgets:
                     dock_visible=False
                     
-                    dock_visibility = self.settings.value("LSCaTAnalysis/ProfileWindow_%s" % dw[0], "false")
+                    dock_visibility = self.qsettings.value("LSCaTAnalysis/ProfileWindow_%s" % dw[0], "false")
                     
                     if isinstance(dock_visibility, str):
                         dock_visible = dock_visibility.lower().strip() == "true"
@@ -10385,25 +10385,25 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 #### BEGIN Load window and viewer settings
                 winSettingsStrPrefix = "LSCaTAnalysis/ScansDataWindow_"
                                             
-                if self.settings.contains("%s_Size" % winSettingsStrPrefix):
-                    windowSize = self.settings.value("%s_Size" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
+                    windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
                     if windowSize is not None:
                         win.resize(windowSize)
                     
-                if self.settings.contains("%s_Position" %  winSettingsStrPrefix):
-                    windowPos = self.settings.value("%s_Position" %  winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
+                    windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
                     if windowPos is not None:
                         win.move(windowPos)
                         
-                if self.settings.contains("%s_State" % winSettingsStrPrefix):
-                    windowState = self.settings.value("%s_State" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
+                    windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
                     if windowState is not None:
                         win.restoreState(windowState)
                 
                 for dw in win.dockWidgets:
                     dock_visible=False
                     
-                    dock_visibility = self.settings.value("LSCaTAnalysis/ScansDataWindow_%s" % dw[0], "false")
+                    dock_visibility = self.qsettings.value("LSCaTAnalysis/ScansDataWindow_%s" % dw[0], "false")
                     
                     if isinstance(dock_visibility, str):
                         dock_visible = dock_visibility.lower().strip() == "true"
@@ -10462,25 +10462,25 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 #### BEGIN Load window & viewer settings
                 winSettingsStrPrefix = "LSCaTAnalysis/SceneDataWindow_"
                 
-                if self.settings.contains("%s_Size" % winSettingsStrPrefix):
-                    windowSize = self.settings.value("%s_Size" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
+                    windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
                     if windowSize is not None:
                         win.resize(windowSize)
                     
-                if self.settings.contains("%s_Position" %  winSettingsStrPrefix):
-                    windowPos = self.settings.value("%s_Position" %  winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
+                    windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
                     if windowPos is not None:
                         win.move(windowPos)
                         
-                if self.settings.contains("%s_State" % winSettingsStrPrefix):
-                    windowState = self.settings.value("%s_State" % winSettingsStrPrefix, None)
+                if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
+                    windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
                     if windowState is not None:
                         win.restoreState(windowState)
                         
                 for dw in win.dockWidgets:
                     dock_visible=False
                     
-                    dock_visibility = self.settings.value("LSCaTAnalysis/SceneDataWindow_%s" % dw[0], "false")
+                    dock_visibility = self.qsettings.value("LSCaTAnalysis/SceneDataWindow_%s" % dw[0], "false")
                     
                     if isinstance(dock_visibility, str):
                         dock_visible = dock_visibility.lower().strip() == "true"
@@ -10610,18 +10610,18 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             
             win = self.scansblockviewers[0]
             
-            if self.settings.contains("%s_Size" % winSettingsStrPrefix):
-                windowSize = self.settings.value("%s_Size" % winSettingsStrPrefix, None)
+            if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
+                windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
                 if windowSize is not None:
                     win.resize(windowSize)
                 
-            if self.settings.contains("%s_Position" %  winSettingsStrPrefix):
-                windowPos = self.settings.value("%s_Position" %  winSettingsStrPrefix, None)
+            if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
+                windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
                 if windowPos is not None:
                     win.move(windowPos)
                     
-            if self.settings.contains("%s_State" % winSettingsStrPrefix):
-                windowState = self.settings.value("%s_State" % winSettingsStrPrefix, None)
+            if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
+                windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
                 if windowState is not None:
                     win.restoreState(windowState)
                                     
@@ -10655,18 +10655,18 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             
             win = self.profileviewers[0]
             
-            if self.settings.contains("%s_Size" % winSettingsStrPrefix):
-                windowSize = self.settings.value("%s_Size" % winSettingsStrPrefix, None)
+            if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
+                windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
                 if windowSize is not None:
                     win.resize(windowSize)
                 
-            if self.settings.contains("%s_Position" %  winSettingsStrPrefix):
-                windowPos = self.settings.value("%s_Position" %  winSettingsStrPrefix, None)
+            if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
+                windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
                 if windowPos is not None:
                     win.move(windowPos)
                     
-            if self.settings.contains("%s_State" % winSettingsStrPrefix):
-                windowState = self.settings.value("%s_State" % winSettingsStrPrefix, None)
+            if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
+                windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
                 if windowState is not None:
                     win.restoreState(windowState)
                                     
@@ -10723,18 +10723,18 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             
             win = self.ephysviewers[0]
             
-            if self.settings.contains("%s_Size" % winSettingsStrPrefix):
-                windowSize = self.settings.value("%s_Size" % winSettingsStrPrefix, None)
+            if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
+                windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
                 if windowSize is not None:
                     win.resize(windowSize)
                 
-            if self.settings.contains("%s_Position" %  winSettingsStrPrefix):
-                windowPos = self.settings.value("%s_Position" %  winSettingsStrPrefix, None)
+            if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
+                windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
                 if windowPos is not None:
                     win.move(windowPos)
                     
-            if self.settings.contains("%s_State" % winSettingsStrPrefix):
-                windowState = self.settings.value("%s_State" % winSettingsStrPrefix, None)
+            if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
+                windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
                 if windowState is not None:
                     win.restoreState(windowState)
             

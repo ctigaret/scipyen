@@ -1,6 +1,21 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-""" Scipyen configuration module for non-gui options.
+""" Scipyen configuration module for non-gui options and Qt gui settings other 
+than window geometry and state.
+
+Non-gui options are configuration settings for various Scipyen functionalities:
+
+ScanData analysis
+
+electrophysiology apps (LTP, AP analysis, IV curves, etc)
+
+The non-gui options are stored in yaml file format using the confuse library.
+
+The gui options are stored directly in Scipyen.conf under groups given by the
+name of the QMainWindow or QWidget subclass which represents the user interface
+of the (sub)application that uses these options (e.g., LSCaTWindow, ScipyenWindow,
+SignalViewer, etc).
+
 """
 # NOTE: 2021-01-09 10:54:10
 # a framework for configuration options
@@ -32,6 +47,9 @@ import confuse
 from .traitcontainers import DataBag
 
 scipyen_lazy_config = confuse.LazyConfig("Scipyen")
+
+# NOTE: 2021-07-18 22:45:53
+# on GNU/Linux, this is '$HOME/.config/Scipyen'
 scipyen_config_dir = os.path.dirname(scipyen_lazy_config.user_config_path())
 
 #from goodconf import GoodConf, Value
@@ -46,7 +64,10 @@ scipyen_config_dir = os.path.dirname(scipyen_lazy_config.user_config_path())
 # `settings_files` = Load this files in the order.
 
 class ScipyenConfiguration(DataBag):
+    """Superclass of all non-gui configurations
+    """
     leaf_parameters = tuple()
+    
     def __init__(self, *args, **kwargs):
         mutable_types = kwargs.pop("mutable_types", False)
         use_casting = kwargs.pop("use_casting", False)
@@ -64,7 +85,24 @@ class ScipyenConfiguration(DataBag):
     
     
 class FunctionConfiguration(ScipyenConfiguration):
-    """ScipyenConfiguration specialized for function options.
+    """ScipyenConfiguration specialized for functional options.
+    
+    A functional option stores the name of a function, and the names and
+    values of its parameters, if present, as one of the many functions available to
+    perform a given data processing operation.
+    
+    The operation itself is described by a function which takes some data and
+    possibily other parameters to generate a result.
+    
+    For example, the process of applying a filter to an image, in order to 
+    improve its signal/noise ratio, can use one of several 2D signal processing
+    functions defined in, say, scipy.signal, or some custom de-noising function
+    of the identify function (i.e. returns the data unprocessed).
+    
+    A FunctionConfiguration object makes the choice of the filter function used
+    in this operation configurable (and, as a result, persistent across Scipyen
+    sessions).
+    
     
     Describes a function call defined by three parameters:
     
@@ -82,6 +120,7 @@ class FunctionConfiguration(ScipyenConfiguration):
     
     """
     leaf_parameters = ("name", "args", "kwargs")
+    
     def __init__(self, *args, **kwargs):
         """Constructs a FunctionConfiguration object.
         Examples:
@@ -97,14 +136,15 @@ class FunctionConfiguration(ScipyenConfiguration):
         
         {'args': (), 'kwargs': {'axis': 0, 'ord': 2}, 'name': 'np.linalg.norm'}
         
-        NOTE: The thirs call must explicitly "unwind" the last dictionary, 
+        NOTE: The third call must explicitly "unwind" the last dictionary, 
         otherwise it will be interpreted as one of the function's arguments (as 
-        if the function secified by 'name' would have expected a dict)
+        if the function specified by 'name' would have expected a dict)
 
         """
         fname=""
-        fargs = ()
-        fkwargs = {}
+        fargs = tuple()
+        fkwargs = dict()
+        
         if len(args):
             if isinstance(args[0], str):
                 if len(args[0].strip()):

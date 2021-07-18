@@ -2233,7 +2233,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                                      cap = QtCore.Qt.RoundCap,
                                                      join = QtCore.Qt.RoundJoin)
         
-        #self.settings                   = QtCore.QSettings()
+        #self.qsettings                   = QtCore.QSettings()
         
         self._display_horizontal_scalebar_ = True
         self._display_vertical_scalebar_   = True
@@ -4081,8 +4081,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.loadViewerSettings()
             
     def loadViewerSettings(self):
-        #colorMapName = self.settings.value("ImageViewer/ColorMap", None)
-        colorMapName = self.settings.value("/".join([self.__class__.__name__, "ColorMap"]), None)
+        #colorMapName = self.qsettings.value("ImageViewer/ColorMap", None)
+        colorMapName = self.qsettings.value("/".join([self.__class__.__name__, "ColorMap"]), None)
         
         #print("ImageViewer %s loadViewerSettings colorMapName" % self, colorMapName)
         
@@ -4095,51 +4095,51 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         else:
             self.colorMap = None
         
-        #color = self.settings.value("/".join([self.__class__.__name__, "CursorColor"]), None)
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "CursorColor"]), None)
         #if isinstance(color, QtGui.QColor) and color.isValid():
             #self.cursorsColor = color
             
-        #color = self.settings.value("/".join([self.__class__.__name__, "CursorLabelTextColor"]), None)
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "CursorLabelTextColor"]), None)
         #if isinstance(color, QtGui.QColor) and color.isValid():
             #self.cursorLabelTextColor = color
             
-        #color = self.settings.value("/".join([self.__class__.__name__, "LinkedCursorColor"]), None)
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "LinkedCursorColor"]), None)
         #if isinstance(color, QtGui.QColor) and color.isValid():
             #self.linkedCursorsColor = color
             
-        #color = self.settings.value("/".join([self.__class__.__name__, "LinkedCursorLabelTextColor"]), None)
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "LinkedCursorLabelTextColor"]), None)
         #if isinstance(color, QtGui.QColor) and color.isValid():
             #self.linkedCursorLabelTextColor = color
             
-        #color = self.settings.value("/".join([self.__class__.__name__, "CursorLabelBackgroundColor"]), None)
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "CursorLabelBackgroundColor"]), None)
         #if isinstance(color, QtGui.QColor) and color.isValid():
             #self.linkedCursorLabelTextColor = color
             
-        #color = self.settings.value("/".join([self.__class__.__name__, "OpaqueCursorLabel"]), None)
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "OpaqueCursorLabel"]), None)
         #if isinstance(color, QtGui.QColor) and color.isValid():
             #self.opaqueCursorLabel = color
             
-        #color = self.settings.value("/".join([self.__class__.__name__, "RoiColor"]), None)
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "RoiColor"]), None)
         #if isinstance(color, QtGui.QColor) and color.isValid():
             #self.roisColor = color
         
-        #color = self.settings.value("/".join([self.__class__.__name__, "ROILabelTextColor"]), None)
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "ROILabelTextColor"]), None)
         #if isinstance(color, QtGui.QColor) and color.isValid():
             #self.roiLabelTextColor = color
             
-        #color = self.settings.value("/".join([self.__class__.__name__, "LinkedROIColor"]), None)
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "LinkedROIColor"]), None)
         #if isinstance(color, QtGui.QColor) and color.isValid():
             #self.linkedROIsColor = color
         
-        #color = self.settings.value("/".join([self.__class__.__name__, "LinkedROILabelTextColor"]), None)
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "LinkedROILabelTextColor"]), None)
         #if isinstance(color, QtGui.QColor) and color.isValid():
             #self.linkedROILabelTextColor = color
             
-        #color = self.settings.value("/".join([self.__class__.__name__, "ROILabelBackgroundColor"]), None)
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "ROILabelBackgroundColor"]), None)
         #if isinstance(color, QtGui.QColor) and color.isValid():
             #self.roiLabelBackgroundColor = color
             
-        #color = self.settings.value("/".join([self.__class__.__name__, "OpaqueROILabel"]), None)
+        #color = self.qsettings.value("/".join([self.__class__.__name__, "OpaqueROILabel"]), None)
         #if isinstance(color, QtGui.QColor) and color.isValid():
             #self.opaqueROILabel = color
             
@@ -4152,25 +4152,25 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
     def saveViewerSettings(self):
         if isinstance(self.colorMap, colormaps.colors.Colormap):
-            self.settings.setValue("/".join([self.__class__.__name__, "ColorMap"]), self.colorMap.name)
+            self.qsettings.setValue("/".join([self.__class__.__name__, "ColorMap"]), self.colorMap.name)
             
         else:
-            self.settings.setValue("/".join([self.__class__.__name__, "ColorMap"]), None)
+            self.qsettings.setValue("/".join([self.__class__.__name__, "ColorMap"]), None)
         
-        #self.settings.setValue("/".join([self.__class__.__name__, "CursorColor"]), self.cursorsColor)
-        #self.settings.setValue("/".join([self.__class__.__name__, "CursorLabelTextColor"]), self.cursorLabelTextColor)
-        #self.settings.setValue("/".join([self.__class__.__name__, "LinkedCursorColor"]), self.linkedCursorsColor)
-        #self.settings.setValue("/".join([self.__class__.__name__, "LinkedCursorLabelTextColor"]), self.linkedCursorLabelTextColor)
-        #self.settings.setValue("/".join([self.__class__.__name__, "CursorLabelBackgroundColor"]), self.cursorLabelBackgroundColor)
-        ##self.settings.setValue("/".join([self.__class__.__name__, "LinkedCursorLabelBackgroundColor"]), self.LinkedCursorLabelBackgroundColor)
-        #self.settings.setValue("/".join([self.__class__.__name__, "OpaqueCursorLabel"]), self.opaqueCursorLabel)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "CursorColor"]), self.cursorsColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "CursorLabelTextColor"]), self.cursorLabelTextColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "LinkedCursorColor"]), self.linkedCursorsColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "LinkedCursorLabelTextColor"]), self.linkedCursorLabelTextColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "CursorLabelBackgroundColor"]), self.cursorLabelBackgroundColor)
+        ##self.qsettings.setValue("/".join([self.__class__.__name__, "LinkedCursorLabelBackgroundColor"]), self.LinkedCursorLabelBackgroundColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "OpaqueCursorLabel"]), self.opaqueCursorLabel)
         
-        #self.settings.setValue("/".join([self.__class__.__name__, "RoiColor"]), self.roisColor)
-        #self.settings.setValue("/".join([self.__class__.__name__, "ROILabelTextColor"]), self.roiLabelTextColor)
-        #self.settings.setValue("/".join([self.__class__.__name__, "LinkedROIColor"]), self.linkedROIsColor)
-        #self.settings.setValue("/".join([self.__class__.__name__, "LinkedROILabelTextColor"]), self.linkedROILabelTextColor)
-        #self.settings.setValue("/".join([self.__class__.__name__, "ROILabelBackgroundColor"]), self.roiLabelBackgroundColor)
-        #self.settings.setValue("/".join([self.__class__.__name__, "OpaqueROILabel"]), self.opaqueROILabel)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "RoiColor"]), self.roisColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "ROILabelTextColor"]), self.roiLabelTextColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "LinkedROIColor"]), self.linkedROIsColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "LinkedROILabelTextColor"]), self.linkedROILabelTextColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "ROILabelBackgroundColor"]), self.roiLabelBackgroundColor)
+        #self.qsettings.setValue("/".join([self.__class__.__name__, "OpaqueROILabel"]), self.opaqueROILabel)
         
         
     def setImage(self, image, doc_title=None, normalize=True, colormap=None, gamma=None,

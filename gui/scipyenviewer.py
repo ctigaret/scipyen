@@ -161,7 +161,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #super(WorkspaceGuiMixin, self).__init__(parent=parent, pWin=pWin)
         WorkspaceGuiMixin.__init__(self, parent=parent)
         
-        self.settings = QtCore.QSettings()
+        self.qsettings = QtCore.QSettings()
 
         self._docTitle_ = None
         self._winTitle_ = None # force auto-set in update_title()
@@ -338,12 +338,12 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """
         #print("ScipyenViewer[%s].saveWindowSettings for %s top level:%s" % (self.__class__.__name__, self.winTitle, self.isTopLevel))
         if self.isTopLevel and self.isVisible():
-            saveWindowSettings(self.settings, self)#, self.__class__.__name__)
-            #self.settings.setValue("/".join([self.__class__.__name__, "WindowSize"]), self.size())
+            saveWindowSettings(self.qsettings, self)#, self.__class__.__name__)
+            #self.qsettings.setValue("/".join([self.__class__.__name__, "WindowSize"]), self.size())
                 
-            #self.settings.setValue("/".join([self.__class__.__name__, "WindowPosition"]), self.pos())
+            #self.qsettings.setValue("/".join([self.__class__.__name__, "WindowPosition"]), self.pos())
                 
-            #self.settings.setValue("/".join([self.__class__.__name__, "WindowState"]), self.saveState())
+            #self.qsettings.setValue("/".join([self.__class__.__name__, "WindowState"]), self.saveState())
             
     @abstractmethod
     def saveViewerSettings(self):
@@ -389,16 +389,16 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # NOTE: 2021-07-08 09:06:32
         # window settings are loaded here only if parent is Scipyen's main window
         if self.isTopLevel:
-            loadWindowSettings(self.settings, self)
-            #windowSize = self.settings.value("/".join([self.__class__.__name__, "WindowSize"]), None)
+            loadWindowSettings(self.qsettings, self)
+            #windowSize = self.qsettings.value("/".join([self.__class__.__name__, "WindowSize"]), None)
             #if windowSize is not None:
                 #self.resize(windowSize)
                 
-            #windowPos = self.settings.value("/".join([self.__class__.__name__, "WindowPos"]), None)
+            #windowPos = self.qsettings.value("/".join([self.__class__.__name__, "WindowPos"]), None)
             #if windowPos is not None:
                 #self.move(windowPos)
                 
-            #windowState = self.settings.value("/".join([self.__class__.__name__, "WindowState"]), None)
+            #windowState = self.qsettings.value("/".join([self.__class__.__name__, "WindowState"]), None)
             #if windowState is not None:
                 #self.restoreState(windowState)
                 

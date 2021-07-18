@@ -966,7 +966,7 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         
-        self.settings = QtCore.QSettings()
+        self.qsettings = QtCore.QSettings()
         self.threadpool = QtCore.QThreadPool()
         
         self._data_ = dict()

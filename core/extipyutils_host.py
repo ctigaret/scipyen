@@ -31,13 +31,6 @@ nrn_ipython_initialization_file = os.path.join(os.path.dirname(__module_path__),
 shell = get_ipython()
 shell.run_cell("from ipykernel import (get_connection_file, get_connection_info, connect_qtconsole)")
 
-#class ContextExecutor(ContextDecorator):
-    #def __enter__(self):
-        #return self
-
-    #def __exit__(self, *exc):
-        #return False
-    
 @magics_class
 class NeuronMagics(Magics):
     nrngui_magic_cmd = "".join(["-i -n ", nrn_ipython_initialization_file, " 'gui'"])

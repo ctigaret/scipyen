@@ -232,7 +232,7 @@ class ExternalConsoleWindow(MainWindow):
         # NOTE 2020-07-09 00:41:55
         # no menu bar or tab bar at this time!
         self.defaultFixedFont = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
-        self.settings = QtCore.QSettings()
+        self.qsettings = QtCore.QSettings()
         self._console_font_ = None
         self._layout_direction_ = QtCore.Qt.LeftToRight
         self._load_settings_()
@@ -334,15 +334,15 @@ class ExternalConsoleWindow(MainWindow):
         
     def _load_settings_(self):
         # located in $HOME/.config/Scipyen/Scipyen.conf
-        loadWindowSettings(self.settings, self)#, group_name=self.__class__.__name__)
-        self.settings.beginGroup(self.__class__.__name__)
-        fontFamily = self.settings.value("FontFamily", self.defaultFixedFont.family())
-        fontSize = int(self.settings.value("FontPointSize", self.defaultFixedFont.pointSize()))
-        fontStyle = int(self.settings.value("FontStyle", self.defaultFixedFont.style()))
-        fontWeight = int(self.settings.value("FontWeight", self.defaultFixedFont.weight()))
+        loadWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
+        self.qsettings.beginGroup(self.__class__.__name__)
+        fontFamily = self.qsettings.value("FontFamily", self.defaultFixedFont.family())
+        fontSize = int(self.qsettings.value("FontPointSize", self.defaultFixedFont.pointSize()))
+        fontStyle = int(self.qsettings.value("FontStyle", self.defaultFixedFont.style()))
+        fontWeight = int(self.qsettings.value("FontWeight", self.defaultFixedFont.weight()))
         
-        self._layout_direction_ = int(self.settings.value("ScrollBarPosition", QtCore.Qt.LeftToRight))
-        self.settings.endGroup()
+        self._layout_direction_ = int(self.qsettings.value("ScrollBarPosition", QtCore.Qt.LeftToRight))
+        self.qsettings.endGroup()
 
         self._console_font_ = QtGui.QFont(fontFamily, fontSize, fontWeight, italic = fontStyle > 0)
         
@@ -378,29 +378,29 @@ class ExternalConsoleWindow(MainWindow):
         
     @safeWrapper
     def _save_settings_(self):
-        saveWindowSettings(self.settings, self, group_name=self.__class__.__name__)
-        self.settings.beginGroup(self.__class__.__name__)
-        self.settings.setValue("ScrollBarPosition", self.getScrollBarPosition())
+        saveWindowSettings(self.qsettings, self, group_name=self.__class__.__name__)
+        self.qsettings.beginGroup(self.__class__.__name__)
+        self.qsettings.setValue("ScrollBarPosition", self.getScrollBarPosition())
         
         if self.active_frontend:
             font = self.active_frontend.font
-            self.settings.setValue("FontFamily", font.family())
-            self.settings.setValue("FontPointSize", font.pointSize())
-            self.settings.setValue("FontStyle", font.style())
-            self.settings.setValue("FontWeight", font.weight())
+            self.qsettings.setValue("FontFamily", font.family())
+            self.qsettings.setValue("FontPointSize", font.pointSize())
+            self.qsettings.setValue("FontStyle", font.style())
+            self.qsettings.setValue("FontWeight", font.weight())
             
-        self.settings.endGroup()
+        self.qsettings.endGroup()
             
     @safeWrapper
     def _save_tab_settings_(self, widget):
         font = widget.font
-        self.settings.beginGroup(self.__class__.__name__)
-        self.settings.setValue("FontFamily", font.family())
-        self.settings.setValue("FontPointSize", font.pointSize())
-        self.settings.setValue("FontStyle", font.style())
-        self.settings.setValue("FontWeight", font.weight())
-        self.settings.setValue("ScrollBarPosition", self.getScrollBarPosition(widget))
-        self.settings.endGroup()
+        self.qsettings.beginGroup(self.__class__.__name__)
+        self.qsettings.setValue("FontFamily", font.family())
+        self.qsettings.setValue("FontPointSize", font.pointSize())
+        self.qsettings.setValue("FontStyle", font.style())
+        self.qsettings.setValue("FontWeight", font.weight())
+        self.qsettings.setValue("ScrollBarPosition", self.getScrollBarPosition(widget))
+        self.qsettings.endGroup()
         
     def create_tab_with_existing_kernel(self, code=None, **kwargs):
         """create a new frontend attached to an external kernel in a new tab"""
@@ -2471,7 +2471,7 @@ class ScipyenConsole(RichJupyterWidget):
         self.custom_pygment=""
         self.custom_colors=""
         
-        self.settings = QtCore.QSettings()
+        self.qsettings = QtCore.QSettings()
         
         # will also set self.custom_pygment and self.custom_colors
         self._load_settings_()
@@ -2511,30 +2511,30 @@ class ScipyenConsole(RichJupyterWidget):
         self._control.setLayoutDirection(value)
 
     def _save_settings_(self):
-        saveWindowSettings(self.settings, self, group_name=self.__class__.__name__)
-        self.settings.beginGroup(self.__class__.__name__)
-        self.settings.setValue("FontFamily", self.font.family())
-        self.settings.setValue("FontPointSize", self.font.pointSize())
-        self.settings.setValue("FontStyle", self.font.style())
-        self.settings.setValue("FontWeight", self.font.weight())
-        self.settings.setValue("Scheme", self.custom_pygment)
-        self.settings.setValue("Colors", self.custom_colors)
-        self.settings.setValue("ScrollBarPosition", self.scrollBarPosition)
-        self.settings.endGroup()
+        saveWindowSettings(self.qsettings, self, group_name=self.__class__.__name__)
+        self.qsettings.beginGroup(self.__class__.__name__)
+        self.qsettings.setValue("FontFamily", self.font.family())
+        self.qsettings.setValue("FontPointSize", self.font.pointSize())
+        self.qsettings.setValue("FontStyle", self.font.style())
+        self.qsettings.setValue("FontWeight", self.font.weight())
+        self.qsettings.setValue("Scheme", self.custom_pygment)
+        self.qsettings.setValue("Colors", self.custom_colors)
+        self.qsettings.setValue("ScrollBarPosition", self.scrollBarPosition)
+        self.qsettings.endGroup()
 
     def _load_settings_(self):
         # located in $HOME/.config/Scipyen/Scipyen.conf
-        loadWindowSettings(self.settings, self)#, group_name=self.__class__.__name__)
-        self.settings.beginGroup(self.__class__.__name__)
-        fontFamily = self.settings.value("FontFamily", self.defaultFixedFont.family())
-        fontSize = int(self.settings.value("FontPointSize", self.defaultFixedFont.pointSize()))
-        fontStyle = int(self.settings.value("FontStyle", self.defaultFixedFont.style()))
-        fontWeight = int(self.settings.value("FontWeight", self.defaultFixedFont.weight()))
+        loadWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
+        self.qsettings.beginGroup(self.__class__.__name__)
+        fontFamily = self.qsettings.value("FontFamily", self.defaultFixedFont.family())
+        fontSize = int(self.qsettings.value("FontPointSize", self.defaultFixedFont.pointSize()))
+        fontStyle = int(self.qsettings.value("FontStyle", self.defaultFixedFont.style()))
+        fontWeight = int(self.qsettings.value("FontWeight", self.defaultFixedFont.weight()))
         
-        layout_direction = int(self.settings.value("ScrollBarPosition", QtCore.Qt.LeftToRight))
-        self.custom_pygment = self.settings.value("Scheme", "")
-        self.custom_colors = self.settings.value("Colors", None)
-        self.settings.endGroup()
+        layout_direction = int(self.qsettings.value("ScrollBarPosition", QtCore.Qt.LeftToRight))
+        self.custom_pygment = self.qsettings.value("Scheme", "")
+        self.custom_colors = self.qsettings.value("Colors", None)
+        self.qsettings.endGroup()
         
         console_font = QtGui.QFont(fontFamily, fontSize, fontWeight, italic = fontStyle > 0)
         
