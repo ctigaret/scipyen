@@ -52,11 +52,19 @@ from traitlets import (
     Dict, Unicode, CBool, Any
 )
 from jupyter_core.paths import jupyter_runtime_dir
+from jupyter_core.application import JupyterApp, base_flags, base_aliases
+
+from jupyter_client.session import Message
+from jupyter_client.localinterfaces import is_local_ip
+from jupyter_client.consoleapp import (
+        JupyterConsoleApp, app_aliases, app_flags,
+    )
+
+
+from pygments import styles as pstyles
 
 from qtconsole import styles as styles
 from qtconsole import __version__
-
-from pygments import styles as pstyles
 
 from qtconsole.frontend_widget import FrontendWidget
 from qtconsole.jupyter_widget import JupyterWidget # for use in the External Console
@@ -70,32 +78,6 @@ from qtconsole.inprocess import QtInProcessKernelManager # for the Scipyen's int
 from qtconsole.mainwindow import (MainWindow, background,)
 from qtconsole.client import QtKernelClient
 from qtconsole.manager import QtKernelManager
-from qtconsole import styles
-
-from jupyter_client.session import Message
-
-#import jupyter_client
-
-
-#from IPython.utils.ipstruct import Struct as IPStruct
-
-#from IPython.core.history import HistoryAccessor
-
-#from IPython.lib.deepreload import reload as dreload
-
-#from IPython.core.magic import (Magics, magics_class, line_magic,
-                                #cell_magic, line_cell_magic,
-                                #needs_local_scope)
-
-from jupyter_core.application import JupyterApp, base_flags, base_aliases
-from jupyter_client.consoleapp import (
-        JupyterConsoleApp, app_aliases, app_flags,
-    )
-
-
-from jupyter_client.localinterfaces import is_local_ip
-
-#from IPython.display import set_matplotlib_formats
 
 #### END ipython/jupyter modules
 
@@ -104,6 +86,8 @@ from core.prog import safeWrapper
 from core.extipyutils_client import (init_commands, execute, ForeignCall,
                                     nrn_ipython_initialization_cmd,)
 from core.strutils import str2symbol
+
+from gui.workspacegui import (saveWindowSettings, loadWindowSettings)
 
 flags = dict(base_flags)
 qt_flags = {
@@ -145,6 +129,9 @@ def available_pygments():
     # NOTE: 2020-12-22 21:35:30
     # jupyter_qtconsole_colorschemes has entry points in pygments.styles
     return list(pstyles.get_all_styles())
+
+def get_available_syntax_styles():
+    return sorted(list(pstyles.get_all_styles()))
 
 class ExternalConsoleWidget(RichJupyterWidget):
     def __init__(self, *args, **kw):
@@ -347,25 +334,20 @@ class ExternalConsoleWindow(MainWindow):
         
     def _load_settings_(self):
         # located in $HOME/.config/Scipyen/Scipyen.conf
-        #print("ExternalConsoleWindow._load_settings_")
-        winSize = self.settings.value("ExternalConsole/Size", QtCore.QSize(600, 350))
-        winPos = self.settings.value("ExternalConsole/Position", QtCore.QPoint(0,0))
-        fontFamily = self.settings.value("ExternalConsole/FontFamily", self.defaultFixedFont.family())
-        fontSize = int(self.settings.value("ExternalConsole/FontPointSize", self.defaultFixedFont.pointSize()))
-        fontStyle = int(self.settings.value("ExternalConsole/FontStyle", self.defaultFixedFont.style()))
-        fontWeight = int(self.settings.value("ExternalConsole/FontWeight", self.defaultFixedFont.weight()))
+        loadWindowSettings(self.settings, self, group_name=self.__class__.__name__)
+        self.settings.beginGroup(self.__class__.__name__)
+        fontFamily = self.settings.value("FontFamily", self.defaultFixedFont.family())
+        fontSize = int(self.settings.value("FontPointSize", self.defaultFixedFont.pointSize()))
+        fontStyle = int(self.settings.value("FontStyle", self.defaultFixedFont.style()))
+        fontWeight = int(self.settings.value("FontWeight", self.defaultFixedFont.weight()))
         
-        self._layout_direction_ = int(self.settings.value("ExternalConsole/ScrollBarPosition", QtCore.Qt.LeftToRight))
-        
-        #print("layout direction from settings:", self._layout_direction_)
+        self._layout_direction_ = int(self.settings.value("ScrollBarPosition", QtCore.Qt.LeftToRight))
+        self.settings.endGroup()
 
         self._console_font_ = QtGui.QFont(fontFamily, fontSize, fontWeight, italic = fontStyle > 0)
         
-        self.move(winPos)
-        self.resize(winSize)
         self.setAcceptDrops(True)
         self.setScrollBarPosition(self._layout_direction_)
-        #self.scrollBarPosition = self._layout_direction_
         
     def getScrollBarPosition(self, widget=None):
         if widget is None:
@@ -396,28 +378,29 @@ class ExternalConsoleWindow(MainWindow):
         
     @safeWrapper
     def _save_settings_(self):
-        #print("ExternalConsoleWindow._save_settings_")
-        self.settings.setValue("ExternalConsole/Size", self.size())
-        self.settings.setValue("ExternalConsole/Position", self.pos())
-        #print("save layout direction", self.getScrollBarPosition())
-        self.settings.setValue("ExternalConsole/ScrollBarPosition", self.getScrollBarPosition())
+        saveWindowSettings(self.settings, self, group_name=self.__class__.__name__)
+        self.settings.beginGroup(self.__class__.__name__)
+        self.settings.setValue("ScrollBarPosition", self.getScrollBarPosition())
         
         if self.active_frontend:
             font = self.active_frontend.font
-            self.settings.setValue("ExternalConsole/FontFamily", font.family())
-            self.settings.setValue("ExternalConsole/FontPointSize", font.pointSize())
-            self.settings.setValue("ExternalConsole/FontStyle", font.style())
-            self.settings.setValue("ExternalConsole/FontWeight", font.weight())
+            self.settings.setValue("FontFamily", font.family())
+            self.settings.setValue("FontPointSize", font.pointSize())
+            self.settings.setValue("FontStyle", font.style())
+            self.settings.setValue("FontWeight", font.weight())
             
-
+        self.settings.endGroup()
+            
     @safeWrapper
     def _save_tab_settings_(self, widget):
         font = widget.font
-        self.settings.setValue("ExternalConsole/FontFamily", font.family())
-        self.settings.setValue("ExternalConsole/FontPointSize", font.pointSize())
-        self.settings.setValue("ExternalConsole/FontStyle", font.style())
-        self.settings.setValue("ExternalConsole/FontWeight", font.weight())
-        self.settings.setValue("ExternalConsole/ScrollBarPosition", self.getScrollBarPosition(widget))
+        self.settings.beginGroup(self.__class__.__name__)
+        self.settings.setValue("FontFamily", font.family())
+        self.settings.setValue("FontPointSize", font.pointSize())
+        self.settings.setValue("FontStyle", font.style())
+        self.settings.setValue("FontWeight", font.weight())
+        self.settings.setValue("ScrollBarPosition", self.getScrollBarPosition(widget))
+        self.settings.endGroup()
         
     def create_tab_with_existing_kernel(self, code=None, **kwargs):
         """create a new frontend attached to an external kernel in a new tab"""
@@ -2488,19 +2471,15 @@ class ScipyenConsole(RichJupyterWidget):
         self.custom_pygment=""
         self.custom_colors=""
         
-        #self.settings = QtCore.QSettings("PICT", "PICT")
         self.settings = QtCore.QSettings()
         
         # will also set self.custom_pygment and self.custom_colors
         self._load_settings_()
         
-        #JupyterWidget.style_sheet = styles.sheet_from_template(self.custom_pygment,
-                                                               #self.custom_colors)
-        
-        #JupyterWidget.syntax_style = self.custom_pygment
-        
-        #self._control.style = pstyles.get_style_by_name(self.custom_pygment)
-        #self._highlighter.set_style(self.custom_pygment)
+        # NOTE: 2021-07-18 10:17:26 - FIXME bug or feature?
+        # the line below won't have effect unless the RichJupyterWidget is visible
+        # e.g. after calling show()
+        self.set_pygment(self.custom_pygment) 
         
     def closeEvent(self, evt):
         self._save_settings_()
@@ -2532,39 +2511,51 @@ class ScipyenConsole(RichJupyterWidget):
         self._control.setLayoutDirection(value)
 
     def _save_settings_(self):
-        self.settings.setValue("Console/Size", self.size())
-        self.settings.setValue("Console/Position", self.pos())
-        self.settings.setValue("Console/FontFamily", self.font.family())
-        self.settings.setValue("Console/FontPointSize", self.font.pointSize())
-        self.settings.setValue("Console/FontStyle", self.font.style())
-        self.settings.setValue("Console/FontWeight", self.font.weight())
-        self.settings.setValue("Console/Scheme", self.custom_pygment)
-        self.settings.setValue("Console/Colors", self.custom_colors)
-        self.settings.setValue("Console/ScrollBarPosition", self.scrollBarPosition)
+        saveWindowSettings(self.settings, self, group_name=self.__class__.__name__)
+        self.settings.beginGroup(self.__class__.__name__)
+        self.settings.setValue("FontFamily", self.font.family())
+        self.settings.setValue("FontPointSize", self.font.pointSize())
+        self.settings.setValue("FontStyle", self.font.style())
+        self.settings.setValue("FontWeight", self.font.weight())
+        self.settings.setValue("Scheme", self.custom_pygment)
+        self.settings.setValue("Colors", self.custom_colors)
+        self.settings.setValue("ScrollBarPosition", self.scrollBarPosition)
+        self.settings.endGroup()
 
     def _load_settings_(self):
         # located in $HOME/.config/Scipyen/Scipyen.conf
-        winSize = self.settings.value("Console/Size", QtCore.QSize(600, 350))
-        winPos = self.settings.value("Console/Position", QtCore.QPoint(0,0))
-        fontFamily = self.settings.value("Console/FontFamily", self.defaultFixedFont.family())
-        fontSize = int(self.settings.value("Console/FontPointSize", self.defaultFixedFont.pointSize()))
-        fontStyle = int(self.settings.value("Console/FontStyle", self.defaultFixedFont.style()))
-        fontWeight = int(self.settings.value("Console/FontWeight", self.defaultFixedFont.weight()))
+        loadWindowSettings(self.settings, self, group_name=self.__class__.__name__)
+        self.settings.beginGroup(self.__class__.__name__)
+        fontFamily = self.settings.value("FontFamily", self.defaultFixedFont.family())
+        fontSize = int(self.settings.value("FontPointSize", self.defaultFixedFont.pointSize()))
+        fontStyle = int(self.settings.value("FontStyle", self.defaultFixedFont.style()))
+        fontWeight = int(self.settings.value("FontWeight", self.defaultFixedFont.weight()))
+        
+        layout_direction = int(self.settings.value("ScrollBarPosition", QtCore.Qt.LeftToRight))
+        self.custom_pygment = self.settings.value("Scheme", "")
+        self.custom_colors = self.settings.value("Colors", None)
+        self.settings.endGroup()
         
         console_font = QtGui.QFont(fontFamily, fontSize, fontWeight, italic = fontStyle > 0)
         
-        self.custom_pygment = self.settings.value("Console/Scheme", "")
-        self.custom_colors = self.settings.value("Console/Colors", None)
         
         self.font = console_font
 
-        self.move(winPos)
-        self.resize(winSize)
+        #self.move(winPos)
+        #self.resize(winSize)
         self.setAcceptDrops(True)
         
-        layout_direction = int(self.settings.value("Console/ScrollBarPosition", QtCore.Qt.LeftToRight))
         
         self.scrollBarPosition = layout_direction
+        #print(self.custom_pygment)
+        if len(self.custom_pygment.strip()):
+            self.set_pygment(scheme=self.custom_pygment)
+            # FIXME: 2021-07-17 23:37:12
+            # looks like setting colors messes up the pygment
+            #if isinstance(self.custom_colors, str) and len(self.custom_colors.strip()):
+                #self.set_pygment(scheme=self.custom_pygment, colors=self.custom_colors)
+            #else:
+                #self.set_pygment(scheme=self.custom_pygment)
         
         
     def dragEnterEvent(self, evt):
@@ -2852,15 +2843,17 @@ class ScipyenConsole(RichJupyterWidget):
             #colors=None
             
         if scheme in available_pygments():
+            #print("found %s scheme" % scheme)
             # rules of thumb:
+            #
             # 1. the syntax highlighting scheme is set by setting the console 
-            #   'syntax_style' attribute to "scheme". 
-            
+            # (RichJupyterWidget) 'syntax_style' attribute to scheme. 
+            #
             # 2. the style sheet gives the widget colors ("style") - so we always 
-            #   need a style sheet, ans we "pygment" the console by setting its
+            #   need a style sheet, and we "pygment" the console by setting its
             #   'style_sheet' attribute. NOTE that schemes do not always provide
             #   prompt styling colors, therefore we need to set up a style sheet 
-            #   dynamically based on the colors guesses according to whether the
+            #   dynamically based on the colors guessed according to whether the
             #   scheme is a "dark" one or not.
             #
             try:
@@ -2878,7 +2871,7 @@ class ScipyenConsole(RichJupyterWidget):
                     #else:
                         #sheet = styles.sheet_from_template(scheme)
                     
-                self.style_sheet=sheet
+                self.style_sheet = sheet
                 self.syntax_style = scheme
                 # also need to call notifiers - this is the order in which they
                 # are called in qtconsoleapp module ('JupyterConsoleApp.init_colors')

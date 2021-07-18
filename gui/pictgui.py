@@ -74,7 +74,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 from core.traitcontainers import DataBag
 from core.prog import (safeWrapper, deprecated,
                        timefunc, processtimefunc,)
-from core.utilities import (unique, index_of,)
+#from core.utilities import (unique, index_of,)
 from core.workspacefunctions import debug_scipyen
 
 

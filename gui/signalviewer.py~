@@ -155,7 +155,7 @@ from ephys.ephys import (cursors2epoch, )
 #### BEGIN pict.gui modules
 #from . import imageviewer as iv
 from . import pictgui as pgui
-from . import quickdialog
+from . import quickdialog as qd
 #from .pictgui import GraphicsObjectType, GraphicsObject, PathElements, Tier2PathElements, SignalCursor, Path, Start, Move, Line, Cubic, Rect, Ellipse, Quad, Arc, ArcMove
 from .scipyenviewer import (ScipyenViewer, ScipyenFrameViewer,)
 from .dictviewer import (InteractiveTreeWidget, DataViewer,)
@@ -368,7 +368,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                  x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
                  y: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
                  parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 pWin: (QtWidgets.QMainWindow, type(None))= None, 
                  ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, 
                  doc_title: (str, type(None)) = None,
@@ -577,7 +576,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                    "vertical":pg.mkColor(self.cursorColors["vertical"]).darker()}
         #### END generic plot options
         
-        super().__init__(data=y, parent=parent, pWin=pWin, ID=ID,
+        super().__init__(data=y, parent=parent, ID=ID,
                          win_title=win_title, doc_title=doc_title,
                          frameIndex=frameIndex, *args, **kwargs)
         
@@ -617,7 +616,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 *args, **kwargs)
                 
     def saveSettings(self):
-        self.saveWindowSettings()
+        # NOTE 2021-07-08 09:48:48
+        # saveWindowSettings is inherited from ScipyenViewer and does noting if
+        # self.parent() is not Scipyen's main window
+        self.saveWindowSettings() # inherited from ScipyenViewer
         self.saveViewerSettings()
         
     def saveViewerSettings(self):
@@ -629,7 +631,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.settings.setValue("/".join([self.__class__.__name__, dw[0]]), dw[1].isVisible())
                 
     def loadSettings(self):
-        self.loadWindowSetings()
+        # NOTE 2021-07-08 09:47:25
+        # loadWindowSettings is inherited from ScipyenViewer and does nothing if
+        # self.parent() is not Scypien's main window
+        self.loadWindowSettings() # inherited from ScipyenViewer
         self.loadViewerSettings()
         
     def loadViewerSettings(self):
@@ -1404,7 +1409,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                        selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
             
             if dlg.exec() == 1:
-                sel_items = dlg.selectedItems
+                sel_items = dlg.selectedItemsText
                 
                 if len(sel_items):
                     self.guiSelectedSignalNames[:] = sel_items[:]
@@ -1730,7 +1735,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                        selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
             
             if dlg.exec() == 1:
-                sel_items = dlg.selectedItems
+                sel_items = dlg.selectedItemsText
                 
                 if len(sel_items):
                     self.guiSelectedIrregularSignalNames[:] = sel_items[:]
@@ -1740,46 +1745,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
         self.displayFrame()
          
-    #@pyqtSlot(str)
-    #@safeWrapper
-    #def slot_displayedIrregularSignalNameChoiceChanged(self, name):
-        #if name.lower() in ("all"):
-            #self.guiSelectedIrregularSignals.clear()
-            
-        #elif name.lower() == "choose":
-            #self.guiSelectedIrregularSignalNames.clear()
-        ## TODO call GUI chooser dialog
-            #self.guiSelectedIrregularSignalNames.clear()
-            
-            #current_txt = self.selectIrregularSignalComboBox.currentText()
-        
-            #available = [self.selectIrregularSignalComboBox.itemText(k) for k in range(1, self.selectIrregularSignalComboBox.count()-1)]
-            
-            #if current_txt in available:
-                #preSelected = current_txt
-                
-            #else:
-                #preSelected=None
-            
-            #dlg = pgui.ItemsListDialog(parent=self, 
-                                       #itemsList = available, 
-                                       #preSelected = preSelected,
-                                       #title="Select Irregular Signals", 
-                                       #modal=True,
-                                       #selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
-            
-            #if dlg.exec() == 1:
-                #sel_items = dlg.selectedItems()
-                
-                #if len(sel_items):
-                    #self.guiSelectedIrregularSignalNames[:] = sel_items[:]
-                    
-        
-        #else:
-            #self.guiSelectedIrregularSignals = [name]
-            
-        #self.displayFrame()
-
     def linkCursors(self, id1, *ids):
         """ Bidirectionally links cursors of the same type.
         Linked cursors move together when either of them is moved by the user.
@@ -2194,8 +2159,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             if len(values):
                 if len(values) == 1:
-                    dlg = quickdialog.QuickDialog(self, "Copy to workspace")
-                    namePrompt = quickdialog.StringInput(dlg, "Data name:")
+                    dlg = qd.QuickDialog(self, "Copy to workspace")
+                    namePrompt = qd.StringInput(dlg, "Data name:")
                     
                     newVarName = strutils.str2symbol(item_paths[-1])
                     
@@ -2460,10 +2425,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             return
         
         if not isinstance(crsID, str):
-            d = quickdialog.QuickDialog(self, "Choose cursor to remove")
-            #d = vigra.pyqt.quickdialog.QuickDialog(self, "Choose cursor to remove")
+            d = qd.QuickDialog(self, "Choose cursor to remove")
+            #d = vigra.pyqt.qd.QuickDialog(self, "Choose cursor to remove")
         
-            cursorComboBox = pgui.QuickDialogComboBox(d, "Select cursor:")
+            cursorComboBox = qd.QuickDialogComboBox(d, "Select cursor:")
             cursorComboBox.setItems([c for c in self._data_cursors_])
             cursorComboBox.setValue(0)
             
@@ -2614,8 +2579,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         initialID = crsId
                 
         if choose:
-            d = quickdialog.QuickDialog(self, "Edit cursor")
-            cursorComboBox = pgui.QuickDialogComboBox(d, "Select cursor:")
+            d = qd.QuickDialog(self, "Edit cursor")
+            cursorComboBox = qd.QuickDialogComboBox(d, "Select cursor:")
             cursorComboBox.setItems([c for c in self._data_cursors_])
             
             d.cursorComboBox = cursorComboBox
@@ -2623,9 +2588,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             d.cursorComboBox.connectIndexChanged(partial(self._slot_updateCursorEditorDlg_, d=d))
         
         else:
-            d = quickdialog.QuickDialog(self, "Edit cursor %s" % crsId)
+            d = qd.QuickDialog(self, "Edit cursor %s" % crsId)
         
-        namePrompt = quickdialog.StringInput(d, "Name:")
+        namePrompt = qd.StringInput(d, "Name:")
         namePrompt.variable.setClearButtonEnabled(True)
         namePrompt.variable.redoAvailable=True
         namePrompt.variable.undoAvailable=True
@@ -2634,14 +2599,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         if cursor is not None:
             if cursor.cursorTypeName in ("vertical", "crosshair"):
-                promptX = quickdialog.FloatInput(d, "X coordinate:")
+                promptX = qd.FloatInput(d, "X coordinate:")
                 promptX.variable.setClearButtonEnabled(True)
                 promptX.variable.redoAvailable=True
                 promptX.variable.undoAvailable=True
 
                 d.promptX = promptX
             
-                promptXWindow = quickdialog.FloatInput(d, "Horizontal window size:")
+                promptXWindow = qd.FloatInput(d, "Horizontal window size:")
                 promptXWindow.variable.setClearButtonEnabled(True)
                 promptXWindow.variable.redoAvailable=True
                 promptXWindow.variable.undoAvailable=True
@@ -2649,14 +2614,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 d.promptXWindow = promptXWindow
             
             if cursor.cursorTypeName in ("horizontal", "crosshair"):
-                promptY = quickdialog.FloatInput(d, "Y coordinate:")
+                promptY = qd.FloatInput(d, "Y coordinate:")
                 promptY.variable.setClearButtonEnabled(True)
                 promptY.variable.redoAvailable=True
                 promptY.variable.undoAvailable=True
 
                 d.promptY = promptY
             
-                promptYWindow = quickdialog.FloatInput(d, "Vertical window size:")
+                promptYWindow = qd.FloatInput(d, "Vertical window size:")
                 promptYWindow.variable.setClearButtonEnabled(True)
                 promptYWindow.variable.redoAvailable=True
                 promptYWindow.variable.undoAvailable=True
@@ -2664,28 +2629,28 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 d.promptYWindow = promptYWindow
                 
         else:
-            promptX = quickdialog.FloatInput(d, "X coordinate:")
+            promptX = qd.FloatInput(d, "X coordinate:")
             promptX.variable.setClearButtonEnabled(True)
             promptX.variable.redoAvailable=True
             promptX.variable.undoAvailable=True
 
             d.promptX = promptX
         
-            promptXWindow = quickdialog.FloatInput(d, "Horizontal window size:")
+            promptXWindow = qd.FloatInput(d, "Horizontal window size:")
             promptXWindow.variable.setClearButtonEnabled(True)
             promptXWindow.variable.redoAvailable=True
             promptXWindow.variable.undoAvailable=True
 
             d.promptXWindow = promptXWindow
             
-            promptY = quickdialog.FloatInput(d, "Y coordinate:")
+            promptY = qd.FloatInput(d, "Y coordinate:")
             promptY.variable.setClearButtonEnabled(True)
             promptY.variable.redoAvailable=True
             promptY.variable.undoAvailable=True
 
             d.promptY = promptY
         
-            promptYWindow = quickdialog.FloatInput(d, "Vertical window size:")
+            promptYWindow = qd.FloatInput(d, "Vertical window size:")
             promptYWindow.variable.setClearButtonEnabled(True)
             promptYWindow.variable.redoAvailable=True
             promptYWindow.variable.undoAvailable=True
@@ -2862,9 +2827,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 name = "Epoch"
                 
-            d = quickdialog.QuickDialog(self, "Make Epoch From Cursors:")
+            d = qd.QuickDialog(self, "Make Epoch From Cursors:")
             d.promptWidgets = list()
-            d.promptWidgets.append(quickdialog.StringInput(d, "Name:"))
+            d.promptWidgets.append(qd.StringInput(d, "Name:"))
             d.promptWidgets[0].setText(name)
             
             d.promptWidgets[0].variable.setClearButtonEnabled(True)
@@ -2907,19 +2872,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         if isinstance(self.y, (neo.Block, neo.Segment)) or (isinstance(self.y, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self.y])):
             #print("prompt me")
-            d = quickdialog.QuickDialog(self, "Attach epoch to data")
+            d = qd.QuickDialog(self, "Attach epoch to data")
 
-            d.epochNamePrompt = quickdialog.StringInput(d, "Epoch Name:")
+            d.epochNamePrompt = qd.StringInput(d, "Epoch Name:")
             d.epochNamePrompt.variable.setClearButtonEnabled(True)
             d.epochNamePrompt.variable.redoAvailable = True
             d.epochNamePrompt.variable.undoAvailable = True
             d.epochNamePrompt.setText(name)
             
                 
-            d.toCurrentSegmentCheckBox = quickdialog.CheckBox(d, "Current segment only")
+            d.toCurrentSegmentCheckBox = qd.CheckBox(d, "Current segment only")
             d.toCurrentSegmentCheckBox.setChecked(False)
             
-            d.overwriteEpochCheckBox = quickdialog.CheckBox(d, "Overwrite existing epochs")
+            d.overwriteEpochCheckBox = qd.CheckBox(d, "Overwrite existing epochs")
             d.overwriteEpochCheckBox.setChecked(True);
             
             
@@ -2954,9 +2919,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             return
         
         if isinstance(self.y, (neo.Block, neo.Segment)) or (isinstance(self.y, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self.y])):
-            d = quickdialog.QuickDialog(self, "Make Epoch From SignalCursor:")
+            d = qd.QuickDialog(self, "Make Epoch From SignalCursor:")
             d.promptWidgets = list()
-            d.namePrompt = quickdialog.StringInput(d, "Name:")
+            d.namePrompt = qd.StringInput(d, "Name:")
             
             d.epoch_name = "Epoch"
             
@@ -2969,15 +2934,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 d.namePrompt.setText("%s from %s" % (d.epoch_name, cursor.ID))
                 
             else:
-                d.cursorComboBox = pgui.QuickDialogComboBox(d, "Select cursor:")
+                d.cursorComboBox = qd.QuickDialogComboBox(d, "Select cursor:")
                 d.cursorComboBox.setItems([c.ID for c in vertAndCrossCursors.values()])
                 d.cursorComboBox.conextIndexChanged(partial(self._slot_update_cursor_to_epoch_dlg, d=d))
                 
             
-            d.toCurrentSegmentCheckBox = quickdialog.CheckBox(d, "Current segment only")
+            d.toCurrentSegmentCheckBox = qd.CheckBox(d, "Current segment only")
             d.toCurrentSegmentCheckBox.setChecked(False)
             
-            d.overwriteEpochCheckBox = quickdialog.CheckBox(d, "Overwrite existing epochs")
+            d.overwriteEpochCheckBox = qd.CheckBox(d, "Overwrite existing epochs")
             d.overwriteEpochCheckBox.setChecked(True);
             
             if d.exec() == QtWidgets.QDialog.Accepted:
@@ -3006,32 +2971,32 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             return
         
         if isinstance(self.y, (neo.Block, neo.Segment)):
-            d = quickdialog.QuickDialog(self, "Make Epoch From Interval Between Cursors:")
-            #d = vigra.pyqt.quickdialog.QuickDialog(self, "Make Epoch From Interval Between Cursors:")
+            d = qd.QuickDialog(self, "Make Epoch From Interval Between Cursors:")
+            #d = vigra.pyqt.qd.QuickDialog(self, "Make Epoch From Interval Between Cursors:")
             d.promptWidgets = list()
             
-            namePrompt=quickdialog.StringInput(d, "Name:")
-            #namePrompt=vigra.pyqt.quickdialog.StringInput(d, "Name:")
+            namePrompt=qd.StringInput(d, "Name:")
+            #namePrompt=vigra.pyqt.qd.StringInput(d, "Name:")
             namePrompt.setText("Epoch")
             
-            c1Prompt = quickdialog.StringInput(d, "SignalCursor 1:")
-            c2Prompt = quickdialog.StringInput(d, "SignalCursor 2:")
+            c1Prompt = qd.StringInput(d, "SignalCursor 1:")
+            c2Prompt = qd.StringInput(d, "SignalCursor 2:")
             
-            #c1Prompt = vigra.pyqt.quickdialog.StringInput(d, "SignalCursor 1:")
-            #c2Prompt = vigra.pyqt.quickdialog.StringInput(d, "SignalCursor 2:")
+            #c1Prompt = vigra.pyqt.qd.StringInput(d, "SignalCursor 1:")
+            #c2Prompt = vigra.pyqt.qd.StringInput(d, "SignalCursor 2:")
             
             d.promptWidgets.append(namePrompt)
             d.promptWidgets.append(c1Prompt)
             d.promptWidgets.append(c2Prompt)
             
-            toCurrentSegmentCheckBox = quickdialog.CheckBox(d, "Current segment only")
-            #toCurrentSegmentCheckBox = vigra.pyqt.quickdialog.CheckBox(d, "Current segment only")
+            toCurrentSegmentCheckBox = qd.CheckBox(d, "Current segment only")
+            #toCurrentSegmentCheckBox = vigra.pyqt.qd.CheckBox(d, "Current segment only")
             toCurrentSegmentCheckBox.setChecked(False)
             
             d.promptWidgets.append(toCurrentSegmentCheckBox)
             
-            overwriteEpochCheckBox = quickdialog.CheckBox(d, "Overwrite existing epochs")
-            #overwriteEpochCheckBox = vigra.pyqt.quickdialog.CheckBox(d, "Overwrite existing epochs")
+            overwriteEpochCheckBox = qd.CheckBox(d, "Overwrite existing epochs")
+            #overwriteEpochCheckBox = vigra.pyqt.qd.CheckBox(d, "Overwrite existing epochs")
             overwriteEpochCheckBox.setChecked(True);
             
             d.promptWidgets.append(overwriteEpochCheckBox)
@@ -3133,9 +3098,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             return
         
         if self._scipyenWindow_ is not None:
-            d = quickdialog.QuickDialog(self, "Make Epoch From SignalCursor:")
+            d = qd.QuickDialog(self, "Make Epoch From SignalCursor:")
             d.promptWidgets = list()
-            d.namePrompt = quickdialog.StringInput(d, "Name:")
+            d.namePrompt = qd.StringInput(d, "Name:")
             
             d.epoch_name = "Epoch"
             
@@ -3148,7 +3113,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 d.namePrompt.setText("%s from %s" % (d.epoch_name, cursor.ID))
                 
             else:
-                d.cursorComboBox = pgui.QuickDialogComboBox(d, "Select cursor:")
+                d.cursorComboBox = qd.QuickDialogComboBox(d, "Select cursor:")
                 d.cursorComboBox.setItems([c.ID for c in vertAndCrossCursors.values()])
                 d.cursorComboBox.conextIndexChanged(partial(self._slot_update_cursor_to_epoch_dlg, d=d))
                 
@@ -3175,12 +3140,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if len(vertAndCrossCursors) == 0:
             return
         
-        d = quickdialog.QuickDialog(self, "Make Epoch From Interval Between Cursors:")
+        d = qd.QuickDialog(self, "Make Epoch From Interval Between Cursors:")
         d.promptWidgets = list()
-        namePrompt=quickdialog.StringInput(d, "Name:")
+        namePrompt=qd.StringInput(d, "Name:")
         namePrompt.setText("Epoch")
-        c1Prompt = quickdialog.StringInput(d, "SignalCursor 1 ID:")
-        c2Prompt = quickdialog.StringInput(d, "SignalCursor 2 ID:")
+        c1Prompt = qd.StringInput(d, "SignalCursor 1 ID:")
+        c2Prompt = qd.StringInput(d, "SignalCursor 2 ID:")
         d.promptWidgets.append(namePrompt)
         d.promptWidgets.append(c1Prompt)
         d.promptWidgets.append(c2Prompt)
@@ -3390,11 +3355,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             return
         
         if name is None:
-            d = quickdialog.QuickDialog(self, "Make Epoch From SignalCursor:")
-            #d = vigra.pyqt.quickdialog.QuickDialog(self, "Make Epoch From SignalCursor:")
+            d = qd.QuickDialog(self, "Make Epoch From SignalCursor:")
+            #d = vigra.pyqt.qd.QuickDialog(self, "Make Epoch From SignalCursor:")
             d.promptWidgets = list()
-            d.promptWidgets.append(quickdialog.StringInput(d, "Name:"))
-            #d.promptWidgets.append(vigra.pyqt.quickdialog.StringInput(d, "Name:"))
+            d.promptWidgets.append(qd.StringInput(d, "Name:"))
+            #d.promptWidgets.append(vigra.pyqt.qd.StringInput(d, "Name:"))
             d.promptWidgets[0].setText("Epoch from "+crs.ID)
             
             if d.exec() == QtWidgets.QDialog.Accepted:
@@ -3414,11 +3379,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         clist = sorted([c0, c1], key=attrgetter('x'))
         
         if name is None:
-            d = quickdialog.QuickDialog(self, "Make Epoch From The Interval Between Two Cursors:")
-            #d = vigra.pyqt.quickdialog.QuickDialog(self, "Make Epoch From Interval Between Two Cursors:")
+            d = qd.QuickDialog(self, "Make Epoch From The Interval Between Two Cursors:")
+            #d = vigra.pyqt.qd.QuickDialog(self, "Make Epoch From Interval Between Two Cursors:")
             d.promptWidgets = list()
-            d.promptWidgets.append(quickdialog.StringInput(d, "Name:"))
-            #d.promptWidgets.append(vigra.pyqt.quickdialog.StringInput(d, "Name:"))
+            d.promptWidgets.append(qd.StringInput(d, "Name:"))
+            #d.promptWidgets.append(vigra.pyqt.qd.StringInput(d, "Name:"))
             d.promptWidgets[0].setText("Epoch")
             
             if d.exec() == QtWidgets.QDialog.Accepted:

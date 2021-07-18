@@ -203,15 +203,47 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):
         return list()
             
         
-def saveWindowSettings(qsettings, win, entry_name, group_name=None):
+def saveWindowSettings(qsettings, win, entry_name:typing.Optional[str]=None, group_name:typing.Optional[str]=None):
     # NOTE: 2021-07-11 18:32:56
     # QSettings support maximum on nesting level (i.e., group/entry)
     if isinstance(group_name, str) and len(group_name.strip()):
         qsettings.beginGroup(group_name)
-    qsettings.setValue("%s_WindowSize" % entry_name, win.size())
-    qsettings.setValue("%s_WindowPosition" % entry_name, win.pos())
-    #qsettings.setValue("%s_Geometry" % entry_name, win.geometry())
-    qsettings.setValue("%s_WindowState" % entry_name, win.saveState())
+    if isinstance(entry_name, str) and len(entry_name.strip()):
+        ename = "%s_" % entry_name
+    else:
+        ename=""
+    qsettings.setValue("%sWindowSize" % ename, win.size())
+    qsettings.setValue("%sWindowPosition" % ename, win.pos())
+    qsettings.setValue("%sWindowGeometry" % ename, win.geometry())
+    if hasattr(win, "saveState"):
+        qsettings.setValue("%sWindowState" % ename, win.saveState())
+    if isinstance(group_name, str) and len(group_name.strip()):
+        qsettings.endGroup()
     
-def loadWindowSettings(qsettings, win, entry_name):
-    pass
+def loadWindowSettings(qsettings, win, entry_name:typing.Optional[str]=None, group_name:typing.Optional[str]=None):
+    if isinstance(group_name, str) and len(group_name.strip()):
+        qsettings.beginGroup(group_name)
+    if isinstance(entry_name, str) and len(entry_name.strip()):
+        ename = "%s_" % entry_name
+    else:
+        ename=""
+        
+    windowSize = qsettings.value("%sWindowSize" % ename, None)
+    if windowSize:
+        win.resize(windowSize)
+        
+    windowPos = qsettings.value("%sWindowPosition" % ename, None)
+    if windowPos:
+        win.move(windowPos)
+    
+    windowGeometry = qsettings.value("%sWindowGeometry" % ename, None)
+    if windowGeometry:
+        win.setGeometry(windowGeometry)
+        
+    if hasattr(win, "restoreState"):
+        windowState = qsettings.value("%sWindowState" % ename, None)
+        if windowState:
+            win.restoreState(windowState)
+    
+    if isinstance(group_name, str) and len(group_name.strip()):
+        qsettings.endGroup()
