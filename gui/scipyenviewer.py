@@ -9,7 +9,7 @@ from PyQt5 import (QtCore, QtWidgets, QtGui,)
 from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
 
 from core.utilities import safeWrapper
-from . import pictgui as pgui
+#from . import pictgui as pgui
 from .workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 
 class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
@@ -336,7 +336,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         The configuration file is determined at application (Scipyen) level.
         See also QtCore.QSettings()
         """
-        print("ScipyenViewer[%s].saveWindowSettings for %s top level:%s" % (self.__class__.__name__, self.winTitle, self.isTopLevel))
+        #print("ScipyenViewer[%s].saveWindowSettings for %s top level:%s" % (self.__class__.__name__, self.winTitle, self.isTopLevel))
         if self.isTopLevel and self.isVisible():
             saveWindowSettings(self.settings, self, self.__class__.__name__)
             #self.settings.setValue("/".join([self.__class__.__name__, "WindowSize"]), self.size())

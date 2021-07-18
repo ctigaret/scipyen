@@ -142,7 +142,7 @@ from core.datatypes import (arraySlice, isColumnVector, isVector, normalized_ind
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.triggerprotocols import TriggerProtocol
-from core.utilities import (unique, get_nested_value, set_nested_value,)
+#from core.utilities import (unique, get_nested_value, set_nested_value,)
 from core.workspacefunctions import validate_varname
 
 from imaging.vigrautils import vigraKernel1D_to_ndarray
@@ -702,6 +702,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def _setup_signal_choosers_(self, analog:(tuple, list, type(None)) = None, irregular:(tuple, list, type(None)) = None):
         """
         """
+        from core.utilities import unique
         sigBlock = [QtCore.QSignalBlocker(widget) for widget in (self.selectSignalComboBox, self.selectIrregularSignalComboBox)]
         
         if analog is None or (isinstance(analog, (tuple, list)) and len(analog) == 0):
@@ -2131,6 +2132,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
     @safeWrapper
     def _export_data_items_(self, items):
+        from core.utilities import get_nested_value
         if self._scipyenWindow_ is None:
             return
         

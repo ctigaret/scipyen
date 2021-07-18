@@ -160,7 +160,7 @@ from core.datatypes import (TypeEnum, reverse_mapping_lookup, reverse_dict, )
 from core.traitcontainers import DataBag
 from core.prog import (safeWrapper, deprecated,
                        timefunc, processtimefunc,)
-from core.utilities import (unique, index_of,)
+#from core.utilities import (unique, index_of,)
 from core.workspacefunctions import debug_scipyen
 #### END core modules
 
@@ -1474,6 +1474,7 @@ class PlanarGraphics():
         WARNING: This can be very expensive - only call it at construction
         """
         #print("PlanarGraphics (%s) _checkStates_: %d states: " % (self.__class__.__name__, len(self._states_)), self._states_)
+        from core.utilities import unique
         if len(self._states_):
             # make sure the states conform to the planar descriptors
             states = [s for s in self._states_ if self.__class__.validateState(s)]
@@ -1564,7 +1565,7 @@ class PlanarGraphics():
         
         """
         import math, bisect
-        
+        from core.utilities import unique
         # allows sorting by z_frames when None is amongst them
         # NOTE: however that by RULE I a state where z_frame is None is THE ONLY
         # state available
@@ -2705,6 +2706,7 @@ class PlanarGraphics():
             OR None
             
         """
+        from core.utilities import index_of
         if state is None:
             state = self.getState(z_frame=z_frame, return_visible=visible_only)
                         
@@ -3149,6 +3151,7 @@ class PlanarGraphics():
         with visibility in all available frames.
             
         """
+        from core.utilities import index_of
         # NOTE: 2020-11-13 12:43:53 re-write
         
         if not self.__class__.validateState(state):

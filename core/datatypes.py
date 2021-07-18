@@ -42,7 +42,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 
 from . import xmlutils
 from . import strutils
-from .utilities import (counter_suffix, unique, )
+#from .utilities import (counter_suffix, unique, )
 from .prog import safeWrapper
 
 from imaging.imageprocessing import *
@@ -1014,6 +1014,7 @@ class TypeEnum(IntEnum):
             TypeEnum.values() or TypeEnum.names(), respectively)
         
         """
+        from .utilities import unique
         if isinstance(t, (int, str)):
             t_hat = cls.type(t)
             if isinstance(t_hat, list):
@@ -1041,6 +1042,7 @@ class TypeEnum(IntEnum):
             TypeEnum.values() or TypeEnum.names(), respectively)
         
         """
+        from .utilities import unique
         if isinstance(t, (int, str)):
             t_hat = cls.type(t)
             if isinstance(t_hat, list):

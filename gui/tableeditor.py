@@ -34,7 +34,7 @@ import core.datatypes as dt
 import core.strutils as strutils
 from core.strutils import str2float
 
-from core.utilities import (safeWrapper, unique,)
+from core.prog import (safeWrapper, )
 
 from core.triggerprotocols import TriggerProtocol
 from core.triggerprotocols import (TriggerEvent, TriggerEventType,)
@@ -1073,6 +1073,7 @@ class TableEditor(ScipyenViewer, Ui_TableEditor):
         
     @safeWrapper
     def _plot_model_data_(self, modelIndexes, custom=False):
+        from core.utilities import unique
         if len(modelIndexes)==0: # bail out if there is no selection
             return
         

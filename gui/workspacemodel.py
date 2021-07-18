@@ -876,6 +876,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
             #self.removeRow(row)
             
+    @pyqtSlot()
+    def slot_updateTable(self):
+        self.updateTable(from_console=False)
+            
     def addRowForVariable(self, dataname, data):
         """CAUTION Only use for data in the internal workspace, not in remote ones.
         """

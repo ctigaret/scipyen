@@ -39,7 +39,7 @@ from core import xmlutils, strutils
 
 from core.workspacefunctions import validate_varname
 
-from core.utilities import (get_nested_value, set_nested_value, counter_suffix, )
+#from core.utilities import (get_nested_value, set_nested_value, counter_suffix, )
 
 from core.prog import (safeWrapper, safeGUIWrapper, )
 
@@ -381,6 +381,7 @@ class DataViewer(ScipyenViewer): #, QtWidgets.QMainWindow):
     @pyqtSlot(QtWidgets.QTreeWidgetItem, int)
     @safeWrapper
     def slot_itemDoubleClicked(self, item, column):
+        from core.utilities import get_nested_value
         if self._scipyenWindow_ is None:
             return
         
@@ -515,6 +516,7 @@ class DataViewer(ScipyenViewer): #, QtWidgets.QMainWindow):
     @pyqtSlot()
     @safeWrapper
     def slot_viewItemDataInNewWindow(self):
+        from core.utilities import get_nested_value
         if self._scipyenWindow_ is None:
             return
         
@@ -593,6 +595,7 @@ class DataViewer(ScipyenViewer): #, QtWidgets.QMainWindow):
     
     @safeWrapper
     def _export_data_items_(self, items, fullPathAsName=False):
+        from core.utilities import get_nested_value
         if self._scipyenWindow_ is None:
             return
         

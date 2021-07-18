@@ -222,7 +222,7 @@ from . import colorwidgets
 from . import stylewidgets
 from . import gradientwidgets
 
-from .workspacegui import WorkspaceGuiMixin
+from .workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 from .workspacemodel import WorkspaceModel
 
 # qtconsole.styles and pygments.styles, respectively:
@@ -399,9 +399,10 @@ class WorkspaceViewer(QtWidgets.QTableView):
 # inerited only from the _FIRST_ superclass, which must also have the deepest 
 # inheritance tree
 class WindowManager(__QMainWindow__):
+    sig_windowRemoved = pyqtSignal(tuple, name="sig_windowRemoved")
+    
     def __init__(self, parent=None):
-        #super(WindowManager, self).__init__(parent)
-        super().__init__(parent) # the Python3 way?
+        super().__init__(parent)
         
         # gui_viewers defined in gui package (see gui/__init__.py)
         self.viewers = dict(map(lambda x: (x, list()), gui_viewers))
@@ -437,6 +438,26 @@ class WindowManager(__QMainWindow__):
     def handle_mpl_figure_enter(self, evt):
         self._setCurrentWindow(evt.canvas.figure)
         
+    @safeWrapper
+    def handle_mpl_figure_close(self, evt):
+        """Removes the figure from the workspace and updates the workspace table.
+        NOTE: handle_mpl_figure_close in WindowManager is now obsolete
+        """
+        fig_number = evt.canvas.figure.number
+        fig_varname = "Figure%d" % fig_number
+        plt.close(evt.canvas.figure)
+        # NOTE: 2020-02-05 00:53:51
+        # this also closes the figure window and removes it from self.currentViewers
+        self.deRegisterViewer(evt.canvas.figure) # doe nto remove symbol from workspace
+        
+        # NOTE: now remove the figure variable name from user workspace
+        ns_fig_names_objs = [x for x in self.shell.user_ns.items() if isinstance(x[1], mpl.figure.Figure) and x[1] is evt.canvas.figure]
+
+        for ns_fig in ns_fig_names_objs:
+            self.sig_windowRemoved.emit(ns_fig)
+            #self.shell.user_ns.pop(ns_fig[0], None)
+            #self.workspaceModel.updateTable(from_console=False)
+            
     @safeWrapper
     def _set_new_viewer_window_name_(self, winClass, name=None):
         """Sets up the name of a new window viewer variable in the workspace
@@ -1581,6 +1602,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.workspaceModel             = WorkspaceModel(self.shell, parent=self)
         
+        self.sig_windowRemoved.connect(self.slot_windowRemoved) # signal inherited from WindowManager
+        
         # NOTE: 2020-10-22 13:30:54
         # self._nonInteractiveVars_ is updated in _init_QtConsole_()
         self.workspaceModel.user_ns_hidden.update(self._nonInteractiveVars_)
@@ -2130,8 +2153,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # finally, customize console window title and show it
             # -------------------------
             self.console.setWindowTitle(u'Scipyen Console')
+            
         
         self.console.show()
+        self.console.set_pygment(self.console.custom_pygment) # must be applied on visible console!
         
     # NOTE: 2016-03-20 21:18:32
     # to run code inside the console and use the console as stdout, 
@@ -2365,25 +2390,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.workspace[name] = val
         self.slot_updateWorkspaceTable(from_console)
         
-    @safeWrapper
-    def _handle_matplotlib_figure_close(self, evt):
-        """Removes the figure from the workspace and updates the workspace table.
-        NOTE: handle_mpl_figure_close in WindowManager is now obsolete
-        """
-        fig_number = evt.canvas.figure.number
-        fig_varname = "Figure%d" % fig_number
-        plt.close(evt.canvas.figure)
-        # NOTE: 2020-02-05 00:53:51
-        # this also closes the figure window and removes it from self.currentViewers
-        self.deRegisterViewer(evt.canvas.figure) 
-        
-        # NOTE: now remove the figure variable name from user workspace
-        ns_fig_names_objs = [x for x in self.shell.user_ns.items() if isinstance(x[1], mpl.figure.Figure) and x[1] is evt.canvas.figure]
-
-        for ns_fig in ns_fig_names_objs:
-            self.shell.user_ns.pop(ns_fig[0], None)
-            self.workspaceModel.updateTable(from_console=False)
-            
     @pyqtSlot()
     @safeWrapper
     def slot_newViewer(self):
@@ -2403,7 +2409,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             win = self._newViewer(selected_viewer_type_name)# , name=win_name)
             
             if isinstance(win, mpl.figure.Figure):
-                win.canvas.mpl_connect("close_event", self._handle_matplotlib_figure_close)
+                win.canvas.mpl_connect("close_event", self.handle_mpl_figure_close)
             
     @pyqtSlot()
     @safeWrapper
@@ -3172,13 +3178,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         evt.accept()
         
     def _save_settings_(self):
-        self.settings.endGroup()
+        #self.settings.endGroup()
+        saveWindowSettings(self.settings, self, group_name=self.__class__.__name__)
         
-        self.settings.beginGroup("ScipyenWindow")
-        self.settings.setValue("Size", self.size())
-        self.settings.setValue("Position", self.pos())
-        self.settings.setValue("Geometry", self.geometry())
-        self.settings.setValue("State", self.saveState())
+        self.settings.beginGroup(self.__class__.__name__)
         
         #consoleFont = self.console.font
         #self.settings.setValue("ConsoleFont", consoleFont)
@@ -3210,6 +3213,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         #### NOTE: user-defined gui handlers (viewers) for variable types, or user-changed
         # configuration of gui handlers
+        # FIXME 2021-07-17 22:55:17 
+        # Not written to Scipyen.conf 
         self.settings.beginGroup("Custom_GUI_Handlers")
         for viewerClass in VTH.gui_handlers.keys():
             self.settings.beginGroup(viewerClass.__name__)
@@ -3262,20 +3267,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     #@processtimefunc
     def _load_settings_(self):
         self.settings                   = QtCore.QSettings("Scipyen", "Scipyen")
+        loadWindowSettings(self.settings, self, group_name = self.__class__.__name__)
         
-        self.settings.beginGroup("ScipyenWindow")
-        self.windowSize                 = self.settings.value("Size", QtCore.QSize(414, 588))
-
-        self.resize(self.windowSize)
-        
-        self.windowPosition             = self.settings.value("Position", QtCore.QPoint(0,0))
-        
-        self.move(self.windowPosition)
-        
-        self.windowState                = self.settings.value("State", None)
-
-        if self.windowState is not None:
-            self.restoreState(self.windowState)
+        self.settings.beginGroup(self.__class__.__name__)
             
         #consoleFontSize = self.settings.value("ConsoleFontSize",8.)
         #consoleFont = self.settings.value("ConsoleFont", QtGui.QFont("Monospace"))
@@ -3375,7 +3369,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
         self.settings.endGroup() # settings for ScipyenWindow group
         
-        self.settings.beginGroup("Custom GUI Handlers")
+        self.settings.beginGroup("Custom_GUI_Handlers")
         
         # FIXME: 2019-11-03 22:56:20 -- inconsistency
         # what if a viewer doesn't have any types defined?
@@ -3400,9 +3394,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 VTH.register(viewerClass, types, actionName=action)
                 self.settings.endGroup()
             
-        #for viewerClass in VTH.gui_handlers.keys():
-            #if 
-        
         self.settings.endGroup()
     
     #@processtimefunc
@@ -5472,7 +5463,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             self._slot_set_app_gui_style_("Default")
 
-        
+    @pyqtSlot(tuple)
+    def slot_windowRemoved(self, name_obj):
+        self.shell.user_ns.pop(name_obj[0], None)
+        self.workspaceModel.updateTable(from_console=False)
                 
     @pyqtSlot()
     @safeWrapper

@@ -21,8 +21,6 @@ from .prog import safeWrapper
 
 from .strutils import get_int_sfx
 
-from gui.guiutils import (get_text_width, get_elided_text)
-
 abbreviated_type_names = {'IPython.core.macro.Macro' : 'Macro'}
 sequence_types = (list, tuple, deque)
 sequence_typenames = ('list', 'tuple', "deque")
@@ -66,6 +64,8 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     the Scipyen main window.
     
     """
+    from gui.guiutils import (get_text_width, get_elided_text)
+    
     #NOTE: memory size is reported as follows:
         #result of obj.nbytes, for object types derived from numpy ndarray
         #result of total_size(obj) for python containers
