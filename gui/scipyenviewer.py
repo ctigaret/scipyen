@@ -338,7 +338,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """
         #print("ScipyenViewer[%s].saveWindowSettings for %s top level:%s" % (self.__class__.__name__, self.winTitle, self.isTopLevel))
         if self.isTopLevel and self.isVisible():
-            saveWindowSettings(self.settings, self, self.__class__.__name__)
+            saveWindowSettings(self.settings, self)#, self.__class__.__name__)
             #self.settings.setValue("/".join([self.__class__.__name__, "WindowSize"]), self.size())
                 
             #self.settings.setValue("/".join([self.__class__.__name__, "WindowPosition"]), self.pos())
@@ -389,17 +389,18 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # NOTE: 2021-07-08 09:06:32
         # window settings are loaded here only if parent is Scipyen's main window
         if self.isTopLevel:
-            windowSize = self.settings.value("/".join([self.__class__.__name__, "WindowSize"]), None)
-            if windowSize is not None:
-                self.resize(windowSize)
+            loadWindowSettings(self.settings, self)
+            #windowSize = self.settings.value("/".join([self.__class__.__name__, "WindowSize"]), None)
+            #if windowSize is not None:
+                #self.resize(windowSize)
                 
-            windowPos = self.settings.value("/".join([self.__class__.__name__, "WindowPos"]), None)
-            if windowPos is not None:
-                self.move(windowPos)
+            #windowPos = self.settings.value("/".join([self.__class__.__name__, "WindowPos"]), None)
+            #if windowPos is not None:
+                #self.move(windowPos)
                 
-            windowState = self.settings.value("/".join([self.__class__.__name__, "WindowState"]), None)
-            if windowState is not None:
-                self.restoreState(windowState)
+            #windowState = self.settings.value("/".join([self.__class__.__name__, "WindowState"]), None)
+            #if windowState is not None:
+                #self.restoreState(windowState)
                 
 
     @abstractmethod
@@ -604,7 +605,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """All viewers in Scipyen should behave consistently.
         However, this may by overridden in derived classes.
         """
-        print("ScipyenViewer[%s].closeEvent %s: isTopLevel %s" % (self.__class__.__name__, self.winTitle, self.isTopLevel))
+        #print("ScipyenViewer[%s].closeEvent %s: isTopLevel %s" % (self.__class__.__name__, self.winTitle, self.isTopLevel))
         # NOTE: 2021-07-08 12:07:35
         # also de-register the viewer with Scipyen's main window, if this viewer
         # is NOT a client (child) of another Scypen app (e.g. LSCaTWindow)

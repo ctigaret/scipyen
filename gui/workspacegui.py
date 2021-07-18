@@ -203,11 +203,15 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):
         return list()
             
         
-def saveWindowSettings(qsettings, win, entry_name:typing.Optional[str]=None, group_name:typing.Optional[str]=None):
+def saveWindowSettings(qsettings, win, entry_name:typing.Optional[str]=None, 
+                       use_group:bool=True, group_name:typing.Optional[str]=None):
     # NOTE: 2021-07-11 18:32:56
-    # QSettings support maximum on nesting level (i.e., group/entry)
-    if isinstance(group_name, str) and len(group_name.strip()):
+    # QSettings support maximum one nesting level (i.e., group/entry)
+    if use_group:
+        if not isinstance(group_name, str) or len(group_name.strip()):
+            group_name = win.__class__.__name__
         qsettings.beginGroup(group_name)
+        
     if isinstance(entry_name, str) and len(entry_name.strip()):
         ename = "%s_" % entry_name
     else:
@@ -217,12 +221,17 @@ def saveWindowSettings(qsettings, win, entry_name:typing.Optional[str]=None, gro
     qsettings.setValue("%sWindowGeometry" % ename, win.geometry())
     if hasattr(win, "saveState"):
         qsettings.setValue("%sWindowState" % ename, win.saveState())
-    if isinstance(group_name, str) and len(group_name.strip()):
+        
+    if use_group:
         qsettings.endGroup()
     
-def loadWindowSettings(qsettings, win, entry_name:typing.Optional[str]=None, group_name:typing.Optional[str]=None):
-    if isinstance(group_name, str) and len(group_name.strip()):
+def loadWindowSettings(qsettings, win, entry_name:typing.Optional[str]=None, 
+                       use_group:bool=True, group_name:typing.Optional[str]=None):
+    if use_group:
+        if not isinstance(group_name, str) or len(group_name.strip()):
+            group_name = win.__class__.__name__
         qsettings.beginGroup(group_name)
+        
     if isinstance(entry_name, str) and len(entry_name.strip()):
         ename = "%s_" % entry_name
     else:
@@ -245,5 +254,5 @@ def loadWindowSettings(qsettings, win, entry_name:typing.Optional[str]=None, gro
         if windowState:
             win.restoreState(windowState)
     
-    if isinstance(group_name, str) and len(group_name.strip()):
+    if use_group:
         qsettings.endGroup()

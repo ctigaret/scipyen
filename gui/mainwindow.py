@@ -762,24 +762,26 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
         
         
     def _load_settings_(self):
-        windowSize = self.settings.value("/".join([self.__class__.__name__, "WindowSize"]), None)
-        if windowSize is not None:
-            self.resize(windowSize)
+        loadWindowSettings(self.settings, self)
+        #windowSize = self.settings.value("/".join([self.__class__.__name__, "WindowSize"]), None)
+        #if windowSize is not None:
+            #self.resize(windowSize)
             
-        windowPos = self.settings.value("/".join([self.__class__.__name__, "WindowPos"]), None)
-        if windowPos is not None:
-            self.move(windowPos)
+        #windowPos = self.settings.value("/".join([self.__class__.__name__, "WindowPos"]), None)
+        #if windowPos is not None:
+            #self.move(windowPos)
             
-        windowState = self.settings.value("/".join([self.__class__.__name__, "WindowState"]), None)
-        if windowState is not None:
-            self.restoreState(windowState)
+        #windowState = self.settings.value("/".join([self.__class__.__name__, "WindowState"]), None)
+        #if windowState is not None:
+            #self.restoreState(windowState)
             
     def _save_settings_(self):
-        self.settings.setValue("/".join([self.__class__.__name__, "WindowSize"]), self.size())
+        saveWindowSettings(self.settings, self)
+        #self.settings.setValue("/".join([self.__class__.__name__, "WindowSize"]), self.size())
             
-        self.settings.setValue("/".join([self.__class__.__name__, "WindowPos"]), self.pos())
+        #self.settings.setValue("/".join([self.__class__.__name__, "WindowPos"]), self.pos())
             
-        self.settings.setValue("/".join([self.__class__.__name__, "WindowState"]), self.saveState())
+        #self.settings.setValue("/".join([self.__class__.__name__, "WindowState"]), self.saveState())
             
     def setData(self, scriptsDict):
         if not isinstance(scriptsDict, dict):
@@ -3179,7 +3181,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
     def _save_settings_(self):
         #self.settings.endGroup()
-        saveWindowSettings(self.settings, self, group_name=self.__class__.__name__)
+        saveWindowSettings(self.settings, self)#, group_name=self.__class__.__name__)
         
         self.settings.beginGroup(self.__class__.__name__)
         
@@ -3267,7 +3269,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     #@processtimefunc
     def _load_settings_(self):
         self.settings                   = QtCore.QSettings("Scipyen", "Scipyen")
-        loadWindowSettings(self.settings, self, group_name = self.__class__.__name__)
+        loadWindowSettings(self.settings, self)#, group_name = self.__class__.__name__)
         
         self.settings.beginGroup(self.__class__.__name__)
             

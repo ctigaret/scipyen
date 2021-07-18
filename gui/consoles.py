@@ -334,7 +334,7 @@ class ExternalConsoleWindow(MainWindow):
         
     def _load_settings_(self):
         # located in $HOME/.config/Scipyen/Scipyen.conf
-        loadWindowSettings(self.settings, self, group_name=self.__class__.__name__)
+        loadWindowSettings(self.settings, self)#, group_name=self.__class__.__name__)
         self.settings.beginGroup(self.__class__.__name__)
         fontFamily = self.settings.value("FontFamily", self.defaultFixedFont.family())
         fontSize = int(self.settings.value("FontPointSize", self.defaultFixedFont.pointSize()))
@@ -2524,7 +2524,7 @@ class ScipyenConsole(RichJupyterWidget):
 
     def _load_settings_(self):
         # located in $HOME/.config/Scipyen/Scipyen.conf
-        loadWindowSettings(self.settings, self, group_name=self.__class__.__name__)
+        loadWindowSettings(self.settings, self)#, group_name=self.__class__.__name__)
         self.settings.beginGroup(self.__class__.__name__)
         fontFamily = self.settings.value("FontFamily", self.defaultFixedFont.family())
         fontSize = int(self.settings.value("FontPointSize", self.defaultFixedFont.pointSize()))
