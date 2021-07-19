@@ -40,6 +40,8 @@ from core.utilities import (summarize_object_properties,
 
 from core.traitcontainers import DataBag
 
+from .guiutils import (get_text_width, get_elided_text)
+
 class WorkspaceModel(QtGui.QStandardItemModel):
     '''
     The data model for the workspace variable that are displayed in the QTableView 
@@ -696,12 +698,23 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
         self.updateTable(from_console=True)
         
-    def _generate_standard_item_for_object_(self, propdict:dict, 
-                                            editable:typing.Optional[bool] = False, 
-                                            background:typing.Optional[QtGui.QBrush]=None, 
-                                            foreground:typing.Optional[QtGui.QBrush]=None) -> QtGui.QStandardItem:
+    def _gen_item_for_object_(self, propdict:dict, 
+                            editable:typing.Optional[bool] = False, 
+                            elidetip:typing.Optional[bool] = False,
+                            background:typing.Optional[QtGui.QBrush]=None, 
+                            foreground:typing.Optional[QtGui.QBrush]=None) -> QtGui.QStandardItem:
         item = QtGui.QStandardItem(propdict["display"])
-        item.setToolTip(propdict["tooltip"])
+        
+        ttip = propdict["tooltip"]
+        # NOTE: 2021-07-19 11:06:48
+        # optionally use elided text for long tooltips
+        if elidetip:
+            components = ttip.split("\n")
+            wspace_name = components[-1]
+            w = get_text_width(wspace_name) * 2
+            ttip = "\n".join([get_elided_text(s, w) for s in components[:-1]] + [wspace_name])
+            
+        item.setToolTip(ttip)
         item.setStatusTip(propdict["tooltip"])
         item.setWhatsThis(propdict["tooltip"])
         item.setEditable(editable)
@@ -715,20 +728,20 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return item
     
     @safeWrapper
-    def generateRowContents2(self, dataname:str, data:object, namespace:str="Internal") -> typing.List[QtGui.QStandardItem]:
+    def generateRowContents(self, dataname:str, data:object, namespace:str="Internal") -> typing.List[QtGui.QStandardItem]:
         obj_props = summarize_object_properties(dataname, data, namespace=namespace)
-        #print("generateRowContents2 obj_props", obj_props)
-        return self.generateRowFromPropertiesDict(obj_props)
+        return self.genRowFromPropDict(obj_props)
     
-    def generateRowFromPropertiesDict(self, obj_props:dict,
+    def genRowFromPropDict(self, obj_props:dict,
                                       background:typing.Optional[QtGui.QBrush]=None,
                                       foreground:typing.Optional[QtGui.QBrush]=None) -> typing.List[QtGui.QStandardItem]:
         """Returns a row of QStandardItems
         """
-        return [self._generate_standard_item_for_object_(obj_props[key], 
-                                                         editable = (key=="Name"), 
-                                                         background=background, 
-                                                         foreground=foreground) for key in standard_obj_summary_headers]
+        return [self._gen_item_for_object_(obj_props[key], 
+                editable = (key == "Name"), 
+                elidetip = (key == "Name"),
+                background=background, 
+                foreground=foreground) for key in standard_obj_summary_headers]
         
         
     def getRowContents(self, row, asStrings=True):
@@ -784,7 +797,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         originalRow = self.getRowContents(row, asStrings=False)
         
-        v_row = self.generateRowContents2(dataname, data) # generate model view row contents for existing item
+        v_row = self.generateRowContents(dataname, data) # generate model view row contents for existing item
         #v_row = self.generateRowContents(dataname, data) # generate model view row contents for existing item
         
         for col in range(1, self.columnCount()):
@@ -813,20 +826,20 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         if len(items) > 0:
             row = self.indexFromItem(items[0]).row() # same as below
             #row = items[0].index().row()
-            v_row = self.generateRowContents2(dataname, data) # generate model view row contents for existing item
+            v_row = self.generateRowContents(dataname, data) # generate model view row contents for existing item
             self.updateRow(row, v_row)
             
     def updateRowFromProps(self, row, obj_props, background=None):
         """
         Parameters:
         row = int
-        obj_props: dict, see generateRowContents2
+        obj_props: dict, see generateRowContents
         """
         if background is None:
-            v_row = self.generateRowFromPropertiesDict(obj_props)
+            v_row = self.genRowFromPropDict(obj_props)
             
         else:
-            v_row = self.generateRowFromPropertiesDict(obj_props, background=background)
+            v_row = self.genRowFromPropDict(obj_props, background=background)
             
         self.updateRow(row, v_row)
                 
@@ -884,7 +897,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         """CAUTION Only use for data in the internal workspace, not in remote ones.
         """
         #print("addRowForVariable: ", dataname, data)
-        v_row = self.generateRowContents2(dataname, data) # generate model view row contents
+        v_row = self.generateRowContents(dataname, data) # generate model view row contents
         #v_row = self.generateRowContents(dataname, data) # generate model view row contents
         self.appendRow(v_row) # append the row to the model
         
@@ -1035,12 +1048,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             items_row_ndx = self.rowIndexForNamedItemsWithProps(vname, Workspace=ns_key)
             
             if items_row_ndx is None:
-                row = self.generateRowFromPropertiesDict(props)
+                row = self.genRowFromPropDict(props)
                 self.appendRow(row)
                 
             elif isinstance(items_row_ndx, int):
                 if items_row_ndx == -1:
-                    row = self.generateRowFromPropertiesDict(props)
+                    row = self.genRowFromPropDict(props)
                     self.appendRow(row)
                 
                 else:
@@ -1048,13 +1061,13 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     
             elif isinstance(items_row_ndx, (tuple, list)):
                 if len(items_row_ndx) == 0:
-                    row = self.generateRowFromPropertiesDict(props)
+                    row = self.genRowFromPropDict(props)
                     self.appendRow(row)
                     
                 else:
                     for r in items_row_ndx:
                         if r  == -1:
-                            row = self.generateRowFromPropertiesDict()
+                            row = self.genRowFromPropDict()
                             self.appendRow(row)
                             
                         else:

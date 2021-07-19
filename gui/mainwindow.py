@@ -1550,9 +1550,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #pg.setConfigOptions(editorCommand=self.scipyenEditor)
         
         #self._default_scipyen_settings_ = defaults
-        self._scipyen_settings_         = settings
+        self._scipyen_settings_         = settings # aliased in the workspace as 
+                                                   # 'scipyen_settings'
         
-        self._scipyendir_ = ""
+        self._scipyendir_ = "" # aliased in the workspace as 'scipyen_topdir'
         # NOTE: 2021-01-10 16:26:18
         # read must be called ONLY ONCE
         if isinstance(self._scipyen_settings_, confuse.LazyConfig) and not self._scipyen_settings_._materialized:
@@ -2055,22 +2056,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [repr(sessionNo)])
                     items.append(sessionItem)
 
-                #lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [inline])
                 lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [repr(line), inline])
-                #lineItem.setText(0,repr(line))
-                #lineItem.setText(1,inline)
                 items.append(lineItem)
 
             self.currentSessionTreeWidgetItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, ["Current"])
             
             items.append(self.currentSessionTreeWidgetItem)
             
-            #self.console.historyItemsDropped.connect(self._rerunCommand)
             #NOTE: 2017-03-21 22:55:57 much better!
             # connect signals emitted by the console when processing a drop event
             self.console.historyItemsDropped.connect(self.slot_pasteHistorySelection) 
             self.console.workspaceItemsDropped.connect(self.slot_pasteWorkspaceSelection)
-            #self.console.workspaceItemsDropped[bool].connect(self.slot_pasteWorkspaceSelection)
             self.console.loadUrls[object, bool, QtCore.QPoint].connect(self.slot_loadDroppedURLs)
             self.console.pythonFileReceived[str, QtCore.QPoint].connect(self.slot_handlePythonTextFile)
 
@@ -2109,6 +2105,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.workspace['console'] = self.console # useful for testing functionality; remove upon release
             self.workspace["shell"] = self.shell # alias to self.ipkernel.shell
             self.workspace["scipyen_settings"] = self._scipyen_settings_
+            #self.workspace["scipyen_config"] = self._scipyen_settings_
             self.workspace["scipyen_topdir"] = self._scipyendir_
             
             #print("exit" in self.ipkernel.shell.user_ns)

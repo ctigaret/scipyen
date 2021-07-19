@@ -15,6 +15,7 @@ import pandas as pd
 #from pandas.core.base import PandasObject as PandasObject
 from quantities import Quantity as Quantity
 from vigra import VigraArray as VigraArray
+from pyqtgraph import eq
 
 
 from .prog import safeWrapper
@@ -32,8 +33,6 @@ dict_typenames = ("dict",)
 neo_containernames = ("Block", "Segment",)
 # NOTE: 2020-07-10 12:52:57
 # PictArray is defunct
-#vigra_array_types = ["VigraArray", "PictArray"] 
-#vigra_array_typenames = ("VigraArray",)
 signal_types = ('Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 
                 'SpikeTrain', "DataSignal", "IrregularlySampledDataSignal",
                 "TriggerEvent",)
@@ -64,7 +63,9 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     the Scipyen main window.
     
     """
-    from gui.guiutils import (get_text_width, get_elided_text)
+    # NOTE: 2021-07-19 10:41:55
+    # FIXME for the above 2021-07-19 10:01:35:
+    # eliding is now created in gui.WorkspaceModel._get_item_for_object
     
     #NOTE: memory size is reported as follows:
         #result of obj.nbytes, for object types derived from numpy ndarray
@@ -77,36 +78,23 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         #TODO construct handlers for other object types as well including 
         #PyQt5 objects (maybe)
             
-    #print("summarize_object_properties", objname)
     
     result = dict(map(lambda x: (x, {"display":"", "tooltip":""}), standard_obj_summary_headers))
-    #print("obj", obj)
     objtype = type(obj)
     typename = objtype.__name__
     
     objcls = obj.__class__
     clsname = objcls.__name__
     
-    # NOTE: 2021-06-12 12:23:41
-    # For "Name" only, let the the tooltip display an elided version of the 
-    # object's string representation; take a space that is twice as wide as the 
-    # namespace tooltip
     wspace_name = "Namespace: %s" % namespace
-    w = get_text_width(wspace_name) * 2
     if isinstance(obj, str):
-        ttip = get_elided_text("'%s'" % obj, w)
+        ttip = obj
     elif isinstance(obj, (tuple, list)):
-        ttip = get_elided_text("%s" % (obj,), w)
+        ttip = "%s" % (obj,)
     else:
-        ttip = get_elided_text("%s" % obj, w)
-    #if isinstance(obj, (str, Number, sequence_types, set_types, dict_types, pd.Series, pd.DataFrame, ndarray)):
-        #ttip = get_elided_text("%s" % obj, w)
-    
-    #else:
-        #ttip = objname
+        ttip = "%s" % obj
     
     result["Name"] = {"display": "%s" % objname, "tooltip":"\n".join([ttip, wspace_name])}
-    #result["Name"] = {"display": objname, "tooltip":objname}
     
     tt = abbreviated_type_names.get(typename, typename)
     
@@ -504,7 +492,77 @@ def counter_suffix(x, strings, sep="_"):
                 
     return x
                 
+@safeWrapper
+def find_leaf(src, leaf):
+    """Search for a leaf object in src - depth-first
+    Returns a mixed sequence of hashable objects and int.
+    
+    Parameters:
+    ----------
+    
+    src: dict, tuple, list
+    leaf: object nested deep in src
+    
+    Example 1:
+    
+    ar = np.arange(5)
+    a = {"a":{"b":[1,2,3], "c":{"d":4, "e":list()}}, "f":{"g":"some text", "h":dict(), "i":ar}}
 
+    find_leaf(a, ar)
+    --> ['f', 'i']
+     
+    find_leaf(a, 2)
+    --> ['a', 'b', 1] 
+    
+    find_leaf(a, 4)
+    --> ['a', 'c', 'd']
+    
+    find_leaf(a, "some text")
+    --> ['f', 'g']
+    
+    """
+    path = []
+    
+    if isinstance(src, dict):
+        if hasattr(leaf, "__hash__") and leaf.__hash__ is not None and leaf in src.keys():
+            # leaf is a top level key -> return it
+            # CAUTION 2021-07-19 14:06:26
+            # if src[leaf] is a nested dict and leaf is also found deeper it will
+            # be overlooked
+            path.append(leaf)
+            
+        else:
+            if any((safe_identity_test(leaf, v) for v in src.values())):
+                path += [name for name, val in src.items() if safe_identity_test(val, leaf)]
+                
+            else:
+                # depth-first search
+                for k, v in src.items():
+                    p = find_leaf(v, leaf)
+                    if len(p):
+                        path.append(k)
+                        path += p
+               
+    elif isinstance(src, (tuple, list)):
+        if any((safe_identity_test(leaf, v) for v in src)):
+            path.append(src.index(leaf))
+            
+        elif isinstance(leaf, str) and hasattr(src, leaf):
+            path.append(getattr(src, leaf))
+                        
+        else:
+            # depth first search
+            for k, v in enumerate(src):
+                p = find_leaf(v, leaf)
+                if len(p):
+                    path.append(k)
+                    path += p
+                
+    elif safe_identity_test(src, leaf):
+        path.append(0)
+                    
+    return path
+                
 def get_nested_value(src, path):
     """Returns a value contained in the nested dictionary structure src.
     
@@ -513,7 +571,8 @@ def get_nested_value(src, path):
     Parameters:
     ===========
     
-    src: a dictionary, possibily containing other nested dictionaries; 
+    src: a dictionary, or a sequence (tuple, list), possibily containing other 
+        nested dict/tuple/list; 
         NOTE: all keys in the dictionary must be hashable objects
     
     path: a hashable object that points to a valid key in "src", or a list of
@@ -523,27 +582,37 @@ def get_nested_value(src, path):
             Hashable objects are python object that define __hash__() and __eq__()
             functions, and have a hash value that never changes during the object's
             lifetime. Typical hashable objects are scalars and strings.
+            
+            When src is a tuple or list, path is expected to be a sequence of int
+            (or values that can be casted to int).
+            
+            When src is a collections.namedtuple or a dict, path may contain a mixture of str 
+            and int.
+            
+            NOTE: the path represents depth-first traversal of src.
     
     """
     if not isinstance(src, (dict, tuple, list)):
         raise TypeError("First parameter (%s) expected to be a dict, tuple, or list; got %s instead" % (src, type(src).__name__))
     
-    #if hasattr(path, "__hash__") and getattr(path, "__hash__") is not None: 
-        ## list has a __hash__ attribute which is None
-        #if path in src:
-            #return src[path]
-        
-        #else:
-            #return None
-        
     elif isinstance(path, (tuple, list)):
         try:
             if isinstance(src, (tuple, list)):
-                ndx = int(path[0])
+                # here path is expected to be a sequence of int unless src is a
+                # named tuple
+                if isinstance(src, tuple) and isinstance(path[0], str):
+                        # will raise exception if src is not a named tuple or
+                        # path[0] is not a field name of src
+                        value = getattr(src, path[0]) 
+                else:
+                    # will raise exception if casting cannot be done
+                    ndx = int(path[0]) 
+                                   
                 
             else:
                 ndx = path[0]
             
+            # will raise exception if ndx is not hashable
             value = src[ndx]
             
             if len(path) == 1:
@@ -559,9 +628,11 @@ def get_nested_value(src, path):
             traceback.print_exc
             return None
         
+    elif isinstance(path, (str, int)):
+        return get_nested_value(src, [path])
+        
     else:
         raise TypeError("Expecting a hashable object or a sequence of hashable objects, for path %s; got %s instead" % (path, type(path).__name__))
-        
         
 def set_nested_value(src, path, value):
     """Adds (or sets) a nested value in a mapping (dict) src.
@@ -683,8 +754,6 @@ def sequence_depth(x):
         
 @safeWrapper
 def safe_identity_test(x, y):
-    from pyqtgraph import eq
-    
     try:
         ret = True
         
@@ -692,6 +761,9 @@ def safe_identity_test(x, y):
         
         if not ret:
             return ret
+        
+        if isinstance(x, (np.ndarray, str, Number)):
+            return eq(x,y)
         
         if hasattr(x, "size"):
             ret &= x.size == y.size
@@ -720,7 +792,7 @@ def safe_identity_test(x, y):
             if not ret:
                 return ret
             
-            ret &= all(map(lambda x_,y_: safe_identity_test(x_,y_). zip(x,y)))
+            ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
             
             if not ret:
                 return ret

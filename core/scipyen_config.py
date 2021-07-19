@@ -18,21 +18,21 @@ SignalViewer, etc).
 
 """
 # NOTE: 2021-01-09 10:54:10
-# a framework for configuration options
-# a configuration is a nested (i.e., hierarchical) mapping that contains 
-# parameter values for various modules and functions in Scipyen, and are unrelated
+# A framework for configuration options:
+# A configuration is a possibly nested (i.e., hierarchical) mapping that contains 
+# parameter values for various modules and functions in Scipyen, that are unrelated
 # to GUI configuration options
 # 
-# A configuration is a mapping between parameter values and parameter names.
-# This mapping may be hierarchical, allowing branched configuration structure 
-# (think nested dictionaries): a parameter may be retrieved by its "leaf" name as long 
-# as its name is unique inside the configuration, or by its fully-qualified path
-# name (dot-separated names).
+# When the mapping is hierarchical, it provides a branched configuration structure 
+# (think nested dictionaries): a parameter may be retrieved directly by its "leaf"
+# name as long as the leaf name is unique inside the configuration, or by its 
+# fully-qualified path name (dot-separated names).
 # 
 # A parameter value can be any type, and is stored under a str key (the name of 
-# the parameter) which must be a valid Python identifier, and not a keyword.
+# the parameter) which must be a valid Python identifier (this excludes Python
+# keywords).
 # 
-# Some parameter names are fixed (e.g. see FunctionConfiguration, below)
+# Some leaf names are fixed (e.g. see FunctionConfiguration, below)
 # 
 # Implementation:
 # Configurations are DataBag() objects. A parameter with value type DataBag and

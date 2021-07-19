@@ -16,6 +16,7 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from PyQt5.uic import loadUiType as __loadUiType__
 
 from pyqtgraph import (DataTreeWidget, TableWidget, )
+
 import neo
 import numpy as np
 #### END 3rd party modules
@@ -53,18 +54,20 @@ from . import quickdialog
 from . import resources_rc
 #### END pict.gui modules
 
-class ScipyenTableWidget(TableWidget):
+class ScipyenTableWidget(TableWidget): # TableWidget imported from pyqtgraph
     def __init__(self, *args, **kwds):
         super().__init__(*args, **kwds)
         
     def iterFirstAxis(self, data):
-        """Avoid exceptions when data is a dimesionless array.
+        """Overrides TableWidget.iterFirstAxis.
+        
+        Avoid exceptions when data is a dimesionless array.
         
         In the original TableWidget from pyqtgraph this method fails when data 
         is a dimesionless np.ndarray (i.e. with empty shape and ndim = 0).
         
         This kind of arrays unfortunately can occur when creating a numpy
-        array (either directly in the numpy library, os in the python Quantities
+        array (either directly in the numpy library, or in the python Quantities
         library):
         
         Example 1 - using python quantities:
@@ -125,8 +128,9 @@ class ScipyenTableWidget(TableWidget):
             for i in range(data.shape[0]):
                 yield data[i]
 
-class InteractiveTreeWidget(DataTreeWidget):
+class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqtgraph
     """Adds support for custom context menu to pyqtgraph.DataTreeWidget.
+    Also uses ScipyenTableWidget instead of pyqtgraph.TableWidget
     """
     def __init__(self, *args, **kwargs):
         super(InteractiveTreeWidget, self).__init__(*args, **kwargs)
@@ -179,10 +183,6 @@ class InteractiveTreeWidget(DataTreeWidget):
             widget = table
         elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
             frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
-            #childs = OrderedDict([
-                #(i, {'file': child[0], 'line': child[1], 'function': child[2], 'code': child[3]})
-                #for i, child in enumerate(frames)])
-            #childs = OrderedDict([(i, ch) for i,ch in enumerate(frames)])
             widget = QtGui.QPlainTextEdit(asUnicode('\n'.join(frames)))
             widget.setMaximumHeight(200)
             widget.setReadOnly(True)
@@ -191,7 +191,7 @@ class InteractiveTreeWidget(DataTreeWidget):
         
         return typeStr, desc, childs, widget
         
-class DataViewer(ScipyenViewer): #, QtWidgets.QMainWindow):
+class DataViewer(ScipyenViewer):
     """Viewer for hierarchical collection types: (nested) dictionaries, lists, arrays
     Uses InteractiveTreeWidget which inherits from pyqtgraph DataTreeWidget 
     and in turn inherits from QTreeWidget.
@@ -219,7 +219,6 @@ class DataViewer(ScipyenViewer): #, QtWidgets.QMainWindow):
         super().__init__(data=data, parent=parent, pWin=pWin, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs)
         
     def _configureUI_(self):
-        #self.treeWidget = DataTreeWidget(parent = self)
         self.treeWidget = InteractiveTreeWidget(parent = self)
         
         self.treeWidget.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
@@ -243,9 +242,8 @@ class DataViewer(ScipyenViewer): #, QtWidgets.QMainWindow):
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
         
     def _recursive_traverse_(self, x):
-        """Ensure np.ndarrays have at least 1D
-        ... in order to avoid errors from iterFirstAxis in TabelWidget
-        Possibly obsolete by the use of ScipyenTableWidget
+        """DEPRECATED Ensure np.ndarrays have at least 1D
+        This is in order to avoid errors from iterFirstAxis in TableWidget.
         """
         from core.traitcontainers import DataBag
         

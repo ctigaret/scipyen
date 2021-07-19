@@ -322,8 +322,8 @@ def reverse_mapping_lookup(x:dict, y:typing.Any)->typing.Optional[typing.Any]:
     Returns None if 'y' is not found among x.values()
     
     """
-    from .traitcontainers import (DataBag, Bunch, )
-    from collections import OrderedDict
+    #from .traitcontainers import (DataBag, Bunch, )
+    #from collections import OrderedDict
     
     if y in x.values():
         ret = [name for name, val in x.items() if y == val]
