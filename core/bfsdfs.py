@@ -1,7 +1,7 @@
 """Breadth-first and depth-first search algorithms.
 """
 from collections import deque
-from prog import safeWrapper
+from core.prog import safeWrapper
 from core.utilities import safe_identity_test
 
 class Node:
@@ -23,7 +23,7 @@ def height(node):
     return rheight + 1
 
 @safeWrapper
-def find_leaf(src, leaf):
+def find_leaf(src, leaf, key=True):
     """Search for a leaf object in src - depth-first
     Returns a mixed sequence of hashable objects and int.
     
@@ -102,19 +102,109 @@ def find_leaf(src, leaf):
                     
     return path
                 
+                
+def dict_depth(x):
+    """Return max depth of a nested dict
+    """
+    ret = 0
+    depths = list()
+    
+    dkv = [(k,v) for k,v in x.items() if isinstance(v, dict)]
+    
+    for kv in dkv:
+        dp = dict_depth(kv[1])
+        print(kv[0], dp)
+        depths.append(dp)
+        
+    if len(depths):
+        ret += 1
+        ret += max(depths)
+        
+    return ret
     
 class Finder:
     def __init__(self, src):
         self.data = src
-        self.visited = deque()
-        self.queued = deque()
+        self.visited = deque(maxlen=len(self.data))
+        self.queued = deque(maxlen=len(self.data))
         self.result = list()
         
-    def fs(self, data, leaf):
-        self.visited.append(leaf)
-        self.queued.append(leaf)
-        while len(self.queued):
-            m = self.queued.popleft()
+        self.branches = list()
+        
+        self.level = 0
+        
+    def dict_depth(self, x=None, branch = list()):
+        if x is None:
+            x = self.data
+            self.level = 0
             
-            if m is leaf:
-                self.result.append(m)
+            
+        ret = 0
+        depths = list()
+        
+        dkv = [(k,v) for k,v in x.items() if isinstance(v, dict)]
+        
+        #self.level += 1
+        
+        #for k, kv in enumerate(dkv):
+        for k, (key, val) in enumerate(dkv):
+            branches.append([key])
+            dp, dbr, dbb = self.dict_depth(val, branches[k], branches)
+            depths.append(dp)
+            if dp > 0: # store in branch
+                branch += dbr
+                
+        #self.level -= 1
+            
+        if len(depths):
+            ret += (max(depths) + 1)
+            
+        return ret , branch
+    
+        
+    def find(self, data, leaf, key=True):
+        """search for a leaf
+        
+        key = True =>  search for a leaf KEY, return its value: 
+            leaf is a (possibly nested) key
+            
+            CAUTION: the keys are unique at the same nesting level, but not 
+            necessarily across different nesting levels
+            
+        key = False => search for a leaf VALUE, return its tree path:
+            leaf is an object, possibly nested => return the path leading to it
+            including the KEY it is mapped to
+            
+        For dict data this is straightforward.
+        For sequence data (tuple, list) keys are indices
+        
+        For nested dict the path looks like:
+        [key_0][key_1]...[key_n] for n+1 nesting levels, with key_x being any
+        hashable object that can be used as a dict key.
+        
+        For nested (i.e. ragged) sequences (tuple, lists) the path looks like:
+        [ndx_0][ndx_1]...[ndx_n] for n+1 nesting levels, with ndx_x being an int
+        
+        For nested mixed data (dict containing dict and ragged sequences as above)
+        the path reflects the data types (dict/sequence) in the structure;
+        the nesting level indicesare always global (i.e. start at 0) so when retrieving
+        the path
+            
+        
+        """
+        from core.datatypes import reverse_mapping_lookup
+        ret = None
+        if key: # search for key, return its value(s)
+            if isinstance(data, dict):
+                if key and leaf in data.keys():
+                    ret = data[leaf]
+                elif leaf in data.values():
+                    ret = reverse_mapping_lookup(data, leaf)
+            
+        #self.visited.append(leaf)
+        #self.queued.append(leaf)
+        #while len(self.queued):
+            #m = self.queued.popleft()
+            
+            #if m is leaf:
+                #self.result.append(m)

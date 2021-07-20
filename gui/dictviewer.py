@@ -7,7 +7,7 @@ TODO
 #### BEGIN core python modules
 from __future__ import print_function
 
-import os, warnings, types, traceback
+import os, warnings, types, traceback, itertools
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -129,8 +129,11 @@ class ScipyenTableWidget(TableWidget): # TableWidget imported from pyqtgraph
                 yield data[i]
 
 class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqtgraph
-    """Adds support for custom context menu to pyqtgraph.DataTreeWidget.
-    Also uses ScipyenTableWidget instead of pyqtgraph.TableWidget
+    """Extends pyqtgraph.widgets.DataTreeWidget
+    adds the following:
+    1. Support for custom context menu to pyqtgraph.DataTreeWidget.
+    2. Uses ScipyenTableWidget instead of pyqtgraph.TableWidget
+    3. Support dict data with a mixture of key types (any hashable object)
     """
     def __init__(self, *args, **kwargs):
         super(InteractiveTreeWidget, self).__init__(*args, **kwargs)
@@ -165,11 +168,20 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
             desc = "length=%d" % len(data)
             if isinstance(data, OrderedDict):
                 childs = data
+                
             else:
-                childs = OrderedDict(sorted(data.items()))
+                # NOTE: 2021-07-20 09:52:34
+                # dict objects with mixed key types cannot be sorted
+                # therefore wwe resort to an indexing vector
+                ndx = [i[1] for i in sorted((str(k[0]), k[1]) for k in zip(data.keys(), range(len(data))))]
+                items = [i for i in data.items()]
+                childs = OrderedDict([items[k] for k in ndx])
+                #childs = OrderedDict(sorted(data.items())) # does not support mixed key types!
+                
         elif isinstance(data, (list, tuple)):
             desc = "length=%d" % len(data)
             childs = OrderedDict(enumerate(data))
+            
         elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
             childs = OrderedDict([
                 ('data', data.view(np.ndarray)),
@@ -190,6 +202,44 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
             desc = asUnicode(data)
         
         return typeStr, desc, childs, widget
+    
+    def buildTree(self, data, parent, name='', hideRoot=False, path=()):
+        from pyqtgraph.python2_3 import asUnicode
+        if hideRoot:
+            node = parent
+        else:
+            node = QtGui.QTreeWidgetItem([name, "", ""])
+            parent.addChild(node)
+        
+        # record the path to the node so it can be retrieved later
+        # (this is used by DiffTreeWidget)
+        self.nodes[path] = node
+
+        typeStr, desc, childs, widget = self.parse(data)
+        node.setText(1, typeStr)
+        node.setText(2, desc)
+            
+        # Truncate description and add text box if needed
+        if len(desc) > 100:
+            desc = desc[:97] + '...'
+            if widget is None:
+                widget = QtGui.QPlainTextEdit(asUnicode(data))
+                widget.setMaximumHeight(200)
+                widget.setReadOnly(True)
+        
+        # Add widget to new subnode
+        if widget is not None:
+            self.widgets.append(widget)
+            subnode = QtGui.QTreeWidgetItem(["", "", ""])
+            node.addChild(subnode)
+            self.setItemWidget(subnode, 0, widget)
+            self.setFirstItemColumnSpanned(subnode, True)
+            
+        # recurse to children
+        for key, data in childs.items():
+            #key_ = str(key) if not isinstance(key, str) else key
+            self.buildTree(data, node, asUnicode(key), path=path+(key,))
+
         
 class DataViewer(ScipyenViewer):
     """Viewer for hierarchical collection types: (nested) dictionaries, lists, arrays

@@ -315,7 +315,6 @@ def reverse_mapping_lookup(x:dict, y:typing.Any)->typing.Optional[typing.Any]:
     
     Returns:
     ========
-    
     The key mapped to 'y', if the mapping is unique, else a tuple of keys that
     map to the same value in 'y'.
     
