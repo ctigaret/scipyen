@@ -4,6 +4,78 @@ from collections import deque
 from core.prog import safeWrapper
 from core.utilities import safe_identity_test
 
+import nested_lookup as nlu
+import dpath
+
+def gen_dict_extract(var, key):
+    if isinstance(var, dict):
+        for k, v in var.items():
+            if k == key: # if key found in var yield
+                yield v
+            # else check v (recursive call)
+            if isinstance(v, (dict, list, tuple, deque)):
+                yield from gen_dict_extract(v, key)
+                
+    elif isinstance(var, (list, tuple, deque)):
+        for v in var: # no key comparison; key should be an int
+            yield from gen_dict_extract(v, key)
+            
+def gen_dict_extract0(key, var):
+    """
+    hexerei software
+    https://stackoverflow.com/questions/9807634/find-all-occurrences-of-a-key-in-nested-dictionaries-and-lists
+    """
+    #if hasattr(var,'iteritems'):
+    if hasattr(var,'items'): # python 3
+    #try:
+        #g = var.items()
+    #except AttributeError:
+        #pass
+    #else:
+        #for k, v in g:
+        #for k, v in var.iteritems():
+        for k, v in var.items(): # python 3
+            if k == key:
+                yield v
+            if isinstance(v, dict):
+                for result in gen_dict_extract(key, v):
+                    yield result
+            elif isinstance(v, list):
+                for d in v:
+                    for result in gen_dict_extract(key, d):
+                        yield result
+
+def gen_dict_extract1(key, var): # Alfe
+    try:
+        g = var.iteritems()
+    except AttributeError:
+        pass
+    else:
+        for k, v in g:
+            if k == key:
+                yield v
+            if isinstance(v, dict):
+                for result in gen_dict_extract(key, v):
+                    yield result
+            elif isinstance(v, list):
+                for d in v:
+                    for result in gen_dict_extract(key, d):
+                        yield result
+
+def gen_dict_extract2(var, keys):
+   for key in keys:
+      if hasattr(var, 'items'):
+         for k, v in var.items():
+            if k == key:
+               yield v
+            if isinstance(v, dict):
+               for result in gen_dict_extract([key], v):
+                  yield result
+            elif isinstance(v, list):
+               for d in v:
+                  for result in gen_dict_extract([key], d):
+                     yield result    
+
 class Node:
     def __init__(self, key):
         self.data = key
@@ -144,7 +216,51 @@ class Finder:
         
         print(self.branches)
         
-    def dict_depth(self, x=None, branch=list()):#, branch = list()):
+    #def traverse_dict(self, x=None, branch=list()):
+        #if x is None:
+            #x = self.data
+            #self.level = 0
+            
+        ##if branch is None:
+            ##branch = ["/"]
+            
+        
+        ##print("in %s {%s} branch: %s" % ("/".join(["%s"% s for s in branch]), ", ".join(["%s" % k for k in x.keys()]), branch))
+        ##print("in branch %s" % branch)
+            
+        #ret = 0
+        #depths = list()
+        
+        
+        #self.level += 1
+        
+        #for k, (key, val) in enumerate(x.items()):
+            #if isinstance(val, dict):
+                #self.queued.append([ki for ki in val.keys()])
+                #if self.level == 1:
+                    #current_branch = self.branches[k]
+                #else:
+                    
+                    
+                #current_branch = [k for k in filter(lambda i: i[0:self.level]==[key], self.branches)]
+                #print("in branch %s" % branch, "key",key, "current", current_branch, "level", self.level)
+                #if len(branch) == 0:
+                    #branch.append(key)
+                #dp, br = self.traverse_dict(val, current_branch)#, branch+[key])#, branches[k], branches)
+                
+                #depths.append(dp)
+                #if dp > 0: # store in branch
+                    #current_branch+=br
+                #print("in branch %s" % branch, "key", key, "updated current", current_branch, "level", self.level)
+                
+        #self.level -= 1
+            
+        #if len(depths):
+            #ret += (max(depths) + 1)
+            
+        #return ret, branch
+    
+    def dict_depth(self, x=None, branch=list()):
         if x is None:
             x = self.data
             self.level = 0
@@ -154,7 +270,7 @@ class Finder:
             
         
         #print("in %s {%s} branch: %s" % ("/".join(["%s"% s for s in branch]), ", ".join(["%s" % k for k in x.keys()]), branch))
-            
+        #print("in branch %s" % branch)
             
         ret = 0
         depths = list()
@@ -166,14 +282,15 @@ class Finder:
         #for k, kv in enumerate(dkv):
         for k, (key, val) in enumerate(dkv):
             current_branch = [k for k in filter(lambda i: i[0:self.level]==[key], self.branches)]
-            print(key,current_branch, self.level)
+            print("in branch %s" % branch, "key",key, "current", current_branch, "level", self.level)
+            if len(branch) == 0:
+                branch.append(key)
             dp, br = self.dict_depth(val, current_branch)#, branch+[key])#, branches[k], branches)
             
             depths.append(dp)
             if dp > 0: # store in branch
                 current_branch+=br
-                #branch += br
-                #print(key, dp, branch)
+            print("in branch %s" % branch, "key", key, "updated current", current_branch, "level", self.level)
                 
         self.level -= 1
             
