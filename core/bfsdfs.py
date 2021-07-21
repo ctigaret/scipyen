@@ -7,6 +7,57 @@ from core.utilities import safe_identity_test
 import nested_lookup as nlu
 import dpath
 
+def gen_extract_p(var, key, key_is_index=False, path=None, currentkey=None):
+    if isinstance(path, bool) and path:
+        path = list()
+        
+    if isinstance(var, dict):
+        #if isinstance(path, list):
+            #paths = list(map(lambda x: [x], var.keys()))
+            
+        for k, v in var.items():
+            if k == key: # if key found in var yield
+                if isinstance(path, list):
+                    path.append(k)
+                    yield (path,v)
+                else:
+                    yield v
+            # else check v (recursive call)
+            if isinstance(v, (dict, list, tuple, deque)):
+                if isinstance(path, list):
+                    path.append(k)
+                    
+                yield from gen_extract_p(v, key, key_is_index=key_is_index, path=path)
+                
+    elif isinstance(var, (list, tuple, deque)):
+        if key_is_index and isinstance(key, int):
+            if key < len(var):
+                if isinstance(path, list):
+                    path.append(key)
+                    yield (path, var[key])
+                else:
+                    yield var[key]
+            
+        for v in var: # no key comparison; key should be an int
+            yield from gen_extract_p(v, key, key_is_index=key_is_index, path=path)
+            
+def gen_extract(var, key, key_is_index=False):
+    if isinstance(var, dict):
+        for k, v in var.items():
+            if k == key: # if key found in var yield
+                yield v
+            # else check v (recursive call)
+            if isinstance(v, (dict, list, tuple, deque)):
+                yield from gen_extract(v, key, key_is_index=key_is_index)
+                
+    elif isinstance(var, (list, tuple, deque)):
+        if key_is_index and isinstance(key, int):
+            if key < len(var):
+                yield var[key]
+            
+        for v in var: # no key comparison; key should be an int
+            yield from gen_extract(v, key, key_is_index=key_is_index)
+            
 def gen_dict_extract(var, key):
     if isinstance(var, dict):
         for k, v in var.items():

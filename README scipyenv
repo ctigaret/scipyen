@@ -355,6 +355,8 @@ e.g. pip install -I numpy
     xarray      
     pyxdg
     python-magic    Python interface to the libmagic file type identification library
+    nested_lookup
+    dpath
     
     *** Install Python libraries for storing configuration options unrelated to the GUI:
         NOTE: this is still experimental - testing various configuration libraries
