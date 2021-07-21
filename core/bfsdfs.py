@@ -124,19 +124,36 @@ def dict_depth(x):
     
 class Finder:
     def __init__(self, src):
-        self.data = src
-        self.visited = deque(maxlen=len(self.data))
-        self.queued = deque(maxlen=len(self.data))
+        #self.visited = deque(maxlen=len(self.data))
+        #self.queued = deque(maxlen=len(self.data))
         self.result = list()
         
-        self.branches = list()
+        #self.branches = list()
+        if isinstance(src, dict):
+            self.branches = [[k] for k in src.keys()]
+            
+        elif isinstance(src, (tuple, list, deque)):
+            self.branches = [[k] for k in range(len(src))]
+            
+        else:
+            raise TypeError("src expected to be a dict, tuple, list or collections.deque; got %s instead" % type(src).__name__)
         
+        self.data = src
+
         self.level = 0
         
-    def dict_depth(self, x=None, branch = list()):
+        print(self.branches)
+        
+    def dict_depth(self, x=None, branch=list()):#, branch = list()):
         if x is None:
             x = self.data
             self.level = 0
+            
+        #if branch is None:
+            #branch = ["/"]
+            
+        
+        #print("in %s {%s} branch: %s" % ("/".join(["%s"% s for s in branch]), ", ".join(["%s" % k for k in x.keys()]), branch))
             
             
         ret = 0
@@ -144,22 +161,26 @@ class Finder:
         
         dkv = [(k,v) for k,v in x.items() if isinstance(v, dict)]
         
-        #self.level += 1
+        self.level += 1
         
         #for k, kv in enumerate(dkv):
         for k, (key, val) in enumerate(dkv):
-            branches.append([key])
-            dp, dbr, dbb = self.dict_depth(val, branches[k], branches)
+            current_branch = [k for k in filter(lambda i: i[0:self.level]==[key], self.branches)]
+            print(key,current_branch, self.level)
+            dp, br = self.dict_depth(val, current_branch)#, branch+[key])#, branches[k], branches)
+            
             depths.append(dp)
             if dp > 0: # store in branch
-                branch += dbr
+                current_branch+=br
+                #branch += br
+                #print(key, dp, branch)
                 
-        #self.level -= 1
+        self.level -= 1
             
         if len(depths):
             ret += (max(depths) + 1)
             
-        return ret , branch
+        return ret, branch
     
         
     def find(self, data, leaf, key=True):
