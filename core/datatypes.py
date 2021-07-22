@@ -277,62 +277,6 @@ def isRowVector(x):
     else:
         return False
     
-def reverse_dict(x:dict)->dict:
-    """Returns a reverse mapping (values->keys) from x
-    
-    Parameters:
-    ==========
-    x:dict
-        CAUTION: the keys in 'x' must be mapped to unique values, and 
-                 the values in 'x' must be of hashable types
-    
-    Returns:
-    =======
-    
-    A dict mapping values to keys ('inverse' projection of 'x')
-    
-    """
-    from .traitcontainers import (DataBag, Bunch, )
-    from collections import OrderedDict
-    if isinstance(x, DataBag):
-        ret = DataBag((v,i) for i,v in x.items())
-    elif isinstance(x, Bunch):
-        ret = Bunch((v,i) for i,v in x.items())
-    elif isinstance(x, OrderedDict):
-        ret = OrderedDict((v,i) for i,v in x.items())
-    else:
-        ret = dict((v,i) for i,v in x.items())
-        
-    return ret
-
-def reverse_mapping_lookup(x:dict, y:typing.Any)->typing.Optional[typing.Any]:
-    """Looks up the key mapped to value y in the x mapping (dict)
-    Parameters:
-    ===========
-    x:dict
-    
-    y: any type
-    
-    Returns:
-    ========
-    The key mapped to 'y', if the mapping is unique, else a tuple of keys that
-    map to the same value in 'y'.
-    
-    Returns None if 'y' is not found among x.values()
-    
-    """
-    #from .traitcontainers import (DataBag, Bunch, )
-    #from collections import OrderedDict
-    
-    if y in x.values():
-        ret = [name for name, val in x.items() if y == val]
-        
-        if len(ret) == 1:
-            return ret[0]
-        
-        elif len(ret) > 1:
-            return tuple(ret)
-    
     
 def arraySlice(data:np.ndarray, slicing:(dict, type(None))):
     """Dynamic slicing of nD arrays and introducing new axis in the array.

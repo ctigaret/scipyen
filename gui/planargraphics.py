@@ -156,7 +156,8 @@ from PyQt5.uic import loadUiType as __loadUiType__
 #### END 3rd party modules
 
 #### BEGIN core modules
-from core.datatypes import (TypeEnum, reverse_mapping_lookup, reverse_dict, )
+from core.datatypes import (TypeEnum, )
+from core.utilities import (reverse_mapping_lookup, reverse_dict, )
 from core.traitcontainers import DataBag
 from core.prog import (safeWrapper, deprecated,
                        timefunc, processtimefunc,)

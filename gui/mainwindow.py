@@ -763,25 +763,9 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
         
     def _load_settings_(self):
         loadWindowSettings(self.qsettings, self)
-        #windowSize = self.qsettings.value("/".join([self.__class__.__name__, "WindowSize"]), None)
-        #if windowSize is not None:
-            #self.resize(windowSize)
-            
-        #windowPos = self.qsettings.value("/".join([self.__class__.__name__, "WindowPos"]), None)
-        #if windowPos is not None:
-            #self.move(windowPos)
-            
-        #windowState = self.qsettings.value("/".join([self.__class__.__name__, "WindowState"]), None)
-        #if windowState is not None:
-            #self.restoreState(windowState)
             
     def _save_settings_(self):
         saveWindowSettings(self.qsettings, self)
-        #self.qsettings.setValue("/".join([self.__class__.__name__, "WindowSize"]), self.size())
-            
-        #self.qsettings.setValue("/".join([self.__class__.__name__, "WindowPos"]), self.pos())
-            
-        #self.qsettings.setValue("/".join([self.__class__.__name__, "WindowState"]), self.saveState())
             
     def setData(self, scriptsDict):
         if not isinstance(scriptsDict, dict):
@@ -3482,6 +3466,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.menuFile.insertSeparator(self.actionQuit)
         
+        # ### BEGIN scripts menu
         self.menuScripts = QtWidgets.QMenu("Scripts", self)
         self.menubar.insertMenu(self.menuHelp.menuAction(), self.menuScripts)
         self.actionScriptRun = QtWidgets.QAction("Run...", self)
@@ -3499,12 +3484,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.menuScripts.addAction(self.actionManageScripts)
         
         #self.menuScripts.insertMenu(self.actionQuit, self.recentScriptsMenu)
-
+        #### END scripts menu
+        
         # NOTE: 2016-05-02 12:22:21 -- refactoring plugin codes
         #self.startPluginLoad.connect(self.slot_loadPlugins)
         #self.startPluginLoad.emit()
         
         #### BEGIN custom workspace viewer DO NOT DELETE
+        
         # NOTE: 2019-08-11 00:01:11
         # replace the workspace viewer in the designer UI file with the derived one
         # WARNING work in progress, don't use yet
@@ -3529,6 +3516,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         #### END custom workspace viewer DO NOT DELETE
         
+        #### BEGIN workspace view
         self.workspaceView.setShowGrid(False)
         self.workspaceView.setModel(self.workspaceModel)
         self.workspaceView.selectionModel().selectionChanged[QtCore.QItemSelection, QtCore.QItemSelection].connect(self.slot_selectionChanged)
@@ -3551,12 +3539,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
         self.workspaceModel.modelContentsChanged.connect(self.slot_updateWorkspaceView)
+        #### END workspace view
         
+        #### BEGIN command history view
         self.historyTreeWidget.setHeaderLabels(["Session, line:", "Statement:"])
         self.historyTreeWidget.itemActivated[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemActivated)
         self.historyTreeWidget.customContextMenuRequested[QtCore.QPoint].connect(self.slot_historyContextMenuRequest)
         self.historyTreeWidget.itemClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemSelected)
         
+        #### END command history view
         self.setWindowTitle("Scipyen")
         
         self.newViewersMenu = QtWidgets.QMenu("Create New", self)
@@ -3588,7 +3579,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #self.actionNewViewer.triggered.connect(self.slot_newViewer)
         #### END do not delete: action for presenting a list of viewer types to choose from
         
-        
+        #### BEGIN file system view,  navigation widgets & actions
         self.fileSystemTreeView.setModel(self.fileSystemModel)
         self.fileSystemTreeView.setAlternatingRowColors(True)
         self.fileSystemTreeView.activated[QtCore.QModelIndex].connect(self.slot_fileSystemItemActivated)
@@ -3676,7 +3667,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.varNameFilterFinderComboBox.lineEdit().addAction(self.removeVarNameFromFinderListAction,
                                                               QtWidgets.QLineEdit.TrailingPosition)
         
+        #### END file system view,  navigation widgets & actions
         
+        #### BEGIN command history filters
         # filter/select commands from history combo
         self.commandFinderComboBox.currentTextChanged[str].connect(self.slot_findCommand)
 
@@ -3693,6 +3686,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.commandFinderComboBox.lineEdit().addAction(self.removeItemFromCommandFinderListAction, \
                                                         QtWidgets.QLineEdit.TrailingPosition)
+        
+        #### END command history filters
         
     @pyqtSlot()
     @safeWrapper

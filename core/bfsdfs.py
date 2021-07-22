@@ -7,57 +7,185 @@ from core.utilities import safe_identity_test
 import nested_lookup as nlu
 import dpath
 
-def gen_extract_p(var, key, key_is_index=False, path=None, currentkey=None):
-    if isinstance(path, bool) and path:
-        path = list()
-        
-    if isinstance(var, dict):
-        #if isinstance(path, list):
-            #paths = list(map(lambda x: [x], var.keys()))
-            
-        for k, v in var.items():
-            if k == key: # if key found in var yield
-                if isinstance(path, list):
-                    path.append(k)
-                    yield (path,v)
-                else:
-                    yield v
-            # else check v (recursive call)
-            if isinstance(v, (dict, list, tuple, deque)):
-                if isinstance(path, list):
-                    path.append(k)
-                    
-                yield from gen_extract_p(v, key, key_is_index=key_is_index, path=path)
-                
-    elif isinstance(var, (list, tuple, deque)):
-        if key_is_index and isinstance(key, int):
-            if key < len(var):
-                if isinstance(path, list):
-                    path.append(key)
-                    yield (path, var[key])
-                else:
-                    yield var[key]
-            
-        for v in var: # no key comparison; key should be an int
-            yield from gen_extract_p(v, key, key_is_index=key_is_index, path=path)
-            
-def gen_extract(var, key, key_is_index=False):
+found = deque()
+visited = deque()
+queued = deque()
+
+def gen_extract(var, key, index=False):
     if isinstance(var, dict):
         for k, v in var.items():
             if k == key: # if key found in var yield
                 yield v
             # else check v (recursive call)
             if isinstance(v, (dict, list, tuple, deque)):
-                yield from gen_extract(v, key, key_is_index=key_is_index)
+                yield from gen_extract(v, key, index=index)
                 
-    elif isinstance(var, (list, tuple, deque)):
-        if key_is_index and isinstance(key, int):
+    if isinstance(var, (list, tuple, deque)):
+        if index and isinstance(key, int):
             if key < len(var):
                 yield var[key]
+                
+        if isinstance(key, str) and hasattr(var, key): # for named tuples
+            yield getattr(var, key) 
             
         for v in var: # no key comparison; key should be an int
-            yield from gen_extract(v, key, key_is_index=key_is_index)
+            yield from gen_extract(v, key, index=index)
             
+def gen_extract_item(var, item, asindex=True):
+    if isinstance(var, dict):
+        for k, v in var.items():
+            visited.append(k)
+            if asindex:
+                if k == item: 
+                    found.append(list(visited))
+                    yield v
+            else:
+                if v == item:
+                    found.append(list(visited))
+                    yield k
+                    
+            if isinstance(v, (dict, list, tuple, deque)):
+                yield from gen_extract_item(v, item, asindex)
+            
+            if len(visited):
+                visited.pop()
+                
+        if len(visited):
+            visited.pop()
+                
+    elif isinstance(var, (list, tuple, deque)):
+        if asindex:
+            if isinstance(item, int) and item < len(var):
+                visited.append(item)
+                found.append(list(visited))
+                yield var[item]
+                
+            elif isinstance(item, str) and hasattr(var, item): # for named tuples
+                visited.append(item)
+                found.append(list(visited))
+                yield getattr(var, item)
+                
+        else:
+            if item in var:
+                ndx = var.index(item)
+                visited.append(ndx)
+                found.append(list(visited))
+                yield ndx
+        
+        for k, v in enumerate(var): # no item or value comparison; delegate to elements
+            yield from gen_extract_item(v, item, asindex)
+            
+        if len(visited):
+            visited.pop()
+        
+def gen_extract_key(var, item):
+    if isinstance(var, dict):
+        for k, v in var.items():
+            visited.append(k)
+            if k == item: 
+                found.append(list(visited))
+                yield v
+                    
+            if isinstance(v, (dict, list, tuple, deque)):
+                yield from gen_extract_key(v, item)
+            
+            if len(visited):
+                visited.pop()
+                
+        if len(visited):
+            visited.pop()
+                
+    elif isinstance(var, (list, tuple, deque)):
+        if isinstance(item, int) and item < len(var):
+            visited.append(item)
+            found.append(list(visited))
+            yield var[item]
+            
+        elif isinstance(item, str) and hasattr(var, item): # for named tuples
+            visited.append(item)
+            found.append(list(visited))
+            yield getattr(var, item)
+        
+        for k, v in enumerate(var): # no item or value comparison; delegate to elements
+            yield from gen_extract_key(v, item)
+            
+        if len(visited):
+            visited.pop()
+        
+def gen_extract_p(var, item, index=True):
+    if isinstance(var, dict):
+        #print("in dict, visited:", list(visited))
+        for k, v in var.items():
+            #print("k", k)
+            if index:
+                if k == item: # if item found in var yield
+                    visited.append(k)
+                    #print("in dict, item found as key", k, "=> new visited:", list(visited))
+                    found.append(list(visited))
+                    #print("\tfound:", list(found))
+                    yield v
+                    
+            elif v == item:
+                visited.append(k)
+                #print("in dict, item found as value", v, "=> new visited:", list(visited))
+                found.append(list(visited))
+                #print("\tfound:", list(found))
+                yield k
+                    
+            # no yield at this level: check inside v (recursive call)
+            if isinstance(v, (dict, list, tuple, deque)):
+                #visited.append(k)
+                #print("in dict, check recursive at index", k, "value:", v)
+                yield from gen_extract_p(v, item, index=index)
+                #if len(visited):
+                    #visited.pop()
+                
+            # no yield: remove k from visited
+            if len(visited):
+                visited.pop()
+                
+        if len(visited):
+            visited.pop()
+                
+        #print("in dict, no yields, visited:", list(visited))
+                
+    elif isinstance(var, (list, tuple, deque)):
+        #print("in seq,", list(visited))
+        if index:
+            if isinstance(item, int) and item < len(var):
+                visited.append(item)
+                #print("in seq, use item as int index", item, "=> new visited:", list(visited))
+                found.append(list(visited))
+                #print("\tfound:", list(found))
+                yield var[item]
+                
+            if isinstance(item, str) and hasattr(var, item): # for named tuples
+                visited.append(item)
+                #print("in seq, use item as name index", item, "=> new visited:", list(visited))
+                found.append(list(visited))
+                #print("\tfound:", list(found))
+                yield getattr(var, item)
+                
+        if item in var:
+            ndx = var.index(item)
+            visited.append(ndx)
+            #print("in seq, item found as value", item, "=> new visited:", list(visited))
+            found.append(list(visited))
+            #print("\tfound:", list(found))
+            yield ndx
+        
+        for k, v in enumerate(var): # no item or value comparison; delegate to elements
+            #print("in seq enum var", list(visited))
+            visited.append(k)
+            yield from gen_extract_p(v, item, index=index)
+            #if len(visited):
+                #visited.pop()
+            
+        if len(visited):
+            visited.pop()
+            
+        #print("in seq, no yields, visited:", list(visited))
+        
 def gen_dict_extract(var, key):
     if isinstance(var, dict):
         for k, v in var.items():

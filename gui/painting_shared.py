@@ -80,7 +80,7 @@ standardQtBrushTextures = OrderedDict(sorted([(name, value) for name, value in s
                                            key = lambda x: x[1]))
 
 def populateMimeData(mimeData:QtCore.QMimeData, color:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]):
-    from core.datatypes import reverse_dict
+    from core.utilities import reverse_dict
     mimeData.setColorData(color)
     
     if isinstance(color, QtCore.Qt.GlobalColor):

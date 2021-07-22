@@ -477,7 +477,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         if not any([self._check_supports_parameter_type_(a) for a in args]):
             raise TypeError("Expecting a %s; got %s instead" % (" ".join([s.__name__ for s in self.supported_types]), type(data).__name__))
             
-        self._set_data_(*args, **kwargs)
             
         get_focus = kwargs.get("get_focus", False)
         
@@ -492,6 +491,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             self._docTitle_ = None
         
         self.update_title(doc_title = doc_title, win_title=self._winTitle_)
+        
+        self._set_data_(*args, **kwargs)
         
         if not self.isVisible():
             self.setVisible(True)

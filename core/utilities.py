@@ -46,7 +46,174 @@ standard_obj_summary_headers = ["Name","Workspace",
                                 "Shape", "Axes", "Array Order", "Memory Size",
                                 ]
 
+class NestedFinder(object):
+    def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None):
+        self.data = src
+        self.paths = deque()
+        self.visited = deque()
+        self.result = list()
+        
+    def initialize(self):
+        """Clears book-keeping queues, results and removes data reference
+        """
+        self.reset()
+        self.data = None
+        
+    def reset(self):
+        """Clears the result and book-keeping queues
+        """
+        self.paths.clear()
+        self.visited.clear()
+        self.result.clear()
+        self.values.clear()
+        
+    def gen_extract(self, var, item, asindex=True):
+        """Generator to extract value from nested data structure.
+        
+        Parameters:
+        ----------
+        var: nested data structure (dict, tuple, list, deque)
+        item: object to be found; see below for details
+        asindex:bool (default True)
+        
+        A nested data structure is one of:
+        1. a nested mapping (dict): 
+            Some of the keys may be mapped to dict or sequences, which may be 
+            themselevs nested data structures
+        2. a nested (or ragged) sequence (deque, list, tuple):
+            Some of the elements may themselves by dict, be nested data structures
+        
+        When 'asindex' is True (default) uses `item' as an indexing variable
+        inside the nested data structure.
+        
+        This means that 'item' can be:
+        
+        1. an int - for indexing in a sequence
+        2. a str - for indexing in a named tuple or used as a dict key
+        3. any hashable object usable as dict key.
+        
+        NOTE: thanks to 
+        
+        hexerei software
+        https://stackoverflow.com/questions/9807634/find-all-occurrences-of-a-key-in-nested-dictionaries-and-lists
+        
+        for the original get_dict_extract function on which this is based
+        """
+        if isinstance(var, dict):
+            for k, v in var.items():
+                self.visited.append(k)
+                if asindex:
+                    if k == item: 
+                        self.paths.append(list(visited))
+                        yield v
+                        
+                else:
+                    if safe_identity_test(v, item):
+                        self.paths.append(list(visited))
+                        yield k
+                        
+                if isinstance(v, (dict, list, tuple, deque)):
+                    yield from gen_extract(v, item, asindex)
+                    
+                if len(self.visited):
+                    self.visited.pop()
+                    
+            if len(self.visited):
+                self.visited.pop()
+                    
+        elif isinstance(var, (list, tuple, deque)):
+            if asindex:
+                if isinstance(item, int) and item < len(var):
+                    self.visited.append(item)
+                    self.paths.append(list(self.visited))
+                    yield var[item]
+                    
+                elif isinstance(item, str) and hasattr(var, item): # for named tuples
+                    self.visited.append(item)
+                    self.paths.append(list(self.visited))
+                    yield getattr(var, item)
+            else:
+                if item in var:
+                    ndx = var.index(item)
+                    self.visited.append(ndx)
+                    self.paths.append(list(self.visited))
+                    yield ndx
+                    
+            for k, v in enumerate(var): # no item comparison; item should be an int
+                yield from gen_extract(v, item)
+                
+            if len(self.visited):
+                self.visited.pop()
+                
+        def find(self, item, asindex=True):
+            self.values = list(self.gen_extract(self.data, item, asindex))
+            assert len(self.values) == len(self.paths)
+            self.result = zip(self.paths, self.values)
+            return self.result
+        
+        def findkey(self, item):
+            return self.find(item, True)
+        
+        def findval(self, item):
+            return self.find(item, False)
+            
+    
+def reverse_dict(x:dict)->dict:
+    """Returns a reverse mapping (values->keys) from x
+    
+    Parameters:
+    ==========
+    x:dict
+        CAUTION: the keys in 'x' must be mapped to unique values, and 
+                 the values in 'x' must be of hashable types
+    
+    Returns:
+    =======
+    
+    A dict mapping values to keys ('inverse' projection of 'x')
+    
+    """
+    from .traitcontainers import (DataBag, Bunch, )
+    from collections import OrderedDict
+    if isinstance(x, DataBag):
+        ret = DataBag((v,i) for i,v in x.items())
+    elif isinstance(x, Bunch):
+        ret = Bunch((v,i) for i,v in x.items())
+    elif isinstance(x, OrderedDict):
+        ret = OrderedDict((v,i) for i,v in x.items())
+    else:
+        ret = dict((v,i) for i,v in x.items())
+        
+    return ret
 
+def reverse_mapping_lookup(x:dict, y:typing.Any)->typing.Optional[typing.Any]:
+    """Looks up the key mapped to value y in the x mapping (dict)
+    Parameters:
+    ===========
+    x:dict
+    
+    y: any type
+    
+    Returns:
+    ========
+    The key mapped to 'y', if the mapping is unique, else a tuple of keys that
+    map to the same value in 'y'.
+    
+    Returns None if 'y' is not found among x.values()
+    
+    """
+    #from .traitcontainers import (DataBag, Bunch, )
+    #from collections import OrderedDict
+    
+    if y in x.values():
+        ret = [name for name, val in x.items() if y == val]
+        
+        if len(ret) == 1:
+            return ret[0]
+        
+        elif len(ret) > 1:
+            return tuple(ret)
+    
 def summarize_object_properties(objname, obj, namespace="Internal"):
     """Returns a dict with object properties for display in Scipyen workspace.
     The dict keys represent the column names in the WorkspaceViewer table, and 
@@ -740,18 +907,6 @@ def __name_lookup__(container: typing.Sequence, name:str,
         
     return names.index(name)
 
-def sequence_depth(x):
-    """Returns the depth of a nested sequence (tuple or list).
-    A linear sequence has depth 1; this is incremented by 1 for each next level
-    of nested sequences.
-    
-    A non-sequence has depth 0
-    """
-    if isinstance(x, (tuple, list)):
-        return 1 + max([sequence_depth(x_) for x_ in x])
-    return 0
-
-        
 @safeWrapper
 def safe_identity_test(x, y):
     try:

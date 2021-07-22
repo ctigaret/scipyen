@@ -14,9 +14,7 @@ import sip
 
 from core.prog import (safeWrapper, no_sip_autoconversion)
 
-from core.utilities import counter_suffix
-
-from core.datatypes import (reverse_dict, reverse_mapping_lookup)
+from core.utilities import (counter_suffix, reverse_dict, reverse_mapping_lookup)
 
 from .painting_shared import (HoverPoints, x_less_than, y_less_than,
                               qtGlobalColors, standardPalette, standardPaletteDict, 

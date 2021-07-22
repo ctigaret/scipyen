@@ -371,31 +371,6 @@ class DataViewer(ScipyenViewer):
         # Solutions to be implemented in the InteractiveTreeWidget in this module
         """
         #print(data)
-        #self._data_ = self._recursive_traverse_(data)
-        
-        #self.treeWidget.setData(self._data_)
-        
-        #top_title = self._docTitle_ if (isinstance(self._docTitle_, str) and len(self._docTitle_.strip())) else "/"
-        
-        #if self.treeWidget.topLevelItemCount() == 1:
-            #self.treeWidget.topLevelItem(0).setText(0, top_title)
-            
-        #for k in range(self.treeWidget.topLevelItemCount()):
-            #self._collapseRecursive_(self.treeWidget.topLevelItem(k), collapseCurrent=False)
-            
-        #if kwargs.get("show", True):
-            #self.activateWindow()
-        
-        #if not isinstance(data, (dict, tuple, list)):
-            ## quick and dirty workaround for TODO 2019-09-14 10:16:03
-            ##data = {"Type":type(data).__name__, "__dict__":data.__dict__}
-            
-            #dd = self._recursive_traverse_(data.__dict__)
-            
-            #data = {"Type":type(data), "__dict__":dd}
-            
-        #elif isinstance(data, DataBag):
-            #data = self._recursive_traverse_(data)
         
         if data is not self._data_:
             self._data_ = data
