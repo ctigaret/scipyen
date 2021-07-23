@@ -54,6 +54,7 @@ def gen_extract_item(var, item, asindex=True):
             visited.pop()
                 
     elif isinstance(var, (list, tuple, deque)):
+        # search in structs nested here, before going for index
         if asindex:
             if isinstance(item, int) and item < len(var):
                 visited.append(item)
@@ -72,7 +73,11 @@ def gen_extract_item(var, item, asindex=True):
                 found.append(list(visited))
                 yield ndx
         
-        for k, v in enumerate(var): # no item or value comparison; delegate to elements
+        # NOTE:2021-07-23 18:13:50
+        # the loop below is exeuted ONLY if 'item' was not found as a valid index
+        # the corrolary is that if item is faound as valid index other nexted structs
+        # are overlooked - this therefore is a problem.
+        for v in var: # no item or value comparison; delegate to elements
             yield from gen_extract_item(v, item, asindex)
             
         if len(visited):

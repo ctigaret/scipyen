@@ -52,14 +52,19 @@ class NestedFinder(object):
         self.paths = deque()
         self.visited = deque()
         self.result = list()
+        self.values = list()
         
-    def initialize(self):
-        """Clears book-keeping queues, results and removes data reference
-        """
+    def setData(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None):
         self.reset()
-        self.data = None
+        self.data=src
         
     def reset(self):
+        """Clears book-keeping queues, results and removes data reference
+        """
+        self.initialize()
+        self.data = None
+        
+    def initialize(self):
         """Clears the result and book-keeping queues
         """
         self.paths.clear()
@@ -104,16 +109,16 @@ class NestedFinder(object):
                 self.visited.append(k)
                 if asindex:
                     if k == item: 
-                        self.paths.append(list(visited))
+                        self.paths.append(list(self.visited))
                         yield v
                         
                 else:
                     if safe_identity_test(v, item):
-                        self.paths.append(list(visited))
+                        self.paths.append(list(self.visited))
                         yield k
                         
                 if isinstance(v, (dict, list, tuple, deque)):
-                    yield from gen_extract(v, item, asindex)
+                    yield from self.gen_extract(v, item, asindex)
                     
                 if len(self.visited):
                     self.visited.pop()
@@ -139,23 +144,28 @@ class NestedFinder(object):
                     self.paths.append(list(self.visited))
                     yield ndx
                     
-            for k, v in enumerate(var): # no item comparison; item should be an int
-                yield from gen_extract(v, item)
+            for k, v in enumerate(var): # no item comparison; 
+                yield from self.gen_extract(v, item, asindex)
                 
             if len(self.visited):
                 self.visited.pop()
                 
-        def find(self, item, asindex=True):
-            self.values = list(self.gen_extract(self.data, item, asindex))
-            assert len(self.values) == len(self.paths)
-            self.result = zip(self.paths, self.values)
-            return self.result
+    def find(self, item, asindex=True):
+        self.initialize()
+        self.values[:] = list(self.gen_extract(self.data, item, asindex))
+        assert len(self.values) == len(self.paths)
+        if asindex:
+            self.result[:] = list(zip(self.paths, self.values))
+        else:
+            self.result[:] = list(self.paths)
+        return self.result
         
-        def findkey(self, item):
-            return self.find(item, True)
-        
-        def findval(self, item):
-            return self.find(item, False)
+    
+    def findkey(self, item):
+        return self.find(item, True)
+    
+    def findval(self, item):
+        return self.find(item, False)
             
     
 def reverse_dict(x:dict)->dict:
