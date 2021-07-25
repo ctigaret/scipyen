@@ -12,6 +12,7 @@ from __future__ import print_function
 
 #### BEGIN core python modules
 import collections 
+from collections import deque
 import datetime
 from enum import (Enum, IntEnum,)
 import inspect
@@ -29,6 +30,7 @@ from copy import (deepcopy, copy,)
 #### BEGIN 3rd party modules
 from PyQt5 import (QtGui, QtCore, QtWidgets,)
 import numpy as np
+from numpy import ndarray
 import numpy.matlib as mlib
 import pandas as pd
 import quantities as pq
@@ -113,6 +115,23 @@ from imaging.imageprocessing import *
 # the case when a new axis is added (vigra.newaxis), which I must then immediately 
 # follow by calibrate(...) or something
 #   
+abbreviated_type_names = {'IPython.core.macro.Macro' : 'Macro'}
+sequence_types = (list, tuple, deque)
+sequence_typenames = ('list', 'tuple', "deque")
+set_types = (set, frozenset)
+set_typenames = ("set", "frozenset")
+dict_types = (dict,)
+dict_typenames = ("dict",)
+# NOTE: neo.Segment class name clashes with nrn.Segment
+neo_containernames = ("Block", "Segment",)
+# NOTE: 2020-07-10 12:52:57
+# PictArray is defunct
+signal_types = ('Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 
+                'SpikeTrain', "DataSignal", "IrregularlySampledDataSignal",
+                "TriggerEvent",)
+                
+ndarray_type = ndarray.__name__
+
 NUMPY_NUMERIC_KINDS = set("buifc")
 NUMPY_STRING_KINDS = set("SU")
 
@@ -387,6 +406,9 @@ def arraySlice(data:np.ndarray, slicing:(dict, type(None))):
         raise TypeError("Slicing expected to be a dict or None; got %s instead" % type(slicing).__name__)
     
     return tuple(indexobj)
+
+def is_namedtuple(x):
+    return isinstance(x, tuple) and all([hasattr(x, a) for a in ("_asdict", "_fields", "_make", "_replace", "_source")])
     
 def is_string(array):
     """Determine whether the argument has a string or character datatype, when

@@ -161,7 +161,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #super(WorkspaceGuiMixin, self).__init__(parent=parent, pWin=pWin)
         WorkspaceGuiMixin.__init__(self, parent=parent)
         
-        self.settings = QtCore.QSettings()
+        self.qsettings = QtCore.QSettings()
 
         self._docTitle_ = None
         self._winTitle_ = None # force auto-set in update_title()
@@ -312,7 +312,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """
         pass
     
-    @abstractmethod
+    #@abstractmethod
     def saveSettings(self):
         """ Must override in subclasses
         NOTE: 2021-05-04 21:53:04
@@ -320,7 +320,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         fully initialized by the time this is called).
         see NOTE: 2019-11-09 09:30:38 for details
         """
-        pass
+        self.saveWindowSettings()
+        self.saveViewerSettings()
     
     def saveWindowSettings(self):
         """Save viewer's window settings in Scipyen's configuration file.
@@ -338,20 +339,20 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """
         #print("ScipyenViewer[%s].saveWindowSettings for %s top level:%s" % (self.__class__.__name__, self.winTitle, self.isTopLevel))
         if self.isTopLevel and self.isVisible():
-            saveWindowSettings(self.settings, self)#, self.__class__.__name__)
-            #self.settings.setValue("/".join([self.__class__.__name__, "WindowSize"]), self.size())
+            saveWindowSettings(self.qsettings, self)#, self.__class__.__name__)
+            #self.qsettings.setValue("/".join([self.__class__.__name__, "WindowSize"]), self.size())
                 
-            #self.settings.setValue("/".join([self.__class__.__name__, "WindowPosition"]), self.pos())
+            #self.qsettings.setValue("/".join([self.__class__.__name__, "WindowPosition"]), self.pos())
                 
-            #self.settings.setValue("/".join([self.__class__.__name__, "WindowState"]), self.saveState())
+            #self.qsettings.setValue("/".join([self.__class__.__name__, "WindowState"]), self.saveState())
             
-    @abstractmethod
+    #@abstractmethod
     def saveViewerSettings(self):
         """Must be implemented in the subclass
         """
         pass
     
-    @abstractmethod
+    #@abstractmethod
     def loadSettings(self):
         """Must override in subclasses
         NOTE: 2021-05-04 21:42:12 About settings
@@ -369,7 +370,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         by using overloaded loadViewerSettings(); in contrast, loadWindowSettings
         defined here and inherited by the subclass works fine.
         """
-        pass
+        self.loadWindowSettings()
+        self.loadViewerSettings()
     
     def loadWindowSettings(self):
         """Restores viewer's settings from Scipyen's configuration file.
@@ -389,21 +391,21 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # NOTE: 2021-07-08 09:06:32
         # window settings are loaded here only if parent is Scipyen's main window
         if self.isTopLevel:
-            loadWindowSettings(self.settings, self)
-            #windowSize = self.settings.value("/".join([self.__class__.__name__, "WindowSize"]), None)
+            loadWindowSettings(self.qsettings, self)
+            #windowSize = self.qsettings.value("/".join([self.__class__.__name__, "WindowSize"]), None)
             #if windowSize is not None:
                 #self.resize(windowSize)
                 
-            #windowPos = self.settings.value("/".join([self.__class__.__name__, "WindowPos"]), None)
+            #windowPos = self.qsettings.value("/".join([self.__class__.__name__, "WindowPos"]), None)
             #if windowPos is not None:
                 #self.move(windowPos)
                 
-            #windowState = self.settings.value("/".join([self.__class__.__name__, "WindowState"]), None)
+            #windowState = self.qsettings.value("/".join([self.__class__.__name__, "WindowState"]), None)
             #if windowState is not None:
                 #self.restoreState(windowState)
                 
 
-    @abstractmethod
+    #@abstractmethod
     def loadViewerSettings(self):
         """Must be implemented in the subclass
         """
@@ -477,7 +479,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         if not any([self._check_supports_parameter_type_(a) for a in args]):
             raise TypeError("Expecting a %s; got %s instead" % (" ".join([s.__name__ for s in self.supported_types]), type(data).__name__))
             
-        self._set_data_(*args, **kwargs)
             
         get_focus = kwargs.get("get_focus", False)
         
@@ -492,6 +493,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             self._docTitle_ = None
         
         self.update_title(doc_title = doc_title, win_title=self._winTitle_)
+        
+        self._set_data_(*args, **kwargs)
         
         if not self.isVisible():
             self.setVisible(True)
@@ -616,7 +619,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # Here saveSettings will have access to all the subclass attributes (it
             # is fully initialized, etc)
             # see NOTE: 2019-11-09 09:30:38 for details
-            self.saveSettings() # should be overridden in subclasses
+            self.saveSettings()
         
             if any([v is self for v in self.appWindow.workspace.values()]):
                 self.appWindow.deRegisterViewer(self) # this will also save settings and close the viewer window

@@ -8,6 +8,7 @@ TODO
 from __future__ import print_function
 
 import os, warnings, types, traceback, itertools
+from collections import deque
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -16,6 +17,7 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from PyQt5.uic import loadUiType as __loadUiType__
 
 from pyqtgraph import (DataTreeWidget, TableWidget, )
+#from pyqtgraph.widgets.TableWidget import _defersort
 
 import neo
 import numpy as np
@@ -55,8 +57,19 @@ from . import resources_rc
 #### END pict.gui modules
 
 class ScipyenTableWidget(TableWidget): # TableWidget imported from pyqtgraph
-    def __init__(self, *args, **kwds):
+    def __init__(self, *args, natural_row_index=False, natural_col_index=False, **kwds):
+        self._pythonic_col_index = not natural_col_index
+        self._pythonic_row_index = not natural_row_index
         super().__init__(*args, **kwds)
+        
+    def setData(self, data):
+        super().setData(data)
+        if isinstance(data, (np.ndarray, tuple, list, deque)):
+            if self._pythonic_col_index:
+                self.setHorizontalHeaderLabels(["%d"%i for i in range(self.columnCount())])
+                
+            if self._pythonic_row_index:
+                self.setVerticalHeaderLabels(["%d"%i for i in range(self.rowCount())])
         
     def iterFirstAxis(self, data):
         """Overrides TableWidget.iterFirstAxis.
@@ -121,7 +134,7 @@ class ScipyenTableWidget(TableWidget): # TableWidget imported from pyqtgraph
 
         
         """
-        if len(data.shape) == 0 or data.ndim ==0:
+        if len(data.shape) == 0 or data.ndim == 0:
             yield(data.take(0))
             
         else:
@@ -138,6 +151,10 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
     def __init__(self, *args, **kwargs):
         super(InteractiveTreeWidget, self).__init__(*args, **kwargs)
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.headerItem().setToolTip(0, "Key or index of child data.\nThe type of the key or index is shown in their tooltip.")
+        self.headerItem().setToolTip(1, "Type of child data mapped to a key or index.\nAdditional type information is shown in their tooltip.")
+        self.headerItem().setToolTip(2, "Value of child data, or its length\n(when data is a nested collection).\nNumpy arrays ar displayed as a table")
+        
     
     def parse(self, data):
         """
@@ -146,6 +163,10 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
         * a short string representation
         * a dict of sub-objects to be parsed
         * optional widget to display as sub-node
+        * NOTE 2021-07-24 14:13:10 CMT
+        * keytype: the type of the key (for dict data) or of the index (for sequences)
+            The latter is useful for namedtuples
+            
         
         NOTE: 2020-10-11 13:48:51
         override superclass parse to use ScipyenTableWidget instead
@@ -154,11 +175,17 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
         from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
         from pyqtgraph.pgcollections import OrderedDict
         from pyqtgraph.python2_3 import asUnicode
+        from core.datatypes import is_namedtuple
 
         # defaults for all objects
         typeStr = type(data).__name__
         if typeStr == 'instance':
             typeStr += ": " + data.__class__.__name__
+            
+        typeTip = ""
+        if is_namedtuple(data):
+            typeTip = "(namedtuple)"
+            
         widget = None
         desc = ""
         childs = {}
@@ -170,17 +197,22 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
                 childs = data
                 
             else:
+                #childs = OrderedDict(sorted(data.items())) # does not support mixed key types!
                 # NOTE: 2021-07-20 09:52:34
                 # dict objects with mixed key types cannot be sorted
-                # therefore wwe resort to an indexing vector
+                # therefore we resort to an indexing vector
                 ndx = [i[1] for i in sorted((str(k[0]), k[1]) for k in zip(data.keys(), range(len(data))))]
                 items = [i for i in data.items()]
                 childs = OrderedDict([items[k] for k in ndx])
-                #childs = OrderedDict(sorted(data.items())) # does not support mixed key types!
                 
         elif isinstance(data, (list, tuple)):
             desc = "length=%d" % len(data)
-            childs = OrderedDict(enumerate(data))
+            # NOTE: 2021-07-24 14:57:02
+            # accommodate namedtuple types
+            if is_namedtuple(data):
+                childs = data._asdict()
+            else:
+                childs = OrderedDict(enumerate(data))
             
         elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
             childs = OrderedDict([
@@ -193,18 +225,50 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
             table.setData(data)
             table.setMaximumHeight(200)
             widget = table
+            
         elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
             frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
             widget = QtGui.QPlainTextEdit(asUnicode('\n'.join(frames)))
             widget.setMaximumHeight(200)
             widget.setReadOnly(True)
+            
         else:
             desc = asUnicode(data)
         
-        return typeStr, desc, childs, widget
+        return typeStr, desc, childs, widget, typeTip
     
-    def buildTree(self, data, parent, name='', hideRoot=False, path=()):
+    def buildTree(self, data, parent, name="", nameTip = "", hideRoot=False, path=()):
         from pyqtgraph.python2_3 import asUnicode
+        
+        # NOTE: 2021-07-24 13:15:38
+        # throughout this function 'node' is a QtGui.QTreeWidgetItem
+        # the root node is named after the symbol of the nested data structure
+        # shown by DataViewer, or by _docTitle_, hence it is always a str
+        #
+        # Child nodes are either dict keys, or int indices in iterables; this 
+        # can lead to confusion e..g, between different types of dict keys that 
+        # are represented by similar str for display purpose.
+        #
+        # For example, a dict key "2" (a str) and a dict key 2 (an int) are both
+        # represented as the str "2" (both str and int are hashable, hence they
+        # can be used as dict keys). 
+        #
+        # Consider the contrived example of a dict with two key/value pairs:
+        # 
+        # contrived = {2:"text", "2": "another text"}
+        #
+        # Since the keys appear identical in the InteractiveTreeWidget (as the 
+        # str '2') a user who wants to retrieve the value "text" from the dict 
+        # s/he has no way to know whether to type 'contrived[2]' (the correct
+        # choice in this example) or 'contrived["2"]' unless they try first, 
+        # with a 50% chance to get the wrong value
+        #
+        # For this reason we endow the 'key/index' column with a tooltip stating
+        # the type of the key (e.g. str or int, in this case)
+        #
+        # The only exception to this is the root node where the "name" is always
+        # "str"
+        
         if hideRoot:
             node = parent
         else:
@@ -215,8 +279,10 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
         # (this is used by DiffTreeWidget)
         self.nodes[path] = node
 
-        typeStr, desc, childs, widget = self.parse(data)
+        typeStr, desc, childs, widget, typeTip = self.parse(data)
+        node.setToolTip(0, nameTip)
         node.setText(1, typeStr)
+        node.setToolTip(1, typeTip)
         node.setText(2, desc)
             
         # Truncate description and add text box if needed
@@ -237,8 +303,8 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
             
         # recurse to children
         for key, data in childs.items():
-            #key_ = str(key) if not isinstance(key, str) else key
-            self.buildTree(data, node, asUnicode(key), path=path+(key,))
+            keyTypeTip = "key / index type: %s" % type(key).__name__
+            self.buildTree(data, node, asUnicode(key), keyTypeTip, path=path+(key,))
 
         
 class DataViewer(ScipyenViewer):
@@ -284,10 +350,17 @@ class DataViewer(ScipyenViewer):
         self.setCentralWidget(self.treeWidget)
         
         self.toolBar = QtWidgets.QToolBar("Main", self)
-        self.toolBar.setObjectName("DataViewer_Main_Toolbar")
+        self.toolBar.setObjectName("%s_Main_Toolbar" % self.__class__.__name__)
         
-        refreshAction = self.toolBar.addAction(QtGui.QIcon(":/images/view-refresh.svg"), "Refresh")
+        #refreshAction = self.toolBar.addAction(QtGui.QIcon(":/images/view-refresh.svg"), "Refresh")
+        refreshAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh")
         refreshAction.triggered.connect(self.slot_refreshDataDisplay)
+        
+        collapseAllAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("collapse-all"), "Collapse All")
+        collapseAllAction.triggered.connect(self.slot_collapseAll)
+        
+        expandAllAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("expand-all"), "Expand All")
+        expandAllAction.triggered.connect(self.slot_expandAll)
         
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
         
@@ -383,7 +456,8 @@ class DataViewer(ScipyenViewer):
                 self.treeWidget.topLevelItem(0).setText(0, top_title)
                 
             for k in range(self.treeWidget.topLevelItemCount()):
-                self._collapseRecursive_(self.treeWidget.topLevelItem(k), collapseCurrent=False)
+                self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
+                #self._collapseRecursive_(self.treeWidget.topLevelItem(k), collapseCurrent=False)
                 
         if kwargs.get("show", True):
             self.activateWindow()
@@ -399,7 +473,8 @@ class DataViewer(ScipyenViewer):
             self.treeWidget.topLevelItem(0).setText(0, top_title)
             
         for k in range(self.treeWidget.topLevelItemCount()):
-            self._collapseRecursive_(self.treeWidget.topLevelItem(k), collapseCurrent=False)
+            self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
+            #self._collapseRecursive_(self.treeWidget.topLevelItem(k), collapseCurrent=False)
 
     @pyqtSlot(QtWidgets.QTreeWidgetItem, int)
     @safeWrapper
@@ -501,6 +576,20 @@ class DataViewer(ScipyenViewer):
                 
         elif len(item_paths) == 1:
             self._scipyenWindow_.app.clipboard().setText(item_paths[0])
+            
+    @pyqtSlot()
+    @safeWrapper
+    def slot_collapseAll(self):
+        for k in range(self.treeWidget.topLevelItemCount()):
+            self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
+            #self._collapseRecursive_(self.treeWidget.topLevelItem(k), collapseCurrent=False)
+
+    
+    @pyqtSlot()
+    @safeWrapper
+    def slot_expandAll(self):
+        for k in range(self.treeWidget.topLevelItemCount()):
+            self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), expand=True, current=False)
         
     @pyqtSlot()
     @safeWrapper
@@ -661,7 +750,6 @@ class DataViewer(ScipyenViewer):
                         
                         self._scipyenWindow_.assignToWorkspace(newVarName, values[0], from_console=False)
                         
-                        
                 else:
                     for name, full_path, value in zip(item_names, item_path_names, values):
                         if fullPathAsName:
@@ -671,11 +759,48 @@ class DataViewer(ScipyenViewer):
                             
                         self._scipyenWindow_.assignToWorkspace(newVarName, value, from_console=False)
         
-    def _collapseRecursive_(self, item, collapseCurrent=True):
-        if item.childCount():
-            for k in range(item.childCount()):
-                self._collapseRecursive_(item.child(k))
+    #def _collapseRecursive_(self, item, current=True):
+        #if item.childCount():
+            #for k in range(item.childCount()):
+                #self._collapseRecursive_(item.child(k))
                 
-        if collapseCurrent:
-            self.treeWidget.collapseItem(item)
+        #if current:
+            #self.treeWidget.collapseItem(item)
+            
+    #def _expandRecursive_(self, item, current=True):
+        #if item.childCount():
+            #for k in range(item.childCount()):
+                #self._expandRecursive_(item.child(k))
+                
+        #if current:
+            #self.treeWidget.expandItem(item)
+            
+    def _collapse_expand_Recursive(self, item, expand=False, current=True):
+        if expand:
+            fn = self.treeWidget.expandItem
+        else:
+            fn = self.treeWidget.collapseItem
+            
+        for k in range(item.childCount()):
+            self._collapse_expand_Recursive(item.child(k), expand=expand)
+            
+        if current:
+            fn(item)
         
+        
+    #def loadSettings(self):
+        ## NOTE: 2021-07-08 09:52:11
+        ## loadWindowSettings is inheritd from ScipyenViewer and does nothing if
+        ## self.parent() is not Scipyen's main window
+        #self.loadWindowSettings() # inherited from ScipyenViewer
+        #self.loadViewerSettings()
+        
+    #def loadViewerSettings(self):
+        #pass
+            
+    #def saveSettings(self):
+        #self.saveWindowSettings() # inherited from ScipyenViewer
+        #self.saveViewerSettings()
+        
+    #def saveViewerSettings(self):
+        #pass

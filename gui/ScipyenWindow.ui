@@ -48,7 +48,7 @@
      <x>0</x>
      <y>0</y>
      <width>1115</width>
-     <height>29</height>
+     <height>28</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -393,26 +393,6 @@ NOTE: you can click anywhere in the row to select</string>
         </widget>
        </item>
        <item>
-        <widget class="QToolButton" name="dirUpBtn">
-         <property name="toolTip">
-          <string>Go to parent directory</string>
-         </property>
-         <property name="text">
-          <string>Parent directory</string>
-         </property>
-         <property name="icon">
-          <iconset theme="go-up">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-         <property name="autoRaise">
-          <bool>true</bool>
-         </property>
-         <property name="arrowType">
-          <enum>Qt::UpArrow</enum>
-         </property>
-        </widget>
-       </item>
-       <item>
         <widget class="QToolButton" name="dirBackBtn">
          <property name="toolTip">
           <string>Go back</string>
@@ -453,12 +433,33 @@ NOTE: you can click anywhere in the row to select</string>
         </widget>
        </item>
        <item>
+        <widget class="QToolButton" name="dirUpBtn">
+         <property name="toolTip">
+          <string>Go to parent directory</string>
+         </property>
+         <property name="text">
+          <string>Parent directory</string>
+         </property>
+         <property name="icon">
+          <iconset theme="go-up">
+           <normaloff>.</normaloff>.</iconset>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+         <property name="arrowType">
+          <enum>Qt::UpArrow</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QToolButton" name="viewFilesFilterToolBtn">
          <property name="text">
           <string/>
          </property>
          <property name="icon">
-          <iconset theme="view-filter"/>
+          <iconset theme="view-filter">
+           <normaloff>.</normaloff>.</iconset>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -636,7 +637,8 @@ NOTE: you can click anywhere in the row to select</string>
              <string/>
             </property>
             <property name="icon">
-             <iconset theme="window-close"/>
+             <iconset theme="window-close">
+              <normaloff>.</normaloff>.</iconset>
             </property>
             <property name="autoRaise">
              <bool>true</bool>

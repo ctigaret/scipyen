@@ -3,7 +3,13 @@
 Various utilities
 '''
 import traceback, re, itertools, time, typing, warnings
-from inspect import getmro
+from inspect import (getmro, ismodule, isclass, isbuiltin,
+                     isgeneratorfunction, iscoroutinefunction,
+                     iscoroutine, isawaitable, isasyncgenfunction,
+                     isasyncgen, istraceback, isframe, 
+                     isabstract, ismethoddescriptor, isdatadescriptor,
+                     isgetsetdescriptor, ismemberdescriptor,
+                     )
 from collections import deque
 from numbers import Number
 from sys import getsizeof
@@ -22,22 +28,24 @@ from .prog import safeWrapper
 
 from .strutils import get_int_sfx
 
-abbreviated_type_names = {'IPython.core.macro.Macro' : 'Macro'}
-sequence_types = (list, tuple, deque)
-sequence_typenames = ('list', 'tuple', "deque")
-set_types = (set, frozenset)
-set_typenames = ("set", "frozenset")
-dict_types = (dict,)
-dict_typenames = ("dict",)
-# NOTE: neo.Segment class name clashes with nrn.Segment
-neo_containernames = ("Block", "Segment",)
-# NOTE: 2020-07-10 12:52:57
-# PictArray is defunct
-signal_types = ('Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 
-                'SpikeTrain', "DataSignal", "IrregularlySampledDataSignal",
-                "TriggerEvent",)
+# NOTE: 2021-07-24 15:03:53
+# moved to core.datatypes
+#abbreviated_type_names = {'IPython.core.macro.Macro' : 'Macro'}
+#sequence_types = (list, tuple, deque)
+#sequence_typenames = ('list', 'tuple', "deque")
+#set_types = (set, frozenset)
+#set_typenames = ("set", "frozenset")
+#dict_types = (dict,)
+#dict_typenames = ("dict",)
+## NOTE: neo.Segment class name clashes with nrn.Segment
+#neo_containernames = ("Block", "Segment",)
+## NOTE: 2020-07-10 12:52:57
+## PictArray is defunct
+#signal_types = ('Quantity', 'AnalogSignal', 'IrregularlySampledSignal', 
+                #'SpikeTrain', "DataSignal", "IrregularlySampledDataSignal",
+                #"TriggerEvent",)
                 
-ndarray_type = ndarray.__name__
+#ndarray_type = ndarray.__name__
 
 
 standard_obj_summary_headers = ["Name","Workspace",
@@ -47,39 +55,55 @@ standard_obj_summary_headers = ["Name","Workspace",
                                 ]
 
 class NestedFinder(object):
+    supported_types = (np.ndarray, dict, list, tuple, deque,)
+    
     def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None):
-        self.data = src
         self.paths = deque()
         self.visited = deque()
+        self.queued =deque()
         self.result = list()
         self.values = list()
-        
-    def setData(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None):
-        self.reset()
-        self.data=src
+        self._data_ = src
         
     def reset(self):
         """Clears book-keeping queues, results and removes data reference
         """
         self.initialize()
-        self.data = None
+        self._data_ = None
         
     def initialize(self):
         """Clears the result and book-keeping queues
         """
         self.paths.clear()
         self.visited.clear()
+        self.queued.clear()
         self.result.clear()
         self.values.clear()
         
-    def gen_extract(self, var, item, asindex=True):
-        """Generator to extract value from nested data structure.
+    @property
+    def data(self):
+        return self._data_
+    
+    @data.setter
+    def data(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None):
+        self.reset()
+        self._data_ = src
+        
+    def is_namedtuple(self, x):
+        from core.datatypes import is_namedtuple
+        return is_namedtuple(x)
+        
+    
+    def gen_search(self, var, item, as_index=False):
+        """Generator to search item in a nested data structure.
+        
+        Item can be an indexing object, or a value.
         
         Parameters:
         ----------
         var: nested data structure (dict, tuple, list, deque)
         item: object to be found; see below for details
-        asindex:bool (default True)
+        as_index:bool (default True)
         
         A nested data structure is one of:
         1. a nested mapping (dict): 
@@ -88,14 +112,14 @@ class NestedFinder(object):
         2. a nested (or ragged) sequence (deque, list, tuple):
             Some of the elements may themselves by dict, be nested data structures
         
-        When 'asindex' is True (default) uses `item' as an indexing variable
-        inside the nested data structure.
+        When 'as_index' is True (default) uses `item' as an indexing object
+        inside the nested data structure: as a mapping key for dict, or integer
+        index for sequences as follows.
         
-        This means that 'item' can be:
-        
-        1. an int - for indexing in a sequence
-        2. a str - for indexing in a named tuple or used as a dict key
-        3. any hashable object usable as dict key.
+        1. when item is an int if will be used as index in a sequence
+        2. when item is a str it will be used ad a mapping key and as a
+            namedtuple field name
+        3. when item is a hashable object it will be used as dict key.
         
         NOTE: thanks to 
         
@@ -103,12 +127,145 @@ class NestedFinder(object):
         https://stackoverflow.com/questions/9807634/find-all-occurrences-of-a-key-in-nested-dictionaries-and-lists
         
         for the original get_dict_extract function on which this is based
+        
+        
+        Generates:
+        ---------
+        a) an indexing object when item is a value (as_index is False, default)
+        b) a value, when item is an indexing object (as_index = True)
+        
         """
+        # NOTE: 2021-07-25 00:18:52
+        # For all intents and purposes ndarray are considered leaf data here.
+        # We rely on numpy search routines to retrieve the index of an item
+        # (as long as it is a scalar type appropriate for the nested ndarray)
+        
+        if var is None:
+            var = self.data
+            
         if isinstance(var, dict):
+            print("in dict self.visited:", self.visited)
             for k, v in var.items():
                 self.visited.append(k)
-                if asindex:
+                self.queued.append(k)
+                
+                if as_index:
                     if k == item: 
+                        self.paths.append(list(self.visited))
+                        self.queued.pop()
+                        yield v
+                        
+                else:
+                    if safe_identity_test(v, item):
+                        self.paths.append(list(self.visited))
+                        self.queued.pop()
+                        yield k
+                        
+                if isinstance(v, self.supported_types):
+                    print("next deep in dict self.visited:", self.visited)
+                    yield from self.gen_search(v, item, as_index)
+                    self.queued.pop()
+                    #if len(self.visited):
+                        #self.visited.pop()
+                    
+                if len(self.visited):
+                    self.visited.pop()
+                    
+            if len(self.visited):
+                self.visited.pop()
+                
+        elif isinstance(var, np.ndarray):
+            if as_index: # search for value at index
+                # NOTE 1: 2021-07-25 00:02:37
+                #
+                # We DO NOT support slice indexing, indexing arrays, or other
+                # fancy ndarray indexing here.
+                #
+                # We DO support ONLY the following (simple) ndarray indexing:
+                # (a) indexing by an int (flat index)
+                # (b) indexing by a tuple of int (one element per ndarray axis)
+                # (c) indexing by a tuple of "scalar" ndarrays (with size 1)
+                #     (as if output by np.nonzero)
+                #
+                # NOTE 2:
+                # We only support ndarrays with primitive data types (for now)
+                #
+                # NOTE 3: When 'item' is a suitable indexing object (see NOTE 1) 
+                # the function yields an indexing ndarray of size 1 as in NOTE 1
+                # case (c)
+                #
+                # NOTE 4: When 'item' is a value to be searched for, it must be
+                # cast-able to the ndarray's dtype, or an ndarray of size one &
+                # same dtype as the ndarray where the search is performed
+                
+                if isinstance(item, int): 
+                    # case (a)
+                    if len(var.shape)==0 or var.ndim==0:
+                        if item == 0:
+                            self.visited.append(np.array[item])
+                            self.paths.append(list(self.visited))
+                            yield var[0]
+                            
+                    elif item < var.shape[0]:
+                        self.visited.append(np.array[item])
+                        self.paths.append(list(self.visited))
+                        yield var[item] # may yield a subdimensional array
+                        
+                #elif isinstance(item, (tuple, list)) and all([isinstance(i, int) for i in item]):
+                elif isinstance(item, (tuple, list)) and all(filter(lambda x: isinstance(x, int) or (isinstance(x, np.ndarray) and x.size==1), item)):
+                    # cases (b) and (c)
+                    if len(item) == var.ndim:
+                        self.visited.append(np.array[item])
+                        self.paths.append(list(self.visited))
+                        yield var[tuple(item)]
+
+            else: # search for index of value
+                if isinstance(item, (Number, str)) or (isinstance(item, np.ndarray) and item.size == 1):
+                    try:
+                        ndx = var == item
+                        if np.any(ndx):
+                            nx = np.nonzero(np.atleast_1d(ndx))
+                            self.visited.append(nx)
+                            self.paths.append(list(self.visited))
+                            yield nx
+                    except:
+                        pass
+                    
+            if len(self.visited):
+                self.visited.pop()
+                
+        elif self.is_namedtuple(var):
+            print("in namedtuple self.visited:", self.visited)
+            for n in var._fields:
+                v = getattr(var, n)
+                self.visited.append(n)
+                
+                if as_index:
+                    if n == item:
+                        self.paths.append(list(self.visited))
+                        yield v
+                        
+                else:
+                    if safe_identity_test(v, item):
+                        self.paths.append(list(self.visited))
+                        yield n
+                        
+                if isinstance(v, self.supported_types):
+                    print("next deep in namedtuple self.visited:", self.visited)
+                    yield from self.gen_search(v, item, as_index)
+                        
+                if len(self.visited):
+                    self.visited.pop()
+                
+            #if len(self.visited):
+                #self.visited.pop()
+            
+        elif isinstance(var, (list, tuple, deque)):
+            for k, v in enumerate(var):
+                self.visited.append(k)
+                
+                if as_index:
+                    if k == item:
                         self.paths.append(list(self.visited))
                         yield v
                         
@@ -117,55 +274,67 @@ class NestedFinder(object):
                         self.paths.append(list(self.visited))
                         yield k
                         
-                if isinstance(v, (dict, list, tuple, deque)):
-                    yield from self.gen_extract(v, item, asindex)
+                if isinstance(v, self.supported_types):
+                    yield from self.gen_search(v, item, as_index)
                     
                 if len(self.visited):
                     self.visited.pop()
-                    
-            if len(self.visited):
-                self.visited.pop()
-                    
-        elif isinstance(var, (list, tuple, deque)):
-            if asindex:
-                if isinstance(item, int) and item < len(var):
-                    self.visited.append(item)
-                    self.paths.append(list(self.visited))
-                    yield var[item]
-                    
-                elif isinstance(item, str) and hasattr(var, item): # for named tuples
-                    self.visited.append(item)
-                    self.paths.append(list(self.visited))
-                    yield getattr(var, item)
-            else:
-                if item in var:
-                    ndx = var.index(item)
-                    self.visited.append(ndx)
-                    self.paths.append(list(self.visited))
-                    yield ndx
-                    
-            for k, v in enumerate(var): # no item comparison; 
-                yield from self.gen_extract(v, item, asindex)
                 
-            if len(self.visited):
-                self.visited.pop()
+            #if len(self.visited):
+                #self.visited.pop()
+            
+                    
+        #elif isinstance(var, (list, tuple, deque)):
+            #if as_index:
+                #if isinstance(item, int) and item < len(var):
+                    #self.visited.append(item)
+                    #self.paths.append(list(self.visited))
+                    #yield var[item]
+                    
+                #elif isinstance(item, str) and hasattr(var, item): # for named tuples
+                    #self.visited.append(item)
+                    #self.paths.append(list(self.visited))
+                    #yield getattr(var, item)
+                    
+                #for v in var: # no item comparison; 
+                    #yield from self.gen_search(v, item, as_index)
                 
-    def find(self, item, asindex=True):
+            #else: # search for item as element value in list
+                #for k, v in enumerate(var): # avoid blunt comparison of numeric item with an ndarray
+                    #self.visited.append(k)
+                    
+                    ## this returns the first v that equals item
+                    #if safe_identity_test(v, item):
+                        #self.paths.append(list(self.visited))
+                        #yield k
+                        
+                    #if isinstance(v, (np.ndarray, dict, list, tuple, deque)):
+                        #yield from self.gen_search(v, item, as_index)
+                        ##yield self.gen_search(v, item, as_index)
+                    
+                    #if len(self.visited):
+                        #self.visited.pop()
+                        
+                #if len(self.visited):
+                    #self.visited.pop()
+                    
+                
+    def find(self, item, find_value=True):
         self.initialize()
-        self.values[:] = list(self.gen_extract(self.data, item, asindex))
-        assert len(self.values) == len(self.paths)
-        if asindex:
-            self.result[:] = list(zip(self.paths, self.values))
-        else:
+        self.values[:] = list(self.gen_search(self.data, item, not find_value))
+        if find_value:
             self.result[:] = list(self.paths)
+        else:
+            assert len(self.values) == len(self.paths)
+            self.result[:] = list(zip(self.paths, self.values))
         return self.result
         
     
     def findkey(self, item):
-        return self.find(item, True)
-    
-    def findval(self, item):
         return self.find(item, False)
+    
+    def findvalue(self, item):
+        return self.find(item, True)
             
     
 def reverse_dict(x:dict)->dict:
@@ -240,6 +409,11 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     the Scipyen main window.
     
     """
+    from core.datatypes import (abbreviated_type_names, dict_types, dict_typenames,
+                                ndarray_type, neo_containernames, 
+                                sequence_types, sequence_typenames, 
+                                set_types, set_typenames, signal_types, is_namedtuple, 
+                                UnitTypes, )
     # NOTE: 2021-07-19 10:41:55
     # FIXME for the above 2021-07-19 10:01:35:
     # eliding is now created in gui.WorkspaceModel._get_item_for_object
@@ -257,11 +431,10 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             
     
     result = dict(map(lambda x: (x, {"display":"", "tooltip":""}), standard_obj_summary_headers))
+    
     objtype = type(obj)
     typename = objtype.__name__
     
-    objcls = obj.__class__
-    clsname = objcls.__name__
     
     wspace_name = "Namespace: %s" % namespace
     if isinstance(obj, str):
@@ -279,9 +452,57 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         tt += " (%s)" % obj.dimensionality
     
     if tt == "instance":
+        objcls = obj.__class__
+        clsname = objcls.__name__
+        
         tt = abbreviated_type_names.get(clsname, clsname)
         
-    result["Type"] = {"display": tt, "tooltip": "type: %s" % tt}
+    ttip = tt
+        
+    if is_namedtuple(obj):
+        ttip += " (namedtuple)"
+        
+    if isabstract(obj):
+        ttip += " (abstract base class)"
+        
+    if isframe(obj):
+        ttip += " (execution stack frame)"
+        
+    if istraceback(obj):
+        ttip += " (execution stack traceback)"
+        
+    if isbuiltin(obj):
+        ttip = " (builtin)"
+    
+    if isgeneratorfunction(obj):
+        ttip += " (generator function)"
+        
+    if iscoroutinefunction(obj):
+        ttip += " (coroutine)"
+        
+    if isasyncgenfunction(obj):
+        ttip += " (asynchronous generator function)"
+        
+    # Not sure if these below are needed
+    if isasyncgen(obj):
+        ttip += " (asynchronous generator)"
+        
+    if isawaitable(obj): 
+        ttip += " (awaitable)"
+        
+    if isdatadescriptor(obj):
+        ttip += " (data descriptor)"
+        
+    if isgetsetdescriptor(obj):
+        ttip += " (getset descriptor)"
+        
+    if ismethoddescriptor(obj):
+        ttip += " (method descriptor)"
+        
+    if ismemberdescriptor(obj):
+        ttip += " (member descriptor)"
+            
+    result["Type"] = {"display": tt, "tooltip": "type: %s" % ttip}
     
     # these get assigned values below
     dtypestr = ""
@@ -671,8 +892,10 @@ def counter_suffix(x, strings, sep="_"):
                 
 @safeWrapper
 def find_leaf(src, leaf):
-    """Search for a leaf object in src - depth-first
+    """DEPRECATED Search for a leaf object in src - depth-first
     Returns a mixed sequence of hashable objects and int.
+    
+    Use utilities.NestedFinder instead
     
     Parameters:
     ----------
@@ -698,6 +921,7 @@ def find_leaf(src, leaf):
     --> ['f', 'g']
     
     """
+    warnings.warn("DEPRECATED")
     path = []
     
     if isinstance(src, dict):

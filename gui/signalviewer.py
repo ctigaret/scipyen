@@ -580,7 +580,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                          win_title=win_title, doc_title=doc_title,
                          frameIndex=frameIndex, *args, **kwargs)
         
-        self.loadSettings()
+        #self.loadSettings() # now called by ScipyenViewer.__init__()
 
         if self.y is not None:
             if self.x is None:
@@ -615,12 +615,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 doc_title = doc_title,
                                 *args, **kwargs)
                 
-    def saveSettings(self):
-        # NOTE 2021-07-08 09:48:48
-        # saveWindowSettings is inherited from ScipyenViewer and does noting if
-        # self.parent() is not Scipyen's main window
-        self.saveWindowSettings() # inherited from ScipyenViewer
-        self.saveViewerSettings()
+    #def saveSettings(self):
+        ## NOTE 2021-07-08 09:48:48
+        ## saveWindowSettings is inherited from ScipyenViewer and does noting if
+        ## self.parent() is not Scipyen's main window
+        #self.saveWindowSettings() # inherited from ScipyenViewer
+        #self.saveViewerSettings()
         
     def saveViewerSettings(self):
         if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
@@ -630,12 +630,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             for dw in self.dockWidgets:
                 self.qsettings.setValue("/".join([self.__class__.__name__, dw[0]]), dw[1].isVisible())
                 
-    def loadSettings(self):
-        # NOTE 2021-07-08 09:47:25
-        # loadWindowSettings is inherited from ScipyenViewer and does nothing if
-        # self.parent() is not Scypien's main window
-        self.loadWindowSettings() # inherited from ScipyenViewer
-        self.loadViewerSettings()
+    #def loadSettings(self):
+        ## NOTE 2021-07-08 09:47:25
+        ## loadWindowSettings is inherited from ScipyenViewer and does nothing if
+        ## self.parent() is not Scypien's main window
+        #self.loadWindowSettings() # inherited from ScipyenViewer
+        #self.loadViewerSettings()
         
     def loadViewerSettings(self):
         if type(self._scipyenWindow_).__name__ == "ScipyenWindow":

@@ -2247,7 +2247,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         super().__init__(data=data, parent=parent, ID=ID, win_title=win_title, doc_title=doc_title, frame=frame, *args, *kwargs)
         
-        self.loadSettings()
+        #self.loadSettings() # now called by ScipyenViewer.__init__()
         
         if isinstance(data, ImageViewer.supported_types) or any([t in type(data).mro() for t in ImageViewer.supported_types]):
             self.setData(data, doc_title=self._docTitle_)
@@ -3667,9 +3667,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.removeAllRoisAction.triggered.connect(self.viewerWidget.slot_removeAllRois)
         
         self.toolBar = QtWidgets.QToolBar("Main", self)
-        self.toolBar.setObjectName("DataViewer_Main_Toolbar")
+        self.toolBar.setObjectName("%s_Main_Toolbar" % self.__class__.__name__)
         
-        refreshAction = self.toolBar.addAction(QtGui.QIcon(":/images/view-refresh.svg"), "Refresh")
+        #refreshAction = self.toolBar.addAction(QtGui.QIcon(":/images/view-refresh.svg"), "Refresh")
+        refreshAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh")
         refreshAction.triggered.connect(self.slot_refreshDataDisplay)
         
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
@@ -4073,12 +4074,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         elif name in self.graphicsObjects(rois=False):
             self.viewerWidget.slot_removeCursorByName(name)
             
-    def loadSettings(self):
-        # NOTE: 2021-07-08 09:52:11
-        # loadWindowSettings is inheritd from ScipyenViewer and does nothing if
-        # self.parent() is not Scipyen's main window
-        self.loadWindowSettings() # inherited from ScipyenViewer
-        self.loadViewerSettings()
+    #def loadSettings(self):
+        ## NOTE: 2021-07-08 09:52:11
+        ## loadWindowSettings is inheritd from ScipyenViewer and does nothing if
+        ## self.parent() is not Scipyen's main window
+        #self.loadWindowSettings() # inherited from ScipyenViewer
+        #self.loadViewerSettings()
             
     def loadViewerSettings(self):
         #colorMapName = self.qsettings.value("ImageViewer/ColorMap", None)
@@ -4143,12 +4144,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         #if isinstance(color, QtGui.QColor) and color.isValid():
             #self.opaqueROILabel = color
             
-    def saveSettings(self):
-        # NOTE: 2021-07-08 09:51:30
-        # saveWindowSettings is inherited rom ScipyenViewer and does nothing if
-        # self.parent() is not Scipyen's main window
-        self.saveWindowSettings() # inherited from ScipyenViewer
-        self.saveViewerSettings()
+    #def saveSettings(self):
+        ## NOTE: 2021-07-08 09:51:30
+        ## saveWindowSettings is inherited rom ScipyenViewer and does nothing if
+        ## self.parent() is not Scipyen's main window
+        #self.saveWindowSettings() # inherited from ScipyenViewer
+        #self.saveViewerSettings()
         
     def saveViewerSettings(self):
         if isinstance(self.colorMap, colormaps.colors.Colormap):
