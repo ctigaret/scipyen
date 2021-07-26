@@ -2,7 +2,9 @@
 """
 from collections import deque
 from core.prog import safeWrapper
-from core.utilities import safe_identity_test
+from core.utilities import safe_identity_test, NestedFinder
+
+import numpy as np
 
 import nested_lookup as nlu
 import dpath
@@ -10,6 +12,83 @@ import dpath
 found = deque()
 visited = deque()
 queued = deque()
+
+def gen_elem(src, ndx):
+    if isinstance(src, dict):
+        if ndx in src.keys():
+            yield src[ndx]
+            
+    elif NestedFinder.is_namedtuple(src):
+        if ndx in src._fields:
+            yield getattr(src, ndx)
+            
+    elif isinstance(src, (tuple, list, deque)):
+        if isinstance(ndx, int):
+            yield src[ndx]
+            
+    elif isinstance(src, np.ndarray):
+        yield src[ndx]
+        
+    else:
+        yield src
+            
+            
+def gen_nested_value(src, path=None):
+    #print("\n\ngen_nested_value src", src, "\npath", path)
+    if not path:
+        yield src
+        
+    if isinstance(path, deque): # begins here
+        #print("in deque path")
+        while len(path):
+            pth = path.popleft()
+            #print("\tpth", pth)
+            yield from gen_nested_value(src, pth)
+            
+    if isinstance(path, list): # first element is top index, then next nesting level etc
+        #print("in list path")
+        while len(path):
+            ndx = path.pop(0)
+            #print("\tndx",ndx, "path", path)
+            g = gen_elem(src, ndx)
+            #if len(path) == 0:
+                #path = None
+            try:
+                yield from gen_nested_value(next(g), path)
+            except StopIteration:
+                pass
+            
+    else:# elementary indexing with POD scalars, ndarray or tuple of ndarray
+        yield from gen_elem(src, path)
+        #if isinstance(src, dict):
+            #print("gen_nested_value in dict src", src, "path", path)
+            #if path in src.keys():
+                #yield src[path]
+            
+        #elif NestedFinder.is_namedtuple(src):
+            #print("gen_nested_value in namedtuple src", src, "path", path)
+            #if path in src._fields:
+                #yield getattr(src, path)
+                
+        #elif isinstance(src, (tuple, list, deque)):
+            #print("gen_nested_value in sequence src", src, "path", path)
+            #if isinstance(path, int):
+                #yield src[path]
+            
+        #elif isinstance(src, np.ndarray):
+            #print("gen_nested_value in ndarray src", src, "path", path)
+            #yield src[path]
+        
+        #else:
+            #yield src
+            
+            
+        
+    #elif 
+    #elif isinstance(src, (tuple, list, deque))
+            
+    
+    
 
 def gen_extract(var, key, index=False):
     if isinstance(var, dict):
