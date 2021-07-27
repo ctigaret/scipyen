@@ -68,10 +68,11 @@ class NestedFinder(object):
     def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None):
         self._paths_ = deque()
         self._visited_ = deque()
-        #self.queued =deque()
         self._result_ = deque()
         self._values_ = deque()
         self._data_ = src
+        self._item_as_index_ = None
+        self._item_as_value_ = None
         
     def reset(self):
         """Clears book-keeping queues, results and removes data reference
@@ -84,10 +85,23 @@ class NestedFinder(object):
         """
         self._paths_.clear()
         self._visited_.clear()
-        #self.queued.clear()
         self._result_.clear()
         self._values_.clear()
+        self._item_as_index_ = None
+        self._item_as_value_ = None
         
+    @property
+    def lastSearchIndex(self):
+        """Read-only acces to the last search item
+        """
+        return self._item_as_index_
+    
+    @property
+    def lastSearchValue(self):
+        """Read-only acces to the last search item
+        """
+        return self._item_as_value_
+    
     @property
     def paths(self):
         """Rad-only access to the collection of indexing paths.
@@ -177,8 +191,8 @@ class NestedFinder(object):
                 
         else:# elementary indexing with POD scalars, ndarray or tuple of ndarray
             yield from self._gen_elem(src, path)
-    
-    def _gen_search(self, var, item, as_index=False):
+            
+    def _gen_search(self, var, item, parent=None, as_index=False):#, ntabs=0): # ntabs - for debugging only!
         """Generator to search item in a nesting data structure.
         
         Item can be an indexing object, or a value.
@@ -187,6 +201,7 @@ class NestedFinder(object):
         ----------
         var: nested data structure (dict, tuple, list, deque)
         item: object to be found; see below for details
+        parent: parent indexing object (optional, default None)
         as_index:bool (default True)
         
         A nested data structure is one of:
@@ -224,46 +239,53 @@ class NestedFinder(object):
         # We rely on numpy search routines to retrieve the index of an item
         # (as long as it is a scalar type appropriate for the nested ndarray)
         
+        # NOTE: 2021-07-27 10:39:33
+        # New parameter optional 'parent' represents the indexing object of the 
+        # item's container - necessary to avoid unnecessary trimming of 
+        # self._visited_
+        
         if var is None:
             var = self.data
             
-        #print("\n_gen_search in %s" % type(var).__name__, "paths=", self._paths_, "visited=", self._visited_)
+        # print("\n%s_gen_search in %s (parent: %s)" % ("".join(["\t"] * ntabs), type(var).__name__, parent), "visited:", self._visited_)
             
         if isinstance(var, dict): # search inside a dict
-            print("loop in %s" % type(var).__name__, "paths=", self._paths_, "visited=", self._visited_)
+            # print("%sloop through %s members -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
             for k, v in var.items():
                 self._visited_.append(k)
                 
+                # print("%scheck %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__),"visited:", self._visited_)
                 if as_index:
                     if safe_identity_test(k, item): # item should be hashable 
                         self._paths_.append(list(self._visited_))
-                        print("\tin %s found %s: %s" % (type(var).__name__, k, type(v).__name__), "paths=", self._paths_, "visited=", self._visited_)
+                        # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._visited_)
                         yield v
                         
                 else:
                     if safe_identity_test(v, item):
                         self._paths_.append(list(self._visited_))
-                        print("\tin %s found %s: %s" % (type(var).__name__, k, type(v).__name__), "paths=", self._paths_, "visited=", self._visited_)
+                        # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._visited_)
                         yield k
                         
                 if isinstance(v, self.supported_types):
-                    print("\tsearch inside %s: %s" % (k, type(v).__name__), "paths=", self._paths_, "visited=", self._visited_)
-                    yield from self._gen_search(v, item, as_index)
+                    # print("%ssearch inside %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._visited_)
+                    yield from self._gen_search(v, item, k, as_index)#, ntabs+1) # ntabs for debugging
                     
-                print("\tnot found in %s: %s" % (k, type(v).__name__), "paths=", self._paths_, "visited=", self._visited_)
+                # print("%sNOT FOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._visited_)
                 
                 if len(self._visited_):
                     self._visited_.pop()
-                    #print("\tback up one after %s: %s" % (k, type(v).__name__), "paths=", self._paths_, "visited=", self._visited_)
+                    # print("%sback up one from %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._visited_)
                     
-            #print("\tnot found in %s" % type(v).__name__, "paths=", self._paths_, "visited=", self._visited_)
+            # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._visited_)
                     
             if len(self._visited_):
-                self._visited_.pop()
-                #print("\tback up one in %s" % type(var).__name__, "paths=", self._paths_, "visited=", self._visited_)
-                
+                if not parent or parent != self._visited_[-1]:
+                    self._visited_.pop()
+                    # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._visited_)
                 
         elif isinstance(var, np.ndarray): # search inside an np.ndarray
+            # print("%slookup in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
             if as_index: # search for value at index
                 # NOTE 1: 2021-07-25 00:02:37
                 #
@@ -293,13 +315,13 @@ class NestedFinder(object):
                         if item == 0:
                             self._visited_.append(np.array[item])
                             self._paths_.append(list(self._visited_))
-                            #print("\tin %s found" % type(var).__name__, "paths=", self._paths_, "visited=", self._visited_)
+                            # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
                             yield var[0]
                             
                     elif item < var.shape[0]:
                         self._visited_.append(np.array[item])
                         self._paths_.append(list(self._visited_))
-                        #print("\tin %s found" % type(var).__name__, "paths=", self._paths_, "visited=", self._visited_)
+                        # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
                         yield var[item] # may yield a subdimensional array
                         
                 elif isinstance(item, (tuple, list)) and all(filter(lambda x: isinstance(x, int) or (isinstance(x, np.ndarray) and x.size==1), item)):
@@ -307,14 +329,13 @@ class NestedFinder(object):
                     if len(item) == var.ndim:
                         self._visited_.append(np.array[item])
                         self._paths_.append(list(self._visited_))
-                        #print("\tin %s found" % type(var).__name__, "paths=", self._paths_, "visited=", self._visited_)
+                        # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
                         yield var[tuple(item)]
 
             else: # search for index of value
                 if isinstance(item, (Number, str)) or (isinstance(item, np.ndarray) and item.size == 1):
                     try:
                         ndx = np.array([False])
-                        #print("in %s item:" % type(var).__name__, item)
                         if isinstance(item, (Number,str)):
                             ai = np.array([item])
                             if ai.dtype == var.dtype:
@@ -328,94 +349,97 @@ class NestedFinder(object):
                             nx = np.nonzero(np.atleast_1d(ndx))
                             self._visited_.append(nx)
                             self._paths_.append(list(self._visited_))
-                            #print("\tin %s found" % type(var).__name__,  "paths=", self._paths_, "visited=", self._visited_)
+                            # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
                             yield nx
                     except:
                         pass
                     
-            #print("\tnot found in %s" % type(var).__name__, "paths=", self._paths_, "visited=", self._visited_)
+            # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
             
             # NOTE: 2021-07-26 17:31:03
-            # DO NOT BACK UP ONE HERE: upon reaching this point we haven't added
-            # anything to the visited so there's nothing to back up (actually
-            # there is from the previous _gen_search call and popping it out
-            # breaks the outcome of the search algorithm)
-            # up to this point!
-            # (we only add if item was found, but then we yield right away)
-            #if len(self._visited_):
-                #self._visited_.pop()
-                #print("\tback up one in %s" % type(var).__name__, "paths=", self._paths_, "visited=", self._visited_)
+            # DO NOT BACK UP ONE HERE: ndarray is a leaf !
+            # upon reaching this point we haven't added anything to self._visited_
+            # so there's nothing to back up (actually there is from the previous 
+            # _gen_search call and popping it out eats out prev outcome)
+            if len(self._visited_):
+                if not parent or parent != self._visited_[-1]:
+                    self._visited_.pop()
+                    # print("%sback up one in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
                 
         elif NestedFinder.is_namedtuple(var): # search inside a namedtuple
-            #print("loop in %s" % type(var).__name__, "paths=", self._paths_, "visited=", self._visited_)
-            for n in var._fields:
-                v = getattr(var, n)
-                self._visited_.append(n)
-                
-                if as_index:
-                    if n == item:
-                        self._paths_.append(list(self._visited_))
-                        #print("\tin %s found %s: %s" % (type(var).__name__, n, type(v).__name__),  "paths=", self._paths_, "visited=", self._visited_)
-                        yield v
-                        
-                else:
-                    if safe_identity_test(v, item):
-                        self._paths_.append(list(self._visited_))
-                        #print("\tin %s found %s: %s" % (type(var).__name__, n, type(v).__name__),  "paths=", self._paths_, "visited=", self._visited_)
-                        yield n
-                        
-                if isinstance(v, self.supported_types):
-                    #print("\tsearch inside %s: %s" % (n, type(v).__name__),  "paths=", self._paths_, "visited=", self._visited_)
-                    yield from self._gen_search(v, item, as_index)
-                        
-                #print("\tnot found in %s: %s" % (n, type(v).__name__),  "paths=", self._paths_, "visited=", self._visited_)
-                
-                if len(self._visited_):
-                    self._visited_.pop()
-                    #print("\tback up one after %s: %s" % (n, type(v).__name__),  "paths=", self._paths_, "visited=", self._visited_)
-                
-            #print("\tnot found in %s" % type(v).__name__, "paths=", self._paths_, "visited=", self._visited_)
-
-            # not needed !?!
-            #if len(self._visited_):
-                #self._visited_.pop()
-                #print("\tback up one in %s" % type(var).__name__, "paths=", self._paths_, "visited=", self._visited_)
-            
-        elif isinstance(var, (list, tuple, deque)): # search inside a sequence other that any of the above
-            #print("loop in %s" % type(var).__name__, "paths=", self._paths_, "visited=", self._visited_)
-            for k, v in enumerate(var):
+            # print("%sloop through %s fields -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._visited_)
+            for k in var._fields:
+                v = getattr(var, k)
                 self._visited_.append(k)
                 
+                # print("%scheck %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__), "visited:", self._visited_)
                 if as_index:
                     if k == item:
                         self._paths_.append(list(self._visited_))
-                        #print("\tin %s found %s: %s" % (type(var).__name__, k, type(v).__name__),  "paths=", self._paths_, "visited=", self._visited_)
+                        # print("%sFOUND in %s field %s: %s -" % "".join(["\t"] * (ntabs+1)), (type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
                         yield v
                         
                 else:
                     if safe_identity_test(v, item):
                         self._paths_.append(list(self._visited_))
-                        #print("\tin %s found %s: %s" % (type(var).__name__, k, type(v).__name__),  "paths=", self._paths_, "visited=", self._visited_)
+                        # print("%sFOUND in %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
                         yield k
                         
                 if isinstance(v, self.supported_types):
-                    #print("\tsearch inside %s: %s" % (k, type(v).__name__),  "paths=", self._paths_, "visited=", self._visited_)
-                    yield from self._gen_search(v, item, as_index)
-                    
-                #print("\tnot found in %s: %s" % (k, type(v).__name__),  "paths=", self._paths_, "visited=", self._visited_)
+                    # print("%ssearch inside %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
+                    yield from self._gen_search(v, item, k, as_index)#, ntabs+1) # ntabs for debugging
+                        
+                # print("%sNOT FOUND in %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
                 
                 if len(self._visited_):
                     self._visited_.pop()
-                    #print("\tback up one after %s: %s" % (k, type(v).__name__),  "paths=", self._paths_, "visited=", self._visited_)
+                    # print("%sback up one from %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
                 
-            #print("\tnot found in %s" % type(v).__name__, "paths=", self._paths_, "visited=", self._visited_)
+            # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
 
             # not needed !?!
             if len(self._visited_):
-                self._visited_.pop()
-                #print("\tback up one in %s" % type(var).__name__, "paths=", self._paths_, "visited=", self._visited_)
+                if not parent or parent != self._visited_[-1]:
+                    self._visited_.pop()
+                    # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
             
-    def find(self, item, find_value=True):
+        elif isinstance(var, (list, tuple, deque)): # search inside a sequence other that any of the above
+            # print("%sloop through %s elements -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
+            for k, v in enumerate(var):
+                self._visited_.append(k)
+                
+                # print("%scheck %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__), "visited:", self._visited_)
+                if as_index:
+                    if k == item:
+                        self._paths_.append(list(self._visited_))
+                        # print("%sFOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
+                        yield v
+                        
+                else:
+                    if safe_identity_test(v, item):
+                        self._paths_.append(list(self._visited_))
+                        # print("%sFOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
+                        yield k
+                        
+                if isinstance(v, self.supported_types):
+                    # print("%ssearch inside %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
+                    yield from self._gen_search(v, item, k, as_index)#, ntabs+1) # ntabs for debugging
+                    
+                # print("%sNOT FOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
+                
+                if len(self._visited_):
+                    self._visited_.pop()
+                    # print("%sback up one from %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
+                
+            # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
+
+            # not needed !?!
+            if len(self._visited_):
+                if not parent or parent != self._visited_[-1]:
+                    self._visited_.pop()
+                    # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
+            
+    def find(self, item:typing.Optional[typing.Any]=None, find_value:typing.Optional[bool]=None):
         """Search item in nesting data structure.
         
         When find_value is False, item is considered an indexing object (e.g. 
@@ -437,14 +461,275 @@ class NestedFinder(object):
         to be used in other code that may possibly 'consume' it (see, e.g., 
         self.get).
         
+        See also the contrived example at the end of this docstring.
+        
+        Parameters:
+        -----------
+        
+        item: object of the search (optional, default is None)
+            When None, the function re-runs the last search. 
+            
+            The search mode (by value or by index) is determined by 'find_value'
+            parameter (see below).
+            
+        find_value: bool (optional, default is None) 
+            Determines up the search mode: by value or by index.
+            
+            When True: 'search by value' mode
+            
+                * 'item' is cosidered a value possibly contained deep inside the
+                    nesting data structure
+                
+                * the function returns a collection of paths leading to the 
+                    values identical to that of 'item' (for primitive data types),
+                    or that are references to the 'item' (for other objects)
+                
+                * if 'item' is None, the function re-runs the last search in 
+                    'search by value' mode regardless of the mode of the previous 
+                    search
+                
+            When False: 'search by index' mode (a.k.a index lookup)
+            
+                * 'item' is considered an atomic indexing object (e.g. str, int, 
+                    ndarray or tuple of ndarrays) possibly valid for any of the
+                    containers nested in data 
+                
+                * the function returns a collection of found values and their
+                    paths inside the nesting data structure (see below)
+                
+                * If 'item' is None, the function re-runs the last search in 
+                    'search by index' mode regardless of the mode of the previous 
+                    search
+                
+            When anything else (i.e. NOT a bool):
+                If 'item' is None, the function re-runs the last search with the
+                same mode as the previous search.
+                
+                Otherwise, the function runs a search for 'item', using 
+                'search by value' mode.
+                
+        Returns:
+        -------
+        A deque.
+        
+        In 'search by value' mode the returned value contains paths, where each 
+        path consists of the indices into nested containers with increasing 
+        nesting depth (think "tree branch") leading to where the 'item' was found.
+        
+        These paths (either individually, or their deque container returned here)
+        can be used to retrieve these values later on (see, e.g., self.get() and
+        NestedFinder.getvalue()). 
+        
+        CAUTION: When the nesting data structure has been modified externally, 
+        these paths may not be valid anymore.
+        
+        In 'search by index' mode, the returned value contains ('path', 'value')
+        tuples, where:
+        
+        * 'path' is the "tree branches" leading to (and ending with) the found 
+            'item' (remember, 'item' is an atomic index)
+            
+        * 'value' is the object found at the index that was looked up ('item')
+        
+        Examples:
+        --------
+        
+        Preamble:
+        ---------
+        
+        from collections import namedtuple
+        from core.utilities import NestedFinder
+        Point = namedtuple("Point", ("x", "y"))
+        p = Point(11,22)
+        ar = np.arange(5)
+           
+        d = {'b': {
+                    7: 8,
+                    9: [10, 11, ar],
+                    '9': ar,
+                    'd': p
+                    },
+            'd': p,
+            'e': (1, p)
+            }
+            
+        finder = NestedFinder(d)
+        
+        Example 1: 'search by value' mode = searching for a value retrieves the
+        paths leading to it.
+        -----------------------------------
+        
+        # ALso shows how these paths can be used to retrieve the value that was 
+        # searched for (for illustration purposes, as we already have the value 
+        # because we used it in the search)
+        
+        finder.find(p)
+        --> deque([['b', 'd'], ['d'], ['e', 1]]) #  a collection of indexing paths
+        
+        # use the internally stored collection of indexing paths to get the leaf 
+        # objects
+        finder.get()
+        --> Point(x=11, y=22), Point(x=11, y=22), Point(x=11, y=22)]
+        
+        # find another value
+        finder.find(11)
+        --> deque([['b', 9, 1],
+                    ['b', 9, 2, (array([11]),)],
+                    ['b', '9', (array([11]),)],
+                    ['b', 'd', 'x'],
+                    ['d', 'x'],
+                    ['e', 1, 'x']])
+        
+        # last search parameters are stored
+        finder.lastSearchIndex --> None
+        finder.lastSearchValue --> 11
+        
+        # repeat last search
+        finder.find() 
+        --> deque([['b', 9, 1],
+                    ['b', 9, 2, (array([11]),)],
+                    ['b', '9', (array([11]),)],
+                    ['b', 'd', 'x'],
+                    ['d', 'x'],
+                    ['e', 1, 'x']])
+                    
+        # retrieve the leaves using the found indexing paths 
+        #
+        # we searched to objects with the value 11 (an int); these are either the
+        # int objects stored at (IN 'PSEUDO-CODE'):
+        #
+        #   d['b'][9][1]    because d['b'] is a dict, and d['b'][9] is a list 
+        #                   where element at index 1 equals 11
+        #
+        #   d['b']['d'].x   because d['b']['d'] is a Point (namedtuple) where 
+        #                   the field 'x' equals 11
+        #
+        #   d['e'][1].x     because d['e'] is a tuple where element at index 1 
+        #                   is a Point (namedtuple) with field 'x' equal to 11
+        #
+        # or the ndarray elements at:
+        #
+        # d['b'][9][2][(array([11]),)]
+        #                   because element with index 2 in the d['b'][9] list
+        #                   is a numpy array where the element at [11,] equals 11
+        #
+        # d['b']['9'][(array([11]),)]
+        #                   because d['b']['9'] is a numpy array with the element
+        #                   at [11,] equal to 11
+        
+        finder.get()
+        --> [11, array([11]), array([11]), 11, 11, 11]
+        
+        finder.find("x")
+        --> deque([])
+        
+        Example 2: 'search by index' mode
+        ----------------------------------
+        
+        finder.find("x", False)
+        --> deque([(['b', 'd', 'x'], 11), (['d', 'x'], 11), (['e', 1, 'x'], 11)])
+        
+        ret = finder.find()
+        
+        ret
+        --> deque([(['b', 'd', 'x'], 11), (['d', 'x'], 11), (['e', 1, 'x'], 11)])
+        
+        finder.lastSearchIndex --> 'x'
+        finder.lastSearchValue --> None
+        
+        # the found values can be retrieved directly from the result:
+        vals = [v[1] for v in ret]
+        vals
+        --> [11, 11, 11]
+        
+        # but if the opportunity is lost, one can access the values using the 
+        # paths found in 'search by index' mode
+        
+        finder.get() # uses internally stored paths from last find
+        --> [11, 11, 11]
+        
+        # or even later, by passing an externally-generated paths collection
+        pth = [v[0] for v in ret]
+        pth
+        --> [['b', 'd', 'x'], ['d', 'x'], ['e', 1, 'x']]
+        
+        finder.get(pth) --> [11,11,11] # WARNING "consumes" pth (and indirectly, ret)
+        pth --> [[], [], []]
+        ret --> deque([([], 11), ([], 11), ([], 11)])
+        
+        # ret can be retrieved back
+        
+        ret = finder.find()
+        ret
+        --> deque([(['b', 'd', 'x'], 11), (['d', 'x'], 11), (['e', 1, 'x'], 11)])
+        
+        pth = [v[0] for v in ret]
+        pth
+        --> [['b', 'd', 'x'], ['d', 'x'], ['e', 1, 'x']]
+        
+        finder.get(deque(pth)) # WARNING "consumes" pth (and indirectly, ret)
+        --> [11, 11, 11]
+        
+        # restore paths collection (see above)
+        ret = finder.find()
+        pth = [v[0] for v in ret]
+        
+        finder.get(pth[0], True)
+        --> [11]
+        pth
+        --> [[], ['d', 'x'], ['e', 1, 'x']] # WARNING consumes partially
+        
+        To avoid the paths arguement from being consumed, pass a deep copy:
+        
+        from copy import deepcopy
+        finder.get(deepcopy(pth[0]), True)
+        
+        
+        When feeding a list to finder.get one must specify 'single' True/False
+        depending whether the list is ONE path or a collection of paths
+        finder.get(pth, True) --> TypeError: unhashable type: 'list'
+        
+        Example 3: One can work "outside" of a NestedFinder object.
+        ------------------------------------------------------------
+        
+        finder = NestedFinder(d)
+        del finder # goodbye 
+        
+        ret = finder.find("x", False)
+        pth = [v[0] for v in ret]
+        
+        NestedFinder.getvalue(d, deepcopy(pth))
+        --> [11, 11, 11]
+
         """
+        if item is None:
+            if self.lastSearchIndex:
+                item = self.lastSearchIndex
+                if not isinstance(find_value, bool):
+                    find_value = False
+                
+            elif self.lastSearchValue:
+                item = self.lastSearchValue
+                if not isinstance(find_value, bool):
+                    find_value = True
+                
+            else:
+                return deque()
+            
+        if not isinstance(find_value, bool): # force the default here
+            find_value = True
+            
         self.initialize()
-        self._values_ = deque(self._gen_search(self.data, item, not find_value))
+        
+        self._values_ = deque(self._gen_search(self.data, item, None, not find_value))
+        
         if find_value:
             self._result_ = self._paths_
+            self._item_as_value_ = item
         else:
             assert len(self._values_) == len(self._paths_)
             self._result_ = deque(zip(self._paths_, self._values_))
+            self._item_as_index_ = item
             
         return deepcopy(self._result_)
         
@@ -471,26 +756,95 @@ class NestedFinder(object):
         """
         return self.find(value, True)
     
-    def get(self, paths=None):
-        """Instance method. Retrieves nested value(s) given paths.
+    def get(self, paths:typing.Optional[typing.Union[tuple, list,deque]]=None, single:bool=False):
+        """Instance method. Retrieves nested value(s) from self.data using paths.
+        
+        A path is a list (or tuple) of atomic indexing objects, given in an 
+        increasing order of nesting depth (think tree branches from the stem to
+        a leaf).
+        
+        The data source is self.data.
+        
+        For other data sources use the static method NestedFinder.getvalue
+        and an appropriate paths collection (e.g. found by another instance of
+        NestedFinder).
+        
+        Parameters:
+        ----------
+        paths: tuple, list, deque; optional, default is None
+        
+            When None, use the deque paths collection from the last search
+            (see self.find(), self.findindex, self.findkey, self.findvalue)
+            
+            When a list or tuple, the parameter 'single' MUST be used to specify
+            if 'paths' is ONE path or a collection of paths.
+            
+            When a deque, 'paths' is a collection of path lists (or tuples).
+            
+            When 'paths' is passed by reference its elements will be "consumed".
+            
+            To avoid this pass a deep copy.
+        
+        single: bool, default is False
+            Specifies if 'paths' is a collection of path sequences (False) or
+            just a single path (True).
+            
+            See above for how this modifies the function's behaviour.
+        
+        Returns:
+        -------
+        
+        A (possibly empty) list of values, one for each path in the 'paths' 
+        collection.
+        
+        Examples:
+        --------
+        
+        See examples in NestedFinder.find
+        
+        See also NestedFinder.getvalue
+        
         """
-        if paths is None:
+        if not isinstance(paths, (deque, list, tuple)):
             if not self._paths_:
                 #warnings.warn("Must run self.findvalue(val) or self.find(val, True) first")
                 return []
-            #paths = deepcopy(self._paths_)
             paths = self.paths
             
-        #elif isinstance(paths, list):
-            #paths = deque(paths)
+        if not isinstance(paths, deque):
+            if not single:
+                paths = deque(paths)
             
         return list(self._gen_nested_value(self.data, paths))
             
     @staticmethod
-    def getvalue(data, paths):
-        """Static method version of self.get.
+    def getvalue(data, paths:typing.Optional[typing.Union[tuple, list, deque]]=None, single:bool = False):
+        """Static version of NestedFinder.get.
+        
+        Parameters:
+        -----------
+        
+        data: a nesting data structure
+        
+        paths: sequence of indexing paths or an indexing path.
+        
+            Optional, default is None, in which case returns an empty list.
+            
+        See NestedFinder.get for details
+        
+        WARNING: paths must reflect the nesting structure in 'data'
+        
         """
-        return list(self._gen_nested_value(data, paths))
+        if not isinstance(paths, (deque, list, tuple)):
+            return list()
+        
+        if not isinstance(paths, deque):
+            if not single:
+                paths = deque(paths)
+                
+        finder = NestedFinder()
+        
+        return list(finder._gen_nested_value(data, paths))
         
     
 def reverse_dict(x:dict)->dict:
