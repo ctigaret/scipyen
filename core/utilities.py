@@ -2,7 +2,7 @@
 '''
 Various utilities
 '''
-import traceback, re, itertools, time, typing, warnings
+import traceback, re, itertools, functools, time, typing, warnings, operator
 from copy import (copy, deepcopy,)
 from inspect import (getmro, ismodule, isclass, isbuiltin,
                      isgeneratorfunction, iscoroutinefunction,
@@ -22,7 +22,7 @@ import pandas as pd
 #from pandas.core.base import PandasObject as PandasObject
 from quantities import Quantity as Quantity
 from vigra import VigraArray as VigraArray
-from pyqtgraph import eq
+from pyqtgraph import eq # not sure is needed
 
 
 from .prog import safeWrapper
@@ -65,7 +65,8 @@ class NestedFinder(object):
     """
     supported_types = (np.ndarray, dict, list, tuple, deque,) # this implicitly includes namedtuple
     
-    def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None):
+    def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None,
+                 comparison:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=None):
         self._paths_ = deque()
         self._visited_ = deque()
         self._result_ = deque()
@@ -73,6 +74,19 @@ class NestedFinder(object):
         self._data_ = src
         self._item_as_index_ = None
         self._item_as_value_ = None
+        
+        self._comparison_ = operator.eq # see 'operator' module for other examples
+        
+        isbinfun = inspect.isfunction(comparison) and len(inspect.signature(comparison).parameters) == 2
+        isparfun = isinstance(comparison, functools.partial) and len(inspect.signature(comparison.func).parameters >= 2)
+        
+        if isbinfun or isparfun:
+            # NOTE: this can be a functools.partial
+            # Foe example, np.isclose can be fed into the finder and have its keyword
+            # parameters such as 'atol' and 'rtol' fixed; e.g., 
+            # fn = functools.partial(np.isclose, atol=2e-2, atol-2e-2)
+            # pass fn as comparison parameter here (or to self.comparison setter)
+            self._comparison_ = comparison
         
     def reset(self):
         """Clears book-keeping queues, results and removes data reference
@@ -89,6 +103,30 @@ class NestedFinder(object):
         self._values_.clear()
         self._item_as_index_ = None
         self._item_as_value_ = None
+        
+    #def _pyeq_(self, x, y):
+        #return x == y
+    
+    @property
+    def comparison(self):
+        """Returns the comparison function used in searching of the str '=='
+        """
+        return self._comparison_
+    
+    @comparison.setter
+    def comparison(self, fn:typing.Callable[..., typing.Any]):
+        """Sets the comparison function to a custom binary callable
+        """
+        if fn is None:
+            self._comparison_ = operator.eq
+            return
+        
+        isbinfun = inspect.isfunction(comparison) and len(inspect.signature(comparison).parameters) == 2
+        isparfun = isinstance(comparison, functools.partial) and len(inspect.signature(comparison.func).parameters >= 2)
+        
+        if isbinfun or isparfun:
+            # NOTE: this can be a functools.partial
+            self._comparison_ = comparison
         
     @property
     def lastSearchIndex(self):
@@ -146,7 +184,6 @@ class NestedFinder(object):
         return is_namedtuple(x)
     
     def _gen_elem(self, src, ndx):
-        #print("_gen_elem src", src, "ndx", ndx)
         if ndx:
             if isinstance(src, dict):
                 if ndx in src.keys():
@@ -159,6 +196,31 @@ class NestedFinder(object):
             elif isinstance(src, (tuple, list, deque)):
                 if isinstance(ndx, int):
                     yield src[ndx]
+                    
+            elif isinstance(src, pd.DataFrame): 
+                # can't just  check everything, just only the basics: 
+                # for DF ndx is a (row idx, col idx) tuple or list of such
+                # if ndx not appropriate raises exceptions
+                if isinstance(ndx, list) and all([isinstance(i, tuple) and len(i)==2 for i in ndx]):
+                    yield [src.iloc[ix[0], ix[1]] if all([isinstance(i, int) for i in ix]) else src.loc[ix[0], ix[1]] for ix in ndx]
+                    
+                elif isinstance(ndx, tuple) and len(ndx) == 2: # (row index, col index)
+                    if all([isinstance(i, int) for i in ndx]):
+                        yield src.iloc[ndx[0], ndx[1]] 
+                    else:
+                        yield src.loc[ndx[0], ndx[1]] 
+                    
+            elif isinstance(src, pd.Series):
+                # can't just  check everything, just only the basics: 
+                # for Series ndx can be an int, (row) index, or a list of such
+                if isinstance(ndx, list):
+                    yield [src.iloc[i] if isinstance(i, int) else src.loc[i] for i in ndx]
+                    
+                elif isinstance(ndx, int):
+                    yield src.iloc[ndx]
+                    
+                else:
+                    yield src.loc[ndx] # will raise exc if ndx not appropriate
                     
             elif isinstance(src, np.ndarray):
                 yield src[ndx]
@@ -256,13 +318,15 @@ class NestedFinder(object):
                 
                 # print("%scheck %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__),"visited:", self._visited_)
                 if as_index:
-                    if safe_identity_test(k, item): # item should be hashable 
+                    #if safe_identity_test(k, item): # item should be hashable 
+                    if self._comparison_(k, item): # item should be hashable 
                         self._paths_.append(list(self._visited_))
                         # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._visited_)
                         yield v
                         
                 else:
-                    if safe_identity_test(v, item):
+                    #if safe_identity_test(v, item):
+                    if self._comparison_(v, item):
                         self._paths_.append(list(self._visited_))
                         # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._visited_)
                         yield k
@@ -284,6 +348,88 @@ class NestedFinder(object):
                     self._visited_.pop()
                     # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._visited_)
                 
+        elif isinstance(var, (pd.DataFrame, pd.Series)):
+            if as_index:
+                # the index appended to paths must be something to tell us that
+                # it aplies to pandas DataFrame or Series objects; 
+                if isinstance(var, pd.Series):
+                    if isinstance(item, (tuple, list)):
+                        self._visited_.append(item)
+                        try:
+                            v = [var.iloc[ix] if isinstance(ix, int) else var.loc[ix] for ix in item]
+                            self._paths_.append(list(self._visited_))
+                            yield v
+                        except:
+                            self._visited_.pop()
+                        
+                        
+                    if isinstance(item, int):
+                        self._visited_.append(item)
+                        try:
+                            v = var.iloc[item]
+                            self._paths_.append(list(self._visited_))
+                            yield v
+                        except:
+                            self._visited_.pop()
+                        
+                    else:
+                        self._visited_.append(item)
+                        try:
+                            v = var.loc[item]
+                            self._paths_.append(list(self._visited_))
+                            yield v
+                        except:
+                            self._visited_.pop()
+                        
+                elif isinstance(var, pd.DataFrame):
+                    if isinstance(item, list):
+                        self._visited_.append(item)
+                        try:
+                            v = [var.iloc[ix[0], ix[1]] if all ([isinstance(i, int) for i in ix]) else var.loc[ix[0],ix[1]] for ix in item]
+                            self._paths_.append(list(self._visited_))
+                            yield v
+                        except:
+                            self._visited_.pop()
+                            
+                    elif isinstance(item, tuple):
+                        self._visited_.append(item)
+                        try:
+                            v = var.loc[item[0], item[1]]
+                            self._paths_.append(list(self._visited_))
+                            yield v
+                        except:
+                            self._visited_.pop()
+                            
+                        
+            else:
+                # FIXME: only supports scalar numbers and str for now
+                if isinstance(item, (Number, str)):
+                    try:
+                        ndx = self._comparison_(var, item)
+                        if np.any(ndx):
+                            # creates a sequence of (row indexer, column indexer) tuples
+                            # where item was found
+                            # each tuple element ix in nx can then be used as
+                            # df.loc[ix[0], ix[1]] to retrieve the data value in
+                            # the data frame
+                            if isinstance(var, pd.DataFrame):
+                                nx = [(ndx.index[ndx.loc[:,c]], c) for c in var.columns[ndx.any()]]
+                                
+                            else:
+                                nx = ndx.index[ndx]
+                                
+                            self._visited_.append(nx)
+                            self._paths_.append(list(self._visited_))
+                            yield nx
+                            
+                    except:
+                        pass
+                            
+            if len(self._visited_):
+                if not parent or parent != self._visited_[-1]:
+                    self._visited_.pop()
+        
+        
         elif isinstance(var, np.ndarray): # search inside an np.ndarray
             # print("%slookup in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
             if as_index: # search for value at index
@@ -292,7 +438,7 @@ class NestedFinder(object):
                 # We DO NOT support slice indexing, indexing arrays, or other
                 # fancy ndarray indexing here.
                 #
-                # We DO support ONLY the following (simple) ndarray indexing:
+                # We ONLY support the following (simple) ndarray indexing:
                 # (a) indexing by an int (flat index)
                 # (b) indexing by a tuple of int (one element per ndarray axis)
                 # (c) indexing by a tuple of "scalar" ndarrays (with size 1)
@@ -380,7 +526,8 @@ class NestedFinder(object):
                         yield v
                         
                 else:
-                    if safe_identity_test(v, item):
+                    #if safe_identity_test(v, item):
+                    if self._comparison_(v, item):
                         self._paths_.append(list(self._visited_))
                         # print("%sFOUND in %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
                         yield k
@@ -416,7 +563,8 @@ class NestedFinder(object):
                         yield v
                         
                 else:
-                    if safe_identity_test(v, item):
+                    #if safe_identity_test(v, item):
+                    if self._comparison_(v, item):
                         self._paths_.append(list(self._visited_))
                         # print("%sFOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
                         yield k
