@@ -4,13 +4,16 @@ Various utilities
 '''
 import traceback, re, itertools, functools, time, typing, warnings, operator
 from copy import (copy, deepcopy,)
-from inspect import (getmro, ismodule, isclass, isbuiltin,
+from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
                      isgeneratorfunction, iscoroutinefunction,
                      iscoroutine, isawaitable, isasyncgenfunction,
                      isasyncgen, istraceback, isframe, 
                      isabstract, ismethoddescriptor, isdatadescriptor,
                      isgetsetdescriptor, ismemberdescriptor,
+                     signature,
                      )
+from functools import (partial, partialmethod,)
+
 from collections import deque
 from numbers import Number
 from sys import getsizeof
@@ -22,7 +25,11 @@ import pandas as pd
 #from pandas.core.base import PandasObject as PandasObject
 from quantities import Quantity as Quantity
 from vigra import VigraArray as VigraArray
-from pyqtgraph import eq # not sure is needed
+
+try:
+    from pyqtgraph import eq # not sure is needed
+except:
+    from operator import eq
 
 
 from .prog import safeWrapper
@@ -54,6 +61,74 @@ standard_obj_summary_headers = ["Name","Workspace",
                                 "Minimum", "Maximum", "Size", "Dimensions",
                                 "Shape", "Axes", "Array Order", "Memory Size",
                                 ]
+# NOTE: 2021-07-27 23:09:02
+# define this here BEFORE NestedFinder so that we can use it as default value for
+# comparator
+@safeWrapper
+def safe_identity_test(x, y):
+    return safe_comparator(x, y)
+
+@safeWrapper
+def safe_comparator(x, y, comp=eq):
+    try:
+        ret = True
+        
+        ret &= type(x) == type(y)
+        
+        if not ret:
+            return ret
+        
+        if isfunction(x):
+            return x == y
+        
+        if isinstance(x, partial):
+            return x.func == y.func and x.args == y.args and x.keywords == y.keywords
+            
+        if isinstance(x, (np.ndarray, str, Number)):
+            #return operator.eq(x,y)
+            return comp(x,y)
+        
+        if hasattr(x, "size"):
+            ret &= x.size == y.size
+
+        if not ret:
+            return ret
+        
+        if hasattr(x, "shape"):
+            ret &= x.shape == y.shape
+            
+        if not ret:
+            return ret
+        
+        # NOTE: 2018-11-09 21:46:52
+        # isn't this redundant after checking for shape?
+        # unless an object could have shape attribte but not ndim
+        if hasattr(x, "ndim"):
+            ret &= x.ndim == y.ndim
+        
+        if not ret:
+            return ret
+        
+        if hasattr(x, "__len__") or hasattr(x, "__iter__"):
+            ret &= len(x) == len(y)
+
+            if not ret:
+                return ret
+            
+            ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
+            
+            if not ret:
+                return ret
+            
+        ret &= eq(x,y)
+        
+        return ret ## good fallback, though potentially expensive
+    
+    except Exception as e:
+        #traceback.print_exc()
+        #print("x:", x)
+        #print("y:", y)
+        return False
 
 class NestedFinder(object):
     """Provides searching in deeply nesting data structures.
@@ -63,10 +138,42 @@ class NestedFinder(object):
     data structure (dict, tuple, list, deque).
     
     """
-    supported_types = (np.ndarray, dict, list, tuple, deque,) # this implicitly includes namedtuple
+    supported_types = (np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame) # this implicitly includes namedtuple
     
     def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None,
-                 comparison:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=None):
+                 comparator:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=safe_identity_test):
+        """NestedFinder initializer.
+        
+        Parameters:
+        -----------
+        data: a possibily nesting data structure. 
+        
+            Supported types are:
+        
+            np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame
+            
+        comparator: function or functools.partial (optional)
+            A callable taking at least two arguments, and returns a bool.
+            
+            Typical binary comparators are:
+                operators.eq
+                pyqtgraph.eq
+                Scipyen's utilities.safe_identity_test. This is the default.
+            
+            When None, the finder's comparator reverts to operators.eq which
+            when used with numpy array will very likely raise exceptions
+            
+            Comparator functions can be made from functions taking additional
+            parameters or keyword parameters. 
+            
+            For example, to use numpy' isclose:
+            
+            from functools import partial
+            import numpy as np
+            fn = partial(np, atol=1e-2, rtol=1e-2)
+            
+            Then pass fn as comparator parameter to the NestedFinder initializer
+        """
         self._paths_ = deque()
         self._visited_ = deque()
         self._result_ = deque()
@@ -75,27 +182,29 @@ class NestedFinder(object):
         self._item_as_index_ = None
         self._item_as_value_ = None
         
-        self._comparison_ = operator.eq # see 'operator' module for other examples
+        self._comparator_ = operator.eq # see 'operator' module for other examples
         
-        isbinfun = inspect.isfunction(comparison) and len(inspect.signature(comparison).parameters) == 2
-        isparfun = isinstance(comparison, functools.partial) and len(inspect.signature(comparison.func).parameters >= 2)
+        isbinfun = isfunction(comparator) and len(signature(comparator).parameters) == 2
+        isparfun = isinstance(comparator, partial) and len(signature(comparator.func).parameters) >= 2
         
         if isbinfun or isparfun:
             # NOTE: this can be a functools.partial
             # Foe example, np.isclose can be fed into the finder and have its keyword
             # parameters such as 'atol' and 'rtol' fixed; e.g., 
             # fn = functools.partial(np.isclose, atol=2e-2, atol-2e-2)
-            # pass fn as comparison parameter here (or to self.comparison setter)
-            self._comparison_ = comparison
+            # pass fn as comparator parameter here (or to self.comparator setter)
+            self._comparator_ = comparator
         
     def reset(self):
         """Clears book-keeping queues, results and removes data reference
+        The comparator function is left the same.
         """
         self.initialize()
         self._data_ = None
         
     def initialize(self):
-        """Clears the result and book-keeping queues
+        """Clears the result and book-keeping queues.
+        The comparator function is left unchanged.
         """
         self._paths_.clear()
         self._visited_.clear()
@@ -104,29 +213,27 @@ class NestedFinder(object):
         self._item_as_index_ = None
         self._item_as_value_ = None
         
-    #def _pyeq_(self, x, y):
-        #return x == y
-    
     @property
-    def comparison(self):
-        """Returns the comparison function used in searching of the str '=='
+    def comparator(self):
+        """Returns the comparator function used in searching of the str '=='
         """
-        return self._comparison_
+        return self._comparator_
     
-    @comparison.setter
-    def comparison(self, fn:typing.Callable[..., typing.Any]):
-        """Sets the comparison function to a custom binary callable
+    @comparator.setter
+    def comparator(self, fn:typing.Callable[..., typing.Any]):
+        """Sets the comparator function to a custom binary callable.
+        A binary callable compares two arguments.
         """
         if fn is None:
-            self._comparison_ = operator.eq
+            self._comparator_ = operator.eq
             return
         
-        isbinfun = inspect.isfunction(comparison) and len(inspect.signature(comparison).parameters) == 2
-        isparfun = isinstance(comparison, functools.partial) and len(inspect.signature(comparison.func).parameters >= 2)
+        isbinfun = isfunction(fn) and len(signature(fn).parameters) == 2
+        isparfun = isinstance(fn, partial) and len(signature(fn.func).parameters) >= 2
         
         if isbinfun or isparfun:
             # NOTE: this can be a functools.partial
-            self._comparison_ = comparison
+            self._comparator_ = fn
         
     @property
     def lastSearchIndex(self):
@@ -319,14 +426,14 @@ class NestedFinder(object):
                 # print("%scheck %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__),"visited:", self._visited_)
                 if as_index:
                     #if safe_identity_test(k, item): # item should be hashable 
-                    if self._comparison_(k, item): # item should be hashable 
+                    if self._comparator_(k, item): # item should be hashable 
                         self._paths_.append(list(self._visited_))
                         # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._visited_)
                         yield v
                         
                 else:
                     #if safe_identity_test(v, item):
-                    if self._comparison_(v, item):
+                    if self._comparator_(v, item):
                         self._paths_.append(list(self._visited_))
                         # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._visited_)
                         yield k
@@ -405,7 +512,7 @@ class NestedFinder(object):
                 # FIXME: only supports scalar numbers and str for now
                 if isinstance(item, (Number, str)):
                     try:
-                        ndx = self._comparison_(var, item)
+                        ndx = self._comparator_(var, item)
                         if np.any(ndx):
                             # creates a sequence of (row indexer, column indexer) tuples
                             # where item was found
@@ -527,7 +634,7 @@ class NestedFinder(object):
                         
                 else:
                     #if safe_identity_test(v, item):
-                    if self._comparison_(v, item):
+                    if self._comparator_(v, item):
                         self._paths_.append(list(self._visited_))
                         # print("%sFOUND in %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
                         yield k
@@ -564,7 +671,7 @@ class NestedFinder(object):
                         
                 else:
                     #if safe_identity_test(v, item):
-                    if self._comparison_(v, item):
+                    if self._comparator_(v, item):
                         self._paths_.append(list(self._visited_))
                         # print("%sFOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
                         yield k
@@ -1548,80 +1655,6 @@ def counter_suffix(x, strings, sep="_"):
                 
     return x
                 
-@safeWrapper
-def find_leaf(src, leaf):
-    """DEPRECATED Search for a leaf object in src - depth-first
-    Returns a mixed sequence of hashable objects and int.
-    
-    Use utilities.NestedFinder instead
-    
-    Parameters:
-    ----------
-    
-    src: dict, tuple, list
-    leaf: object nested deep in src
-    
-    Example 1:
-    
-    ar = np.arange(5)
-    a = {"a":{"b":[1,2,3], "c":{"d":4, "e":list()}}, "f":{"g":"some text", "h":dict(), "i":ar}}
-
-    find_leaf(a, ar)
-    --> ['f', 'i']
-     
-    find_leaf(a, 2)
-    --> ['a', 'b', 1] 
-    
-    find_leaf(a, 4)
-    --> ['a', 'c', 'd']
-    
-    find_leaf(a, "some text")
-    --> ['f', 'g']
-    
-    """
-    warnings.warn("DEPRECATED")
-    path = []
-    
-    if isinstance(src, dict):
-        if hasattr(leaf, "__hash__") and leaf.__hash__ is not None and leaf in src.keys():
-            # leaf is a top level key -> return it
-            # CAUTION 2021-07-19 14:06:26
-            # if src[leaf] is a nested dict and leaf is also found deeper it will
-            # be overlooked
-            path.append(leaf)
-            
-        else:
-            if any((safe_identity_test(leaf, v) for v in src.values())):
-                path += [name for name, val in src.items() if safe_identity_test(val, leaf)]
-                
-            else:
-                # depth-first search
-                for k, v in src.items():
-                    p = find_leaf(v, leaf)
-                    if len(p):
-                        path.append(k)
-                        path += p
-               
-    elif isinstance(src, (tuple, list)):
-        if any((safe_identity_test(leaf, v) for v in src)):
-            path.append(src.index(leaf))
-            
-        elif isinstance(leaf, str) and hasattr(src, leaf):
-            path.append(getattr(src, leaf))
-                        
-        else:
-            # depth first search
-            for k, v in enumerate(src):
-                p = find_leaf(v, leaf)
-                if len(p):
-                    path.append(k)
-                    path += p
-                
-    elif safe_identity_test(src, leaf):
-        path.append(0)
-                    
-    return path
-
 def get_nested_value(src, path):
     """Returns a value contained in a nested structure src.
     
@@ -1656,7 +1689,6 @@ def get_nested_value(src, path):
             NOTE: the path represents depth-first traversal of src.
     
     """
-    #if not isinstance(src, (np.ndarray, dict, tuple, list, deque)):
     if not isinstance(src, NestedFinder.supported_types):
         raise TypeError("First parameter (%s) expected to be a %s; got %s instead" % (src, NestedFinder.supported_types, type(src).__name__))
     
@@ -1805,57 +1837,3 @@ def __name_lookup__(container: typing.Sequence, name:str,
         
     return names.index(name)
 
-@safeWrapper
-def safe_identity_test(x, y):
-    try:
-        ret = True
-        
-        ret &= type(x) == type(y)
-        
-        if not ret:
-            return ret
-        
-        if isinstance(x, (np.ndarray, str, Number)):
-            return eq(x,y)
-        
-        if hasattr(x, "size"):
-            ret &= x.size == y.size
-
-        if not ret:
-            return ret
-        
-        if hasattr(x, "shape"):
-            ret &= x.shape == y.shape
-            
-        if not ret:
-            return ret
-        
-        # NOTE: 2018-11-09 21:46:52
-        # isn't this redundant after checking for shape?
-        # unless an object could have shape attribte but not ndim
-        if hasattr(x, "ndim"):
-            ret &= x.ndim == y.ndim
-        
-        if not ret:
-            return ret
-        
-        if hasattr(x, "__len__") or hasattr(x, "__iter__"):
-            ret &= len(x) == len(y)
-
-            if not ret:
-                return ret
-            
-            ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
-            
-            if not ret:
-                return ret
-            
-        ret &= eq(x,y)
-        
-        return ret ## good fallback, though potentially expensive
-    
-    except Exception as e:
-        #traceback.print_exc()
-        #print("x:", x)
-        #print("y:", y)
-        return False
