@@ -528,7 +528,8 @@ class NestedFinder(object):
             # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._visited_)
                     
             if len(self._visited_):
-                if not parent or parent != self._visited_[-1]:
+                #if not parent or parent != self._visited_[-1]:
+                if not parent or not safe_identity_test(parent, self._visited_[-1]):
                     self._visited_.pop()
                     # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._visited_)
                 
@@ -590,11 +591,17 @@ class NestedFinder(object):
                             
                         
             else:
-                # FIXME: only supports scalar numbers and str for now
+                # FIXME: 2021-07-28 15:18:51
+                # only supports scalar numbers and str for now
+                # and only support identity comparison (i.e. ignores self.comparator)
+                # TODO: 2021-07-28 15:20:38
+                # customized support for qualified comparators e.g., np.isclose
+                # and string comparisons (using pandas parser. etc) according to
+                # the column's dtype
                 if isinstance(item, (Number, str)):
                     try:
-                        ndx = self._comparator_(var, item)
-                        if np.any(ndx):
+                        ndx = var == item
+                        if np.any(ndx): # check in values
                             # creates a sequence of (row indexer, column indexer) tuples
                             # where item was found
                             # each tuple element ix in nx can then be used as
@@ -606,15 +613,53 @@ class NestedFinder(object):
                             else:
                                 nx = ndx.index[ndx]
                                 
+                            # NOTE: 2021-07-28 15:32:26
+                            # this will append a tuple of pandas indices (row ix, col ix)!
+                            # treat carefully!
                             self._visited_.append(nx)
                             self._paths_.append(list(self._visited_))
                             yield nx
                             
+                        else: #check in indices
+                            #print("check in indices in %s" % type(var).__name__)
+                            if isinstance(var, pd.Series): # only row indices for Series
+                                ndx = var.index == item
+                                if np.any(ndx):
+                                    nx = ndx.index[ndx]
+                                    self._visited_.append(nx)
+                                    self._paths_.append(list(self._visited_))
+                                    yield nx
+                                    
+                            if isinstance(var, pd.DataFrame):
+                                rowndx = var.index == item
+                                #print("rowndx", np.any(rowndx))
+                                if np.any(rowndx):# -> row index + all columns
+                                    nx = [(ndx.index[ndx.loc[:,c]], var.columns)]
+                                    self._visited_.append(nx)
+                                    self._paths_.append(list(self._visited_))
+                                    yield nx
+                                    
+                                colndx = var.columns == item
+                                found = np.any(colndx)
+                                #print("colndx", found)
+                                if found: # -> all rows, given cols
+                                    nx = [(var.index, var.columns[colndx])]
+                                    #print("col nx", nx)
+                                    self._visited_.append(nx)
+                                    self._paths_.append(list(self._visited_))
+                                    #print(self._visited_)
+                                    #print(self._paths_)
+                                    yield nx
+                            
                     except:
+                        traceback.print_exc()
                         pass
                             
+            #print(parent)
+            #print(self._visited_)
             if len(self._visited_):
-                if not parent or parent != self._visited_[-1]:
+                #if not parent or parent != self._visited_[-1]:
+                if not parent or not safe_identity_test(parent, self._visited_[-1]):
                     self._visited_.pop()
         
         
@@ -667,6 +712,12 @@ class NestedFinder(object):
                         yield var[tuple(item)]
 
             else: # search for index of value
+                # FIXME 2021-07-28 15:19:40
+                # only supports identity; this will almost surely fail for floats
+                # TODO: 2021-07-28 15:21:54
+                # customized application of qualified comparators e..g, 
+                # np.isclose for numeric arrays and other comparisons for non-numeric
+                # dtypes
                 if isinstance(item, (Number, str)) or (isinstance(item, np.ndarray) and item.size == 1):
                     try:
                         ndx = np.array([False])
@@ -696,7 +747,8 @@ class NestedFinder(object):
             # so there's nothing to back up (actually there is from the previous 
             # _gen_search call and popping it out eats out prev outcome)
             if len(self._visited_):
-                if not parent or parent != self._visited_[-1]:
+                #if not parent or parent != self._visited_[-1]:
+                if not parent or not safe_identity_test(parent, self._visited_[-1]):
                     self._visited_.pop()
                     # print("%sback up one in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
                 
@@ -734,7 +786,8 @@ class NestedFinder(object):
 
             # not needed !?!
             if len(self._visited_):
-                if not parent or parent != self._visited_[-1]:
+                #if not parent or parent != self._visited_[-1]:
+                if not parent or not safe_identity_test(parent, self._visited_[-1]):
                     self._visited_.pop()
                     # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
             
@@ -771,7 +824,8 @@ class NestedFinder(object):
 
             # not needed !?!
             if len(self._visited_):
-                if not parent or parent != self._visited_[-1]:
+                # if not parent or parent != self._visited_[-1]:
+                if not parent or not safe_identity_test(parent, self._visited_[-1]):
                     self._visited_.pop()
                     # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
             

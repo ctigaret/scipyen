@@ -872,7 +872,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 self.setItem(rowindex, col, newrowdata[col])
 
     def removeRowForVariable(self, dataname, ns=None):
-        #wscol = standard_obj_summary_headers.index("Workspace")
         
         if isinstance(ns, str):
             if len(ns.strip()) == 0:
@@ -895,13 +894,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             self.removeRow(row)
         
-        #items = self.findItems(dataname)
-        
-        #if len(items) > 0:
-            #row = self.indexFromItem(items[0]).row()
-            
-            #self.removeRow(row)
-            
     @pyqtSlot()
     def slot_updateTable(self):
         self.updateTable(from_console=False)

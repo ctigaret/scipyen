@@ -875,7 +875,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
     @pyqtSlot()
     def slot_resizeAllColumnsToContents(self):
-        print("TableEditorWidget slot_resizeAllColumnsToContents")
+        #print("TableEditorWidget slot_resizeAllColumnsToContents")
         signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
         self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
         

@@ -2587,10 +2587,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def slot_variableItemPressed(self, ndx):
         #print("ScipyenWindow.slot_variableItemPressed %s", ndx)
-        # NOTE: choudl be taken care of by slot_selectionChanged
-        #self.workspaceModel.currentVarItem = self.workspaceModel.item(ndx.row(),0)
-        #self.workspaceModel.currentVarName = self.workspaceModel.item(ndx.row(),0).text()
-        pass
+        self.workspaceModel.currentVarItem = self.workspaceModel.item(ndx.row(),0)
+        self.workspaceModel.currentVarName = self.workspaceModel.item(ndx.row(),0).text()
+        #pass
         #item = self.workspace[self.workspaceModel.currentVarName]
         
         #if isinstance(item, (QtWidgets.QMainWindow, mpl.figure.Figure)):
@@ -3561,7 +3560,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.workspaceView.activated[QtCore.QModelIndex].connect(self.slot_variableItemActivated)
         # NOTE: 2021-07-28 14:41:38
         # taken care of by selectionChanged?
-        #self.workspaceView.pressed[QtCore.QModelIndex].connect(self.slot_variableItemPressed)
+        self.workspaceView.pressed[QtCore.QModelIndex].connect(self.slot_variableItemPressed)
         self.workspaceView.customContextMenuRequested[QtCore.QPoint].connect(self.slot_workspaceViewContextMenuRequest)
         
         # NOTE: 2019-12-01 13:30:02
