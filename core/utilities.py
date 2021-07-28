@@ -215,7 +215,7 @@ class NestedFinder(object):
     data structure (dict, tuple, list, deque).
     
     """
-    supported_types = (np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame) # this implicitly includes namedtuple
+    supported_types = (np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame, pd.Index) # this implicitly includes namedtuple
     
     def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None,
                  comparator:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=safe_identity_test):
@@ -532,7 +532,54 @@ class NestedFinder(object):
                 if not parent or not safe_identity_test(parent, self._visited_[-1]):
                     self._visited_.pop()
                     # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._visited_)
+             
+        elif isinstance(var, pd.Index):
+            #print("in index")
+            if as_index: # expects a tuple of 1D int arrays!
+                if isinstance(item, np.ndarray) and item.ndims == 1:
+                    try:
+                        self._visited_.append((item,))
+                        self._paths_.append(list(self._visited_))
+                        yield var[item]
+                        
+                    except:
+                        # NOTE: 2021-07-28 16:42:06
+                        # uncomment for debugging
+                        traceback.print_exc()
+                        pass
+                        
+                if isinstance(item, (tuple, list)) and len(item) == 1 and isinstance(item[0], np.ndarray) and item[0].ndim==1:
+                    try:
+                        self._visited_.append(item)
+                        self._paths_.append(list(self._visited_))
+                        yield var[item]
+                        
+                    except:
+                        # NOTE: 2021-07-28 16:42:06
+                        # uncomment for debugging
+                        traceback.print_exc()
+                        pass
+                        
+            else: # => if found yelds a tuple with one numpy array of int indices where found!
+                try:
+                    ndx = var == item # should be a boolean ndarray
+                    if np.any(ndx):
+                        nx = np.nonzero(np.atleast_1d(ndx))
+                        self._visited_.append(nx)
+                        self._paths_.append(list(self._visited_))
+                        yield nx # tuple(ndarray(), )
+                except:
+                    # NOTE: 2021-07-28 16:32:28
+                    # uncomment for debugging
+                    traceback.print_exc()
+                    pass
                 
+            if len(self._visited_):
+                #if not parent or parent != self._visited_[-1]:
+                if not parent or not safe_identity_test(parent, self._visited_[-1]):
+                    self._visited_.pop()
+                    # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._visited_)
+             
         elif isinstance(var, (pd.DataFrame, pd.Series)):
             # TODO: 2021-07-28 14:07:12 TODO
             # searching for values in pandas objects is only trivial with 
@@ -652,7 +699,9 @@ class NestedFinder(object):
                                     yield nx
                             
                     except:
-                        traceback.print_exc()
+                        # NOTE: 2021-07-28 16:32:51
+                        # uncomment for debugging
+                        #traceback.print_exc()
                         pass
                             
             #print(parent)
