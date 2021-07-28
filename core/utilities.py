@@ -61,15 +61,88 @@ standard_obj_summary_headers = ["Name","Workspace",
                                 "Minimum", "Maximum", "Size", "Dimensions",
                                 "Shape", "Axes", "Array Order", "Memory Size",
                                 ]
+
+class SafeComparator(object):
+    # NOTE: 2021-07-28 13:42:07
+    # pg.eq does NOT work with numpy arrays and pandas objects!
+    # operator.eq DOES work with numpy array and pandas objects!
+    # and accepts non-numeric values
+    # operator.le ge lt gt accept ONLY numeric values hence MAY not work with
+    # either numpy array or pandas objects
+    
+    def __init__(comp=eq):
+        self.comp = comp
+        
+    def __call__(self, x, y):
+        try:
+            ret = True
+            
+            ret &= type(x) == type(y)
+            
+            if not ret:
+                return ret
+            
+            if isfunction(x):
+                return x == y
+            
+            if isinstance(x, partial):
+                return x.func == y.func and x.args == y.args and x.keywords == y.keywords
+                
+            if isinstance(x, (np.ndarray, str, Number)):
+                #return operator.eq(x,y)
+                return self.comp(x,y)
+            
+            if hasattr(x, "size"):
+                ret &= x.size == y.size
+
+            if not ret:
+                return ret
+            
+            if hasattr(x, "shape"):
+                ret &= x.shape == y.shape
+                
+            if not ret:
+                return ret
+            
+            # NOTE: 2018-11-09 21:46:52
+            # isn't this redundant after checking for shape?
+            # unless an object could have shape attribte but not ndim
+            if hasattr(x, "ndim"):
+                ret &= x.ndim == y.ndim
+            
+            if not ret:
+                return ret
+            
+            if hasattr(x, "__len__") or hasattr(x, "__iter__"):
+                ret &= len(x) == len(y)
+
+                if not ret:
+                    return ret
+                
+                ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
+                
+                if not ret:
+                    return ret
+                
+            ret &= self.comp(x,y)
+            
+            return ret ## good fallback, though potentially expensive
+        
+        except Exception as e:
+            #traceback.print_exc()
+            #print("x:", x)
+            #print("y:", y)
+            return False
+    
 # NOTE: 2021-07-27 23:09:02
 # define this here BEFORE NestedFinder so that we can use it as default value for
 # comparator
 @safeWrapper
-def safe_identity_test(x, y):
-    return safe_comparator(x, y)
+def safe_identity_test2(x, y):
+    return SafeComparator(comp=eq)(x, y)
 
 @safeWrapper
-def safe_comparator(x, y, comp=eq):
+def safe_identity_test(x, y):
     try:
         ret = True
         
@@ -84,30 +157,26 @@ def safe_comparator(x, y, comp=eq):
         if isinstance(x, partial):
             return x.func == y.func and x.args == y.args and x.keywords == y.keywords
             
-        if isinstance(x, (np.ndarray, str, Number)):
-            #return operator.eq(x,y)
-            return comp(x,y)
+        if isinstance(x, (np.ndarray, str, Number, pd.DataFrame, pd.Series, pd.Index)):
+            return np.all(x==y)
         
         if hasattr(x, "size"):
             ret &= x.size == y.size
 
-        if not ret:
-            return ret
+            if not ret:
+                return ret
         
         if hasattr(x, "shape"):
             ret &= x.shape == y.shape
-            
-        if not ret:
-            return ret
+                
+            if not ret:
+                return ret
         
         # NOTE: 2018-11-09 21:46:52
         # isn't this redundant after checking for shape?
         # unless an object could have shape attribte but not ndim
         if hasattr(x, "ndim"):
             ret &= x.ndim == y.ndim
-        
-        if not ret:
-            return ret
         
         if hasattr(x, "__len__") or hasattr(x, "__iter__"):
             ret &= len(x) == len(y)
@@ -120,6 +189,14 @@ def safe_comparator(x, y, comp=eq):
             if not ret:
                 return ret
             
+        
+        #if isinstance(x, (pd.DataFrame, pd.Series, pd.Index)):
+            #return (x==y).all().all()
+        
+        #if not ret:
+            #return ret
+        
+        #ret &= x==y
         ret &= eq(x,y)
         
         return ret ## good fallback, though potentially expensive
@@ -456,6 +533,10 @@ class NestedFinder(object):
                     # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._visited_)
                 
         elif isinstance(var, (pd.DataFrame, pd.Series)):
+            # TODO: 2021-07-28 14:07:12 TODO
+            # searching for values in pandas objects is only trivial with 
+            # trivial comparators (such as operator.eq)
+            # TODO: for more complicated comparators e.g. numpy.isclose this needs more work
             if as_index:
                 # the index appended to paths must be something to tell us that
                 # it aplies to pandas DataFrame or Series objects; 

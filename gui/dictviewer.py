@@ -21,6 +21,7 @@ from pyqtgraph import (DataTreeWidget, TableWidget, )
 
 import neo
 import numpy as np
+import pandas as pd
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -47,6 +48,8 @@ from core.workspacefunctions import validate_varname
 from core.prog import (safeWrapper, safeGUIWrapper, )
 
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
+
+from gui.tableeditor import (TableEditorWidget, TabularDataModel,)
 
 #### END pict.core modules
 
@@ -179,6 +182,7 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
 
         # defaults for all objects
         typeStr = type(data).__name__
+        
         if typeStr == 'instance':
             typeStr += ": " + data.__class__.__name__
             
@@ -219,6 +223,31 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
                 ('data', data.view(np.ndarray)),
                 ('meta', data.infoCopy())
             ])
+            
+        elif isinstance(data, pd.DataFrame):
+            desc = "length=%d, columns=%d" % (len(data), len(data.columns))
+            model = TabularDataModel()
+            table = TableEditorWidget(model, self)
+            signalBlocker = QtCore.QSignalBlocker(table.tableView)
+            table.tableView.model().setModelData(data)
+            table.setMaximumHeight(200)
+            widget = table
+            
+        elif isinstance(data, pd.Series):
+            desc = "length=%d, dtype=%s" % (len(data), data.dtype)
+            model = TabularDataModel()
+            table = TableEditorWidget(model, self)
+            signalBlocker = QtCore.QSignalBlocker(table.tableView)
+            table.tableView.model().setModelData(data)
+            table.setMaximumHeight(200)
+            widget = table
+            
+        elif isinstance(data, pd.Index):
+            desc = "length=%d" % len(data)
+            widget = QtGui.QPlainTextEdit(asUnicode(data))
+            widget.setMaximumHeight(200)
+            widget.setReadOnly(True)
+            
         elif isinstance(data, np.ndarray):
             desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
             table = ScipyenTableWidget()

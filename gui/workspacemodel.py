@@ -66,7 +66,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #self.set_types = ["set", "frozenset"]
         #self.dict_types = ["dict"]
         #self.ndarray_type = np.ndarray.__name__
-        self.currentVarItem = None
         
         self.shell = shell # reference to IPython InteractiveShell of the internal console
         
@@ -78,13 +77,18 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.deleted_vars = dict()
         self.user_ns_hidden = dict(user_ns_hidden)
     
-        
+        # NOTE: 2021-07-28 09:58:38
+        # currentVarItem/Name are set by selecting/activating an item in workspace view
+        self.currentVarItem = None
         # NOTE: 2017-09-22 21:33:47
         # cache for the current var name to allow renaming workspace variables
         # this should be updated whenever the variable name is selected/activated in the model table view
         self.currentVarName = "" # name of currently selected variable
         # NOTE: 2021-06-12 12:11:25
-        # cache symbol when the data it is bound to has changed
+        # cache symbol when the data it is bound to has changed; needed e.g. 
+        # for updateRowForVariable
+        # CAUTION this is volatile, DO NOT USE it to retrieve current var name
+        # e.g., for the purpose of renaming
         self.originalVarName = "" # varname cache for individual row changes
         self.setColumnCount(len(standard_obj_summary_headers))
         self.setHorizontalHeaderLabels(standard_obj_summary_headers) # defined in core.utilities
@@ -778,17 +782,32 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return ndx
 
     def getCurrentVarName(self):
-        if self.currentVarItem is None:
-            return None
+        """DEPRECATED
+        """
+        warnings.warn("Deprecated", DeprecationWarning)
         
-        else:
-            try:
-                self.currentVarName = self.currentVarItem.text()
-                return str(self.currentVarName)
+        varname = self.currentVarName
+        
+        if varname is None or (isinstance(varname, str) and len(varname.strip()) == 0):
+            if self.parent():
+                if hasattr(self.parent(),"workspaceView"):
+                    wv = self.parent().workspaceView
+                    indexList = wv.selectedIndexes()
+                    if len(indexList) == 0:
+                        return
+                    
+                    varname = wv.item(indexList[0].row(),0).text()
+                    
+                if varname is None or isinstance(varname, str) and len(varname.strip()) == 0:
+                    return
+                
+                if varname not in self.shell.user_ns.keys():
+                    return
+                
+                self.currentVarName = varname
             
-            except Exception as e:
-                traceback.print_exc()
-
+        return varname
+            
     def __update_variable_row__(self, dataname, data):
         # FIXME/TODO 2019-08-04 23:55:04
         # make this faster
@@ -848,15 +867,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #print("updateRow originalRow as str", self.getRowContents(rowindex, asStrings=True))
         if originalRow is not None:
             for col in range(self.columnCount()):
-                #if col == 0:
-                    #self.originalVarName = newrowdata[col].text()
+                # NOTE: 2021-07-28 10:42:17
+                # this emits itemChange signal!
                 self.setItem(rowindex, col, newrowdata[col])
-                #if originalRow is not None and col < len(originalRow):# and originalRow[col] != newrowdata[col]:
-                    
-        #for col in range(1, self.columnCount()):
-            #if originalRow is not None and col < len(originalRow):# and originalRow[col] != newrowdata[col]:
-                #self.setItem(rowindex, col, newrowdata[col])
-                
 
     def removeRowForVariable(self, dataname, ns=None):
         #wscol = standard_obj_summary_headers.index("Workspace")
@@ -951,7 +964,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 # variables modified via code executed in the console
                 for item in self.modified_vars.items(): # populated by post_execute
                     self.originalVarName = item[0] # make sure we cache this here
+                                                   # only used for updateRowForVariable
                     self.updateRowForVariable(item[0], item[1])
+                    
                 self.originalVarName = ""
                 
                 #print("added variables:", self.new_vars)

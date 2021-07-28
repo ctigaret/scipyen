@@ -1367,7 +1367,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                                     if b.text() == "None":
                                         args.append(None)
                                     elif b.text() == '~':
-                                        selVarName = self.workspaceModel.getCurrentVarName()
+                                        selVarName = self.getCurrentVarName()
                                         if selVarName is not None:
                                             args.append(self.workspace[selVarName])
                                         else:
@@ -1378,7 +1378,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                                     args.append(self.workspace[b.text()])
                                     
                             elif isinstance(a, str) and a == '~' and b is None: # b SHOULD be None here
-                                selVarName = self.workspaceModel.getCurrentVarName()
+                                selVarName = self.getCurrentVarName()
                                 if selVarName is not None:
                                     args.append(self.workspace[selVarName])
 
@@ -2369,6 +2369,32 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     
             self.slot_updateWorkspaceTable(from_console)
         
+    @safeWrapper
+    def getCurrentVarName(self):
+        signalBlockers = [QtCore.QSignalBlocker(self.workspaceView),
+                          QtCore.QSignalBlocker(self.workspaceModel),
+                          QtCore.QSignalBlocker(self.workspaceView.selectionModel())]
+        
+        varname = self.workspaceModel.currentVarName
+        
+        if varname is None:
+            indexList = self.workspaceView.selectedIndexes()
+            
+            if len(indexList) == 0:
+                return
+            
+            varname = self.workspaceModel.item(indexList[0].row(),0).text()
+            
+            if varname is None or isinstance(varname, str) and len(varname.strip()) == 0:
+                return
+            
+            if varname not in self.workspace.keys():
+                return
+            
+        #print("MainWindow.getCurrentVarName", varname)
+        
+        return varname
+
     def assignToWorkspace(self, name:str, val:object, from_console:bool = False):
         self.workspace[name] = val
         self.slot_updateWorkspaceTable(from_console)
@@ -2415,20 +2441,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         pass
         #from ephys.membrane import analyse_AP_depol_series
         
-        #varname = self.workspaceModel.getCurrentVarName()
+        #varname = self.getCurrentVarName()
         
         #if varname is None:
-            #indexList = self.workspaceView.selectedIndexes()
-            
-            #if len(indexList) == 0:
-                #return
-            
-            #varname = self.workspaceModel.item(indexList[0].row(),0).text()
-            
-            #if varname is None:
-                #return
-            
-        #if varname not in self.workspace.keys():
             #return
         
         #data = self.workspace[varname]
@@ -2571,10 +2586,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot(QtCore.QModelIndex)
     @safeWrapper
     def slot_variableItemPressed(self, ndx):
-        pass
         #print("ScipyenWindow.slot_variableItemPressed %s", ndx)
+        # NOTE: choudl be taken care of by slot_selectionChanged
         #self.workspaceModel.currentVarItem = self.workspaceModel.item(ndx.row(),0)
         #self.workspaceModel.currentVarName = self.workspaceModel.item(ndx.row(),0).text()
+        pass
         #item = self.workspace[self.workspaceModel.currentVarName]
         
         #if isinstance(item, (QtWidgets.QMainWindow, mpl.figure.Figure)):
@@ -2739,8 +2755,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         cm.popup(self.workspaceView.mapToGlobal(point))#, copyVarNames)
         #cm.popup(self.workspaceView.mapToGlobal(point), cm.actions()[0])
         
-    @pyqtSlot(QtCore.QItemSelection, QtCore.QItemSelection)
     @safeWrapper
+    @pyqtSlot(QtCore.QItemSelection, QtCore.QItemSelection)
     def slot_selectionChanged(self, selected, deselected):
         """Selection change in the workspace viewer
         """
@@ -2769,13 +2785,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             self.workspaceModel.currentVarName = ""
             self.workspaceModel.currentVarItem = None
-            #self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
+            self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
 
         #print("ScipyenWindow slot_selectionChanged: currentVarName %s" % self.workspaceModel.currentVarName)
 
     #@pyqtSlot(QtGui.QStandardItem)
-    @pyqtSlot("QStandardItem*")
     @safeWrapper
+    @pyqtSlot("QStandardItem*")
     def slot_variableItemNameChanged(self, item):
         """Called when itemChanged was emitted by workspaceModel.
         
@@ -2785,28 +2801,52 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         For the case when the variable name is changed via its context menu see 
         slot_renameWorkspaceVar().
         
+        CAUTION: this is also called when variables are re-created!
+        
         """
         #print("slot_variableItemNameChanged")
+        signalBlockers = [QtCore.QSignalBlocker(self.workspaceView),
+                          QtCore.QSignalBlocker(self.workspaceModel),
+                          QtCore.QSignalBlocker(self.workspaceView.selectionModel())]
+        
         if item.column() > 0:
             # only accept changes in the first (0th) column which contains
             # the variable name
             return
         
-        signalBlockers = [QtCore.QSignalBlocker(self.workspaceView),
-                          QtCore.QSignalBlocker(self.workspaceModel),
-                          QtCore.QSignalBlocker(self.workspaceView.selectionModel())]
+        #print("ScipyenWindow slot_variableItemNameChanged item %s" % item.text())
+        #print("ScipyenWindow slot_variableItemNameChanged item in ws", item.text() in self.workspace.keys())
         
         #print("workspace model rows: ", self.workspaceModel.rowCount())
         
-        #originalVarName = self.workspaceModel.getCurrentVarName()
+        # NOTE 2021-07-28 10:24:33
+        # self.workspaceModel.currentVarName may be None is no variable has
+        # been selected; in this case use self.workspaceModel.originalVarName
+        # normally this is empty, except in the process of variable creation or
+        # modification, when self.workspaceModel.updateRowForVariable is called,
+        # and self.workspaceView.itemChange signal is emitted (which is connected
+        # to this slot)
+        #originalVarName = self.workspaceModel.currentVarName
+        
+        #if originalVarName is None or (isinstance(originalVarName, str) and len(originalVarName.strip()) == 0):
+            
         # NOTE: 2021-06-12 12:10:22
         # use cached symbol when symbol's bound data has changed
+        # FIXME 2021-07-28 10:47:04 
+        # this BREAKS variable renaming using the keyboard shortcut (e.g. F2)
         originalVarName = self.workspaceModel.originalVarName
-        #originalVarName = self.workspaceModel.currentVarName
-        #print("ScipyenWindow slot_variableItemNameChanged originalVarName %s" % originalVarName)
         newVarName = item.text()
+        
+        # NOTE 2021-07-28 11:01:16
+        # FIXES 2021-07-28 10:47:04 
+        # self.getCurrentVarName() returns the name of selected var (before EditKeyPressed)
+        if originalVarName is None or (isinstance(originalVarName, str) and len(originalVarName.strip()) == 0):
+            originalVarName = self.getCurrentVarName()
+            
+        #print("ScipyenWindow slot_variableItemNameChanged originalVarName %s" % originalVarName)
+        
         #print("ScipyenWindow slot_variableItemNameChanged newVarName %s" % newVarName)
-
+        
         if newVarName != originalVarName:
             # NOTE: 2017-09-22 21:57:23
             # check newVarName for sanity
@@ -2815,22 +2855,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if newVarNameOK != newVarName: # also update the item's text
                 item.setText(newVarNameOK)
                 
-            data = self.workspace[originalVarName]
+            data = self.workspace.pop(originalVarName, None)
             
-            self.workspace.pop(originalVarName, None)
+            if data is None:
+                return
             
             self.workspace[newVarNameOK] = data
                 
-            #cmd = "".join([newVarNameOK, "=", originalVarName, "; del(", originalVarName,")" ])
-            
-            #print(cmd)
-
-            #self.console.execute(cmd, hidden=True)
-            
             self.slot_updateWorkspaceTable(False)
             
-            self.workspaceModel.currentVarName = newVarNameOK
-            self.workspaceView.selectionModel().setCurrentIndex(self.workspaceModel.indexFromItem(item), QtCore.QItemSelectionModel.Select)
+            #self.workspaceModel.currentVarName = newVarNameOK
+            #self.workspaceView.selectionModel().setCurrentIndex(self.workspaceModel.indexFromItem(item), QtCore.QItemSelectionModel.Select)
         
     @pyqtSlot()
     @safeWrapper
@@ -3520,9 +3555,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.workspaceView.setShowGrid(False)
         self.workspaceView.setModel(self.workspaceModel)
         self.workspaceView.selectionModel().selectionChanged[QtCore.QItemSelection, QtCore.QItemSelection].connect(self.slot_selectionChanged)
+        # NOTE 2021-07-28 14:26:09 
+        # avoid editing by db-click
         self.workspaceView.setEditTriggers(QtWidgets.QAbstractItemView.EditKeyPressed)
         self.workspaceView.activated[QtCore.QModelIndex].connect(self.slot_variableItemActivated)
-        self.workspaceView.pressed[QtCore.QModelIndex].connect(self.slot_variableItemPressed)
+        # NOTE: 2021-07-28 14:41:38
+        # taken care of by selectionChanged?
+        #self.workspaceView.pressed[QtCore.QModelIndex].connect(self.slot_variableItemPressed)
         self.workspaceView.customContextMenuRequested[QtCore.QPoint].connect(self.slot_workspaceViewContextMenuRequest)
         
         # NOTE: 2019-12-01 13:30:02
@@ -4906,16 +4945,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         """
         selectedItems = self.workspaceView.selectedIndexes()
-        #selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes() \
-                         #if not self.fileSystemModel.isDir(item)]# list of QModelIndex
         
         if len(selectedItems) == 0:
             return
-        
-        #varname = self.workspaceModel.getCurrentVarName()
-        
-        #if varname is None:
-            #return
         
         elif len(selectedItems) == 1:
             # make sure we get the data in the first column (the variable name) 
@@ -5489,18 +5521,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_exportToCsv(self):
-        varname = self.workspaceModel.getCurrentVarName()
+        indexList = self.workspaceView.selectedIndexes()
         
-        if varname is None:
-            indexList = self.workspaceView.selectedIndexes()
-            
-            if len(indexList) == 0:
-                return
-            
-            varname = self.workspaceModel.item(indexList[0].row(),0).text()
-            
-            if varname is None or len(varname.strip()) == 0:
-                return
+        if len(indexList) == 0:
+            return
+        
+        varname = self.workspaceModel.item(indexList[0].row(),0).text()
+        
+        if varname is None or len(varname.strip()) == 0:
+            return
 
         #if not isinstance(self.workspace[varname], (pd.Series, pd.DataFrame, np.ndarray, dict)):
         if not isinstance(self.workspace[varname], (pd.Series, pd.DataFrame, neo.basesignal.BaseSignal, neo.SpikeTrain, np.ndarray)):
@@ -5530,7 +5559,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             newWindow = False
             
-        varname = self.workspaceModel.getCurrentVarName()
+        varname = self.workspaceModel.currentVarName
         
         if varname is None:
             indexList = self.workspaceView.selectedIndexes()
@@ -5540,10 +5569,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
             varname = self.workspaceModel.item(indexList[0].row(),0).text()
             
-            if varname is None:
+            if varname is None or isinstance(varname, str) and len(varname.strip()) == 0:
                 return
-        if varname not in self.workspace.keys():
-            return
+            
+            if varname not in self.workspace.keys():
+                return
         
         action = self.sender()
         actionName = action.text().replace("&","")
@@ -5574,7 +5604,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.slot_viewSelectedVarInNewWindow()
             return
         
-        varname = self.workspaceModel.getCurrentVarName()
+        varname = self.workspaceModel.currentVarName
         
         if varname is None:
             indexList = self.workspaceView.selectedIndexes()
@@ -5627,7 +5657,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.slot_viewNDarrayNewWindow()
             return
         
-        varname = self.workspaceModel.getCurrentVarName()
+        varname = self.getCurrentVarName()
 
         if varname is None: # workspaceModel dit not pick it up, try to get it from workspaceView
             indexList = self.workspaceView.selectedIndexes()
@@ -5662,18 +5692,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_viewNDarrayNewWindow(self):
         """Displays ndarray in a new  TableEditor
         """
-        varname = self.workspaceModel.getCurrentVarName()
-
-        if varname is None: # workspaceModel dit not pick it up, try to get it from workspaceView
-            indexList = self.workspaceView.selectedIndexes()
-            
-            if len(indexList) == 0:
-                return
-            
-            varname = self.workspaceModel.item(indexList[0].row(),0).text()
-            
-            if varname is None:
-                return
+        varname = self.getCurrentVarName()
+        if varname is None:
+            return
         
         winDict = self.tableEditorWindows
         
@@ -5691,17 +5712,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #else:
             #useSignalViewerForNdArrays = False
             
-        varname = self.workspaceModel.getCurrentVarName()
-        
+        varname = self.getCurrentVarName()
         if varname is None:
-            indexList = self.workspaceView.selectedIndexes()
-            if len(indexList) == 0:
-                return
-            
-            varname = self.workspaceModel.item(indexList[0].row(),0).text()
-            
-            if varname is None:
-                return
+            return
         
         #if not self.viewVar(varname, newWindow=True, useSignalViewerForNdArrays=useSignalViewerForNdArrays):
         if not self.viewVar(varname, newWindow=True):
