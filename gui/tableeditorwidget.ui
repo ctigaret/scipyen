@@ -21,21 +21,41 @@
      </property>
      <item>
       <widget class="QToolButton" name="resizeColumnsToolButton">
+       <property name="toolTip">
+        <string>Autoresize columns width to fit contents</string>
+       </property>
+       <property name="statusTip">
+        <string>Autoresize columns width to fit contents</string>
+       </property>
+       <property name="whatsThis">
+        <string>Autoresize columns width to fit contents</string>
+       </property>
        <property name="text">
         <string>Resize columns</string>
        </property>
        <property name="icon">
-        <iconset theme="resizecol"/>
+        <iconset theme="resizecol">
+         <normaloff>.</normaloff>.</iconset>
        </property>
       </widget>
      </item>
      <item>
       <widget class="QToolButton" name="resizeRowsToolButton">
+       <property name="toolTip">
+        <string>Autoresize rows height to fit contents</string>
+       </property>
+       <property name="statusTip">
+        <string>Autoresize rows height to fit contents</string>
+       </property>
+       <property name="whatsThis">
+        <string>Autoresize rows height to fit contents</string>
+       </property>
        <property name="text">
         <string>Resize rows</string>
        </property>
        <property name="icon">
-        <iconset theme="resizerow"/>
+        <iconset theme="resizerow">
+         <normaloff>.</normaloff>.</iconset>
        </property>
       </widget>
      </item>

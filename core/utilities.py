@@ -590,53 +590,97 @@ class NestedFinder(object):
                 # it aplies to pandas DataFrame or Series objects; 
                 if isinstance(var, pd.Series):
                     if isinstance(item, (tuple, list)):
-                        self._visited_.append(item)
+                        #self._visited_.append(item)
                         try:
-                            v = [var.iloc[ix] if isinstance(ix, int) else var.loc[ix] for ix in item]
+                            v = [var.iloc[ix] if isinstance(ix, (int, slice, range)) else var.loc[ix] for ix in item]
+                            self._visited_.append(item)
                             self._paths_.append(list(self._visited_))
                             yield v
                         except:
-                            self._visited_.pop()
+                            pass
+                            #self._visited_.pop()
                         
                         
-                    if isinstance(item, int):
-                        self._visited_.append(item)
+                    if isinstance(item, (int, slice, range)):
+                        #self._visited_.append(item)
                         try:
                             v = var.iloc[item]
+                            self._visited_.append(item)
                             self._paths_.append(list(self._visited_))
                             yield v
                         except:
-                            self._visited_.pop()
+                            pass
+                            #self._visited_.pop()
                         
                     else:
-                        self._visited_.append(item)
+                        #self._visited_.append(item)
                         try:
                             v = var.loc[item]
+                            self._visited_.append(item)
                             self._paths_.append(list(self._visited_))
                             yield v
                         except:
-                            self._visited_.pop()
+                            pass
+                            #self._visited_.pop()
                         
                 elif isinstance(var, pd.DataFrame):
-                    if isinstance(item, list):
-                        self._visited_.append(item)
+                    if isinstance(item, list): # list of row, col index pairs - either as int or as row & col index objects
+                        #self._visited_.append(item)
                         try:
-                            v = [var.iloc[ix[0], ix[1]] if all ([isinstance(i, int) for i in ix]) else var.loc[ix[0],ix[1]] for ix in item]
+                            v = [var.iloc[ix[0], ix[1]] if all ([isinstance(i, (int, slice, range)) for i in ix]) else var.loc[ix[0],ix[1]] for ix in item]
+                            self._visited_.append(item)
                             self._paths_.append(list(self._visited_))
                             yield v
                         except:
-                            self._visited_.pop()
+                            pass
+                            #self._visited_.pop()
                             
-                    elif isinstance(item, tuple):
-                        self._visited_.append(item)
-                        try:
-                            v = var.loc[item[0], item[1]]
+                    elif isinstance(item, tuple): # tuple of row, col indexes - either as int or as row & col index objects
+                        #self._visited_.append(item)
+                        try: # will raise exception if neither elements in item are valid
+                            #print("item", item)
+                            v = var.iloc[item[0], item[1]] if all([isinstance(i, (int, slice, range)) for i in item]) else var.loc[item[0], item[1]]
+                            #print("v", v)
+                            self._visited_.append(item)
                             self._paths_.append(list(self._visited_))
-                            yield v
+                            yield v # a pd.DataFrame or a pd.Series!
                         except:
-                            self._visited_.pop()
+                            traceback.print_exc()
+                            pass
+                            #self._visited_.pop()
                             
-                        
+                    elif isinstance(item, (int, range,slice)): # int index: for dataframe retrun the item_th row as a pd.Series
+                        #self._visited_.append([item, slice(var.shape[1])]) # => explicit indexing: row, col
+                        try:
+                            v = var.iloc[item,:] # this is a series
+                            self._visited_.append([item, slice(var.shape[1])]) # => explicit (normalized) indexing: row, col
+                            self._paths_.append(list(self._visited_))
+                            yield v # a pd.Series
+                        except:
+                            try:
+                                v = var.iloc[:,item] # try columns
+                                self._visited_.append([slice(var.shape[0]), item]) # => explicit (normalized) indexing: row, col
+                                self._paths_.append(list(self._visited_))
+                            except:
+                                pass
+                        #if item >= 0 and item < len(var):
+                                #self._visited_.pop()
+                            
+                    elif isinstance(item, pd.Index): # try to see if the index applies to the dataframe rows; _IF_ it fails, then check columns
+                        try:
+                            v = var.loc[item,:] # this is now a DataFrame
+                            self._visited_.append([item, var.columns]) # => explicit (normalized) row/col indexing; item is a row ndex
+                            self._paths_.append(list(self._visited_))
+                            yield v # a pd.DataFrame
+                            
+                        except:
+                            try:
+                                v = var.loc[:,item] # check columns
+                                self._visited_.append([var.index, item]) # => explicit (normalized) row/col indexing; item is a col index
+                                self._paths_.append(list(self._visited_))
+                                yield v
+                            except:
+                                pass
             else:
                 # FIXME: 2021-07-28 15:18:51
                 # only supports scalar numbers and str for now
@@ -741,13 +785,13 @@ class NestedFinder(object):
                     # case (a)
                     if len(var.shape)==0 or var.ndim==0:
                         if item == 0:
-                            self._visited_.append(np.array[item])
+                            self._visited_.append(np.array([item]))
                             self._paths_.append(list(self._visited_))
                             # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
                             yield var[0]
                             
                     elif item < var.shape[0]:
-                        self._visited_.append(np.array[item])
+                        self._visited_.append(np.array([item]))
                         self._paths_.append(list(self._visited_))
                         # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
                         yield var[item] # may yield a subdimensional array
@@ -755,7 +799,7 @@ class NestedFinder(object):
                 elif isinstance(item, (tuple, list)) and all(filter(lambda x: isinstance(x, int) or (isinstance(x, np.ndarray) and x.size==1), item)):
                     # cases (b) and (c)
                     if len(item) == var.ndim:
-                        self._visited_.append(np.array[item])
+                        self._visited_.append(np.array([item]))
                         self._paths_.append(list(self._visited_))
                         # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
                         yield var[tuple(item)]
@@ -879,22 +923,27 @@ class NestedFinder(object):
                     # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
             
     def find(self, item:typing.Optional[typing.Any]=None, find_value:typing.Optional[bool]=None):
-        """Search item in nesting data structure.
+        """Search for an item in a nesting data structure.
         
-        When find_value is False, item is considered an indexing object (e.g. 
+        A nesting data structure if a collection (sequence or mapping - a dict)
+        that contains other sequnences or dicts nested inside (with arbitrary
+        nesting levels).
+        
+        The searched item can be an indexing object or a value contained in the
+        nesting data structure, as indicated by the 'find_value' parameter.
+        
+        When 'find_value' is False, 'item' is considered an indexing object (e.g. 
         a dict key, int index, ndarray or tuple of ndarrays), and the result is
         a sequence of (path, value) tuples, where:
         
-        * 'path' is a list of indexing objects (or keys) leading from the top 
+        * 'path' is a list of indexing objects leading from the top 
             level to the item's nesting level,
+            
         * 'value' is the nested object that is equal (or identical) to item.
         
-        Oherwise, the function locates the item and returns the indexing path(s)
-        that lead to the nested object(s) with the same value as item (or are
-        the item itself).
-        
-        In both cases, the read-only attributes self.values, self.paths, and 
-        self.result are initialized then updated accordingly.
+        When 'find_value' is True, the function locates the indexing object
+        specified by 'item' and returns the indexing path(s) up to and including
+        'item'.
         
         The function returns a deep copy of self.result. This allows the result
         to be used in other code that may possibly 'consume' it (see, e.g., 
@@ -945,7 +994,8 @@ class NestedFinder(object):
                 same mode as the previous search.
                 
                 Otherwise, the function runs a search for 'item', using 
-                'search by value' mode.
+                'search by value' mode (i.e., as if find_value was passed as 
+                True)
                 
         Returns:
         -------
