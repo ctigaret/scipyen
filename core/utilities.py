@@ -208,14 +208,15 @@ def safe_identity_test(x, y):
         return False
 
 class NestedFinder(object):
-    """Provides searching in deeply nesting data structures.
+    """Provides searching in nesting data structures.
     
-    A deeply nesting data structure is a mapping (dict) or sequence (tuple, 
+    A nesting data structure is a mapping (dict) or sequence (tuple, 
     list, deque) where at least one elements (or value) is another nesting
     data structure (dict, tuple, list, deque).
     
     """
     supported_types = (np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame, pd.Index) # this implicitly includes namedtuple
+    nesting_types = (dict, list, tuple, deque)
     
     def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None,
                  comparator:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=safe_identity_test):
@@ -252,9 +253,11 @@ class NestedFinder(object):
             Then pass fn as comparator parameter to the NestedFinder initializer
         """
         self._paths_ = deque()
-        self._visited_ = deque()
+        self._found_ = deque() # indexing objects visited
         self._result_ = deque()
         self._values_ = deque()
+        self._visited_ = deque() # visited nesting types - to avoid infinite recursion
+        #self._visited_ = set()
         self._data_ = src
         self._item_as_index_ = None
         self._item_as_value_ = None
@@ -283,8 +286,9 @@ class NestedFinder(object):
         """Clears the result and book-keeping queues.
         The comparator function is left unchanged.
         """
-        self._paths_.clear()
         self._visited_.clear()
+        self._paths_.clear()
+        self._found_.clear()
         self._result_.clear()
         self._values_.clear()
         self._item_as_index_ = None
@@ -466,7 +470,7 @@ class NestedFinder(object):
             namedtuple field name
         3. when item is a hashable object it will be used as dict key.
         
-        NOTE: thanks to 
+        NOTE: inspired from code by 
         
         hexerei software
         https://stackoverflow.com/questions/9807634/find-all-occurrences-of-a-key-in-nested-dictionaries-and-lists
@@ -488,58 +492,72 @@ class NestedFinder(object):
         # NOTE: 2021-07-27 10:39:33
         # New parameter optional 'parent' represents the indexing object of the 
         # item's container - necessary to avoid unnecessary trimming of 
-        # self._visited_
+        # self._found_
         
         if var is None:
             var = self.data
             
-        # print("\n%s_gen_search in %s (parent: %s)" % ("".join(["\t"] * ntabs), type(var).__name__, parent), "visited:", self._visited_)
             
-        if isinstance(var, dict): # search inside a dict
-            # print("%sloop through %s members -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
-            for k, v in var.items():
-                self._visited_.append(k)
+        if isinstance(var, NestedFinder.nesting_types) and var not in self._visited_:
+            self._visited_.append(var)
+            
+        #print("\n%s_gen_search in %s (parent: %s)" % ("".join(["\t"] * ntabs), type(var).__name__, parent), "visited:", self._found_)
                 
-                # print("%scheck %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__),"visited:", self._visited_)
+        if isinstance(var, dict): # search inside a dict
+            # print("%sloop through %s members -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
+            for k, v in var.items():
+                if isinstance(v, NestedFinder.nesting_types):
+                    if v in self._visited_:
+                        continue
+                    self._visited_.append(v)
+                
+                # print("%scheck %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__),"visited:", self._found_)
                 if as_index:
                     #if safe_identity_test(k, item): # item should be hashable 
                     if self._comparator_(k, item): # item should be hashable 
-                        self._paths_.append(list(self._visited_))
-                        # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._visited_)
+                        self._found_.append(k)
+                        self._paths_.append(list(self._found_))
+                        # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
+                        #self._visited_.append(v)
                         yield v
                         
                 else:
                     #if safe_identity_test(v, item):
                     if self._comparator_(v, item):
-                        self._paths_.append(list(self._visited_))
-                        # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._visited_)
+                        self._found_.append(k)
+                        self._paths_.append(list(self._found_))
+                        # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
+                        #self._visited_.append(v)
                         yield k
                         
                 if isinstance(v, self.supported_types):
-                    # print("%ssearch inside %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._visited_)
+                    self._found_.append(k)
+                    #self._visited_.append(v)
+                    # print("%ssearch inside %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
                     yield from self._gen_search(v, item, k, as_index)#, ntabs+1) # ntabs for debugging
+                    self._found_.pop()
                     
-                # print("%sNOT FOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._visited_)
+                # print("%sNOT FOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
                 
-                if len(self._visited_):
-                    self._visited_.pop()
-                    # print("%sback up one from %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._visited_)
+                #if len(self._found_):
+                    #self._found_.pop()
+                    # print("%sback up one from %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
                     
-            # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._visited_)
+            # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._found_)
                     
-            if len(self._visited_):
-                #if not parent or parent != self._visited_[-1]:
-                if not parent or not safe_identity_test(parent, self._visited_[-1]):
-                    self._visited_.pop()
-                    # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._visited_)
-             
-        elif isinstance(var, pd.Index):
+            if len(self._found_):
+                #if not parent or parent != self._found_[-1]:
+                if not parent or not safe_identity_test(parent, self._found_[-1]):
+                    self._found_.pop()
+                    # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._found_)
+            
+        elif isinstance(var, pd.Index):#  pd.Index is a leaf collection
             #print("in index")
             if as_index: # expects a tuple of 1D int arrays!
                 if isinstance(item, np.ndarray) and item.ndims == 1:
                     try:
-                        self._visited_.append((item,))
-                        self._paths_.append(list(self._visited_))
+                        self._found_.append((item,))
+                        self._paths_.append(list(self._found_))
                         yield var[item]
                         
                     except:
@@ -550,8 +568,8 @@ class NestedFinder(object):
                         
                 if isinstance(item, (tuple, list)) and len(item) == 1 and isinstance(item[0], np.ndarray) and item[0].ndim==1:
                     try:
-                        self._visited_.append(item)
-                        self._paths_.append(list(self._visited_))
+                        self._found_.append(item)
+                        self._paths_.append(list(self._found_))
                         yield var[item]
                         
                     except:
@@ -565,8 +583,8 @@ class NestedFinder(object):
                     ndx = var == item # should be a boolean ndarray
                     if np.any(ndx):
                         nx = np.nonzero(np.atleast_1d(ndx))
-                        self._visited_.append(nx)
-                        self._paths_.append(list(self._visited_))
+                        self._found_.append(nx)
+                        self._paths_.append(list(self._found_))
                         yield nx # tuple(ndarray(), )
                 except:
                     # NOTE: 2021-07-28 16:32:28
@@ -574,13 +592,13 @@ class NestedFinder(object):
                     traceback.print_exc()
                     pass
                 
-            if len(self._visited_):
-                #if not parent or parent != self._visited_[-1]:
-                if not parent or not safe_identity_test(parent, self._visited_[-1]):
-                    self._visited_.pop()
-                    # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._visited_)
-             
-        elif isinstance(var, (pd.DataFrame, pd.Series)):
+            if len(self._found_):
+                #if not parent or parent != self._found_[-1]:
+                if not parent or not safe_identity_test(parent, self._found_[-1]):
+                    self._found_.pop()
+                    # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._found_)
+            
+        elif isinstance(var, (pd.DataFrame, pd.Series)): # leaf collections
             # TODO: 2021-07-28 14:07:12 TODO
             # searching for values in pandas objects is only trivial with 
             # trivial comparators (such as operator.eq)
@@ -590,94 +608,94 @@ class NestedFinder(object):
                 # it aplies to pandas DataFrame or Series objects; 
                 if isinstance(var, pd.Series):
                     if isinstance(item, (tuple, list)):
-                        #self._visited_.append(item)
+                        #self._found_.append(item)
                         try:
                             v = [var.iloc[ix] if isinstance(ix, (int, slice, range)) else var.loc[ix] for ix in item]
-                            self._visited_.append(item)
-                            self._paths_.append(list(self._visited_))
+                            self._found_.append(item)
+                            self._paths_.append(list(self._found_))
                             yield v
                         except:
                             pass
-                            #self._visited_.pop()
+                            #self._found_.pop()
                         
                         
                     if isinstance(item, (int, slice, range)):
-                        #self._visited_.append(item)
+                        #self._found_.append(item)
                         try:
                             v = var.iloc[item]
-                            self._visited_.append(item)
-                            self._paths_.append(list(self._visited_))
+                            self._found_.append(item)
+                            self._paths_.append(list(self._found_))
                             yield v
                         except:
                             pass
-                            #self._visited_.pop()
+                            #self._found_.pop()
                         
                     else:
-                        #self._visited_.append(item)
+                        #self._found_.append(item)
                         try:
                             v = var.loc[item]
-                            self._visited_.append(item)
-                            self._paths_.append(list(self._visited_))
+                            self._found_.append(item)
+                            self._paths_.append(list(self._found_))
                             yield v
                         except:
                             pass
-                            #self._visited_.pop()
+                            #self._found_.pop()
                         
                 elif isinstance(var, pd.DataFrame):
                     if isinstance(item, list): # list of row, col index pairs - either as int or as row & col index objects
-                        #self._visited_.append(item)
+                        #self._found_.append(item)
                         try:
                             v = [var.iloc[ix[0], ix[1]] if all ([isinstance(i, (int, slice, range)) for i in ix]) else var.loc[ix[0],ix[1]] for ix in item]
-                            self._visited_.append(item)
-                            self._paths_.append(list(self._visited_))
+                            self._found_.append(item)
+                            self._paths_.append(list(self._found_))
                             yield v
                         except:
                             pass
-                            #self._visited_.pop()
+                            #self._found_.pop()
                             
                     elif isinstance(item, tuple): # tuple of row, col indexes - either as int or as row & col index objects
-                        #self._visited_.append(item)
+                        #self._found_.append(item)
                         try: # will raise exception if neither elements in item are valid
                             #print("item", item)
                             v = var.iloc[item[0], item[1]] if all([isinstance(i, (int, slice, range)) for i in item]) else var.loc[item[0], item[1]]
                             #print("v", v)
-                            self._visited_.append(item)
-                            self._paths_.append(list(self._visited_))
+                            self._found_.append(item)
+                            self._paths_.append(list(self._found_))
                             yield v # a pd.DataFrame or a pd.Series!
                         except:
                             traceback.print_exc()
                             pass
-                            #self._visited_.pop()
+                            #self._found_.pop()
                             
                     elif isinstance(item, (int, range,slice)): # int index: for dataframe retrun the item_th row as a pd.Series
-                        #self._visited_.append([item, slice(var.shape[1])]) # => explicit indexing: row, col
+                        #self._found_.append([item, slice(var.shape[1])]) # => explicit indexing: row, col
                         try:
                             v = var.iloc[item,:] # this is a series
-                            self._visited_.append([item, slice(var.shape[1])]) # => explicit (normalized) indexing: row, col
-                            self._paths_.append(list(self._visited_))
+                            self._found_.append([item, slice(var.shape[1])]) # => explicit (normalized) indexing: row, col
+                            self._paths_.append(list(self._found_))
                             yield v # a pd.Series
                         except:
                             try:
                                 v = var.iloc[:,item] # try columns
-                                self._visited_.append([slice(var.shape[0]), item]) # => explicit (normalized) indexing: row, col
-                                self._paths_.append(list(self._visited_))
+                                self._found_.append([slice(var.shape[0]), item]) # => explicit (normalized) indexing: row, col
+                                self._paths_.append(list(self._found_))
                             except:
                                 pass
                         #if item >= 0 and item < len(var):
-                                #self._visited_.pop()
+                                #self._found_.pop()
                             
                     elif isinstance(item, pd.Index): # try to see if the index applies to the dataframe rows; _IF_ it fails, then check columns
                         try:
                             v = var.loc[item,:] # this is now a DataFrame
-                            self._visited_.append([item, var.columns]) # => explicit (normalized) row/col indexing; item is a row ndex
-                            self._paths_.append(list(self._visited_))
+                            self._found_.append([item, var.columns]) # => explicit (normalized) row/col indexing; item is a row ndex
+                            self._paths_.append(list(self._found_))
                             yield v # a pd.DataFrame
                             
                         except:
                             try:
                                 v = var.loc[:,item] # check columns
-                                self._visited_.append([var.index, item]) # => explicit (normalized) row/col indexing; item is a col index
-                                self._paths_.append(list(self._visited_))
+                                self._found_.append([var.index, item]) # => explicit (normalized) row/col indexing; item is a col index
+                                self._paths_.append(list(self._found_))
                                 yield v
                             except:
                                 pass
@@ -707,8 +725,8 @@ class NestedFinder(object):
                             # NOTE: 2021-07-28 15:32:26
                             # this will append a tuple of pandas indices (row ix, col ix)!
                             # treat carefully!
-                            self._visited_.append(nx)
-                            self._paths_.append(list(self._visited_))
+                            self._found_.append(nx)
+                            self._paths_.append(list(self._found_))
                             yield nx
                             
                         else: #check in indices
@@ -717,8 +735,8 @@ class NestedFinder(object):
                                 ndx = var.index == item
                                 if np.any(ndx):
                                     nx = ndx.index[ndx]
-                                    self._visited_.append(nx)
-                                    self._paths_.append(list(self._visited_))
+                                    self._found_.append(nx)
+                                    self._paths_.append(list(self._found_))
                                     yield nx
                                     
                             if isinstance(var, pd.DataFrame):
@@ -726,8 +744,8 @@ class NestedFinder(object):
                                 #print("rowndx", np.any(rowndx))
                                 if np.any(rowndx):# -> row index + all columns
                                     nx = [(ndx.index[ndx.loc[:,c]], var.columns)]
-                                    self._visited_.append(nx)
-                                    self._paths_.append(list(self._visited_))
+                                    self._found_.append(nx)
+                                    self._paths_.append(list(self._found_))
                                     yield nx
                                     
                                 colndx = var.columns == item
@@ -736,9 +754,9 @@ class NestedFinder(object):
                                 if found: # -> all rows, given cols
                                     nx = [(var.index, var.columns[colndx])]
                                     #print("col nx", nx)
-                                    self._visited_.append(nx)
-                                    self._paths_.append(list(self._visited_))
-                                    #print(self._visited_)
+                                    self._found_.append(nx)
+                                    self._paths_.append(list(self._found_))
+                                    #print(self._found_)
                                     #print(self._paths_)
                                     yield nx
                             
@@ -749,15 +767,14 @@ class NestedFinder(object):
                         pass
                             
             #print(parent)
-            #print(self._visited_)
-            if len(self._visited_):
-                #if not parent or parent != self._visited_[-1]:
-                if not parent or not safe_identity_test(parent, self._visited_[-1]):
-                    self._visited_.pop()
+            #print(self._found_)
+            if len(self._found_):
+                #if not parent or parent != self._found_[-1]:
+                if not parent or not safe_identity_test(parent, self._found_[-1]):
+                    self._found_.pop()
         
-        
-        elif isinstance(var, np.ndarray): # search inside an np.ndarray
-            # print("%slookup in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
+        elif isinstance(var, np.ndarray): # leaf collection
+            # print("%slookup in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
             if as_index: # search for value at index
                 # NOTE 1: 2021-07-25 00:02:37
                 #
@@ -785,23 +802,23 @@ class NestedFinder(object):
                     # case (a)
                     if len(var.shape)==0 or var.ndim==0:
                         if item == 0:
-                            self._visited_.append(np.array([item]))
-                            self._paths_.append(list(self._visited_))
-                            # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
+                            self._found_.append(np.array([item]))
+                            self._paths_.append(list(self._found_))
+                            # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
                             yield var[0]
                             
                     elif item < var.shape[0]:
-                        self._visited_.append(np.array([item]))
-                        self._paths_.append(list(self._visited_))
-                        # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
+                        self._found_.append(np.array([item]))
+                        self._paths_.append(list(self._found_))
+                        # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
                         yield var[item] # may yield a subdimensional array
                         
                 elif isinstance(item, (tuple, list)) and all(filter(lambda x: isinstance(x, int) or (isinstance(x, np.ndarray) and x.size==1), item)):
                     # cases (b) and (c)
                     if len(item) == var.ndim:
-                        self._visited_.append(np.array([item]))
-                        self._paths_.append(list(self._visited_))
-                        # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
+                        self._found_.append(np.array([item]))
+                        self._paths_.append(list(self._found_))
+                        # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
                         yield var[tuple(item)]
 
             else: # search for index of value
@@ -825,134 +842,128 @@ class NestedFinder(object):
                                 
                         if np.any(ndx):
                             nx = np.nonzero(np.atleast_1d(ndx))
-                            self._visited_.append(nx)
-                            self._paths_.append(list(self._visited_))
-                            # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
+                            self._found_.append(nx)
+                            self._paths_.append(list(self._found_))
+                            # print("%sFOUND in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
                             yield nx
                     except:
                         pass
                     
-            # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
+            # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
             
             # NOTE: 2021-07-26 17:31:03
             # DO NOT BACK UP ONE HERE: ndarray is a leaf !
-            # upon reaching this point we haven't added anything to self._visited_
+            # upon reaching this point we haven't added anything to self._found_
             # so there's nothing to back up (actually there is from the previous 
             # _gen_search call and popping it out eats out prev outcome)
-            if len(self._visited_):
-                #if not parent or parent != self._visited_[-1]:
-                if not parent or not safe_identity_test(parent, self._visited_[-1]):
-                    self._visited_.pop()
-                    # print("%sback up one in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
+            if len(self._found_):
+                #if not parent or parent != self._found_[-1]:
+                if not parent or not safe_identity_test(parent, self._found_[-1]):
+                    self._found_.pop()
+                    # print("%sback up one in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
                 
         elif NestedFinder.is_namedtuple(var): # search inside a namedtuple
-            # print("%sloop through %s fields -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._visited_)
+            # print("%sloop through %s fields -" % ("".join(["\t"] * ntabs), type(var).__name__, ), "visited:", self._found_)
             for k in var._fields:
                 v = getattr(var, k)
-                self._visited_.append(k)
+                if isinstance(v, NestedFinder.nesting_types):
+                    if v in self._visited_:
+                        continue
+                    self._visited_.append(v)
+                #self._found_.append(k)
                 
-                # print("%scheck %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__), "visited:", self._visited_)
+                # print("%scheck %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__), "visited:", self._found_)
                 if as_index:
                     if k == item:
-                        self._paths_.append(list(self._visited_))
-                        # print("%sFOUND in %s field %s: %s -" % "".join(["\t"] * (ntabs+1)), (type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
+                        self._found_.append(k)
+                        self._paths_.append(list(self._found_))
+                        # print("%sFOUND in %s field %s: %s -" % "".join(["\t"] * (ntabs+1)), (type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
                         yield v
                         
                 else:
                     #if safe_identity_test(v, item):
                     if self._comparator_(v, item):
-                        self._paths_.append(list(self._visited_))
-                        # print("%sFOUND in %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
+                        self._found_.append(k)
+                        self._paths_.append(list(self._found_))
+                        # print("%sFOUND in %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
                         yield k
                         
                 if isinstance(v, self.supported_types):
-                    # print("%ssearch inside %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
+                    self._found_.append(k)
+                    # print("%ssearch inside %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
                     yield from self._gen_search(v, item, k, as_index)#, ntabs+1) # ntabs for debugging
+                    self._found_.pop()
                         
-                # print("%sNOT FOUND in %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
+                # print("%sNOT FOUND in %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
                 
-                if len(self._visited_):
-                    self._visited_.pop()
-                    # print("%sback up one from %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
+                #if len(self._found_):
+                    #self._found_.pop()
+                    # print("%sback up one from %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
                 
-            # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
+            # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
 
             # not needed !?!
-            if len(self._visited_):
-                #if not parent or parent != self._visited_[-1]:
-                if not parent or not safe_identity_test(parent, self._visited_[-1]):
-                    self._visited_.pop()
-                    # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
+            if len(self._found_):
+                #if not parent or parent != self._found_[-1]:
+                if not parent or not safe_identity_test(parent, self._found_[-1]):
+                    self._found_.pop()
+                    # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
             
         elif isinstance(var, (list, tuple, deque)): # search inside a sequence other that any of the above
-            # print("%sloop through %s elements -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
+            # print("%sloop through %s elements -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
             for k, v in enumerate(var):
-                self._visited_.append(k)
+                if isinstance(v, NestedFinder.nesting_types):
+                    if v in self._visited_:
+                        continue
+                    self._visited_.append(v)
+                #self._found_.append(k)
                 
-                # print("%scheck %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__), "visited:", self._visited_)
+                # print("%scheck %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__), "visited:", self._found_)
                 if as_index:
                     if k == item:
-                        self._paths_.append(list(self._visited_))
-                        # print("%sFOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
+                        self._found_.append(k)
+                        self._paths_.append(list(self._found_))
+                        # print("%sFOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
                         yield v
                         
                 else:
                     #if safe_identity_test(v, item):
                     if self._comparator_(v, item):
-                        self._paths_.append(list(self._visited_))
-                        # print("%sFOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
+                        self._found_.append(k)
+                        self._paths_.append(list(self._found_))
+                        # print("%sFOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
                         yield k
                         
                 if isinstance(v, self.supported_types):
-                    # print("%ssearch inside %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
+                    self._found_.append(k)
+                    # print("%ssearch inside %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
                     yield from self._gen_search(v, item, k, as_index)#, ntabs+1) # ntabs for debugging
+                    self._found_.pop()
                     
-                # print("%sNOT FOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
+                # print("%sNOT FOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
                 
-                if len(self._visited_):
-                    self._visited_.pop()
-                    # print("%sback up one from %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._visited_)
+                #if len(self._found_):
+                    #self._found_.pop()
+                    # print("%sback up one from %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
                 
-            # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
+            # print("%sNOT FOUND inside %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
 
             # not needed !?!
-            if len(self._visited_):
-                # if not parent or parent != self._visited_[-1]:
-                if not parent or not safe_identity_test(parent, self._visited_[-1]):
-                    self._visited_.pop()
-                    # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._visited_)
+            if len(self._found_):
+                # if not parent or parent != self._found_[-1]:
+                if not parent or not safe_identity_test(parent, self._found_[-1]):
+                    self._found_.pop()
+                    # print("%sback up one from %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
             
     def find(self, item:typing.Optional[typing.Any]=None, find_value:typing.Optional[bool]=None):
-        """Search for an item in a nesting data structure.
+        """Search for 'item' in a nesting data structure.
         
         A nesting data structure if a collection (sequence or mapping - a dict)
         that contains other sequnences or dicts nested inside (with arbitrary
         nesting levels).
         
-        The searched item can be an indexing object or a value contained in the
-        nesting data structure, as indicated by the 'find_value' parameter.
-        
-        When 'find_value' is False, 'item' is considered an indexing object (e.g. 
-        a dict key, int index, ndarray or tuple of ndarrays), and the result is
-        a sequence of (path, value) tuples, where:
-        
-        * 'path' is a list of indexing objects leading from the top 
-            level to the item's nesting level,
-            
-        * 'value' is the nested object that is equal (or identical) to item.
-        
-        When 'find_value' is True, the function locates the indexing object
-        specified by 'item' and returns the indexing path(s) up to and including
-        'item'.
-        
-        The function returns a deep copy of self.result. This allows the result
-        to be used in other code that may possibly 'consume' it (see, e.g., 
-        self.get).
-        
-        See also the contrived example at the end of this docstring.
-        
-        Parameters:
-        -----------
+        Parameters (for Usage, see below):
+        ----------------------------------
         
         item: object of the search (optional, default is None)
             When None, the function re-runs the last search. 
@@ -1020,8 +1031,189 @@ class NestedFinder(object):
             
         * 'value' is the object found at the index that was looked up ('item')
         
-        Examples:
-        --------
+        Usage:
+        ------
+        
+        Searching can be perfomred in two modes:
+        
+        1) 'search-by-value'
+        
+        To find the index branch path of a value inside the nesting data:
+        
+        * pass the value as 'item', and optionally specify 'find_value' as True
+        
+        * the method returns a collection (deque) of indexing paths from the 
+        top level to the 'leaf' index where 'item' was found
+        
+        2) 'search-by-index-or-key'
+        
+        To find values at a given index (or indexing object) inside ALL the 
+            collections contained in the nesting data structure:
+        
+        * pass the index as 'item' and specify 'find_value' as False. 
+        
+        * the method returns a collection (deque) of ('path', 'value') pairs,
+            where:
+            * 'path' is the indexing path from the top level to the index
+            specfied by 'item' (if found, and if appropriate)
+        
+            * 'value' is the object found at 'item' index in each of the 
+            collections contained inside the nesting data structure.
+            
+        To split out the index branch path the correspondng vales in two 
+        sequences (tuples), use the idiom:
+        
+            paths, values = zip(*ret) 
+        
+        where 'ret' is the return value of this method.
+        
+        The indexing object:
+        -------------------------------
+        An indexing object is any python object that can be used for subscript-
+        or key-based access, as follows:
+        
+        a) a hashable object usable as dict key
+        
+        b) int, range, slice - for indexing into sequences and pandas.Index objects
+        
+        c) a str - used as dict key, or as field name in a named tuple
+        
+        d) pandas Index object - for use with pandas Series and DataFrame objects
+        
+        e) numpy ndarray with integer elements - for indexing in numpy ndarrays
+        
+        f) a tuple of the above as appropriate
+        
+        The nesting data structure
+        --------------------------
+        This is a collection containing other collections as elements. These 
+        'nested' collections can themselves contain other nested collections, 
+        and so on to an arbitrary level.
+        
+        The tables below describe what python types are considered nesting data
+        structures, leaf, and nested data types, and the type of indexing objects
+        by convention accepted here, with brief notes about their use internally.
+        
+        Nesting data types are collections where the search is performed recursively;
+        they can be nested inside a parent nesting data.
+        
+        Nesting data type           Indexing object type
+        -------------------------------------------------
+        dict (and subclasses)       Hashable object that can be used as a key
+                                    (including but not limited to int, str)
+                                     
+        list, tuple, deque          int, range, slice
+        
+        namedtuple                  int, range, slice - as for tuple
+                                    str - for named field attribute-like access
+        
+        The following data types, although they are specialized collection types, 
+        are considered as 'leaf' objects: no recursive search is performed inside
+        their elements.
+        
+        'Leaf' data type            Indexing object type
+        ------------------------------------------------
+        numpy ndarray               indexing array (numpy ndarray with int or bool 
+                                    elements)
+                                    tuple of indexing arrays (with length matching
+                                    that of the array's shape)
+                                    
+        pandas.Index                int, range, slice, 
+                                    indexing array (as for 1D numpy ndarray)
+        
+        pandas.Series               pandas.Index (via Series.loc)     
+                                    int, range, slice (via Series.iloc property)
+                                    
+        pandas.DataFrame            (rows, cols) pair of pandas.Index objects 
+                                        (via DataFrame.loc)
+                                    tuple of int, range, slice (row, cols)
+                                        (via DataFrame.iloc)
+                                        
+        NOTE: Numpy ndarray objects also accept imple indexing via int, range, 
+            slice; however, for numpy arrays, the finder returns "canonical" 
+            indexing arrays as described above.
+        
+        
+        WARNING: circular nesting is not supported - i.e., nesting where an inner
+        collection is a reference to one of its parents. Using data with 
+        circular nesting will generate runaway iterations and crash the interpreter
+        
+        Indexing path:
+        --------------
+        This is a sequence (deque) of indexing objects as above, representing 
+        the 'tree' path from the top level nesting data (root) to the "leaf"; 
+        the root is excluded from the path.
+        
+        To illustrate, given a dict dd as below:
+        
+        dd = {"a":1, "b":{"c":2}, "c":[1,2,3]}
+        
+        1) Finding items with a given value:
+        
+        Elements with value 1 are found at the following paths:
+        
+        ["a"] and ["c", 0]
+        
+            NestedFinder(dd).find(1) --> deque([['a'], ['c', 0]])
+        
+        Elements with value 2 are found at the following paths:
+        ["b", "c"] and ["c", 1]
+        
+            NestedFinder(dd).find(2) --> deque([['b', 'c'], ['c', 1]])
+            
+        An element with value 3 is found at ["c",2]:
+        
+            NestedFinder(dd).find(3) --> deque([['c', 2]])
+        
+        
+        Furthermore: 
+        
+            NestedFinder(dd).find([1,2,3]) --> deque([['c']])
+            
+            NestedFinder(dd).find({"c":2}) --> deque([['b']])
+        
+        However:
+        
+            NestedFinder(dd).find({"c":1}) --> deque([]) # i.e., not found!
+            
+            NestedFinder(dd).find(4) --> deque([]) # i.e., not found!
+        
+        
+            NestedFinder(dd).find("c") --> deque([]) # i.e., not found!
+            
+        
+        2) Finding values given an index:
+            
+            NestedFinder(dd).find("c", False) 
+            
+            --> deque([(['b', 'c'], 2), (['c'], [1, 2, 3])])
+            
+            (compare with the previous example)
+            
+            Capture paths and values separately:
+            
+            paths, values  = zip(*NestedFinder(dd).find("c", False))
+            
+            paths 
+            --> (['b', 'c'], ['c'])
+            
+            values 
+            --> (2, [1, 2, 3])
+            
+        Finally, the last search (with its search mode) can be re-run by 
+        calling 'find' without parameters.
+            
+        
+        In either search mode (1) or (2) a deep copy of the collection of indexing
+        paths can be obtained as the NestedFinder object's property "paths".
+        
+        This can be used as the 'paths' parameter for the static method
+        NestedFinder.getvalue and the instance method NestedFinder.get.
+        
+        WARNING: Both of these methods will 'consume' the 'paths' parameter 
+        and therefore this collection should be treated as volatile.
+        
+        See also more contrived example below.
         
         Preamble:
         ---------

@@ -150,14 +150,20 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
     1. Support for custom context menu to pyqtgraph.DataTreeWidget.
     2. Uses ScipyenTableWidget instead of pyqtgraph.TableWidget
     3. Support dict data with a mixture of key types (any hashable object)
+    
+    TODO: Code to avoid cyclic recursion for nested references to existing objects
     """
     def __init__(self, *args, **kwargs):
+        self._visited_ = set()
         super(InteractiveTreeWidget, self).__init__(*args, **kwargs)
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.headerItem().setToolTip(0, "Key or index of child data.\nThe type of the key or index is shown in their tooltip.")
         self.headerItem().setToolTip(1, "Type of child data mapped to a key or index.\nAdditional type information is shown in their tooltip.")
         self.headerItem().setToolTip(2, "Value of child data, or its length\n(when data is a nested collection).\nNumpy arrays ar displayed as a table")
         
+    #def setData(self, data):
+        #self._visited_.add(id(data))
+        #super().setData(data)
     
     def parse(self, data):
         """
@@ -179,6 +185,7 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
         from pyqtgraph.pgcollections import OrderedDict
         from pyqtgraph.python2_3 import asUnicode
         from core.datatypes import is_namedtuple
+        
 
         # defaults for all objects
         typeStr = type(data).__name__
@@ -307,13 +314,18 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
         # record the path to the node so it can be retrieved later
         # (this is used by DiffTreeWidget)
         self.nodes[path] = node
+        
+        #if id(data) in self._visited_:
+            #print([n for n in self.nodes])
+            ##desc = "/".join([n.text() for n in self.nodes])
+            #return
 
         typeStr, desc, childs, widget, typeTip = self.parse(data)
         node.setToolTip(0, nameTip)
         node.setText(1, typeStr)
         node.setToolTip(1, typeTip)
         node.setText(2, desc)
-            
+        
         # Truncate description and add text box if needed
         if len(desc) > 100:
             desc = desc[:97] + '...'
@@ -393,73 +405,73 @@ class DataViewer(ScipyenViewer):
         
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
         
-    def _recursive_traverse_(self, x):
-        """DEPRECATED Ensure np.ndarrays have at least 1D
-        This is in order to avoid errors from iterFirstAxis in TableWidget.
-        """
-        from core.traitcontainers import DataBag
+    #def _recursive_traverse_(self, x):
+        #"""DEPRECATED Ensure np.ndarrays have at least 1D
+        #This is in order to avoid errors from iterFirstAxis in TableWidget.
+        #"""
+        #from core.traitcontainers import DataBag
         
-        if isinstance(x, DataBag):
-            obs = object.__getattribute__(x, "__observer__")
-            ret = dict()
-            for key in x.traits().keys():
-                if key not in DataBagTraitsObserver.hidden_traits:
-                    ret[key] = self._recursive_traverse_(x[key])
+        #if isinstance(x, DataBag):
+            #obs = object.__getattribute__(x, "__observer__")
+            #ret = dict()
+            #for key in x.traits().keys():
+                #if key not in DataBagTraitsObserver.hidden_traits:
+                    #ret[key] = self._recursive_traverse_(x[key])
                     
-            return ret
+            #return ret
         
-        elif isinstance(x, (tuple, list)):
-            return [self._recursive_traverse_(v) for v in x]
+        #elif isinstance(x, (tuple, list)):
+            #return [self._recursive_traverse_(v) for v in x]
             
-        elif isinstance(x, np.ndarray):
-            if len(x.shape) == 0:
-                return np.atleast_1d(x)
+        #elif isinstance(x, np.ndarray):
+            #if len(x.shape) == 0:
+                #return np.atleast_1d(x)
             
-            else:
-                return x
+            #else:
+                #return x
             
-        elif isinstance(x, dict):
-            ret = dict()
-            for key in x.keys():
-                #print("key", key, "value:", x[key])
-                if isinstance(x[key], dict):
-                    ret[key] = self._recursive_traverse_(x[key])
+        #elif isinstance(x, dict):
+            #ret = dict()
+            #for key in x.keys():
+                ##print("key", key, "value:", x[key])
+                #if isinstance(x[key], dict):
+                    #ret[key] = self._recursive_traverse_(x[key])
                     
-                elif isinstance(x[key], np.ndarray):
-                    if len(x[key].shape) == 0:
-                        ret[key] = np.atleast_1d(x[key])
+                #elif isinstance(x[key], np.ndarray):
+                    #if len(x[key].shape) == 0:
+                        #ret[key] = np.atleast_1d(x[key])
                         
-                elif isinstance(x[key], (tuple, list)):
-                    val = list()
-                    for v in x[key]:
-                        if isinstance(v, np.ndarray):
-                            if len(v.shape) == 0:
-                                val.append(np.atleast_1d(v))
+                #elif isinstance(x[key], (tuple, list)):
+                    #val = list()
+                    #for v in x[key]:
+                        #if isinstance(v, np.ndarray):
+                            #if len(v.shape) == 0:
+                                #val.append(np.atleast_1d(v))
                                 
-                            else:
-                                val.append(v)
+                            #else:
+                                #val.append(v)
                                 
                                 
-                        else:
-                            val.append(self._recursive_traverse_(v))
+                        #else:
+                            #val.append(self._recursive_traverse_(v))
                                 
-                    if isinstance(x[key], tuple):
-                        ret[key] = tuple(val)
+                    #if isinstance(x[key], tuple):
+                        #ret[key] = tuple(val)
                         
-                    else:
-                        ret[key] = val
+                    #else:
+                        #ret[key] = val
 
-                else:
-                    ret[key] = self._recursive_traverse_(x[key])
+                #else:
+                    #ret[key] = self._recursive_traverse_(x[key])
                     
-            return ret
+            #return ret
         
-        else:
-            if hasattr(x, "__dict__"):
-                return self._recursive_traverse_(getattr(x, "__dict__"))
+        #else:
+            #if hasattr(x, "__dict__"):
+                #return self._recursive_traverse_(getattr(x, "__dict__"))
                 
-            else:
-                return x # all builtin types lack __dict__
+            #else:
+                #return x # all builtin types lack __dict__
             
     def _set_data_(self, data:object, *args, **kwargs):
         """
