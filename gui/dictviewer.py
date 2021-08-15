@@ -45,6 +45,8 @@ from core.workspacefunctions import validate_varname
 
 #from core.utilities import (get_nested_value, set_nested_value, counter_suffix, )
 
+from core.utilities import NestedFinder
+
 from core.prog import (safeWrapper, safeGUIWrapper, )
 
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
@@ -144,28 +146,40 @@ class ScipyenTableWidget(TableWidget): # TableWidget imported from pyqtgraph
             for i in range(data.shape[0]):
                 yield data[i]
 
-class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqtgraph
-    """Extends pyqtgraph.widgets.DataTreeWidget
-    adds the following:
+class InteractiveTreeWidget(DataTreeWidget):
+    """Extends pyqtgraph.widgets.DataTreeWidget with the following:
     1. Support for custom context menu to pyqtgraph.DataTreeWidget.
-    2. Uses ScipyenTableWidget instead of pyqtgraph.TableWidget
-    3. Support dict data with a mixture of key types (any hashable object)
+    2. Use Scipyen gui.tableeditor.TableEditorWidget instead of pyqtgraph.TableWidget
+    3. Support for dict data with a mixture of key types (any hashable object)
+    4. Support for circular references to hierarchical data objects (subsequent
+        references ot the same object are NOT traversed; instead, a path to the 
+        first encountered reference - in depth-first order - is displayed)
     
-    TODO: Code to avoid cyclic recursion for nested references to existing objects
     """
     def __init__(self, *args, **kwargs):
-        self._visited_ = set()
+        #self._visited_ = list()
+        self._visited_ = dict()
+        self.top_title = "/"
         super(InteractiveTreeWidget, self).__init__(*args, **kwargs)
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.headerItem().setToolTip(0, "Key or index of child data.\nThe type of the key or index is shown in their tooltip.")
         self.headerItem().setToolTip(1, "Type of child data mapped to a key or index.\nAdditional type information is shown in their tooltip.")
         self.headerItem().setToolTip(2, "Value of child data, or its length\n(when data is a nested collection).\nNumpy arrays ar displayed as a table")
         
-    #def setData(self, data):
-        #self._visited_.add(id(data))
-        #super().setData(data)
+    def setData(self, data, top_title:str = ""):
+        self._visited_.clear()
+        if len(top_title.strip()) == 0:
+            self.top_title = "/"
+        else:
+            self.top_title = top_title
+        super().setData(data)
+        #print(self.topLevelItemCount())
+        #if self.topLevelItemCount() > 1 or len(top_title.strip()) == 0:
+            #top_title = "/"
+        self.topLevelItem(0).setText(0, self.top_title)
+        #self.top_title = top_title
     
-    def parse(self, data):
+    def parse(self, data):#, visited=False):
         """
         Given any python object, return:
         * type
@@ -202,28 +216,42 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
         childs = {}
         
         # type-specific changes
-        if isinstance(data, dict):
-            desc = "length=%d" % len(data)
-            if isinstance(data, OrderedDict):
-                childs = data
-                
+        if isinstance(data, NestedFinder.nesting_types):
+            if id(data) in self._visited_.keys():
+                #print(self._visited_[id(data)])
+                objtype = self._visited_[id(data)][0]
+                path = "/".join(list(self._visited_[id(data)][1]))
+                if len(path.strip()) == 0:
+                    full_path = self.top_title
+                else:
+                    if self.top_title == "/":
+                        full_path = "/" + path
+                    else:
+                        full_path = "/".join([self.top_title, path])
+                desc = "<reference to %s at %s >" % (objtype, full_path)
             else:
-                #childs = OrderedDict(sorted(data.items())) # does not support mixed key types!
-                # NOTE: 2021-07-20 09:52:34
-                # dict objects with mixed key types cannot be sorted
-                # therefore we resort to an indexing vector
-                ndx = [i[1] for i in sorted((str(k[0]), k[1]) for k in zip(data.keys(), range(len(data))))]
-                items = [i for i in data.items()]
-                childs = OrderedDict([items[k] for k in ndx])
-                
-        elif isinstance(data, (list, tuple)):
-            desc = "length=%d" % len(data)
-            # NOTE: 2021-07-24 14:57:02
-            # accommodate namedtuple types
-            if is_namedtuple(data):
-                childs = data._asdict()
-            else:
-                childs = OrderedDict(enumerate(data))
+                if isinstance(data, dict):
+                    desc = "length=%d" % len(data)
+                    if isinstance(data, OrderedDict):
+                        childs = data
+                        
+                    else:
+                        #childs = OrderedDict(sorted(data.items())) # does not support mixed key types!
+                        # NOTE: 2021-07-20 09:52:34
+                        # dict objects with mixed key types cannot be sorted
+                        # therefore we resort to an indexing vector
+                        ndx = [i[1] for i in sorted((str(k[0]), k[1]) for k in zip(data.keys(), range(len(data))))]
+                        items = [i for i in data.items()]
+                        childs = OrderedDict([items[k] for k in ndx])
+                        
+                elif isinstance(data, (list, tuple, deque)):
+                    desc = "length=%d" % len(data)
+                    # NOTE: 2021-07-24 14:57:02
+                    # accommodate namedtuple types
+                    if is_namedtuple(data):
+                        childs = data._asdict()
+                    else:
+                        childs = OrderedDict(enumerate(data))
             
         elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
             childs = OrderedDict([
@@ -282,7 +310,7 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
         # shown by DataViewer, or by _docTitle_, hence it is always a str
         #
         # Child nodes are either dict keys, or int indices in iterables; this 
-        # can lead to confusion e..g, between different types of dict keys that 
+        # can lead to confusion e.g., between different types of dict keys that 
         # are represented by similar str for display purpose.
         #
         # For example, a dict key "2" (a str) and a dict key 2 (an int) are both
@@ -305,6 +333,15 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
         # The only exception to this is the root node where the "name" is always
         # "str"
         
+        # NOTE: 2021-08-15 14:43:54
+        # node is a QTreeWidgetItem constructed on three strings, each one to
+        # be displayed in its corresponding column, as follows:
+        # string 0 -> "key/index" column: 'name' (displayed key or index)
+        # string 1 -> "type"      column: data type
+        # string 2 -> "value"     column: a description string:
+        #                           length (for collections)
+        #                           value  (for str)
+        #                           etc
         if hideRoot:
             node = parent
         else:
@@ -313,19 +350,24 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
         
         # record the path to the node so it can be retrieved later
         # (this is used by DiffTreeWidget)
+        
+        # NOTE: 2021-08-15 14:41:32
+        # self.nodes is a dict
+        # path is a tuple (as index branch path) - this is hashable hence usable
+        # as dict key
         self.nodes[path] = node
         
-        #if id(data) in self._visited_:
-            #print([n for n in self.nodes])
-            ##desc = "/".join([n.text() for n in self.nodes])
-            #return
-
         typeStr, desc, childs, widget, typeTip = self.parse(data)
+        
         node.setToolTip(0, nameTip)
         node.setText(1, typeStr)
         node.setToolTip(1, typeTip)
         node.setText(2, desc)
         
+        if isinstance(data, NestedFinder.nesting_types):
+            if id(data) not in self._visited_.keys():
+                self._visited_[id(data)] = (typeStr, path)
+            
         # Truncate description and add text box if needed
         if len(desc) > 100:
             desc = desc[:97] + '...'
@@ -349,9 +391,17 @@ class InteractiveTreeWidget(DataTreeWidget): # DataTreeWidget imported from pyqt
 
         
 class DataViewer(ScipyenViewer):
-    """Viewer for hierarchical collection types: (nested) dictionaries, lists, arrays
-    Uses InteractiveTreeWidget which inherits from pyqtgraph DataTreeWidget 
+    """Viewer for hierarchical (nesting) collection types.
+    These can be: (nested) dictionaries, lists, tuples.
+    Numpy arrays and pandas data types, although collection data types, are
+    considered "leaf" objects.
+    
+    Changelog:
+    ---------
+    2019: Uses InteractiveTreeWidget which inherits from pyqtgraph DataTreeWidget 
     and in turn inherits from QTreeWidget.
+    2021-08-15 22:51:43: support for circular references to hierarchical data types
+        e.g., a dict can contain a key mapped to itself
     """
     sig_activated = pyqtSignal(int)
     closeMe  = pyqtSignal(int)
@@ -405,74 +455,6 @@ class DataViewer(ScipyenViewer):
         
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
         
-    #def _recursive_traverse_(self, x):
-        #"""DEPRECATED Ensure np.ndarrays have at least 1D
-        #This is in order to avoid errors from iterFirstAxis in TableWidget.
-        #"""
-        #from core.traitcontainers import DataBag
-        
-        #if isinstance(x, DataBag):
-            #obs = object.__getattribute__(x, "__observer__")
-            #ret = dict()
-            #for key in x.traits().keys():
-                #if key not in DataBagTraitsObserver.hidden_traits:
-                    #ret[key] = self._recursive_traverse_(x[key])
-                    
-            #return ret
-        
-        #elif isinstance(x, (tuple, list)):
-            #return [self._recursive_traverse_(v) for v in x]
-            
-        #elif isinstance(x, np.ndarray):
-            #if len(x.shape) == 0:
-                #return np.atleast_1d(x)
-            
-            #else:
-                #return x
-            
-        #elif isinstance(x, dict):
-            #ret = dict()
-            #for key in x.keys():
-                ##print("key", key, "value:", x[key])
-                #if isinstance(x[key], dict):
-                    #ret[key] = self._recursive_traverse_(x[key])
-                    
-                #elif isinstance(x[key], np.ndarray):
-                    #if len(x[key].shape) == 0:
-                        #ret[key] = np.atleast_1d(x[key])
-                        
-                #elif isinstance(x[key], (tuple, list)):
-                    #val = list()
-                    #for v in x[key]:
-                        #if isinstance(v, np.ndarray):
-                            #if len(v.shape) == 0:
-                                #val.append(np.atleast_1d(v))
-                                
-                            #else:
-                                #val.append(v)
-                                
-                                
-                        #else:
-                            #val.append(self._recursive_traverse_(v))
-                                
-                    #if isinstance(x[key], tuple):
-                        #ret[key] = tuple(val)
-                        
-                    #else:
-                        #ret[key] = val
-
-                #else:
-                    #ret[key] = self._recursive_traverse_(x[key])
-                    
-            #return ret
-        
-        #else:
-            #if hasattr(x, "__dict__"):
-                #return self._recursive_traverse_(getattr(x, "__dict__"))
-                
-            #else:
-                #return x # all builtin types lack __dict__
-            
     def _set_data_(self, data:object, *args, **kwargs):
         """
         Display new data
@@ -489,12 +471,12 @@ class DataViewer(ScipyenViewer):
         if data is not self._data_:
             self._data_ = data
             
-            self.treeWidget.setData(self._data_)
-            
             top_title = self._docTitle_ if (isinstance(self._docTitle_, str) and len(self._docTitle_.strip())) else "/"
             
-            if self.treeWidget.topLevelItemCount() == 1:
-                self.treeWidget.topLevelItem(0).setText(0, top_title)
+            self.treeWidget.setData(self._data_, top_title)
+            
+            #if self.treeWidget.topLevelItemCount() == 1:
+                #self.treeWidget.topLevelItem(0).setText(0, top_title)
                 
             for k in range(self.treeWidget.topLevelItemCount()):
                 self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
@@ -506,12 +488,12 @@ class DataViewer(ScipyenViewer):
     @pyqtSlot()
     @safeWrapper
     def slot_refreshDataDisplay(self):
-        self.treeWidget.setData(self._data_)
-
         top_title = self._docTitle_ if (isinstance(self._docTitle_, str) and len(self._docTitle_.strip())) else "/"
         
-        if self.treeWidget.topLevelItemCount() == 1:
-            self.treeWidget.topLevelItem(0).setText(0, top_title)
+        self.treeWidget.setData(self._data_, top_title)
+
+        #if self.treeWidget.topLevelItemCount() == 1:
+            #self.treeWidget.topLevelItem(0).setText(0, top_title)
             
         for k in range(self.treeWidget.topLevelItemCount()):
             self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
@@ -590,7 +572,7 @@ class DataViewer(ScipyenViewer):
         if len(items) == 0:
             return
         
-        if isinstance(self._data_, (dict, tuple, list)):
+        if isinstance(self._data_, NestedFinder.nesting_types):
             item_paths = list()
             
             for item in items:
@@ -748,6 +730,8 @@ class DataViewer(ScipyenViewer):
     
     @safeWrapper
     def _export_data_items_(self, items, fullPathAsName=False):
+        # TODO: 2021-08-15 22:55:45
+        # Use NestedFinder.getvalue()
         from core.utilities import get_nested_value
         if self._scipyenWindow_ is None:
             return
@@ -800,22 +784,6 @@ class DataViewer(ScipyenViewer):
                             
                         self._scipyenWindow_.assignToWorkspace(newVarName, value, from_console=False)
         
-    #def _collapseRecursive_(self, item, current=True):
-        #if item.childCount():
-            #for k in range(item.childCount()):
-                #self._collapseRecursive_(item.child(k))
-                
-        #if current:
-            #self.treeWidget.collapseItem(item)
-            
-    #def _expandRecursive_(self, item, current=True):
-        #if item.childCount():
-            #for k in range(item.childCount()):
-                #self._expandRecursive_(item.child(k))
-                
-        #if current:
-            #self.treeWidget.expandItem(item)
-            
     def _collapse_expand_Recursive(self, item, expand=False, current=True):
         if expand:
             fn = self.treeWidget.expandItem
@@ -828,20 +796,3 @@ class DataViewer(ScipyenViewer):
         if current:
             fn(item)
         
-        
-    #def loadSettings(self):
-        ## NOTE: 2021-07-08 09:52:11
-        ## loadWindowSettings is inheritd from ScipyenViewer and does nothing if
-        ## self.parent() is not Scipyen's main window
-        #self.loadWindowSettings() # inherited from ScipyenViewer
-        #self.loadViewerSettings()
-        
-    #def loadViewerSettings(self):
-        #pass
-            
-    #def saveSettings(self):
-        #self.saveWindowSettings() # inherited from ScipyenViewer
-        #self.saveViewerSettings()
-        
-    #def saveViewerSettings(self):
-        #pass
