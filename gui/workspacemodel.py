@@ -993,6 +993,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 # 3. clears self.deleted_vars
                 self.pre_execute()
                 
+                # NOTE: 2021-08-16 10:15:20
+                # needed to take into account bindings created outside console?
+                self.post_execute()
+                
                 # variables DELETED from workspace or MODIFIED by code executed 
                 # outside the console
                 for varname in displayed_vars_types:

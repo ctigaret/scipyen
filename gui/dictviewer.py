@@ -62,6 +62,14 @@ from . import resources_rc
 #### END pict.gui modules
 
 class ScipyenTableWidget(TableWidget): # TableWidget imported from pyqtgraph
+    """Another simple table widget, which allows zero-based row/column indices.
+    
+    Really DEPRECATED.
+    
+    Kept for diversity and inclusion but gui.tableeditor.TableEditorWidget is
+    much more useful. 
+    
+    """
     def __init__(self, *args, natural_row_index=False, natural_col_index=False, **kwds):
         self._pythonic_col_index = not natural_col_index
         self._pythonic_row_index = not natural_row_index
@@ -157,7 +165,6 @@ class InteractiveTreeWidget(DataTreeWidget):
     
     """
     def __init__(self, *args, **kwargs):
-        #self._visited_ = list()
         self._visited_ = dict()
         self.top_title = "/"
         super(InteractiveTreeWidget, self).__init__(*args, **kwargs)
@@ -261,34 +268,50 @@ class InteractiveTreeWidget(DataTreeWidget):
             
         elif isinstance(data, pd.DataFrame):
             desc = "length=%d, columns=%d" % (len(data), len(data.columns))
-            model = TabularDataModel()
-            table = TableEditorWidget(model, self)
-            signalBlocker = QtCore.QSignalBlocker(table.tableView)
-            table.tableView.model().setModelData(data)
-            table.setMaximumHeight(200)
-            widget = table
+            #model = TabularDataModel()
+            #table = TableEditorWidget(model, self)
+            #widget = table
+            widget = TableEditorWidget(parent=self)
+            signalBlocker = QtCore.QSignalBlocker(widget.tableView)
+            widget.tableView.model().setModelData(data)
+            widget.setMaximumHeight(200)
+            widget.readOnly=True
             
         elif isinstance(data, pd.Series):
             desc = "length=%d, dtype=%s" % (len(data), data.dtype)
-            model = TabularDataModel()
-            table = TableEditorWidget(model, self)
-            signalBlocker = QtCore.QSignalBlocker(table.tableView)
-            table.tableView.model().setModelData(data)
-            table.setMaximumHeight(200)
-            widget = table
+            #model = TabularDataModel()
+            #table = TableEditorWidget(model, self)
+            #widget = table
+            widget = TableEditorWidget(parent=self)
+            signalBlocker = QtCore.QSignalBlocker(widget.tableView)
+            widget.tableView.model().setModelData(data)
+            widget.setMaximumHeight(200)
+            widget.readOnly=True
             
         elif isinstance(data, pd.Index):
             desc = "length=%d" % len(data)
-            widget = QtGui.QPlainTextEdit(asUnicode(data))
+            widget = TableEditorWidget(parent=self)
+            signalBlocker = QtCore.QSignalBlocker(widget.tableView)
+            widget.tableView.model().setModelData(data)
             widget.setMaximumHeight(200)
-            widget.setReadOnly(True)
+            widget.readOnly=True
+            
+            #widget = QtGui.QPlainTextEdit(asUnicode(data))
+            #widget.setMaximumHeight(200)
+            #widget.setReadOnly(True)
             
         elif isinstance(data, np.ndarray):
             desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
-            table = ScipyenTableWidget()
-            table.setData(data)
-            table.setMaximumHeight(200)
-            widget = table
+            widget = TableEditorWidget(parent=self)
+            signalBlocker = QtCore.QSignalBlocker(widget.tableView)
+            widget.tableView.model().setModelData(data)
+            widget.setMaximumHeight(200)
+            widget.readOnly=True
+            
+            #table = ScipyenTableWidget()
+            #table.setData(data)
+            #table.setMaximumHeight(200)
+            #widget = table
             
         elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
             frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
@@ -545,16 +568,16 @@ class DataViewer(ScipyenViewer):
         cm = QtWidgets.QMenu("Data operations", self)
         cm.setToolTipsVisible(True)
         
-        copyItemData = cm.addAction("Copy to workspace")
-        copyItemData.setToolTip("Copy item data to workspace (SHIFT to assign full path as name)")
-        copyItemData.setStatusTip("Copy item data to workspace (SHIFT to assign full path as name)")
-        copyItemData.setWhatsThis("Copy item data to workspace (SHIFT to assign full path as name)")
+        copyItemData = cm.addAction("Copy value(s) to workspace")
+        copyItemData.setToolTip("Copy value(s) to workspace (SHIFT to assign full path as name)")
+        copyItemData.setStatusTip("Copy value(s) to workspace (SHIFT to assign full path as name)")
+        copyItemData.setWhatsThis("Copy value(s) to workspace (SHIFT to assign full path as name)")
         copyItemData.triggered.connect(self.slot_exportItemDataToWorkspace)
         
         copyItemPath = cm.addAction("Copy path(s)")
         copyItemPath.triggered.connect(self.slot_copyPaths)
         
-        sendToConsole = cm.addAction("Send data path to console")
+        sendToConsole = cm.addAction("Send path(s) to console")
         sendToConsole.triggered.connect(self.slot_exportItemPathToConsole)
         
         viewItemData = cm.addAction("View")
@@ -565,6 +588,34 @@ class DataViewer(ScipyenViewer):
         
         cm.popup(self.treeWidget.mapToGlobal(point), copyItemData)
         
+    #@safeWrapper
+    #def getSelectedPathsExpr(self):
+        #items = self.treeWidget.selectedItems()
+        
+        #if len(items) == 0:
+            #return
+        
+        #item_paths = list()
+        
+        #if isinstance(self._data_, NestedFinder.nesting_types):
+            #finder = NestedFinder(self._data)
+            
+            #top_title = self.treeWidget.top_title
+            
+            ##if top_title in (os.path.sep, "/")
+            
+            #for item in items:
+                #item_path = self._get_path_for_item_(item)
+                
+                #path_element_strings = list() if item_path[0] in (os.path.sep, "/") else [item_path[0]]
+                
+                #for ipath in item_path[1:]:
+                    #path_element_strings.append("['"+ipath+"']")
+                    
+                #item_paths.append("".join(path_element_strings))
+                
+        #return item_paths
+        
     @safeWrapper
     def getSelectedPaths(self):
         items = self.treeWidget.selectedItems()
@@ -572,17 +623,20 @@ class DataViewer(ScipyenViewer):
         if len(items) == 0:
             return
         
+        item_paths = list()
+        
+        top_title = self.treeWidget.top_title
+        
         if isinstance(self._data_, NestedFinder.nesting_types):
-            item_paths = list()
-            
             for item in items:
                 item_path = self._get_path_for_item_(item)
-                path_element_strings = list() if item_path[0] in (os.path.sep, "/") else [item_path[0]]
                 
-                for ipath in item_path[1:]:
-                    path_element_strings.append("['"+ipath+"']")
-                    
-                item_paths.append("".join(path_element_strings))
+                expr = NestedFinder.paths2expression(self._data_, item_path)
+                
+                if len(top_title.strip()) > 0 and top_title not in (os.path.sep, "/"):
+                    expr = top_title+expr
+                
+                item_paths.append(expr)
                 
         return item_paths
         
@@ -593,9 +647,11 @@ class DataViewer(ScipyenViewer):
         
         if len(item_paths) > 1:
             if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier):
-                self._scipyenWindow_.app.clipboard().setText(",\n".join(item_paths))
+                self._scipyenWindow_.app.clipboard().setText(",\n".join(["""%s""" % i for i in item_paths]))
+                #self._scipyenWindow_.app.clipboard().setText(",\n".join(item_paths))
             else:
-                self._scipyenWindow_.app.clipboard().setText(", ".join(item_paths))
+                self._scipyenWindow_.app.clipboard().setText(", ".join(["""%s""" % i for i in item_paths]))
+                #self._scipyenWindow_.app.clipboard().setText(", ".join(item_paths))
                 
         elif len(item_paths) == 1:
             self._scipyenWindow_.app.clipboard().setText(item_paths[0])
@@ -636,6 +692,37 @@ class DataViewer(ScipyenViewer):
     @pyqtSlot()
     @safeWrapper
     def slot_exportItemDataToWorkspace(self):
+        """Exports data from currently selected items to the workspace.
+        
+        When a single item is selected, the user is presented with a Dialog to
+        verify/modify the symbol (name) to which the data will be bound in the
+        workspace.
+        
+        When multiple items are selected, the data will be exported directly to
+        the workspace, bound to symbols (named) generated from the item name or 
+        from the tree path (see below). If these symbols already exists, they will
+        be re-bound to the new data (with the previously bounded data to be
+        garbage collected by the python interpreter).
+        
+        The symbol (or name) of the data is created from the item's display str
+        in the first column of the table widget (i.e. the key / index).
+        
+        If the key / index corresponds to a str key (or field name in the case of
+        namedtuple objects) the symbol is named directly after the key.
+        
+        If the key / index is an int (as in the case of int index into sequences)
+        the symbol is the string representation of the index prefixed with 'data_'.
+        
+        When SHIFT key is pressed, the symbol(s) are generated from the FULL path
+        (from top level to the leaf item)
+        
+        NOTE 1: Multiple selections are possible by SHIFT + LMB click (contiguous)
+        or CTRL + LMB click (discontiguous)
+        
+        NOTE 2: This does NOT export subarrays or slices of pandas objects.
+        
+        
+        """
         fullPathAsName = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
         
         if self._scipyenWindow_ is None:
@@ -713,77 +800,154 @@ class DataViewer(ScipyenViewer):
                         self._scipyenWindow_.viewObject(obj, objname, 
                                                        newWindow=True)
     
-    @safeWrapper
-    def _get_path_for_item_(self, item):
-        item_path = list()
-        item_path.append(item.text(0))
+    #@safeWrapper
+    #def _get_path_for_item_0_(self, item):
+        #"""WARNING: Result is not suitable as parameter to eval()
+        #"""
+        #item_path = list()
+        #item_path.append(item.text(0))
         
+        #parent = item.parent()
+        
+        #while parent is not None:
+            #item_path.append(parent.text(0))
+            #parent = parent.parent()
+        
+        #item_path.reverse()
+        
+        #return item_path
+    
+    @safeWrapper
+    def _parse_item(self, item):
+        item_name = item.text(0)
+        
+        if len(item_name.strip()) == 0:
+            return None
+        
+        item_type_str = item.toolTip(0).replace("key / index type: ", "")
+        
+        return item_name if (item_type_str == "str" or len(item_type_str.strip())==0) else eval("%s(%s)" % (item_type_str, item_name))
+    
+    @safeWrapper
+    def _get_path_for_item_(self, item:QtWidgets.QTreeWidgetItem):#, as_expression:bool=True):
+        """Returns a tree (indexing) path to item.
+        
+        Parameters:
+        -----------
+        item: QTreeWidgetItem
+        
+        as_expression:bool, optional (default is True)
+        
+        Returns:
+        -------
+        
+        When as_expression is True (default):
+        
+            returns a str which can be eval()-ed AFTER prefixing it with the 
+            name (symbol) bound to the top level hierarchical data collection 
+            (which must exist in the namespace where eval() is called)
+            
+        
+        When as_expression if False:
+        
+            returns a list of item names that compose the indexing path with
+            increasing nesting depth.
+        
+        """
+        item_path = list()
+        
+        ndx = self._parse_item(item)
+        
+        if ndx is not None:
+            item_path.append(ndx)
+
         parent = item.parent()
         
         while parent is not None:
-            item_path.append(parent.text(0))
+            if parent.parent() is not None:
+                ndx = self._parse_item(parent)
+                if ndx is not None:
+                    item_path.append(ndx)
+                #item_path.append(self._parse_item(parent))
+                #if isinstance(ndx, str) and len(ndx.strip()) == 0:
+                    #continue
+                
             parent = parent.parent()
-        
+
         item_path.reverse()
         
         return item_path
     
     @safeWrapper
     def _export_data_items_(self, items, fullPathAsName=False):
-        # TODO: 2021-08-15 22:55:45
-        # Use NestedFinder.getvalue()
-        from core.utilities import get_nested_value
-        if self._scipyenWindow_ is None:
+        """Export data displayed by their corresponding items, to workspace.
+        
+        Parameters:
+        ----------
+        
+        items: sequence of QTreeWidgetItem objects - typicaly, the selected 
+            non-hidden QTreeWidgetItem items in the treeWidget.
+            
+        fullPathAsName: bool (optional, default is False)
+            When True, each object described by the item in items will be bound
+            to a symbol in the workspace formed from the concatenation of the
+            indexing path elements from top level (root) to the the object being
+            exported.
+            
+            When False, the exported objects will be bound to a symbol in the
+            workspace, formed by the item's display text.
+        
+        """
+        
+        names = list()
+        objects = list()
+        
+        for item in items:
+            path = self._get_path_for_item_(item)
+            #print("_export_data_items_ path", path)
+            # process path NOW before it is consumed by NestedFinder.getvalue(),
+            # below
+            if len(path) == 0:
+                continue
+            
+            if fullPathAsName:
+                name = strutils.str2symbol("_".join(["%s" % s for s in path]))
+            else:
+                name = strutils.str2symbol("%s" % path[-1])
+            
+            objs = NestedFinder.getvalue(self._data_, path, single=True)
+            
+            if len(objs) == 0:
+                continue
+            
+            if len(objs) > 1:
+                raise RuntimeError("More than one value was returned")
+            
+            names.append(name)
+            objects += objs
+                
+        
+        if len(objects) == 0:
             return
         
-        values = list()
-        
-        item_names = list()
-        
-        item_path_names = list()
-        
-        if isinstance(self._data_, (dict, tuple, list)):
-            for item in items:
-                item_path = self._get_path_for_item_(item)
+        if len(objects) == 1:
+            dlg = quickdialog.QuickDialog(self, "Copy to workspace")
+            namePrompt = quickdialog.StringInput(dlg, "Data name:")
+            namePrompt.variable.setClearButtonEnabled(True)
+            namePrompt.variable.redoAvailable=True
+            namePrompt.variable.undoAvailable=True
+            
+            namePrompt.setText(names[0])
+            
+            if dlg.exec() == QtWidgets.QDialog.Accepted:
+                newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
                 
-                value = get_nested_value(self._data_, item_path[1:]) # because 1st item is the insivible root name
+                self._scipyenWindow_.assignToWorkspace(newVarName, objects[0], from_console=False)
                 
-                values.append(value)
-                
-                item_names.append(item_path[-1])
-                
-                item_path_names.append("_".join(item_path))
-                
-            if len(values):
-                if len(values) == 1:
-                    dlg = quickdialog.QuickDialog(self, "Copy to workspace")
-                    namePrompt = quickdialog.StringInput(dlg, "Data name:")
-                    
-                    if fullPathAsName:
-                        newVarName = strutils.str2symbol(item_path_names[0])
-                    else:
-                        newVarName = strutils.str2symbol(item_names[0])
-                    
-                    namePrompt.variable.setClearButtonEnabled(True)
-                    namePrompt.variable.redoAvailable=True
-                    namePrompt.variable.undoAvailable=True
-                    
-                    namePrompt.setText(newVarName)
-                    
-                    if dlg.exec() == QtWidgets.QDialog.Accepted:
-                        newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
-                        
-                        self._scipyenWindow_.assignToWorkspace(newVarName, values[0], from_console=False)
-                        
-                else:
-                    for name, full_path, value in zip(item_names, item_path_names, values):
-                        if fullPathAsName:
-                            newVarName = validate_varname(full_path, self._scipyenWindow_.workspace)
-                        else:
-                            newVarName = validate_varname(name, self._scipyenWindow_.workspace)
-                            
-                        self._scipyenWindow_.assignToWorkspace(newVarName, value, from_console=False)
-        
+        else:
+            for name, obj in zip(names, objects):
+                self._scipyenWindow_.assignToWorkspace(name, obj, from_console=False)
+
     def _collapse_expand_Recursive(self, item, expand=False, current=True):
         if expand:
             fn = self.treeWidget.expandItem

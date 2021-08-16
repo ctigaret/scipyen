@@ -22,6 +22,17 @@ from . import resources_rc
 
 # TODO / FIXME: 2019-11-10 16:33:13 Merge with TableEditor
 class MatrixViewer(ScipyenViewer):
+    """Simple table viewer for numpy arrays and vigra.filters.Kernel* objects.
+    
+    No context menu or editing capabilities are implemented.
+    
+    On its way to deprecation -- use TableEditor (see below)
+    
+    See also:
+    * gui.dictviewer.ScipyenTableWidget
+    * gui.tableeditor.TableEditorWidget for extended functionality
+    
+    """
     supported_types = (np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D)
     view_action_name = "Matrix"
     

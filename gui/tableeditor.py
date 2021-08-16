@@ -8,7 +8,7 @@
 #### BEGIN core python modules
 from __future__ import print_function
 
-import os, inspect, warnings, traceback, datetime
+import os, inspect, warnings, traceback, datetime, typing
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -184,7 +184,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     #### BEGIN item data handling
     #### BEGIN read-only access
     def data(self, modelIndex, role=QtCore.Qt.DisplayRole):
-        #print("TabularDataModel data, index row: %d; col %d; role %s" % (modelIndex.row(), modelIndex.column(), role))
         try:
             if self._modelData_ is None:
                 return QtCore.QVariant()
@@ -304,6 +303,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 #self._modelDataRowHeaders = data.index
                 #self._modelDataColumnHeaders = data.name
                 
+            elif isinstance(data, pd.Index):
+                self._modelData_ = data
+                self._modelRows_ = data.shape[0]
+                self._modelColumns_ = 1
+                
             elif isinstance(data, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
                 if data.ndim:
                     self._modelRows_ = data.shape[0]
@@ -326,6 +330,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     
                     if data.ndim > 1:
                         self._modelColumns_ = data.shape[1]
+                        
+                    else:
+                        self._modelColumns_ = 1
                     
                 else:
                     self._modelRows_ = 1
@@ -636,7 +643,15 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 
                 if isinstance(ret, datetime.datetime):
                     ret = ret.isoformat(" ")
+                    
+            elif isinstance(self._modelData_, pd.Index):
+                ret = self._modelData_[row]
+                
+                ret_type = type(ret).__name__
 
+                if isinstance(ret, datetime.datetime):
+                    ret = ret.isoformat(" ")
+                    
             elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
                 if col == 0:
                     ret = self._modelData_.times[row]
@@ -647,7 +662,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     ret_type = type(ret).__name__
                     
             elif isinstance(self._modelData_, np.ndarray):
-                ret = self._modelData_[row, col]
+                if self._modelData_.ndim  == 0: # e.g. pq object
+                    ret = np.atleast_1d(self._modelData_)[row]
+                    
+                elif self._modelData_.ndim > 1:
+                    ret = self._modelData_[row, col]
+                    
+                else:
+                    ret = self._modelData_[row]
                 
                 ret_type = type(ret).__name__
 
@@ -812,7 +834,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     
     view_action_name = "Table"
     
-    def __init__(self, model:(QtCore.QAbstractTableModel, type(None)), parent: (QtWidgets.QMainWindow, type(None))) -> None:
+    def __init__(self, model:typing.Optional[QtCore.QAbstractTableModel]=None, 
+                 parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
         super().__init__(parent=parent)
         
         if model is None:
@@ -823,6 +846,13 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
         self._configureUI_()
         
+        # NOTE: 2021-08-16 17:22:20
+        # By default, this is defined in the .ui file as:
+        # QtWidgets.QAbstractItemView.DoubleClicked |
+        # QtWidgets.QAbstractItemView.EditKeyPressed |
+        # QtWidgets.QAbstractItemView.AnyKeyPressed
+        self._defaultEditTriggers_ = self.tableView.editTriggers()
+        
     
     @property
     def model(self):
@@ -832,7 +862,23 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     def model(self, md):
         self._dataModel_ = md
         self.tabelView.setModel(self._dataModel_)
+        
+    @property
+    def readOnly(self):
+        return self.tableView.editTriggers() == QtWidgets.QAbstractItemView.NoEditTriggers
     
+    @readOnly.setter
+    def readOnly(self, val:bool):
+        if val:
+            self.tableView.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        else:
+            self.tableView.setEditTriggers(self._defaultEditTriggers_)
+            
+    def setEditTriggers(self, val):
+        """See documentation for QtWidgets.QAbstractItemView.setEditTriggers()
+        """
+        self.tableView.setEditTriggers(val)
+            
     def _configureUI_(self):
         self.setupUi(self)
         self.tableView.setSortingEnabled(False)
