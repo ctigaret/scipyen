@@ -904,7 +904,7 @@ class DataViewer(ScipyenViewer):
         
         for item in items:
             path = self._get_path_for_item_(item)
-            #print("_export_data_items_ path", path)
+            print("_export_data_items_ path", path)
             # process path NOW before it is consumed by NestedFinder.getvalue(),
             # below
             if len(path) == 0:
