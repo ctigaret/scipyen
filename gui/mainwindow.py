@@ -291,7 +291,7 @@ _info_banner_.append("signalviewer -> sv (*)   GUI for 1D signals + cursors")
 _info_banner_.append("imageviewer -> iv (*)    GUI for images (VigraArray)")
 _info_banner_.append("textviewer -> tv (*)     GUI for text data types")
 _info_banner_.append("tableeditor --> te (*)   GUI for matrix data viewer")
-#_info_banner_.append("matrixviewer             GUI for matrix data viewer")
+_info_banner_.append("matrixviewer             GUI for matrix data viewer")
 _info_banner_.append("pictgui -> pgui (*)      ancillary GUI stuff")
 _info_banner_.append("pictio -> pio (*)        i/o functions")
 _info_banner_.append("datatypes                new python quantities and data types")
@@ -312,49 +312,6 @@ def console_info():
 __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__,"mainwindow.ui"), from_imports=True, import_from="gui")
 
 __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__,"scriptmanagerwindow.ui"), from_imports=True, import_from="gui")
-
-#class FileSystemModel(QtWidgets.QFileSystemModel):
-    #"""DEPRECATED - TOO SLOW
-    #"""
-    ## sys.platform -> 'linux', 'win32', 'cygwin', 'darwin'
-    
-    #def __init__(self, parent=None):
-        ## TODO : 2020-10-22 18:13:38
-        ## check for plasma5 usage: 
-        ## "KDE" in os.environ["XDG_SESSION_DESKTOP"]
-        ## "plasma5" in os.environ["DESKTOP_SESSION"]
-        ## "plasma" in os.environ["WINDOWMANAGER"]
-        ## check ~/.local/share/usr-places.xbel for plasma 5 places
-        #super(FileSystemModel, self).__init__(parent)
-        #self.special_directories = dict()
-        
-    #def setRootPath(self, newPath):
-        ##print("fileSystemModel setRootPath", newPath)
-        #return super().setRootPath(newPath)
-    
-    #def data(self, ndx, role=QtCore.Qt.DisplayRole):
-        ## NOTE: 2021-08-17 12:05:29
-        ## this feels like a bottleneck
-        #if ndx.column() == 0:
-            ##if role == QtCore.Qt.DecorationRole:
-                ##return self.fileIcon(ndx) # I think this calls self.data() hence circular recursion
-        
-            #mimeType = QtCore.QMimeDatabase().mimeTypeForFile(self.fileInfo(ndx))
-            #if role == QtCore.Qt.DecorationRole:
-                ##if self.isDir(ndx):
-                    ##fallback = QtGui.QIcon.fromTheme("folder")
-                ##else:
-                    ##fallback = QtGui.QIcon.fromTheme("unknown")
-                    
-                #fallback = QtGui.QIcon.fromTheme("folder") if self.isDir(ndx) else QtGui.QIcon.fromTheme("unknown")
-                
-                #return QtGui.QIcon.fromTheme(mimeType.iconName(), fallback)
-                    ##return QtGui.QIcon.fromTheme(mimeType.iconName(), QtGui.QIcon.fromTheme("folder"))
-                
-                ##else:
-                    ##return QtGui.QIcon.fromTheme(mimeType.iconName(), QtGui.QIcon.fromTheme("unknown"))
-
-        #return super(FileSystemModel, self).data(ndx, role)
 
 class WorkspaceViewer(QtWidgets.QTableView):
     """Inherits QTableView with customized drag & drop
@@ -379,7 +336,6 @@ class WorkspaceViewer(QtWidgets.QTableView):
         #print("WorkspaceViewer.contextMenuEvent")
         #print(event.pos())
         self.customContextMenuRequested.emit(event.pos())
-        #pass # use CustomContextMenu policy
             
     @safeWrapper
     def mouseMoveEvent(self, event):
@@ -405,8 +361,6 @@ class WorkspaceViewer(QtWidgets.QTableView):
                     mimeData.setText(varName)
                     drag.setMimeData(mimeData)
                     dropAction = drag.exec(QtCore.Qt.CopyAction)
-                    
-        
 
 # NOTE 2016-03-27 16:53:16
 # the way multiple inheritance works in pyqt dictates that additional signals are 
