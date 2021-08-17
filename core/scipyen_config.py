@@ -184,3 +184,16 @@ def create_option(option_name:str, option_value:typing.Any, parent:DataBag=None)
     """
     pass
     
+def get_scipyen_config_file(configuration:confuse.Configuration, 
+                            default:bool = False) -> typing.Optional[str]:
+    if isinstance(configuration, confuse.Configuration):
+        if not configuration._materialized:
+            configuration.read()
+            
+        if default:
+            defsrc = [s for s in configuration.sources if s.default]
+            if len(defsrc):
+                return defsrc[0].filename
+            
+        return configuration.user_config_path()
+    

@@ -21,7 +21,6 @@ from PyQt5 import (QtCore, QtWidgets, QtGui, )
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
-#import scipyen_defaults
 
 # =========================================================
 # BEGIN NOTE: 2021-01-08 10:59:00  Scipyen options/settings
@@ -43,8 +42,15 @@ __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 # 
 # this is the passed to the mainWindow constructor as the 'settings' parameter
 # where its read() method must be called exactly once!
+#
+# The second parameter is the name of a shim module (empty) just in order to set
+# the path correctly for where the default configuration yaml file is located
 # END NOTE: 2021-01-10 13:17:58
 scipyen_config = confuse.LazyConfig("Scipyen", "scipyen_defaults")
+scipyen_config.read() # make sure this is done only once
+
+# ATTENTION 2021-08-17 14:33:10
+# do not confuse this with 'config' from console
 
 # NOTE: 2021-01-10 13:19:20
 # the same Configuration object holds/merges both the user options and the 
@@ -124,6 +130,7 @@ def main():
         
         # NOTE: 2021-08-17 10:06:24 FIXME / TODO
         # come up with a nice icon?
+        # see also NOTE: 2021-08-17 12:36:49 in gui.mainwindow
         #mainWindow.setWindowIcon(app.icon)
         
         # 3. show the main window

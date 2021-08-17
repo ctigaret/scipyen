@@ -1839,7 +1839,10 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     elif isinstance(obj, (tuple, list)):
         ttip = "%s" % (obj,)
     else:
-        ttip = "%s" % obj
+        try:
+            ttip = "%s" % obj
+        except:
+            ttip = typename
     
     result["Name"] = {"display": "%s" % objname, "tooltip":"\n".join([ttip, wspace_name])}
     

@@ -48,7 +48,9 @@ from importlib import reload # I use this all too often !
 #### END core python modules
 
 #### BEGIN 3rd party modules
-import confuse
+ # NOTE: 2021-08-17 16:52:16
+ # get this via scipyen_config module aliased as scipyenconf
+#import confuse
 
 #### BEGIN numerics & data visualization
 import numpy as np
@@ -87,6 +89,8 @@ pg.setConfigOptions(background="w", foreground="k", editorCommand="kwrite")
 import matplotlib as mpl
 mpl.use("Qt5Agg")
 import matplotlib.pyplot as plt
+# NOTE: 2021-08-17 12:17:08
+# this is NOT recommended anymore
 #import matplotlib.pylab as plb
 import matplotlib.mlab as mlb
 
@@ -143,12 +147,14 @@ from jupyter_client.session import Message
 #import core.prog as prog
 from core.prog import (timefunc, timeblock, processtimefunc, processtimeblock,
                        Timer, safeWrapper, warn_with_traceback,)
+
 from core.scipyenmagics import ScipyenMagics
 # NOTE: 2017-04-16 09:48:15 
 # these are also imported into the console in slot_initQtConsole(), so they are
 # available directly in the console
 from core.workspacefunctions import * 
 from core import scipyen_config as scipyenconf
+from core.scipyen_config import confuse
 from core import plots as plots
 from core import datatypes as dt
 from core import neoutils
@@ -163,10 +169,12 @@ import core.curvefitting as crvf
 import core.strutils as strutils
 #import core.simulations as sim
 import core.data_analysis as anl
+
 from core.utilities import (summarize_object_properties,
                             standard_obj_summary_headers,
                             safe_identity_test, unique, index_of,
-                            )
+                            NestedFinder,)
+
 from core.prog import (safeWrapper, deprecation, iter_attribute,
                        filter_type, filterfalse_type, 
                        filter_attribute, filterfalse_attribute)
@@ -717,7 +725,7 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
         
         self.qsettings = QtCore.QSettings()
         
-        self._load_settings_()
+        self.loadSettings()
         
         self.acceptDrops = True
         self.scriptsTable.acceptDrops = True
@@ -729,10 +737,10 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
         #self.menubar.insertMenu(self.mainMenu.menuAction())
         
         
-    def _load_settings_(self):
+    def loadSettings(self):
         loadWindowSettings(self.qsettings, self)
             
-    def _save_settings_(self):
+    def saveSettings(self):
         saveWindowSettings(self.qsettings, self)
             
     def setData(self, scriptsDict):
@@ -778,7 +786,7 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
         self.scriptsTable.setRowCount(0)
         
     def closeEvent(self, evt):
-        self._save_settings_()
+        self.saveSettings()
         evt.accept()
         self.close()
         
@@ -1472,8 +1480,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         return sw_f
 
     #@processtimefunc
-    def __init__(self, app, settings=None, parent=None):
+    def __init__(self, app:QtWidgets.QApplication, 
+                 settings:typing.Optional[confuse.LazyConfig]=None, 
+                 parent:typing.Optional[QtWidgets.QWidget]=None) -> None:
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: python3 way
+        WorkspaceGuiMixin.__init__(self, parent=self)
         self.app                        = app
         self.recentFiles                = collections.OrderedDict()
         self.recentDirectories          = collections.deque()
@@ -1502,21 +1513,27 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #pg.setConfigOptions(editorCommand=self.scipyenEditor)
         
         #self._default_scipyen_settings_ = defaults
-        self._scipyen_settings_         = settings # aliased in the workspace as 
-                                                   # 'scipyen_settings'
         
-        self._scipyendir_ = "" # aliased in the workspace as 'scipyen_topdir'
-        # NOTE: 2021-01-10 16:26:18
-        # read must be called ONLY ONCE
-        if isinstance(self._scipyen_settings_, confuse.LazyConfig) and not self._scipyen_settings_._materialized:
-            self._scipyen_settings_.read()
-            defsrc = [s for s in self._scipyen_settings_.sources if s.default]
-            if len(defsrc):
-                self._scipyendir_ = os.path.dirname(defsrc[0].filename)
+        # NOTE: 2021-08-17 13:09:38
+        # passed from scipyen.main(), this is 
+        # confuse.LazyConfig("Scipyen", "scipyen_defaults")
+        # and is aliased in the workspace as 'scipyen_settings'
+        # From console, the user configuration file name is accessed as 
+        # scipyen_settings.user_config_path()
+        # --> $HOME/.config/Scipyen/config.yaml
+        # WARNING this has nothing to do with %config magic in IPython (available
+        # in Scipyen's consoles)
+        self._scipyen_settings_         = settings 
+        
+        # NOTE: Qt GUI settings in $HOME/.config/Scipyen/Scipyen.conf
+        self.qsettings                   = QtCore.QSettings("Scipyen", "Scipyen")
+
+        # NOTE: 2021-08-17 12:29:29
+        # directory where scipyen is installed
+        # aliased in the workspace as 'scipyen_topdir'
+        self._scipyendir_ = os.path.dirname(__module_path__) 
                 
-            else:
-                self._scipyendir_ = os.path.dirname(__module_path__)
-        
+        #### BEGIN - to revisit
         self._temp_python_filename_   = None # cached file name for python source (for loading or running)
         
         self._save_settings_guard_ = False
@@ -1524,6 +1541,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._copy_varnames_quoted_ = False
         
         self._copy_varnames_separator_ = " "
+        #### END - to revisit
         
         self._setup_console_pygments_()
         
@@ -1542,18 +1560,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.scriptsManager.signal_pythonFileAdded[str].connect(self._slot_scriptFileAddedInManager)
         
         # NOTE: 2016-04-15 23:58:08
-        # define some place holders
+        # place holders for the tree widget item holding the commands in the 
+        # current session, in the command history tree widget
         self.currentSessionTreeWidgetItem = None
         
-        # NOTE: 2017-04-26 08:31:30 do not remove; might use these later
-        #self.imageViewer   = dict()
-        #self.signalViewers = dict()
-        
         # NOTE: 2018-10-07 21:12:14
-        # (re)initializes self.workspace, self._nonInteractiveVars_, self.ipkernel, self.console and self.shell
+        # (re)initialize self.workspace, self._nonInteractiveVars_, 
+        # self.ipkernel, self.console and self.shell
         self._init_QtConsole_() 
         
-        ##self.fileSystemModel            = FileSystemModel(parent=self)
         self.fileSystemModel            = QtWidgets.QFileSystemModel(parent=self)
         
         self.workspaceModel             = WorkspaceModel(self.shell, parent=self)
@@ -1576,14 +1591,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # _configureUI_ must be called NOW
         self._configureUI_()
         
-        self._load_settings_()
+        # NOTE: 2021-08-17 12:35:47
+        # loads window settings, not Scipyen non-gui settings !
+        self.loadSettings()
+        
+        # NOTE: 2021-08-17 12:36:49 TODO custom icon ?
+        # see also NOTE: 2021-08-17 10:06:24 in scipyen.py
         icon = QtGui.QIcon.fromTheme("python")
-        self.setWindowIcon(icon)
+        #self.setWindowIcon(icon) # this doesn't work? -- next line does
+        QtWidgets.QApplication.setWindowIcon(icon)
+
+        # NOTE: 2021-08-17 12:38:41 see also NOTE: 2021-08-17 10:05:20 in scipyen.py
         #self._default_GUI_style = self.app.style()
         self._current_GUI_style_name = "Default"
         
-        QtWidgets.QApplication.setWindowIcon(icon)
-
         
         # -----------------
         # connect widget actions through signal/slot mechanism
@@ -1596,10 +1617,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # we also need to quit the app when Pict main window is closed
         self.app.destroyed.connect(self.slot_Quit)
         
-        # NOTE: 2017-07-04 16:10:14
+        # NOTE: 2017-07-04 16:10:14 -- NOT NEEDED ANYMORE
         # for this to work one has to set horizontalScrollBarPolicy
         # to ScrollBarAlwaysOff (e.g in QtDesigner)
-        self._resizeFileColumn_()
+        #self._resizeFileColumn_()
         
         # NOTE: 2016-04-15 12:18:04
         # TODO/FIXME also import the plugins in the pict / ipkernel scopes
@@ -1614,17 +1635,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         ##print("ScipyenWindow initialized")
         
         # NOTE: 2018-02-22 13:36:17
+        # FIXME: 2021-08-17 12:41:57 TODO Sund contrived - check is really needed
+        # and, if not, then remove
         # finally, inject self into relevant modules:
         #for m in (ltp, ivramp, membrane, epsignal, CaTanalysis, pgui, sigp, imgp, crvf, plots):
         for m in (ltp, ivramp, membrane, CaTanalysis, pgui, sigp, imgp, crvf, plots):
             m.__dict__["mainWindow"] = self
             m.__dict__["workspace"] = self.workspace
             
-        #self.app.focusWindowChanged[]
-            
+        # NOTE: 2021-08-17 12:45:10 TODO
+        # currently used in _run_loop_process_, which at the moment is not used 
+        # anywhere - keep available as app-wide threadpool for various sub-apps
         self.threadpool = QtCore.QThreadPool()
         
-        self.__class__._instance = self # FIXME: what's this for?!?
+        self.__class__._instance = self # FIXME: what's this for?!? - flag as singleton?
         
     @property
     def scipyenSettings(self):
@@ -3131,8 +3155,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     def slot_Quit(self):
         self.close()
-        #evt = QtGui.QCloseEvent()
-        #self.closeEvent(evt)
         
     def closeEvent(self, evt):
         if self.external_console is not None:
@@ -3142,30 +3164,27 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.external_console = None
             self.workspace["external_console"] = None
             self.workspaceModel.user_ns_hidden["external_console"] = None
-            #self.slot_updateWorkspaceTable(False)
             
         if self.console is not None:
             self.console.kernel_manager.shutdown_kernel()
             self.console.close()
-            #del self.console
             self.console = None
             
         if not self._save_settings_guard_:
-            self._save_settings_()
+            self.saveSettings()
             self._save_settings_guard_ = True
             
-        # NOTE: this mustn't happen anymore
-        #lscatWindows = [w for w in self.app.allWidgets() if isinstance(w, CaTanalysis.LSCaTWindow)]
-        #for w in lscatWindows:
-            #w.slot_Quit()
-            
-        #self.app.closeAllWindows()
-        
         evt.accept()
         
-    def _save_settings_(self):
-        #self.qsettings.endGroup()
-        saveWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
+    def saveSettings(self):
+        self.saveWindowSettings()
+        self.saveAppSettings()
+        
+    def saveAppSettings(self):
+        pass
+        
+    def saveWindowSettings(self):
+        saveWindowSettings(self.qsettings, self)
         
         self.qsettings.beginGroup(self.__class__.__name__)
         
@@ -3251,8 +3270,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         
     #@processtimefunc
-    def _load_settings_(self):
-        self.qsettings                   = QtCore.QSettings("Scipyen", "Scipyen")
+    def loadSettings(self):
+        self.loadWindowSettings()
+        self.loadAppSettings()
+        
+    def loadAppSettings(self):
+        pass
+    
+    def loadWindowSettings(self):
         loadWindowSettings(self.qsettings, self)#, group_name = self.__class__.__name__)
         
         self.qsettings.beginGroup(self.__class__.__name__)
@@ -3350,9 +3375,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
         self.filesFilterFrame.setVisible(showFilesFilter)
         
-        #if showFilesFilter:
-            #self.filesFilterFrame.show()
-            
         self.qsettings.endGroup() # settings for ScipyenWindow group
         
         self.qsettings.beginGroup("Custom_GUI_Handlers")
@@ -3957,34 +3979,34 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_filterSelectVarNames(self, val):
         """Select variables in workspace viewer, according to name filter.
         """
+        match = QtCore.Qt.MatchContains | \
+                QtCore.Qt.MatchCaseSensitive | \
+                QtCore.Qt.MatchWrap | \
+                QtCore.Qt.MatchRecursive | \
+                QtCore.Qt.MatchRegExp
+        
+        #### BEGIN other matching options - dont work as well
         #match = QtCore.Qt.MatchContains | \
                 #QtCore.Qt.MatchCaseSensitive | \
                 #QtCore.Qt.MatchWildcard | \
                 #QtCore.Qt.MatchWrap | \
                 #QtCore.Qt.MatchRecursive
             
-        #match1 = QtCore.Qt.MatchWildcard| \
+        #match = QtCore.Qt.MatchWildcard| \
                 #QtCore.Qt.MatchCaseSensitive | \
                 #QtCore.Qt.MatchWrap | \
                 #QtCore.Qt.MatchRecursive
-        
-        match2 = QtCore.Qt.MatchContains | \
-                QtCore.Qt.MatchCaseSensitive | \
-                QtCore.Qt.MatchWrap | \
-                QtCore.Qt.MatchRecursive | \
-                QtCore.Qt.MatchRegExp
+                
+        #### END other matching options - dont work as well
         
         
-        itemList = self.workspaceModel.findItems(val, match2)
+        itemList = self.workspaceModel.findItems(val, match)
         
         self.workspaceView.selectionModel().clearSelection()
         
         if len(itemList) > 0:
             for i in itemList:
-                #print(i.text())
                 self.workspaceView.selectionModel().select(i.index(), QtCore.QItemSelectionModel.Select)
-            
-            #self.lastVariableFind = val
             
     @pyqtSlot()
     @safeWrapper
@@ -6031,6 +6053,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self._installPluginFunction_(dd.keys()[0], menuOrItemLabel, parentMenu, *d.values()[0])
             
     def _run_loop_process_(self, fn, process_name, *args, **kwargs):
+        # TODO : 2021-08-17 12:43:35
+        # check where it is used (currently nowhere, but potentially when running
+        # plugins) 
+        # possibly move to core.prog
         if isinstance(process_name, str) and len(process_name.strip()):
             title = "%s..." % process_name
             

@@ -156,7 +156,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):
     def isTopLevel(self):
         return self.appWindow is self.parent()
                 
-        
     @property
     def appWindow(self):
         """The application main window.
