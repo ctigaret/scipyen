@@ -20,3 +20,5 @@ fi
 xrdb -merge $scipyendir/neuron_python/app-defaults/nrniv
 
 python3 $scipyendir/scipyen.py &
+
+# python3 -m cProfile -s 'cumtime' $scipyendir/scipyen.py > profile &

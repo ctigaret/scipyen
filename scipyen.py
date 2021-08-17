@@ -4,10 +4,9 @@
 
 #### BEGIN core python modules
 
-#from __future__ import print_function
-#from __future__ import absolute_import # for python 2.5
 import faulthandler
 import sys, os, atexit, re, inspect, gc, io, traceback
+import cProfile
 
 #import warnings
 #### END core python modules
@@ -24,9 +23,9 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 #import scipyen_defaults
 
-# ===================================================
-# NOTE: 2021-01-08 10:59:00  Scipyen options/settings
-# ===================================================
+# =========================================================
+# BEGIN NOTE: 2021-01-08 10:59:00  Scipyen options/settings
+# =========================================================
 # While gui-related options (e.g., window size/position, recent files,
 # recent directories, etc.) are stored using the PyQt5/Qt5 settings framework,
 # non-gui options contain custom parameter values for various modules, e.g.
@@ -35,15 +34,16 @@ __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 # These "non-gui" options are often represented by nested dictionary (hierarchical)
 # structures not easily amenable to the linear (and binary) format of the Qt5 
 # settings framework.
-#
+# END NOTE: 2021-01-08 10:59:00
 
-# NOTE: 2021-01-10 13:17:58
+# BEGIN NOTE: 2021-01-10 13:17:58
 # LazyConfig inherits form confuse.Configuration, but its read() method must be 
 # called explicitly/programmatically (i.e. unlike its ancestor Configuration,
 # read is NOT called at initialization).
 # 
 # this is the passed to the mainWindow constructor as the 'settings' parameter
 # where its read() method must be called exactly once!
+# END NOTE: 2021-01-10 13:17:58
 scipyen_config = confuse.LazyConfig("Scipyen", "scipyen_defaults")
 
 # NOTE: 2021-01-10 13:19:20
@@ -59,8 +59,6 @@ if hasattr(QtCore, "QLoggingCategory"):
 os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
 #os.putenv("PYQTGRAPH_QT_LIB", "PyQt5")
 
-#sys.path.insert(2, os.path.dirname(os.path.dirname(__file__)))
-
 
 class MyProxyStyle(QtWidgets.QProxyStyle):
     """To prevent repeats of valueChanged in QSpinBox controls for frame navigation.
@@ -71,6 +69,8 @@ class MyProxyStyle(QtWidgets.QProxyStyle):
     See https://bugreports.qt.io/browse/QTBUG-33128.
     
     """
+    # NOTE: 2021-08-17 10:01:32 FIXME
+    # not really used? TODO DEPRECATED
     def __init__(self, *args):
         super().__init__(*args)
         
@@ -87,6 +87,9 @@ def main():
     import gui.mainwindow as mainwindow
     faulthandler.enable()
 
+    # NOTE: 2021-08-17 10:02:20
+    # thsi did not improve / prevent crashes when exiting NEURON - leave here so
+    # that we know we tried and didn't work
     #if sys.platform == "linux":
         #import subprocess
         #compl = subprocess.run(["xrdb", "-merge", os.path.join(__module_path__, "neuron_python",  "app-defaults", "nrniv")])
@@ -94,13 +97,18 @@ def main():
     #sip.setdestroyonexit(True)
 
     try:
-        #sip.setdestroyonexit(False)
+        #sip.setdestroyonexit(False) # better leave to default
+        
+        # NOTE: 2021-08-17 10:07:11 is this needed?
         QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-        #library_paths = QtCore.QCoreApplication.libraryPaths()
-        ##library_paths.insert(0,'/usr/lib64/qt5/plugins')
-        #library_paths.append('/usr/lib64/qt5/plugins')
-        #library_paths = QtCore.QCoreApplication.setLibraryPaths(library_paths)
+        
+        # BEGIN 
+        # 1. create the pyqt5 app
         app = QtWidgets.QApplication(sys.argv)
+        
+        # NOTE: 2021-08-17 10:05:20
+        # explore the possibility to customize look and feel
+        # for now, we just use whatever the system uses
         #app.setStyle(QtWidgets.QStyleFactory.create("Breeze"))
         #app.setStyle(MyProxyStyle())
         
@@ -110,15 +118,18 @@ def main():
         gc.enable()
 
         #import pudb
-        mainWindow = mainwindow.ScipyenWindow(app, 
-                                              settings = scipyen_config)
         
-        #mainWindow = mainwindow.ScipyenWindow(app, 
-                                              #defaults = scipyen_defaults,
-                                              #settings = scipyen_config)
+        # 2. initialize main window
+        mainWindow = mainwindow.ScipyenWindow(app, settings = scipyen_config)
+        
+        # NOTE: 2021-08-17 10:06:24 FIXME / TODO
+        # come up with a nice icon?
         #mainWindow.setWindowIcon(app.icon)
+        
+        # 3. show the main window
         mainWindow.show()
         
+        # 4. start the main GUI app (pyqt5) event loop
         app.exec()
         
     except Exception as e:
@@ -127,4 +138,6 @@ def main():
         
 if __name__ == '__main__':
     main()
+    
+    #cProfile.run("main()", "profile.txt", 2)
         
