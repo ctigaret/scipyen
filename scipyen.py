@@ -13,44 +13,16 @@ import cProfile
 
 #### BEGIN 3rd party modules
 
-import confuse # configuration library for non-gui options
-
 # NOTE: 2019-07-29 12:08:47 these are imported indirectly via pict.gui
 from PyQt5 import (QtCore, QtWidgets, QtGui, )
 #### END 3rd party modules
 
+#### BEGIN Scipyen modules
+from core import scipyen_config # non-gui-related settings
+#### END Scipyen modules
+
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
-
-# =========================================================
-# BEGIN NOTE: 2021-01-08 10:59:00  Scipyen options/settings
-# =========================================================
-# While gui-related options (e.g., window size/position, recent files,
-# recent directories, etc.) are stored using the PyQt5/Qt5 settings framework,
-# non-gui options contain custom parameter values for various modules, e.g.
-# options for ScanData objects, trigger detection, etc. 
-# 
-# These "non-gui" options are often represented by nested dictionary (hierarchical)
-# structures not easily amenable to the linear (and binary) format of the Qt5 
-# settings framework.
-# END NOTE: 2021-01-08 10:59:00
-
-# BEGIN NOTE: 2021-01-10 13:17:58
-# LazyConfig inherits form confuse.Configuration, but its read() method must be 
-# called explicitly/programmatically (i.e. unlike its ancestor Configuration,
-# read is NOT called at initialization).
-# 
-# this is the passed to the mainWindow constructor as the 'settings' parameter
-# where its read() method must be called exactly once!
-#
-# The second parameter is the name of a shim module (empty) just in order to set
-# the path correctly for where the default configuration yaml file is located
-# END NOTE: 2021-01-10 13:17:58
-scipyen_config = confuse.LazyConfig("Scipyen", "scipyen_defaults")
-scipyen_config.read() # make sure this is done only once
-
-# ATTENTION 2021-08-17 14:33:10
-# do not confuse this with 'config' from console
 
 # NOTE: 2021-01-10 13:19:20
 # the same Configuration object holds/merges both the user options and the 
@@ -62,6 +34,7 @@ if hasattr(QtCore, "QLoggingCategory"):
 
 # NOTE: on opensuse pyqtgraph expect PyQt4 first, as qtlib; if not found this
 # raises an exception; setting pq.Qt.lib later does not work.
+# therefore is better to set this up early, here.
 os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
 #os.putenv("PYQTGRAPH_QT_LIB", "PyQt5")
 
@@ -126,7 +99,7 @@ def main():
         #import pudb
         
         # 2. initialize main window
-        mainWindow = mainwindow.ScipyenWindow(app, settings = scipyen_config)
+        mainWindow = mainwindow.ScipyenWindow(app, settings = scipyen_config.scipyen_config)
         
         # NOTE: 2021-08-17 10:06:24 FIXME / TODO
         # come up with a nice icon?
