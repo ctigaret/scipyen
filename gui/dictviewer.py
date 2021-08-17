@@ -830,7 +830,9 @@ class DataViewer(ScipyenViewer):
     
     @safeWrapper
     def _get_path_for_item_(self, item:QtWidgets.QTreeWidgetItem):#, as_expression:bool=True):
-        """Returns a tree (indexing) path to item.
+        """Returns a tree (indexing) path to item, as a list of 'nodes'.
+        
+        This EXCLUDES the top level parent.
         
         Parameters:
         -----------
@@ -868,9 +870,6 @@ class DataViewer(ScipyenViewer):
                 ndx = self._parse_item(parent)
                 if ndx is not None:
                     item_path.append(ndx)
-                #item_path.append(self._parse_item(parent))
-                #if isinstance(ndx, str) and len(ndx.strip()) == 0:
-                    #continue
                 
             parent = parent.parent()
 
@@ -904,16 +903,37 @@ class DataViewer(ScipyenViewer):
         
         for item in items:
             path = self._get_path_for_item_(item)
-            #print("_export_data_items_ path", path)
-            # process path NOW before it is consumed by NestedFinder.getvalue(),
-            # below
+            #print("\n_export_data_items_ path", path)
+            
             if len(path) == 0:
                 continue
             
             if fullPathAsName:
-                name = strutils.str2symbol("_".join(["%s" % s for s in path]))
+                # NOTE: 2021-08-17 09:35:10 the order is important:
+                # 1) cannot modify path here because it will be used to get
+                # the object -> use a temporary full path prepended with top 
+                # level item if available
+                #
+                # 2) cannot get the object first then figure out the name because
+                # NestedFinder.getvalue() consumes the path (so by the time name
+                # is built the path will be empty)
+                #
+                # in either case we need a temporary list - I guess the runtime
+                # penaly is minor
+                top_title = self.treeWidget.top_title
+                if isinstance(top_title, str) and len(top_title.strip()):
+                    full_path = [p for p in path]
+                    full_path.insert(0, top_title)
+                    
+                else:
+                    full_path = path
+                    
+                name = strutils.str2symbol("_".join(["%s" % s for s in full_path]))
+                
             else:
                 name = strutils.str2symbol("%s" % path[-1])
+                
+            #print("name", name)
             
             objs = NestedFinder.getvalue(self._data_, path, single=True)
             

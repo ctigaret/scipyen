@@ -457,71 +457,99 @@ class NestedFinder(object):
 
         return ""
             
-    def _gen_elem(self, src, ndx):
-        if ndx:
-            if isinstance(src, dict):
-                if ndx in src.keys():
-                    yield src[ndx]
-                    
-            elif NestedFinder.is_namedtuple(src):
-                if ndx in src._fields:
-                    yield getattr(src, ndx)
-                    
-            elif isinstance(src, (tuple, list, deque)):
-                if isinstance(ndx, int):
-                    yield src[ndx]
-                    
-            elif isinstance(src, pd.DataFrame): 
-                # can't just  check everything, just only the basics: 
-                # for DF ndx is a (row idx, col idx) tuple or list of such
-                # if ndx not appropriate raises exceptions
-                if isinstance(ndx, list) and all([isinstance(i, tuple) and len(i)==2 for i in ndx]):
-                    yield [src.iloc[ix[0], ix[1]] if all([isinstance(i, int) for i in ix]) else src.loc[ix[0], ix[1]] for ix in ndx]
-                    
-                elif isinstance(ndx, tuple) and len(ndx) == 2: # (row index, col index)
-                    if all([isinstance(i, int) for i in ndx]):
-                        yield src.iloc[ndx[0], ndx[1]] 
+    def _gen_elem(self, 
+                  src:typing.Any, ndx:typing.Any, 
+                  report:bool=False) -> typing.Generator[typing.Any, None, None]:
+        """Element retrieval from collection given key or index
+        Parameters:
+        -----------
+        src: python object
+        ndx: key or index
+        
+        Yields:
+        ------
+        A value - when src is a collection and ndx is a valid indexing object 
+            appropriate for src, src if src is an elemental object (NOT a
+            collection) or nothing
+        
+        """
+        try:
+            #if ndx: # NOTE: 2021-08-17 09:07:37 when ndx == 0 (perfectly valid) this is False!
+            if ndx is not None: # better be explicit
+                if isinstance(src, dict):
+                    if ndx in src.keys():
+                        yield src[ndx]
+                        
+                elif NestedFinder.is_namedtuple(src):
+                    if ndx in src._fields:
+                        yield getattr(src, ndx)
+                        
+                elif isinstance(src, (tuple, list, deque)):
+                    if isinstance(ndx, int) and ndx in range(len(src)): # also check validity
+                        yield src[ndx]
+                        
+                elif isinstance(src, pd.DataFrame): 
+                    # can't just  check everything, just only the basics: 
+                    # for DF ndx is a (row idx, col idx) tuple or list of such
+                    # if ndx not appropriate raises exceptions
+                    if isinstance(ndx, list) and all([isinstance(i, tuple) and len(i)==2 for i in ndx]):
+                        yield [src.iloc[ix[0], ix[1]] if all([isinstance(i, int) for i in ix]) else src.loc[ix[0], ix[1]] for ix in ndx]
+                        
+                    elif isinstance(ndx, tuple) and len(ndx) == 2: # (row index, col index)
+                        if all([isinstance(i, int) for i in ndx]):
+                            yield src.iloc[ndx[0], ndx[1]] 
+                        else:
+                            yield src.loc[ndx[0], ndx[1]] 
+                        
+                elif isinstance(src, pd.Series):
+                    # can't just  check everything, just only the basics: 
+                    # for Series ndx can be an int, (row) index, or a list of such
+                    if isinstance(ndx, list):
+                        yield [src.iloc[i] if isinstance(i, int) else src.loc[i] for i in ndx]
+                        
+                    elif isinstance(ndx, int):
+                        yield src.iloc[ndx]
+                        
                     else:
-                        yield src.loc[ndx[0], ndx[1]] 
-                    
-            elif isinstance(src, pd.Series):
-                # can't just  check everything, just only the basics: 
-                # for Series ndx can be an int, (row) index, or a list of such
-                if isinstance(ndx, list):
-                    yield [src.iloc[i] if isinstance(i, int) else src.loc[i] for i in ndx]
-                    
-                elif isinstance(ndx, int):
-                    yield src.iloc[ndx]
+                        yield src.loc[ndx] # will raise exc if ndx not appropriate
+                        
+                elif isinstance(src, (np.ndarray, pd.Index)):
+                    yield src[ndx]
                     
                 else:
-                    yield src.loc[ndx] # will raise exc if ndx not appropriate
-                    
-            elif isinstance(src, np.ndarray):
-                yield src[ndx]
-                
-            else:
-                yield src
+                    yield src
             
-    def _gen_nested_value(self, src, path=None):
+        except:
+            # optionally, give some feedfback on failure
+            if report:
+                traceback.print_exc()
+            
+    def _gen_nested_value(self, src:typing.Any, 
+                          path:typing.Optional[typing.List[typing.Any]]=None) -> typing.Generator[typing.Any, None, None]:
         #print("_gen_nested_value, path", path)
-        if not path:
+        if path is None or (isinstance(path , list) and len(path) == 0):
             #print("\tnot path")
             yield src
             
         if isinstance(path, deque): # begins here
             #print("start from deque")
-            #while len(path):
-            while path:
+            #while path: # NOTE: 2021-08-17 09:03:28 DON'T: [0] resolves as False!!!
+            while len(path):
                 pth = path.popleft()
                 #print("\tpth", pth, "path", path)
                 yield from self._gen_nested_value(src, pth)
                 
         if isinstance(path, list): # first element is top index, then next nesting level etc
             while len(path):
+                #print("src", src)
                 ndx = path.pop(0)
+                #print("ndx", ndx)
                 g = self._gen_elem(src, ndx)
                 try:
                     yield from self._gen_nested_value(next(g), path)
+                    #ng = next(g)
+                    #print("next_g", ng)
+                    #yield from self._gen_nested_value(ng, path)
                 except StopIteration:
                     pass
                 
