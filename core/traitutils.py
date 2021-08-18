@@ -209,6 +209,16 @@ class transform_link(traitlets.link):
         self.target[0].unobserve(self._update_source, names=self.target[1])
         self.source, self.target = None, None
         
+class ListTrait(List):
+    info_text = "Trait for lists that is sensitive to changes in content"
+    
+    def validate_elements(self, obj, value):
+        pass
+    
+    def validate(self, obj, value):
+        value = super(ListTrait, self).validate(obj, value)
+        
+        
 class ArrayTrait(Instance):
     info_text = "Trait for numpy arrays"
     default_value = np.array([])
@@ -370,7 +380,7 @@ def trait_from_type(x, *args, **kwargs):
     #from core.traitcontainers import DataBag
     allow_none = kwargs.pop("allow_none", False)
     
-    immclass = getmro(x.__class__)[0]
+    immediate_class = getmro(x.__class__)[0]
     # NOTE 2020-07-07 14:42:22
     # to prevent "slicing" of derived classes, 
     
@@ -384,56 +394,56 @@ def trait_from_type(x, *args, **kwargs):
         return Any()
     
     elif isinstance(x, bool):
-        if immclass != bool:
+        if immediate_class != bool:
             # preserve its immediate :class:, otherwise this will slice subclasses
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
         return Bool(default_value=x, allow_none = allow_none)
     
     elif isinstance(x, int):
-        if immclass != int:
+        if immediate_class != int:
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
         return Int(default_value=x, allow_none = allow_none)
     
     elif isinstance(x, float):
-        if immclass != float:
+        if immediate_class != float:
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
         return Float(default_value=x, allow_none = allow_none)
     
     elif isinstance(x, complex):
-        if immclass != complex:
+        if immediate_class != complex:
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
         return Complex(default_value=x, allow_none = allow_none)
     
     elif isinstance(x, bytes):
-        if immclass != bytes:
+        if immediate_class != bytes:
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
         return Bytes(default_value=x, allow_none = allow_none)
     
     elif isinstance(x, str):
-        if immclass != str:
+        if immediate_class != str:
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
         return Unicode(default_value=x, allow_none = allow_none)
     
     elif isinstance(x, list):
-        if immclass != list:
+        if immediate_class != list:
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
         return List(default_value=x, allow_none = allow_none)
     
     elif isinstance(x, set):
-        if immclass != set:
+        if immediate_class != set:
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
         return Set(default_value = x, allow_none = allow_none)
     
     elif isinstance(x, tuple):
-        if immclass != tuple:
+        if immediate_class != tuple:
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
         return Tuple(default_value=x, allow_none = allow_none)
@@ -443,7 +453,7 @@ def trait_from_type(x, *args, **kwargs):
         #return DataBagTrait(default_value=x, allow_none=allow_none)
     
     elif isinstance(x, dict):
-        if immclass != dict:
+        if immediate_class != dict:
             # preserve its immediate :class:, otherwise this will slice subclasses
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
@@ -454,9 +464,9 @@ def trait_from_type(x, *args, **kwargs):
         return UseEnum(x, allow_none = allow_none)
     
     else:
-        #immclass = getmro(x.__class__)[0]
-        if immclass.__name__ == "type": # trait encapsulates a type, not an instance
-            return Type(klass=x, default_value = immclass, allow_none = allow_none)
+        #immediate_class = getmro(x.__class__)[0]
+        if immediate_class.__name__ == "type": # trait encapsulates a type, not an instance
+            return Type(klass=x, default_value = immediate_class, allow_none = allow_none)
         
         else: # trait encapsulates an instance
             # NOTE: 2020-09-05 14:23:43 some classes need special treatment for 

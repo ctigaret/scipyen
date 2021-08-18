@@ -745,12 +745,6 @@ class TriggerDetectDialog(qd.QuickDialog):
             self.detected=False
             return
         
-        #presyn = self.eventDetectionWidget.presyn
-        #postsyn = self.eventDetectionWidget.postsyn
-        #photo = self.eventDetectionWidget.photo
-        #imaging = self.eventDetectionWidget.imaging
-        
-        #if any((self.eventDetectionWidget.presyn, self.eventDetectionWidget.postsyn, self.eventDetectionWidget.photo, self.eventDetectionWidget.imaging)):
         if any((self.presyn, self.postsyn, self.photo, self.imaging)):
             self._cached_events_ = get_events(self._ephys_) # cache all events, not just the trigger ones
             

@@ -3698,7 +3698,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             item[0].disconnect(item[1])
             
     def saveSettings(self):
-        print("%s.saveSettings %s" % (self.__class__.__name__, self.winTitle))
+        #print("%s.saveSettings %s" % (self.__class__.__name__, self.winTitle))
         # NOTE: 2021-07-08 10:18:11
         # Saves the settings for the QMainWindow instances of LSCaTWindow AND of
         # its (child, or client) viewers
@@ -3772,62 +3772,34 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
     def saveWindowSettings(self):
         """Overrides saveWindowSettings inherited from ScipyenViewer
         """
-        print("%s.saveWindowSettings %s" % (self.__class__.__name__, self.winTitle))
-        print("%s.saveWindowSettings %s save client windows settings" % (self.__class__.__name__, self.winTitle))
+        #print("%s.saveWindowSettings %s" % (self.__class__.__name__, self.winTitle))
+        #print("%s.saveWindowSettings %s save client windows settings" % (self.__class__.__name__, self.winTitle))
         for k, w in enumerate(self.sceneviewers):
             saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/SceneWindow_%d" % k)
-            #self.qsettings.setValue("LSCaTAnalysis/SceneWindow_%d_Size" % k, w.size())
-            #self.qsettings.setValue("LSCaTAnalysis/SceneWindow_%d_Position" % k, w.pos())
-            ##self.qsettings.setValue("LSCaTAnalysis/SceneWindow_%d_Geometry" % k, w.geometry())
-            #self.qsettings.setValue("LSCaTAnalysis/SceneWindow_%d_State" % k, w.saveState())
                 
         for k, w in enumerate(self.scansviewers):
             saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/ScansWindow_%d" % k)
-            #self.qsettings.setValue("LSCaTAnalysis/ScansWindow_%d_Size" % k, w.size())
-            #self.qsettings.setValue("LSCaTAnalysis/ScansWindow_%d_Position" % k, w.pos())
-            ##self.qsettings.setValue("LSCaTAnalysis/ScansWindow_%d_Geometry" % k, w.geometry())
-            #self.qsettings.setValue("LSCaTAnalysis/ScansWindow_%d_State" % k, w.saveState())
                     
         if len(self.profileviewers):
             w = self.profileviewers[0]
             saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/ProfileWindow")
-            #self.qsettings.setValue("LSCaTAnalysis/ProfileWindow_Size", w.size())
-            #self.qsettings.setValue("LSCaTAnalysis/ProfileWindow_Position", w.pos())
-            ##self.qsettings.setValue("LSCaTAnalysis/ProfileWindow_Geometry", w.geometry())
-            #self.qsettings.setValue("LSCaTAnalysis/ProfileWindow_State", w.saveState())
                 
         if len(self.scansblockviewers):
             w = self.scansblockviewers[0]
             saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/ScansDataWindow")
-            #self.qsettings.setValue("LSCaTAnalysis/ScansDataWindow_Size", w.size())
-            #self.qsettings.setValue("LSCaTAnalysis/ScansDataWindow_Position", w.pos())
-            ##self.qsettings.setValue("LSCaTAnalysis/ScansDataWindow_Geometry", w.geometry())
-            #self.qsettings.setValue("LSCaTAnalysis/ScansDataWindow_State", w.saveState())
                 
         if self.reportWindow.isVisible():
             saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/ReportWindow")
-            #self.qsettings.setValue("LSCaTAnalysis/ReportWindow_Size", self.reportWindow.size())
-            #self.qsettings.setValue("LSCaTAnalysis/ReportWindow_Position", self.reportWindow.pos())
-            ##self.qsettings.setValue("LSCaTAnalysis/ReportWindow_Geometry", self.reportWindow.geometry())
-            #self.qsettings.setValue("LSCaTAnalysis/ReportWindow_State", self.reportWindow.saveState())
             
         if len(self.ephysviewers):
             w = self.ephysviewers[0]
             saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/EphysWindow")
-            #self.qsettings.setValue("LSCaTAnalysis/EphysWindow_Size", w.size())
-            #self.qsettings.setValue("LSCaTAnalysis/EphysWindow_Position", w.pos())
-            ##self.qsettings.setValue("LSCaTAnalysis/EphysWindow_Geometry", w.geometry())
-            #self.qsettings.setValue("LSCaTAnalysis/EphysWindow_State", w.saveState())
             
         if len(self.scansblockviewers):
             w = self.scansblockviewers[0]
             saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/SceneDataWindow")
-            #self.qsettings.setValue("LSCaTAnalysis/SceneDataWindow_Size", w.size())
-            #self.qsettings.setValue("LSCaTAnalysis/SceneDataWindow_Position", w.pos())
-            ##self.qsettings.setValue("LSCaTAnalysis/ScansDataWindow_Geometry", w.geometry())
-            #self.qsettings.setValue("LSCaTAnalysis/SceneDataWindow_State", w.saveState())
                 
-        print("%s.saveWindowSettings %s Call super().saveWindowSettings" % (self.__class__.__name__, self.winTitle))
+        #print("%s.saveWindowSettings %s Call super().saveWindowSettings" % (self.__class__.__name__, self.winTitle))
         super().saveWindowSettings() # to save LSCaT window pos, geometry & statwe
             
     def loadViewerSettings(self):
@@ -8091,9 +8063,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             
         # first, deselect all graphics objects
         for w in self.scansviewers + self.sceneviewers:
-            for objdict in w.graphicsObjects().values():
-                for obj in objdict.values():
-                    obj.setSelected(False)
+            #for objdict in w.graphicsObjects().values():
+                #for obj in objdict.values():
+                    #obj.setSelected(False)
+            for objdict in w.graphicsObjects:
+                obj.setSelected(False)
                 
         if self._selected_analysis_cursor_ is not None:
             for obj in self._selected_analysis_cursor_.frontends:
@@ -12915,17 +12889,17 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
     def closeEvent(self, evt):
         """Overrides ScipyenFrameViewer.closeEvent() for clean up.
         """
-        print("%s.closeEvent %s:" % (self.__class__.__name__, self.winTitle))
+        #print("%s.closeEvent %s:" % (self.__class__.__name__, self.winTitle))
         #print("LSCaTWindow.closeEvent: isTopLevel", self.isTopLevel)
         
-        print("%s.closeEvent %s save settings" % (self.__class__.__name__, self.winTitle))
+        #print("%s.closeEvent %s save settings" % (self.__class__.__name__, self.winTitle))
         self.saveSettings()
         self._clear_contents_()
         
         # NOTE: 2021-07-08 10:27:14
         # close client viewers and remove their references
         try: 
-            print("%s.closeEvent %s Closing client windows" % (self.__class__.__name__, self.winTitle))
+            #print("%s.closeEvent %s Closing client windows" % (self.__class__.__name__, self.winTitle))
             if len(self.sceneviewers) > 0:
                 key = list()
                 for win in self.sceneviewers:
@@ -13042,7 +13016,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         #super().closeEvent(evt) 
         # finally close this window
         
-        print("%s.closeEvent %s accept event" % (self.__class__.__name__, self.winTitle))
+        #print("%s.closeEvent %s accept event" % (self.__class__.__name__, self.winTitle))
         evt.accept()
         #self.close()
         

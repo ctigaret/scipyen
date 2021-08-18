@@ -146,6 +146,11 @@ def safe_identity_test(x, y):
     try:
         ret = True
         
+        ret &= id(x) == id(y)
+        
+        if not ret:
+            return ret
+        
         ret &= type(x) == type(y)
         
         if not ret:
@@ -189,7 +194,6 @@ def safe_identity_test(x, y):
             if not ret:
                 return ret
             
-        
         #if isinstance(x, (pd.DataFrame, pd.Series, pd.Index)):
             #return (x==y).all().all()
         

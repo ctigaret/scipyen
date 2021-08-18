@@ -476,15 +476,9 @@ IV Generic indexing for the neo framework (provisional)
 
 """
 #### BEGIN core python modules
-import traceback
-import datetime
-import collections
-import numbers
-import inspect
+import traceback, datetime, collections, numbers, inspect, warnings, typing
 from itertools import chain, filterfalse
 from functools import partial
-import warnings
-import typing
 from enum import (Enum, IntEnum,)
 #### END core python modules
 
@@ -517,14 +511,81 @@ from . import utilities
 #### END pict.core modules
 
 ephys_data = (neo.Block, neo.Segment, neo.AnalogSignal, neo.IrregularlySampledSignal, 
-              neo.SpikeTrain, DataSignal, IrregularlySampledDataSignal,)
+              neo.SpikeTrain, DataSignal, IrregularlySampledDataSignal,
+              )
 
-ephys_data_collection = (neo.Block, neo.Segment)
+ancillary_neo_data = (neo.ImageSequence, neo.Event, neo.Epoch)
+
+ephys_data_collection = (neo.Block, neo.Segment, neo.Unit)
+
+type_to_container_member_name = {
+    neo.Segment: {
+        DataSignal: "analogsignals",
+        IrregularlySampledDataSignal: "irregularlysampledsignals",
+        neo.AnalogSignal: "analogsignals",
+        neo.IrregularlySampledSignal: "irregularlysampledsignals",
+        neo.SpikeTrain: "spiketrains",
+        neo.Event: "events",
+        neo.Epoch: "epochs",
+        neo.ImageSequence: "imagesequences",
+        },
+    neo.Block: {
+        neo.RectangularRegionOfInterest: "regionsofinterest",
+        neo.CircularRegionOfInterest: "regionofinterest",
+        neo.PolygonRegionOfInterest: "regionsofinterest",
+        neo.Segment: "segments",
+        neo.ChannelIndex: "channel_indexes",
+        neo.Group: "groups",
+        neo.Unit: "list_units",
+        },
+    neo.Unit: {
+        neo.SpikeTrain: "spiketrains",
+        },
+    neo.Group: {
+        neo.Segment: "segments",
+        DataSignal: "analogsignals",
+        IrregularlySampledDataSignal: "irregularlysampledsignals",
+        neo.AnalogSignal: "analogsignals",
+        neo.IrregularlySampledSignal: "irregularlysampledsignals",
+        neo.SpikeTrain: "spiketrains",
+        neo.Event: "events",
+        neo.Epoch: "epochs",
+        neo.ImageSequence: "imagesequences",
+        },
+    }
+
 
 if __debug__:
     global __debug_count__
 
     __debug_count__ = 0
+    
+def get_member_collections(container:typing.Union[type, neo.core.container.Container],
+                           membertype:typing.Union[type, tuple, list]) -> list:
+    if isinstance(container, type):
+        if not neo.core.container.Container in inspect.getmro(container):
+            raise TypeError("Cannot handle %s" % container)
+        
+        if container not in type_to_container_member_name.keys():
+            raise TypeError("Cannot handle %s" % container)
+        
+        cont_type = container
+        
+    else:
+        cont_type = type(container)
+        
+        if not neo.core.container.Container in inspect.getmro(cont_type):
+            raise TypeError("Cannot handle container with type" % cont_type)
+        
+        if cont_type not in type_to_container_member_name.keys():
+            raise TypeError("Cannot handle container with type" % cont_type)
+        
+    cont_dict = type_to_container_member_name[cont_type]
+    
+    if isinstance(membertype, (tuple, list)) and all([isinstance(t, type) and t in cont_dict.keys() for t in membertype]):
+        attrnames = [cont_dict[t] for t in membertype]
+        
+    #elif isinstance(membertype, type) and membertype in 
 
 def get_neo_version() -> tuple:
     major, minor, dot = neo.version.version.split(".")
@@ -1068,7 +1129,7 @@ def normalized_signal_index(src: neo.core.container.Container,
     if not isinstance(src, (neo.Segment, neo.ChannelIndex, neo.Unit)):
         raise TypeError("Expecting a neo.Segment or neo.ChannelIndex; got %s instead" % type(src).__name__)
     
-    #### BEGIN figure out what signal collection we're after'
+    #### BEGIN figure out what signal collection we're after
     if ctype in (neo.AnalogSignal, DataSignal):
         if not isinstance(src, (neo.Segment, neo.ChannelIndex)):
             raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))

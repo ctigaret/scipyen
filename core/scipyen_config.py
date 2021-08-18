@@ -94,8 +94,7 @@ class ScipyenConfiguration(DataBag):
                         mutable_types = mutable_types,
                         use_casting = use_casting,
                         allow_none = allow_none)
-    
-    
+
 class FunctionConfiguration(ScipyenConfiguration):
     """ScipyenConfiguration specialized for functional options.
     

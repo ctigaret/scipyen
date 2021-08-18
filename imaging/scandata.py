@@ -18,6 +18,8 @@ from core.datatypes import (UnitTypes,Genotypes, arbitrary_unit, pixel_unit,
                             embryonic_day, embryonic_week, embryonic_month,
                             )
 
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
+
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 
 from core.triggerprotocols import (TriggerProtocol,

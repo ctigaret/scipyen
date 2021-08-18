@@ -1344,8 +1344,16 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             maxHeight = self.__scene__.rootImage.boundingRect().height()
             
             if isinstance(item, pgui.Cursor):
+                # FIXME 2021-08-18 10:31:43 in planargraphics
+                # cursor width & height should NEVER be none!
+                if item.width is None: 
+                    item.width = maxWidth
+                    
                 if item.width <= 0 or item.width > maxWidth:
                     item.width = maxWidth
+                    
+                if item.height is None:
+                    item.height = maxHeight
                     
                 if item.height <= 0 or item.height > maxHeight:
                     item.height = maxHeight

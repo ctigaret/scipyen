@@ -16,7 +16,7 @@ event handlers pre_execute() and post_execute().
 #
 
 import traceback, typing, inspect, os
-
+from copy import deepcopy
 import json
 
 #from jupyter_core.paths import jupyter_runtime_dir
@@ -564,22 +564,47 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             return val is not self.user_ns_hidden[name]
         
         return True
+    
+    def var_observed_handler(self, change):
+        return change["name"]
             
     def pre_execute(self):
         """Callback from the jupyter interpreter/kernel before executing code
         """
+        # FIXME 2021-08-18 12:55:33
+        #### BEGIN
+        # because cached_vars holds references, it will get updated once the 
+        # object has changed and the change won't be picked up
+        # vivid example:
+        # a = list() ==> workspace viewer displays a with 0 length
+        # a += [1,2,3] ==> workspace viewer still displays a with 0 length
+        # but:
+        # a = [1,2,3] ==> updates correctly because a now has a new id
+        #### END
+        
         # see NOTE 2020-11-29 16:29:01 and NOTE: 2020-11-29 16:05:14
         # checks if a new variable reassigns the binding to an already existing 
         # symbol (previously bound to a hidden variable) - so that it can be 
         # restored when user "deletes" it from the workspace
+        
+        # FIXME: 2021-08-18 13:04:17
+        # if you deepcopy they will get a new id
+        #self.cached_vars = dict([deepcopy(item) for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         self.cached_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         
-        #print("pre_execute cached vars", self.cached_vars)
+        #self.cached_vars = DataBag([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         
         self.modified_vars.clear()
         self.new_vars.clear()
         self.deleted_vars.clear()
         
+        existing_vars = [item for item in self.shell.user_ns.items() if item[0] in self.cached_vars.keys()]
+        
+        self.modified_vars.update([item for item in existing_vars if not safe_identity_test(item[1], self.cached_vars[item[0]])])
+            
+        #print("pre_execute self.cached_vars", self.cached_vars)
+        #print("pre_execute self.modified_vars", self.modified_vars)
+            
     @safeWrapper
     def post_execute(self):
         """Callback for the internal inprocess ipython kernel
@@ -623,6 +648,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # workspace (which may not be a bad idea, after all)
             vars_to_restore = [k for k in self.deleted_vars.keys() if k in self.user_ns_hidden.keys()]
             #print("post_execute vars_to_restore",vars_to_restore)
+            
             # restore the links between the deleted symbol and the original reference
             for v in vars_to_restore:
                 self.shell.user_ns[v] = self.user_ns_hidden[v]
@@ -632,10 +658,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             for item in deleted_mpl_figs:
                 self.cached_vars.pop(item, None)
             
-            #self.deleted_vars.update(dict_of_mpl_figs_deleted_in_ns)
-            #self.deleted_vars.update(deleted_mpl_figs)
-            
-            #new_mpl_figs = [fig for fig in mpl_figs_in_pyplot if fig not in dict_of_mpl_figs_in_ns.values()]
             new_mpl_figs = [fig for fig in mpl_figs_in_pyplot if fig not in mpl_figs_in_ns]
             
             #print("\npost_execute: new figs",new_mpl_figs)
@@ -661,13 +683,15 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # symbol to faciliate user interaction, but thenn we restore them
             # once the user has "deleted" the new binding (NOTE: 2020-11-29 16:05:14)
             new_vars = dict([(i,v) for i, v in self.shell.user_ns.items() if i not in self.cached_vars.keys() and not i.startswith("_") and self.is_user_var(i,v)])
-            #new_vars = dict([(i,v) for i, v in self.shell.user_ns.items() if i not in self.cached_vars.keys() and i not in self.user_ns_hidden and not i.startswith("_")])
             
             self.new_vars.update(new_vars)
             
             #print("post_execute new_vars", self.new_vars)
+            #print("post_execute self.cached_vars", self.cached_vars)
             
             existing_vars = [item for item in self.shell.user_ns.items() if item[0] in self.cached_vars.keys()]
+            
+            #print("post_execute existing_vars", existing_vars)
             
             for fig in new_mpl_figs:
                 self.new_vars["Figure%d" % fig.number] = fig
@@ -677,6 +701,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 fig.canvas.mpl_connect("figure_enter_event", self.shell.user_ns["mainWindow"].handle_mpl_figure_enter)
             
             self.modified_vars.update([item for item in existing_vars if not safe_identity_test(item[1], self.cached_vars[item[0]])])
+            
+            #print("post_execute self.modified_vars", self.modified_vars)
             
             self.cached_vars.update(self.new_vars)
             

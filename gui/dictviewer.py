@@ -210,17 +210,24 @@ class InteractiveTreeWidget(DataTreeWidget):
 
         # defaults for all objects
         typeStr = type(data).__name__
-        
-        if typeStr == 'instance':
-            typeStr += ": " + data.__class__.__name__
-            
         typeTip = ""
+        
+        if typeStr == "instance":
+            typeStr += ": " + data.__class__.__name__
+            typeTip = data.__class__.__name__
+            
+        elif typeStr == "type":
+            typeStr = data.__name__
+            typeTip = str(data)
+            
         if is_namedtuple(data):
             typeTip = "(namedtuple)"
             
         widget = None
         desc = ""
         childs = {}
+        
+        #print("typeStr", typeStr, "typeTip", typeTip)
         
         # type-specific changes
         if isinstance(data, NestedFinder.nesting_types):
@@ -409,8 +416,20 @@ class InteractiveTreeWidget(DataTreeWidget):
             
         # recurse to children
         for key, data in childs.items():
-            keyTypeTip = "key / index type: %s" % type(key).__name__
-            self.buildTree(data, node, asUnicode(key), keyTypeTip, path=path+(key,))
+            if isinstance(key, type):
+                keyrepr = key.__name__
+                keytip = asUnicode(key)
+                
+            elif type(key)._name__ == "instance":
+                keyrepr = key.__class__.__name__
+                keytip = asUnicode(key)
+                
+            else:
+                keyrepr = asUnicode(key)
+                keytip = type(key).__name__
+                
+            keyTypeTip = "key / index type: %s" % keytip
+            self.buildTree(data, node, keyrepr, keyTypeTip, path=path+(key,))
 
         
 class DataViewer(ScipyenViewer):
