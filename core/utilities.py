@@ -142,14 +142,15 @@ def safe_identity_test2(x, y):
     return SafeComparator(comp=eq)(x, y)
 
 @safeWrapper
-def safe_identity_test(x, y):
+def safe_identity_test(x, y, idcheck=False):
     try:
         ret = True
         
-        ret &= id(x) == id(y)
-        
-        if not ret:
-            return ret
+        if idcheck:
+            ret &= id(x) == id(y)
+            
+            if not ret:
+                return ret
         
         ret &= type(x) == type(y)
         

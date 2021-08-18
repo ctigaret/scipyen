@@ -210,10 +210,14 @@ class transform_link(traitlets.link):
         self.source, self.target = None, None
         
 class ListTrait(List):
+    """TraitType that should also be able to notify:
+    a) when a list contents has changed (i.e., gained/lost members)
+    b) when an element in the list has changed (either a new value, or a new type)
+    """
     info_text = "Trait for lists that is sensitive to changes in content"
     
-    def validate_elements(self, obj, value):
-        pass
+    #def validate_elements(self, obj, value):
+        #pass
     
     def validate(self, obj, value):
         value = super(ListTrait, self).validate(obj, value)

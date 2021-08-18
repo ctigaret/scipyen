@@ -39,34 +39,34 @@ class DataBagTraitsObserver(HasTraits):
         
         super().__init__(*args, **kwargs)
     
-    def add_traits(self, **traits):
-        # NOTE 2020-07-04 22:43:58 FIXME
-        # the super's add_traits blows away non-trait attributes
-        # because existing traits are reverted to the default value
-        # NOTE: that was because they were defined as CLASS attributes
-        # 
-        #length = object.__getattribute__(self, "baglength")
-        #mutable = object.__getattribute__(self,"mutable_types")
-        #do_type_casting = object.__getattribute__(self, "use_casting")
-        #allow_none = object.__getattribute__(self, "allow_none")
+    #def add_traits(self, **traits):
+        ## NOTE 2020-07-04 22:43:58 FIXME
+        ## the super's add_traits blows away non-trait attributes
+        ## because existing traits are reverted to the default value
+        ## NOTE: that was because they were defined as CLASS attributes
+        ## 
+        ##length = object.__getattribute__(self, "baglength")
+        ##mutable = object.__getattribute__(self,"mutable_types")
+        ##do_type_casting = object.__getattribute__(self, "use_casting")
+        ##allow_none = object.__getattribute__(self, "allow_none")
         
-        ## NOTE 2020-07-04 22:42:42
-        ## length and mutable_types need to be reset to their
-        ## current values (see NOTE 2020-07-04 22:43:58)
-        ## we do this here in order to avoid triggering a change notification
-        #traits.update({"baglength":trait_from_type(length), 
-                        #"mutable_types":trait_from_type(mutable),
-                        #"use_casting": trait_from_type(do_type_casting),
-                        #"allow_none": trait_from_type(allow_none)})
+        ### NOTE 2020-07-04 22:42:42
+        ### length and mutable_types need to be reset to their
+        ### current values (see NOTE 2020-07-04 22:43:58)
+        ### we do this here in order to avoid triggering a change notification
+        ##traits.update({"baglength":trait_from_type(length), 
+                        ##"mutable_types":trait_from_type(mutable),
+                        ##"use_casting": trait_from_type(do_type_casting),
+                        ##"allow_none": trait_from_type(allow_none)})
                         
-        #print("DataBagTraitsObserver.add_traits", traits)
+        ##print("DataBagTraitsObserver.add_traits", traits)
         
-        super().add_traits(**traits) # this DOES keep length and mutable_types traits but reverts them to the defaults
+        #super().add_traits(**traits) # this DOES keep length and mutable_types traits but reverts them to the defaults
         
-        # this also works, but triggers a change notification, which we don't 
-        # need right now
-        #self.baglength = length
-        #self.mutable_types = mutable
+        ## this also works, but triggers a change notification, which we don't 
+        ## need right now
+        ##self.baglength = length
+        ##self.mutable_types = mutable
         
     def remove_traits(self, **traits):
         current_traits = self.traits()
@@ -86,7 +86,9 @@ class DataBagTraitsObserver(HasTraits):
                             #"use_casting": trait_from_type(use_casting==True),
                             #"allow_none": trait_from_type(allow_none==True)})
         
-        self.__class__ = type(self.__class__.__name__, (HasTraits, ), {"changed":self.changed, "remove_traits":self.remove_traits})
+        self.__class__ = type(self.__class__.__name__,
+                              (HasTraits, ), 
+                              {"changed":self.changed, "remove_traits":self.remove_traits})
         
         self.add_traits(**keep_traits)
         
@@ -124,18 +126,20 @@ class DataBagTraitsObserver(HasTraits):
     def __getstate__(self):
         return super().__getstate__()
     
-    def _add_notifiers(self, handler, name, typ):
-        #print("DataBagTraitsObserver._add_notifiers() handler:", handler, "name", name, "type", typ)
-        #print("\t has _trait_notifiers:", hasattr(self, "_trait_notifiers"))
-        if not hasattr(self, "_trait_notifiers"):
-            #print("I am a", type(self))
-            raise AttributeError()
+    #def _add_notifiers(self, handler, name, typ):
+        ##print("DataBagTraitsObserver._add_notifiers() handler:", handler, "name", name, "type", typ)
+        ##print("\t has _trait_notifiers:", hasattr(self, "_trait_notifiers"))
+        #if not hasattr(self, "_trait_notifiers"):
+            ##print("I am a", type(self))
+            #raise AttributeError()
             
-        super()._add_notifiers(handler, name, typ)
+        #super()._add_notifiers(handler, name, typ)
         
     @observe(All)
     def changed(self, change):
         """for illustration purposes
+        WARNING the corresponding ObserveHandler will be removed upon calling
+        self.unobserve() or self.unobserve_all()
         """
         ## NOTE: 2020-07-05 18:01:01 that's what you can to with these
         #print("self.changed: change['type']:\n",change["type"], "\n")
@@ -412,30 +416,21 @@ class DataBag(Bunch):
                 
                 if type(val) != target_type:
                     #if object.__getattribute__(obs, "use_casting"):
-                    if object.__getattribute__(hid, "use_casting"):
+                    if hid["use_casting"]:
                         new_val = target_type(val) # this may fail !
                         object.__setattr__(obs, key, new_val)
                         
                     #elif object.__getattribute__(obs, "mutable_types"):
-                    elif object.__getattribute__(hid, "use_mutable"):
+                    elif hid["use_mutable"]:
                         self.__coerce_trait__(obs, key, val)
                         
                     else:
+                        # allow_none takes effect in the call below
                         object.__setattr__(obs, key, val) # may raise TraitError
                         
                 else:
-                    ## enforce mutual exclusivity for mutable_types and use_casting
-                    #if key == "mutable_types" and val == True:
-                        #object.__setattr__(self, "use_casting", False)
-                        ##object.__setattr__(obs, "use_casting", False)
-                        
-                    #elif key == "use_casting" and val == True:
-                        #object.__setattr__(self, "mutable_types", False)
-                        ##object.__setattr__(obs, "mutable_types", False)
-                    
                     object.__setattr__(obs, key, val)
 
-                #object.__setattr__(obs, "baglength", self.__len__())
                 super().__setitem__(key, val)
                         
             except:
