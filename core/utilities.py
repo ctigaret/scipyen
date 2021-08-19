@@ -2,7 +2,8 @@
 '''
 Various utilities
 '''
-import traceback, re, itertools, functools, time, typing, warnings, operator
+import traceback, re, itertools, functools, time, typing, warnings, operator, random
+from sys import getsizeof, stderr
 from copy import (copy, deepcopy,)
 from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
                      isgeneratorfunction, iscoroutinefunction,
@@ -13,10 +14,9 @@ from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
                      signature,
                      )
 from functools import (partial, partialmethod,)
-
-from collections import deque
+from itertools import chain
+from collections import deque, OrderedDict
 from numbers import Number
-from sys import getsizeof
 import numpy as np
 from numpy import ndarray
 from neo.core.dataobject import DataObject as NeoDataObject
@@ -37,7 +37,7 @@ from .prog import safeWrapper
 from .strutils import get_int_sfx
 
 # NOTE: 2021-07-24 15:03:53
-# moved to core.datatypes
+# moved TO core.datatypes
 #abbreviated_type_names = {'IPython.core.macro.Macro' : 'Macro'}
 #sequence_types = (list, tuple, deque)
 #sequence_typenames = ('list', 'tuple', "deque")
@@ -54,7 +54,12 @@ from .strutils import get_int_sfx
                 #"TriggerEvent",)
                 
 #ndarray_type = ndarray.__name__
+random.seed()
+hashrandseed = random.randrange(4294967295)
 
+# NOTE: 2021-08-19 09:47:18
+# moved FROM copre.workspacefunctions:
+# total_size
 
 standard_obj_summary_headers = ["Name","Workspace",
                                 "Type","Data Type", 
@@ -134,6 +139,92 @@ class SafeComparator(object):
             #print("y:", y)
             return False
     
+def gethash(x:typing.Any) -> Number:
+    """Calculates a hash-like figure for objects including non-hashable
+    To be used for object comparisons.
+    
+    WARNING: This is NOT NECESSARILY a hash
+    In particular for mutable sequences, or objects containing immutable sequences
+    is very likely to return floats
+    """
+    from core.datatypes import is_hashable
+    from math import log2, factorial
+    if isinstance(x, dict): # order is not important
+        return sum((gethash(v) for v in x.values()))
+    
+    elif isinstance(x, (set, frozenset)): # order is not important
+        return sum((gethash(v) for v in x))
+    
+    elif isinstance(x, (list, deque)):
+        return sum((log2(abs(gethash(v) * k ** p)) for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((1, -1))))) # captures the order
+        #return sum((log(gethash(v) * factorial(k) ** p) for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((1, -1))))) # captures the order
+        #return sum((gethash(v) * k for v,k in zip(x, range(len(x))))) # captures the order
+    
+    elif not is_hashable(x):
+        return gethash(x.__dict__)
+    
+    else:
+        # NOTE: 2021-08-19 16:18:20
+        # tuples, like all immutable basic python datatypes are hashable and their
+        # hash values reflect the order of the elements
+        # All user-defined classes and objects of user-defined types are also
+        # hashable
+        return hash(x) + hashrandseed
+        
+def total_size(o, handlers={}, verbose=False):
+    """ Returns the approximate memory footprint an object and all of its contents.
+
+    Automatically finds the contents of the following builtin containers and
+    their subclasses:  tuple, list, deque, dict, set and frozenset.
+    To search other containers, add handlers to iterate over their contents:
+
+        handlers = {SomeContainerClass: iter,
+                    OtherContainerClass: OtherContainerClass.get_elements}
+
+    Author:
+    Raymond Hettinger
+    
+    Reference:
+    Compute memory footprint of an object and its contents (python recipe)
+    
+    Raymond Hettinger python recipe 577504-1
+    https://code.activestate.com/recipes/577504/
+    
+    """
+    dict_handler = lambda d: chain.from_iterable(d.items())
+    all_handlers = {tuple: iter,
+                    list: iter,
+                    deque: iter,
+                    dict: dict_handler,
+                    set: iter,
+                    frozenset: iter,
+                   }
+    all_handlers.update(handlers)     # user handlers, if given, take precedence
+    seen = set()                      # track which object id's have already been seen
+    default_size = getsizeof(0)       # estimate sizeof object without __sizeof__
+
+    def sizeof(o_):
+        if id(o_) in seen:       # do not double count the same object
+            return 0
+        seen.add(id(o_))
+        
+        s = getsizeof(o_, default_size)
+
+        if verbose:
+            print(s, type(o_), repr(o_), file=stderr)
+            
+        handler = all_handlers[type(o_)]
+        
+        s += sum(map(sizeof, handler(o_)))
+
+        #for typ, handler in all_handlers.items():
+            #if isinstance(o_, typ):
+                #s += sum(map(sizeof, handler(o_)))
+                #break
+        return s
+
+    return sizeof(o)
+
 # NOTE: 2021-07-27 23:09:02
 # define this here BEFORE NestedFinder so that we can use it as default value for
 # comparator

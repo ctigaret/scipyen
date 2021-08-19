@@ -28,6 +28,7 @@ import neo
 import quantities as pq
 from core import datasignal
 from core.datatypes import units_convertible
+from core.utilities import gethash
 
 #from prog import safeWrapper
 
@@ -209,19 +210,88 @@ class transform_link(traitlets.link):
         self.target[0].unobserve(self._update_source, names=self.target[1])
         self.source, self.target = None, None
         
-class ListTrait(List):
-    """TraitType that should also be able to notify:
+class ListTrait(List): # inheritance chain: List <- Container <- Instance
+    """TraitType that ideally should notify:
     a) when a list contents has changed (i.e., gained/lost members)
     b) when an element in the list has changed (either a new value, or a new type)
+    c) when the order of the elements has changed
     """
+    _trait = None
+    
     info_text = "Trait for lists that is sensitive to changes in content"
     
-    #def validate_elements(self, obj, value):
-        #pass
-    
-    def validate(self, obj, value):
-        value = super(ListTrait, self).validate(obj, value)
+    def __init__(self, trait=None, traits=None, default_value=None, **kwargs):
         
+        self._traits = traits # a list of traits, one per element
+        self._length = 0
+        
+        self.hashed = 0
+        
+        # initialize the List (<- Container <- Instance) NOW
+        super(ListTrait, self).__init__(trait=trait, default_value=default_value, **kwargs)
+        
+        if default_value is not None or default_value is not Undefined:
+            self._length = len(default_value)
+            self.hashed = gethash(default_value)
+            
+        #print("ListTrait.__init__ trait", trait, 
+              #"traits", traits, "default_value", default_value, 
+              #"**kwargs", kwargs)
+        
+    def validate_elements(self, obj, value):
+        # NOTE: 2021-08-19 11:28:10 do the inherited validation first
+        value = super(ListTrait, self).validate_elements(obj, value)
+        # NOTE: 2021-08-19 11:18:25 then the customized one
+        # imitates see traitlets.Dict.validate_elements
+        use_list = bool(self._traits) # may be None
+        default_to = (self._trait or Any())
+        validated = []
+        
+        if not use_list and isinstance(default_to, Any):
+            return value
+        
+        for k,v in enumerate(value):
+            if k < len(self._traits):
+                try:
+                    v = self._traits[k]._validate(obj, v)
+                except TraitError:
+                    self.element_error(obj, v, self._traits[k])
+                else:
+                    validated.append(v)
+                    
+            else:
+                validated.append(v)
+
+        return self.klass(validated)
+
+    def set(self, obj, value):
+        """Overrides List.set to check for special hash.
+        This is supposed to also detect changes in order of elements.
+        """
+        new_value = self._validate(obj, value)
+        try:
+            old_value = obj._trait_values[self.name]
+        except KeyError:
+            old_value = self.default_value
+
+        obj._trait_values[self.name] = new_value
+        try:
+            silent = bool(old_value == new_value)
+            
+            # NOTE: 2021-08-19 16:17:23
+            # check for change in contents
+            if silent is not False:
+                new_hash = gethash(new_value)
+                silent = (new_hash == self.hashed)
+                if not silent:
+                    self.hashed = new_hash
+        except:
+            # if there is an error in comparing, default to notify
+            silent = False
+        if silent is not True:
+            # we explicitly compare silent to True just in case the equality
+            # comparison above returns something other than True/False
+            obj._notify_trait(self.name, old_value, new_value)
         
 class ArrayTrait(Instance):
     info_text = "Trait for numpy arrays"
@@ -379,10 +449,13 @@ def trait_from_type(x, *args, **kwargs):
     --------
     
     allow_none: bool default is False
+    content_traits:bool, default is False
+    content_allow_none:bool, default is whatever allow_none is
     
     """
-    #from core.traitcontainers import DataBag
     allow_none = kwargs.pop("allow_none", False)
+    content_traits = kwargs.pop("content_traits", True)
+    content_allow_none = kwargs.pop("content_allow_none", allow_none)
     
     immediate_class = getmro(x.__class__)[0]
     # NOTE 2020-07-07 14:42:22
@@ -435,10 +508,16 @@ def trait_from_type(x, *args, **kwargs):
         return Unicode(default_value=x, allow_none = allow_none)
     
     elif isinstance(x, list):
+        if content_traits:
+            traits = [trait_from_type(v, allow_none=allow_none, content_traits=content_traits) for v in x]
+        else:
+            traits = None
+            
         if immediate_class != list:
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
-        return List(default_value=x, allow_none = allow_none)
+        return ListTrait(default_value = x, traits = traits, allow_none = allow_none)
+        #return List(default_value=x, allow_none = allow_none)
     
     elif isinstance(x, set):
         if immediate_class != set:
@@ -450,19 +529,26 @@ def trait_from_type(x, *args, **kwargs):
         if immediate_class != tuple:
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
-        return Tuple(default_value=x, allow_none = allow_none)
+        return Tuple(default_value = x, allow_none = allow_none)
     
     #elif "DataBag" in type(x).__name__:
     #elif isinstance(x, DataBag):
         #return DataBagTrait(default_value=x, allow_none=allow_none)
     
     elif isinstance(x, dict):
+        # NOTE 2021-08-19 11:33:03
+        # for Dict, traits is a mapping of dict keys to their corresponding traits
+        if content_traits:
+            traits = dict((k, trait_from_type(v, allow_none = allow_none, content_traits=content_traits)) for k,v in x.items()) 
+        else:
+            traits = None
+            
         if immediate_class != dict:
             # preserve its immediate :class:, otherwise this will slice subclasses
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
-        return Dict(default_value=x, allow_none = allow_none)
-
+        return Dict(default_value=x, traits=traits, allow_none = allow_none)
+        #return Dict(default_value=x, allow_none = allow_none)
     
     elif isinstance(x, enum.EnumMeta):
         return UseEnum(x, allow_none = allow_none)

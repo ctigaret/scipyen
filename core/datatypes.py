@@ -117,11 +117,14 @@ from imaging.imageprocessing import *
 #   
 abbreviated_type_names = {'IPython.core.macro.Macro' : 'Macro'}
 sequence_types = (list, tuple, deque)
-sequence_typenames = ('list', 'tuple', "deque")
+sequence_typenames = (t.__name__ for t in sequence_types)
+#sequence_typenames = ('list', 'tuple', "deque")
 set_types = (set, frozenset)
-set_typenames = ("set", "frozenset")
+set_typenames = (t.__name__ for t in set_types)
+#set_typenames = ("set", "frozenset")
 dict_types = (dict,)
-dict_typenames = ("dict",)
+dict_typenames = (t.__name__ for t in dict_types)
+#dict_typenames = ("dict",)
 # NOTE: neo.Segment class name clashes with nrn.Segment
 neo_containernames = ("Block", "Segment",)
 # NOTE: 2020-07-10 12:52:57
@@ -406,6 +409,10 @@ def arraySlice(data:np.ndarray, slicing:(dict, type(None))):
         raise TypeError("Slicing expected to be a dict or None; got %s instead" % type(slicing).__name__)
     
     return tuple(indexobj)
+
+def is_hashable(x):
+    return getattr(x, "__hash__", None) is not None
+        
 
 def is_namedtuple(x):
     return isinstance(x, tuple) and all([hasattr(x, a) for a in ("_asdict", "_fields", "_make", "_replace", "_source")])

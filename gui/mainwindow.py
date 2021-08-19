@@ -2149,14 +2149,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
     @pyqtSlot()
     def slot_refreshWorkspaceView(self):
-        self.workspaceModel.updateTable(from_console=False)
-        #self.workspaceModel.pre_execute()
-        #for name, var in self.workspaceModel.cached_vars.items():
-            #self.workspaceModel.originalVarName = name
-            #self.workspaceModel.updateRowForVariable(name, var)
-            
-        #self.workspaceModel.originalVarName=""
-        #self.workspaceModel.modelContentsChanged.emit()
+        self.workspaceModel.updateTable(from_console=False, force=True)
     
     # NOTE: 2016-03-26 17:07:17
     # as a workaround for the problem in NOTE: 2016-03-26 17:01:32

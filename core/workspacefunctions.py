@@ -8,8 +8,7 @@ DOES NOT WORK (yet)
 #import pict
 
 from __future__ import print_function
-from sys import getsizeof, stderr
-from itertools import chain
+#from sys import getsizeof, stderr
 
 import re as _re # re is also imported directly from pict
 
@@ -69,57 +68,6 @@ def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None) -> bool:
     elif not isinstance(arg, bool):
         raise TypeError("Expecting a str ('on' or 'off'), a bool, or None; got %s instead" % arg)
         
-def total_size(o, handlers={}, verbose=False):
-    """ Returns the approximate memory footprint an object and all of its contents.
-
-    Automatically finds the contents of the following builtin containers and
-    their subclasses:  tuple, list, deque, dict, set and frozenset.
-    To search other containers, add handlers to iterate over their contents:
-
-        handlers = {SomeContainerClass: iter,
-                    OtherContainerClass: OtherContainerClass.get_elements}
-
-    Author:
-    Raymond Hettinger
-    
-    Reference:
-    Compute memory footprint of an object and its contents (python recipe)
-    
-    Raymond Hettinger python recipe 577504-1
-    https://code.activestate.com/recipes/577504/
-    
-    """
-    dict_handler = lambda d: chain.from_iterable(d.items())
-    all_handlers = {tuple: iter,
-                    list: iter,
-                    deque: iter,
-                    dict: dict_handler,
-                    set: iter,
-                    frozenset: iter,
-                   }
-    all_handlers.update(handlers)     # user handlers take precedence
-    seen = set()                      # track which object id's have already been seen
-    default_size = getsizeof(0)       # estimate sizeof object without __sizeof__
-
-    def sizeof(o):
-        if id(o) in seen:       # do not double count the same object
-            return 0
-        seen.add(id(o))
-        s = getsizeof(o, default_size)
-
-        if verbose:
-            print(s, type(o), repr(o), file=stderr)
-
-        for typ, handler in all_handlers.items():
-            if isinstance(o, typ):
-                s += sum(map(sizeof, handler(o)))
-                break
-        return s
-
-    return sizeof(o)
-
-#"def" lsvars(ws = None, sel = None, sort=False, sortkey=None, reverse=None):
-#"def" lsvars(*args, ws = None, sort=False, sortkey=None, reverse=None):
 def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, 
             var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None,
             sort:bool=False, sortkey:object=None, reverse:bool=False):

@@ -587,10 +587,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # symbol (previously bound to a hidden variable) - so that it can be 
         # restored when user "deletes" it from the workspace
         
-        # FIXME: 2021-08-18 13:04:17
-        # if you deepcopy they will get a new id
-        self.cached_vars = dict([deepcopy(item) for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
-        #self.cached_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        # FIXME: 2021-08-18 13:04:17 deepcopy problems
+        # 1. if you deepcopy they will get a new id
+        # 2. cannot deepcopy a module => issues with imported modules present in the ns
+        # 3. deepcopy could duplicate memory use
+        # workaround 2 & 3: filter what to deepcopy (i.e. restrict only to POD and
+        # python containers but code could become even more unwieldy that it already is)
+        #self.cached_vars = dict([deepcopy(item) for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        self.cached_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         
         #self.cached_vars = DataBag([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         
@@ -935,7 +939,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def clearTable(self):
         self.removeRows(0,self.rowCount())
         
-    def updateTable(self, from_console:bool = False):
+    def updateTable(self, from_console:bool = False, force:bool=False):
         """CAUTION Updates model table only for vars in internal workspace.
         For data in external kernels (i.e., in the external console) use 
         updateFromExternal
@@ -1029,14 +1033,19 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     if varname not in self.shell.user_ns: # deleted by GUI
                         self.removeRowForVariable(varname)
                         
-                    elif varname in self.cached_vars: # should also be in user_ns
-                        if type(self.cached_vars[varname]).__name__ != displayed_vars_types[varname]:
+                    else:
+                        if force:
                             self.originalVarName = varname # see NOTE: 2021-06-12 12:11:25
                             self.updateRowForVariable(varname, self.shell.user_ns[varname])
                             
-                        elif not safe_identity_test(self.shell.user_ns[varname], self.cached_vars[varname]):
-                            self.originalVarName = varname # see NOTE: 2021-06-12 12:11:25
-                            self.updateRowForVariable(varname, self.shell.user_ns[varname])
+                        elif varname in self.cached_vars: # should also be in user_ns
+                            if type(self.cached_vars[varname]).__name__ != displayed_vars_types[varname]:
+                                self.originalVarName = varname # see NOTE: 2021-06-12 12:11:25
+                                self.updateRowForVariable(varname, self.shell.user_ns[varname])
+                                
+                            elif not safe_identity_test(self.shell.user_ns[varname], self.cached_vars[varname]):
+                                self.originalVarName = varname # see NOTE: 2021-06-12 12:11:25
+                                self.updateRowForVariable(varname, self.shell.user_ns[varname])
                 
                 # NOTE: 2021-06-12 12:12:50
                 # clear symbol cache, see NOTE: 2021-06-12 12:11:25

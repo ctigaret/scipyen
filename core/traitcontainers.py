@@ -11,7 +11,7 @@ accessed using attribute syntax.
 
 """
 import traceback
-from inspect import getcallargs
+from inspect import getcallargs, isfunction, ismethod
 #from traitlets import (HasTraits, TraitType, Eventhandler, Int, Bool, All, 
                        #is_trait, observe,TraitError,)
 from traitlets.utils.bunch import Bunch
@@ -40,26 +40,8 @@ class DataBagTraitsObserver(HasTraits):
         super().__init__(*args, **kwargs)
     
     #def add_traits(self, **traits):
-        ## NOTE 2020-07-04 22:43:58 FIXME
-        ## the super's add_traits blows away non-trait attributes
-        ## because existing traits are reverted to the default value
-        ## NOTE: that was because they were defined as CLASS attributes
-        ## 
-        ##length = object.__getattribute__(self, "baglength")
-        ##mutable = object.__getattribute__(self,"mutable_types")
-        ##do_type_casting = object.__getattribute__(self, "use_casting")
-        ##allow_none = object.__getattribute__(self, "allow_none")
-        
-        ### NOTE 2020-07-04 22:42:42
-        ### length and mutable_types need to be reset to their
-        ### current values (see NOTE 2020-07-04 22:43:58)
-        ### we do this here in order to avoid triggering a change notification
-        ##traits.update({"baglength":trait_from_type(length), 
-                        ##"mutable_types":trait_from_type(mutable),
-                        ##"use_casting": trait_from_type(do_type_casting),
-                        ##"allow_none": trait_from_type(allow_none)})
-                        
         ##print("DataBagTraitsObserver.add_traits", traits)
+        
         
         #super().add_traits(**traits) # this DOES keep length and mutable_types traits but reverts them to the defaults
         
@@ -243,14 +225,12 @@ class DataBag(Bunch):
     #   d.mutable_types = True
     
             
-    #hidden_traits = ("length",)
-    hidden_traits = ("length", "use_mutable", "use_casting", "allow_none","notify_length",)
-    #__observer__ = DataBagTraitsObserver() # class variable - should be instance variable?
+    hidden_traits = ("length", "use_mutable", "use_casting", "allow_none")
     
     @staticmethod
-    def _make_hidden():
-        ret = dict([(name, False) for name in DataBag.hidden_traits])
-        ret["length"] = 0
+    def _make_hidden(**kwargs):
+        ret = Bunch([(name, kwargs.pop(name, False)) for name in DataBag.hidden_traits])
+        ret.length = 0
         return ret
     
     def __init__(self, *args, **kwargs):
@@ -262,8 +242,8 @@ class DataBag(Bunch):
             
             Otherwise it is ignored.
             
-        **kwargs : attributes to go into the data bag, and the 
-                    following options:
+        **kwargs : key, value pairs to go into the data bag, and the following
+                    options:
         
         use_casting: bool, default is False
             When True, the value set to an EXISTING attribute is cast to the type
@@ -283,38 +263,28 @@ class DataBag(Bunch):
         allow_none: bool, default False
             When True, a trait value can be None
             
+        handler: a function or method accepting a dict (or Bunch) with the 
+            following keys: 'owner', 'type', 'name', 'old', 'new'
+            
+            Optional, default is None
+            
+            When given, all the key/value pairs in the DataBag will be observed
+            for change (whenever possible)
+            
         ATTENTION   mutable_types and use_casting cannot be simultaneously True,
                     but can be simultaneously False.
         
         When both mutable_types and use_casting are given True values, then 
         use_casting takes precedence over mutable_types.
-        
             
         """
-        self.__hidden__ = dict()
-        self.__hidden__["use_mutable"] = kwargs.pop("mutable_types", False)
-        self.__hidden__["use_casting"] = kwargs.pop("use_casting", False)
-        self.__hidden__["allow_none"] = kwargs.pop("allow_none", False)
-        self.__hidden__["notify_length"] = kwargs.pop("notify_length", False)
+        self.__hidden__ = DataBag._make_hidden(**kwargs)
         
         dd = dict(*args, **kwargs)
         
-        dd.pop("mutable_types", None)
-        dd.pop("use_casting", None)
-        dd.pop("allow_none", None)
-        dd.pop("notify_length", None)
-        #is_copy_ctor=False
+        for name in self.__hidden__.keys():
+            dd.pop(name, None)
         
-        #print("DataBag.__init__ args: %s\n" % ["arg %d, %s: %s" % (k, type(a).__name__, a) for k,a in enumerate(args)])
-        
-        #if len(args):
-            #if isinstance(args[0], DataBag):
-                #use_mutable = args[0].mutable_types
-                #do_type_cast = args[0].use_casting
-                #allow_none = args[0].allow_none
-                
-                #dd = dict(args[0].__observer__._trait_values)
-                
         if self.use_casting:
             self.use_mutable = False
                 
@@ -325,9 +295,9 @@ class DataBag(Bunch):
         
         super().__init__(*args, **kwargs)
         
-        trdict = dict(map(lambda x: (x, trait_from_type(dd[x], allow_none=allow_none)), dd.keys()))
+        trdict = dict(map(lambda x: (x, trait_from_type(dd[x], allow_none=self.__hidden__.allow_none)), dd.keys()))
         
-        length = len(trdict)
+        self.__hidden__.length = len(trdict)
         
         #trdict.update({"baglength": trait_from_type(length),
                         #"mutable_types": trait_from_type(use_mutable==True),
@@ -339,8 +309,8 @@ class DataBag(Bunch):
     def __setitem__(self, key, val):
         """Implements indexed (subscript) assignment: self[key] = val
         """
-        if key in ("baglength", "length", "len"):
-            return # read-only but fail gracefully
+        #if key in ("baglength", "length", "len"):
+            #return # read-only but fail gracefully
             #raise KeyError("Key %s is read-only" % key)
         
             
@@ -415,12 +385,10 @@ class DataBag(Bunch):
                 target_type = type(old_value)
                 
                 if type(val) != target_type:
-                    #if object.__getattribute__(obs, "use_casting"):
                     if hid["use_casting"]:
                         new_val = target_type(val) # this may fail !
                         object.__setattr__(obs, key, new_val)
                         
-                    #elif object.__getattribute__(obs, "mutable_types"):
                     elif hid["use_mutable"]:
                         self.__coerce_trait__(obs, key, val)
                         
@@ -438,54 +406,39 @@ class DataBag(Bunch):
                 
         else:
             # add a new trait
-            #if key not in ("__observer__", ) and key not in DataBagTraitsObserver.hidden_traits:
             if key not in ("__observer__", "__hidden__") and key not in self.__hidden__.keys():
-                #trdict = {key:trait_from_type(val, allow_none = object.__getattribute__(self, "_allow_none"))}
                 trdict = {key:trait_from_type(val, allow_none = self.allow_none)}
                 obs.add_traits(**trdict)
                 object.__setattr__(obs, key, val)
-                #object.__setattr__(obs, "baglength", self.__len__())
+                object.__getattribute__(self, "__hidden__").length = len(trdict)
                 
             super().__setitem__(key, val)
             
     def __len__(self):
         obs = object.__getattribute__(self, "__observer__") # bypass self.__getitem__()
         ret = len(obs.traits())
+        object.__getattribute__(self, "__hidden__")["length"] = ret
         return ret
-        #cleanup = [t for t in DataBagTraitsObserver.hidden_traits if t in obs.traits()]
-        
-        #if len(cleanup) > ret:
-            #return 0
-        
-        #else:
-            #return ret - len(cleanup)
 
     def __str__(self):
         obs = object.__getattribute__(self, "__observer__")
-        d = dict((key, getattr(obs, key)) for key in obs.traits())# if key not in DataBagTraitsObserver.hidden_traits and key != "__observer__")
-        #d = dict((key, getattr(obs, key)) for key in obs.traits() if key not in DataBagTraitsObserver.hidden_traits and key != "__observer__")
+        d = dict((key, getattr(obs, key)) for key in obs.traits())
         return d.__str__()
     
     def __repr__(self):
         obs = object.__getattribute__(self, "__observer__")
-        d = dict((key, getattr(obs, key)) for key in obs.traits())# if key not in DataBagTraitsObserver.hidden_traits and key != "__observer__")
-        #d = dict((key, getattr(obs, key)) for key in obs.traits() if key not in DataBagTraitsObserver.hidden_traits and key != "__observer__")
+        d = dict((key, getattr(obs, key)) for key in obs.traits())
         return d.__repr__()
     
     def __getitem__(self, key):
         """Implements bag[key] (subscript access, or "bracket syntax"")
         """
-        #if key in self.__dict__:
-            #return self.__dict__[key]
         obs = object.__getattribute__(self, "__observer__")
         return getattr(obs, key)
     
     def __getattr__(self, key):
         """Implements bag.key (attribute access, or "dot syntax")
         """
-        #if key in self.__dict__:
-            #return self.__dict__[key]
-        
         try:
             obs = object.__getattribute__(self, "__observer__")
             
@@ -493,7 +446,7 @@ class DataBag(Bunch):
                 val = getattr(obs, key)
                 
             else:
-                val = self.__getitem__(key)
+                val = self.__getitem__(key) # this exposes access to observer's methods
                 
             if isinstance(val, TraitType):
                 return val.get(obs)
@@ -503,6 +456,9 @@ class DataBag(Bunch):
             
         except:
             raise #KeyError("%s" % key)
+        
+    def __hash__(self):
+        return sum((hash(v) for v in self.items()))
         
     def __delitem__(self, key):
         """Implements del a[key] where a is a DataBag and key is a str
@@ -514,7 +470,8 @@ class DataBag(Bunch):
             if obs.has_trait(key):
                 out_traits = {key: obs.traits()[key]}
                 obs.remove_traits(**out_traits)
-            
+                
+            object.__getattribute__(self, "__hidden__")["length"] = len(obs.traits())
             
         except:
             raise #KeyError("%s" % key)
@@ -525,9 +482,6 @@ class DataBag(Bunch):
         try:
             obs = object.__getattribute__(self, "__observer__")
             return obs.has_trait(key)
-            #return key in obs._trait_values.keys()
-            #if key in obs.__dict__.keys():
-                #return True
         except:
             raise
             
@@ -578,8 +532,10 @@ class DataBag(Bunch):
         
     @property
     def observer(self):
+        """The HasTraits observer. Read-only
+        """
         return self.__observer__
-        
+    
     def as_dict(self):
         return dict((k,v) for k,v in self.items())
         
@@ -615,8 +571,6 @@ class DataBag(Bunch):
     @property
     def mutable_types(self):
         return self.__hidden__["use_mutable"]
-        #return object.__getattribute__(self, "_mutable_types")
-        #return self.__observer__.mutable_types
     
     @mutable_types.setter
     def mutable_types(self, val:bool):
@@ -624,19 +578,13 @@ class DataBag(Bunch):
             raise TypeError("Expecting a bool; got %s instead" % type(val).__name__)
         
         self.__hidden__["use_mutable"] = val
-        #object.__setattr__(self, "_mutable_types", val)
-        #self.__observer__.mutable_types = val
         
         if val:
             self.__hidden__["use_casting"] = False
-            #object.__setattr__(self, "_use_casting", False)
-            #self.__observer__.use_casting = False
         
     @property
     def use_mutable(self):
         return self.__hidden__["use_mutable"]
-        #return object.__getattribute__(self, "_mutable_types")
-        #return self.__observer__.mutable_types
     
     @mutable_types.setter
     def use_mutable(self, val:bool):
@@ -644,19 +592,13 @@ class DataBag(Bunch):
             raise TypeError("Expecting a bool; got %s instead" % type(val).__name__)
         
         self.__hidden__["use_mutable"] = val
-        #object.__setattr__(self, "_mutable_types", val)
-        #self.__observer__.mutable_types = val
         
         if val:
             self.__hidden__["use_casting"] = False
-            #object.__setattr__(self, "_use_casting", False)
-            #self.__observer__.use_casting = False
         
     @property
     def use_casting(self):
         return self.__hidden__["use_casting"]
-        #return object.__getattribute__(self, "_use_casting")
-        #return self.__observer__.use_casting
     
     @use_casting.setter
     def use_casting(self, val:bool):
@@ -664,19 +606,13 @@ class DataBag(Bunch):
             raise TypeError("Expecting a bool; got %s instead" % type(val).__name__)
         
         self.__hidden__["use_casting"] = val
-        #object.__setattr__(self, "_use_casting", val)
-        #self.__observer__.use_casting = val
         
         if val == True:
             self.__hidden__["use_mutable"] = False
-            #object.__setattr__(self, "_use_mutable", False)
-            #self.__observer__.use_mutable = False
         
     @property
     def allow_none(self):
         return self.__hidden__["allow_none"]
-        #return object.__getattribute__(self, "_allow_none")
-        #return self.__observer__.allow_none
         
     @allow_none.setter
     def allow_none(self, val):
@@ -684,19 +620,6 @@ class DataBag(Bunch):
             raise TypeError("Expecting a bool; got %s instead" % type(val).__name__)
         
         self.__hidden__["allow_none"] = val
-        #object.__setattr__(self, "_allow_none", val )
-        #self.__observer__.allow_none = val 
-        
-    @property
-    def notify_length(self):
-        return self.__hidden__["notify_length"]
-    
-    @notify_length.setter
-    def notify_length(self, val):
-        if not isinstance(val, bool):
-            raise TypeError("Expecting a bool; got %s instead" % type(val).__name__)
-        
-        self.__hidden__["notify_length"] = val
         
     def keys(self):
         """Generates a keys 'view'
@@ -704,7 +627,7 @@ class DataBag(Bunch):
         obs = object.__getattribute__(self, "__observer__")
         # TODO find a way to return this as a dict_view (mapping proxy)
         # it should be OK for now
-        yield from (k for k in obs._trait_values if k not in DataBagTraitsObserver.hidden_traits)
+        yield from (k for k in obs._trait_values)
     
     def values(self):
         """Generates a values 'view'
@@ -797,13 +720,9 @@ class DataBag(Bunch):
                 self[key] = value
                 
     def observe(self, handler, names=All, type="change"):
-        #if names == "baglength":
-            #names = "baglength"
         self.__observer__.observe(handler, names=names, type=type)
         
     def unobserve(self, handler, names=All, type="change"):
-        #if names == "baglength":
-            #names = "baglength"
         self.__observer__.unobserve(handler, names=names, type=type)
         
     def link(self, name, other, other_name):
@@ -933,9 +852,9 @@ class DataBag(Bunch):
         else:
             raise TypeError("'source' expected to be a DataBag or HasTraits; got %s instead" % type(source).__name__)
         
-        
-def generic_change_handler(chg):
-    print("change_handler chg['owner']:\n",chg["owner"], "\n")
-    print("change_handler chg['name']:\n",chg["name"], "\n")
-    print("change_handler chg['old']:\n",chg["old"], "\n")
-    print("change_handler chg['new']:\n",chg["new"], "\n")
+def generic_change_handler(c):
+    print("type:",  c.type)
+    print("owner:", c.owner)
+    print("name:",  c.name)
+    print("old:",   c.old)
+    print("new:",   c.new)
