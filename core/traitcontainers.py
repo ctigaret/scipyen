@@ -407,7 +407,7 @@ class DataBag(Bunch):
         else:
             # add a new trait
             if key not in ("__observer__", "__hidden__") and key not in self.__hidden__.keys():
-                trdict = {key:trait_from_type(val, allow_none = self.allow_none)}
+                trdict = {key:trait_from_type(val, allow_none = self.allow_none, content_traits=True)}
                 obs.add_traits(**trdict)
                 object.__setattr__(obs, key, val)
                 object.__getattribute__(self, "__hidden__").length = len(trdict)
@@ -466,8 +466,10 @@ class DataBag(Bunch):
         try:
             obs = object.__getattribute__(self, "__observer__")
             super().__delitem__(key)
-            obs.length = self.__len__()
-            if obs.has_trait(key):
+            #obs.length = self.__len__()
+            
+            #if obs.has_trait(key):
+            if key in obs.traits():
                 out_traits = {key: obs.traits()[key]}
                 obs.remove_traits(**out_traits)
                 
@@ -537,18 +539,19 @@ class DataBag(Bunch):
         return self.__observer__
     
     def as_dict(self):
-        return dict((k,v) for k,v in self.items())
+        """Dictionary view
+        """
+        return self._trait_values
+        #return dict((k,v) for k,v in self.items())
         
     def clear(self):
         try:
-            # simply inheriting from Bunch just won't do: we also need to get rid
-            # of the traits (except for the maintenance ones)
             super().clear()
             
             obs = object.__getattribute__(self, "__observer__")
-            traits = dict([(k, obs.traits()[k]) for k in obs.traits() if k not in DataBagTraitsObserver.hidden_traits])
+            traits = dict(obs.traits())
             obs.remove_traits(**traits)
-            obs.length = self.__len__()
+            object.__getattribute__(self, "__hidden__")["length"] = len(obs.traits())
             
         except:
             raise
@@ -560,7 +563,7 @@ class DataBag(Bunch):
         """
         try:
             ret = self.__getitem__(key)
-            self.__delitem__(key)
+            self.__delitem__(key) # also updates __hidden__.length
             return ret
         except:
             if len(args) == 0:
@@ -570,56 +573,56 @@ class DataBag(Bunch):
         
     @property
     def mutable_types(self):
-        return self.__hidden__["use_mutable"]
+        return self.__hidden__.use_mutable
     
     @mutable_types.setter
     def mutable_types(self, val:bool):
         if not isinstance(val, bool):
             raise TypeError("Expecting a bool; got %s instead" % type(val).__name__)
         
-        self.__hidden__["use_mutable"] = val
+        self.__hidden__.use_mutable = val
         
         if val:
-            self.__hidden__["use_casting"] = False
+            self.__hidden__.use_casting = False
         
     @property
     def use_mutable(self):
-        return self.__hidden__["use_mutable"]
+        return self.__hidden__.use_mutable
     
     @mutable_types.setter
     def use_mutable(self, val:bool):
         if not isinstance(val, bool):
             raise TypeError("Expecting a bool; got %s instead" % type(val).__name__)
         
-        self.__hidden__["use_mutable"] = val
+        self.__hidden__.use_mutable = val
         
         if val:
-            self.__hidden__["use_casting"] = False
+            self.__hidden__.use_casting = False
         
     @property
     def use_casting(self):
-        return self.__hidden__["use_casting"]
+        return self.__hidden__.use_casting
     
     @use_casting.setter
     def use_casting(self, val:bool):
         if not isinstance(val, bool):
             raise TypeError("Expecting a bool; got %s instead" % type(val).__name__)
         
-        self.__hidden__["use_casting"] = val
+        self.__hidden__.use_casting = val
         
         if val == True:
-            self.__hidden__["use_mutable"] = False
+            self.__hidden__.use_mutable = False
         
     @property
     def allow_none(self):
-        return self.__hidden__["allow_none"]
+        return self.__hidden__.allow_none
         
     @allow_none.setter
     def allow_none(self, val):
         if not isinstance(val, bool):
             raise TypeError("Expecting a bool; got %s instead" % type(val).__name__)
         
-        self.__hidden__["allow_none"] = val
+        self.__hidden__.allow_none = val
         
     def keys(self):
         """Generates a keys 'view'

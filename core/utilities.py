@@ -138,7 +138,92 @@ class SafeComparator(object):
             #print("x:", x)
             #print("y:", y)
             return False
+        
+def hashlist(x:typing.Iterable[typing.Any]) -> Number:
+    """Takes into account the order of the elements
     
+    Example 1:
+    
+    import random # to generate random sequences
+    random.seed()
+    
+    # generate 10 random sequences
+    k = 11
+    seqs = [random.sample(range(k), k) for i in range(k)]
+
+    seqs
+    
+        [[7, 5, 10, 1, 4, 2, 6, 3, 9, 8, 0],
+         [9, 0, 7, 1, 5, 8, 3, 10, 6, 4, 2],
+         [7, 10, 9, 3, 6, 4, 8, 1, 5, 0, 2],
+         [1, 6, 8, 2, 5, 10, 9, 4, 0, 7, 3],
+         [5, 7, 2, 0, 9, 6, 8, 4, 3, 10, 1],
+         [6, 0, 2, 9, 7, 1, 8, 3, 4, 10, 5],
+         [10, 2, 6, 7, 4, 1, 5, 9, 0, 8, 3],
+         [3, 7, 5, 1, 10, 0, 9, 6, 8, 4, 2],
+         [0, 5, 3, 8, 2, 9, 1, 6, 4, 7, 10],
+         [9, 10, 2, 3, 5, 8, 0, 1, 4, 7, 6],
+         [8, 9, 0, 3, 5, 7, 1, 4, 2, 6, 10]]    
+        
+    sums = [sum(hashlist(x)) for x in seqs]
+
+    sums
+
+        [103034808763.81586,
+         103034808806.43579,
+         103034808697.90562,
+         103034808809.05049,
+         103034808811.85916,
+         103034808796.93391,
+         103034808824.6124,
+         103034808735.8485,
+         103034808837.7218,
+         103034808790.48198,
+         103034808795.09956]
+        
+    Example 2:
+    
+    k = 10
+    
+    eye = [[0]*k for i in range(k)]
+    
+    for i, s in enumerate(eye):
+        s[i]=1
+        
+    eye
+    
+        [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+         [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+         [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+         [0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+         [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+         [0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]
+
+    sums = [sum(hashlist(x)) for s in eye]
+    
+    sums
+    
+        [102740977801.8254,
+         102740977802.8254,
+         102740977801.15872,
+         102740977804.8254,
+         102740977801.02539,
+         102740977806.8254,
+         102740977800.96825,
+         102740977808.8254,
+         102740977800.93651,
+         102740977810.8254]
+        
+    """
+    if not hasattr(x, "__iter__"):
+        raise TypeError("Expecting an iterable; got %s instead" % type(x).__name__)
+    
+    return (gethash(v) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
+
 def gethash(x:typing.Any) -> Number:
     """Calculates a hash-like figure for objects including non-hashable
     To be used for object comparisons.
@@ -148,7 +233,7 @@ def gethash(x:typing.Any) -> Number:
     is very likely to return floats
     """
     from core.datatypes import is_hashable
-    from math import log2, factorial
+    from math import log2, factorial, exp
     if isinstance(x, dict): # order is not important
         return sum((gethash(v) for v in x.values()))
     
@@ -156,9 +241,7 @@ def gethash(x:typing.Any) -> Number:
         return sum((gethash(v) for v in x))
     
     elif isinstance(x, (list, deque)):
-        return sum((log2(abs(gethash(v) * k ** p)) for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((1, -1))))) # captures the order
-        #return sum((log(gethash(v) * factorial(k) ** p) for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((1, -1))))) # captures the order
-        #return sum((gethash(v) * k for v,k in zip(x, range(len(x))))) # captures the order
+        return sum(hashlist(x))
     
     elif not is_hashable(x):
         return gethash(x.__dict__)

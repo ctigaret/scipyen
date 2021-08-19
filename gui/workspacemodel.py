@@ -76,7 +76,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.new_vars = dict()
         self.deleted_vars = dict()
         self.user_ns_hidden = dict(user_ns_hidden)
-    
+        
+        self.observed_vars = DataBag(allow_none = True)
+        
         # NOTE: 2021-07-28 09:58:38
         # currentVarItem/Name are set by selecting/activating an item in workspace view
         self.currentVarItem = None
@@ -103,7 +105,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #self.foreign_kernel_palette = list(sb.color_palette("pastel", 1))
         
         self.foreign_namespaces = DataBag(allow_none=True, mutable_types=True)
-        self.foreign_namespaces.observe(self._foreign_namespaces_count_changed_, names="length")
+        # FIXME: 2021-08-19 21:45:17
+        #self.foreign_namespaces.observe(self._foreign_namespaces_count_changed_, names="length")
             
     def _foreign_namespaces_count_changed_(self, change):
         # FIXME / TODO 2020-07-30 23:49:13
@@ -113,6 +116,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #self.foreign_kernel_palette = list(sb.color_palette("pastel", change["new"]))
         #print("workspaceModel: foreign namespaces = %s, (old: %s, new: %s)" % (len(self.foreign_namespaces), change["old"], change["new"]))
         pass
+    
+    def _var_changed(self, ns, change):
+        pass
+        
         
     def __reset_variable_dictionaries__(self):
         self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.user_ns_hidden and not item[0].startswith("_")])

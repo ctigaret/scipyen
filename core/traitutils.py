@@ -234,10 +234,6 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
             self._length = len(default_value)
             self.hashed = gethash(default_value)
             
-        #print("ListTrait.__init__ trait", trait, 
-              #"traits", traits, "default_value", default_value, 
-              #"**kwargs", kwargs)
-        
     def validate_elements(self, obj, value):
         # NOTE: 2021-08-19 11:28:10 do the inherited validation first
         value = super(ListTrait, self).validate_elements(obj, value)
@@ -266,7 +262,7 @@ class ListTrait(List): # inheritance chain: List <- Container <- Instance
 
     def set(self, obj, value):
         """Overrides List.set to check for special hash.
-        This is supposed to also detect changes in order of elements.
+        This is supposed to also detect changes in the order of elements.
         """
         new_value = self._validate(obj, value)
         try:

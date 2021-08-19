@@ -172,7 +172,7 @@ import core.data_analysis as anl
 
 from core.utilities import (summarize_object_properties,
                             standard_obj_summary_headers,
-                            safe_identity_test, unique, index_of,
+                            safe_identity_test, unique, index_of, gethash,
                             NestedFinder,)
 
 from core.prog import (safeWrapper, deprecation, iter_attribute,
