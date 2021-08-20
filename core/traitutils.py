@@ -3,9 +3,12 @@
 """
 
 import enum
+from enum import EnumMeta
 import contextlib
 
-from inspect import getmro
+from inspect import getmro, isclass
+from types import new_class
+from collections import deque
 
 import traitlets
 
@@ -30,9 +33,73 @@ from core import datasignal
 from core.datatypes import units_convertible
 from core.utilities import gethash
 
+# NOTE :2021-08-20 09:50:52
+# to figure out traitlets classes use the following idioms:
+#
+#    for klass in vars(traitlets).values():
+#        if inspect.isclass(klass) and issubclass(klass, traitlets.TraitType):
+#            print(klass)
+#
+#    for klass in vars(traitlets).values():
+#        if inspect.isclass(klass) and issubclass(traitlets.Instance):
+#            print(klass)
+
+
+
 #from prog import safeWrapper
 
+type_to_trait = {
+    None:       (Any,),
+    bool:       (Bool,      Instance,),
+    int:        (Int,       Instance,),
+    float:      (Float,     Instance,),
+    complex:    (Complex,   Instance,),
+    bytes:      (Bytes,     Instance,),
+    str:        (Unicode,   Instance,),
+    list:       (List,      Instance,),
+    deque:      (List,      Instance,),
+    set:        (Set,       Instance,),
+    frozenset:  (Set,       Instance,),
+    tuple:      (Tuple,     Instance,),
+    dict:       (Dict,      Instance,),
+    EnumMeta:   (UseEnum, ),
+    
+    }
+
+class TraitSetMixin(object):
+    def __init__(self):
+        super().__init__
             
+    def set(self, obj, value):
+        """Overrides List.set to check for special hash.
+        This is supposed to also detect changes in the order of elements.
+        """
+        print("TraitSetMixin.set")
+        new_value = self._validate(obj, value)
+        try:
+            old_value = obj._trait_values[self.name]
+        except KeyError:
+            old_value = self.default_value
+
+        obj._trait_values[self.name] = new_value
+        try:
+            silent = bool(old_value == new_value)
+            
+            # NOTE: 2021-08-19 16:17:23
+            # check for change in contents
+            if silent is not False:
+                new_hash = gethash(new_value)
+                silent = (new_hash == self.hashed)
+                if not silent:
+                    self.hashed = new_hash
+        except:
+            # if there is an error in comparing, default to notify
+            silent = False
+        if silent is not True:
+            # we explicitly compare silent to True just in case the equality
+            # comparison above returns something other than True/False
+            obj._notify_trait(self.name, old_value, new_value)
+        
 class TraitsObserver(HasTraits):
     """ CAUTION do not use yet
     """
@@ -425,6 +492,53 @@ class QuantityTrait(Instance):
                     % (self.name, self.info(), msg)
             
         raise TraitError(e)
+    
+def dynamic_trait(x, *args, **kwargs):
+    """Generates a TraitType for object x.
+    
+    Prerequisites: Except for enum types (enum.Enum and enumIntEnum)
+    x.__class__ should define a "copy constructor", e.g.:
+    
+    x = SomeClass()
+    
+    y = SomeClass(x)    # copy constructor semantics when x and y are of the same type 
+                        # x may be a subclass/superclass of y, or another type
+    
+    For types derived from builtin types, this is taken care of by the python 
+    library. Anything else needs a bit of work.
+    
+    Options:
+    --------
+    
+    allow_none: bool default is False
+    content_traits:bool, default is False
+    content_allow_none:bool, default is whatever allow_none is
+    
+    """
+    allow_none = kwargs.pop("allow_none", False)
+    content_traits = kwargs.pop("content_traits", True)
+    content_allow_none = kwargs.pop("content_allow_none", allow_none)
+    
+    immediate_class = getmro(x.__class__)[0]
+    # NOTE 2020-07-07 14:42:22
+    # to prevent "slicing" of derived classes, 
+    
+    arg = [x] + [a for a in args]
+    
+    args = tuple(arg)
+    
+    kw = kwargs
+    
+    if x is None:
+        klass = Any
+        
+    elif isinstance(x, bool):
+        if immediate_class != bool:
+            klass = Instance
+        else:
+            klass = Bool
+            
+    elif isinstance(x, int):
 
     
 def trait_from_type(x, *args, **kwargs):
@@ -512,7 +626,10 @@ def trait_from_type(x, *args, **kwargs):
         if immediate_class != list:
             return Instance(klass = x.__class__, args=args, kw=kw, allow_none = allow_none)
         
-        return ListTrait(default_value = x, traits = traits, allow_none = allow_none)
+        traitklass = new_class("ListTrait1", bases = (List,), exec_body = new_trait_callback)
+        return traitklass(default_value = x, allow_none = allow_none)
+        #return TestTrait(default_value = x, traits = traits, allow_none = allow_none)
+        #return ListTrait(default_value = x, traits = traits, allow_none = allow_none)
         #return List(default_value=x, allow_none = allow_none)
     
     elif isinstance(x, set):
@@ -691,3 +808,45 @@ def trait_from_type(x, *args, **kwargs):
             trait.default_value = x
             return trait
     
+class TestTrait(TraitSetMixin, List):
+    def __init__(self, *args, **kwargs):
+        List.__init__(self, **kwargs)
+        super().__init__()
+        #TraitSetMixin.__init__(self)
+        
+def new_trait_callback(ns):
+    def new_set(instance, obj, value):
+        """Overrides List.set to check for special hash.
+        This is supposed to also detect changes in the order of elements.
+        """
+        print("own set")
+        new_value = instance._validate(obj, value)
+        try:
+            old_value = obj._trait_values[instance.name]
+        except KeyError:
+            old_value = instance.default_value
+
+        obj._trait_values[instance.name] = new_value
+        try:
+            silent = bool(old_value == new_value)
+            
+            # NOTE: 2021-08-19 16:17:23
+            # check for change in contents
+            if silent is not False:
+                new_hash = gethash(new_value)
+                silent = (new_hash == instance.hashed)
+                if not silent:
+                    instance.hashed = new_hash
+        except:
+            # if there is an error in comparing, default to notify
+            silent = False
+        if silent is not True:
+            # we explicitly compare silent to True just in case the equality
+            # comparison above returns something other than True/False
+            obj._notify_trait(instance.name, old_value, new_value)
+
+    print("ns:", ns)
+    ns["info_text"]="Trait that is sensitive to content change"
+    ns["hashed"] = 0
+    ns["set"] = new_set
+        
