@@ -2789,7 +2789,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         CAUTION: this is also called when variables are re-created!
         
         """
-        #print("slot_variableItemNameChanged")
+        print("slot_variableItemNameChanged", item.text())
         signalBlockers = [QtCore.QSignalBlocker(self.workspaceView),
                           QtCore.QSignalBlocker(self.workspaceModel),
                           QtCore.QSignalBlocker(self.workspaceView.selectionModel())]

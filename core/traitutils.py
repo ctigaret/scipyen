@@ -32,7 +32,7 @@ import neo
 import quantities as pq
 from core import datasignal
 from core.datatypes import units_convertible
-from core.utilities import gethash
+from core.utilities import gethash, safe_identity_test
 
 # NOTE :2021-08-20 09:50:52
 # to figure out traitlets classes use the following idioms:
@@ -93,18 +93,32 @@ def _enhanced_set_(instance, obj, value):
     obj._trait_values[instance.name] = new_value
     
     try:
-        silent = bool(old_value == new_value)
+        new_hash = gethash(new_value)
+        #print(instance.name, "old hashed", instance.hashed, "new_hash", new_hash)
+        silent = (new_hash == instance.hashed)
         
-        # NOTE: 2021-08-19 16:17:23
-        # check for change in contents
-        if silent is not False:
-            new_hash = gethash(new_value)
-            silent = (new_hash == instance.hashed)
-            if not silent:
-                instance.hashed = new_hash
+        if not silent:
+            instance.hashed = new_hash
+            
+        
+        #silent = bool(safe_identity_test(old_value, new_value))
+        ##silent = bool(old_value == new_value)
+        
+        #print("%s: silent before hash" % instance.name, silent)
+        
+        ## NOTE: 2021-08-19 16:17:23
+        ## check for change in contents
+        #if silent is not False:
+            #new_hash = gethash(new_value)
+            #silent = (new_hash == instance.hashed)
+            #print("%s: silent after hash" % instance.name, silent)
+            #if not silent:
+                #instance.hashed = new_hash
     except:
+        traceback.print_exc()
         # if there is an error in comparing, default to notify
         silent = False
+        
     if silent is not True:
         # we explicitly compare silent to True just in case the equality
         # comparison above returns something other than True/False

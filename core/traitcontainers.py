@@ -499,7 +499,7 @@ class DataBag(Bunch):
         old_trait = obs.traits()[key]
         old_type = type(object.__getattribute__(obs, key))
         
-        new_trait = trait_from_type(val, allow_none = self.allow_none)
+        new_trait = dynamic_trait(val, allow_none = self.allow_none, content_traits=True)
         new_type = type(val)
         
         obs.remove_traits(**{key:old_trait})
@@ -855,9 +855,25 @@ class DataBag(Bunch):
         else:
             raise TypeError("'source' expected to be a DataBag or HasTraits; got %s instead" % type(source).__name__)
         
-def generic_change_handler(c):
-    print("type:",  c.type)
-    print("owner:", c.owner)
-    print("name:",  c.name)
-    print("old:",   c.old)
-    print("new:",   c.new)
+def generic_change_handler(c, show:str="all"):
+    if isinstance(show, str):
+        if len(show.strip()) == 0:
+            show="all"
+            
+        elif show not in c:
+           show="all"
+           
+    else:
+        show = "all"
+        
+    print("generic_change_handler for debugging")
+        
+    if show == "all":
+        print("type:",  c.type)
+        print("owner:", c.owner)
+        print("name:",  c.name)
+        print("old:",   c.old)
+        print("new:",   c.new)
+        
+    else:
+        print(show, c[show])

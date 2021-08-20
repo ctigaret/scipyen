@@ -252,52 +252,53 @@ def gethash(x:typing.Any) -> Number:
     
     # Arguably, we don't need to monitor elemental vale changes in these large
     # data sets, just their ndim/shape/size/axistags, etc
-    
+    def _arsum(_x):
+        return sum((hash(_x.ndim), hash(_x.size), hash(_x.shape),))
+        
+    def _arsumtype(_x):
+        return _arsum(_x) + hash(_x.dtype)
+
     try:
         if isinstance(x, dict): # order is not important
-            return sum((gethash(v) for v in x.values()))
+            return hash(type(x)) + sum((gethash(v) for v in x.values()))
         
         elif isinstance(x, (set, frozenset)): # order is not important
-            return sum((gethash(v) for v in x))
+            return hash(type(x)) + sum((gethash(v) for v in x))
         
         elif isinstance(x, (list, deque)):
-            return sum(hashlist(x))
+            return hash(type(x)) + sum(hashlist(x))
         
         elif isinstance(x, pq.Quantity):
-            return sum([hash(x.dtype), hash(x.ndim), hash(x.size), hash(x.shape), hash(x.dimensionality)])
-            #return HASHRANDSEED + sum([hash(x.dtype), hash(x.ndim), hash(x.size), hash(x.shape), hash(x.dimensionality)])
+            return hash(type(x)) + _arsumtype(x) + hash(x.dimensionality)
         
         elif isinstance(x, vigra.VigraArray):
-            return gethash(np.array(x)) + hash(x.axistags)
+            return hash(type(x)) + gethash(np.array(x)) + hash(x.axistags)
         
         elif isinstance(x, vigra.vigranumpycore.ChunkedArrayBase):
-            arsum = sum([hash(x.dtype), hash(x.ndim), hash(x.size), hash(x.shape),])
-            arsum += sum([hash(x.chunk_array_shape), hash(x.chunk_shape), ])
-            return arsum
-            #return HASHRANDSEED + arsum
+            return hash(type(x)) + _arsumtype(x) + sum((hash(x.chunk_array_shape), hash(x.chunk_shape), ))
         
         elif isinstance(x, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
-            return hash(x)
+            return hash(type(x)) + hash(x)
             #return HASHRANDSEED + hash(x)
         
         elif isinstance(x, np.ndarray):
-            return sum([hash(x.shape), hash(x.size), hash(x.ndim) , hash(x.dtype)])
+            return hash(type(x)) + _arsumtype(x)
             #return HASHRANDSEED + sum([hash(x.shape), hash(x.size), hash(x.ndim) , hash(x.dtype)])
         
         elif isinstance(x, pd.DataFrame):
-            return hash(tuple(x.index)) + hash(tuple(x.columns)) + sum((gethash(x[c]) for c in df.columns))
+            return hash(type(x)) + _arsum(x) + hash(tuple(x.index)) + hash(tuple(x.columns)) + sum((gethash(x[c]) for c in x.columns))
         
         elif isinstance(x, pd.Series):
-            return hash(tuple(x.index)) + hash(tuple(x.name))  + hash(x.dtype) # + hash(tuple(x))
+            return hash(type(x)) + _arsumtype(x) + hash(tuple(x.index)) + hash(tuple(x.name))
             #return HASHRANDSEED + hash(tuple(x.index)) + hash(tuple(x.name)) + hash(tuple(x)) + hash(x.dtype)
         
         elif isinstance(x, pd.Index):
-            return hash(tuple(x)) 
+            return hash(type(x)) + hash(tuple(x)) + hash(x.dtype)
             #return HASHRANDSEED + hash(tuple(x)) 
         
         elif not is_hashable(x):
             if hasattr(x, "__dict__"):
-                return gethash(x.__dict__)
+                return hash(type(x)) + gethash(x.__dict__)
             
             else:
                 return hash(type(x)) # FIXME 2021-08-20 14:22:13
@@ -309,7 +310,7 @@ def gethash(x:typing.Any) -> Number:
             # hash values reflect the order of the elements
             # All user-defined classes and objects of user-defined types are also
             # hashable
-            return hash(x)
+            return hash(type(x)) + hash(x)
             #return HASHRANDSEED + hash(x)
     except:
         return hash(type(x))
@@ -372,6 +373,11 @@ def total_size(o, handlers={}, verbose=False):
 # NOTE: 2021-07-27 23:09:02
 # define this here BEFORE NestedFinder so that we can use it as default value for
 # comparator
+
+@safeWrapper
+def hash_identity_test(x,y):
+    return gethash(x) == gethash(y)
+
 @safeWrapper
 def safe_identity_test2(x, y):
     return SafeComparator(comp=eq)(x, y)
@@ -398,15 +404,23 @@ def safe_identity_test(x, y, idcheck=False):
         if isinstance(x, partial):
             return x.func == y.func and x.args == y.args and x.keywords == y.keywords
             
-        if isinstance(x, (np.ndarray, str, Number, pd.DataFrame, pd.Series, pd.Index)):
-            return np.all(x==y)
-        
         if hasattr(x, "size"):
             ret &= x.size == y.size
 
             if not ret:
                 return ret
         
+        elif hasattr(x, "__len__") or hasattr(x, "__iter__"):
+            ret &= len(x) == len(y)
+
+            if not ret:
+                return ret
+            
+            ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
+            
+            if not ret:
+                return ret
+            
         if hasattr(x, "shape"):
             ret &= x.shape == y.shape
                 
@@ -419,30 +433,27 @@ def safe_identity_test(x, y, idcheck=False):
         if hasattr(x, "ndim"):
             ret &= x.ndim == y.ndim
         
-        if hasattr(x, "__len__") or hasattr(x, "__iter__"):
-            ret &= len(x) == len(y)
-
             if not ret:
                 return ret
-            
-            ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
-            
+        
+        if hasattr(x, "dtype"):
+            ret &= x.dtype == y.dtype
+        
             if not ret:
                 return ret
-            
-        #if isinstance(x, (pd.DataFrame, pd.Series, pd.Index)):
-            #return (x==y).all().all()
         
-        #if not ret:
-            #return ret
+        if isinstance(x, (np.ndarray, str, Number, pd.DataFrame, pd.Series, pd.Index)):
+            ret &= np.all(x==y)
         
-        #ret &= x==y
+            if not ret:
+                return ret
+        
         ret &= eq(x,y)
         
         return ret ## good fallback, though potentially expensive
     
     except Exception as e:
-        #traceback.print_exc()
+        traceback.print_exc()
         #print("x:", x)
         #print("y:", y)
         return False
@@ -896,12 +907,7 @@ class NestedFinder(object):
                         continue
                     self._visited_.append(id(v))
                 
-                # print("%scheck %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__),"visited:", self._found_)
-                #self._found_.append(k)
-                
                 if as_index:
-                    #if safe_identity_test(k, item): # item should be hashable 
-                    #if self._comparator_(k, item): # item should be hashable 
                     if k == item:    # item should be hashable 
                         self._found_.append(k)
                         self._paths_.append(list(self._found_))
@@ -909,7 +915,6 @@ class NestedFinder(object):
                         yield v
                         
                 else:
-                    #if safe_identity_test(v, item):
                     if self._comparator_(v, item):
                         self._found_.append(k)
                         self._paths_.append(list(self._found_))
@@ -946,7 +951,6 @@ class NestedFinder(object):
                 self._found_.append(k)
                 # print("%scheck %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__), "visited:", self._found_)
                 if as_index:
-                    #if self._comparator_(k, item):
                     if k == item:
                         #self._found_.append(k)
                         self._paths_.append(list(self._found_))
@@ -954,7 +958,6 @@ class NestedFinder(object):
                         yield v
                         
                 else:
-                    #if safe_identity_test(v, item):
                     if self._comparator_(v, item):
                         #self._found_.append(k)
                         self._paths_.append(list(self._found_))
@@ -998,7 +1001,6 @@ class NestedFinder(object):
                         yield v
                         
                 else:
-                    #if safe_identity_test(v, item):
                     if self._comparator_(v, item):
                         #self._found_.append(k)
                         self._paths_.append(list(self._found_))

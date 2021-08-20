@@ -38,7 +38,7 @@ from core.utilities import (summarize_object_properties,
                             safe_identity_test,
                             )
 
-from core.traitcontainers import DataBag
+from core.traitcontainers import DataBag, generic_change_handler
 
 from .guiutils import (get_text_width, get_elided_text)
 
@@ -112,15 +112,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #print("workspaceModel: foreign namespaces = %s, (old: %s, new: %s)" % (len(self.foreign_namespaces), change["old"], change["new"]))
         pass
     
-    def _var_changed(self, ns, change):
-        pass
-        
-        
     def __reset_variable_dictionaries__(self):
         self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.user_ns_hidden and not item[0].startswith("_")])
         self.modified_vars.clear()
         self.new_vars.clear()
         self.deleted_vars.clear()
+        self.observed_vars.clear()
         
     def remove_foreign_namespace(self, wspace:dict):
         #print("workspaceModel to remove %s" % wspace)
@@ -570,7 +567,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     
     def var_observer(self, change):
         name = change.name
-        print("var_observer", name) # it works!
+        #generic_change_handler(change, "name") # for debugging
         displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
         
         if name in self.shell.user_ns:
@@ -990,11 +987,23 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.removeRows(0,self.rowCount())
         
     def updateTable(self, from_console:bool = False, force:bool=False):
-        self.updateTable_old(from_console=from_console, force=force)
+        self.updateTable_new()
+        #self.updateTable_old(from_console=from_console, force=force)
         
-    def updateTable_new(self, from_console:bool = False, force:bool=False):
-        if not from_console:
-            pass
+    def updateTable_new(self,):
+        del_vars = [name for name in self.observed_vars.keys() if name not in self.shell.user_ns.keys()]
+
+        for name in del_vars:
+            self.removeRowForVariable(name)
+
+        self.observed_vars.remove_members(*del_vars)
+        
+        current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        
+        self.observed_vars.update(current_vars)
+        
+        displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
+        
         
     def updateTable_old(self, from_console:bool = False, force:bool=False):
         """CAUTION Updates model table only for vars in internal workspace.
@@ -1004,7 +1013,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         TODO/FIXME 2020-07-30 21:51:49 factor these two under a common logic
         """
         
-        print("updateTable from_console:", from_console)
+        print("updateTable_old from_console:", from_console)
 
         try:
             displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
