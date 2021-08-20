@@ -12,11 +12,12 @@ accessed using attribute syntax.
 """
 import traceback
 from inspect import getcallargs, isfunction, ismethod
+from functools import partial
 #from traitlets import (HasTraits, TraitType, Eventhandler, Int, Bool, All, 
                        #is_trait, observe,TraitError,)
 from traitlets.utils.bunch import Bunch
 
-from .traitutils import (trait_from_type, transform_link, is_trait, 
+from .traitutils import (dynamic_trait, trait_from_type, transform_link, is_trait, 
                         HasTraits, TraitType, TraitsObserver, ContainerTraitsObserver,
                         EventHandler,Int, Bool, All, is_trait, observe)
 
@@ -27,46 +28,18 @@ class DataBagTraitsObserver(HasTraits):
     #hidden_traits = ("baglength", "mutable_types", "use_casting", "allow_none",)
     
     def __init__(self, *args, **kwargs):
-        #self.baglength = kwargs.pop("baglength", 0)
-        #self.mutable_types = kwargs.pop("mutable_types", False)
-        #self.use_casting = kwargs.pop("use_casting", False)
-        #self.allow_none = kwargs.pop("allow_none", False)
-        
-        #kwargs.update({"baglength":self.baglength, 
-                       #"mutable_types": self.mutable_types,
-                       #"use_casting": self.use_casting,
-                       #"allow_none": self.allow_none})
-        
         super().__init__(*args, **kwargs)
     
-    #def add_traits(self, **traits):
-        ##print("DataBagTraitsObserver.add_traits", traits)
-        
-        
-        #super().add_traits(**traits) # this DOES keep length and mutable_types traits but reverts them to the defaults
-        
-        ## this also works, but triggers a change notification, which we don't 
-        ## need right now
-        ##self.baglength = length
-        ##self.mutable_types = mutable
-        
     def remove_traits(self, **traits):
         current_traits = self.traits()
         keep_traits  = dict([(k, current_traits[k]) for k in current_traits if k not in traits])
+        #trait_values = dict([(k, self._trait_values[k]) for k in current_traits if k not in traits])
         
-        #length = self.baglength
-        #mutable = self.mutable_types
-        #use_casting = self.use_casting
-        #allow_none = self.allow_none
+        #self.__class__ = type(self.__class__.__name__,
+                              #(HasTraits, ), 
+                              #{"changed":self.changed, "remove_traits":self.remove_traits, "_trait_values": trait_values})
         
-        
-        # again, this resets the maintenance traits to their default values, 
-        # so we need to restore them (see NOTE 2020-07-04 22:43:58 and 
-        # NOTE 2020-07-04 22:42:42)
-        #keep_traits.update({"baglength":trait_from_type(length), 
-                            #"mutable_types":trait_from_type(mutable==True),
-                            #"use_casting": trait_from_type(use_casting==True),
-                            #"allow_none": trait_from_type(allow_none==True)})
+        self._trait_values.clear()
         
         self.__class__ = type(self.__class__.__name__,
                               (HasTraits, ), 
@@ -108,15 +81,6 @@ class DataBagTraitsObserver(HasTraits):
     def __getstate__(self):
         return super().__getstate__()
     
-    #def _add_notifiers(self, handler, name, typ):
-        ##print("DataBagTraitsObserver._add_notifiers() handler:", handler, "name", name, "type", typ)
-        ##print("\t has _trait_notifiers:", hasattr(self, "_trait_notifiers"))
-        #if not hasattr(self, "_trait_notifiers"):
-            ##print("I am a", type(self))
-            #raise AttributeError()
-            
-        #super()._add_notifiers(handler, name, typ)
-        
     @observe(All)
     def changed(self, change):
         """for illustration purposes
@@ -231,6 +195,8 @@ class DataBag(Bunch):
     def _make_hidden(**kwargs):
         ret = Bunch([(name, kwargs.pop(name, False)) for name in DataBag.hidden_traits])
         ret.length = 0
+        ret.allow_none = True
+        ret.use_mutable = True
         return ret
     
     def __init__(self, *args, **kwargs):
@@ -295,7 +261,15 @@ class DataBag(Bunch):
         
         super().__init__(*args, **kwargs)
         
-        trdict = dict(map(lambda x: (x, trait_from_type(dd[x], allow_none=self.__hidden__.allow_none)), dd.keys()))
+        if self in dd.keys():
+            raise ValueError("One cannot set onself as a trait key!")
+        
+        
+        #trdict = dict(map(lambda x: (x, trait_from_type(dd[x], allow_none=self.__hidden__.allow_none)), dd.keys()))
+        
+        dtrait = partial(dynamic_trait, allow_none=self.__hidden__.allow_none) 
+        
+        trdict = dict(map(lambda x: (x[0], dtrait(x[1]) if x[1] is not self else dtrait(x[1].as_dict())), dd.items()))
         
         self.__hidden__.length = len(trdict)
         
@@ -406,8 +380,13 @@ class DataBag(Bunch):
                 
         else:
             # add a new trait
+            if val is self:
+                val = self.as_dict()
+                #raise ValueError("One cannot add a trait to oneself!")
+            
             if key not in ("__observer__", "__hidden__") and key not in self.__hidden__.keys():
-                trdict = {key:trait_from_type(val, allow_none = self.allow_none, content_traits=True)}
+                trdict = {key: dynamic_trait(val, allow_none = self.allow_none, content_traits=True)}
+                #trdict = {key:trait_from_type(val, allow_none = self.allow_none, content_traits=True)}
                 obs.add_traits(**trdict)
                 object.__setattr__(obs, key, val)
                 object.__getattribute__(self, "__hidden__").length = len(trdict)
@@ -472,6 +451,7 @@ class DataBag(Bunch):
             if key in obs.traits():
                 out_traits = {key: obs.traits()[key]}
                 obs.remove_traits(**out_traits)
+                #obs._trait_values.pop(key, None) # taken care of by obs.remove_traits
                 
             object.__getattribute__(self, "__hidden__")["length"] = len(obs.traits())
             
@@ -544,6 +524,24 @@ class DataBag(Bunch):
         return self._trait_values
         #return dict((k,v) for k,v in self.items())
         
+    def remove_members(self, *keys):
+        try:
+            obs = object.__getattribute__(self, "__observer__")
+            
+            current_traits = dict(obs.traits())
+            
+            current_traits_keys = current_traits.keys()
+            
+            traits = dict([(key, current_traits[key]) for key in keys if key in current_traits_keys])
+            
+            obs.remove_traits(**traits)
+            
+            object.__getattribute__(self, "__hidden__")["length"] = len(obs.traits())
+        
+        except:
+            traceback.print_exc()
+            raise
+        
     def clear(self):
         try:
             super().clear()
@@ -551,9 +549,11 @@ class DataBag(Bunch):
             obs = object.__getattribute__(self, "__observer__")
             traits = dict(obs.traits())
             obs.remove_traits(**traits)
+            #obs._trait_values.clear() # taken care of by obs.remove_traits
             object.__getattribute__(self, "__hidden__")["length"] = len(obs.traits())
             
         except:
+            traceback.print_exc()
             raise
         
     def pop(self, key, *args):

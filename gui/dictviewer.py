@@ -420,7 +420,7 @@ class InteractiveTreeWidget(DataTreeWidget):
                 keyrepr = key.__name__
                 keytip = asUnicode(key)
                 
-            elif type(key)._name__ == "instance":
+            elif type(key).__name__ == "instance":
                 keyrepr = key.__class__.__name__
                 keytip = asUnicode(key)
                 

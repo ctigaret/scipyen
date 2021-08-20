@@ -3,7 +3,7 @@
 """
 
 import enum
-from enum import EnumMeta
+from enum import EnumMeta, Enum, IntEnum
 import contextlib
 
 from inspect import getmro, isclass
@@ -13,11 +13,12 @@ from collections import deque
 import traitlets
 
 from traitlets import (six,
-    HasTraits, MetaHasTraits, TraitType, Any, Bool, CBytes, Dict, Enum, Set,
-    Int, CInt, Long, CLong, Integer, Float, CFloat, Complex, Bytes, Unicode,
-    TraitError, Union, All, Undefined, Type, This, Instance, TCPAddress,
-    List, Tuple, UseEnum, ObjectName, DottedObjectName, CRegExp, link, directional_link,
-    ForwardDeclaredType, ForwardDeclaredInstance, validate, observe, default,
+    HasTraits, MetaHasTraits, TraitType, All, Any, Bool, CBool, Bytes, CBytes, 
+    Dict, Enum, Set, Int, CInt, Long, CLong, Integer, Float, CFloat, 
+    Complex, CComplex, Unicode, CUnicode, CRegExp, TraitError, Union, Undefined, 
+    Type, This, Instance, TCPAddress, List, Tuple, UseEnum, ObjectName, 
+    DottedObjectName, CRegExp, ForwardDeclaredType, ForwardDeclaredInstance, 
+    link, directional_link, validate, observe, default,
     observe_compat, BaseDescriptor, HasDescriptors, is_trait, getmembers,
     class_of, repr_type, add_article, EventHandler,
 )
@@ -47,25 +48,293 @@ from core.utilities import gethash
 
 
 #from prog import safeWrapper
+#from core.traitcontainers import DataBag # doesn't work because of recursion
 
-type_to_trait = {
+# NOTE: 2021-08-20 15:29:02
+# below, type is a placeholder for types NOT defined in this module
+# e.g. not imported
+# in particular this is the case for traitcontainer.DataBag, TriggerEvent, etc
+
+TRAITSMAP = {           # use casting versions
     None:       (Any,),
-    bool:       (Bool,      Instance,),
-    int:        (Int,       Instance,),
-    float:      (Float,     Instance,),
-    complex:    (Complex,   Instance,),
-    bytes:      (Bytes,     Instance,),
-    str:        (Unicode,   Instance,),
-    list:       (List,      Instance,),
-    deque:      (List,      Instance,),
-    set:        (Set,       Instance,),
-    frozenset:  (Set,       Instance,),
-    tuple:      (Tuple,     Instance,),
-    dict:       (Dict,      Instance,),
-    EnumMeta:   (UseEnum, ),
-    
+    type(None): (Any,),
+    bool:       (CBool,),
+    int:        (CInt,),
+    float:      (CFloat,),
+    complex:    (CComplex,),
+    bytes:      (CBytes,),
+    str:        (CUnicode,),
+    list:       (List,),
+    deque:      (List,),
+    set:        (Set,),
+    frozenset:  (Set,),
+    tuple:      (Tuple,),
+    dict:       (Dict,),
+    EnumMeta:   (UseEnum,),
+    Enum:       (UseEnum,), # IntEnum inherits from int and Enum
+    type:       (Instance,),    # e.g., type(type(None))
+    #type:       (Type,),    # e.g., type(type(None))
+    property:   (DottedObjectName,),
     }
 
+def _enhanced_set_(instance, obj, value):
+    """Overrides traitlets.TraitType.set to check for special hash.
+    This is supposed to also detect changes in the order of elements in sequences.
+    """
+    #print("enhanced set for %s" % type(instance).__name__)
+    
+    new_value = instance._validate(obj, value)
+    
+    try:
+        old_value = obj._trait_values[instance.name]
+    except KeyError:
+        old_value = instance.default_value
+
+    obj._trait_values[instance.name] = new_value
+    
+    try:
+        silent = bool(old_value == new_value)
+        
+        # NOTE: 2021-08-19 16:17:23
+        # check for change in contents
+        if silent is not False:
+            new_hash = gethash(new_value)
+            silent = (new_hash == instance.hashed)
+            if not silent:
+                instance.hashed = new_hash
+    except:
+        # if there is an error in comparing, default to notify
+        silent = False
+    if silent is not True:
+        # we explicitly compare silent to True just in case the equality
+        # comparison above returns something other than True/False
+        obj._notify_trait(instance.name, old_value, new_value)
+
+def _dynatrtyp_exec_body_(ns):
+    #print("ns:", ns)
+    ns["info_text"]="Trait that is sensitive to content change"
+    ns["hashed"] = 0
+    ns["set"] = _enhanced_set_
+    
+def adapt_args_kw(x, args, kw, allow_none):
+    # NOTE: 2020-09-05 14:23:43 some classes need special treatment for 
+    # their default constructors (ie when *args and **kw are empty)
+    # so far we plan to implement this for the following:
+    # vigra.VigraArray, vigra.AxisInfo, vigra.AxisTags,
+    # neo.ChannelIndex, neo.AnalogSignal, neo.IrregularlySampledSignal,
+    # neo.ImageSequence, neo.SpikeTrain
+    # datasignal.DataSignal, datasignal.IrregularlySampledDataSignal,
+    # pandas.Series, pandas.DataFrame
+    # TODO 2021-08-20 14:37:44
+    # include vigra Kernel1D/2D, Chunked_Array_Base
+    if isinstance(x, vigra.AxisInfo):
+        if "key" not in kw:
+            kw["key"] = x.key
+            
+        if "typeFlags" not in kw:
+            kw["typeflags"] = x.typeFlags
+            
+            
+        if "resolution" not in kw:
+            kw["resolution"] = x.resolution
+            
+        if "description" not in kw:
+            kw["description"] = x.description
+                    
+    elif isinstance(x, vigra.AxisTags):
+        if len(args) == 0:
+            args = (x, ) # copy c'tor
+        
+    elif isinstance(x, vigra.VigraArray):
+        if len(args) == 0:
+            args = (x, ) # can be a copy constructor
+            
+        if "dtype" not in kw:
+            kw["dtype"] = x.dtype
+            
+        if "order" not in kw:
+            kw["order"] = x.order
+            
+        if "axistags" not in kw:
+            kw["axistags"] = None # calls VigraArray.defaultAxistags or uses x.axistags if they exist
+            
+    elif isinstance(x, neo.ChannelIndex):
+        if len(args) == 0:
+            args = (x.index, )
+            
+        for attr in x._all_attrs:
+            if attr[0] != "index":
+                if attr[0] not in kw:
+                    kw[attr[0]] = getattr(x, attr[0])
+        
+    elif isinstance(x, (neo.AnalogSignal, datasignal.DataSignal)):
+        if len(args) == 0:
+            args = (x,) # takes units & time units from x
+            
+        for attr in x._all_attrs:
+            if attr[0] != "signal":
+                if attr[0] not in kw:
+                    kw[attr[0]] = getattr(x, attr[0])
+        
+    elif isinstance(x, (neo.IrregularlySampledSignal, datasignal.IrregularlySampledDataSignal)):
+        if len(args) < 2:
+            args = (x.times, x,)
+            
+        for attr in x._all_attrs:
+            if attr[0] not in ("times", "signal"):
+                if attr[0] not in kw:
+                    kw[attr[0]] = getattr(x, attr[0])
+                
+    elif isinstance(x, neo.SpikeTrain):
+        if len(args)  == 0:
+            args = (x.times, x.t_stop,)
+            
+        for attr in x._all_attrs:
+            if attr[0] not in ("times", "t_stop"):
+                if attr[0] not in kw:
+                    kw[attr[0]] = getattr(x, attr[0])
+        
+    elif isinstance(x, neo.ImageSequence):
+        if len(args) == 0:
+            args = (x, )
+            
+        for attr in x._all_attrs:
+            if attr[0] != "image_data":
+                if attr[0] not in kw:
+                    kw[attr[0]] = getattr(x, attr[0])
+        
+    elif isinstance(x, (neo.Segment, neo.Block, neo.Unit)):
+        if len(args) == 0:
+            args = (x, )
+        
+    elif isinstance(x, (neo.Epoch, neo.Event)):
+        for attr in x._all_attrs:
+            if attr[0] not in kw:
+                kw[attr[0]] = getattr(x, attr[0])
+        
+    elif isinstance(x, pq.Quantity):
+        if "units" not in kw:
+            kw["units"] = x.units
+        
+        if "dtype" not in kw:
+            kw["dtype"] = x.dtype
+            
+        if "buffer" not in kw:
+            kw["buffer"] = x.data
+        
+        kw["default_value"] = x
+        
+        kw["allow_none"] = allow_none
+        
+        #return QuantityTrait(x, **kw)
+                
+    elif isinstance(x, np.ndarray):
+        if "dtype" not in kw:
+            kw["dtype"] = x.dtype
+            
+        if "buffer" not in kw:
+            kw["buffer"] = x.data
+            
+        kw["default_value"] = x
+        kw["allow_none"] = allow_none
+        
+        #return ArrayTrait(x, **kw)
+                    
+    elif isinstance(x, (pd.DataFrame, pd.Series, pd.Index)):
+        if len(args) == 0:
+            args = (x, )
+
+    return args, kw
+    
+def dynamic_trait(x, *args, **kwargs):
+    """Generates a TraitType for object x.
+    
+    Prerequisites: Except for enum types (enum.Enum and enumIntEnum)
+    x.__class__ should define a "copy constructor", e.g.:
+    
+    x = SomeClass()
+    
+    y = SomeClass(x)    # copy constructor semantics when x and y are of the same type 
+                        # x may be a subclass/superclass of y, or another type
+    
+    For types derived from builtin types, this is taken care of by the python 
+    library. Anything else needs a bit of work.
+    
+    Options:
+    --------
+    
+    allow_none: bool default is False
+    content_traits:bool, default is False
+    content_allow_none:bool, default is whatever allow_none is
+    
+    """
+    allow_none = kwargs.pop("allow_none", False)
+    content_traits = kwargs.pop("content_traits", True)
+    content_allow_none = kwargs.pop("content_allow_none", allow_none)
+    
+    # NOTE: 2021-08-20 11:44:00 A reminder:
+    # isinstance(x, sometype) returns True when sometype is in type(x).__mro__
+    # this means a that EITHER 'x' is of type 'sometype' OR 'x' is derived from
+    # 'sometype', possibly with more than one inheritance level
+    #
+    # getmro returns a tuple of classes starting from x.__class__ and backwards
+    # up the inheritance chain: superclasses = getmro(type(x))
+    #
+    # therefore superclasses[0] == type(x) is ALWAYS True
+    #
+    # so unlike in trait_from_type, here we don't need immediate_class anymore
+    # if 'x' is of a type found in traitsmap keys then OK, else we fallback to
+    # Instance
+    
+    myclass = x.__class__
+    
+    #print("myclass", myclass)
+    
+    arg = [x] + [a for a in args]
+    
+    args = tuple(arg)
+    
+    kw = kwargs
+    
+    #traitclass = TRAITSMAP.get(myclass, Instance)
+    
+    # NOTE: 2021-08-20 12:22:12 For a finer granularity
+    traitclass = TRAITSMAP.get(myclass, (None, ))
+    #traitclass = TRAITSMAP.get(type(x).__class__, (None, ))
+    
+    #print("traitclass", traitclass)
+
+    if traitclass[0] is None:
+        highest_below_object = [s for s in reversed(getmro(type(x)))][1] # all Python types inherit from object
+        traitclass = TRAITSMAP.get(highest_below_object, (Instance,))
+        
+    #print("traitclass", traitclass)
+    
+    
+    new_klass = new_class("%s_Dyn" % traitclass[0].__name__, bases = traitclass, exec_body = _dynatrtyp_exec_body_)
+    
+    #print("new_klass", new_klass)
+    
+    new_args, new_kw = adapt_args_kw(x, args, kw, allow_none)
+    
+    #print("new_args", new_args)
+    #print("new_kw", new_kw)
+    
+    #if issubclass(new_klass, Instance):
+    if traitclass[0] is Instance:
+        return new_klass(klass = myclass, args = args, kw = kw, allow_none = allow_none)
+    
+    if issubclass(new_klass, Dict):
+        if content_traits:
+            traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=content_traits)) for k,v in x.items())
+        else:
+            traits = None
+            
+        return new_klass(default_value = x, traits=traits, allow_none = allow_none)
+    
+    else:
+        return new_klass(default_value = x, allow_none = allow_none)
+    
 class TraitSetMixin(object):
     def __init__(self):
         super().__init__
@@ -74,31 +343,32 @@ class TraitSetMixin(object):
         """Overrides List.set to check for special hash.
         This is supposed to also detect changes in the order of elements.
         """
-        print("TraitSetMixin.set")
-        new_value = self._validate(obj, value)
-        try:
-            old_value = obj._trait_values[self.name]
-        except KeyError:
-            old_value = self.default_value
+        _enhanced_set_(self, obj, value)
+        #print("TraitSetMixin.set")
+        #new_value = self._validate(obj, value)
+        #try:
+            #old_value = obj._trait_values[self.name]
+        #except KeyError:
+            #old_value = self.default_value
 
-        obj._trait_values[self.name] = new_value
-        try:
-            silent = bool(old_value == new_value)
+        #obj._trait_values[self.name] = new_value
+        #try:
+            #silent = bool(old_value == new_value)
             
-            # NOTE: 2021-08-19 16:17:23
-            # check for change in contents
-            if silent is not False:
-                new_hash = gethash(new_value)
-                silent = (new_hash == self.hashed)
-                if not silent:
-                    self.hashed = new_hash
-        except:
-            # if there is an error in comparing, default to notify
-            silent = False
-        if silent is not True:
-            # we explicitly compare silent to True just in case the equality
-            # comparison above returns something other than True/False
-            obj._notify_trait(self.name, old_value, new_value)
+            ## NOTE: 2021-08-19 16:17:23
+            ## check for change in contents
+            #if silent is not False:
+                #new_hash = gethash(new_value)
+                #silent = (new_hash == self.hashed)
+                #if not silent:
+                    #self.hashed = new_hash
+        #except:
+            ## if there is an error in comparing, default to notify
+            #silent = False
+        #if silent is not True:
+            ## we explicitly compare silent to True just in case the equality
+            ## comparison above returns something other than True/False
+            #obj._notify_trait(self.name, old_value, new_value)
         
 class TraitsObserver(HasTraits):
     """ CAUTION do not use yet
@@ -493,53 +763,7 @@ class QuantityTrait(Instance):
             
         raise TraitError(e)
     
-def dynamic_trait(x, *args, **kwargs):
-    """Generates a TraitType for object x.
-    
-    Prerequisites: Except for enum types (enum.Enum and enumIntEnum)
-    x.__class__ should define a "copy constructor", e.g.:
-    
-    x = SomeClass()
-    
-    y = SomeClass(x)    # copy constructor semantics when x and y are of the same type 
-                        # x may be a subclass/superclass of y, or another type
-    
-    For types derived from builtin types, this is taken care of by the python 
-    library. Anything else needs a bit of work.
-    
-    Options:
-    --------
-    
-    allow_none: bool default is False
-    content_traits:bool, default is False
-    content_allow_none:bool, default is whatever allow_none is
-    
-    """
-    allow_none = kwargs.pop("allow_none", False)
-    content_traits = kwargs.pop("content_traits", True)
-    content_allow_none = kwargs.pop("content_allow_none", allow_none)
-    
-    immediate_class = getmro(x.__class__)[0]
-    # NOTE 2020-07-07 14:42:22
-    # to prevent "slicing" of derived classes, 
-    
-    arg = [x] + [a for a in args]
-    
-    args = tuple(arg)
-    
-    kw = kwargs
-    
-    if x is None:
-        klass = Any
-        
-    elif isinstance(x, bool):
-        if immediate_class != bool:
-            klass = Instance
-        else:
-            klass = Bool
-            
-    elif isinstance(x, int):
-
+   
     
 def trait_from_type(x, *args, **kwargs):
     """Generates a TraitType for object x.
@@ -674,7 +898,7 @@ def trait_from_type(x, *args, **kwargs):
         else: # trait encapsulates an instance
             # NOTE: 2020-09-05 14:23:43 some classes need special treatment for 
             # their default constructors (ie when *args and **kw are empty)
-            # so far we pkant to implement this for the following:
+            # so far we plan to implement this for the following:
             # vigra.VigraArray, vigra.AxisInfo, vigra.AxisTags,
             # neo.ChannelIndex, neo.AnalogSignal, neo.IrregularlySampledSignal,
             # neo.ImageSequence, neo.SpikeTrain
@@ -813,40 +1037,4 @@ class TestTrait(TraitSetMixin, List):
         List.__init__(self, **kwargs)
         super().__init__()
         #TraitSetMixin.__init__(self)
-        
-def new_trait_callback(ns):
-    def new_set(instance, obj, value):
-        """Overrides List.set to check for special hash.
-        This is supposed to also detect changes in the order of elements.
-        """
-        print("own set")
-        new_value = instance._validate(obj, value)
-        try:
-            old_value = obj._trait_values[instance.name]
-        except KeyError:
-            old_value = instance.default_value
-
-        obj._trait_values[instance.name] = new_value
-        try:
-            silent = bool(old_value == new_value)
-            
-            # NOTE: 2021-08-19 16:17:23
-            # check for change in contents
-            if silent is not False:
-                new_hash = gethash(new_value)
-                silent = (new_hash == instance.hashed)
-                if not silent:
-                    instance.hashed = new_hash
-        except:
-            # if there is an error in comparing, default to notify
-            silent = False
-        if silent is not True:
-            # we explicitly compare silent to True just in case the equality
-            # comparison above returns something other than True/False
-            obj._notify_trait(instance.name, old_value, new_value)
-
-    print("ns:", ns)
-    ns["info_text"]="Trait that is sensitive to content change"
-    ns["hashed"] = 0
-    ns["set"] = new_set
         

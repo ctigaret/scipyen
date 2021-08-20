@@ -44,22 +44,10 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 
 from . import xmlutils
 from . import strutils
-#from .utilities import (counter_suffix, unique, )
 from .prog import safeWrapper
 
 from imaging.imageprocessing import *
-
-
-#import patchneo
-#from .patchneo import neo
-
-#from . import ephys
-
 #### END pict.core.modules
-
-#### BEGIN pict.systems modules
-#from systems import * # PrairieView, soon ScanImage also
-#### END pict.systems modules
 
 # CHANGELOG (most recent first)
 #
@@ -411,7 +399,15 @@ def arraySlice(data:np.ndarray, slicing:(dict, type(None))):
     return tuple(indexobj)
 
 def is_hashable(x):
-    return getattr(x, "__hash__", None) is not None
+    ret = bool(getattr(x, "__hash__", None) is not None)
+    if ret:
+        try:
+            # because some 3rd party packages 'get smart' and override __hash__()
+            # to raise Exception 
+            hash(x) 
+            return True
+        except:
+            return False
         
 
 def is_namedtuple(x):

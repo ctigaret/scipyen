@@ -273,6 +273,7 @@ e.g. pip install -I numpy
                      only ONCE: the lists are not exhaustive representations of
                      these dependencies)
     ----------------------------------------------------------------------------
+    xxhash (optional, not used currently)
     distributed
     blosc
     numpy

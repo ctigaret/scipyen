@@ -18,13 +18,16 @@ from itertools import chain
 from collections import deque, OrderedDict
 from numbers import Number
 import numpy as np
-from numpy import ndarray
+#from numpy import ndarray
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
 import pandas as pd
+import quantities as pq
 #from pandas.core.base import PandasObject as PandasObject
-from quantities import Quantity as Quantity
-from vigra import VigraArray as VigraArray
+#from quantities import Quantity as Quantity
+import vigra
+
+#import xxhash
 
 try:
     from pyqtgraph import eq # not sure is needed
@@ -55,7 +58,7 @@ from .strutils import get_int_sfx
                 
 #ndarray_type = ndarray.__name__
 random.seed()
-hashrandseed = random.randrange(4294967295)
+HASHRANDSEED = random.randrange(4294967295)
 
 # NOTE: 2021-08-19 09:47:18
 # moved FROM copre.workspacefunctions:
@@ -228,31 +231,89 @@ def gethash(x:typing.Any) -> Number:
     """Calculates a hash-like figure for objects including non-hashable
     To be used for object comparisons.
     
+    Not suitable for secure code.
+    
+    CAUTION: some types may return same hash even if they have different content:
+    These are np.ndarray and subclasses
+    
     WARNING: This is NOT NECESSARILY a hash
     In particular for mutable sequences, or objects containing immutable sequences
     is very likely to return floats
     """
     from core.datatypes import is_hashable
-    from math import log2, factorial, exp
-    if isinstance(x, dict): # order is not important
-        return sum((gethash(v) for v in x.values()))
     
-    elif isinstance(x, (set, frozenset)): # order is not important
-        return sum((gethash(v) for v in x))
+    # FIXME 2021-08-20 14:23:26
+    # for large data array, calculating the hash after converting to tuple may:
+    # 
+    # 1. incur significant overheads (for very large data)
+    #
+    # 2. may raise exception when the element type in the tuple is not hashable
+    #   checking this may also increase overhead
     
-    elif isinstance(x, (list, deque)):
-        return sum(hashlist(x))
+    # Arguably, we don't need to monitor elemental vale changes in these large
+    # data sets, just their ndim/shape/size/axistags, etc
     
-    elif not is_hashable(x):
-        return gethash(x.__dict__)
-    
-    else:
-        # NOTE: 2021-08-19 16:18:20
-        # tuples, like all immutable basic python datatypes are hashable and their
-        # hash values reflect the order of the elements
-        # All user-defined classes and objects of user-defined types are also
-        # hashable
-        return hash(x) + hashrandseed
+    try:
+        if isinstance(x, dict): # order is not important
+            return sum((gethash(v) for v in x.values()))
+        
+        elif isinstance(x, (set, frozenset)): # order is not important
+            return sum((gethash(v) for v in x))
+        
+        elif isinstance(x, (list, deque)):
+            return sum(hashlist(x))
+        
+        elif isinstance(x, pq.Quantity):
+            return sum([hash(x.dtype), hash(x.ndim), hash(x.size), hash(x.shape), hash(x.dimensionality)])
+            #return HASHRANDSEED + sum([hash(x.dtype), hash(x.ndim), hash(x.size), hash(x.shape), hash(x.dimensionality)])
+        
+        elif isinstance(x, vigra.VigraArray):
+            return gethash(np.array(x)) + hash(x.axistags)
+        
+        elif isinstance(x, vigra.vigranumpycore.ChunkedArrayBase):
+            arsum = sum([hash(x.dtype), hash(x.ndim), hash(x.size), hash(x.shape),])
+            arsum += sum([hash(x.chunk_array_shape), hash(x.chunk_shape), ])
+            return arsum
+            #return HASHRANDSEED + arsum
+        
+        elif isinstance(x, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
+            return hash(x)
+            #return HASHRANDSEED + hash(x)
+        
+        elif isinstance(x, np.ndarray):
+            return sum([hash(x.shape), hash(x.size), hash(x.ndim) , hash(x.dtype)])
+            #return HASHRANDSEED + sum([hash(x.shape), hash(x.size), hash(x.ndim) , hash(x.dtype)])
+        
+        elif isinstance(x, pd.DataFrame):
+            return hash(tuple(x.index)) + hash(tuple(x.columns)) + sum((gethash(x[c]) for c in df.columns))
+        
+        elif isinstance(x, pd.Series):
+            return hash(tuple(x.index)) + hash(tuple(x.name))  + hash(x.dtype) # + hash(tuple(x))
+            #return HASHRANDSEED + hash(tuple(x.index)) + hash(tuple(x.name)) + hash(tuple(x)) + hash(x.dtype)
+        
+        elif isinstance(x, pd.Index):
+            return hash(tuple(x)) 
+            #return HASHRANDSEED + hash(tuple(x)) 
+        
+        elif not is_hashable(x):
+            if hasattr(x, "__dict__"):
+                return gethash(x.__dict__)
+            
+            else:
+                return hash(type(x)) # FIXME 2021-08-20 14:22:13
+                #return HASHRANDSEED + hash(type(x)) # FIXME 2021-08-20 14:22:13
+        
+        else:
+            # NOTE: 2021-08-19 16:18:20
+            # tuples, like all immutable basic python datatypes are hashable and their
+            # hash values reflect the order of the elements
+            # All user-defined classes and objects of user-defined types are also
+            # hashable
+            return hash(x)
+            #return HASHRANDSEED + hash(x)
+    except:
+        return hash(type(x))
+        #return HASHRANDSEED + hash(type(x))
         
 def total_size(o, handlers={}, verbose=False):
     """ Returns the approximate memory footprint an object and all of its contents.
@@ -2207,7 +2268,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        elif isinstance(obj, ndarray):
+        elif isinstance(obj, np.ndarray):
             dtypestr = str(obj.dtype)
             dtypetip = "dtype: "
             
@@ -2247,7 +2308,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz    = str(obj.nbytes)
             memsztip = "memory size (bytes): "
             
-            if isinstance(obj, VigraArray):
+            if isinstance(obj, vigra.VigraArray):
                 axes    = repr(obj.axistags)
                 axestip = "axes: "
                 
@@ -2259,9 +2320,6 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             #vmemsize = QtGui.QStandardItem(str(getsizeof(obj)))
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
-            
-            
-        #print("namespace", namespace)
             
         result["Data Type"]     = {"display": dtypestr,     "tooltip" : "%s%s" % (dtypetip, dtypestr)}
         result["Workspace"]     = {"display": namespace,    "tooltip" : "Location: %s kernel namespace" % namespace}
@@ -2279,15 +2337,6 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         for key, value in result.items():
             if key != "Name":
                 value["tooltip"] = "\n".join([value["tooltip"], wspace_name])
-            #wspace_name = "Namespace: %s" % result["Workspace"]["display"]
-            #if key == "Name":
-                #wnwidth = get_text_width(wspace_name)
-                #if isinstance(obj, (str, Number, sequence_types, set_types, dict_types, pd.Series, pd.DataFrame, ndarray)):
-                    #ttip = get_elided_text("%s: %s" % (value["tooltip"], obj), wnwidth)
-                    #value["tooltip"] = "\n".join([ttip, wspace_name])
-                    
-            #else:
-                #value["tooltip"] = "\n".join([value["tooltip"], wspace_name])
         
     except Exception as e:
         traceback.print_exc()

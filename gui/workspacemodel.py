@@ -59,13 +59,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     windowVariableDeleted = pyqtSignal(int, name="windowVariableDeleted")
     
     def __init__(self, shell, user_ns_hidden=dict(), parent=None):
-        #from core.utilities import standard_obj_summary_headers
         super(WorkspaceModel, self).__init__(parent)
-        #self.abbrevs = {'IPython.core.macro.Macro' : 'Macro'}
-        #self.seq_types = ['list', 'tuple', "deque"]
-        #self.set_types = ["set", "frozenset"]
-        #self.dict_types = ["dict"]
-        #self.ndarray_type = np.ndarray.__name__
         
         self.shell = shell # reference to IPython InteractiveShell of the internal console
         
@@ -78,6 +72,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.user_ns_hidden = dict(user_ns_hidden)
         
         self.observed_vars = DataBag(allow_none = True)
+        self.observed_vars.observe(self.var_observer)
         
         # NOTE: 2021-07-28 09:58:38
         # currentVarItem/Name are set by selecting/activating an item in workspace view
@@ -562,6 +557,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.new_vars.clear()
         self.deleted_vars.clear()
         self.user_ns_hidden.clear()
+        self.observed_vars.clear()
         
     def is_user_var(self, name, val):
         """Checks binding of symbol (name) to a hidden variable.
@@ -572,10 +568,51 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         return True
     
-    def var_observed_handler(self, change):
-        return change["name"]
-            
+    def var_observer(self, change):
+        name = change.name
+        print("var_observer", name) # it works!
+        displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
+        
+        if name in self.shell.user_ns:
+            if name not in displayed_vars_types:
+                self.addRowForVariable(name, self.shell.user_ns[name])
+            else:
+                self.updateRowForVariable(name, self.shell.user_ns[name])
+        
     def pre_execute(self):
+        self.pre_execute_new()
+        self.pre_execute_old()
+        
+    def post_execute(self):
+        self.post_execute_new()
+        #self.post_execute_old()
+        
+    def pre_execute_new(self):
+        #print("pre_execute_new")
+        self.cached_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        self.observed_vars.unobserve(self.var_observer)
+        
+        self.observed_vars.clear()
+        
+        self.observed_vars.update(self.cached_vars)
+        self.observed_vars.observe(self.var_observer)
+
+    def post_execute_new(self):
+        #print("post_execute_new")
+        del_vars = [name for name in self.observed_vars.keys() if name not in self.shell.user_ns.keys()]
+        
+        for name in del_vars:
+            self.removeRowForVariable(name)
+
+        self.observed_vars.remove_members(*del_vars)
+        
+        current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        
+        self.observed_vars.update(current_vars)
+        
+        
+            
+    def pre_execute_old(self):
         """Callback from the jupyter interpreter/kernel before executing code
         """
         # FIXME 2021-08-18 12:55:33
@@ -603,6 +640,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #self.cached_vars = dict([deepcopy(item) for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         self.cached_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         
+        
         #self.cached_vars = DataBag([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         
         self.modified_vars.clear()
@@ -617,7 +655,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #print("pre_execute self.modified_vars", self.modified_vars)
             
     @safeWrapper
-    def post_execute(self):
+    def post_execute_old(self):
         """Callback for the internal inprocess ipython kernel
         """
         # NOTE: 2018-10-07 09:00:53
@@ -770,7 +808,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     
     @safeWrapper
     def generateRowContents(self, dataname:str, data:object, namespace:str="Internal") -> typing.List[QtGui.QStandardItem]:
+        #print("generateRowContents", dataname, data, namespace)
         obj_props = summarize_object_properties(dataname, data, namespace=namespace)
+        #print("generateRowContents obj_props", obj_props)
         return self.genRowFromPropDict(obj_props)
     
     def genRowFromPropDict(self, obj_props:dict,
@@ -797,12 +837,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             return "" if asStrings else None
         
         return [self.item(row, col).text() if asStrings else self.item(row, col) for col in range(self.columnCount())]
-
-        #ret = []
-        #for col in range(self.columnCount()):
-            #ret.append(self.item(row, col).text() if asStrings else self.item(row, col))
-                
-        #return ret
 
     def getRowIndexForVarname(self, varname, regVarNames=None):
         if regVarNames is None:
@@ -845,20 +879,20 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
         return varname
             
-    def __update_variable_row__(self, dataname, data):
-        # FIXME/TODO 2019-08-04 23:55:04
-        # make this faster
+    #def __update_variable_row__(self, dataname, data):
+        ## FIXME/TODO 2019-08-04 23:55:04
+        ## make this faster
         
-        row = self.indexFromItem(items[0]).row()
+        #row = self.indexFromItem(items[0]).row()
         
-        originalRow = self.getRowContents(row, asStrings=False)
+        #originalRow = self.getRowContents(row, asStrings=False)
         
-        v_row = self.generateRowContents(dataname, data) # generate model view row contents for existing item
         #v_row = self.generateRowContents(dataname, data) # generate model view row contents for existing item
+        ##v_row = self.generateRowContents(dataname, data) # generate model view row contents for existing item
         
-        for col in range(1, self.columnCount()):
-            if originalRow is not None and col < len(originalRow) and originalRow[col] != v_row[col]:
-                self.setItem(row, col, v_row[col])
+        #for col in range(1, self.columnCount()):
+            #if originalRow is not None and col < len(originalRow) and originalRow[col] != v_row[col]:
+                #self.setItem(row, col, v_row[col])
         
     def updateRowForVariable(self, dataname, data, ns=None):
         # CAUTION This is only for internal workspace, but 
@@ -875,12 +909,19 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             ns = "Internal"
             
+        #print("updateRowForVariable", dataname, data, ns)
+        
         row = self.rowIndexForItemsWithProps(Workspace=ns)
+        
+        #print("updateRowForVariable, row:", row)
         
         items = self.findItems(dataname)
 
+        #print("updateRowForVariable, items", items)
+        
         if len(items) > 0:
             row = self.indexFromItem(items[0]).row() # same as below
+            #print("updateRowForVariable, row:", row)
             #row = items[0].index().row()
             v_row = self.generateRowContents(dataname, data) # generate model view row contents for existing item
             self.updateRow(row, v_row)
@@ -903,9 +944,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         originalRow = self.getRowContents(rowindex, asStrings=False)
         #print("updateRow originalRow as str", self.getRowContents(rowindex, asStrings=True))
         if originalRow is not None:
-            for col in range(self.columnCount()):
+            #for col in range(self.columnCount()):
+            for col in range(1, self.columnCount()):
                 # NOTE: 2021-07-28 10:42:17
-                # this emits itemChange signal!
+                # ATTENTION this emits itemChange signal thereby will trigger
+                # code for displayed name change
                 self.setItem(rowindex, col, newrowdata[col])
 
     def removeRowForVariable(self, dataname, ns=None):
@@ -933,6 +976,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
     @pyqtSlot()
     def slot_updateTable(self):
+        #print("slot_updateTable")
         self.updateTable(from_console=False)
             
     def addRowForVariable(self, dataname, data):
@@ -940,19 +984,27 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         """
         #print("addRowForVariable: ", dataname, data)
         v_row = self.generateRowContents(dataname, data) # generate model view row contents
-        #v_row = self.generateRowContents(dataname, data) # generate model view row contents
         self.appendRow(v_row) # append the row to the model
         
     def clearTable(self):
         self.removeRows(0,self.rowCount())
         
     def updateTable(self, from_console:bool = False, force:bool=False):
+        self.updateTable_old(from_console=from_console, force=force)
+        
+    def updateTable_new(self, from_console:bool = False, force:bool=False):
+        if not from_console:
+            pass
+        
+    def updateTable_old(self, from_console:bool = False, force:bool=False):
         """CAUTION Updates model table only for vars in internal workspace.
         For data in external kernels (i.e., in the external console) use 
         updateFromExternal
         
         TODO/FIXME 2020-07-30 21:51:49 factor these two under a common logic
         """
+        
+        print("updateTable from_console:", from_console)
 
         try:
             displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
@@ -1134,7 +1186,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         ----------
         **kwargs: key/value mapping, where:
         
-            Key is one of 
+            Key is one of (case-sensitive)
                 ['Name', 'Type', 'Data_Type', 'Minimum', 'Maximum', 'Size', 
                 'Dimensions','Shape', 'Axes', 'Array_Order', 'Memory_Size', 
                 'Workspace']
@@ -1326,7 +1378,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                             returned as (a Python list of) strings, otherwise 
                             they are returned as Python list of QStandardItems
         '''
-        #from core.utilities import standard_obj_summary_headers
         wscol = standard_obj_summary_headers.index("Workspace")
         ret = [self.item(row).text() if asStrings else self.item(row) for row in range(self.rowCount()) if self.item(row, wscol).text() == ws]
         
