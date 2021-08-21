@@ -578,7 +578,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
     def pre_execute(self):
         self.pre_execute_new()
-        self.pre_execute_old()
+        #self.pre_execute_old()
         
     def post_execute(self):
         self.post_execute_new()
@@ -609,168 +609,168 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         
             
-    def pre_execute_old(self):
-        """Callback from the jupyter interpreter/kernel before executing code
-        """
-        # FIXME 2021-08-18 12:55:33
-        #### BEGIN
-        # because cached_vars holds references, it will get updated once the 
-        # object has changed and the change won't be picked up
-        # vivid example:
-        # a = list() ==> workspace viewer displays a with 0 length
-        # a += [1,2,3] ==> workspace viewer still displays a with 0 length
-        # but:
-        # a = [1,2,3] ==> updates correctly because a now has a new id
-        #### END
+    #def pre_execute_old(self):
+        #"""Callback from the jupyter interpreter/kernel before executing code
+        #"""
+        ## FIXME 2021-08-18 12:55:33
+        ##### BEGIN
+        ## because cached_vars holds references, it will get updated once the 
+        ## object has changed and the change won't be picked up
+        ## vivid example:
+        ## a = list() ==> workspace viewer displays a with 0 length
+        ## a += [1,2,3] ==> workspace viewer still displays a with 0 length
+        ## but:
+        ## a = [1,2,3] ==> updates correctly because a now has a new id
+        ##### END
         
-        # see NOTE 2020-11-29 16:29:01 and NOTE: 2020-11-29 16:05:14
-        # checks if a new variable reassigns the binding to an already existing 
-        # symbol (previously bound to a hidden variable) - so that it can be 
-        # restored when user "deletes" it from the workspace
+        ## see NOTE 2020-11-29 16:29:01 and NOTE: 2020-11-29 16:05:14
+        ## checks if a new variable reassigns the binding to an already existing 
+        ## symbol (previously bound to a hidden variable) - so that it can be 
+        ## restored when user "deletes" it from the workspace
         
-        # FIXME: 2021-08-18 13:04:17 deepcopy problems
-        # 1. if you deepcopy they will get a new id
-        # 2. cannot deepcopy a module => issues with imported modules present in the ns
-        # 3. deepcopy could duplicate memory use
-        # workaround 2 & 3: filter what to deepcopy (i.e. restrict only to POD and
-        # python containers but code could become even more unwieldy that it already is)
-        #self.cached_vars = dict([deepcopy(item) for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
-        self.cached_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        ## FIXME: 2021-08-18 13:04:17 deepcopy problems
+        ## 1. if you deepcopy they will get a new id
+        ## 2. cannot deepcopy a module => issues with imported modules present in the ns
+        ## 3. deepcopy could duplicate memory use
+        ## workaround 2 & 3: filter what to deepcopy (i.e. restrict only to POD and
+        ## python containers but code could become even more unwieldy that it already is)
+        ##self.cached_vars = dict([deepcopy(item) for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        #self.cached_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         
         
-        #self.cached_vars = DataBag([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
+        ##self.cached_vars = DataBag([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         
-        self.modified_vars.clear()
-        self.new_vars.clear()
-        self.deleted_vars.clear()
+        #self.modified_vars.clear()
+        #self.new_vars.clear()
+        #self.deleted_vars.clear()
         
-        existing_vars = [item for item in self.shell.user_ns.items() if item[0] in self.cached_vars.keys()]
+        #existing_vars = [item for item in self.shell.user_ns.items() if item[0] in self.cached_vars.keys()]
         
-        self.modified_vars.update([item for item in existing_vars if not safe_identity_test(item[1], self.cached_vars[item[0]])])
+        #self.modified_vars.update([item for item in existing_vars if not safe_identity_test(item[1], self.cached_vars[item[0]])])
             
-        #print("pre_execute self.cached_vars", self.cached_vars)
-        #print("pre_execute self.modified_vars", self.modified_vars)
+        ##print("pre_execute self.cached_vars", self.cached_vars)
+        ##print("pre_execute self.modified_vars", self.modified_vars)
             
-    @safeWrapper
-    def post_execute_old(self):
-        """Callback for the internal inprocess ipython kernel
-        """
-        # NOTE: 2018-10-07 09:00:53
-        # find out what happened to the variables and populate the corresponding
-        # dictionaries
-        try:
-            # FIXME: 2019-09-11 21:46:30
-            # when you call del(figure) in the console (Figure being a matplotlib Figure instance)
-            # is unbinds the name "figure" in the shell (user) workspace from the Figure instance
-            # however pyplot STILL holds a live reference to it (which is only removed
-            # after calling plt.close(figure))
-            # so just by simply comparing the figure numbers plt knows about, to those
-            # of any figures left in the user namespace will flag those figures as newly created
+    #@safeWrapper
+    #def post_execute_old(self):
+        #"""Callback for the internal inprocess ipython kernel
+        #"""
+        ## NOTE: 2018-10-07 09:00:53
+        ## find out what happened to the variables and populate the corresponding
+        ## dictionaries
+        #try:
+            ## FIXME: 2019-09-11 21:46:30
+            ## when you call del(figure) in the console (Figure being a matplotlib Figure instance)
+            ## is unbinds the name "figure" in the shell (user) workspace from the Figure instance
+            ## however pyplot STILL holds a live reference to it (which is only removed
+            ## after calling plt.close(figure))
+            ## so just by simply comparing the figure numbers plt knows about, to those
+            ## of any figures left in the user namespace will flag those figures as newly created
             
-            # NOTE 2019-09-11 22:01:42
-            # a new figure (created via pyplot, or "plt" interface) will be present in BOTH 
-            # user namespace and Gcf.figs (placed there by the plt intereface)
-            # but absent from cached_vars
-            #
-            # conversely, a figure removed from user namespace via del statement
-            # will be present in cached_vars AND ALSO in Gcf.figs, if created via
-            # plt interface
+            ## NOTE 2019-09-11 22:01:42
+            ## a new figure (created via pyplot, or "plt" interface) will be present in BOTH 
+            ## user namespace and Gcf.figs (placed there by the plt intereface)
+            ## but absent from cached_vars
+            ##
+            ## conversely, a figure removed from user namespace via del statement
+            ## will be present in cached_vars AND ALSO in Gcf.figs, if created via
+            ## plt interface
             
-            mpl_figs_in_pyplot = [plt.figure(i) for i in plt.get_fignums()] # a list of figure objects!!!
+            #mpl_figs_in_pyplot = [plt.figure(i) for i in plt.get_fignums()] # a list of figure objects!!!
 
-            mpl_figs_in_ns = [item[1] for item in self.shell.user_ns.items() if isinstance(item[1], mpl.figure.Figure)]
+            #mpl_figs_in_ns = [item[1] for item in self.shell.user_ns.items() if isinstance(item[1], mpl.figure.Figure)]
             
-            #print("post_execute cached vars", self.cached_vars)
+            ##print("post_execute cached vars", self.cached_vars)
             
-            # 1) deleted variables -- present in cached vars but not in the user namespace anymore
-            self.deleted_vars.update([item for item in self.cached_vars.items() if item[0] not in self.shell.user_ns])
+            ## 1) deleted variables -- present in cached vars but not in the user namespace anymore
+            #self.deleted_vars.update([item for item in self.cached_vars.items() if item[0] not in self.shell.user_ns])
             
-            #print("post_execute deleted vars", self.deleted_vars)
+            ##print("post_execute deleted vars", self.deleted_vars)
             
-            # NOTE: 2020-11-29 16:05:14 check if any of the deleted symbols need 
-            # to be rebound to their original variables in self.user_ns_hidden
-            # (see NOTE 2020-11-29 16:29:01 below)
-            # this also means we can NEVER remove these symbols from the user
-            # workspace (which may not be a bad idea, after all)
-            vars_to_restore = [k for k in self.deleted_vars.keys() if k in self.user_ns_hidden.keys()]
-            #print("post_execute vars_to_restore",vars_to_restore)
+            ## NOTE: 2020-11-29 16:05:14 check if any of the deleted symbols need 
+            ## to be rebound to their original variables in self.user_ns_hidden
+            ## (see NOTE 2020-11-29 16:29:01 below)
+            ## this also means we can NEVER remove these symbols from the user
+            ## workspace (which may not be a bad idea, after all)
+            #vars_to_restore = [k for k in self.deleted_vars.keys() if k in self.user_ns_hidden.keys()]
+            ##print("post_execute vars_to_restore",vars_to_restore)
             
-            # restore the links between the deleted symbol and the original reference
-            for v in vars_to_restore:
-                self.shell.user_ns[v] = self.user_ns_hidden[v]
+            ## restore the links between the deleted symbol and the original reference
+            #for v in vars_to_restore:
+                #self.shell.user_ns[v] = self.user_ns_hidden[v]
             
-            deleted_mpl_figs = [item for item in mpl_figs_in_ns if item not in mpl_figs_in_pyplot]
+            #deleted_mpl_figs = [item for item in mpl_figs_in_ns if item not in mpl_figs_in_pyplot]
             
-            for item in deleted_mpl_figs:
-                self.cached_vars.pop(item, None)
+            #for item in deleted_mpl_figs:
+                #self.cached_vars.pop(item, None)
             
-            new_mpl_figs = [fig for fig in mpl_figs_in_pyplot if fig not in mpl_figs_in_ns]
+            #new_mpl_figs = [fig for fig in mpl_figs_in_pyplot if fig not in mpl_figs_in_ns]
             
-            #print("\npost_execute: new figs",new_mpl_figs)
+            ##print("\npost_execute: new figs",new_mpl_figs)
             
-            # NOTE 2020-11-29 16:29:01: 
-            # some variables may bear the same name as a loaded module;
-            # this is an easy mistake to make, e.g. by loading electrophysiology
-            # data and assigning it to a variable named "ephys" - a symbol which
-            # is already bound to the module ephys.ephys; the module is still 
-            # loaded in sys.module, and has a reference there, but it just becomes
-            # unaccessible to the user
-            #
-            # this happens at interpreter (kernel) level, which cannot prevent it
-            # from happening
-            #
-            # because the original symbol-object binding is contained in
-            # self.user_ns_hidden (even if hidden from user's view) we can restore
-            # it whem the new symbol-object binding has been removed by the user 
-            # (i.e., when user has called "del").
-            #
-            # NOTE: 2020-11-29 16:35:21:
-            # so here we show these new variables bound to an already existing
-            # symbol to faciliate user interaction, but thenn we restore them
-            # once the user has "deleted" the new binding (NOTE: 2020-11-29 16:05:14)
-            new_vars = dict([(i,v) for i, v in self.shell.user_ns.items() if i not in self.cached_vars.keys() and not i.startswith("_") and self.is_user_var(i,v)])
+            ## NOTE 2020-11-29 16:29:01: 
+            ## some variables may bear the same name as a loaded module;
+            ## this is an easy mistake to make, e.g. by loading electrophysiology
+            ## data and assigning it to a variable named "ephys" - a symbol which
+            ## is already bound to the module ephys.ephys; the module is still 
+            ## loaded in sys.module, and has a reference there, but it just becomes
+            ## unaccessible to the user
+            ##
+            ## this happens at interpreter (kernel) level, which cannot prevent it
+            ## from happening
+            ##
+            ## because the original symbol-object binding is contained in
+            ## self.user_ns_hidden (even if hidden from user's view) we can restore
+            ## it whem the new symbol-object binding has been removed by the user 
+            ## (i.e., when user has called "del").
+            ##
+            ## NOTE: 2020-11-29 16:35:21:
+            ## so here we show these new variables bound to an already existing
+            ## symbol to faciliate user interaction, but thenn we restore them
+            ## once the user has "deleted" the new binding (NOTE: 2020-11-29 16:05:14)
+            #new_vars = dict([(i,v) for i, v in self.shell.user_ns.items() if i not in self.cached_vars.keys() and not i.startswith("_") and self.is_user_var(i,v)])
             
-            self.new_vars.update(new_vars)
+            #self.new_vars.update(new_vars)
             
-            #print("post_execute new_vars", self.new_vars)
-            #print("post_execute self.cached_vars", self.cached_vars)
+            ##print("post_execute new_vars", self.new_vars)
+            ##print("post_execute self.cached_vars", self.cached_vars)
             
-            existing_vars = [item for item in self.shell.user_ns.items() if item[0] in self.cached_vars.keys()]
+            #existing_vars = [item for item in self.shell.user_ns.items() if item[0] in self.cached_vars.keys()]
             
-            #print("post_execute existing_vars", existing_vars)
+            ##print("post_execute existing_vars", existing_vars)
             
-            for fig in new_mpl_figs:
-                self.new_vars["Figure%d" % fig.number] = fig
-                self.shell.user_ns["Figure%d" % fig.number] = fig
-                fig.canvas.mpl_connect("close_event", self.shell.user_ns["mainWindow"]._handle_matplotlib_figure_close)
-                fig.canvas.mpl_connect("button_press_event", self.shell.user_ns["mainWindow"].handle_mpl_figure_click)
-                fig.canvas.mpl_connect("figure_enter_event", self.shell.user_ns["mainWindow"].handle_mpl_figure_enter)
+            #for fig in new_mpl_figs:
+                #self.new_vars["Figure%d" % fig.number] = fig
+                #self.shell.user_ns["Figure%d" % fig.number] = fig
+                #fig.canvas.mpl_connect("close_event", self.shell.user_ns["mainWindow"]._handle_matplotlib_figure_close)
+                #fig.canvas.mpl_connect("button_press_event", self.shell.user_ns["mainWindow"].handle_mpl_figure_click)
+                #fig.canvas.mpl_connect("figure_enter_event", self.shell.user_ns["mainWindow"].handle_mpl_figure_enter)
             
-            self.modified_vars.update([item for item in existing_vars if not safe_identity_test(item[1], self.cached_vars[item[0]])])
+            #self.modified_vars.update([item for item in existing_vars if not safe_identity_test(item[1], self.cached_vars[item[0]])])
             
-            #print("post_execute self.modified_vars", self.modified_vars)
+            ##print("post_execute self.modified_vars", self.modified_vars)
             
-            self.cached_vars.update(self.new_vars)
+            #self.cached_vars.update(self.new_vars)
             
-            self.cached_vars.update(self.modified_vars) # not really necessary? (vars are stored by ref)
+            #self.cached_vars.update(self.modified_vars) # not really necessary? (vars are stored by ref)
             
-            cached_mpl_figs = [item[1] for item in self.cached_vars.items() if isinstance(item[1], mpl.figure.Figure)]
+            #cached_mpl_figs = [item[1] for item in self.cached_vars.items() if isinstance(item[1], mpl.figure.Figure)]
             
-            for item in cached_mpl_figs:
-                if item not in mpl_figs_in_pyplot:
-                    self.cached_vars.pop(item, None)
+            #for item in cached_mpl_figs:
+                #if item not in mpl_figs_in_pyplot:
+                    #self.cached_vars.pop(item, None)
             
             
-            for item in self.deleted_vars.items():
-                self.cached_vars.pop(item[0], None)
-                if isinstance(item[1], QtWidgets.QWidget) and hasattr(item[1], "winId"):
-                    item[1].close()
-                    self.windowVariableDeleted.emit(int(item[1].winId()))
+            #for item in self.deleted_vars.items():
+                #self.cached_vars.pop(item[0], None)
+                #if isinstance(item[1], QtWidgets.QWidget) and hasattr(item[1], "winId"):
+                    #item[1].close()
+                    #self.windowVariableDeleted.emit(int(item[1].winId()))
             
-            self.cached_vars.clear()
+            #self.cached_vars.clear()
             
-        except Exception as e:
-            traceback.print_exc()
+        #except Exception as e:
+            #traceback.print_exc()
             
         self.updateTable(from_console=True)
         

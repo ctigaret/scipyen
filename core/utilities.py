@@ -127,7 +127,13 @@ class SafeComparator(object):
                 if not ret:
                     return ret
                 
-                ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
+                # NOTE: 2021-08-21 09:43:33 FIXME
+                # ATTENTION Line below produces infinite recursion
+                # when x contains a reference to itself
+                #ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
+                
+                # NOTE: 2021-08-21 09:45:48 FIXED
+                ret &= all(map(lambda x_: hash_identity_test(x_[0],x_[1]),zip(x,y)))
                 
                 if not ret:
                     return ret
@@ -225,7 +231,12 @@ def hashlist(x:typing.Iterable[typing.Any]) -> Number:
     if not hasattr(x, "__iter__"):
         raise TypeError("Expecting an iterable; got %s instead" % type(x).__name__)
     
-    return (gethash(v) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
+    # NOTE: 2021-08-21 10:02:46 FIXME
+    # ATTENTION:
+    # The line below generate infinite recursion when v contains references to x
+    #return (gethash(v) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
+    # NOTE: 2021-08-21 10:08:01 FIXED
+    return ( (hash(type(v)) if isinstance(v, (list, deque, dict)) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
 
 def gethash(x:typing.Any) -> Number:
     """Calculates a hash-like figure for objects including non-hashable
@@ -384,79 +395,146 @@ def safe_identity_test2(x, y):
 
 @safeWrapper
 def safe_identity_test(x, y, idcheck=False):
-    try:
-        ret = True
+    ret = True
+    
+    if idcheck:
+        ret &= id(x) == id(y)
         
-        if idcheck:
-            ret &= id(x) == id(y)
-            
-            if not ret:
-                return ret
+        if not ret:
+            return ret
+    
+    ret &= type(x) == type(y)
+    
+    if not ret:
+        return ret
+    
+    if isfunction(x):
+        return x == y
+    
+    if isinstance(x, partial):
+        return x.func == y.func and x.args == y.args and x.keywords == y.keywords
         
-        ret &= type(x) == type(y)
+    if hasattr(x, "size"):
+        ret &= x.size == y.size
+
+        if not ret:
+            return ret
+    
+    elif hasattr(x, "__len__") or hasattr(x, "__iter__"):
+        ret &= len(x) == len(y)
+
+        if not ret:
+            return ret
+        
+        ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
         
         if not ret:
             return ret
         
-        if isfunction(x):
-            return x == y
-        
-        if isinstance(x, partial):
-            return x.func == y.func and x.args == y.args and x.keywords == y.keywords
+    if hasattr(x, "shape"):
+        ret &= x.shape == y.shape
             
-        if hasattr(x, "size"):
-            ret &= x.size == y.size
-
-            if not ret:
-                return ret
-        
-        elif hasattr(x, "__len__") or hasattr(x, "__iter__"):
-            ret &= len(x) == len(y)
-
-            if not ret:
-                return ret
-            
-            ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
-            
-            if not ret:
-                return ret
-            
-        if hasattr(x, "shape"):
-            ret &= x.shape == y.shape
-                
-            if not ret:
-                return ret
-        
-        # NOTE: 2018-11-09 21:46:52
-        # isn't this redundant after checking for shape?
-        # unless an object could have shape attribte but not ndim
-        if hasattr(x, "ndim"):
-            ret &= x.ndim == y.ndim
-        
-            if not ret:
-                return ret
-        
-        if hasattr(x, "dtype"):
-            ret &= x.dtype == y.dtype
-        
-            if not ret:
-                return ret
-        
-        if isinstance(x, (np.ndarray, str, Number, pd.DataFrame, pd.Series, pd.Index)):
-            ret &= np.all(x==y)
-        
-            if not ret:
-                return ret
-        
-        ret &= eq(x,y)
-        
-        return ret ## good fallback, though potentially expensive
+        if not ret:
+            return ret
     
-    except Exception as e:
-        traceback.print_exc()
-        #print("x:", x)
-        #print("y:", y)
-        return False
+    # NOTE: 2018-11-09 21:46:52
+    # isn't this redundant after checking for shape?
+    # unless an object could have shape attribte but not ndim
+    if hasattr(x, "ndim"):
+        ret &= x.ndim == y.ndim
+    
+        if not ret:
+            return ret
+    
+    if hasattr(x, "dtype"):
+        ret &= x.dtype == y.dtype
+    
+        if not ret:
+            return ret
+    
+    if isinstance(x, (np.ndarray, str, Number, pd.DataFrame, pd.Series, pd.Index)):
+        ret &= np.all(x==y)
+    
+        if not ret:
+            return ret
+    
+    ret &= eq(x,y)
+    
+    return ret ## good fallback, though potentially expensive
+
+    #try:
+        #ret = True
+        
+        #if idcheck:
+            #ret &= id(x) == id(y)
+            
+            #if not ret:
+                #return ret
+        
+        #ret &= type(x) == type(y)
+        
+        #if not ret:
+            #return ret
+        
+        #if isfunction(x):
+            #return x == y
+        
+        #if isinstance(x, partial):
+            #return x.func == y.func and x.args == y.args and x.keywords == y.keywords
+            
+        #if hasattr(x, "size"):
+            #ret &= x.size == y.size
+
+            #if not ret:
+                #return ret
+        
+        #elif hasattr(x, "__len__") or hasattr(x, "__iter__"):
+            #ret &= len(x) == len(y)
+
+            #if not ret:
+                #return ret
+            
+            #ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
+            
+            #if not ret:
+                #return ret
+            
+        #if hasattr(x, "shape"):
+            #ret &= x.shape == y.shape
+                
+            #if not ret:
+                #return ret
+        
+        ## NOTE: 2018-11-09 21:46:52
+        ## isn't this redundant after checking for shape?
+        ## unless an object could have shape attribte but not ndim
+        #if hasattr(x, "ndim"):
+            #ret &= x.ndim == y.ndim
+        
+            #if not ret:
+                #return ret
+        
+        #if hasattr(x, "dtype"):
+            #ret &= x.dtype == y.dtype
+        
+            #if not ret:
+                #return ret
+        
+        #if isinstance(x, (np.ndarray, str, Number, pd.DataFrame, pd.Series, pd.Index)):
+            #ret &= np.all(x==y)
+        
+            #if not ret:
+                #return ret
+        
+        #ret &= eq(x,y)
+        
+        #return ret ## good fallback, though potentially expensive
+    
+    #except Exception as e:
+        #traceback.print_exc()
+        ##print("x:", x)
+        ##print("y:", y)
+        #return False
 
 class NestedFinder(object):
     """Provides searching in nesting (hierarchical) data structures.

@@ -338,9 +338,16 @@ def dynamic_trait(x, *args, **kwargs):
     if traitclass[0] is Instance:
         return new_klass(klass = myclass, args = args, kw = kw, allow_none = allow_none)
     
+    #return new_klass(default_value = x, allow_none = allow_none)
     if issubclass(new_klass, Dict):
         if content_traits:
-            traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=content_traits)) for k,v in x.items())
+            # NOTE: 2021-08-21 09:54:18 FIXME
+            # ATTENTION Line below produces infinite recursion when the underlying dict
+            # contains a reference to itself
+            #traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=content_traits)) for k,v in x.items())
+            # NOTE: 2021-08-21 09:54:46 FIXED
+            # do NOT use content_traits for dict values when these are of dict type
+            traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=False)) for k,v in x.items())
         else:
             traits = None
             
@@ -358,31 +365,6 @@ class TraitSetMixin(object):
         This is supposed to also detect changes in the order of elements.
         """
         _enhanced_set_(self, obj, value)
-        #print("TraitSetMixin.set")
-        #new_value = self._validate(obj, value)
-        #try:
-            #old_value = obj._trait_values[self.name]
-        #except KeyError:
-            #old_value = self.default_value
-
-        #obj._trait_values[self.name] = new_value
-        #try:
-            #silent = bool(old_value == new_value)
-            
-            ## NOTE: 2021-08-19 16:17:23
-            ## check for change in contents
-            #if silent is not False:
-                #new_hash = gethash(new_value)
-                #silent = (new_hash == self.hashed)
-                #if not silent:
-                    #self.hashed = new_hash
-        #except:
-            ## if there is an error in comparing, default to notify
-            #silent = False
-        #if silent is not True:
-            ## we explicitly compare silent to True just in case the equality
-            ## comparison above returns something other than True/False
-            #obj._notify_trait(self.name, old_value, new_value)
         
 class TraitsObserver(HasTraits):
     """ CAUTION do not use yet
