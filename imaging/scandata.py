@@ -447,6 +447,10 @@ class AnalysisUnit(object):
         
         super().__init__()
         
+        if isinstance(parent, AnalysisUnit):
+            self = parent.copy()
+            return
+        
         if not isinstance(parent, ScanData):
             raise TypeError("parent is expected to be a ScanData object; got %s instead" % type(parent).__name__)
         
@@ -1606,7 +1610,7 @@ class AnalysisUnit(object):
         return self.isSameAs(other)
     
     def copy(self):
-        """Returns a shallow copy of this copy.
+        """Returns a shallow copy of this object.
         
         The result's landmark and protocol(s) are references to the landmark and
         protocol(s) of this unit.
@@ -2041,6 +2045,10 @@ class ScanData(object):
         #
         
         # END comments
+        
+        if isinstance(scene, ScanData):
+            self = scene.copy()
+            return
         
         #self.apiversion = (0,3) # MAJOR, MINOR
         #print("ScanData.__init__ start")
@@ -3312,13 +3320,14 @@ class ScanData(object):
                           electrophysiology = ephys,
                           analysisOptions = analysisOptions)
         
-        # MUST reaassign triggerProtocols because the constructor above tries to 
+        # MUST reassign triggerProtocols because the constructor above tries to 
         # parse the trigger events in electrophysiology which might result in 
         # name clashes
         
         # object containers
-        result._scene_filters_ = copy.deepcopy(self._scene_filters_)
-        result._scans_filters_ = copy.deepcopy(self._scans_filters_)
+        if hasattr(self, "_scene_filters_"): # old API
+            result._scene_filters_ = copy.deepcopy(self._scene_filters_)
+            result._scans_filters_ = copy.deepcopy(self._scans_filters_)
         
         # neo.Block does not have a copy() method so we need to use our own
         result._scene_block_ = neo_copy(self._scene_block_)

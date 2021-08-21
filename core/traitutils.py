@@ -75,6 +75,7 @@ TRAITSMAP = {           # use casting versions
     type:       (Instance,),    # e.g., type(type(None))
     #type:       (Type,),    # e.g., type(type(None))
     property:   (DottedObjectName,),
+    #function:   (Any,)
     }
 
 def _enhanced_set_(instance, obj, value):
@@ -320,7 +321,8 @@ def dynamic_trait(x, *args, **kwargs):
 
     if traitclass[0] is None:
         highest_below_object = [s for s in reversed(getmro(type(x)))][1] # all Python types inherit from object
-        traitclass = TRAITSMAP.get(highest_below_object, (Instance,))
+        traitclass = TRAITSMAP.get(highest_below_object, (Any,))
+        #traitclass = TRAITSMAP.get(highest_below_object, (Instance,))
         
     #print("traitclass", traitclass)
     

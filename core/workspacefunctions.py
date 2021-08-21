@@ -593,6 +593,7 @@ def validate_varname(arg, ws=None):
     a modified variable name
     
     """
+    from core.utilities import counter_suffix
     
     if ws is None:
         frame_records = inspect.getouterframes(inspect.currentframe())
@@ -600,27 +601,30 @@ def validate_varname(arg, ws=None):
             if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within the IPython console
                 ws = f[0].f_globals["mainWindow"].workspace
                 break
-    
+    if not isinstance(arg, str) or len(arg.strip()) == 0:
+        arg = "data"
     # check if arg is a valid python variable identifier; replace non-valid characters with 
-    # "_" (underscore) and prepend "variable_" if it starts with a digit
+    # "_" (underscore) and prepend "data_" if it starts with a digit
     if not arg.isidentifier():
-        arg = _re.sub("^(?=\d)","variable_", _re.sub("\W", "_", arg))
+        arg = _re.sub("^(?=\d)","data_", _re.sub("\W", "_", arg))
         
     # avoid arg being a valid python language keyword
     if keyword.iskeyword(arg):
-        arg = "variable_" + arg
+        arg = "data_" + arg
         
-    if arg in ws.keys():
-        while arg in ws.keys():
-            m = _re.search("_(\d+)$", arg)
-            if m:
-                count = int(m.group(0).split("_")[1]) + 1
-                arg = _re.sub("_(\d+)$", "_%d" % count, arg)
+    arg = counter_suffix(arg, ws.keys())
+        
+    #if arg in ws.keys():
+        #while arg in ws.keys():
+            #m = _re.search("_(\d+)$", arg)
+            #if m:
+                #count = int(m.group(0).split("_")[1]) + 1
+                #arg = _re.sub("_(\d+)$", "_%d" % count, arg)
                 
-            else:
-                arg += "_01"
+            #else:
+                #arg += "_01"
         
-            #print("validate_varname: new name: %s", arg)
+            ##print("validate_varname: new name: %s", arg)
                 
             
     return arg

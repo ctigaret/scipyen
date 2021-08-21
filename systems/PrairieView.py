@@ -423,7 +423,8 @@ class PVSystemConfiguration(object):
     
     def __str__(self):
         ret = ["System Configuration:"]
-        ret += ["%s = %s" % (i[0], i[1]) for i in self.__attributes__.items()]
+        if self.__attributes__.items() is not None:
+            ret += ["%s = %s" % (i[0], i[1]) for i in self.__attributes__.items() if i is not None]
         #ret += ["%s = %s" % (i[0], i[1]) for i in self.__dict__.items()]
         for l in self.lasers:
             ret.append(l.__str__())
@@ -3015,8 +3016,6 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
                 
             if self.auto_export:
                 self._scipyenWindow_.assignToWorkspace(self.scanDataVarName, self.scanData, from_console=False)
-                #self._scipyenWindow_.workspace[strutils.str2symbol(self.dataName)] = self._scandata_ 
-                #self._scipyenWindow_.slot_updateWorkspaceTable(False)
             
     def updateProtocolEditor(self):
         self.protocolEditorDialog.triggerProtocols = self.triggerProtocols

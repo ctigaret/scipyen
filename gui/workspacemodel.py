@@ -575,17 +575,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 self.addRowForVariable(name, self.shell.user_ns[name])
             else:
                 self.updateRowForVariable(name, self.shell.user_ns[name])
+                
+            self.modelContentsChanged.emit()
         
     def pre_execute(self):
-        self.pre_execute_new()
-        #self.pre_execute_old()
-        
-    def post_execute(self):
-        self.post_execute_new()
-        #self.post_execute_old()
-        
-    def pre_execute_new(self):
-        #print("pre_execute_new")
         self.cached_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         self.observed_vars.unobserve(self.var_observer)
         
@@ -593,9 +586,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         self.observed_vars.update(self.cached_vars)
         self.observed_vars.observe(self.var_observer)
-
-    def post_execute_new(self):
-        #print("post_execute_new")
+        
+    def post_execute(self):
         del_vars = [name for name in self.observed_vars.keys() if name not in self.shell.user_ns.keys()]
         
         for name in del_vars:
@@ -607,50 +599,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         self.observed_vars.update(current_vars)
         
-        
-            
-    #def pre_execute_old(self):
-        #"""Callback from the jupyter interpreter/kernel before executing code
-        #"""
-        ## FIXME 2021-08-18 12:55:33
-        ##### BEGIN
-        ## because cached_vars holds references, it will get updated once the 
-        ## object has changed and the change won't be picked up
-        ## vivid example:
-        ## a = list() ==> workspace viewer displays a with 0 length
-        ## a += [1,2,3] ==> workspace viewer still displays a with 0 length
-        ## but:
-        ## a = [1,2,3] ==> updates correctly because a now has a new id
-        ##### END
-        
-        ## see NOTE 2020-11-29 16:29:01 and NOTE: 2020-11-29 16:05:14
-        ## checks if a new variable reassigns the binding to an already existing 
-        ## symbol (previously bound to a hidden variable) - so that it can be 
-        ## restored when user "deletes" it from the workspace
-        
-        ## FIXME: 2021-08-18 13:04:17 deepcopy problems
-        ## 1. if you deepcopy they will get a new id
-        ## 2. cannot deepcopy a module => issues with imported modules present in the ns
-        ## 3. deepcopy could duplicate memory use
-        ## workaround 2 & 3: filter what to deepcopy (i.e. restrict only to POD and
-        ## python containers but code could become even more unwieldy that it already is)
-        ##self.cached_vars = dict([deepcopy(item) for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
-        #self.cached_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
-        
-        
-        ##self.cached_vars = DataBag([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
-        
-        #self.modified_vars.clear()
-        #self.new_vars.clear()
-        #self.deleted_vars.clear()
-        
-        #existing_vars = [item for item in self.shell.user_ns.items() if item[0] in self.cached_vars.keys()]
-        
-        #self.modified_vars.update([item for item in existing_vars if not safe_identity_test(item[1], self.cached_vars[item[0]])])
-            
-        ##print("pre_execute self.cached_vars", self.cached_vars)
-        ##print("pre_execute self.modified_vars", self.modified_vars)
-            
     #@safeWrapper
     #def post_execute_old(self):
         #"""Callback for the internal inprocess ipython kernel
@@ -772,7 +720,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #except Exception as e:
             #traceback.print_exc()
             
-        self.updateTable(from_console=True)
+        #self.update(from_console=True)
         
     def _gen_item_for_object_(self, propdict:dict, 
                             editable:typing.Optional[bool] = False, 
@@ -974,7 +922,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     @pyqtSlot()
     def slot_updateTable(self):
         #print("slot_updateTable")
-        self.updateTable(from_console=False)
+        self.update()
+        #self.update(from_console=False)
             
     def addRowForVariable(self, dataname, data):
         """CAUTION Only use for data in the internal workspace, not in remote ones.
@@ -986,11 +935,16 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def clearTable(self):
         self.removeRows(0,self.rowCount())
         
-    def updateTable(self, from_console:bool = False, force:bool=False):
-        self.updateTable_new()
-        #self.updateTable_old(from_console=from_console, force=force)
+    def update(self, from_console:bool = False, force:bool=False):
+        """Updates workspace model.
+        Must be called by code that adds/remove/mofifies or renames variables 
+        in the ScipyenWindow.workspace namespace in order to update the
+        workspace viewer.
         
-    def updateTable_new(self,):
+        Code executed in the main Scipyen's console does not (and SHOULD NOT)
+        call this function, as the model is updated automatically by 
+        self.observed_vars (via pre_execute and post_execute).
+        """
         del_vars = [name for name in self.observed_vars.keys() if name not in self.shell.user_ns.keys()]
 
         for name in del_vars:
@@ -1001,136 +955,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
         
         self.observed_vars.update(current_vars)
-        
-        displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
-        
-        
-    def updateTable_old(self, from_console:bool = False, force:bool=False):
-        """CAUTION Updates model table only for vars in internal workspace.
-        For data in external kernels (i.e., in the external console) use 
-        updateFromExternal
-        
-        TODO/FIXME 2020-07-30 21:51:49 factor these two under a common logic
-        """
-        
-        print("updateTable_old from_console:", from_console)
-
-        try:
-            displayed_vars_types = self.getDisplayedVariableNamesAndTypes()
-
-            if from_console:
-                #print("WT update from console")
-                # NOTE: 2018-10-07 21:46:03
-                # added/removed/modified variables as a result of code executed
-                # in the console; 
-                #
-                # pre_execute and post_execute IPython events
-                # are handled as follows:
-                #
-                # pre_execute always creates a snapshot of the shell.user_ns, in
-                # cached_vars; hence, cached_vars represent the most recent state
-                # of the user_ns (and hence of the mainWindow.workspace)
-                #
-                # post_execute checks shell.user_ns against cached_vars and determines:
-                #
-                # 1) if variables have been deleted from user_ns (but still present
-                #       in cached_vars) => deleted_vars
-                #
-                # 2) if variables present in user_ns have been modified (these have
-                #       the same KEYs in cached_vars, but the cached_vars maps these KEYs 
-                #       to different objects than the ones they are mapped to in user_ns
-                #   => modified_vars
-                #
-                # 3) if variables have been created in (added to) user_ns (but
-                #       missing from cached_vars) => new_vars
-                #
-                
-                # variables deleted via a call to "del()" in the console
-                for varname in self.deleted_vars.keys(): # this is populated by post_execute()
-                    self.removeRowForVariable(varname)
-                    
-                #print("modified variables:", self.modified_vars)
-                
-                # variables modified via code executed in the console
-                for item in self.modified_vars.items(): # populated by post_execute
-                    self.originalVarName = item[0] # make sure we cache this here
-                                                   # only used for updateRowForVariable
-                    self.updateRowForVariable(item[0], item[1])
-                    
-                self.originalVarName = ""
-                
-                #print("added variables:", self.new_vars)
-                
-                # variables created by code executed in the console
-                for item in self.new_vars.items(): # populated by post_execute
-                    # NOTE: 2020-11-29 16:39:18:
-                    # see NOTE 2020-11-29 16:29:01 and NOTE: 2020-11-29 16:35:21
-                    if self.is_user_var(item[0], item[1]) and not item[0].startswith("_"):
-                        if item[0] not in displayed_vars_types:
-                            self.addRowForVariable(item[0], item[1])
-                        
-                        else:
-                            if item[0] in self.cached_vars and not safe_identity_test(item[1], self.cached_vars[item[0]]):
-                                self.updateRowForVariable(item[0], item[1])
-                                
-                self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.user_ns_hidden and not item[0].startswith("_")])
-                self.deleted_vars.clear()
-                self.new_vars.clear()
-                
-            else:
-                # NOTE 2018-10-07 21:54:45
-                # for variables added/modified/deleted from code executed outside
-                # the console, unfortunately we cannot easily rely on the event handlers
-                # pre_execute and post_execute;
-                # therefore the cached_vars does not offer us much help here
-                # we rely directly on shell.user_ns instead
-                
-                # NOTE: 2020-03-06 11:02:01
-                # 1. updates self.cached_vars
-                # 2. clears self.new_vars 
-                # 3. clears self.deleted_vars
-                self.pre_execute()
-                
-                # NOTE: 2021-08-16 10:15:20
-                # needed to take into account bindings created outside console?
-                self.post_execute()
-                
-                # variables DELETED from workspace or MODIFIED by code executed 
-                # outside the console
-                for varname in displayed_vars_types:
-                    if varname not in self.shell.user_ns: # deleted by GUI
-                        self.removeRowForVariable(varname)
-                        
-                    else:
-                        if force:
-                            self.originalVarName = varname # see NOTE: 2021-06-12 12:11:25
-                            self.updateRowForVariable(varname, self.shell.user_ns[varname])
-                            
-                        elif varname in self.cached_vars: # should also be in user_ns
-                            if type(self.cached_vars[varname]).__name__ != displayed_vars_types[varname]:
-                                self.originalVarName = varname # see NOTE: 2021-06-12 12:11:25
-                                self.updateRowForVariable(varname, self.shell.user_ns[varname])
-                                
-                            elif not safe_identity_test(self.shell.user_ns[varname], self.cached_vars[varname]):
-                                self.originalVarName = varname # see NOTE: 2021-06-12 12:11:25
-                                self.updateRowForVariable(varname, self.shell.user_ns[varname])
-                
-                # NOTE: 2021-06-12 12:12:50
-                # clear symbol cache, see NOTE: 2021-06-12 12:11:25
-                self.originalVarName=""            
-                # variables CREATED by code executed outside the console
-                for item in self.cached_vars.items():
-                    if item[0] not in displayed_vars_types:
-                        self.addRowForVariable(item[0], item[1])
-                        
-                # is this still needed !?!
-                self.cached_vars = dict([item for item in self.shell.user_ns.items() if item[0] not in self.user_ns_hidden and not item[0].startswith("_")])
-
-        except Exception as e:
-            print("\n\n***Exception in updateTable: ***\n")
-            traceback.print_exc()
-
-        self.modelContentsChanged.emit()
         
     def updateFromExternal(self, prop_dicts):
         """prop_dicts: {name: nested properties dict}

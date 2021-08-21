@@ -7860,7 +7860,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         elif isinstance(obj, dict):
             self._scipyenWindow_.workspace.update(obj)
             
-            self._scipyenWindow_.slot_updateWorkspaceTable(False)
+            self._scipyenWindow_.slot_updateWorkspaceModel()
+            #self._scipyenWindow_.slot_updateWorkspaceModel(False)
             
             self.statusBar().showMessage("Done!")
             
@@ -7868,7 +7869,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             self._scipyenWindow_.workspace.update(obj[0])
             self._scipyenWindow_.workspace.update(obj[1])
             
-            self._scipyenWindow_.slot_updateWorkspaceTable(False)
+            self._scipyenWindow_.slot_updateWorkspaceModel()
+            #self._scipyenWindow_.slot_updateWorkspaceModel(False)
             
             self.statusBar().showMessage("Done!")
             
@@ -7917,7 +7919,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 return
 
         self._scipyenWindow_.workspace[var_name] = result
-        self._scipyenWindow_.slot_updateWorkspaceTable(False)
+        self._scipyenWindow_.slot_updateWorkspaceModel()
+        #self._scipyenWindow_.slot_updateWorkspaceModel(False)
         
         self.statusBar().showMessage("Done!")
         
@@ -7958,14 +7961,16 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                     for r in result:
                         self._scipyenWindow_.workspace[strutils.str2symbol(r.name)] = r
             
-                self._scipyenWindow_.slot_updateWorkspaceTable(False)
+                self._scipyenWindow_.slot_updateWorkspaceModel()
+                #self._scipyenWindow_.slot_updateWorkspaceModel(False)
                 
                 self.statusBar().showMessage("Done!")
                 
             elif isinstance(result, ScanData):
                 self._scipyenWindow_.workspace[strutils.str2symbol(result.name)] = result
                 
-                self._scipyenWindow_.slot_updateWorkspaceTable(False)
+                self._scipyenWindow_.slot_updateWorkspaceModel()
+                #self._scipyenWindow_.slot_updateWorkspaceModel(False)
                 
                 self.statusBar().showMessage("Done!")
                 
@@ -13004,11 +13009,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             if any([v is self for v in self.appWindow.workspace.values()]):
                 self.appWindow.deRegisterViewer(self) # this will also save settings and close the viewer window
                 self.appWindow.removeFromWorkspace(self, from_console=False, by_name=False)
-                self.appWindow.slot_updateWorkspaceTable(False)
+                self.appWindow.slot_updateWorkspaceModel()
+                #self.appWindow.slot_updateWorkspaceModel(False)
 
-            #if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-                #self._scipyenWindow_.slot_updateWorkspaceTable(False)
-        
         #print("%s.closeEvent %s Call super().closeEvent" % (self.__class__.__name__, self.winTitle))
         # NOTE: 2021-07-08 15:59:47
         # call below needed so that the  LSCaTwindow instance is removed from 

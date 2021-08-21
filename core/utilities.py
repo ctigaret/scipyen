@@ -243,9 +243,10 @@ def hashiterable(x:typing.Iterable[typing.Any]) -> Number:
     # The line below generate infinite recursion when v contains references to x
     #return (gethash(v) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
     # NOTE: 2021-08-21 10:08:01 FIXED
-    return ( (hash(type(v)) if hasattr(v, "__iter__") else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
+    return ( (hash(type(v)) if (hasattr(v, "__iter__") or v is x) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
     #return ( (hash(type(v)) if isinstance(v, (list, deque, dict)) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
 
+@safeWrapper
 def gethash(x:typing.Any) -> Number:
     """Calculates a hash-like figure for objects including non-hashable
     To be used for object comparisons.
@@ -271,49 +272,54 @@ def gethash(x:typing.Any) -> Number:
     
     # Arguably, we don't need to monitor elemental vale changes in these large
     # data sets, just their ndim/shape/size/axistags, etc
-    def _arsum(_x):
+    def _sumarr(_x):
         return sum((hash(_x.ndim), hash(_x.size), hash(_x.shape),))
         
-    def _arsumtype(_x):
-        return _arsum(_x) + hash(_x.dtype)
+    def _sumarrdtype(_x):
+        return _sumarr(_x) + hash(_x.dtype)
 
     try:
-        if isinstance(x, dict): # order is not important
-            return hash(type(x)) + sum((gethash(v) for v in x.values() if v is not x))
+        #if isinstance(x, dict): # order is not important
+            ##print("gethash(dict)")
+            #return hash(type(x)) + sum((gethash(v) for v in x.values() if v is not x))
         
-        elif isinstance(x, (set, frozenset)): # order is not important
-            return hash(type(x)) + sum((gethash(v) for v in x))
+        #elif isinstance(x, (set, frozenset)): # order is not important
+            #return hash(type(x)) + sum((gethash(v) for v in x))
         
-        elif isinstance(x, (list, deque)):
-            return hash(type(x)) + sum(hashiterable(x))
+        #elif isinstance(x, (list, deque)):
+            #return hash(type(x)) + sum(hashiterable(x))
         
-        elif isinstance(x, pq.Quantity):
-            return hash(type(x)) + _arsumtype(x) + hash(x.dimensionality)
+        if isinstance(x, pq.Quantity):
+            return hash(type(x)) + _sumarrdtype(x) + hash(x.dimensionality)
         
         elif isinstance(x, vigra.VigraArray):
-            return hash(type(x)) + gethash(np.array(x)) + hash(x.axistags)
+            return hash(type(x)) + _sumarrdtype(x) + hash(x.axistags)
+            #return hash(type(x)) + gethash(np.array(x)) + hash(x.axistags)
         
         elif isinstance(x, vigra.vigranumpycore.ChunkedArrayBase):
-            return hash(type(x)) + _arsumtype(x) + sum((hash(x.chunk_array_shape), hash(x.chunk_shape), ))
+            return hash(type(x)) + _sumarrdtype(x) + sum((hash(x.chunk_array_shape), hash(x.chunk_shape), ))
         
         elif isinstance(x, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
             return hash(type(x)) + hash(x)
             #return HASHRANDSEED + hash(x)
         
         elif isinstance(x, np.ndarray):
-            return hash(type(x)) + _arsumtype(x)
+            return hash(type(x)) + _sumarrdtype(x)
             #return HASHRANDSEED + sum([hash(x.shape), hash(x.size), hash(x.ndim) , hash(x.dtype)])
         
         elif isinstance(x, pd.DataFrame):
-            return hash(type(x)) + _arsum(x) + hash(tuple(x.index)) + hash(tuple(x.columns)) + sum((gethash(x[c]) for c in x.columns))
+            return hash(type(x)) + _sumarr(x) + gethash(x.index) + gethash(x.columns) + sum((gethash(x[c]) for c in x.columns))
         
         elif isinstance(x, pd.Series):
-            return hash(type(x)) + _arsumtype(x) + hash(tuple(x.index)) + hash(tuple(x.name))
+            return hash(type(x)) + _sumarrdtype(x) + hash(tuple(x.index)) + hash(tuple(x.name))
             #return HASHRANDSEED + hash(tuple(x.index)) + hash(tuple(x.name)) + hash(tuple(x)) + hash(x.dtype)
         
         elif isinstance(x, pd.Index):
-            return hash(type(x)) + hash(tuple(x)) + hash(x.dtype)
+            return hash(type(x)) + _sumarrdtype(x)
             #return HASHRANDSEED + hash(tuple(x)) 
+            
+        elif hasattr(x, "__iter__"):
+            return hash(type(x)) + sum(hashiterable(x))
         
         elif not is_hashable(x):
             if hasattr(x, "__dict__"):

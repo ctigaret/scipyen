@@ -47,30 +47,32 @@ class DataBagTraitsObserver(HasTraits):
         self.add_traits(**keep_traits)
         
     def __setstate__(self, state):
+        super().__setstate__(state)
+        ##print("DataBagTraitsObserver.__setstate__", state)
         
-        # ATTENTION: 2020-10-30 14:27:36
-        # the following completely messes up DataBagTraitsObserver when unpickled
-        #self.__dict__ = state.copy()
+        ## ATTENTION: 2020-10-30 14:27:36
+        ## the following completely messes up DataBagTraitsObserver when unpickled
+        ##self.__dict__ = state.copy()
         
-        # ATTENTION: 2020-10-30 14:27:58
-        # therefore we UPDATE values in self._trait_values, rather than self__dict__
+        ## ATTENTION: 2020-10-30 14:27:58
+        ## therefore we UPDATE values in self._trait_values, rather than self__dict__
         
-        # event handlers are reassigned to self
-        cls = self.__class__
-        #print("DataBagTraitsObserver.__setstate__: cls", cls)
-        for key in dir(cls):
-            # Some descriptors raise AttributeError like zope.interface's
-            # __provides__ attributes even though they exist.  This causes
-            # AttributeErrors even though they are listed in dir(cls).
-            #print("DataBagTraitsObserver.__setstate__: key", key)
-            try:
-                value = getattr(cls, key)
-            except AttributeError:
-                pass
-            else:
-                if isinstance(value, EventHandler):
-                    #print("DataBagTraitsObserver.__setstate__ value is a ", type(value))
-                    value.instance_init(self)
+        ## event handlers are reassigned to self
+        #cls = self.__class__
+        ##print("DataBagTraitsObserver.__setstate__: cls", cls)
+        #for key in dir(cls):
+            ## Some descriptors raise AttributeError like zope.interface's
+            ## __provides__ attributes even though they exist.  This causes
+            ## AttributeErrors even though they are listed in dir(cls).
+            ##print("DataBagTraitsObserver.__setstate__: key", key)
+            #try:
+                #value = getattr(cls, key)
+            #except AttributeError:
+                #pass
+            #else:
+                #if isinstance(value, EventHandler):
+                    ##print("DataBagTraitsObserver.__setstate__ value is a ", type(value))
+                    #value.instance_init(self)
 
     def __getstate__(self):
         return super().__getstate__()
@@ -390,19 +392,22 @@ class DataBag(Bunch):
 
     def __str__(self):
         obs = object.__getattribute__(self, "__observer__")
-        d = dict((key, getattr(obs, key)) for key in obs.traits())
+        d = dict((key, getattr(obs, key, "<...>")) for key in obs.traits())
         return d.__str__()
     
     def __repr__(self):
         obs = object.__getattribute__(self, "__observer__")
-        d = dict((key, getattr(obs, key)) for key in obs.traits())
+        d = dict((key, getattr(obs, key, "<...>")) for key in obs.traits())
         return d.__repr__()
     
     def __getitem__(self, key):
         """Implements bag[key] (subscript access, or "bracket syntax"")
         """
-        obs = object.__getattribute__(self, "__observer__")
-        return getattr(obs, key)
+        try:
+            obs = object.__getattribute__(self, "__observer__")
+            return getattr(obs, key)
+        except:
+            raise
     
     def __getattr__(self, key):
         """Implements bag.key (attribute access, or "dot syntax")
@@ -455,20 +460,24 @@ class DataBag(Bunch):
             return obs.has_trait(key)
         except:
             raise
-            
         
     def __getstate__(self):
-        """Returns the DataBagTraitsObserver of this object, wrapped in a dict
+        """Returns the state of this object's observer wrapped in a dict
         """
-        obs = object.__getattribute__(self, "__observer__")
-        state = obs.__getstate__()
-        d = {"__observer__": state}
+        obs = object.__getattribute__(self, "__observer__", None)
+        if obs is None:
+            d = {"__observer--": {"_trait_notifiers":{}, "_trait_validators":{}}}
+        else:
+            state = obs.__getstate__()
+            d = {"__observer__": state}
         return d
     
-    def __setstate__(self, state):
+    def __setstate__(self, state:dict):
         """Restores the state dictionary
         state: dict
         """
+        
+        print("DataBag.__setstate__", [k for k in state])
         if "__observer__" in state:
             observer_state = state["__observer__"]
             
@@ -481,9 +490,10 @@ class DataBag(Bunch):
             
         obs = object.__getattribute__(self, "__observer__")
             
-        if state is not None:
-            obs.__setstate__(observer_state)
-    
+        #if state is not None:
+        #if isinstance(state, dict):
+        obs.__setstate__(observer_state)
+            
     def __coerce_trait__(self, obs, key, val):
         old_trait = obs.traits()[key]
         old_type = type(object.__getattribute__(obs, key))
@@ -616,22 +626,31 @@ class DataBag(Bunch):
     def keys(self):
         """Generates a keys 'view'
         """
-        obs = object.__getattribute__(self, "__observer__")
-        # TODO find a way to return this as a dict_view (mapping proxy)
-        # it should be OK for now
-        yield from (k for k in obs._trait_values)
+        try:
+            obs = object.__getattribute__(self, "__observer__")
+            # TODO find a way to return this as a dict_view (mapping proxy)
+            # it should be OK for now
+            yield from (k for k in obs._trait_values)
+        except:
+            yield
     
     def values(self):
         """Generates a values 'view'
         """
-        obs = object.__getattribute__(self, "__observer__")
-        yield from (obs._trait_values[k] for k in self.keys())
+        try:
+            obs = object.__getattribute__(self, "__observer__")
+            yield from (obs._trait_values[k] for k in self.keys())
+        except:
+            yield
     
     def items(self):
         """Generates an items 'view'
         """
-        obs = object.__getattribute__(self, "__observer__")
-        yield from ((k, obs._trait_values[k]) for k in self.keys())
+        try:
+            obs = object.__getattribute__(self, "__observer__")
+            yield from ((k, obs._trait_values[k]) for k in self.keys())
+        except:
+            yield
         
     @property
     def notifiers(self):

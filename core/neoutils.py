@@ -2525,21 +2525,21 @@ def neo_copy(src: typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Uni
                         index=src.index)
         ret.annotations.update(src.annotations)
         
-        for r in src.regionsofinterest:
-            r_ = None
-            
-            if isinstance(r, neo.PolygonRegionOfInterest):
-                r_ = neo.PolygonRegionOfInterest(*r.vertices)
+        if hasattr(src, "regionsofinterest"): # data created with older neo versions
+            for r in src.regionsofinterest:
+                r_ = None
                 
-            elif isinstance(r, neo.RectangularRegionOfInterest):
-                r_ = neo.RectangularRegionOfInterest(r.x, r.y, r.width, r.height)
+                if isinstance(r, neo.PolygonRegionOfInterest):
+                    r_ = neo.PolygonRegionOfInterest(*r.vertices)
+                    
+                elif isinstance(r, neo.RectangularRegionOfInterest):
+                    r_ = neo.RectangularRegionOfInterest(r.x, r.y, r.width, r.height)
+                    
+                elif isinstance(r, neo.CircularRegionOfInterest):
+                    r_ = neo.CircularRegionOfInterest(r.x, r.y, r.radius)
                 
-            elif isinstance(r, neo.CircularRegionOfInterest):
-                r_ = neo.CircularRegionOfInterest(r.x, r.y, r.radius)
-            
-            if r_ is not None:
-                ret.regionsofinterest.append(r_)
-            
+                if r_ is not None:
+                    ret.regionsofinterest.append(r_)
         
         # NOTE: 2020-03-13 18:33:19
         # original channel: {"copy": copied channel, "units": {original unit: copied unit}}
@@ -2604,7 +2604,8 @@ def neo_copy(src: typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Uni
             s_.events += [neo_copy(e) for e in s.events]
             #s_.events += [e.copy() for e in s.events]
             
-            s_.imagesequences == [i.copy() for i in s.imagesequences]
+            if hasattr(s, "imagesequences"):
+                s_.imagesequences == [i.copy() for i in s.imagesequences]
             
             ret.segments.append(s_)
             

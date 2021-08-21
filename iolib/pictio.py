@@ -1299,8 +1299,25 @@ def custom_unpickle(src:typing.Union[str, io.BufferedReader]):#,
         raise TypeError("Expecting a str containing an exiting file name or a BufferedReader; got %s instead" % type(src).__name__)
         
     return ret
-            
+
 def loadPickleFile(fileName):
+    """Loads pickled data.
+    ATTENTION: 
+    Doesn't load data from pickle files saved with old (pre-git) Scipyen versions
+    where module hierarchies (and paths) have changed.
+    
+    Will also fail to load pickle files that contain objects of dynamic types
+    such as those created in the user workspace - a good example is that of
+    namedtuple instances - unless they are defined in a loaded module.
+    
+    """
+    with open(fileName, mode="rb") as fileSrc:
+        result = pickle.load(fileSrc)
+        
+    return result
+    
+            
+def loadPickleFile_old(fileName):
     from unittest import mock
     try:
         # NOTE: try pickle first - in  python3 this is fast (via cPickle)
