@@ -148,8 +148,15 @@ class SafeComparator(object):
             #print("y:", y)
             return False
         
-def hashlist(x:typing.Iterable[typing.Any]) -> Number:
-    """Takes into account the order of the elements
+def hashiterable(x:typing.Iterable[typing.Any]) -> Number:
+    """Takes into account the order of the elements.
+    
+    NOTE: This works when the type of the elements contained in the iterable are
+    basic Python type elements. 
+    
+    When the elements are iterables their type, and not their content, is 'hashed'
+    in order to prevent infinite recursion when these elements contain reference(s)
+    to the iterable being 'hashed'.
     
     Example 1:
     
@@ -174,7 +181,7 @@ def hashlist(x:typing.Iterable[typing.Any]) -> Number:
          [9, 10, 2, 3, 5, 8, 0, 1, 4, 7, 6],
          [8, 9, 0, 3, 5, 7, 1, 4, 2, 6, 10]]    
         
-    sums = [sum(hashlist(x)) for x in seqs]
+    sums = [sum(hashiterable(x)) for x in seqs]
 
     sums
 
@@ -212,7 +219,7 @@ def hashlist(x:typing.Iterable[typing.Any]) -> Number:
          [0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
          [0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]
 
-    sums = [sum(hashlist(x)) for s in eye]
+    sums = [sum(hashiterable(x)) for s in eye]
     
     sums
     
@@ -236,7 +243,8 @@ def hashlist(x:typing.Iterable[typing.Any]) -> Number:
     # The line below generate infinite recursion when v contains references to x
     #return (gethash(v) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
     # NOTE: 2021-08-21 10:08:01 FIXED
-    return ( (hash(type(v)) if isinstance(v, (list, deque, dict)) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
+    return ( (hash(type(v)) if hasattr(v, "__iter__") else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
+    #return ( (hash(type(v)) if isinstance(v, (list, deque, dict)) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
 
 def gethash(x:typing.Any) -> Number:
     """Calculates a hash-like figure for objects including non-hashable
@@ -277,7 +285,7 @@ def gethash(x:typing.Any) -> Number:
             return hash(type(x)) + sum((gethash(v) for v in x))
         
         elif isinstance(x, (list, deque)):
-            return hash(type(x)) + sum(hashlist(x))
+            return hash(type(x)) + sum(hashiterable(x))
         
         elif isinstance(x, pq.Quantity):
             return hash(type(x)) + _arsumtype(x) + hash(x.dimensionality)
