@@ -260,7 +260,7 @@ def gethash(x:typing.Any) -> Number:
 
     try:
         if isinstance(x, dict): # order is not important
-            return hash(type(x)) + sum((gethash(v) for v in x.values()))
+            return hash(type(x)) + sum((gethash(v) for v in x.values() if v is not x))
         
         elif isinstance(x, (set, frozenset)): # order is not important
             return hash(type(x)) + sum((gethash(v) for v in x))

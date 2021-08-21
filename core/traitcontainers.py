@@ -33,24 +33,20 @@ class DataBagTraitsObserver(HasTraits):
     def remove_traits(self, **traits):
         current_traits = self.traits()
         keep_traits  = dict([(k, current_traits[k]) for k in current_traits if k not in traits])
-        #trait_values = dict([(k, self._trait_values[k]) for k in current_traits if k not in traits])
-        
-        #self.__class__ = type(self.__class__.__name__,
-                              #(HasTraits, ), 
-                              #{"changed":self.changed, "remove_traits":self.remove_traits, "_trait_values": trait_values})
         
         self._trait_values.clear()
         
         self.__class__ = type(self.__class__.__name__,
                               (HasTraits, ), 
-                              {"changed":self.changed, "remove_traits":self.remove_traits})
+                              {"remove_traits":self.remove_traits})
+        
+        #self.__class__ = type(self.__class__.__name__,
+                              #(HasTraits, ), 
+                              #{"changed":self.changed, "remove_traits":self.remove_traits})
         
         self.add_traits(**keep_traits)
         
     def __setstate__(self, state):
-        #print("DataBagTraitsObserver.__setstate__: self.__dict__ before setting", self.__dict__)
-        #print("DataBagTraitsObserver.__setstate__: I am a ", type(self))
-        #print("DataBagTraitsObserver.__setstate__: and I have _trait_notifiers ", hasattr(self, "_trait_notifiers"))
         
         # ATTENTION: 2020-10-30 14:27:36
         # the following completely messes up DataBagTraitsObserver when unpickled
@@ -59,8 +55,6 @@ class DataBagTraitsObserver(HasTraits):
         # ATTENTION: 2020-10-30 14:27:58
         # therefore we UPDATE values in self._trait_values, rather than self__dict__
         
-        #print("DataBagTraitsObserver.__setstate__: self.__dict__ after setting", self.__dict__)
-
         # event handlers are reassigned to self
         cls = self.__class__
         #print("DataBagTraitsObserver.__setstate__: cls", cls)
@@ -81,19 +75,19 @@ class DataBagTraitsObserver(HasTraits):
     def __getstate__(self):
         return super().__getstate__()
     
-    @observe(All)
-    def changed(self, change):
-        """for illustration purposes
-        WARNING the corresponding ObserveHandler will be removed upon calling
-        self.unobserve() or self.unobserve_all()
-        """
-        ## NOTE: 2020-07-05 18:01:01 that's what you can to with these
-        #print("self.changed: change['type']:\n",change["type"], "\n")
-        #print("self.changed: change['owner']:\n",change["owner"], "\n")
-        #print("self.changed: change['name']:\n",change["name"], "\n")
-        #print("self.changed: change['old']:\n",change["old"], "\n")
-        #print("self.changed: change['new']:\n",change["new"], "\n")
-        return
+    #@observe(All)
+    #def changed(self, change):
+        #"""for illustration purposes
+        #WARNING the corresponding ObserveHandler will be removed upon calling
+        #self.unobserve() or self.unobserve_all()
+        #"""
+        ### NOTE: 2020-07-05 18:01:01 that's what you can to with these
+        ##print("self.changed: change['type']:\n",change["type"], "\n")
+        ##print("self.changed: change['owner']:\n",change["owner"], "\n")
+        ##print("self.changed: change['name']:\n",change["name"], "\n")
+        ##print("self.changed: change['old']:\n",change["old"], "\n")
+        ##print("self.changed: change['new']:\n",change["new"], "\n")
+        #return
 
 class DataBag(Bunch):
     """Dictionary with semantics for direct attribute reference and attribute change observer.
@@ -259,10 +253,14 @@ class DataBag(Bunch):
             
         self.__observer__ = DataBagTraitsObserver(**dd)
         
+        #self.__itself__ = None
+        
         super().__init__(*args, **kwargs)
         
         if self in dd.keys():
             raise ValueError("One cannot set onself as a trait key!")
+        
+        #if self in dd.items()
         
         
         #trdict = dict(map(lambda x: (x, trait_from_type(dd[x], allow_none=self.__hidden__.allow_none)), dd.keys()))
@@ -272,21 +270,12 @@ class DataBag(Bunch):
         trdict = dict(map(lambda x: (x[0], dtrait(x[1]) if x[1] is not self else dtrait(x[1].as_dict())), dd.items()))
         
         self.__hidden__.length = len(trdict)
-        
-        #trdict.update({"baglength": trait_from_type(length),
-                        #"mutable_types": trait_from_type(use_mutable==True),
-                        #"use_casting": trait_from_type(do_type_cast==True),
-                        #"allow_none": trait_from_type(allow_none==True)})
-                        
+
         self.__observer__.add_traits(**trdict)
         
     def __setitem__(self, key, val):
         """Implements indexed (subscript) assignment: self[key] = val
         """
-        #if key in ("baglength", "length", "len"):
-            #return # read-only but fail gracefully
-            #raise KeyError("Key %s is read-only" % key)
-        
             
         # NOTE 2020-07-04 17:32:16 :
         # Unlike an ordinary dict which accepts all sorts of hashable objects as

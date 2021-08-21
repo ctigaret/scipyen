@@ -298,6 +298,7 @@ def safeWrapper(f, *args, **kwargs):
             return f(*args, **kwargs)
             
         except Exception as e:
+            print("***\nIn function %s:\n***" % f.__name__)
             traceback.print_exc()
             
     return wrapper

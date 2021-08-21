@@ -2740,8 +2740,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         cm.popup(self.workspaceView.mapToGlobal(point))#, copyVarNames)
         #cm.popup(self.workspaceView.mapToGlobal(point), cm.actions()[0])
         
-    @safeWrapper
     @pyqtSlot(QtCore.QItemSelection, QtCore.QItemSelection)
+    @safeWrapper
     def slot_selectionChanged(self, selected, deselected):
         """Selection change in the workspace viewer
         """
@@ -2775,8 +2775,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #print("ScipyenWindow slot_selectionChanged: currentVarName %s" % self.workspaceModel.currentVarName)
 
     #@pyqtSlot(QtGui.QStandardItem)
-    @safeWrapper
     @pyqtSlot("QStandardItem*")
+    @safeWrapper
     def slot_variableItemNameChanged(self, item):
         """Called when itemChanged was emitted by workspaceModel.
         
@@ -4395,8 +4395,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         return True
          
-        
-        
     @pyqtSlot()
     @safeWrapper
     def slot_openSelectedFileItems(self):
@@ -6170,5 +6168,3 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             raise ValueError("empty nested dict in plugin info")
     
-    
-# test git branch dev
