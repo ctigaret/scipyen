@@ -1344,8 +1344,16 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             maxHeight = self.__scene__.rootImage.boundingRect().height()
             
             if isinstance(item, pgui.Cursor):
+                # FIXME 2021-08-18 10:31:43 in planargraphics
+                # cursor width & height should NEVER be none!
+                if item.width is None: 
+                    item.width = maxWidth
+                    
                 if item.width <= 0 or item.width > maxWidth:
                     item.width = maxWidth
+                    
+                if item.height is None:
+                    item.height = maxHeight
                     
                 if item.height <= 0 or item.height > maxHeight:
                     item.height = maxHeight
@@ -3670,7 +3678,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.toolBar.setObjectName("%s_Main_Toolbar" % self.__class__.__name__)
         
         #refreshAction = self.toolBar.addAction(QtGui.QIcon(":/images/view-refresh.svg"), "Refresh")
-        refreshAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("refresh-view"), "Refresh")
+        refreshAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh")
         refreshAction.triggered.connect(self.slot_refreshDataDisplay)
         
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
@@ -4479,8 +4487,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._scaleBarLength_ = length
         self._scaleBarOrigin_ = origin
         
-    def addPlanarGraphics(self, item:pgui.PlanarGraphics, movable=True, editable=True, 
-                          showLabel=True, labelShowsPosition=True, autoSelect=True):
+    def addPlanarGraphics(self, item:pgui.PlanarGraphics, movable:bool = True, 
+                          editable:bool = True, showLabel:bool = True, 
+                          labelShowsPosition:bool = True, autoSelect:bool = True,
+                          transparentLabel:bool = False):
         """Programmatically add a roi or a cursor to the underlying scene.
         
         Parameters:
@@ -4494,6 +4504,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         newGraphicsObject(...) method.
         
         NOTE: To manually add a roi or cursor in the window, use the window menu
+        
+        Returns:
+        ========
+        A PlanarGraphics object
         
         """
         obj = self.viewerWidget.newGraphicsObject(item, 
@@ -4511,6 +4525,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             if isinstance(self.roisColor, QtGui.QColor) and self.roisColor.isValid():
                 obj.color = self.roisColor
                 
+        obj.setTransparentLabel(transparentLabel)
         return obj.backend
         
     @pyqtSlot()

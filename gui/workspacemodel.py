@@ -56,7 +56,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     
     '''
     modelContentsChanged = pyqtSignal(name = "modelContentsChanged")
-    windowVariableDeleted = pyqtSignal(int, name="windowVariableDeleted")
+    #windowVariableDeleted = pyqtSignal(int, name="windowVariableDeleted")
     
     def __init__(self, shell, user_ns_hidden=dict(), parent=None):
         super(WorkspaceModel, self).__init__(parent)
@@ -72,15 +72,16 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.user_ns_hidden = dict(user_ns_hidden)
         
         self.observed_vars = DataBag(allow_none = True, mutable_types=False)
+        self.observed_vars.verbose = True
         self.observed_vars.observe(self.var_observer)
         
         # NOTE: 2021-07-28 09:58:38
-        # currentVarItem/Name are set by selecting/activating an item in workspace view
-        self.currentVarItem = None
+        # currentItem/Name are set by selecting/activating an item in workspace view
+        self.currentItem = None
         # NOTE: 2017-09-22 21:33:47
         # cache for the current var name to allow renaming workspace variables
         # this should be updated whenever the variable name is selected/activated in the model table view
-        self.currentVarName = "" # name of currently selected variable
+        self.currentItemName = "" # name of currently selected variable
         # NOTE: 2021-06-12 12:11:25
         # cache symbol when the data it is bound to has changed; needed e.g. 
         # for updateRowForVariable
@@ -793,7 +794,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         """
         warnings.warn("Deprecated", DeprecationWarning)
         
-        varname = self.currentVarName
+        varname = self.currentItemName
         
         if varname is None or (isinstance(varname, str) and len(varname.strip()) == 0):
             if self.parent():
@@ -811,7 +812,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 if varname not in self.shell.user_ns.keys():
                     return
                 
-                self.currentVarName = varname
+                self.currentItemName = varname
             
         return varname
             

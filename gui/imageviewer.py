@@ -4090,6 +4090,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         #self.loadViewerSettings()
             
     def loadViewerSettings(self):
+        # FIXME TODO 2021-08-22 22:08:19
+        # transfer this to confuse settings
         #colorMapName = self.qsettings.value("ImageViewer/ColorMap", None)
         colorMapName = self.qsettings.value("/".join([self.__class__.__name__, "ColorMap"]), None)
         
@@ -4152,13 +4154,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         #if isinstance(color, QtGui.QColor) and color.isValid():
             #self.opaqueROILabel = color
             
-    #def saveSettings(self):
-        ## NOTE: 2021-07-08 09:51:30
-        ## saveWindowSettings is inherited rom ScipyenViewer and does nothing if
-        ## self.parent() is not Scipyen's main window
-        #self.saveWindowSettings() # inherited from ScipyenViewer
-        #self.saveViewerSettings()
-        
     def saveViewerSettings(self):
         if isinstance(self.colorMap, colormaps.colors.Colormap):
             self.qsettings.setValue("/".join([self.__class__.__name__, "ColorMap"]), self.colorMap.name)
@@ -4487,8 +4482,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._scaleBarLength_ = length
         self._scaleBarOrigin_ = origin
         
-    def addPlanarGraphics(self, item:pgui.PlanarGraphics, movable=True, editable=True, 
-                          showLabel=True, labelShowsPosition=True, autoSelect=True):
+    def addPlanarGraphics(self, item:pgui.PlanarGraphics, movable:bool = True, 
+                          editable:bool = True, showLabel:bool = True, 
+                          labelShowsPosition:bool = True, autoSelect:bool = True,
+                          transparentLabel:bool = False):
         """Programmatically add a roi or a cursor to the underlying scene.
         
         Parameters:
@@ -4502,6 +4499,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         newGraphicsObject(...) method.
         
         NOTE: To manually add a roi or cursor in the window, use the window menu
+        
+        Returns:
+        ========
+        A PlanarGraphics object
         
         """
         obj = self.viewerWidget.newGraphicsObject(item, 
@@ -4519,6 +4520,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             if isinstance(self.roisColor, QtGui.QColor) and self.roisColor.isValid():
                 obj.color = self.roisColor
                 
+        obj.setTransparentLabel(transparentLabel)
         return obj.backend
         
     @pyqtSlot()

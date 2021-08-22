@@ -592,11 +592,20 @@ class WindowManager(__QMainWindow__):
     def deRegisterViewer(self, win):
         """Removes references to the viewer window 'win' from the manager.
         
+        Parameters:
+        -----------
+        
+        win: a QMainWindow or matplotlib.figure.Figure instance
+        
         ATTENTION: This function neither removes the viewer object from the 
         workspace, nor unbinds it from its symbol in the workspace!!!
         """
         if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             return
+        
+        w_title = win.get_window_title() if isinstance(win, mpl.figure.Figure) else win.windowTitle()
+        
+        print("ScipyenWindow.deRegisterViewer %s" % w_title)
         
         viewer_type = type(win)
         
@@ -2283,59 +2292,64 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         return varnames
     
-    def removeFromWorkspace(self, value:typing.Any, from_console:bool=True, by_name=True):
-        """Removes a single variable from the workspace.
-        By default, the variable to be removed is specified by the symbol (name)
-        to which it is bound in the workspace. Thus, if the variable has been 
-        'deleted' at the console (therefore is was unbound from its symbol and 
-        the symbol was removedfrom the workspace) the workspace table viewer will 
-        be updated accordingly.
+    def removeFromWorkspace(self, value:typing.Any, by_name:bool=True, update:bool=True) -> None:
+        """Removes an object from the workspace via GUI operations.
         
-        NOTE: 2021-04-16 10:07:26
-        Changed to allow the direct removal of a variable by first performing an
-        inverse lookup for its symbol (name) in the workspace.
-        
-        If found, the symbol (and its bound variable) will be removed from the 
-        workspace,  and the workspace viewer GUI will be updated.
+        By default, the object to be removed is specified by the symbol (name)
+        to which the object is bound in the workspace. 
+
+        However, this function also allows the direct removal of an object's
+        references that exist in the workspace (NOTE that the object may still
+        exist outside the workspace).
         
         Parameters:
         ----------
         value: any type.
-            Typically, this is a str, which is the symbol to which the variable is
-            (was) bound to, in the workspace.
-            
-            However, it now (2021-04-16 10:09:59) can also be any type.
+            Typically (when 'by_name' is True, see below) this is the str symbol, 
+            in the workspace, to which the object is bound
             
         Named parametsrs:
         ----------------
-        from_console:bool, default is True
-            Indicates whether the variable has been 'deleted' at the Scipyen's
-            console. Set it to False ghen the variable is to be removed 
-            programmatically from code.
-            
-        
-        by_name:bool, default is True
+        by_name: bool, optional; default is True
             Used when value is a str, to indicate that it represents the symbol
-            of the variable, in the workspace.
+            of the object to be removed from in the workspace.
             
-            Must be set to False when value is a str variable and not a symbol
+            This is the typical (and expected) usage.
             
-        WARNING Because this also updates the workspace viewer, it is better to
-        avoid calling this function to batch-remove variables
-        
+            When False, 'value' is an object which has at least one reference in
+            in the workspace, bound to some identifiable symbol there, or a 
+            reference to an object in the workspace.
+            
+        update: bool, optional; default is True;
+            When True, the workspace viewer will be updated immediately after the
+            successful removel of the variable.
+            
+            When False, the workspace viewer update will be deferred until the 
+            update() method of the workspace model is called explicitly. This
+            allows batch removal of several variables without potentially
+            expensive updates of the workspace viewer after each variable.
+            
         """
+        print("ScipyenWindow.removeFromWorkspace", value)
         if isinstance(value, str) and by_name:
             self.workspace.pop(value, None)
-            self.workspaceModel.update()
+            
+            #self.workspaceModel.update()
             
         else:
-            # inverse lookup the key mapped to this value
+            # inverse lookup the key mapped to this value - will remove ALL
+            # references to value that exist in the workspace
             objects = [(name, obj) for (name, obj) in self.workspace.items() if obj is value]
             if len(objects):
                 for o in objects:
                     self.workspace.pop(o[0], None)
                     
+            #self.workspaceModel.update()
+            
+        if update:
             self.workspaceModel.update()
+        
+        self.workspaceModel.currentItem = None
         
     @safeWrapper
     def getCurrentVarName(self):
@@ -2343,7 +2357,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                           QtCore.QSignalBlocker(self.workspaceModel),
                           QtCore.QSignalBlocker(self.workspaceView.selectionModel())]
         
-        varname = self.workspaceModel.currentVarName
+        varname = self.workspaceModel.currentItemName
         
         if varname is None:
             indexList = self.workspaceView.selectedIndexes()
@@ -2556,8 +2570,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def slot_variableItemPressed(self, ndx):
         #print("ScipyenWindow.slot_variableItemPressed %s", ndx)
-        self.workspaceModel.currentVarItem = self.workspaceModel.item(ndx.row(),0)
-        self.workspaceModel.currentVarName = self.workspaceModel.item(ndx.row(),0).text()
+        self.workspaceModel.currentItem = self.workspaceModel.item(ndx.row(),0)
+        self.workspaceModel.currentItemName = self.workspaceModel.item(ndx.row(),0).text()
     
     @pyqtSlot(QtCore.QModelIndex)
     @safeWrapper
@@ -2568,10 +2582,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             #TODO separate menu for variables in remote namespaces
             return
         
-        self.workspaceModel.currentVarItem = self.workspaceModel.item(ndx.row(),0)
-        self.workspaceModel.currentVarName = self.workspaceModel.item(ndx.row(),0).text()
+        self.workspaceModel.currentItem = self.workspaceModel.item(ndx.row(),0)
+        self.workspaceModel.currentItemName = self.workspaceModel.item(ndx.row(),0).text()
         
-        item = self.workspace[self.workspaceModel.currentVarName]
+        item = self.workspace[self.workspaceModel.currentItemName]
         
         if isinstance(item, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             self._setCurrentWindow(item)
@@ -2579,9 +2593,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
             
-            if not self.viewVar(self.workspaceModel.currentVarName, newWindow=newWindow):
+            if not self.viewVar(self.workspaceModel.currentItemName, newWindow=newWindow):
                 # view (display) object in console is no handler exists
-                self.console.execute(self.workspaceModel.currentVarName)
+                self.console.execute(self.workspaceModel.currentItemName)
                 
     @safeWrapper
     def _genExternalVarContextMenu(self, indexList, cm):
@@ -2732,25 +2746,25 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 return
 
             if modelIndex.column()==0:
-                self.workspaceModel.currentVarItem = self.workspaceModel.itemFromIndex(modelIndex)
-                self.workspaceModel.currentVarName = self.workspaceModel.itemFromIndex(modelIndex).text()
+                self.workspaceModel.currentItem = self.workspaceModel.itemFromIndex(modelIndex)
+                self.workspaceModel.currentItemName = self.workspaceModel.itemFromIndex(modelIndex).text()
                 
             else:
                 row = modelIndex.row()
-                self.workspaceModel.currentVarItem = self.workspaceModel.item(row,0)
-                self.workspaceModel.currentVarName = self.workspaceModel.item(row,0).text()
+                self.workspaceModel.currentItem = self.workspaceModel.item(row,0)
+                self.workspaceModel.currentItemName = self.workspaceModel.item(row,0).text()
                 
-            item = self.workspace[self.workspaceModel.currentVarName]
+            item = self.workspace[self.workspaceModel.currentItemName]
             
             #if isinstance(item, (QtWidgets.QMainWindow, mpl.figure.Figure)):
                 #self._setCurrentWindow(item)
                 
         else:
-            self.workspaceModel.currentVarName = ""
-            self.workspaceModel.currentVarItem = None
+            self.workspaceModel.currentItemName = ""
+            self.workspaceModel.currentItem = None
             self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
 
-        #print("ScipyenWindow slot_selectionChanged: currentVarName %s" % self.workspaceModel.currentVarName)
+        #print("ScipyenWindow slot_selectionChanged: currentVarName %s" % self.workspaceModel.currentItemName)
 
     @pyqtSlot("QStandardItem*")
     @safeWrapper
@@ -2956,9 +2970,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     #obj.closeEvent(QtGui.QCloseEvent())
                 self.deRegisterViewer(obj) # does not remove its symbol for workspace - this has already been removed by delete action
                 
-            self.workspace.pop(n, None)
+            self.removeFromWorkspace(n, by_name=True, update=False)
+            #self.workspace.pop(n, None)
             
-        self.workspaceModel.currentVarItem = None
+        self.workspaceModel.currentItem = None
         
         self.workspaceModel.update()
         
@@ -5503,7 +5518,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             newWindow = False
             
-        varname = self.workspaceModel.currentVarName
+        varname = self.workspaceModel.currentItemName
         
         if varname is None:
             indexList = self.workspaceView.selectedIndexes()
@@ -5548,7 +5563,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.slot_viewSelectedVarInNewWindow()
             return
         
-        varname = self.workspaceModel.currentVarName
+        varname = self.workspaceModel.currentItemName
         
         if varname is None:
             indexList = self.workspaceView.selectedIndexes()

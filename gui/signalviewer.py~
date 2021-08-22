@@ -580,7 +580,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                          win_title=win_title, doc_title=doc_title,
                          frameIndex=frameIndex, *args, **kwargs)
         
-        self.loadSettings()
+        #self.loadSettings() # now called by ScipyenViewer.__init__()
 
         if self.y is not None:
             if self.x is None:

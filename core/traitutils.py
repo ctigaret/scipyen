@@ -3,12 +3,13 @@
 """
 
 import enum
-from enum import EnumMeta, Enum, IntEnum
+from enum import (EnumMeta, Enum, IntEnum, )
 import contextlib
 
-from inspect import getmro, isclass
+from inspect import (getmro, isclass, isfunction, signature,)
 from types import new_class
 from collections import deque
+from functools import (partial, partialmethod)
 
 import traitlets
 
@@ -78,7 +79,7 @@ TRAITSMAP = {           # use casting versions
     #function:   (Any,)
     }
 
-def _enhanced_set_(instance, obj, value):
+def enhanced_set(instance, obj, value):
     """Overrides traitlets.TraitType.set to check for special hash.
     This is supposed to also detect changes in the order of elements in sequences.
     """
@@ -124,11 +125,11 @@ def _enhanced_set_(instance, obj, value):
         # comparison above returns something other than True/False
         obj._notify_trait(instance.name, old_value, new_value)
 
-def _dynatrtyp_exec_body_(ns):
+def _dynatrtyp_exec_body_(ns, setfn = enhanced_set):
     #print("ns:", ns)
     ns["info_text"]="Trait that is sensitive to content change"
     ns["hashed"] = 0
-    ns["set"] = _enhanced_set_
+    ns["set"] = setfn
     
 def adapt_args_kw(x, args, kw, allow_none):
     # NOTE: 2020-09-05 14:23:43 some classes need special treatment for 
@@ -261,7 +262,14 @@ def adapt_args_kw(x, args, kw, allow_none):
     return args, kw
     
 def dynamic_trait(x, *args, **kwargs):
-    """Generates a TraitType for object x.
+    """Generates a trait type for object x.
+    
+    The trait type is derived from a traitlets.TraitType subclass according to 
+    type(x) after lookup in the TRAITSMAP dict in this module.
+    
+    The derived trait type overrides the default set() method for a customized
+    notification mechanism.
+    
     
     Prerequisites: Except for enum types (enum.Enum and enumIntEnum)
     x.__class__ should define a "copy constructor", e.g.:
@@ -276,15 +284,33 @@ def dynamic_trait(x, *args, **kwargs):
     
     Options:
     --------
-    
     allow_none: bool default is False
+    
     content_traits:bool, default is False
-    content_allow_none:bool, default is whatever allow_none is
+    
+    content_allow_none:bool, default is the value of allow_none
+    
+    force_trait: a subclass of traitlets.TraitType, or None.
+    
+        Optional, default is None.
+    
+        When given, the trait type lookup is bypassed and the trait
+        type specified by force_trait is used as the base Trait type instead.
+        
+    set_function: a function of the signature f(instance, obj, value)
+        Optional, default is None
+        
+        When None, the generated trait type uses the function enhanced_set 
+        defined in this module.
+        
+        For details see traitlets.TraitType.set()
     
     """
     allow_none = kwargs.pop("allow_none", False)
     content_traits = kwargs.pop("content_traits", True)
     content_allow_none = kwargs.pop("content_allow_none", allow_none)
+    force_trait = kwargs.pop("force_trait", None)
+    set_function = kwargs.pop("set_function", None)
     
     # NOTE: 2021-08-20 11:44:00 A reminder:
     # isinstance(x, sometype) returns True when sometype is in type(x).__mro__
@@ -312,9 +338,11 @@ def dynamic_trait(x, *args, **kwargs):
     
     #traitclass = TRAITSMAP.get(myclass, Instance)
     
-    # NOTE: 2021-08-20 12:22:12 For a finer granularity
-    traitclass = TRAITSMAP.get(myclass, (None, ))
-    #traitclass = TRAITSMAP.get(type(x).__class__, (None, ))
+    if isclass(force_trait) and issubclass(force_trait, traitlets.TraitType):
+        traitclass = (force_trait, )
+    else:
+        # NOTE: 2021-08-20 12:22:12 For a finer granularity
+        traitclass = TRAITSMAP.get(myclass, (None, ))
     
     #print("traitclass", traitclass)
 
@@ -325,21 +353,22 @@ def dynamic_trait(x, *args, **kwargs):
         
     #print("traitclass", traitclass)
     
+    if not isfunction(set_function) or len(signature(set_function).parameters) != 3:
+        set_function = enhanced_set
+
+    exec_body_fn = partial(_dynatrtyp_exec_body_, setfn=set_function)
     
-    new_klass = new_class("%s_Dyn" % traitclass[0].__name__, bases = traitclass, exec_body = _dynatrtyp_exec_body_)
-    
-    #print("new_klass", new_klass)
+    new_klass = new_class("%s_Dyn" % traitclass[0].__name__, bases = traitclass, 
+                          exec_body = exec_body_fn)
     
     new_args, new_kw = adapt_args_kw(x, args, kw, allow_none)
     
     #print("new_args", new_args)
     #print("new_kw", new_kw)
     
-    #if issubclass(new_klass, Instance):
     if traitclass[0] is Instance:
         return new_klass(klass = myclass, args = args, kw = kw, allow_none = allow_none)
     
-    #return new_klass(default_value = x, allow_none = allow_none)
     if issubclass(new_klass, Dict):
         if content_traits:
             # NOTE: 2021-08-21 09:54:18 FIXME
@@ -365,7 +394,7 @@ class TraitSetMixin(object):
         """Overrides List.set to check for special hash.
         This is supposed to also detect changes in the order of elements.
         """
-        _enhanced_set_(self, obj, value)
+        enhanced_set(self, obj, value)
         
 class TraitsObserver(HasTraits):
     """ CAUTION do not use yet

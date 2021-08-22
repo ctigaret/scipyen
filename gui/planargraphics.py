@@ -4514,9 +4514,33 @@ class Cursor(PlanarGraphics):
         In contrast with the other PlanarGraphics, 'closed' and 'connected'
         parameters are ignored here
         """
+        if path is None:
+            path = QtGui.QPainterPath()
         
-        pass
+        state = self.getState(frame)
         
+        if state and len(state):
+            if self.type is PlanarGraphicsType.vertical_cursor:
+                path.addRect(QtCore.QRectF(state.x - state.xwindow/2, 0, 
+                                           state.xwindow, state.height))
+                    
+            elif self.type is PlanarGraphicsType.crosshair_cursor:
+                path.addRect(QtCore.QRectF(state.x - state.xwindow/2, 0, 
+                                           state.xwindow, state.height))
+                
+                path.addRect(QtCore.QRectF(0, state.y - state.ywindow/2, 
+                                           state.width, state.ywindow))
+                
+            elif self.type is PlanarGraphicsType.horizontal_cursor:
+                path.addRect(QtCore.QRectF(0, state.y - state.ywindow/2, 
+                                           state.width, state.ywindow))
+                
+            elif self.type is PlanarGraphicsType.point_cursor:
+                path.addRect(QtCore.QRectF(state.x - state.xwindow/2, 
+                                           state.y - state.ywindow/2, 
+                                           state.xwindow, state.ywindow))
+        return path
+    
     def map_to_pc_on_path(self, other, path):
         x = int(self.x)
         

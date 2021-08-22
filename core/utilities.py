@@ -653,8 +653,21 @@ class NestedFinder(object):
     
     @comparator.setter
     def comparator(self, fn:typing.Callable[..., typing.Any]):
-        """Sets the comparator function to a custom binary callable.
-        A binary callable compares two arguments.
+        """Sets the comparator function to a custom binary comparator.
+        A binary comparator compares two arguments e.g., func(x, y) -> bool
+        
+        A comparator that also accept further optional parameters (i.e.
+        named or keyword parameters) can be used by 'wrapping' in a partial where
+        the ohter parameters are 'fixed' to some values:
+        
+        For example, the comparator:
+        
+        func(x, y, option=default) -> True
+        
+        can be passed as a partial:
+        
+        functools.partial(func, option=val)
+        
         """
         if fn is None:
             self._comparator_ = operator.eq
@@ -1000,14 +1013,14 @@ class NestedFinder(object):
                     self._visited_.append(id(v))
                 
                 if as_index:
-                    if k == item:    # item should be hashable 
+                    if item == k:    # item should be hashable 
                         self._found_.append(k)
                         self._paths_.append(list(self._found_))
                         # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
                         yield v
                         
                 else:
-                    if self._comparator_(v, item):
+                    if self._comparator_(item, v):
                         self._found_.append(k)
                         self._paths_.append(list(self._found_))
                         # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)

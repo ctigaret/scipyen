@@ -13,13 +13,15 @@ accessed using attribute syntax.
 import traceback
 from inspect import getcallargs, isfunction, ismethod
 from functools import partial
+from pprint import pformat
 #from traitlets import (HasTraits, TraitType, Eventhandler, Int, Bool, All, 
                        #is_trait, observe,TraitError,)
 from traitlets.utils.bunch import Bunch
 
-from .traitutils import (dynamic_trait, trait_from_type, transform_link, is_trait, 
-                        HasTraits, TraitType, TraitsObserver, ContainerTraitsObserver,
-                        EventHandler,Int, Bool, All, is_trait, observe)
+from .traitutils import (traitlets, dynamic_trait, trait_from_type, transform_link,
+                         is_trait, HasTraits, TraitType, TraitsObserver, 
+                         ContainerTraitsObserver, EventHandler,Int, Bool, All,
+                         observe)
 
 from .prog import safeWrapper
 from .strutils import str2symbol
@@ -183,7 +185,7 @@ class DataBag(Bunch):
     #   d.mutable_types = True
     
             
-    hidden_traits = ("length", "use_mutable", "use_casting", "allow_none")
+    hidden_traits = ("length", "use_mutable", "use_casting", "allow_none","verbose")
     
     @staticmethod
     def _make_hidden(**kwargs):
@@ -191,6 +193,7 @@ class DataBag(Bunch):
         ret.length = 0
         ret.allow_none = True
         ret.use_mutable = True
+        ret.verbose=False
         return ret
     
     def __init__(self, *args, **kwargs):
@@ -260,14 +263,9 @@ class DataBag(Bunch):
         if self in dd.keys():
             raise ValueError("One cannot set onself as a trait key!")
         
-        #if self in dd.items()
-        
-        
-        #trdict = dict(map(lambda x: (x, trait_from_type(dd[x], allow_none=self.__hidden__.allow_none)), dd.keys()))
-        
         dtrait = partial(dynamic_trait, allow_none=self.__hidden__.allow_none) 
         
-        trdict = dict(map(lambda x: (x[0], dtrait(x[1]) if x[1] is not self else dtrait(x[1].as_dict())), dd.items()))
+        trdict = dict(map(lambda x: (x[0], dtrait(x[1]) if x[1] is not self else dtrait(x[1], force_trait=traitlets.Any)), dd.items()))
         
         self.__hidden__.length = len(trdict)
 
@@ -369,12 +367,18 @@ class DataBag(Bunch):
                 
         else:
             # add a new trait
-            if val is self:
-                val = self.as_dict()
+            #if hasattr(val, "__iter__") and 
+            #if val is self:
+                #return
+                #val = self.as_dict()
                 #raise ValueError("One cannot add a trait to oneself!")
             
             if key not in ("__observer__", "__hidden__") and key not in self.__hidden__.keys():
-                trdict = {key: dynamic_trait(val, allow_none = self.allow_none, content_traits=True)}
+                if val is self:
+                    trdict = {key: dynamic_trait(val, allow_none = self.allow_none, content_traits=False, force_trait=traitlets.Any)}
+                    #trdict = {key: traitlets.Any(val, allow_none = True)}
+                else:
+                    trdict = {key: dynamic_trait(val, allow_none = self.allow_none, content_traits=True)}
                 #trdict = {key:trait_from_type(val, allow_none = self.allow_none, content_traits=True)}
                 obs.add_traits(**trdict)
                 object.__setattr__(obs, key, val)
@@ -389,14 +393,16 @@ class DataBag(Bunch):
         return ret
 
     def __str__(self):
+        #return pformat(self)
         obs = object.__getattribute__(self, "__observer__")
-        d = dict((key, getattr(obs, key, "<...>")) for key in obs.traits())
-        return d.__str__()
+        d = dict(map(lambda x: (x[0], x[1] if x[1] is not self else "<Recursion on %s with id=%d>" % (self.__class__.__name__, id(self)) ), obs._trait_values.items()))
+        return pformat(d)
     
     def __repr__(self):
+        #return "%s:\n%s" % (self.__class__, pformat(self))
         obs = object.__getattribute__(self, "__observer__")
-        d = dict((key, getattr(obs, key, "<...>")) for key in obs.traits())
-        return d.__repr__()
+        d = dict(map(lambda x: (x[0], x[1] if x[1] is not self else "<Recursion on %s with id=%d>" % (self.__class__.__name__, id(self)) ), obs._trait_values.items()))
+        return pformat(d)
     
     def __getitem__(self, key):
         """Implements bag[key] (subscript access, or "bracket syntax"")
@@ -607,6 +613,14 @@ class DataBag(Bunch):
         
         if val == True:
             self.__hidden__.use_mutable = False
+            
+    @property
+    def verbose(self):
+        return self.__hidden__.verbose
+    
+    @verbose.setter
+    def verbose(self, val):
+        self.__hidden__.verbose = (val == True)
         
     @property
     def allow_none(self):

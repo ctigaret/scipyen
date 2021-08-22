@@ -11291,8 +11291,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                         for k, win in enumerate(windows):
                             gobj = win.addPlanarGraphics(obj, labelShowsPosition=False)
                             
-                            if gobj is not None:# it may be None if there is no image displayed in the window
-                                gobj.setTransparentLabel(transparent_label)
+                            #if gobj is not None:# it may be None if there is no image displayed in the window
+                                #gobj.setTransparentLabel(transparent_label)
                             
     @safeWrapper
     def _update_filter_ui_fields_(self):
@@ -13008,7 +13008,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         if self.isTopLevel:
             if any([v is self for v in self.appWindow.workspace.values()]):
                 self.appWindow.deRegisterViewer(self) # this will also save settings and close the viewer window
-                self.appWindow.removeFromWorkspace(self, from_console=False, by_name=False)
+                self.appWindow.removeFromWorkspace(self, by_name=False)
+                #self.appWindow.removeFromWorkspace(self, from_console=False, by_name=False)
                 self.appWindow.slot_updateWorkspaceModel()
                 #self.appWindow.slot_updateWorkspaceModel(False)
 

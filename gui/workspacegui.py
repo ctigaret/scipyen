@@ -202,10 +202,15 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):
         return list()
             
         
-def saveWindowSettings(qsettings, win, entry_name:typing.Optional[str]=None, 
+def saveWindowSettings(qsettings, win, parent=None, entry_name:typing.Optional[str]=None, 
                        use_group:bool=True, group_name:typing.Optional[str]=None):
     # NOTE: 2021-07-11 18:32:56
     # QSettings support maximum one nesting level (i.e., group/entry)
+    if isinstance(parent, QMainWindow):
+        use_group = True
+        if not isinstance(group_name, str) or len(group_name.strip()):
+            group_name = parent.__class__.__name__
+        
     if use_group:
         if not isinstance(group_name, str) or len(group_name.strip()):
             group_name = win.__class__.__name__
@@ -215,6 +220,7 @@ def saveWindowSettings(qsettings, win, entry_name:typing.Optional[str]=None,
         ename = "%s_" % entry_name
     else:
         ename=""
+        
     qsettings.setValue("%sWindowSize" % ename, win.size())
     qsettings.setValue("%sWindowPosition" % ename, win.pos())
     qsettings.setValue("%sWindowGeometry" % ename, win.geometry())
