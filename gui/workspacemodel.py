@@ -71,7 +71,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.deleted_vars = dict()
         self.user_ns_hidden = dict(user_ns_hidden)
         
-        self.observed_vars = DataBag(allow_none = True)
+        self.observed_vars = DataBag(allow_none = True, mutable_types=False)
         self.observed_vars.observe(self.var_observer)
         
         # NOTE: 2021-07-28 09:58:38
@@ -588,16 +588,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.observed_vars.observe(self.var_observer)
         
     def post_execute(self):
-        del_vars = [name for name in self.observed_vars.keys() if name not in self.shell.user_ns.keys()]
-        
-        for name in del_vars:
-            self.removeRowForVariable(name)
-
-        self.observed_vars.remove_members(*del_vars)
-        
-        current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
-        
-        self.observed_vars.update(current_vars)
+        self.update()
         
     #@safeWrapper
     #def post_execute_old(self):

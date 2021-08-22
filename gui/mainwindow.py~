@@ -424,7 +424,7 @@ class WindowManager(__QMainWindow__):
         plt.close(evt.canvas.figure)
         # NOTE: 2020-02-05 00:53:51
         # this also closes the figure window and removes it from self.currentViewers
-        self.deRegisterViewer(evt.canvas.figure) # doe nto remove symbol from workspace
+        self.deRegisterViewer(evt.canvas.figure) # does not remove symbol from workspace
         
         # NOTE: now remove the figure variable name from user workspace
         ns_fig_names_objs = [x for x in self.shell.user_ns.items() if isinstance(x[1], mpl.figure.Figure) and x[1] is evt.canvas.figure]
@@ -432,7 +432,7 @@ class WindowManager(__QMainWindow__):
         for ns_fig in ns_fig_names_objs:
             self.sig_windowRemoved.emit(ns_fig)
             #self.shell.user_ns.pop(ns_fig[0], None)
-            #self.workspaceModel.updateTable(from_console=False)
+            #self.workspaceModel.update(from_console=False)
             
     @safeWrapper
     def _set_new_viewer_window_name_(self, winClass, name=None):
@@ -584,8 +584,8 @@ class WindowManager(__QMainWindow__):
             
         self.workspace[workspace_win_varname] = win
         
-        self.slot_updateWorkspaceTable(False)
-            
+        self.workspaceModel.update()
+        
         return win
     
     @safeWrapper
@@ -609,8 +609,8 @@ class WindowManager(__QMainWindow__):
             
         ## FIXME 2021-07-11 15:09:16
         ## this is problematic when deRegisterViewer is called during a closeEvent
-        # and therefore land on a dead PyQt5 object which hasn't garbage collected
-        # yey
+        # and therefore land on a dead PyQt5 object which hasn't been garbage 
+        # collected yet
         #if isinstance(win, mpl.figure.Figure):
             #plt.close(win) # also removes figure number from pyplot figure manager
             
@@ -1393,7 +1393,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         # we'd like this to be seen in the workspace table
                         #
                         # and do it from within inner_f
-                        self.slot_updateWorkspaceTable(False)
+                        self.workspaceModel.update()
                         # NOTE: 2016-04-17 16:26:33 
                         # inner_f does not need to return anything
 
@@ -1431,7 +1431,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                         # we'd like this to be seen
                         #
                         # and do it from within inner_f
-                        self.slot_updateWorkspaceTable(False)
+                        self.workspaceModel.update()
 
                         # NOTE: 2016-04-17 16:27:01
                         # inner_f does not need to return anything
@@ -2149,48 +2149,30 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
     @pyqtSlot()
     def slot_refreshWorkspaceView(self):
-        self.workspaceModel.updateTable(from_console=False, force=True)
+        self.workspaceModel.update()
+        #self.workspaceModel.update(from_console=False, force=True)
     
     # NOTE: 2016-03-26 17:07:17
     # as a workaround for the problem in NOTE: 2016-03-26 17:01:32
     @pyqtSlot()
     @safeWrapper
     def slot_updateWorkspaceView(self):
-        sortOrder = None
-        sortSection = 0
+        self._sortWorkspaceViewFirstColumn_()
+        self._resizeWorkspaceViewFirstColumn_()
         
-        if self.workspaceView.horizontalHeader().isSortIndicatorShown():
-            try:
-                sortSection = self.workspaceView.horizontalHeader().sortIndicatorSection()
-                sortOrder = self.workspaceView.horizontalHeader().sortIndicatorOrder()
-            except:
-                sortSection = 0
-                sortOrder = QtCore.Qt.AscendingOrder
-                
-        if not isinstance(sortOrder, QtCore.Qt.SortOrder):
-            sortOrder = QtCore.Qt.AscendingOrder
-            
-        self.workspaceView.setSortingEnabled(False)
-        self.workspaceView.sortByColumn(sortSection,sortOrder)
-        self.workspaceView.setSortingEnabled(True)
-        
-        self.workspaceView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.workspaceView.resizeColumnToContents(0)
-        self.workspaceView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        
-    @pyqtSlot(bool)
-    def slot_updateWorkspaceTable(self, value:bool):
+    #@pyqtSlot(bool)
+    #def slot_updateWorkspaceModel(self, value:bool):
+    @pyqtSlot()
+    def slot_updateWorkspaceModel(self):
         """ pyplot commands may produce or close a figure; we need to reflect this!
         """
         # NOTE: 2019-11-20 12:22:17
-        # self.workspaceModel.updateTable() emits the signal
+        # self.workspaceModel.update() triggers the signal
         # WorkspaceModel.modelContentsChanged which is connected to the slot
         # self.slot_updateWorkspaceView(); in turn this will sort column 0
         # and resize its contents. 
         # This is because workspaceModel doesn't "know" anything about workspaceView.
-        self.workspaceModel.updateTable(from_console=value) # emits WorkspaceModel.modelContentsChanged
-        
-        self.workspaceChanged.emit() # used by whom? -> slot_updateWorkspaceView ?
+        self.workspaceModel.update() # emits WorkspaceModel.modelContentsChanged
         
     def slot_updateCwd(self):
         if self.cwd != os.getcwd():
@@ -2344,7 +2326,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         if isinstance(value, str) and by_name:
             self.workspace.pop(value, None)
-            self.slot_updateWorkspaceTable(from_console)
+            self.workspaceModel.update()
             
         else:
             # inverse lookup the key mapped to this value
@@ -2353,7 +2335,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 for o in objects:
                     self.workspace.pop(o[0], None)
                     
-            self.slot_updateWorkspaceTable(from_console)
+            self.workspaceModel.update()
         
     @safeWrapper
     def getCurrentVarName(self):
@@ -2366,7 +2348,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if varname is None:
             indexList = self.workspaceView.selectedIndexes()
             
-            if len(indexList) == 0:
+            #if len(indexList) == 0:
+            if len(indexList) != 1:
                 return
             
             varname = self.workspaceModel.item(indexList[0].row(),0).text()
@@ -2383,7 +2366,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
     def assignToWorkspace(self, name:str, val:object, from_console:bool = False):
         self.workspace[name] = val
-        self.slot_updateWorkspaceTable(from_console)
+        self.workspaceModel.update()
         
     @pyqtSlot()
     @safeWrapper
@@ -2575,11 +2558,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #print("ScipyenWindow.slot_variableItemPressed %s", ndx)
         self.workspaceModel.currentVarItem = self.workspaceModel.item(ndx.row(),0)
         self.workspaceModel.currentVarName = self.workspaceModel.item(ndx.row(),0).text()
-        #pass
-        #item = self.workspace[self.workspaceModel.currentVarName]
-        
-        #if isinstance(item, (QtWidgets.QMainWindow, mpl.figure.Figure)):
-            #self._setCurrentWindow(item)
     
     @pyqtSlot(QtCore.QModelIndex)
     @safeWrapper
@@ -2740,8 +2718,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         cm.popup(self.workspaceView.mapToGlobal(point))#, copyVarNames)
         #cm.popup(self.workspaceView.mapToGlobal(point), cm.actions()[0])
         
-    @safeWrapper
     @pyqtSlot(QtCore.QItemSelection, QtCore.QItemSelection)
+    @safeWrapper
     def slot_selectionChanged(self, selected, deselected):
         """Selection change in the workspace viewer
         """
@@ -2774,9 +2752,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         #print("ScipyenWindow slot_selectionChanged: currentVarName %s" % self.workspaceModel.currentVarName)
 
-    #@pyqtSlot(QtGui.QStandardItem)
-    @safeWrapper
     @pyqtSlot("QStandardItem*")
+    @safeWrapper
     def slot_variableItemNameChanged(self, item):
         """Called when itemChanged was emitted by workspaceModel.
         
@@ -2789,7 +2766,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         CAUTION: this is also called when variables are re-created!
         
         """
-        print("slot_variableItemNameChanged", item.text())
         signalBlockers = [QtCore.QSignalBlocker(self.workspaceView),
                           QtCore.QSignalBlocker(self.workspaceModel),
                           QtCore.QSignalBlocker(self.workspaceView.selectionModel())]
@@ -2799,38 +2775,23 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # the variable name
             return
         
-        #print("ScipyenWindow slot_variableItemNameChanged item %s" % item.text())
-        #print("ScipyenWindow slot_variableItemNameChanged item in ws", item.text() in self.workspace.keys())
+        originalVarName = self.getCurrentVarName()
+        # this is the new text (i.e. AFTER name change)
+        if originalVarName is None:
+            return
         
-        #print("workspace model rows: ", self.workspaceModel.rowCount())
+        if len(originalVarName.strip()) == 0:
+            return
         
-        # NOTE 2021-07-28 10:24:33
-        # self.workspaceModel.currentVarName may be None is no variable has
-        # been selected; in this case use self.workspaceModel.originalVarName
-        # normally this is empty, except in the process of variable creation or
-        # modification, when self.workspaceModel.updateRowForVariable is called,
-        # and self.workspaceView.itemChange signal is emitted (which is connected
-        # to this slot)
-        #originalVarName = self.workspaceModel.currentVarName
-        
-        #if originalVarName is None or (isinstance(originalVarName, str) and len(originalVarName.strip()) == 0):
-            
-        # NOTE: 2021-06-12 12:10:22
-        # use cached symbol when symbol's bound data has changed
-        # FIXME 2021-07-28 10:47:04 
-        # this BREAKS variable renaming using the keyboard shortcut (e.g. F2)
-        originalVarName = self.workspaceModel.originalVarName
         newVarName = item.text()
-        
-        # NOTE 2021-07-28 11:01:16
-        # FIXES 2021-07-28 10:47:04 
-        # self.getCurrentVarName() returns the name of selected var (before EditKeyPressed)
-        if originalVarName is None or (isinstance(originalVarName, str) and len(originalVarName.strip()) == 0):
-            originalVarName = self.getCurrentVarName()
+        #print("slot_variableItemNameChanged old", originalVarName, "new", newVarName)
             
-        #print("ScipyenWindow slot_variableItemNameChanged originalVarName %s" % originalVarName)
-        
-        #print("ScipyenWindow slot_variableItemNameChanged newVarName %s" % newVarName)
+        if len(newVarName.strip()) == 0: # no change, really; prevent accidental deletion
+            newVarName = originalVarName
+            self.workspaceModel.itemChanged.disconnect(self.slot_variableItemNameChanged)
+            item.setText(newVarName)
+            self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
+            return
         
         if newVarName != originalVarName:
             # NOTE: 2017-09-22 21:57:23
@@ -2838,20 +2799,20 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             newVarNameOK = validate_varname(newVarName, self.workspace)
             
             if newVarNameOK != newVarName: # also update the item's text
+                self.workspaceModel.itemChanged.disconnect(self.slot_variableItemNameChanged)
                 item.setText(newVarNameOK)
+                self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
                 
             data = self.workspace.pop(originalVarName, None)
+            
+            #print("slot_variableItemNameChanged old", originalVarName, "new", newVarName, "new2", newVarNameOK)
             
             if data is None:
                 return
             
             self.workspace[newVarNameOK] = data
+            self.workspaceModel.update()
                 
-            self.slot_updateWorkspaceTable(False)
-            
-            #self.workspaceModel.currentVarName = newVarNameOK
-            #self.workspaceView.selectionModel().setCurrentIndex(self.workspaceModel.indexFromItem(item), QtCore.QItemSelectionModel.Select)
-        
     @pyqtSlot()
     @safeWrapper
     def slot_renameWorkspaceVar(self):
@@ -2867,16 +2828,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         indexList = self.workspaceView.selectedIndexes()
         
-        if len(indexList) == 0 or len(indexList) > 1 :
+        if len(indexList) != 1:
             return
         
         varName = self.workspaceModel.item(indexList[0].row(),0).text()
+        
         dlg = qd.QuickDialog(self, "Rename variable")
-        #dlg = vigra.pyqt.quickdialog.QuickDialog(self, "Rename variable")
         dlg.addLabel("Rename '%s'" % varName)
         pw = qd.StringInput(dlg, "To :")
-        #pw = vigra.pyqt.quickdialog.StringInput(dlg, "To :")
-        #pw = VariableNameStringInput(dlg, "To:")
         pw.variable.undoAvailable=True
         pw.variable.redoAvailable=True
         pw.variable.setClearButtonEnabled(True)
@@ -2894,14 +2853,18 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         newVarNameOK = validate_varname(newVarName, self.workspace)
         
         if newVarNameOK != newVarName:
-            btn = QtWidgets.QMessageBox.question(self, "Rename variable", "Variable %s has been renamed to %s. Accept?" % (newVarName, newVarNameOK))
+            btn = QtWidgets.QMessageBox.question(self, "Rename variable", "Variable %s will be renamed to %s. Accept?" % (newVarName, newVarNameOK))
             
             if btn == QtWidgets.QMessageBox.No:
                 return
+            
+        self.workspace[newVarNameOK] = self.workspace[varName]
+        self.workspace.pop(varName, None)
+        self.workspaceModel.update()
         
-        cmd = "".join([newVarNameOK, "=", varName, "; del(", varName,")"])
-        self.console.execute(cmd, hidden=True)
-        #self.slot_updateWorkspaceTable()
+        # NOTE: 2021-08-21 22:27:34 DO NOT DELETE - alternative way
+        #cmd = "".join([newVarNameOK, "=", varName, "; del(", varName,")"])
+        #self.console.execute(cmd, hidden=True)
         
         
     @pyqtSlot()
@@ -2991,13 +2954,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 else:
                     obj.close()
                     #obj.closeEvent(QtGui.QCloseEvent())
-                self.deRegisterViewer(obj)
+                self.deRegisterViewer(obj) # does not remove its symbol for workspace - this has already been removed by delete action
                 
             self.workspace.pop(n, None)
             
         self.workspaceModel.currentVarItem = None
         
-        self.slot_updateWorkspaceTable(False)
+        self.workspaceModel.update()
         
     @pyqtSlot()
     @safeWrapper
@@ -3140,7 +3103,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #NOTE: therefore we need to update OUR history manually
         self.executionCount = self.ipkernel.shell.execution_count
         self._updateHistoryView_(self.executionCount-1, self.ipkernel.shell.history_manager.input_hist_raw[-1])
-        self.slot_updateWorkspaceTable(False)
+        self.workspaceModel.update()
         
         #NOTE: 2017-03-19 22:54:55 also this DOES NOT re-create the output
         #NOTE: I guess I can live with this for now...
@@ -4390,12 +4353,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     
             progressDlg.setValue(nItems)
         
-        self.slot_updateWorkspaceTable(False)
+        self.workspaceModel.update()
         
         return True
          
-        
-        
     @pyqtSlot()
     @safeWrapper
     def slot_openSelectedFileItems(self):
@@ -4445,7 +4406,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     
             progressDlg.setValue(nItems)
         
-        self.slot_updateWorkspaceTable(False)
+        self.workspaceModel.update()
         
         return True
     
@@ -4684,7 +4645,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         if self.loadDiskFile(fName):
             #self._addRecentFile_(fName, fileReader) # done inside loadDiskFile
-            self.slot_updateWorkspaceTable(False)
+            self.workspaceModel.update()
             
     @pyqtSlot()
     @safeWrapper
@@ -4703,7 +4664,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             fileReader = self.recentFiles[fName]
 
             if self.loadDiskFile(fName, fileReader):
-                self.slot_updateWorkspaceTable(False)
+                self.workspaceModel.update()
                 
     @pyqtSlot(str)
     @safeWrapper
@@ -5010,7 +4971,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if isinstance(fileName, str) and len(fileName) > 0:
                 if self.loadDiskFile(fileName):
                     self._addRecentFile_(fileName)
-                    self.slot_updateWorkspaceTable(False)
+                    self.workspaceModel.update()
                 
     # NOTE: 2016-04-01 12:18:23
     # keep this as we may want to enforce the use of BioFormats for opening files
@@ -5048,7 +5009,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             #if isinstance(fileName, str) and len(fileName) > 0:
                 #if self.loadDiskFile(fileName, True):
                     #self._addRecentFile_(fileName, "bioformats")
-                    #self.slot_updateWorkspaceTable()
+                    #self.workspaceModel.update()
 
     @pyqtSlot()
     @safeWrapper
@@ -5081,8 +5042,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 if isinstance(fileName, str) and len(fileName) > 0:
                     if not self.loadDiskFile(fileName):
                         return
-                        
-            self.slot_updateWorkspaceTable(False)
+                 
+            self.workspaceModel.update()
                 
     @pyqtSlot()
     @safeWrapper
@@ -5235,7 +5196,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #varname = strutils.str2symbol("_".join([msg["header"]["msg_type"], msg["header"]["session"]]))
         #session_id = msg["header"]["session"]
         #self.workspace[varname] = msg
-        #self.workspaceModel.updateTable(from_console=False)
+        #self.workspaceModel.update(from_console=False)
         #### END get rid of this once done developing
         
         #print("_slot_ext_krn_shell_chnl_msg_recvd")
@@ -5290,7 +5251,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 # external kernel namespace into our own
                     
                 self.workspace.update(vardict)
-                self.workspaceModel.updateTable(from_console=False)
+                self.workspaceModel.update(from_console=False)
                 
                 if len(prop_dicts):
                     #print("mainWindow: len(prop_dicts)", len(prop_dicts))
@@ -5475,7 +5436,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot(tuple)
     def slot_windowRemoved(self, name_obj):
         self.shell.user_ns.pop(name_obj[0], None)
-        self.workspaceModel.updateTable(from_console=False)
+        self.workspaceModel.update(from_console=False)
                 
     @pyqtSlot()
     @safeWrapper
@@ -6076,7 +6037,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             self.workspace["result"] = obj
             
-        self.workspaceModel.updateTable(from_console=False)
+        self.workspaceModel.update(from_console=False)
             
         self.workspaceChanged.emit()
         
@@ -6169,5 +6130,3 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             raise ValueError("empty nested dict in plugin info")
     
-    
-# test git branch dev

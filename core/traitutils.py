@@ -73,8 +73,8 @@ TRAITSMAP = {           # use casting versions
     EnumMeta:   (UseEnum,),
     Enum:       (UseEnum,), # IntEnum inherits from int and Enum
     type:       (Instance,),    # e.g., type(type(None))
-    #type:       (Type,),    # e.g., type(type(None))
     property:   (DottedObjectName,),
+    #type:       (Type,),    # e.g., type(type(None))
     #function:   (Any,)
     }
 
@@ -102,7 +102,6 @@ def _enhanced_set_(instance, obj, value):
             instance.hashed = new_hash
             
         
-        #silent = bool(safe_identity_test(old_value, new_value))
         ##silent = bool(old_value == new_value)
         
         #print("%s: silent before hash" % instance.name, silent)

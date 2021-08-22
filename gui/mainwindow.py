@@ -424,7 +424,7 @@ class WindowManager(__QMainWindow__):
         plt.close(evt.canvas.figure)
         # NOTE: 2020-02-05 00:53:51
         # this also closes the figure window and removes it from self.currentViewers
-        self.deRegisterViewer(evt.canvas.figure) # doe nto remove symbol from workspace
+        self.deRegisterViewer(evt.canvas.figure) # does not remove symbol from workspace
         
         # NOTE: now remove the figure variable name from user workspace
         ns_fig_names_objs = [x for x in self.shell.user_ns.items() if isinstance(x[1], mpl.figure.Figure) and x[1] is evt.canvas.figure]
@@ -598,6 +598,9 @@ class WindowManager(__QMainWindow__):
         if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             return
         
+        w_title = win.get_window_title() if isinstance(win, mpl.figure.Figure) else win.windowTitle()
+        
+        print("ScipyenWindow.deRegisterViewer %s" % w_title)
         viewer_type = type(win)
         
         old_viewer_index = None
@@ -609,8 +612,8 @@ class WindowManager(__QMainWindow__):
             
         ## FIXME 2021-07-11 15:09:16
         ## this is problematic when deRegisterViewer is called during a closeEvent
-        # and therefore land on a dead PyQt5 object which hasn't garbage collected
-        # yey
+        # and therefore land on a dead PyQt5 object which hasn't been garbage 
+        # collected yet
         #if isinstance(win, mpl.figure.Figure):
             #plt.close(win) # also removes figure number from pyplot figure manager
             
@@ -2149,34 +2152,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
     @pyqtSlot()
     def slot_refreshWorkspaceView(self):
-        self.workspaceModel.update(from_console=False, force=True)
+        self.workspaceModel.update()
+        #self.workspaceModel.update(from_console=False, force=True)
     
     # NOTE: 2016-03-26 17:07:17
     # as a workaround for the problem in NOTE: 2016-03-26 17:01:32
     @pyqtSlot()
     @safeWrapper
     def slot_updateWorkspaceView(self):
-        sortOrder = None
-        sortSection = 0
-        
-        if self.workspaceView.horizontalHeader().isSortIndicatorShown():
-            try:
-                sortSection = self.workspaceView.horizontalHeader().sortIndicatorSection()
-                sortOrder = self.workspaceView.horizontalHeader().sortIndicatorOrder()
-            except:
-                sortSection = 0
-                sortOrder = QtCore.Qt.AscendingOrder
-                
-        if not isinstance(sortOrder, QtCore.Qt.SortOrder):
-            sortOrder = QtCore.Qt.AscendingOrder
-            
-        self.workspaceView.setSortingEnabled(False)
-        self.workspaceView.sortByColumn(sortSection,sortOrder)
-        self.workspaceView.setSortingEnabled(True)
-        
-        self.workspaceView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.workspaceView.resizeColumnToContents(0)
-        self.workspaceView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self._sortWorkspaceViewFirstColumn_()
+        self._resizeWorkspaceViewFirstColumn_()
         
     #@pyqtSlot(bool)
     #def slot_updateWorkspaceModel(self, value:bool):
@@ -2185,14 +2170,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         """ pyplot commands may produce or close a figure; we need to reflect this!
         """
         # NOTE: 2019-11-20 12:22:17
-        # self.workspaceModel.update() emits the signal
+        # self.workspaceModel.update() triggers the signal
         # WorkspaceModel.modelContentsChanged which is connected to the slot
         # self.slot_updateWorkspaceView(); in turn this will sort column 0
         # and resize its contents. 
         # This is because workspaceModel doesn't "know" anything about workspaceView.
         self.workspaceModel.update() # emits WorkspaceModel.modelContentsChanged
-        
-        #self.workspaceChanged.emit() # used by whom? -> slot_updateWorkspaceView ?
         
     def slot_updateCwd(self):
         if self.cwd != os.getcwd():
@@ -2344,6 +2327,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         avoid calling this function to batch-remove variables
         
         """
+        print("ScipyenWindow.removeFromWorkspace", value)
         if isinstance(value, str) and by_name:
             self.workspace.pop(value, None)
             self.workspaceModel.update()
@@ -2974,7 +2958,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 else:
                     obj.close()
                     #obj.closeEvent(QtGui.QCloseEvent())
-                self.deRegisterViewer(obj)
+                self.deRegisterViewer(obj) # does not remove its symbol for workspace - this has already been removed by delete action
                 
             self.workspace.pop(n, None)
             
