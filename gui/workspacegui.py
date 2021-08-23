@@ -214,6 +214,7 @@ def saveWindowSettings(qsettings, win, parent=None, entry_name:typing.Optional[s
     # NOTE: 2021-07-11 18:32:56
     # QSettings support maximum one nesting level (i.e., group/entry)
     
+    print("workspacegui.saveWindowSettings viewer %s, group %s, entry %s BEGIN" % (win.__class__, group_name, entry_name))
     if parent is None:
         if isinstance(win, QtWidgets.QMainWindow):
             parent = win.parent()
@@ -226,6 +227,9 @@ def saveWindowSettings(qsettings, win, parent=None, entry_name:typing.Optional[s
         if not isinstance(group_name, str) or len(group_name.strip()):
             group_name = parent.__class__.__name__
             
+    print("parent", parent.__class__.__name__)
+    print("group_name", group_name)
+    
     if isinstance(group_name, str) and len(group_name.strip()):
         use_group = True
         
@@ -239,7 +243,6 @@ def saveWindowSettings(qsettings, win, parent=None, entry_name:typing.Optional[s
     else:
         ename=""
         
-    print("workspacegui.saveWindowSettings viewer %s, group %s, entry %s " % (win.__class__, group_name, entry_name))
     
     qsettings.setValue("%sWindowSize" % ename, win.size())
     qsettings.setValue("%sWindowPosition" % ename, win.pos())
@@ -248,6 +251,7 @@ def saveWindowSettings(qsettings, win, parent=None, entry_name:typing.Optional[s
     if hasattr(win, "saveState"):
         qsettings.setValue("%sWindowState" % ename, win.saveState())
         
+    print("workspacegui.saveWindowSettings viewer %s, group %s, entry %s END" % (win.__class__, group_name, entry_name))
     if use_group:
         qsettings.endGroup()
     
@@ -279,7 +283,7 @@ def loadWindowSettings(qsettings, win, parent=None, entry_name:typing.Optional[s
     else:
         ename=""
         
-    print("workspacegui.loadWindowSettings viewer %s, group %s, entry %s " % (win.__class__, group_name, entry_name))
+    print("workspacegui.loadWindowSettings viewer %s, group %s, entry %s BEGIN" % (win.__class__, group_name, entry_name))
         
     windowSize = qsettings.value("%sWindowSize" % ename, None)
     if windowSize:
@@ -300,3 +304,5 @@ def loadWindowSettings(qsettings, win, parent=None, entry_name:typing.Optional[s
     
     if use_group:
         qsettings.endGroup()
+
+    print("workspacegui.loadWindowSettings viewer %s, group %s, entry %s END" % (win.__class__, group_name, entry_name))

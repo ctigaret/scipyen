@@ -52,6 +52,14 @@ from importlib import reload # I use this all too often !
  # get this via scipyen_config module aliased as scipyenconf
 #import confuse
 
+#### BEGIN Configurable objects with traitlets.config
+# NOTE: 2021-08-23 11:02:10 
+# ATTENTION do not import config directly, as it will override IPython's own 
+# 'config' object
+import traitlets
+from traitlets.utils.bunch import Bunch
+#### END Configurable objects with traitlets.config
+
 #### BEGIN numerics & data visualization
 import numpy as np
 import pywt # wavelets
@@ -230,7 +238,8 @@ from . import colorwidgets
 from . import stylewidgets
 from . import gradientwidgets
 
-from .workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
+from .workspacegui import (WorkspaceGuiMixin, 
+                           saveWindowSettings, loadWindowSettings, )
 from .workspacemodel import WorkspaceModel
 
 # qtconsole.styles and pygments.styles, respectively:
@@ -374,10 +383,11 @@ class WorkspaceViewer(QtWidgets.QTableView):
 # the way multiple inheritance works in pyqt dictates that additional signals are 
 # inerited only from the _FIRST_ superclass, which must also have the deepest 
 # inheritance tree
+#class WindowManager(ConfigurableQMainWindowMeta):
 class WindowManager(__QMainWindow__):
     sig_windowRemoved = pyqtSignal(tuple, name="sig_windowRemoved")
     
-    def __init__(self, parent=None):
+    def __init__(self, config=None, parent=None, *args, **kwargs):
         super().__init__(parent)
         
         # gui_viewers defined in gui package (see gui/__init__.py)
@@ -605,7 +615,7 @@ class WindowManager(__QMainWindow__):
         
         w_title = win.get_window_title() if isinstance(win, mpl.figure.Figure) else win.windowTitle()
         
-        print("ScipyenWindow.deRegisterViewer %s" % w_title)
+        #print("WindowManager.deRegisterViewer %s %s" % (win.__class__, w_title))
         
         viewer_type = type(win)
         
@@ -1172,26 +1182,11 @@ class VTH(object):
         if viewerClass in VTH.default_handlers:
             VTH.gui_handlers[viewerClass] = deepcopy(VTH.default_handlers[viewerClass])
 
-# TODO: enable renaming & deleting of variable names from within the workspace view
-# NOTE: 2016-05-02 20:22:58 CHANGES:
-# 1) uses Qsettings to store app settings, including:
-# Recent Files menu and recent directory
-# recent directory is being udated when a File/Open... menu action is invoked
-# TODO: make the number of recent files configurable
-#
-# 2) open... functions not decorated with _workspaceModifier anymore,
-# to allow more flexibility in handing recently open files
-#
-# 3) recent files implemented as an ordered dictionary that maps the fully qualified 
-# path name of the recent file to a mode tag that indicates how the file should be open
-# see docstring for self._addRecentFile_
-# 
-# 4) similarly implemented recentDirectories (a collections deque, most recent first)
-# and a recentDiretory(to be phased out)
-#
 class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
+    # NOTE: 2021-08-23 10:36:14 WindowManager inherits from __QMainWindow__ which
+    # is QtWidgets.QMainWindow
     workspaceChanged = pyqtSignal()
     
     _instance = None
@@ -1491,7 +1486,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     #@processtimefunc
     def __init__(self, app:QtWidgets.QApplication, 
                  settings:typing.Optional[confuse.LazyConfig]=None, 
-                 parent:typing.Optional[QtWidgets.QWidget]=None) -> None:
+                 parent:typing.Optional[QtWidgets.QWidget]=None,
+                 *args, **kwargs) -> None:
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: python3 way
         WorkspaceGuiMixin.__init__(self, parent=self)
         self.app                        = app
@@ -1592,7 +1588,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.shell.events.register("pre_execute", self.workspaceModel.pre_execute)
         self.shell.events.register("post_execute", self.workspaceModel.post_execute)
         
-        self.workspaceModel.windowVariableDeleted[int].connect(self.slot_windowVariableDeleted)
+        #self.workspaceModel.windowVariableDeleted[int].connect(self.slot_windowVariableDeleted)
         
         # NOTE: 2021-01-06 17:22:45
         # a lot of things happen up to here which depend on an initialized bare-bones

@@ -1548,7 +1548,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._copy_varnames_separator_ = " "
         #### END - to revisit
         
-        self._setup_console_pygments_()
+        #self._setup_console_pygments_()
         
         self.setupUi(self)
         
@@ -3223,18 +3223,17 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
         self.qsettings.endGroup()
         
-    def _setup_console_pygments_(self):
-        from qtconsole.jupyter_widget import JupyterWidget
-        settings = QtCore.QSettings()
-        custom_pygment = settings.value("Console/Scheme", None)
-        custom_colors = settings.value("Console/Colors", "")
+    #def _setup_console_pygments_(self):
+        #from qtconsole.jupyter_widget import JupyterWidget
+        #settings = QtCore.QSettings()
+        #custom_pygment = settings.value("Console/Scheme", None)
+        #custom_colors = settings.value("Console/Colors", "")
         
-        if custom_pygment:
-            JupyterWidget.style_sheet = consoles.styles.sheet_from_template(custom_pygment,
-                                                                   custom_colors)
+        #if custom_pygment:
+            #JupyterWidget.style_sheet = consoles.styles.sheet_from_template(custom_pygment,
+                                                                   #custom_colors)
             
-            JupyterWidget.syntax_style = custom_pygment
-        
+            #JupyterWidget.syntax_style = custom_pygment
         
     #@processtimefunc
     def loadSettings(self):

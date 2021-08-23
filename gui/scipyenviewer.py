@@ -344,7 +344,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #print("ScipyenViewer[%s].saveWindowSettings for %s top level:%s" % (self.__class__.__name__, self.winTitle, self.isTopLevel))
         #if self.isTopLevel and self.isVisible(): # isTopLevel inherited from WorkspaceGuiMixin
         if self.isVisible(): # isTopLevel inherited from WorkspaceGuiMixin
-            saveWindowSettings(self.qsettings, self, self.parent()) # module-level function in workspacegui
+            saveWindowSettings(self.qsettings, self, parent=self.parent()) # module-level function in workspacegui
             
     #@abstractmethod
     def saveViewerSettings(self):
