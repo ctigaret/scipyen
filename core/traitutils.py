@@ -73,7 +73,8 @@ TRAITSMAP = {           # use casting versions
     dict:       (Dict,),
     EnumMeta:   (UseEnum,),
     Enum:       (UseEnum,), # IntEnum inherits from int and Enum
-    type:       (Instance,),    # e.g., type(type(None))
+    type:       (Any,),    # e.g., type(type(None))
+    #type:       (Instance,),    # e.g., type(type(None)) # Instance requires arguments to instantiate default value
     property:   (DottedObjectName,),
     #type:       (Type,),    # e.g., type(type(None))
     #function:   (Any,)

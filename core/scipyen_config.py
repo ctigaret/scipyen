@@ -51,8 +51,14 @@ Qt5 settings framework.
 import os
 import inspect, typing
 import confuse
+from types import new_class
+from functools import partial
 
+import traitlets
+from traitlets.utils.bunch import Bunch
+import traitlets.config
 from .traitcontainers import DataBag
+from core import traitutils
 
 # BEGIN NOTE: 2021-01-10 13:17:58
 # LazyConfig inherits form confuse.Configuration, but its read() method must be 
@@ -75,6 +81,56 @@ scipyen_config = confuse.LazyConfig("Scipyen", "scipyen_defaults")
 if not scipyen_config._materialized:# make sure this is done only once
     scipyen_config.read() 
 
+def make_configurable(klassname:str, kwargs:Bunch):
+    """
+    klassname:str the name of the configurable klass
+    kwargs:traitlets.utils.bunch.Bunch (a dict, unwrapped) with :
+        key: name of the configured parameter
+        value: Bunch with three mandatory keys:
+            "default": the default value for the named configured parameter
+            "help": a help string (may be empty) or None
+            
+    """
+    if not isinstance(klassname, str):
+        raise TypeError("'klassname' expected a str; got %s instead" % type(klassname).__name__)
+    
+    if len(klassname.strip()) == 0:
+        raise ValueError("'klassname' cannot be an empty string")
+    
+    if not isinstance(kwargs, Bunch):
+        raise TypeError("'kwargs' expected a traitlets.utils.bunch.Bunch; got %s instead" % type(kwargs).__name__)
+    
+    if any([s not in kwargs for s in ("default", "help")]):
+        raise ValueError("'kwargs must contain Bunch with ")
+    
+    def _exec_body_(ns, kwargs):
+        """Generates the body of the configurable subclass
+        """
+        for key, val in kwargs:
+            if not isinstance(val, Bunch) or any([s not in val for s in ("default", "help")]):
+                raise ValueError("Expecting Bunch with 'default' and 'help' keys")
+            
+            myclass = type(val.default)
+            myhelp = val.help
+            
+            traitclass = traitutils.TRAITSMAP.get(myclass, (None, ))[0]
+            if traitclass is None:
+                traitclass = traitlets.Any
+            
+            ns[key] = traitclass(val.default, help=myhelp).tag(config=True)
+            
+    new_klass = new_class(klassname, bases = (traitlets.config.Configurable,),
+                          exec_body = partial(_exec_body_, kwargs=kwargs))
+    
+    return new_klass()
+
+class ScipyenConfigurable(traitlets.config.Configurable):
+    """Superclass of all non-gui configurations - testing do not use
+    """
+    name = traitlets.Unicode("defaultname", help="object name").tag(config=True)
+    
+    
+                        
 class ScipyenConfiguration(DataBag):
     """Superclass of all non-gui configurations
     """

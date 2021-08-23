@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 import typing, warnings, os, inspect
+#### BEGIN Configurable objects with traitlets.config
+from traitlets import config
+#### END Configurable objects with traitlets.config
+import matplotlib as mpl
 from PyQt5 import QtCore, QtWidgets, QtGui
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 #from traitlets.config import SingletonConfigurable
@@ -7,7 +11,12 @@ from core.utilities import safeWrapper
 from core.workspacefunctions import user_workspace
 from gui.pictgui import ItemsListDialog
 
-class GuiMessages:
+#class ConfigurableQMainWindowMeta(type(config.Configurable), type(QtWidgets.QMainWindow)):
+    #def __init__(self, config=None, parent=None, *args, **kwargs):
+        #config.Configurable.__init__(self, config=config)
+        #QtWidgets.QMainWindow.__init__(self, parent=parent)
+
+class GuiMessages(object):
     @safeWrapper
     def errorMessage(self, title, text):
         errMsgDlg = QtWidgets.QErrorMessage(self)
@@ -45,7 +54,7 @@ class GuiMessages:
             
         msgbox.exec()
         
-class FileIOGui:
+class FileIOGui(object):
     @safeWrapper
     def chooseFile(self, caption:typing.Optional[str]=None, fileFilter:typing.Optional[str]=None, 
                    single:typing.Optional[bool]=True,
@@ -114,10 +123,8 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):
     
     Also provides common functionality needed in Scipyen's windows. 
     """
+    # NOTE: 2021-08-23 10:39:20 inherits from object !!!
     
-    ####def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
-                 ####pWin: (QtWidgets.QMainWindow, type(None))= None , title="",
-                 ####**kwargs):
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
                  title="", **kwargs):
         self._scipyenWindow_ = None
@@ -206,10 +213,21 @@ def saveWindowSettings(qsettings, win, parent=None, entry_name:typing.Optional[s
                        use_group:bool=True, group_name:typing.Optional[str]=None):
     # NOTE: 2021-07-11 18:32:56
     # QSettings support maximum one nesting level (i.e., group/entry)
-    if isinstance(parent, QMainWindow):
+    
+    if parent is None:
+        if isinstance(win, QtWidgets.QMainWindow):
+            parent = win.parent()
+            
+        elif isinstance(win, mpl.figure.Figure):
+            parent = None # FIXME 2021-08-23 18:39:32
+        
+    if isinstance(parent, QtWidgets.QMainWindow):
         use_group = True
         if not isinstance(group_name, str) or len(group_name.strip()):
             group_name = parent.__class__.__name__
+            
+    if isinstance(group_name, str) and len(group_name.strip()):
+        use_group = True
         
     if use_group:
         if not isinstance(group_name, str) or len(group_name.strip()):
@@ -221,17 +239,36 @@ def saveWindowSettings(qsettings, win, parent=None, entry_name:typing.Optional[s
     else:
         ename=""
         
+    print("workspacegui.saveWindowSettings viewer %s, group %s, entry %s " % (win.__class__, group_name, entry_name))
+    
     qsettings.setValue("%sWindowSize" % ename, win.size())
     qsettings.setValue("%sWindowPosition" % ename, win.pos())
     qsettings.setValue("%sWindowGeometry" % ename, win.geometry())
+    
     if hasattr(win, "saveState"):
         qsettings.setValue("%sWindowState" % ename, win.saveState())
         
     if use_group:
         qsettings.endGroup()
     
-def loadWindowSettings(qsettings, win, entry_name:typing.Optional[str]=None, 
+def loadWindowSettings(qsettings, win, parent=None, entry_name:typing.Optional[str]=None, 
                        use_group:bool=True, group_name:typing.Optional[str]=None):
+    
+    if parent is None:
+        if isinstance(win, QtWidgets.QMainWindow):
+            parent = win.parent()
+            
+        elif isinstance(win, mpl.figure.Figure):
+            parent = None # FIXME 2021-08-23 18:39:32
+        
+    if isinstance(parent, QtWidgets.QMainWindow):
+        use_group = True
+        if not isinstance(group_name, str) or len(group_name.strip()):
+            group_name = parent.__class__.__name__
+        
+    if isinstance(group_name, str) and len(group_name.strip()):
+        use_group = True
+        
     if use_group:
         if not isinstance(group_name, str) or len(group_name.strip()):
             group_name = win.__class__.__name__
@@ -241,6 +278,8 @@ def loadWindowSettings(qsettings, win, entry_name:typing.Optional[str]=None,
         ename = "%s_" % entry_name
     else:
         ename=""
+        
+    print("workspacegui.loadWindowSettings viewer %s, group %s, entry %s " % (win.__class__, group_name, entry_name))
         
     windowSize = qsettings.value("%sWindowSize" % ename, None)
     if windowSize:

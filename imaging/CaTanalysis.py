@@ -3726,47 +3726,49 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
     def saveViewerSettings(self):
         # TODO/FIXME: 2021-07-08 10:55:21
         # settings for LnF of cursors & rois
+        # TODO/FIXME 2021-08-23 18:43:36
+        # use traitlets.config.Configurable and confuse
         from matplotlib.colors import Colormap
         
-        self.qsettings.setValue("LSCaTAnalysis/Use_Opaque_Labels", self.actionOpaque_cursor_labels.isChecked())
+        #self.qsettings.setValue("LSCaTAnalysis/Use_Opaque_Labels", self.actionOpaque_cursor_labels.isChecked())
         
-        self.qsettings.setValue("LSCaTAnalysis/Link_Scan_Vertical_Cursors_to_Scene_Point_Cursors", self.actionLink_vertical_scan_cursors_to_scene_point_cursors.isChecked())
+        #self.qsettings.setValue("LSCaTAnalysis/Link_Scan_Vertical_Cursors_to_Scene_Point_Cursors", self.actionLink_vertical_scan_cursors_to_scene_point_cursors.isChecked())
         
-        self.qsettings.setValue("LSCaTAnalysis/Plot_long_fits", self.actionPlot_long_fits.isChecked())
+        #self.qsettings.setValue("LSCaTAnalysis/Plot_long_fits", self.actionPlot_long_fits.isChecked())
 
-        for k, w in enumerate(self.sceneviewers):
-            if isinstance(w.colorMap, Colormap):
-                self.qsettings.setValue("LSCaTAnalysis/SceneWindow_%d_ColorMap" % k, w.colorMap.name)
+        #for k, w in enumerate(self.sceneviewers):
+            #if isinstance(w.colorMap, Colormap):
+                #self.qsettings.setValue("LSCaTAnalysis/SceneWindow_%d_ColorMap" % k, w.colorMap.name)
                 
-            else:
-                self.qsettings.setValue("LSCaTAnalysis/SceneWindow_%d_ColorMap" % k, None)
+            #else:
+                #self.qsettings.setValue("LSCaTAnalysis/SceneWindow_%d_ColorMap" % k, None)
                 
-        for k, w in enumerate(self.scansviewers):
-            if isinstance(w.colorMap, Colormap):
-                self.qsettings.setValue("LSCaTAnalysis/ScansWindow_%d_ColorMap" % k, w.colorMap.name)
+        #for k, w in enumerate(self.scansviewers):
+            #if isinstance(w.colorMap, Colormap):
+                #self.qsettings.setValue("LSCaTAnalysis/ScansWindow_%d_ColorMap" % k, w.colorMap.name)
                 
-            else:
-                self.qsettings.setValue("LSCaTAnalysis/ScansWindow_%d_ColorMap" % k, None)
+            #else:
+                #self.qsettings.setValue("LSCaTAnalysis/ScansWindow_%d_ColorMap" % k, None)
                 
-        if len(self.profileviewers):
-            w = self.profileviewers[0]
-            for dw in w.dockWidgets:
-                self.qsettings.setValue("LSCaTAnalysis/ProfileWindow_%s" % dw[0], dw[1].isVisible())
+        #if len(self.profileviewers):
+            #w = self.profileviewers[0]
+            #for dw in w.dockWidgets:
+                #self.qsettings.setValue("LSCaTAnalysis/ProfileWindow_%s" % dw[0], dw[1].isVisible())
             
-        if len(self.scansblockviewers):
-            w = self.scansblockviewers[0]
-            for dw in w.dockWidgets:
-                self.qsettings.setValue("LSCaTAnalysis/ScansDataWindow_%s" % dw[0], dw[1].isVisible())
+        #if len(self.scansblockviewers):
+            #w = self.scansblockviewers[0]
+            #for dw in w.dockWidgets:
+                #self.qsettings.setValue("LSCaTAnalysis/ScansDataWindow_%s" % dw[0], dw[1].isVisible())
             
-        if len(self.ephysviewers):
-            w = self.ephysviewers[0]
-            for dw in w.dockWidgets:
-                self.qsettings.setValue("LSCaTAnalysis/EphysWindow_%s" % dw[0], dw[1].isVisible())
+        #if len(self.ephysviewers):
+            #w = self.ephysviewers[0]
+            #for dw in w.dockWidgets:
+                #self.qsettings.setValue("LSCaTAnalysis/EphysWindow_%s" % dw[0], dw[1].isVisible())
             
-        if len(self.scansblockviewers):
-            w = self.scansblockviewers[0]
-            for dw in w.dockWidgets:
-                self.qsettings.setValue("LSCaTAnalysis/SceneDataWindow_%s" % dw[0], dw[1].isVisible())
+        #if len(self.scansblockviewers):
+            #w = self.scansblockviewers[0]
+            #for dw in w.dockWidgets:
+                #self.qsettings.setValue("LSCaTAnalysis/SceneDataWindow_%s" % dw[0], dw[1].isVisible())
                 
             
     def saveWindowSettings(self):
@@ -3775,60 +3777,62 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         #print("%s.saveWindowSettings %s" % (self.__class__.__name__, self.winTitle))
         #print("%s.saveWindowSettings %s save client windows settings" % (self.__class__.__name__, self.winTitle))
         for k, w in enumerate(self.sceneviewers):
-            saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/SceneWindow_%d" % k)
+            saveWindowSettings(self.qsettings, w, entry_name="SceneWindow_%d" % k)
                 
         for k, w in enumerate(self.scansviewers):
-            saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/ScansWindow_%d" % k)
+            saveWindowSettings(self.qsettings, w, entry_name="ScansWindow_%d" % k)
                     
         if len(self.profileviewers):
             w = self.profileviewers[0]
-            saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/ProfileWindow")
+            saveWindowSettings(self.qsettings, w, entry_name="ProfileWindow")
                 
         if len(self.scansblockviewers):
             w = self.scansblockviewers[0]
-            saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/ScansDataWindow")
+            saveWindowSettings(self.qsettings, w, entry_name="ScansDataWindow")
                 
         if self.reportWindow.isVisible():
-            saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/ReportWindow")
+            saveWindowSettings(self.qsettings, w, entry_name="ReportWindow")
             
         if len(self.ephysviewers):
             w = self.ephysviewers[0]
-            saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/EphysWindow")
+            saveWindowSettings(self.qsettings, w, entry_name="EphysWindow")
             
         if len(self.scansblockviewers):
             w = self.scansblockviewers[0]
-            saveWindowSettings(self.qsettings, w, "LSCaTAnalysis/SceneDataWindow")
+            saveWindowSettings(self.qsettings, w, entry_name="SceneDataWindow")
                 
         #print("%s.saveWindowSettings %s Call super().saveWindowSettings" % (self.__class__.__name__, self.winTitle))
-        super().saveWindowSettings() # to save LSCaT window pos, geometry & statwe
+        super().saveWindowSettings() # to save LSCaT window pos, geometry & state
             
     def loadViewerSettings(self):
         """Loads settings unrelated to QMainWindowe instance.
         Concerns only the LSCaTWindow and not its client image/signal viewers
         """
-        use_opaque_labels = self.qsettings.value("LSCaTAnalysis/Use_Opaque_Labels", False)
+        # TODO/FIXME 2021-08-23 18:43:36
+        # use traitlets.config.Configurable and confuse
+        #use_opaque_labels = self.qsettings.value("LSCaTAnalysis/Use_Opaque_Labels", False)
         
-        if isinstance(use_opaque_labels, str):
-            self.actionOpaque_cursor_labels.setChecked(use_opaque_labels.lower().strip() == "true")
+        #if isinstance(use_opaque_labels, str):
+            #self.actionOpaque_cursor_labels.setChecked(use_opaque_labels.lower().strip() == "true")
                 
-        else:
-            self.actionOpaque_cursor_labels.setChecked(use_opaque_labels)
+        #else:
+            #self.actionOpaque_cursor_labels.setChecked(use_opaque_labels)
         
-        link_scan_vc_to_scene_pc = self.qsettings.value("LSCaTAnalysis/Link_Scan_Vertical_Cursors_to_Scene_Point_Cursors", False)
+        #link_scan_vc_to_scene_pc = self.qsettings.value("LSCaTAnalysis/Link_Scan_Vertical_Cursors_to_Scene_Point_Cursors", False)
         
-        if isinstance(link_scan_vc_to_scene_pc, str):
-            self.actionLink_vertical_scan_cursors_to_scene_point_cursors.setChecked(link_scan_vc_to_scene_pc.lower().strip() == "true")
+        #if isinstance(link_scan_vc_to_scene_pc, str):
+            #self.actionLink_vertical_scan_cursors_to_scene_point_cursors.setChecked(link_scan_vc_to_scene_pc.lower().strip() == "true")
 
-        else:
-            self.actionLink_vertical_scan_cursors_to_scene_point_cursors.setChecked(link_scan_vc_to_scene_pc)
+        #else:
+            #self.actionLink_vertical_scan_cursors_to_scene_point_cursors.setChecked(link_scan_vc_to_scene_pc)
             
-        plot_long_fits = self.qsettings.value("LSCaTAnalysis/Plot_long_fits", False)
+        #plot_long_fits = self.qsettings.value("LSCaTAnalysis/Plot_long_fits", False)
         
-        if isinstance(plot_long_fits, str):
-            self.actionPlot_long_fits.setChecked(plot_long_fits.lower().strip() == "true")
+        #if isinstance(plot_long_fits, str):
+            #self.actionPlot_long_fits.setChecked(plot_long_fits.lower().strip() == "true")
             
-        else:
-            self.actionPlot_long_fits.setChecked(plot_long_fits)
+        #else:
+            #self.actionPlot_long_fits.setChecked(plot_long_fits)
             
     def _configureUI_(self):
         self.setupUi(self)

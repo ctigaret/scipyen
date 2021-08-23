@@ -596,7 +596,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """All viewers in Scipyen should behave consistently.
         However, this may by overridden in derived classes.
         """
-        print("ScipyenViewer[%s].closeEvent %s: isTopLevel %s" % (self.__class__.__name__, self.winTitle, self.isTopLevel))
+        #print("ScipyenViewer<%s>.closeEvent %s: isTopLevel %s" % (self.__class__.__name__, self.winTitle, self.isTopLevel))
         # NOTE: 2021-07-08 12:07:35
         # also de-register the viewer with Scipyen's main window, if this viewer
         # is NOT a client (child) of another Scypen app (e.g. LSCaTWindow)
