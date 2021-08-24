@@ -2545,8 +2545,8 @@ class ScipyenConsole(RichJupyterWidget):
         #self.resize(winSize)
         self.setAcceptDrops(True)
         
-        
         self.scrollBarPosition = layout_direction
+        
         #print(self.custom_pygment)
         if len(self.custom_pygment.strip()):
             self.set_pygment(scheme=self.custom_pygment)

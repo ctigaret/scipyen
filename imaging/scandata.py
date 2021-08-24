@@ -3478,6 +3478,38 @@ class ScanData(object):
         
         return result
     
+    def hasImageData(self, image_section):
+        """Checks if this objects contains image data for the specified section.
+        
+        Parameters:
+        ===========
+        image_section: str, valid values are "scene", "scans"
+        
+        "scene": a list with one multi-channel image, or several single-channel 
+            images for the scene of the scan.
+        "scans": a list with one multi-channel image, or several single-channel 
+            images for the actual image scan (linescan, raster scan, etc)
+        
+        """
+        
+        if not isinstance(image_section, str):
+            raise TypeError("Expectign a str; got %s instead" % type(image_section).__name__)
+        
+        data = getattr(self, image_section, None)
+        
+        if data is None:
+            return False
+        
+        ret = isinstance(data, (vigra.VigraArray, list))
+        
+        if not ret:
+            return ret
+        
+        if isinstance(data, list):
+            ret &= all((isinstance(v, vigra.VigraArray) for v in data))
+            
+        return ret
+    
     def hasSignalData(self, data_section):
         """Checks if this object contains signals in the specified data section.
         
@@ -3492,13 +3524,13 @@ class ScanData(object):
         
         "ephys" -- alias for "electrophysiology"
         
-        "scans_profiles"            self.scanRegionScansProfiles
+        "scansProfiles"             self.scanRegionScansProfiles
         
-        "scene_profiles"            self.scanRegionSceneProfiles
+        "sceneProfiles"             self.scanRegionSceneProfiles
         
-        "scans_data"                self.scansBlock
+        "scansBlock"                self.scansBlock
         
-        "scene_data"                self.sceneBlock
+        "sceneBlock"                self.sceneBlock
         
         Returns:
         --------
@@ -3514,31 +3546,18 @@ class ScanData(object):
         if not isinstance(data_section, str):
             raise TypeError("expecting a str; got %s instead" % type(data_section).__name__)
         
-        if data_section in ("electrophysiology", "ephys"):
-            test_data = self.electrophysiology
-            
-        elif data_section  == "scans_profiles":
-            test_data = self.scanRegionScansProfiles
-            
-        elif data_section == "scene_profiles":
-            test_data = self.scanRegionSceneProfiles
-            
-        elif data_section == "scans_data":
-            test_data = self.scansBlock
-            
-        elif data_section == "scene_data":
-            test_data = self.sceneBlock
-            
-        else:
-            raise ValueError("Invalid data section specified: %s" % data_section)
+        test_data = getattr(self, data_section, None)
+        
+        if test_data is None:
+            return False
         
         ret = isinstance(test_data, neo.Block)
         
         if ret:
-            ret = ret and len(test_data.segments)
+            ret &= len(test_data.segments)
             
         if ret:
-            ret = ret and all([len(s.analogsignals) > 0 or len(s.irregularlysampledsignals) > 0 for s in test_data.segments])
+            ret &= all([len(s.analogsignals) > 0 or len(s.irregularlysampledsignals) > 0 for s in test_data.segments])
             
         return ret
     
@@ -10344,6 +10363,14 @@ class ScanData(object):
         
         return self._scan_region_scans_profiles_
         ##return self.__scanline_profiles_scans__
+        
+    @property
+    def scansProfiles(self):
+        return self.scanRegionScansProfiles
+    
+    @property
+    def sceneProfiles(self):
+        return self.scanRegionSceneProfiles
     
     @property
     def scansBlock(self):

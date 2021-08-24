@@ -120,7 +120,7 @@ TODO:
 
 #### BEGIN core python modules
 from __future__ import print_function
-import os, sys, traceback
+import os, sys, traceback, typing
 import sqlite3
 import threading
 import numbers
@@ -137,6 +137,7 @@ import bisect
 #### END
 
 #### BEGIN 3rd party modules
+from traitlets import Bunch
 
 # NOTE: 2019-07-29 13:13:23 TODO load PyQt5 modules via the pict.gui package
 from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
@@ -3698,6 +3699,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             item[0].disconnect(item[1])
             
     def saveSettings(self):
+        """Overrides ScipyenViewer.saveSettings
+        """
         #print("%s.saveSettings %s" % (self.__class__.__name__, self.winTitle))
         # NOTE: 2021-07-08 10:18:11
         # Saves the settings for the QMainWindow instances of LSCaTWindow AND of
@@ -3709,21 +3712,23 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         # AND of its clien viewers
         self.saveViewerSettings()
     
-    def loadSettings(self):
-        #print("%s.loadSetting" % self.winTitle)
-        # NOTE: 2021-07-08 10:13:54
-        # loadWindowSettings is inherited from ScipyenViewer and will ONLY load
-        # LSCaTWindow settings for its main GUI window. 
-        # the settings for individual viewers are NOT loaded here. Instead, they 
-        # are loaded right after their initialization in the various 
-        # self._setup_viewers_() method of LSCaTWindow
-        self.loadWindowSettings()
+    #def loadSettings(self):
+        ##print("%s.loadSetting" % self.winTitle)
+        ## NOTE: 2021-07-08 10:13:54
+        ## loadWindowSettings is inherited from ScipyenViewer and will ONLY load
+        ## LSCaTWindow settings for its main GUI window. 
+        ## the settings for individual viewers are NOT loaded here. Instead, they 
+        ## are loaded right after their initialization in the various 
+        ## self._setup_viewers_() method of LSCaTWindow
+        #self.loadWindowSettings()
         
-        # NOTE: Similarly, settings for individual client viewers, unrelated to 
-        # their QMainWindow instances are also loaded after their initialization.
-        self.loadViewerSettings()
+        ## NOTE: Similarly, settings for individual client viewers, unrelated to 
+        ## their QMainWindow instances are also loaded after their initialization.
+        #self.loadViewerSettings()
         
     def saveViewerSettings(self):
+        """Overrides ScipyenViewer.saveViewerSettings()
+        """
         # TODO/FIXME: 2021-07-08 10:55:21
         # settings for LnF of cursors & rois
         # TODO/FIXME 2021-08-23 18:43:36
@@ -3771,39 +3776,58 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 #self.qsettings.setValue("LSCaTAnalysis/SceneDataWindow_%s" % dw[0], dw[1].isVisible())
                 
             
-    #def saveWindowSettings(self):
-        #"""Overrides saveWindowSettings inherited from ScipyenViewer
-        #laodWindowSettings is inherited from ScipyenViewer
-        #"""
-        ##print("%s.saveWindowSettings %s" % (self.__class__.__name__, self.winTitle))
-        ##print("%s.saveWindowSettings %s save client windows settings" % (self.__class__.__name__, self.winTitle))
-        #for k, w in enumerate(self.sceneviewers):
-            #saveWindowSettings(self.qsettings, w, entry_name="SceneWindow_%d" % k)
+    def saveWindowSettings(self):
+        """Overrides ScipyenViewer.saveWindowSettings()
+        Also saves window settings for child windows.
+        
+        NOTE: The window settings for each of these child windows are loaded
+        individually when they are initialized.
+        """
+        # NOTE: 2021-08-24 09:49:01
+        # window settings for each child window MUST be saved here because
+        # they all inherit from ScipyenViewer and WorkspaceGuiMixin and are NOT
+        # toplevel!
+        # because:
+        # a) they are not top level 
+        #print("%s.saveWindowSettings %s" % (self.__class__.__name__, self.winTitle))
+        #print("%s.saveWindowSettings %s save client windows settings" % (self.__class__.__name__, self.winTitle))
+        for k, w in enumerate(self.sceneviewers):
+            custom = dict()
+            custom["ColorMap"] = w.colorMap.name
+            
+            saveWindowSettings(self.qsettings, w, 
+                               prefix="SceneWindow_%d" % k, **custom)
                 
-        #for k, w in enumerate(self.scansviewers):
-            #saveWindowSettings(self.qsettings, w, entry_name="ScansWindow_%d" % k)
+        for k, w in enumerate(self.scansviewers):
+            custom = dict()
+            custom["ColorMap"] = w.colorMap.name
+            
+            saveWindowSettings(self.qsettings, w, 
+                               prefix="ScansWindow_%d" % k, **custom)
                     
-        #if len(self.profileviewers):
-            #w = self.profileviewers[0]
-            #saveWindowSettings(self.qsettings, w, entry_name="ProfileWindow")
+        if len(self.profileviewers):
+            w = self.profileviewers[0]
+            saveWindowSettings(self.qsettings, w, 
+                               prefix="ProfileWindow")
                 
-        #if len(self.scansblockviewers):
-            #w = self.scansblockviewers[0]
-            #saveWindowSettings(self.qsettings, w, entry_name="ScansDataWindow")
+        if len(self.scansblockviewers):
+            w = self.scansblockviewers[0]
+            saveWindowSettings(self.qsettings, w, 
+                               prefix="ScansDataWindow")
                 
-        #if self.reportWindow.isVisible():
-            #saveWindowSettings(self.qsettings, w, entry_name="ReportWindow")
+        if self.reportWindow.isVisible():
+            saveWindowSettings(self.qsettings, w, prefix="ReportWindow")
             
-        #if len(self.ephysviewers):
-            #w = self.ephysviewers[0]
-            #saveWindowSettings(self.qsettings, w, entry_name="EphysWindow")
+        if len(self.ephysviewers):
+            w = self.ephysviewers[0]
+            saveWindowSettings(self.qsettings, w, prefix="EphysWindow")
             
-        #if len(self.scansblockviewers):
-            #w = self.scansblockviewers[0]
-            #saveWindowSettings(self.qsettings, w, entry_name="SceneDataWindow")
+        if len(self.scansblockviewers):
+            w = self.scansblockviewers[0]
+            saveWindowSettings(self.qsettings, w, prefix="SceneDataWindow")
                 
-        ##print("%s.saveWindowSettings %s Call super().saveWindowSettings" % (self.__class__.__name__, self.winTitle))
-        #super().saveWindowSettings() # to save LSCaT window pos, geometry & state
+        #print("%s.saveWindowSettings %s Call super().saveWindowSettings" % (self.__class__.__name__, self.winTitle))
+        super().saveWindowSettings() # to save LSCaT window pos, geometry & state
             
     def loadViewerSettings(self):
         """Loads settings unrelated to QMainWindowe instance.
@@ -10040,466 +10064,640 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
 
             win.setWindowTitle("Scene %s - %s" % (self._data_.sceneChannelNames[k], self._data_var_name_))
             
-    @safeWrapper
-    def _setup_scans_viewers_(self):
-        """Sets up viewer windows for data.scans images.
-        Creates and/or removes viewer windows according to the layout
-        of data.scans.
-        NOTE: this does NOT link frame navigation across viewers, although when
-        a viewer window is removed, its navigation links are also removed.
-        """
-        # NOTE: 2019-10-12 10:19:50
-        # Unlike the case for ephysviewers, profileviewers, scansblockviewers 
-        # and sceneblockviewers, here we have as many viewer windows as there 
-        # are elements in the data.scene list.
-        # Therefore if data.scans is empty then we'll have no scans windows.
+    #@safeWrapper
+    #def _setup_scans_viewers_(self):
+        #"""Sets up viewer windows for data.scans images.
+        #Creates and/or removes viewer windows according to the layout
+        #of data.scans.
+        #NOTE: this does NOT link frame navigation across viewers, although when
+        #a viewer window is removed, its navigation links are also removed.
+        #"""
+        ## NOTE: 2019-10-12 10:19:50
+        ## Unlike the case for ephysviewers, profileviewers, scansblockviewers 
+        ## and sceneblockviewers, here we have as many viewer windows as there 
+        ## are elements in the data.scene list.
+        ## Therefore if data.scans is empty then we'll have no scans windows.
         
-        if len(self.scansviewers) > len(self._data_.scans):
-            for w in self.scansviewers[len(self._data_.scans):]: # remove extra viewers
-                w.unlinkFromViewers()
-                w.close()
+        #if len(self.scansviewers) > len(self._data_.scans):
+            #for w in self.scansviewers[len(self._data_.scans):]: # remove extra viewers
+                #w.unlinkFromViewers()
+                #w.close()
                 
-            self.scansviewers = self.scansviewers[0:len(self._data_.scans)]
+            #self.scansviewers = self.scansviewers[0:len(self._data_.scans)]
             
-        for k in range(len(self._data_.scans)):
-            if k >= len(self.scansviewers):
-                win = iv.ImageViewer(parent = self)
-                win.signal_graphicsObjectAdded[object].connect(self.slot_graphics_object_added_in_window, type = QtCore.Qt.QueuedConnection)
-                win.signal_graphicsObjectChanged[object].connect(self.slot_graphics_object_changed_in_window, type = QtCore.Qt.QueuedConnection)
-                win.signal_graphicsObjectRemoved[object].connect(self.slot_graphics_object_removed_in_window, type = QtCore.Qt.QueuedConnection)
-                win.signal_graphicsObjectSelected[object].connect(self.slot_graphics_object_selected_in_window, type = QtCore.Qt.QueuedConnection)
-                win.signal_graphicsObjectDeselected.connect(self.slot_graphics_objects_deselected, type = QtCore.Qt.QueuedConnection)
+        #for k in range(len(self._data_.scans)):
+            #if k >= len(self.scansviewers):
+                #win = iv.ImageViewer(parent = self)
+                #win.signal_graphicsObjectAdded[object].connect(self.slot_graphics_object_added_in_window, type = QtCore.Qt.QueuedConnection)
+                #win.signal_graphicsObjectChanged[object].connect(self.slot_graphics_object_changed_in_window, type = QtCore.Qt.QueuedConnection)
+                #win.signal_graphicsObjectRemoved[object].connect(self.slot_graphics_object_removed_in_window, type = QtCore.Qt.QueuedConnection)
+                #win.signal_graphicsObjectSelected[object].connect(self.slot_graphics_object_selected_in_window, type = QtCore.Qt.QueuedConnection)
+                #win.signal_graphicsObjectDeselected.connect(self.slot_graphics_objects_deselected, type = QtCore.Qt.QueuedConnection)
                 
-                ##### BEGIN load window & viewer settings
-                #winSettingsStrPrefix = "LSCaTAnalysis/ScansWindow_%d" % k
+                ###### BEGIN load window & viewer settings
+                ##winSettingsStrPrefix = "LSCaTAnalysis/ScansWindow_%d" % k
                 
-                #if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
-                    #windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
-                    #if windowSize is not None:
-                        #win.resize(windowSize)
+                ##if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
+                    ##windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
+                    ##if windowSize is not None:
+                        ##win.resize(windowSize)
                     
-                #if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
-                    #windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
-                    #if windowPos is not None:
-                        #win.move(windowPos)
+                ##if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
+                    ##windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
+                    ##if windowPos is not None:
+                        ##win.move(windowPos)
                         
-                #if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
-                    #windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
-                    #if windowState is not None:
-                        #win.restoreState(windowState)
+                ##if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
+                    ##windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
+                    ##if windowState is not None:
+                        ##win.restoreState(windowState)
                         
-                #if self.qsettings.contains("%s_ColorMap" % winSettingsStrPrefix):
-                    #cmapname = self.qsettings.value("%s_ColorMap" % winSettingsStrPrefix, None)
-                    #if isinstance(cmapname, str):
-                        #win.setColorMap(cmapname)
+                ##if self.qsettings.contains("%s_ColorMap" % winSettingsStrPrefix):
+                    ##cmapname = self.qsettings.value("%s_ColorMap" % winSettingsStrPrefix, None)
+                    ##if isinstance(cmapname, str):
+                        ##win.setColorMap(cmapname)
                     
-                ## TODO/FIXME: 2021-07-08 10:30:10
-                ## must check/revisit these below
-                #if self.qsettings.contains("%s_CursorsColor" % winSettingsStrPrefix):
-                    #cursorscolor = self.qsettings.value("%s_CursorsColor" % winSettingsStrPrefix, None)
+                ### TODO/FIXME: 2021-07-08 10:30:10
+                ### must check/revisit these below
+                ##if self.qsettings.contains("%s_CursorsColor" % winSettingsStrPrefix):
+                    ##cursorscolor = self.qsettings.value("%s_CursorsColor" % winSettingsStrPrefix, None)
                     
-                    #if isinstance(cursorscolor, QtGui.QColor) and cursorscolor.isValid():
-                        #win.setCursorsColor(cursorscolor)
+                    ##if isinstance(cursorscolor, QtGui.QColor) and cursorscolor.isValid():
+                        ##win.setCursorsColor(cursorscolor)
                 
-                #if self.qsettings.contains("%s_RoisColor" % winSettingsStrPrefix):
-                    #roiscolor = self.qsettings.value("%s_RoisColor" % winSettingsStrPrefix, None)
+                ##if self.qsettings.contains("%s_RoisColor" % winSettingsStrPrefix):
+                    ##roiscolor = self.qsettings.value("%s_RoisColor" % winSettingsStrPrefix, None)
                     
-                    #if isinstance(roiscolor, QtGui.QColor) and roiscolor.isValid():
-                        #win.setRoisColor(roiscolor)
+                    ##if isinstance(roiscolor, QtGui.QColor) and roiscolor.isValid():
+                        ##win.setRoisColor(roiscolor)
                 
-                #if self.qsettings.contains("%s_SharedCursorsColor" % winSettingsStrPrefix):
-                    #cursorscolor = self.qsettings.value("%s_SharedCursorsColor" % winSettingsStrPrefix, None)
+                ##if self.qsettings.contains("%s_SharedCursorsColor" % winSettingsStrPrefix):
+                    ##cursorscolor = self.qsettings.value("%s_SharedCursorsColor" % winSettingsStrPrefix, None)
                     
-                    #if isinstance(cursorscolor, QtGui.QColor) and cursorscolor.isValid():
-                        #win.setSharedCursorsColor(cursorscolor)
+                    ##if isinstance(cursorscolor, QtGui.QColor) and cursorscolor.isValid():
+                        ##win.setSharedCursorsColor(cursorscolor)
                 
-                #if self.qsettings.contains("%s_SharedRoisColor" % winSettingsStrPrefix):
-                    #roiscolor = self.qsettings.value("%s_SharedRoisColor" % winSettingsStrPrefix, None)
+                ##if self.qsettings.contains("%s_SharedRoisColor" % winSettingsStrPrefix):
+                    ##roiscolor = self.qsettings.value("%s_SharedRoisColor" % winSettingsStrPrefix, None)
                     
-                    #if isinstance(roiscolor, QtGui.QColor) and roiscolor.isValid():
-                        #win.setSharedRoisColor(roiscolor)
+                    ##if isinstance(roiscolor, QtGui.QColor) and roiscolor.isValid():
+                        ##win.setSharedRoisColor(roiscolor)
                 
-                #### END load window & viewer settings
+                ##### END load window & viewer settings
                         
-                self.scansviewers.append(win)
+                #self.scansviewers.append(win)
                 
-            else:
-                win = self.scansviewers[k]
-                win.unlinkFromViewers()
-                win.clear()
+            #else:
+                #win = self.scansviewers[k]
+                #win.unlinkFromViewers()
+                #win.clear()
                 
-            if win.framesSlider is not None:
-                win.framesSlider.setMaximum(self._data_.scansFrames)
+            #if win.framesSlider is not None:
+                #win.framesSlider.setMaximum(self._data_.scansFrames)
                 
-            if win.framesSpinner is not None:
-                win.framesSpinner.setMaximum(self._data_.scansFrames)
+            #if win.framesSpinner is not None:
+                #win.framesSpinner.setMaximum(self._data_.scansFrames)
                 
-            win.view(self._data_.scans[k], get_focus=False)
+            #win.view(self._data_.scans[k], get_focus=False)
             
-            win.setWindowTitle("Scans %s - %s" % (self._data_.scansChannelNames[k], self._data_var_name_))
+            #win.setWindowTitle("Scans %s - %s" % (self._data_.scansChannelNames[k], self._data_var_name_))
         
-    @safeWrapper
-    def _setup_ephys_viewer_(self):
-        """Sets up the viewer window for electrophysiology data section.
+    #@safeWrapper
+    #def _setup_ephys_viewer_(self):
+        #"""Sets up the viewer window for electrophysiology data section.
         
-        Ensures that there is at most one SignalViewer window for the
-        electrophysiology section in the data:
+        #Ensures that there is at most one SignalViewer window for the
+        #electrophysiology section in the data:
         
-        Creates a SignalViewer window if data.hasSignalData("ephys"); otherwise
-        it removes this window, if it exists.
+        #Creates a SignalViewer window if data.hasSignalData("ephys"); otherwise
+        #it removes this window, if it exists.
         
-        NOTE: this does NOT link frame navigation across viewers, although when
-        the viewer window is removed, its navigation links are also removed.
-        """
-        # NOTE: 2019-10-12 10:21:01
-        # only shown if len(data.electrophysiology.segments) > 0
+        #NOTE: this does NOT link frame navigation across viewers, although when
+        #the viewer window is removed, its navigation links are also removed.
+        #"""
+        ## NOTE: 2019-10-12 10:21:01
+        ## only shown if len(data.electrophysiology.segments) > 0
         
-        if self._data_.hasSignalData("ephys"):
-            if len(self.ephysviewers):
-                self.ephysviewers = self.ephysviewers[0:1] # make sure the list has only one
-                win = self.ephysviewers[0]
-                win.unlinkFromViewers()
-                win.clear()
+        #if self._data_.hasSignalData("ephys"):
+            #if len(self.ephysviewers):
+                #self.ephysviewers = self.ephysviewers[0:1] # make sure the list has only one
+                #win = self.ephysviewers[0]
+                #win.unlinkFromViewers()
+                #win.clear()
                 
-            else:
-                win = sv.SignalViewer(pWin = self._scipyenWindow_)#, asGUIClient=True)
-            
-                ##### BEGIN Load window and viewer settings
-                #winSettingsStrPrefix = "LSCaTAnalysis/EphysWindow_"
-                                            
-                #if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
-                    #windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
-                    #if windowSize is not None:
-                        #win.resize(windowSize)
-                    
-                #if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
-                    #windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
-                    #if windowPos is not None:
-                        #win.move(windowPos)
-                        
-                #if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
-                    #windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
-                    #if windowState is not None:
-                        #win.restoreState(windowState)
+            #else:
+                #win = sv.SignalViewer(pWin = self._scipyenWindow_)#, asGUIClient=True)
+                
+                #custom = dict()
                 
                 #for dw in win.dockWidgets:
-                    #dock_visible=False
-                    
-                    #dock_visibility = self.qsettings.value("LSCaTAnalysis/EphysWindow_%s" % dw[0], "false")
+                    #custom[dw[0]] = str(False).lower()
+                
+                #loadWindowSettings(self.qsettings, win, parent=self,
+                                   #prefix = "EphysWindow", custom = custom)
+                
+                
+                #for dw in win.dockWidgets:
+                    #dock_visibility = custom.get(dw[0], False)
                     
                     #if isinstance(dock_visibility, str):
                         #dock_visible = dock_visibility.lower().strip() == "true"
-                            
-                    #elif(isinstance(dock_visibility, bool)):
+                        
+                    #elif isinstance(dock_visibility, bool):
                         #dock_visible = dock_visibility
                         
+                    #else:
+                        #dock_visible = False
+                    
                     #if dock_visible:
                         #dw[1].setVisible(True)
                         #dw[1].show()
                                     
                     #else:
                         #dw[1].hide()
-                        
-                ##### END Load window and viewer settings
-                
-                self.ephysviewers.append(win)
-
-            if win.framesSlider is not None:
-                win.framesSlider.setMaximum(len(self._data_.electrophysiology.segments))
-                
-            if win.framesSpinner is not None:
-                win.framesSpinner.setMaximum(len(self._data_.electrophysiology.segments))
-                
-            win.view(self._data_.electrophysiology, get_focus=False)
             
-            win.setWindowTitle("Electrophysiology - %s" % self._data_var_name_)
+                #self.ephysviewers.append(win)
+                
+            #if win.framesSlider is not None:
+                #win.framesSlider.setMaximum(len(self._data_.electrophysiology.segments))
+                
+            #if win.framesSpinner is not None:
+                #win.framesSpinner.setMaximum(len(self._data_.electrophysiology.segments))
+                
+            #win.view(self._data_.electrophysiology, get_focus=False)
             
-        else:
-            for w in self.ephysviewers:
+            #win.setWindowTitle("Electrophysiology - %s" % self._data_var_name_)
+            
+        #else:
+            #for w in self.ephysviewers:
+                #w.unlinkFromViewers()
+                #w.clear()
+                #w.close()
+                
+            #self.ephysviewers.clear()
+            
+    @safeWrapper
+    def _setup_data_viewers_(self, section:str):
+        """Sets up the viewer(s) for a specific ScanData section
+        Parameters:
+        ==========
+        section a str, one of: 
+            "electrophysiology" "ephys", "scansProfiles", "sceneProfiles", 
+            "scansBlock", "sceneBlock", "scans", "scene"
+        """
+        
+        wname, viewers = self._get_viewers_for_data_section(section)
+        
+        if any((v is None for v in (wname, viewers))):
+            return
+        
+        prefix = "%s_Window" % wname.replace(" ", "_")
+        
+        data = getattr(self._data_, section, None)
+        
+        if data is None:
+            for w in viewers:
                 w.unlinkFromViewers()
                 w.clear()
                 w.close()
+            viewers.clear()
+            return
+        
+        if isinstance(viewers, list):
+            if section in ("scene", "scans"): # image viewers: one per channel
+                if isinstance(data, list):
+                    if len(viewers) > len(data):
+                        for w in viewers[len(data):]:
+                            w.unlinkFromViewers()
+                            w.close()
+                            
+                        viewers = viewers[0:len(data)]
+                        
+                    for k in range(len(data)):
+                        if k >= len(viewers):
+                            win = iv.ImageViewer(parent=self) # NOT toplevel hence won't load own QSettings
+                            win.signal_graphicsObjectAdded[object].connect(self.slot_graphics_object_added_in_window, type = QtCore.Qt.QueuedConnection)
+                            win.signal_graphicsObjectChanged[object].connect(self.slot_graphics_object_changed_in_window, type = QtCore.Qt.QueuedConnection)
+                            win.signal_graphicsObjectRemoved[object].connect(self.slot_graphics_object_removed_in_window, type = QtCore.Qt.QueuedConnection)
+                            win.signal_graphicsObjectSelected[object].connect(self.slot_graphics_object_selected_in_window, type = QtCore.Qt.QueuedConnection)
+                            win.signal_graphicsObjectDeselected.connect(self.slot_graphics_objects_deselected, type = QtCore.Qt.QueuedConnection)
+                            
+                            #### BEGIN load window & viewer settings
+                            custom = dict()
+                            custom["ColorMap"] = win.colorMap.name
+                            
+                            loadWindowSettings(self.qsettings, win, 
+                                               prefix = "%s_%d" % (prefix, k), custom=custom)
+                            
+                            cmapname = custom["ColorMap"]
+                            if isinstance(cmapname, str):
+                                win.colorMap = cmapname
+                            
+                                
+                            ## TODO/FIXME: 2021-07-08 10:30:10
+                            ## must check/revisit these below
+                            #if self.qsettings.contains("%s_CursorsColor" % winSettingsStrPrefix):
+                                #cursorscolor = self.qsettings.value("%s_CursorsColor" % winSettingsStrPrefix, None)
+                                
+                                #if isinstance(cursorscolor, QtGui.QColor) and cursorscolor.isValid():
+                                    #win.setCursorsColor(cursorscolor)
+                            
+                            #if self.qsettings.contains("%s_RoisColor" % winSettingsStrPrefix):
+                                #roiscolor = self.qsettings.value("%s_RoisColor" % winSettingsStrPrefix, None)
+                                
+                                #if isinstance(roiscolor, QtGui.QColor) and roiscolor.isValid():
+                                    #win.setRoisColor(roiscolor)
+                            
+                            #if self.qsettings.contains("%s_SharedCursorsColor" % winSettingsStrPrefix):
+                                #cursorscolor = self.qsettings.value("%s_SharedCursorsColor" % winSettingsStrPrefix, None)
+                                
+                                #if isinstance(cursorscolor, QtGui.QColor) and cursorscolor.isValid():
+                                    #win.setSharedCursorsColor(cursorscolor)
+                            
+                            #if self.qsettings.contains("%s_SharedRoisColor" % winSettingsStrPrefix):
+                                #roiscolor = self.qsettings.value("%s_SharedRoisColor" % winSettingsStrPrefix, None)
+                                
+                                #if isinstance(roiscolor, QtGui.QColor) and roiscolor.isValid():
+                                    #win.setSharedRoisColor(roiscolor)
+                            
+                            #### END load window & viewer settings
+                            
+                            viewers.append(win)
+                            
+                        else:
+                            win = viewers[k]
+                            win.unlinkFromViewers()
+                            win.clear()
+                            
+                        if win.framesSlider is not None:
+                            win.framesSlider.setMaximum(self._data_.scansFrames)
+                            
+                        if win.framesSpinner is not None:
+                            win.framesSpinner.setMaximum(self._data_.scansFrames)
+                            
+                        win.view(data[k], get_focus=False)
+                        
+                        win.setWindowTitle("%s %s - %s" % (wname, self._data_.scansChannelNames[k], self._data_var_name_))
+        
+                else:
+                    for w in viewers:
+                        w.unlinkFromViewers()
+                        w.clear()
+                        w.close()
+                    viewers.clear()
+                    
+            else:
+                if len(viewers):
+                    viewers = viewers[0:1]
+                    win = viewers[0]
+                    win.unlinkFromViewers()
+                    win.clear()
+                    
+                else:
+                    win = sv.SignalViewer(pWin = self._scipyenWindow_, parent=self)
+        
+                    custom = dict()
+                    
+                    for dw in win.dockWidgets:
+                        custom[dw[0]] = str(False).lower()
+                    
+                    loadWindowSettings(self.qsettings, win, 
+                                       prefix = prefix, custom = custom)
                 
-            self.ephysviewers.clear()
+                    for dw in win.dockWidgets:
+                        dock_visibility = custom[dw[0]]
+                        
+                        if isinstance(dock_visibility, str):
+                            dock_visible = dock_visibility.lower().strip() == "true"
+                            
+                        elif isinstance(dock_visibility, bool):
+                            dock_visible = dock_visibility
+                            
+                        else:
+                            dock_visible = False
+                        
+                        if dock_visible:
+                            dw[1].setVisible(True)
+                            dw[1].show()
+                                        
+                        else:
+                            dw[1].hide()
+                
+                    viewers.append(win)
+               
+                if win.framesSlider is not None:
+                    win.framesSlider.setMaximum(len(self._data_.electrophysiology.segments))
+                    
+                if win.framesSpinner is not None:
+                    win.framesSpinner.setMaximum(len(self._data_.electrophysiology.segments))
+                    
+                win.view(data, get_focus=False)
+                
+                win.setWindowTitle("%s - %s" % (wname, self._data_var_name_))
+                
+    @safeWrapper
+    def _get_viewers_for_data_section(self, section:str) -> typing.Tuple[str, list]:
+        """
+        Parameters:
+        ==========
+        section: str, one of: 
+            "electrophysiology" "ephys", "scansProfiles", "sceneProfiles", 
+            "scansBlock", "sceneBlock", "scans", "scene"
+        """
+            #"electrophysiology" "ephys", "scansProfiles", "sceneProfiles", 
+            #"scansBlock", "sceneBlock", "scans", "scene", "protocols"
+        #if not self._data_.hasImageData(section):
+            #if not self._data_.hasSignalData(section):
+                #return
+        
+        if section in ("electrophysiology", "ephys"):
+            return "Electrophysiology", self.ephysviewers
+        
+        elif section in ("scansBlock",):
+            return "Scan Data", self.scansblockviewers
            
-    @safeWrapper
-    def _setup_profile_viewer_(self):
-        """Sets up the viewer window for the scan region profile.
-        The scan region profile contains pixel intensity values along the
-        **contour** of the scan region, in the scene images.
+        elif section in ("sceneBlock",):
+            return "Scene Data", self.sceneblockviewers
         
-        Ensures that there is at most one SignalViewer window for the
-        scan region scene profile data section in self._data_
+        elif section in ("scansProfiles", "sceneProfiles"):
+            return "Scan Region Profile", self.profileviewers # same window for all profiles
+           
+        elif section in ("scene",):
+            return "Scene", self.sceneviewers
+           
+        elif section in ("scans",):
+            return "Scans", self.scansviewers
         
-        Creates a SignalViewer window if data.hasSignalData("scene_profiles"); 
-        otherwise it removes this window, if it exists.
+        return (None, None)
         
-        NOTE: this does NOT link frame navigation across viewers, although when
-        the viewer window is removed, its navigation links are also removed.
+    #@safeWrapper
+    #def _setup_profile_viewer_(self):
+        #"""Sets up the viewer window for the scan region profile.
+        #The scan region profile contains pixel intensity values along the
+        #**contour** of the scan region, in the scene images.
         
-        TODO/FIXME 2019-10-12 13:16:25
-        Should also check for scanRegionScansProfiles, but better still
-        change the ScanData API so that we end up with only one neo.Block, 
-        containing pixel intensity profiles on the scan region contour, in BOTH
-        scene and scan data.
-        But NOTE:CAUTION 2019-10-12 13:17:52
-            This is bound to be tricky, as the pixel intensity curves in the scene 
-            data section are almost guaranteed to have diferent domains and/or 
-            length, from those in the scans data section.
-        """
-        # NOTE: 2019-10-12 10:24:14
-        # only shown if len(data.scanRegionSceneProfiles.segments) > 0
+        #Ensures that there is at most one SignalViewer window for the
+        #scan region scene profile data section in self._data_
         
-        # TODO/FIXME: combine viewing of scanRegionScansProfiles and 
-        # scanRegionSceneProfiles;
-        # currently only using scanRegionSceneProfiles
-        if not isinstance(self._data_, ScanData):
-            return
+        #Creates a SignalViewer window if data.hasSignalData("sceneProfiles"); 
+        #otherwise it removes this window, if it exists.
         
-        if self.showScanlineCheckBox.checkState() != QtCore.Qt.Checked:
-            return
+        #NOTE: this does NOT link frame navigation across viewers, although when
+        #the viewer window is removed, its navigation links are also removed.
         
-        if not self._data_.hasSignalData("scene_profiles"):
-            self.generateScanRegionProfilesFromScene()
+        #TODO/FIXME 2019-10-12 13:16:25
+        #Should also check for scanRegionScansProfiles, but better still
+        #change the ScanData API so that we end up with only one neo.Block, 
+        #containing pixel intensity profiles on the scan region contour, in BOTH
+        #scene and scan data.
+        #But NOTE:CAUTION 2019-10-12 13:17:52
+            #This is bound to be tricky, as the pixel intensity curves in the scene 
+            #data section are almost guaranteed to have diferent domains and/or 
+            #length, from those in the scans data section.
+        #"""
+        ## NOTE: 2019-10-12 10:24:14
+        ## only shown if len(data.scanRegionSceneProfiles.segments) > 0
+        
+        ## TODO/FIXME: combine viewing of scanRegionScansProfiles and 
+        ## scanRegionSceneProfiles;
+        ## currently only using scanRegionSceneProfiles
+        #if not isinstance(self._data_, ScanData):
+            #return
+        
+        #if self.showScanlineCheckBox.checkState() != QtCore.Qt.Checked:
+            #return
+        
+        #if not self._data_.hasSignalData("sceneProfiles"):
+            #self.generateScanRegionProfilesFromScene()
             
-        if self._data_.hasSignalData("scene_profiles"):
-            if len(self.profileviewers):
-                self.profileviewers = self.profileviewers[0:1] # make sure the list has only one
+        #if self._data_.hasSignalData("sceneProfiles"):
+            #if len(self.profileviewers):
+                #self.profileviewers = self.profileviewers[0:1] # make sure the list has only one
                 
-                win = self.profileviewers[0]
-                win.unlinkFromViewers()
-                win.clear()
+                #win = self.profileviewers[0]
+                #win.unlinkFromViewers()
+                #win.clear()
                 
-            else:
-                win = sv.SignalViewer(pWin = self._scipyenWindow_)#, asGUIClient=True)
+            #else:
+                #win = sv.SignalViewer(pWin = self._scipyenWindow_)#, asGUIClient=True)
             
-                ##### BEGIN Load window and viewer settings
-                #winSettingsStrPrefix = "LSCaTAnalysis/ProfileWindow_"
+                #custom = dict()
+                
+                #for dw in win.dockWidgets:
+                    #custom[dw[0]] = str(False).lower()
+                
+                #loadWindowSettings(self.qsettings, win, parent=self,
+                                   #prefix = "EphysWindow", custom = custom)
+                
+                
+                #for dw in win.dockWidgets:
+                    #dock_visibility = custom[dw[0]]
+                    
+                    #if isinstance(dock_visibility, str):
+                        #dock_visible = dock_visibility.lower().strip() == "true"
+                        
+                    #elif isinstance(dock_visibility, bool):
+                        #dock_visible = dock_visibility
+                        
+                    #else:
+                        #dock_visible = False
+                    
+                    #if dock_visible:
+                        #dw[1].setVisible(True)
+                        #dw[1].show()
+                                    
+                    #else:
+                        #dw[1].hide()
+            
+                #self.profileviewers.append(win)
+                
+            #if win.framesSlider is not None:
+                #win.framesSlider.setMaximum(len(self._data_.scanRegionSceneProfiles.segments))
+                
+            #if win.framesSpinner is not None:
+                #win.framesSpinner.setMaximum(len(self._data_.scanRegionSceneProfiles.segments))
+                
+            #win.view(self._data_.scanRegionSceneProfiles, get_focus=False)
+            
+            #win.setWindowTitle("Scan Region Profile - %s" % self._data_var_name_)
+            
+        #else:
+            #for w in self.profileviewers:
+                #w.unlinkFromViewers()
+                #w.clear()
+                #w.close()
+                
+            #self.profileviewers.clear()
+            
+    #@safeWrapper
+    #def _setup_scans_block_viewer_(self):
+        #"""Sets up the viewer window for the scan data signals.
+        #Scan data signals are vectors containing values derived from scans image 
+        #pixel along a specific axis, typically in a subregion (ROI) of the scans 
+        #image.
+        
+        #A typical example is a Ca fluorescence intensity signal in a linescan 
+        #experiment: the ROI is defined in the space axis, whereas the signal
+        #is defined in the time axis of the image, with each data sample in the
+        #signal being calculated as the sum of pixel intensities across the space
+        #axis, within the ROI boundaries.
+        
+        #Ensures that there is at most one SignalViewer window for the scan data 
+        #signals.
+        
+        #Creates a SignalViewer window if data.hasSignalData("scansBlock"); 
+        #otherwise it removes this window, if it exists.
+        
+        #NOTE: this does NOT link frame navigation across viewers, although when
+        #the viewer window is removed, its navigation links are also removed.
+        #"""
+        ## NOTE: 2019-10-12 10:25:37
+        ## only shown if len(data.scansBlock.segments) > 0
+        
+        #if self._data_.hasSignalData("scansBlock"):
+            #if len(self.scansblockviewers):
+                #self.scansblockviewers = self.scansblockviewers[0:1] # make sure the list has only one
+                
+                #win = self.scansblockviewers[0]
+                #win.unlinkFromViewers()
+                
+            #else:
+                #win = sv.SignalViewer(pWin = self._scipyenWindow_)#, asGUIClient=True)
+            
+                ###### BEGIN Load window and viewer settings
+                ##winSettingsStrPrefix = "LSCaTAnalysis/ScansDataWindow_"
                                             
-                #if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
-                    #windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
-                    #if windowSize is not None:
-                        #win.resize(windowSize)
+                ##if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
+                    ##windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
+                    ##if windowSize is not None:
+                        ##win.resize(windowSize)
                     
-                #if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
-                    #windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
-                    #if windowPos is not None:
-                        #win.move(windowPos)
+                ##if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
+                    ##windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
+                    ##if windowPos is not None:
+                        ##win.move(windowPos)
                         
-                #if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
-                    #windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
-                    #if windowState is not None:
-                        #win.restoreState(windowState)
+                ##if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
+                    ##windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
+                    ##if windowState is not None:
+                        ##win.restoreState(windowState)
                 
-                #for dw in win.dockWidgets:
-                    #dock_visible=False
+                ##for dw in win.dockWidgets:
+                    ##dock_visible=False
                     
-                    #dock_visibility = self.qsettings.value("LSCaTAnalysis/ProfileWindow_%s" % dw[0], "false")
+                    ##dock_visibility = self.qsettings.value("LSCaTAnalysis/ScansDataWindow_%s" % dw[0], "false")
                     
-                    #if isinstance(dock_visibility, str):
-                        #dock_visible = dock_visibility.lower().strip() == "true"
+                    ##if isinstance(dock_visibility, str):
+                        ##dock_visible = dock_visibility.lower().strip() == "true"
                             
-                    #elif(isinstance(dock_visibility, bool)):
-                        #dock_visible = dock_visibility
+                    ##elif(isinstance(dock_visibility, bool)):
+                        ##dock_visible = dock_visibility
                         
-                    #if dock_visible:
-                        #dw[1].setVisible(True)
-                        #dw[1].show()
+                    ##if dock_visible:
+                        ##dw[1].setVisible(True)
+                        ##dw[1].show()
                                     
-                    #else:
-                        #dw[1].hide()
+                    ##else:
+                        ##dw[1].hide()
                         
-                ##### END Load window and viewer settings
+                ###### END Load window and viewer settings
                 
-                self.profileviewers.append(win)
+                #self.scansblockviewers.append(win)
                 
-            if win.framesSlider is not None:
-                win.framesSlider.setMaximum(len(self._data_.scanRegionSceneProfiles.segments))
+            #if win.framesSlider is not None:
+                #win.framesSlider.setMaximum(len(self._data_.scansBlock.segments))
                 
-            if win.framesSpinner is not None:
-                win.framesSpinner.setMaximum(len(self._data_.scanRegionSceneProfiles.segments))
+            #if win.framesSpinner is not None:
+                #win.framesSpinner.setMaximum(len(self._data_.scansBlock.segments))
                 
-            win.view(self._data_.scanRegionSceneProfiles, get_focus=False)
+            #win.view(self._data_.scansBlock, get_focus=False)
             
-            win.setWindowTitle("Scan Region Profile - %s" % self._data_var_name_)
+            #win.setWindowTitle("Scan Data - %s" % self._data_var_name_)
             
-        else:
-            for w in self.profileviewers:
-                w.unlinkFromViewers()
-                w.clear()
-                w.close()
+        #else:
+            #for w in self.scansblockviewers:
+                #w.unlinkFromViewers()
+                #w.clear()
+                #w.close()
                 
-            self.profileviewers.clear()
+            #self.scansblockviewers.clear()
             
-    @safeWrapper
-    def _setup_scans_block_viewer_(self):
-        """Sets up the viewer window for the scan data signals.
-        Scan data signals are vectors containing values derived from scans image 
-        pixel along a specific axis, typically in a subregion (ROI) of the scans 
-        image.
+    #@safeWrapper
+    #def _setup_scene_block_viewer_(self):
+        #"""Sets up the viewer window for scene data section.
         
-        A typical example is a Ca fluorescence intensity signal in a linescan 
-        experiment: the ROI is defined in the space axis, whereas the signal
-        is defined in the time axis of the image, with each data sample in the
-        signal being calculated as the sum of pixel intensities across the space
-        axis, within the ROI boundaries.
+        #Does the same thing as _setup_scans_block_viewer_()
+        #See self._setup_scans_block_viewer_() documentation for details.
+        #"""
+        ## NOTE: 2019-10-12 10:29:49
+        ## only shown if len(data.sceneBlock.segments) > 0
         
-        Ensures that there is at most one SignalViewer window for the scan data 
-        signals.
-        
-        Creates a SignalViewer window if data.hasSignalData("scans_data"); 
-        otherwise it removes this window, if it exists.
-        
-        NOTE: this does NOT link frame navigation across viewers, although when
-        the viewer window is removed, its navigation links are also removed.
-        """
-        # NOTE: 2019-10-12 10:25:37
-        # only shown if len(data.scansBlock.segments) > 0
-        
-        if self._data_.hasSignalData("scans_data"):
-            if len(self.scansblockviewers):
-                self.scansblockviewers = self.scansblockviewers[0:1] # make sure the list has only one
+        #if self._data_.hasSignalData("sceneBlock"):
+            #if len(self.sceneblockviewers):
+                #self.sceneblockviewers = self.sceneblockviewers[0:1] # make sure the list has only one
                 
-                win = self.scansblockviewers[0]
-                win.unlinkFromViewers()
+                #win = self.sceneblockviewers[0]
                 
-            else:
-                win = sv.SignalViewer(pWin = self._scipyenWindow_)#, asGUIClient=True)
-            
-                ##### BEGIN Load window and viewer settings
-                #winSettingsStrPrefix = "LSCaTAnalysis/ScansDataWindow_"
-                                            
-                #if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
-                    #windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
-                    #if windowSize is not None:
-                        #win.resize(windowSize)
+            #else:
+                #win = sv.SignalViewer(pWin = self._scipyenWindow_)#, asGUIClient=True)
+                
+                ###### BEGIN Load window & viewer settings
+                ##winSettingsStrPrefix = "LSCaTAnalysis/SceneDataWindow_"
+                
+                ##if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
+                    ##windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
+                    ##if windowSize is not None:
+                        ##win.resize(windowSize)
                     
-                #if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
-                    #windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
-                    #if windowPos is not None:
-                        #win.move(windowPos)
+                ##if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
+                    ##windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
+                    ##if windowPos is not None:
+                        ##win.move(windowPos)
                         
-                #if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
-                    #windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
-                    #if windowState is not None:
-                        #win.restoreState(windowState)
-                
-                #for dw in win.dockWidgets:
-                    #dock_visible=False
+                ##if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
+                    ##windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
+                    ##if windowState is not None:
+                        ##win.restoreState(windowState)
+                        
+                ##for dw in win.dockWidgets:
+                    ##dock_visible=False
                     
-                    #dock_visibility = self.qsettings.value("LSCaTAnalysis/ScansDataWindow_%s" % dw[0], "false")
+                    ##dock_visibility = self.qsettings.value("LSCaTAnalysis/SceneDataWindow_%s" % dw[0], "false")
                     
-                    #if isinstance(dock_visibility, str):
-                        #dock_visible = dock_visibility.lower().strip() == "true"
+                    ##if isinstance(dock_visibility, str):
+                        ##dock_visible = dock_visibility.lower().strip() == "true"
                             
-                    #elif(isinstance(dock_visibility, bool)):
-                        #dock_visible = dock_visibility
+                    ##elif(isinstance(dock_visibility, bool)):
+                        ##dock_visible = dock_visibility
                         
-                    #if dock_visible:
-                        #dw[1].setVisible(True)
-                        #dw[1].show()
+                    ##if dock_visible:
+                        ##dw[1].setVisible(True)
+                        ##dw[1].show()
                                     
-                    #else:
-                        #dw[1].hide()
+                    ##else:
+                        ##dw[1].hide()
                         
-                ##### END Load window and viewer settings
+                ###### END Load window & viewer settings
                 
-                self.scansblockviewers.append(win)
+                #self.sceneblockviewers.append(win)
                 
-            if win.framesSlider is not None:
-                win.framesSlider.setMaximum(len(self._data_.scansBlock.segments))
+            #if win.framesSlider is not None:
+                #win.framesSlider.setMaximum(len(self._data_.sceneBlock.segments))
                 
-            if win.framesSpinner is not None:
-                win.framesSpinner.setMaximum(len(self._data_.scansBlock.segments))
+            #if win.framesSpinner is not None:
+                #win.framesSpinner.setMaximum(len(self._data_.sceneBlock.segments))
                 
-            win.view(self._data_.scansBlock, get_focus=False)
+            #win.view(self._data_.sceneBlock, get_focus=False)
             
-            win.setWindowTitle("Scan Data - %s" % self._data_var_name_)
+            #win.setWindowTitle("Scene Data - %s" % self._data_var_name_)
             
-        else:
-            for w in self.scansblockviewers:
-                w.unlinkFromViewers()
-                w.clear()
-                w.close()
+        #else:
+            #for w in self.sceneblockviewers:
+                #w.unlinkFromViewers()
+                #w.clear()
+                #w.close()
                 
-            self.scansblockviewers.clear()
-            
-    @safeWrapper
-    def _setup_scene_block_viewer_(self):
-        """Sets up the viewer window for scene data section.
-        
-        Does the same thing as _setup_scans_block_viewer_()
-        See self._setup_scans_block_viewer_() documentation for details.
-        """
-        # NOTE: 2019-10-12 10:29:49
-        # only shown if len(data.sceneBlock.segments) > 0
-        
-        if self._data_.hasSignalData("scene_data"):
-            if len(self.sceneblockviewers):
-                self.sceneblockviewers = self.sceneblockviewers[0:1] # make sure the list has only one
-                
-                win = self.sceneblockviewers[0]
-                
-            else:
-                win = sv.SignalViewer(pWin = self._scipyenWindow_)#, asGUIClient=True)
-                
-                ##### BEGIN Load window & viewer settings
-                #winSettingsStrPrefix = "LSCaTAnalysis/SceneDataWindow_"
-                
-                #if self.qsettings.contains("%s_Size" % winSettingsStrPrefix):
-                    #windowSize = self.qsettings.value("%s_Size" % winSettingsStrPrefix, None)
-                    #if windowSize is not None:
-                        #win.resize(windowSize)
-                    
-                #if self.qsettings.contains("%s_Position" %  winSettingsStrPrefix):
-                    #windowPos = self.qsettings.value("%s_Position" %  winSettingsStrPrefix, None)
-                    #if windowPos is not None:
-                        #win.move(windowPos)
-                        
-                #if self.qsettings.contains("%s_State" % winSettingsStrPrefix):
-                    #windowState = self.qsettings.value("%s_State" % winSettingsStrPrefix, None)
-                    #if windowState is not None:
-                        #win.restoreState(windowState)
-                        
-                #for dw in win.dockWidgets:
-                    #dock_visible=False
-                    
-                    #dock_visibility = self.qsettings.value("LSCaTAnalysis/SceneDataWindow_%s" % dw[0], "false")
-                    
-                    #if isinstance(dock_visibility, str):
-                        #dock_visible = dock_visibility.lower().strip() == "true"
-                            
-                    #elif(isinstance(dock_visibility, bool)):
-                        #dock_visible = dock_visibility
-                        
-                    #if dock_visible:
-                        #dw[1].setVisible(True)
-                        #dw[1].show()
-                                    
-                    #else:
-                        #dw[1].hide()
-                        
-                ##### END Load window & viewer settings
-                
-                self.sceneblockviewers.append(win)
-                
-            if win.framesSlider is not None:
-                win.framesSlider.setMaximum(len(self._data_.sceneBlock.segments))
-                
-            if win.framesSpinner is not None:
-                win.framesSpinner.setMaximum(len(self._data_.sceneBlock.segments))
-                
-            win.view(self._data_.sceneBlock, get_focus=False)
-            
-            win.setWindowTitle("Scene Data - %s" % self._data_var_name_)
-            
-        else:
-            for w in self.sceneblockviewers:
-                w.unlinkFromViewers()
-                w.clear()
-                w.close()
-                
-            self.sceneblockviewers.clear()
+            #self.sceneblockviewers.clear()
             
     @safeWrapper
     def _setup_viewers_(self):
@@ -10510,12 +10708,19 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
         self.unlinkFromViewers()
         
-        self._setup_scene_viewers_()
-        self._setup_scans_viewers_()
-        self._setup_ephys_viewer_()
-        self._setup_profile_viewer_()
-        self._setup_scans_block_viewer_()
-        self._setup_scene_block_viewer_()
+        self._setup_data_viewers_("scene")
+        self._setup_data_viewers_("scans")
+        self._setup_data_viewers_("ephys")
+        self._setup_data_viewers_("scansProfiles")
+        self._setup_data_viewers_("scansBlock")
+        self._setup_data_viewers_("sceneBlock")
+        
+        #self._setup_scene_viewers_()
+        #self._setup_scans_viewers_()
+        #self._setup_ephys_viewer_()
+        #self._setup_profile_viewer_()
+        #self._setup_scans_block_viewer_()
+        #self._setup_scene_block_viewer_()
         
         allviewers = [self] + self.sceneviewers + self.scansviewers + self.ephysviewers + self.profileviewers + self.scansblockviewers + self.sceneblockviewers
         
@@ -10621,14 +10826,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
             return
         
         # NOTE: there is only ONE scan profiles window!!!
-        scene_profiles = None
-        scans_profiles = None
+        sceneProfiles = None
+        scansProfiles = None
         
         if all([len(s.analogsignals) for s in self._data_.scanRegionSceneProfiles.segments]):
-            scene_profiles  = self._data_.scanRegionSceneProfiles
+            sceneProfiles  = self._data_.scanRegionSceneProfiles
             
         if all([len(s.analogsignals) for s in self._data_.scanRegionScansProfiles.segments]):
-            scans_profiles  = self._data_.scanRegionScansProfiles
+            scansProfiles  = self._data_.scanRegionScansProfiles
         
         # NOTE: avoid overlays until we have written a suitable code for overlaying 
         # neo objects onto neo objects of compatible shape, in SignalViewer
@@ -10654,13 +10859,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 if windowState is not None:
                     win.restoreState(windowState)
                                     
-        if scans_profiles is not None and len(scans_profiles.segments) > 0:
-            if all([len(s.analogsignals) for s in scans_profiles.segments]):
-                self.profileviewers[0].view(scans_profiles)
+        if scansProfiles is not None and len(scansProfiles.segments) > 0:
+            if all([len(s.analogsignals) for s in scansProfiles.segments]):
+                self.profileviewers[0].view(scansProfiles)
             
-        elif scene_profiles is not None and len(scene_profiles.segments) > 0:
-            if all([len(s.analogsignals) for s in scene_profiles.segments]):
-                self.profileviewers[0].view(scene_profiles)
+        elif sceneProfiles is not None and len(sceneProfiles.segments) > 0:
+            if all([len(s.analogsignals) for s in sceneProfiles.segments]):
+                self.profileviewers[0].view(sceneProfiles)
                 
         else:
             return
