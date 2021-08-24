@@ -3,6 +3,7 @@
 """
 import typing, warnings
 from abc import (ABC, ABCMeta, abstractmethod,)
+from traitlets import Bunch
 #from abc import (abstractmethod,)
 
 from PyQt5 import (QtCore, QtWidgets, QtGui,)
@@ -155,6 +156,9 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """
         super().__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=parent)
+        
+        self._qtconfigurables = Bunch()
+        self._configurables = Bunch()
         
         self._docTitle_ = None
         self._winTitle_ = None # force auto-set in update_title()
@@ -340,11 +344,20 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         The configuration file is determined at application (Scipyen) level.
         See also QtCore.QSettings()
+        
+        NOTE: This function only executes when this ScipyenViewer is a 'top level'
+        window (i.e. it is NOT a child of a Scipeyn 'app')
+        
+        To save the settings for a child ScipyenViewer window (i.e. managed by a
+        Scipyen 'app') use workspacegui.saveWindowSettings() directly.
+        
+        The same principle holds for loadWindowSettings()
+        
         """
         #print("ScipyenViewer[%s].saveWindowSettings for %s top level:%s" % (self.__class__.__name__, self.winTitle, self.isTopLevel))
         #if self.isVisible(): # isTopLevel inherited from WorkspaceGuiMixin
         if self.isTopLevel and self.isVisible(): # isTopLevel inherited from WorkspaceGuiMixin
-            saveWindowSettings(self.qsettings, self)#, parent=self.parent()) # module-level function in workspacegui
+            saveWindowSettings(self.qsettings, self)
             
     #@abstractmethod
     def saveViewerSettings(self):
@@ -548,6 +561,14 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             raise TypeError("Expecting a str, or None; got %s instead" % type(value.__name__))
         
         self.update_title(win_title = value, enforce=True)
+        
+    @property
+    def qtconfigurables(self):
+        return self._qtconfigurables
+    
+    @property
+    def configurables(self):
+        return self._configurables
             
     @property
     def docTitle(self):

@@ -157,7 +157,7 @@ from ephys.ephys import (cursors2epoch, )
 from . import pictgui as pgui
 from . import quickdialog as qd
 #from .pictgui import GraphicsObjectType, GraphicsObject, PathElements, Tier2PathElements, SignalCursor, Path, Start, Move, Line, Cubic, Rect, Ellipse, Quad, Arc, ArcMove
-from .scipyenviewer import (ScipyenViewer, ScipyenFrameViewer,)
+from .scipyenviewer import (ScipyenViewer, ScipyenFrameViewer,Bunch)
 from .dictviewer import (InteractiveTreeWidget, DataViewer,)
 from .cursors import SignalCursor
 #### END pict.gui modules
@@ -388,6 +388,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """SignalViewer constructor.
         """
         super(QMainWindow, self).__init__(parent)
+        
         if y is None:
             if x is not None:  # only the data variable Y is passed, 
                 y = x
@@ -576,9 +577,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                    "vertical":pg.mkColor(self.cursorColors["vertical"]).darker()}
         #### END generic plot options
         
+        # ScipyenFrameViewer initialization - also calls self._configureUI_()
         super().__init__(data=y, parent=parent, ID=ID,
                          win_title=win_title, doc_title=doc_title,
                          frameIndex=frameIndex, *args, **kwargs)
+        
+        #self._qtconfigurables.visibleDocks = Bunch()
         
         #self.loadSettings() # now called by ScipyenViewer.__init__()
 
@@ -622,8 +626,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.qsettings.setValue("/".join([self.__class__.__name__, "CursorsShowValue"]), 
                                    self.setCursorsShowValue.isChecked())
             
-            for dw in self.dockWidgets:
-                self.qsettings.setValue("/".join([self.__class__.__name__, dw[0]]), dw[1].isVisible())
+            #for dw in self.dockWidgets:
+                #self.qsettings.setValue("/".join([self.__class__.__name__, dw[0]]), dw[1].isVisible())
                 
     def loadViewerSettings(self):
         if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
@@ -639,30 +643,31 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 cursors_show_value = False
                 
             self.setCursorsShowValue.setChecked(cursors_show_value)
-            for dw in self.dockWidgets:
-                dock_visible=False
+            #for dn, dw in self.dockWidgets.items():
+                #dock_visible=False
                 
-                dock_visibility = self.qsettings.value("/".join([self.__class__.__name__, dw[0]]), "false")
+                #dock_visibility = self.qsettings.value("/".join([self.__class__.__name__, dn]), "false")
                 
-                if isinstance(dock_visibility, str):
-                    dock_visible = dock_visibility.lower().strip() == "true"
+                #if isinstance(dock_visibility, str):
+                    #dock_visible = dock_visibility.lower().strip() == "true"
                         
-                elif(isinstance(dock_visibility, bool)):
-                    dock_visible = dock_visibility
+                #elif(isinstance(dock_visibility, bool)):
+                    #dock_visible = dock_visibility
                     
-                else:
-                    dock_visible = True
+                #else:
+                    #dock_visible = True
                     
-                if dock_visible:
-                    dw[1].setVisible(True)
-                    dw[1].show()
+                #if dock_visible:
+                    #dw.setVisible(True)
+                    #dw.show()
                                 
-                else:
-                    dw[1].hide()
+                #else:
+                    #dw.hide()
                 
     @property
     def dockWidgets(self):
-        return [(name, win) for name, win in self.__dict__.items() if isinstance(win, QtWidgets.QDockWidget)]
+        return dict(((name, w) for name, w in self.__dict__.items() if isinstance(w, QtWidgets.QDockWidget)))
+        #return [(name, win) for name, win in self.__dict__.items() if isinstance(win, QtWidgets.QDockWidget)]
                 
     def _update_annotations_(self, data=None):
         self.dataAnnotations.clear()
@@ -957,7 +962,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.annotationsDockWidget.setWidget(self.annotationsViewer)
         
-        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.annotationsDockWidget)
+        #self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.annotationsDockWidget)
         
         #print("_configureUI_ sets up annotations dock widget action")
         #### END set up annotations dock widget
@@ -999,17 +1004,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #self.showCoordinatesDockWidgetAction.triggered[bool].connect(self.slot_displayDockWidget)
         self.showCoordinatesDockWidgetAction.triggered.connect(self.slot_showCoordinatesDock)
         
-        #self._show_dock_actions_[self.coordinatesDockWidget.objectName()] = self.showCoordinatesDockWidgetAction
-        #for action in self._show_dock_actions_.values():
-            #self.docksMenu.addAction(action)
-            ##action.toggled[bool].connect(self.slot_displayDockWidget)
-        
-        ##print("_configureUI_ adds dock widget actions menu to the menu bar")
         self.menubar.addMenu(self.docksMenu)
-        ##print("_configureUI_ widget actions menu added to the menu bar")
         
         self.actionDetect_Triggers.triggered.connect(self.slot_detectTriggers)
         self.actionDetect_Triggers.setEnabled(False)
+        
+        self._qtconfigurables.visibleDocks = Bunch(((n, w.isVisible()) for n, w in self.dockWidgets.items()))
+        
         
     def addCursors(self, cursorType="c", *where, **kwargs):
         """Manually adds a set of cursors to the selected axes in the SignalViewer window.

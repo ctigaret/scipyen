@@ -353,6 +353,9 @@ def saveWindowSettings(qsettings:QtCore.QSettings,
     else:
         ename=""
         
+        
+    
+        
     #print("\nworkspacegui.saveWindowSettings viewer %s BEGIN" % win.__class__)
     #print("\tgroup name", gname)
     #print("\tpfx", pfx)
@@ -367,8 +370,13 @@ def saveWindowSettings(qsettings:QtCore.QSettings,
     if hasattr(win, "saveState"):
         settings["%sWindowState" % ename] = win.saveState()
         
+    qtconfigs = dict()
+    if hasattr(win, "qtconfigurables"):
+        qtconfigs.update(dict((x, getattr(win,x, None)) for x in getattr(win, "qtconfigurables")))
+        
+    settings.update(qtconfigs)
+    
     custom_settings = dict((("%s%s" % (ename,k), v) for k,v in kwargs.items() if isinstance(k, str) and len(k.strip())))
-
     settings.update(custom_settings)
     
     #print("settings to save")
@@ -530,6 +538,12 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
     if hasattr(win, "saveState"):
         settings["%sWindowState" % ename] = win.saveState()
         
+    qtconfigs = dict()
+    if hasattr(win, "qtconfigurables"):
+        qtconfigs.update(dict((x, getattr(win,x, None)) for x in getattr(win, "qtconfigurables")))
+        
+    settings.update(qtconfigs)
+    
     if isinstance(custom, dict):
         custom_settings = dict((("%s%s" % (ename,k), v) for k,v in custom.items() if isinstance(k, str) and len(k.strip()) ))
 

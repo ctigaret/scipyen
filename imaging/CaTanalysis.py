@@ -10358,14 +10358,20 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
                     custom = dict()
                     
-                    for dw in win.dockWidgets:
-                        custom[dw[0]] = str(False).lower()
+                    if hasattr(win, "configurables"):
+                        custom.update(win.configurables.get("visibleDocks"), dict())
+                    
+                    for dn,dw in win.dockWidgets.items():
+                        if dn in custom:
+                            custom[dn] = str(custom[dn]).lower()
+                        else:
+                            custom[dn] = str(False).lower()
                     
                     loadWindowSettings(self.qsettings, win, 
                                        prefix = prefix, custom = custom)
                 
-                    for dw in win.dockWidgets:
-                        dock_visibility = custom[dw[0]]
+                    for dn,dw in win.dockWidgets.items():
+                        dock_visibility = custom[dn]
                         
                         if isinstance(dock_visibility, str):
                             dock_visible = dock_visibility.lower().strip() == "true"
@@ -10377,11 +10383,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                             dock_visible = False
                         
                         if dock_visible:
-                            dw[1].setVisible(True)
-                            dw[1].show()
+                            dw.setVisible(True)
+                            dw.show()
                                         
                         else:
-                            dw[1].hide()
+                            dw.hide()
                 
                     viewers.append(win)
                
@@ -13116,98 +13122,49 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         try: 
             #print("%s.closeEvent %s Closing client windows" % (self.__class__.__name__, self.winTitle))
             if len(self.sceneviewers) > 0:
-                key = list()
-                for win in self.sceneviewers:
-                    #for wname, w in iter(self._scipyenWindow_.workspace.items()):
-                    for wname, w in iter(self.appWindow.workspace.items()):
-                        if win.__class__ == w.__class__ and win == w:
-                            key.append(wname)
-                            
+                for k, win in enumerate(self.sceneviewers):
+                    saveWindowSettings(qsettings, win, 
+                                       prefix = "%s_%d" % (win.__class__.__name__, k))
                     win.close()
-                    
-                for k in key:
-                    self.appWindow.workspace.pop(k, None)
-                    #self._scipyenWindow_.workspace.pop(k, None)
-                    
             self.sceneviewers.clear()
                         
             if len(self.scansviewers) > 0:
-                key = list()
-                for win in self.scansviewers:
-                    #for kv in iter(self._scipyenWindow_.workspace.items()):
-                    for kv in iter(self.appWindow.workspace.items()):
-                        if win.__class__ == kv[1].__class__ and win == kv[1]:
-                            key.append(kv[0])
-                        
+                for k, win in enumerate(self.scansviewers):
+                    saveWindowSettings(qsettings, win, 
+                                       prefix = "%s_%d" % (win.__class__.__name__, k))
                     win.close()
-                    
-                for k in key:
-                    self.appWindow.workspace.pop(k, None)
-                    #self._scipyenWindow_.workspace.pop(k, None)
-                    
             self.scansviewers.clear()
                         
             if len(self.profileviewers) > 0:
-                key = list()
                 for win in self.profileviewers:
-                    #for kv in iter(self._scipyenWindow_.workspace.items()):
-                    for kv in iter(self.appWindow.workspace.items()):
-                        if win.__class__ == kv[1].__class__ and win == kv[1]:
-                            key.append(kv[0])
+                    saveWindowSettings(qsettings, win, 
+                                       prefix = "%s" % win.__class__.__name__)
                     win.close()
-
-                for k in key:
-                    self.appWindow.workspace.pop(k, None)
-                    #self._scipyenWindow_.workspace.pop(k, None)
-                    
             self.profileviewers.clear()
             
             if len(self.ephysviewers):
-                key = list()
                 for win in self.ephysviewers:
-                    #for kv in iter(self._scipyenWindow_.workspace.items()):
-                    for kv in iter(self.appWindow.workspace.items()):
-                        if win.__class__ == kv[1].__class__ and win == kv[1]:
-                            key.append(kv[0])
-                            
+                    saveWindowSettings(qsettings, win, 
+                                       prefix = "%s" % win.__class__.__name__)
                     win.close()
-                    
-                for k in key:
-                    self.appWindow.workspace.pop(k, None)
-                    #self._scipyenWindow_.workspace.pop(k, None)
-                    
             self.ephysviewers.clear()
                     
             if len(self.scansblockviewers):
-                key = list()
                 for win in self.scansblockviewers:
-                    for kv in iter(self._scipyenWindow_.workspace.items()):
-                        if win.__class__ == kv[1].__class__ and win == kv[1]:
-                            key.append(kv[0])
-                            
+                    saveWindowSettings(qsettings, win, 
+                                       prefix = "%s" % win.__class__.__name__)
                     win.close()
-                    
-                for k in key:
-                    self._scipyenWindow_.workspace.pop(k, None)
-                    
             self.scansblockviewers.clear()
                     
             if len(self.sceneblockviewers):
-                key = list()
                 for win in self.sceneblockviewers:
-                    #for kv in iter(self._scipyenWindow_.workspace.items()):
-                    for kv in iter(self.appWindow.workspace.items()):
-                        if win.__class__ == kv[1].__class__ and win == kv[1]:
-                            key.append(kv[0])
-                            
+                    saveWindowSettings(qsettings, win, 
+                                       prefix = "%s" % win.__class__.__name__)
                     win.close()
-                    
-                for k in key:
-                    self.appWindow.workspace.pop(k, None)
-                    #self._scipyenWindow_.workspace.pop(k, None)
-                    
             self.sceneblockviewers.clear()
                     
+            saveWindowSettings(qsettings, self.reportwindow, 
+                                prefix = "%s" % win.__class__.__name__)
             self.reportWindow.close()
                 
         except Exception as e:
