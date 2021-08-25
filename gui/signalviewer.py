@@ -577,7 +577,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                    "vertical":pg.mkColor(self.cursorColors["vertical"]).darker()}
         #### END generic plot options
         
-        # ScipyenFrameViewer initialization - also calls self._configureUI_()
+        # NOTE: 2021-08-25 09:42:54
+        # ScipyenFrameViewer initialization - also does the following:
+        # 1) calls self._configureUI_():
+        #   1.1) sets up the UI defined in the .ui file (setupUi)
+        #   1.2) populates the qtconfigurables
+        #
+        # 2) calls loadSettings
         super().__init__(data=y, parent=parent, ID=ID,
                          win_title=win_title, doc_title=doc_title,
                          frameIndex=frameIndex, *args, **kwargs)
@@ -668,6 +674,18 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def dockWidgets(self):
         return dict(((name, w) for name, w in self.__dict__.items() if isinstance(w, QtWidgets.QDockWidget)))
         #return [(name, win) for name, win in self.__dict__.items() if isinstance(win, QtWidgets.QDockWidget)]
+        
+    @property
+    def visibleDocks(self):
+        return dict(((name, w.isVisible()) for name, w in self.__dict__.items() if isinstance(w, QtWidgets.QDockWidget)))
+    
+    @visibleDocks.setter
+    def visibleDocks(self, val):
+        if isinstance(val, dict):
+            dw = self.dockWidgets
+            for k, v in val.items():
+                if k in dw:
+                    dw[k].setVisible(v is True) # just to make sure v is a bool
                 
     def _update_annotations_(self, data=None):
         self.dataAnnotations.clear()

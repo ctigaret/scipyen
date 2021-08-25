@@ -157,9 +157,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         super().__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=parent)
         
-        self._qtconfigurables = Bunch()
-        self._configurables = Bunch()
-        
         self._docTitle_ = None
         self._winTitle_ = None # force auto-set in update_title()
         self._custom_viewer_name_ = None
@@ -562,13 +559,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self.update_title(win_title = value, enforce=True)
         
-    @property
-    def qtconfigurables(self):
-        return self._qtconfigurables
-    
-    @property
-    def configurables(self):
-        return self._configurables
             
     @property
     def docTitle(self):

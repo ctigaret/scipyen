@@ -163,6 +163,52 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):
         if isinstance(title, str) and len(title.strip()):
             self.setWindowTitle(title)
             
+        self._qtconfigurables = Bunch()
+        self._configurables = Bunch()
+        
+    @property
+    def qtconfigurables(self):
+        """A str -> type mapping of configurable properties for QSettings.
+        
+        The keys of the mapping (str) are attributes or descriptors with read &
+        write access, defined in the viewer class. 
+        
+        WARNING: use carefully, as this may overwrite class or instance members
+        
+        The values are expected to be built-in Python types, EXCLUDING:
+        - context managers
+        - modules
+        - classes
+        - functions and methods
+        - code objects
+        - type objects
+        - Ellipsis
+        - NotImplemented
+        - stack frame objects
+        - traceback objects
+        
+        NOTE: No type checking is performed.
+        
+        Support for one level of nested mappings:
+        When the key is not an attribute/descriptor of the viewer but the
+        mapped value is a (nested) mapping type where all keys are str AND 
+        represent a descriptor or attribute of the viewer, then the nested mapping
+        is used to read-write the decsriptor or attribute of the viewer, with the
+        'parent' key being used as 'prefix'.
+        
+        This mechanism ensures a 'pseudo-grouping' of configurables inside the
+        Scipyen.conf file used by QSettings.
+        
+        """
+        # TODO 2021-08-25 16:47:16
+        # if using traitlets.config framework then make functions to write atomic
+        # qsettings keyts to the conf file, as the configurble is changed
+        return self._qtconfigurables
+    
+    @property
+    def configurables(self):
+        return self._configurables
+
     @property
     def isTopLevel(self):
         """Returns True when this window is a top level window in Scipyen.
@@ -371,8 +417,20 @@ def saveWindowSettings(qsettings:QtCore.QSettings,
         settings["%sWindowState" % ename] = win.saveState()
         
     qtconfigs = dict()
-    if hasattr(win, "qtconfigurables"):
-        qtconfigs.update(dict((x, getattr(win,x, None)) for x in getattr(win, "qtconfigurables")))
+    qtconfs = getattr(win, "qtconfigurables", dict())
+    
+    for key, val in qtconfs:
+        if hasattr(win, key):
+            qtconfigs[key] = getattr(win, key, None)
+            
+        else:
+            if isinstance(val, dict):
+                for k,v in val:
+                    if hasattr(win, k):
+                        qtconfigs["%s_%s" % (key, k)] = getattr(win, k, None)
+    
+    #if hasattr(win, "qtconfigurables"):
+        #qtconfigs.update(dict((x, getattr(win,x, None)) for x in getattr(win, "qtconfigurables")))
         
     settings.update(qtconfigs)
     
@@ -539,8 +597,20 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
         settings["%sWindowState" % ename] = win.saveState()
         
     qtconfigs = dict()
-    if hasattr(win, "qtconfigurables"):
-        qtconfigs.update(dict((x, getattr(win,x, None)) for x in getattr(win, "qtconfigurables")))
+    qtconfs = getattr(win, "qtconfigurables", dict())
+    
+    for key, val in qtconfs:
+        if hasattr(win, key):
+            qtconfigs[key] = getattr(win, key, None)
+            
+        #else:
+            #if isinstance(val, dict):
+                #for k,v in val:
+                    #if hasattr(win, k):
+                        #qtconfigs["%s_%s" % (key, k)] = getattr(win, k, None)
+    
+    #if hasattr(win, "qtconfigurables"):
+        #qtconfigs.update(dict((x, getattr(win,x, None)) for x in getattr(win, "qtconfigurables")))
         
     settings.update(qtconfigs)
     
