@@ -364,27 +364,27 @@ def saveWindowSettings(qsettings:QtCore.QSettings,
     """
     # NOTE: 2021-07-11 18:32:56
     # QSettings support maximum one nesting level (i.e., group/entry)
-    pfx = ""
+    gname, pfx = qSettingsGroupPfx(win)
     
-    if isinstance(win, QtWidgets.QMainWindow):
-        if isinstance(win, WorkspaceGuiMixin):
-            if win.parent() is None or win.isTopLevel:
-                gname = win.__class__.__name__
-            else:
-                gname = win.parent().__class__.__name__
-                pfx = win.__class__.__name__
-        else:
-            if win.parent() is None or "ScipyenWindow" in win.parent().__class__.__name__:
-                gname = win.__class__.__name__
-            else:
-                gname = win.parent().__class__.__name__
-                pfx = win.__class__.__name__
+    #if isinstance(win, QtWidgets.QMainWindow):
+        #if isinstance(win, WorkspaceGuiMixin):
+            #if win.parent() is None or win.isTopLevel:
+                #gname = win.__class__.__name__
+            #else:
+                #gname = win.parent().__class__.__name__
+                #pfx = win.__class__.__name__
+        #else:
+            #if win.parent() is None or "ScipyenWindow" in win.parent().__class__.__name__:
+                #gname = win.__class__.__name__
+            #else:
+                #gname = win.parent().__class__.__name__
+                #pfx = win.__class__.__name__
                 
-    elif isinstance(win, mpl.figure.Figure):
-        gname = win.canvas.__class__.__name__
+    #elif isinstance(win, mpl.figure.Figure):
+        #gname = win.canvas.__class__.__name__
                 
-    else:
-        gname = win.__class__.__name__
+    #else:
+        #gname = win.__class__.__name__
                 
     if isinstance(group_name, str) and len(group_name.strip()):
         # NOTE: 2021-08-24 15:04:31 override internally determined group name
@@ -395,31 +395,28 @@ def saveWindowSettings(qsettings:QtCore.QSettings,
         pfx = prefix
         
     if isinstance(pfx, str) and len(pfx.strip()):
-        ename = "%s_" % pfx
+        key_prefix = "%s_" % pfx
     else:
-        ename=""
-        
-        
-    
+        key_prefix=""
         
     #print("\nworkspacegui.saveWindowSettings viewer %s BEGIN" % win.__class__)
     #print("\tgroup name", gname)
     #print("\tpfx", pfx)
-    #print("\tename", ename)
+    #print("\tkey_prefix", key_prefix)
     
     settings = dict()
     
-    settings["%sWindowSize" % ename] = win.size()
-    settings["%sWindowPosition" % ename] = win.pos()
-    settings["%sWindowGeometry" % ename] = win.geometry()
+    settings["%sWindowSize" % key_prefix] = win.size()
+    settings["%sWindowPosition" % key_prefix] = win.pos()
+    settings["%sWindowGeometry" % key_prefix] = win.geometry()
     
     if hasattr(win, "saveState"):
-        settings["%sWindowState" % ename] = win.saveState()
+        settings["%sWindowState" % key_prefix] = win.saveState()
         
     qtconfigs = dict()
     qtconfs = getattr(win, "qtconfigurables", dict())
     
-    for key, val in qtconfs:
+    for key, val in qtconfs.items():
         if hasattr(win, key):
             qtconfigs[key] = getattr(win, key, None)
             
@@ -429,12 +426,9 @@ def saveWindowSettings(qsettings:QtCore.QSettings,
                     if hasattr(win, k):
                         qtconfigs["%s_%s" % (key, k)] = getattr(win, k, None)
     
-    #if hasattr(win, "qtconfigurables"):
-        #qtconfigs.update(dict((x, getattr(win,x, None)) for x in getattr(win, "qtconfigurables")))
-        
     settings.update(qtconfigs)
     
-    custom_settings = dict((("%s%s" % (ename,k), v) for k,v in kwargs.items() if isinstance(k, str) and len(k.strip())))
+    custom_settings = dict((("%s%s" % (key_prefix,k), v) for k,v in kwargs.items() if isinstance(k, str) and len(k.strip())))
     settings.update(custom_settings)
     
     #print("settings to save")
@@ -548,26 +542,28 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
         These are useful to append settings later
     
     """
-    pfx = ""
-    if isinstance(win, QtWidgets.QMainWindow):
-        if isinstance(win, WorkspaceGuiMixin):
-            if win.parent() is None or win.isTopLevel:
-                gname = win.__class__.__name__
-            else:
-                gname = win.parent().__class__.__name__
-                pfx = win.__class__.__name__
-        else:
-            if win.parent() is None or "ScipyenWindow" in win.parent().__class__.__name__:
-                gname = win.__class__.__name__
-            else:
-                gname = win.parent().__class__.__name__
-                pfx = win.__class__.__name__
+    gname, pfx = qSettingsGroupPfx(win)
+    
+    #pfx = ""
+    #if isinstance(win, QtWidgets.QMainWindow):
+        #if isinstance(win, WorkspaceGuiMixin):
+            #if win.parent() is None or win.isTopLevel:
+                #gname = win.__class__.__name__
+            #else:
+                #gname = win.parent().__class__.__name__
+                #pfx = win.__class__.__name__
+        #else:
+            #if win.parent() is None or "ScipyenWindow" in win.parent().__class__.__name__:
+                #gname = win.__class__.__name__
+            #else:
+                #gname = win.parent().__class__.__name__
+                #pfx = win.__class__.__name__
                 
-    elif isinstance(win, mpl.figure.Figure):
-        gname = win.canvas.__class__.__name__
+    #elif isinstance(win, mpl.figure.Figure):
+        #gname = win.canvas.__class__.__name__
         
-    else:
-        gname = win.__class__.__name__
+    #else:
+        #gname = win.__class__.__name__
                 
     if isinstance(group_name, str) and len(group_name.strip()):
         # NOTE: 2021-08-24 15:04:31 override internally determined group name
@@ -578,44 +574,41 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
         pfx = prefix
         
     if isinstance(pfx, str) and len(pfx.strip()):
-        ename = "%s_" % pfx
+        key_prefix = "%s_" % pfx
     else:
-        ename=""
+        key_prefix=""
         
     #print("\nworkspacegui.loadWindowSettings viewer %s BEGIN" % win.__class__)
     #print("\tgroup name", gname)
     #print("\tpfx", pfx)
-    #print("\tename", ename)
+    #print("\tkey_prefix", key_prefix)
     
     settings = dict()
     
-    settings["%sWindowSize" % ename] = win.size()
-    settings["%sWindowPosition" % ename] = win.pos()
-    settings["%sWindowGeometry" % ename] = win.geometry()
+    settings["%sWindowSize" % key_prefix] = win.size()
+    settings["%sWindowPosition" % key_prefix] = win.pos()
+    settings["%sWindowGeometry" % key_prefix] = win.geometry()
     
     if hasattr(win, "saveState"):
-        settings["%sWindowState" % ename] = win.saveState()
+        settings["%sWindowState" % key_prefix] = win.saveState()
         
     qtconfigs = dict()
     qtconfs = getattr(win, "qtconfigurables", dict())
     
-    for key, val in qtconfs:
+    for key, val in qtconfs.items():
         if hasattr(win, key):
             qtconfigs[key] = getattr(win, key, None)
             
-        #else:
-            #if isinstance(val, dict):
-                #for k,v in val:
-                    #if hasattr(win, k):
-                        #qtconfigs["%s_%s" % (key, k)] = getattr(win, k, None)
+        else:
+            if isinstance(val, dict):
+                for k,v in val:
+                    if hasattr(win, k):
+                        qtconfigs["%s_%s" % (key, k)] = getattr(win, k, None)
     
-    #if hasattr(win, "qtconfigurables"):
-        #qtconfigs.update(dict((x, getattr(win,x, None)) for x in getattr(win, "qtconfigurables")))
-        
     settings.update(qtconfigs)
     
     if isinstance(custom, dict):
-        custom_settings = dict((("%s%s" % (ename,k), v) for k,v in custom.items() if isinstance(k, str) and len(k.strip()) ))
+        custom_settings = dict((("%s%s" % (key_prefix,k), v) for k,v in custom.items() if isinstance(k, str) and len(k.strip()) ))
 
         settings.update(custom_settings)
     
@@ -632,27 +625,55 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
     #print("loaded settings")
     #pprint(settings)
     
-    #windowSize = qsettings.value("%sWindowSize" % ename, None)
-    windowSize = settings.get("%sWindowSize" % ename, None)
+    windowSize = settings.get("%sWindowSize" % key_prefix, None)
     if windowSize:
         win.resize(windowSize)
         
-    #windowPos = qsettings.value("%sWindowPosition" % ename, None)
-    windowPos = settings.get("%sWindowPosition" % ename, None)
+    windowPos = settings.get("%sWindowPosition" % key_prefix, None)
     if windowPos:
         win.move(windowPos)
     
-    #windowGeometry = qsettings.value("%sWindowGeometry" % ename, None)
-    windowGeometry = settings.get("%sWindowGeometry" % ename, None)
+    windowGeometry = settings.get("%sWindowGeometry" % key_prefix, None)
     if windowGeometry:
         win.setGeometry(windowGeometry)
         
     if hasattr(win, "restoreState"):
-        #windowState = qsettings.value("%sWindowState" % ename, None)
-        windowState = settings.get("%sWindowState" % ename, None)
+        windowState = settings.get("%sWindowState" % key_prefix, None)
         if windowState:
             win.restoreState(windowState)
             
     #print("workspacegui.loadWindowSettings viewer %s END" % win.__class__)
     
     return gname, pfx
+
+def qSettingsGroupPfx(win:typing.Union[QtWidgets.QMainWindow, mpl.figure.Figure]) -> typing.Tuple[str, str]:
+    pfx = ""
+    
+    if isinstance(win, QtWidgets.QMainWindow):
+        if isinstance(win, WorkspaceGuiMixin):
+            if win.parent() is None or win.isTopLevel:
+                gname = win.__class__.__name__
+            else:
+                gname = win.parent().__class__.__name__
+                pfx = win.__class__.__name__
+        else:
+            if win.parent() is None or "ScipyenWindow" in win.parent().__class__.__name__:
+                gname = win.__class__.__name__
+            else:
+                gname = win.parent().__class__.__name__
+                pfx = win.__class__.__name__
+                
+    elif isinstance(win, mpl.figure.Figure):
+        gname = win.canvas.__class__.__name__
+                
+    else:
+        gname = win.__class__.__name__
+        
+    return gname, pfx
+                
+    
+
+def saveQSettingsKey(qsettings:QtCore.QSettings, 
+                    gname, pfx, key, val):
+    
+    pass
