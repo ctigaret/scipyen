@@ -2,7 +2,7 @@
 import typing, warnings, os, inspect
 from pprint import pprint
 #### BEGIN Configurable objects with traitlets.config
-from traitlets import config
+from traitlets import (config, Bunch)
 #### END Configurable objects with traitlets.config
 import matplotlib as mpl
 from PyQt5 import QtCore, QtWidgets, QtGui
