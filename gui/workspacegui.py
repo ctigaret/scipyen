@@ -423,49 +423,69 @@ def saveWindowSettings(qsettings:QtCore.QSettings,
     # NOTE: 2021-08-26 11:29:27 
     # "WindowSize", "WindowPosition", "WindowGeometry" and "WindowState" are too
     # important, so we generate them here if not specified in win's _qtcfg
-    # NOTE that except for matplotlib figure
-    if "WindowSize" not in qtcfg
+    # NOTE except for matplotlib figure
     
-    settings["%sWindowSize" % key_prefix] = win.size()
-    settings["%sWindowPosition" % key_prefix] = win.pos()
-    settings["%sWindowGeometry" % key_prefix] = win.geometry()
-    
-    if hasattr(win, "saveState"):
-        settings["%sWindowState" % key_prefix] = win.saveState()
+    #if "WindowSize" not in qtcfg:
+        #qtcfg["WindowSize"] = ("size", "resize")
         
-    qtconfigs = dict()
-    qtconfs = getattr(win, "qtconfigurables", dict())
-    
-    for key, val in qtconfs.items():
-        if hasattr(win, key):
-            qtconfigs[key] = getattr(win, key, None)
-            
-        else:
-            if isinstance(val, dict):
-                for k,v in val:
-                    if hasattr(win, k):
-                        qtconfigs["%s_%s" % (key, k)] = getattr(win, k, None)
-    
-    settings.update(qtconfigs)
-    
-    custom_settings = dict((("%s%s" % (key_prefix,k), v) for k,v in kwargs.items() if isinstance(k, str) and len(k.strip())))
-    settings.update(custom_settings)
-    
-    #print("settings to save")
-    #pprint(settings)
-    
-    qsettings.beginGroup(gname)
-    
-    for k,v in settings.items():
-        qsettings.setValue(k, v)
-    
-    qsettings.endGroup()
+    #if "WindowPostion" not in qtcfg:
+        #qtcfg["WindowPosition"] = ("pos", "move")
         
-    #print("workspacegui.saveWindowSettings viewer %s, END" % win.__class__)
-    #if use_group:
-        #qsettings.endGroup()
+    #if "WindowGeometry" not in qtcfg:
+        #qtcfg["WindowPosition"] = ("geometry", "setGeometry")
+        
+    #if "WindowState" not in qtcfg:
+        #qtcfg["WindowState"] = ("saveState", "restoreState")
+        
+    for key, getset in qtcfg:
+        gval = getattr(win, getset[0], None)
+        if gval is not None:
+            if len(getset) == 1:
+                # gval is a property => we already have its value
+                saveQSettingsKey(qsettings, gname, key_prefix, key, gval)
+
+            else:
+                # gval is a method that takes 0 arguments (apart from self) and
+                # returns an object; call it...
+                saveQSettingsKey(qsettings, gname, key_prefix, key, gval())
         
     return gname, pfx
+    #if hasattr(win, "saveState"):
+        #settings["%sWindowState" % key_prefix] = win.saveState()
+        
+    #qtconfigs = dict()
+    #qtconfs = getattr(win, "qtconfigurables", dict())
+    
+    #for key, val in qtconfs.items():
+        #if hasattr(win, key):
+            #qtconfigs[key] = getattr(win, key, None)
+            
+        #else:
+            #if isinstance(val, dict):
+                #for k,v in val:
+                    #if hasattr(win, k):
+                        #qtconfigs["%s_%s" % (key, k)] = getattr(win, k, None)
+    
+    #settings.update(qtconfigs)
+    
+    #custom_settings = dict((("%s%s" % (key_prefix,k), v) for k,v in kwargs.items() if isinstance(k, str) and len(k.strip())))
+    #settings.update(custom_settings)
+    
+    ##print("settings to save")
+    ##pprint(settings)
+    
+    #qsettings.beginGroup(gname)
+    
+    #for k,v in settings.items():
+        #qsettings.setValue(k, v)
+    
+    #qsettings.endGroup()
+        
+    ##print("workspacegui.saveWindowSettings viewer %s, END" % win.__class__)
+    ##if use_group:
+        ##qsettings.endGroup()
+        
+    #return gname, pfx
     
 def loadWindowSettings(qsettings:QtCore.QSettings, 
                        win:typing.Union[QtWidgets.QMainWindow, mpl.figure.Figure], 
@@ -731,6 +751,22 @@ def qSettingsGroupPfx(win:typing.Union[QtWidgets.QMainWindow, QtWidgets.QWidget,
     
 
 def saveQSettingsKey(qsettings:QtCore.QSettings, 
-                    gname, pfx, key, val):
+                    gname;str, pfx:str, key:str, val:typing.Any) -> None:
+    if len(gname.strip()) == 0:
+        gname = "General"
+    key_name = "%s%s" % pfx, key
+    qsettings.beginGroup(gname)
+    qsettings.setValue(key_name, val)
+    qsettings.endGroup()
     
-    pass
+def loadQsettingsKey(qsettings:QtCore.QSettings,
+                     gname:str, pfx:str, key:str, default:typing.Any) -> typing.Any:
+    if len(gname.strip()) == 0:
+        gname = "General"
+    key_name = "%s%s" % pfx, key
+    qsettings.beginGroup(gname)
+    ret = qsettings.value(key_name, val, default)
+    qsettings.endGroup()
+    return ret
+    
+    
