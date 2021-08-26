@@ -127,7 +127,35 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):
     2) a custom ID useful when the window is a child of a Scipyen "app" (e.g.,
      LSCaT) instead of beign top level
     """
-    # NOTE: 2021-08-23 10:39:20 inherits from object !!!
+    # NOTE: 2021-08-26 11:32:25
+    # key:str = QSettings key
+    # value: 
+    #   EITHER: tuple (str, str) = getter method name, setter method name
+    #           where:
+    #               getter method name: name of instance or class method that
+    #                                   returns a Python object (CAUTION: when
+    #                                   the method returns SEVERAL obejcts they
+    #                                   will be captured in a tuple!)
+    #               setter method name: name of the instance or class method that
+    #                                   accepts ONE Python object as parameter
+    #                                   which corresponds to the return value of
+    #                                   the getter method
+    #
+    #   OR:     tuple (str, ) = property
+    #           where: property is the name of a descriptor with read-write access
+    #
+    #
+    #
+    _qtcfg = Bunch({"WindowSize":       ("size",        "resize"),
+                    "WindowPosition":   ("pos",         "move"),
+                    "WindowGeometry":   ("geometry",    "setGeometry"),
+                    "WindowState":      ("saveState",   "restoreState")})
+    
+    _ownqtcfg = Bunch()
+    
+    _cfg = Bunch()
+    
+    _owncfg = Bunch()
     
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
                  title="", **kwargs):
@@ -366,26 +394,8 @@ def saveWindowSettings(qsettings:QtCore.QSettings,
     # QSettings support maximum one nesting level (i.e., group/entry)
     gname, pfx = qSettingsGroupPfx(win)
     
-    #if isinstance(win, QtWidgets.QMainWindow):
-        #if isinstance(win, WorkspaceGuiMixin):
-            #if win.parent() is None or win.isTopLevel:
-                #gname = win.__class__.__name__
-            #else:
-                #gname = win.parent().__class__.__name__
-                #pfx = win.__class__.__name__
-        #else:
-            #if win.parent() is None or "ScipyenWindow" in win.parent().__class__.__name__:
-                #gname = win.__class__.__name__
-            #else:
-                #gname = win.parent().__class__.__name__
-                #pfx = win.__class__.__name__
-                
-    #elif isinstance(win, mpl.figure.Figure):
-        #gname = win.canvas.__class__.__name__
-                
-    #else:
-        #gname = win.__class__.__name__
-                
+    # NOTE: 2021-08-26 11:25:58
+    # allow caller to override group name and prefix
     if isinstance(group_name, str) and len(group_name.strip()):
         # NOTE: 2021-08-24 15:04:31 override internally determined group name
         gname = group_name
@@ -405,6 +415,16 @@ def saveWindowSettings(qsettings:QtCore.QSettings,
     #print("\tkey_prefix", key_prefix)
     
     settings = dict()
+    
+    qtcfg = dict()
+    qtcfg.update(getattr(type(win), "_qtcfg", {}))
+    qtcfg.update(getattr(type(win), "_ownqtcfg", {}))
+    
+    # NOTE: 2021-08-26 11:29:27 
+    # "WindowSize", "WindowPosition", "WindowGeometry" and "WindowState" are too
+    # important, so we generate them here if not specified in win's _qtcfg
+    # NOTE that except for matplotlib figure
+    if "WindowSize" not in qtcfg
     
     settings["%sWindowSize" % key_prefix] = win.size()
     settings["%sWindowPosition" % key_prefix] = win.pos()
@@ -544,27 +564,8 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
     """
     gname, pfx = qSettingsGroupPfx(win)
     
-    #pfx = ""
-    #if isinstance(win, QtWidgets.QMainWindow):
-        #if isinstance(win, WorkspaceGuiMixin):
-            #if win.parent() is None or win.isTopLevel:
-                #gname = win.__class__.__name__
-            #else:
-                #gname = win.parent().__class__.__name__
-                #pfx = win.__class__.__name__
-        #else:
-            #if win.parent() is None or "ScipyenWindow" in win.parent().__class__.__name__:
-                #gname = win.__class__.__name__
-            #else:
-                #gname = win.parent().__class__.__name__
-                #pfx = win.__class__.__name__
-                
-    #elif isinstance(win, mpl.figure.Figure):
-        #gname = win.canvas.__class__.__name__
-        
-    #else:
-        #gname = win.__class__.__name__
-                
+    # NOTE: 2021-08-26 11:25:58
+    # allow caller to override group name and prefix
     if isinstance(group_name, str) and len(group_name.strip()):
         # NOTE: 2021-08-24 15:04:31 override internally determined group name
         gname = group_name
@@ -646,7 +647,63 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
     
     return gname, pfx
 
-def qSettingsGroupPfx(win:typing.Union[QtWidgets.QMainWindow, mpl.figure.Figure]) -> typing.Tuple[str, str]:
+def qSettingsGroupPfx(win:typing.Union[QtWidgets.QMainWindow, QtWidgets.QWidget, mpl.figure.Figure]) -> typing.Tuple[str, str]:
+    """Generates a QSettings group name and, optionally, a prefix.
+    
+    Parameters:
+    ===========
+    win: QMainWindow, QWidget, or matplotlib Figure
+    
+    Returns:
+    =======
+    
+    A tuple of str (group_name, prefix), where:
+    
+        * group_name is the name of the settings group in the QSettings .conf 
+            file (on Linux this is $HOME/.config/Scipyen/Scipyen.conf)
+    
+        * prefix is to be prepended to the QSettings key name (pseudo-subgroups)
+         and may be the empty string.
+        
+    For Scipyen's top-level instances of QMainWindow (see NOTE 1):
+        * 'group_name' is the name of the viewer's class
+        * 'prefix' is the empty string.
+        
+    For Scipyen's viewers that are not 'top-level':
+        * 'group_name' is the name of the viewer's parent class
+        * 'prefix' is composed of the name of the viewer's class and a persistent
+            tag string that differentiates the specific win instance from other
+            instances of the same class as win.
+            
+    This ensures that the QSettings are consistent among all the instances 
+    of the viewer. For example, if there are several ImageViewer instances,
+    the window geometry, colormap and other GUI-related settings are those
+    of the last ImageViewer window being closed.
+    
+    Since there can be any number of ImageViewer windows open during a Scipyen
+    session, managing the settings for each individual instance is not only 
+    difficult, but does not make sense.
+        
+    For QMainWindow instances that are managed by a Scipyen top-level window it
+    is assumed that there is a maximum number of such instances, and managing 
+    their settings individually not only is possible but it may also make more 
+    sense.
+    
+    The typical example is that of LSCaT where the main GUI window is a 
+    'top-level' Scipyen viewer and manages a fixed number of ImageViewer windows
+    (up to the number of image channels). The settings for these individual
+    ImageViewer windows need to be persistent across sessions and managed
+    individually (e.g., a given channel should always be viewed in the same 
+    colormap, etc).
+    
+    NOTE 1: A 'top-level' window is any Scipyen viewer that operates directly in 
+            Scipyen's workspace and is managed by Scipyen's main window.
+            
+            These include Scipyen's main window (ScipyenWindow), the console
+            classes (ScipyenConsole, ExternalConsole, and ExternalConsoleWindow)
+            and all matplotlib figures managed by matplotlib.pyplot
+            
+    """
     pfx = ""
     
     if isinstance(win, QtWidgets.QMainWindow):
