@@ -305,8 +305,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):
 def saveWindowSettings(qsettings:QtCore.QSettings, 
                        win:typing.Union[QtWidgets.QMainWindow, mpl.figure.Figure], 
                        group_name:typing.Optional[str]=None,
-                       prefix:typing.Optional[str]=None, 
-                       **kwargs) -> typing.Tuple[str, str]:
+                       prefix:typing.Optional[str]=None) -> typing.Tuple[str, str]:
     """Saves window settings to the Scipyen's Qt configuration file.
     
     On recent Linux distributions this is $HOME/.config/Scipyen/Scipyen.conf 
@@ -390,12 +389,154 @@ def saveWindowSettings(qsettings:QtCore.QSettings,
         These are useful to append settings later
     
     """
-    # NOTE: 2021-07-11 18:32:56
-    # QSettings support maximum one nesting level (i.e., group/entry)
+    return syncWindowSettings(qsettings, win, group_name, prefix, True)
+    
+def syncWindowSettings(qsettings:QtCore.QSettings, 
+                       win:typing.Union[QtWidgets.QMainWindow, mpl.figure.Figure], 
+                       group_name:typing.Optional[str]=None,
+                       prefix:typing.Optional[str]=None,
+                       save:bool=True)-> typing.Tuple[str, str]:
+    """Synchronize user-specifc settings with the Scipyen's Qt configuration file.
+    
+    The Scipyen's configuration file is in native format, and on Linux it usually
+    is $HOME/.config/Scipyen/Scipyen.conf. For details, please see QSettings 
+    class documentation in Qt Assistant, or at:
+    https://doc.qt.io/qt-5/qsettings.html
+    
+    The direction of synchronization is determined by the :bool: value of the 
+    'save' parameter: when True, the settings are save to the file; otherwise,
+    they are loaded.
+    
+    The general idea is that the QSettings conf file only supports one level of
+    grouping for qsetting key/value entries. Subgroups can be emulated with
+    distinct prefixes to the qsettings key.
+    
+    What exactly is synchronized is specified in the class attributes '_qtcfg'
+    and '_ownqtcfg' of win.
+    
+    All window classes in Scipyen that inherit from gui.workspacegui.WorkspaceGuiMixin
+    have at least the '_qtcfg' attribute.
+    
+    _qtcfg is a mapping of QSettings key names to a tuple of str containing:
+    * either a single element - corresponding to an instance property with read/write access
+    * or two elements corresponding to the getter and setter method (in this order)
+        for the particular setting
+        
+    By default, '_qtcfg' is:
+    
+    {'WindowSize':      ('size',        'resize'),
+     'WindowPosition':  ('pos',         'move'),
+     'WindowGeometry':  ('geometry',    'setGeometry'),
+     'WindowState':     ('saveState',   'restoreState')
+     }
+     
+    In subclasses of WorkspaceGuiMixin '_qtcfg' should be augmented by a similar
+    mapping in '_ownqtcfg'
+    
+    E.g., for SignalViewer, the '_ownqtcfg' is 
+    
+    {'VisibleDocks': ('visibleDocks',)}
+    
+    where 'visibleDocks' is a dynamic property that retrieves a dict 
+    {dock_name1: visible bool, dock_name2: visible bool, <etc...>} and its 
+    setter expects the same.
+    
+    The '_qtcfg'-based mechanism ensures that the following keys are always
+    synchronized whenever the win's class provides 'getter' and 'setter' methods
+    for access:
+    
+    QSettings key     Getter method                   Setter method
+    ------------------------------------------------------------------------------
+    Window size       win.size()      -> QSize        win.resisze(QSize)
+    Window position   win.pos()       -> QPoint       win.move(QPoint)
+    Window geometry   win.geometry()  -> QRect        win.setGeometry(QRect)
+    Window state      win.saveState() -> QByteArray   win.restoreState(QByteArray)
+    
+    Of these, the first three are available for all objects derived from QWidget
+    (including RichJupyterWidget,such as Cipyen's console); the window state is 
+    only available for objects derived from QMainWindow.
+    
+    This mechanism can be bypassed in order to save/load QSettings keys directly
+    using the QSettings API, or, for a more consistent group and key nomenclature, 
+    via qSettingsGroupPfx(), followed by saveQSettingsKey() or loadQsettingsKey()
+    functions in this module.
+    
+    Settings are always saved in groups inside the Scipyen.conf file. The group's
+    name is determined automatically, or it can be specified.
+    
+    Because the conf file only supports one level of group nesting (i.e. no 
+    "sub-groups") an optional extra-nesting level is emulated by prepending
+    a custom prefix to the setting's name (or key).
+    
+    Parameters:
+    ==========
+    
+    qsettings: QtCore.QSettings. Typically, Scipyen's global QSettings.
+    
+    win: QMainWindow or matplotlib Figure. The window for which the settings are
+        loaded.
+    
+    group_name:str, optional, default is None. The qsettings group name under 
+        which the settings will be saved.
+        
+        When specified, this will override the automatically determined group 
+        name (see below).
+    
+        When group_name is None, the group name is determined from win's type 
+        as follows:
+        
+        * When win is a matplotlib Figure instance, group name is set to the 
+            class name of the Figure's canvas 
+            
+        * When win is an instance of a QMainWindow (this includes Scipyen's main
+            window, all Scipyen viewer windows, and ExternalConsoleWindow):
+            
+            * for instances of WorkspaceGuiMixin:
+                * if win is top level, or win.parent() is None:
+                    group name is the name of the win's class
+                    
+                * otherwise:
+                    group name is set to the class name of win.parent(); 
+                    prefix is set to the win's class class name in order to
+                    specify the settings entries
+            
+            * otherwise, the win is considered top level and the group name is
+            set to the win's class name
+            
+        For any other window types, the group name is set to the window's class 
+        name (for now, this is only the case for ScipyenConsole which inherits 
+        from QWidget, and not from QMainWindow).
+        
+    prefix: str (optional, default is None)
+        When given, it will be prepended to the settings entry name. This is 
+        useful to distinguish between several windows of the same type which are
+        children of the same parent, yet need distinct settings.
+        
+    custom: A key(str) : value(typing.Any) mapping for additional entries.
+    
+        The values in the mapping are default values used when their keys are 
+        not found in qsettings.
+        
+        If found, their values will be mapped to the corresponding key in 'custom'
+        
+        Since 'custom' is passed by reference, the new settings values can be 
+        accessed directly from there, in the caller namespace.
+        
+    Returns:
+    ========
+    
+    A tuple: (group_name, prefix) 
+        group_name is the qsettings group name under which the win's settings 
+            were saved
+            
+        prefix is th prefix prepended to each setting name
+        
+        These are useful to append settings later
+    
+    """
+    
     gname, pfx = qSettingsGroupPfx(win)
     
-    # NOTE: 2021-08-26 11:25:58
-    # allow caller to override group name and prefix
     if isinstance(group_name, str) and len(group_name.strip()):
         # NOTE: 2021-08-24 15:04:31 override internally determined group name
         gname = group_name
@@ -409,89 +550,40 @@ def saveWindowSettings(qsettings:QtCore.QSettings,
     else:
         key_prefix=""
         
-    #print("\nworkspacegui.saveWindowSettings viewer %s BEGIN" % win.__class__)
-    #print("\tgroup name", gname)
-    #print("\tpfx", pfx)
-    #print("\tkey_prefix", key_prefix)
-    
     settings = dict()
     
     qtcfg = dict()
     qtcfg.update(getattr(type(win), "_qtcfg", {}))
     qtcfg.update(getattr(type(win), "_ownqtcfg", {}))
     
-    # NOTE: 2021-08-26 11:29:27 
-    # "WindowSize", "WindowPosition", "WindowGeometry" and "WindowState" are too
-    # important, so we generate them here if not specified in win's _qtcfg
-    # NOTE except for matplotlib figure
+    print("syncWindowSettings %s: save %s, qtcfg =" % (type(win), save), qtcfg)
     
-    #if "WindowSize" not in qtcfg:
-        #qtcfg["WindowSize"] = ("size", "resize")
-        
-    #if "WindowPostion" not in qtcfg:
-        #qtcfg["WindowPosition"] = ("pos", "move")
-        
-    #if "WindowGeometry" not in qtcfg:
-        #qtcfg["WindowPosition"] = ("geometry", "setGeometry")
-        
-    #if "WindowState" not in qtcfg:
-        #qtcfg["WindowState"] = ("saveState", "restoreState")
-        
-    for key, getset in qtcfg:
-        gval = getattr(win, getset[0], None)
-        if gval is not None:
-            if len(getset) == 1:
-                # gval is a property => we already have its value
-                saveQSettingsKey(qsettings, gname, key_prefix, key, gval)
-
+    for key, getset in qtcfg.items():
+        val = getattr(win, getset[0], None)
+        if len(getset) == 1:
+            if save:
+                if val is not None:
+                    saveQSettingsKey(qsettings, gname, key_prefix, key, val)
             else:
-                # gval is a method that takes 0 arguments (apart from self) and
-                # returns an object; call it...
-                saveQSettingsKey(qsettings, gname, key_prefix, key, gval())
-        
-    return gname, pfx
-    #if hasattr(win, "saveState"):
-        #settings["%sWindowState" % key_prefix] = win.saveState()
-        
-    #qtconfigs = dict()
-    #qtconfs = getattr(win, "qtconfigurables", dict())
-    
-    #for key, val in qtconfs.items():
-        #if hasattr(win, key):
-            #qtconfigs[key] = getattr(win, key, None)
+                newval = loadQSettingsKey(qsettings, gname, key_prefix, key, val)
+                setattr(win, getset[0], newval)
             
-        #else:
-            #if isinstance(val, dict):
-                #for k,v in val:
-                    #if hasattr(win, k):
-                        #qtconfigs["%s_%s" % (key, k)] = getattr(win, k, None)
-    
-    #settings.update(qtconfigs)
-    
-    #custom_settings = dict((("%s%s" % (key_prefix,k), v) for k,v in kwargs.items() if isinstance(k, str) and len(k.strip())))
-    #settings.update(custom_settings)
-    
-    ##print("settings to save")
-    ##pprint(settings)
-    
-    #qsettings.beginGroup(gname)
-    
-    #for k,v in settings.items():
-        #qsettings.setValue(k, v)
-    
-    #qsettings.endGroup()
-        
-    ##print("workspacegui.saveWindowSettings viewer %s, END" % win.__class__)
-    ##if use_group:
-        ##qsettings.endGroup()
-        
-    #return gname, pfx
+        elif len(getset) == 2:
+            if save:
+                if val is not None:
+                    saveQSettingsKey(qsettings, gname, key_prefix, key, val())
+            else:
+                setter = getattr(win, getset[1])
+                default = val()
+                newval = loadQSettingsKey(qsettings, gname, key_prefix, key, val)
+                setter(newval)
+            
+    return gname, pfx
     
 def loadWindowSettings(qsettings:QtCore.QSettings, 
                        win:typing.Union[QtWidgets.QMainWindow, mpl.figure.Figure], 
                        group_name:typing.Optional[str]=None,
-                       prefix:typing.Optional[str]=None, 
-                       custom:typing.Optional[dict]=None) -> typing.Tuple[str, str]:
+                       prefix:typing.Optional[str]=None) -> typing.Tuple[str, str]:
     """Loads window settings from the Scipyen's Qt configuration file.
     
     On recent Linux distributions this is $HOME/.config/Scipyen/Scipyen.conf 
@@ -582,90 +674,7 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
         These are useful to append settings later
     
     """
-    gname, pfx = qSettingsGroupPfx(win)
-    
-    # NOTE: 2021-08-26 11:25:58
-    # allow caller to override group name and prefix
-    if isinstance(group_name, str) and len(group_name.strip()):
-        # NOTE: 2021-08-24 15:04:31 override internally determined group name
-        gname = group_name
-        
-    if isinstance(prefix, str) and len(prefix.strip()):
-        # NOTE: 2021-08-24 15:04:31 override internally determined group name
-        pfx = prefix
-        
-    if isinstance(pfx, str) and len(pfx.strip()):
-        key_prefix = "%s_" % pfx
-    else:
-        key_prefix=""
-        
-    #print("\nworkspacegui.loadWindowSettings viewer %s BEGIN" % win.__class__)
-    #print("\tgroup name", gname)
-    #print("\tpfx", pfx)
-    #print("\tkey_prefix", key_prefix)
-    
-    settings = dict()
-    
-    settings["%sWindowSize" % key_prefix] = win.size()
-    settings["%sWindowPosition" % key_prefix] = win.pos()
-    settings["%sWindowGeometry" % key_prefix] = win.geometry()
-    
-    if hasattr(win, "saveState"):
-        settings["%sWindowState" % key_prefix] = win.saveState()
-        
-    qtconfigs = dict()
-    qtconfs = getattr(win, "qtconfigurables", dict())
-    
-    for key, val in qtconfs.items():
-        if hasattr(win, key):
-            qtconfigs[key] = getattr(win, key, None)
-            
-        else:
-            if isinstance(val, dict):
-                for k,v in val:
-                    if hasattr(win, k):
-                        qtconfigs["%s_%s" % (key, k)] = getattr(win, k, None)
-    
-    settings.update(qtconfigs)
-    
-    if isinstance(custom, dict):
-        custom_settings = dict((("%s%s" % (key_prefix,k), v) for k,v in custom.items() if isinstance(k, str) and len(k.strip()) ))
-
-        settings.update(custom_settings)
-    
-    #print("settings to load:")
-    #pprint(settings)
-    
-    qsettings.beginGroup(gname)
-    
-    for k,v in settings.items():
-        settings[k] = qsettings.value(k, v)
-        
-    qsettings.endGroup()
-    
-    #print("loaded settings")
-    #pprint(settings)
-    
-    windowSize = settings.get("%sWindowSize" % key_prefix, None)
-    if windowSize:
-        win.resize(windowSize)
-        
-    windowPos = settings.get("%sWindowPosition" % key_prefix, None)
-    if windowPos:
-        win.move(windowPos)
-    
-    windowGeometry = settings.get("%sWindowGeometry" % key_prefix, None)
-    if windowGeometry:
-        win.setGeometry(windowGeometry)
-        
-    if hasattr(win, "restoreState"):
-        windowState = settings.get("%sWindowState" % key_prefix, None)
-        if windowState:
-            win.restoreState(windowState)
-            
-    #print("workspacegui.loadWindowSettings viewer %s END" % win.__class__)
-    
-    return gname, pfx
+    return syncWindowSettings(qsettings, win, group_name, prefix, False)
 
 def qSettingsGroupPfx(win:typing.Union[QtWidgets.QMainWindow, QtWidgets.QWidget, mpl.figure.Figure]) -> typing.Tuple[str, str]:
     """Generates a QSettings group name and, optionally, a prefix.
@@ -751,21 +760,21 @@ def qSettingsGroupPfx(win:typing.Union[QtWidgets.QMainWindow, QtWidgets.QWidget,
     
 
 def saveQSettingsKey(qsettings:QtCore.QSettings, 
-                    gname;str, pfx:str, key:str, val:typing.Any) -> None:
+                    gname:str, pfx:str, key:str, val:typing.Any) -> None:
     if len(gname.strip()) == 0:
         gname = "General"
-    key_name = "%s%s" % pfx, key
+    key_name = "%s%s" % (pfx, key)
     qsettings.beginGroup(gname)
     qsettings.setValue(key_name, val)
     qsettings.endGroup()
     
-def loadQsettingsKey(qsettings:QtCore.QSettings,
+def loadQSettingsKey(qsettings:QtCore.QSettings,
                      gname:str, pfx:str, key:str, default:typing.Any) -> typing.Any:
     if len(gname.strip()) == 0:
         gname = "General"
-    key_name = "%s%s" % pfx, key
+    key_name = "%s%s" % (pfx, key)
     qsettings.beginGroup(gname)
-    ret = qsettings.value(key_name, val, default)
+    ret = qsettings.value(key_name, default)
     qsettings.endGroup()
     return ret
     

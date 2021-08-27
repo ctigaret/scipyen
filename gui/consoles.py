@@ -87,7 +87,9 @@ from core.extipyutils_client import (init_commands, execute, ForeignCall,
                                     nrn_ipython_initialization_cmd,)
 from core.strutils import str2symbol
 
-from gui.workspacegui import (saveWindowSettings, loadWindowSettings)
+from gui.workspacegui import (WorkspaceGuiMixin, 
+                              saveWindowSettings, loadWindowSettings,
+                              )
 
 flags = dict(base_flags)
 qt_flags = {
