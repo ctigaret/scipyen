@@ -123,20 +123,48 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):
     """Mixin type for windows that need to be aware of Scipyen's main workspace.
     
     Also provides:
-    1) common functionality needed in Scipyen's windows. 
+    1) common functionality needed in Scipyen's windows, including QSettings
+        maganement
     2) a custom ID useful when the window is a child of a Scipyen "app" (e.g.,
      LSCaT) instead of beign top level
+     
+    To save a standardized set of window-specifc settings to the QSettings .conf
+    file, in the derived :class: override the instance methos closeEvent() to 
+    call 'saveWindowSettings()' defined in this module.
+    
+    To load a standardized set of window-specific settings from the QSettings
+    .conf file call 'loadWindowSettings()' defined in this module.
+    
+    The standardized window-specific settings are window size, position, geometry
+    and (whenever possible ) state.
+    
+    In addition, further settings can be defined by either:
+    
+    1) populate the '_qtcfg' attribute of the derived window class with new
+    entries (see self.qtconfigurables for details),  - this will be updated with
+    WorkspaceGuiMixin._qtcfg contents upon initialization of the derived :class:,
+    
+    or:
+    
+    2) create in the subclass an attribute named '_ownqtcfg' - a mapping of a 
+    similar structure to '_qtcfg'.
+    
+    NOTE: this only needs to be done in the most derived :class: in a long
+    inheritance chain. This is done. e.g. in SignalViewer where the inheritance 
+    chains is:
+    
+    SignalViewer <- ScipyenFrameViewer <- ScipyenViewer <- WorkspaceGuiMixin
     """
     # NOTE: 2021-08-26 11:32:25
     # key:str = QSettings key
     # value: 
     #   EITHER: tuple (str, str) = getter method name, setter method name
     #           where:
-    #               getter method name: name of instance or class method that
+    #               getter method name: name of instance or :class: method that
     #                                   returns a Python object (CAUTION: when
     #                                   the method returns SEVERAL obejcts they
     #                                   will be captured in a tuple!)
-    #               setter method name: name of the instance or class method that
+    #               setter method name: name of the instance or :class: method that
     #                                   accepts ONE Python object as parameter
     #                                   which corresponds to the return value of
     #                                   the getter method
@@ -159,14 +187,13 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):
     
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
                  title="", **kwargs):
+        if self.__class__ is not WorkspaceGuiMixin:
+            if hasattr(self.__class__, "_qtcfg"):
+                subclassqtcfg = getattr(self.__class__, "_qtcfg")
+                subclassqtcfg.update(WorkspaceGuiMixin._qtcfg)
+                setattr(self.__class__, "_qtcfg", subclassqtcfg)
+                
         self._scipyenWindow_ = None
-        
-        # NOTE: 2020-12-05 21:12:43:
-        # user_workspace(does NOT work here unless this is called by a 
-        # constructor executed in the Scipyen console (so that the user workspace
-        # is contained in the outermost frame))
-        #ws = user_workspace()
-        #print(ws)
         
         if isinstance(parent, QtWidgets.QMainWindow) and type(parent).__name__ == "ScipyenWindow":
             self._scipyenWindow_   = parent
@@ -191,19 +218,36 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):
         if isinstance(title, str) and len(title.strip()):
             self.setWindowTitle(title)
             
-        self._qtconfigurables = Bunch()
-        self._configurables = Bunch()
+        #self._qtconfigurables = Bunch()
+        #self._configurables = Bunch()
         
     @property
     def qtconfigurables(self):
         """A str -> type mapping of configurable properties for QSettings.
         
         The keys of the mapping (str) are attributes or descriptors with read &
-        write access, defined in the viewer class. 
+        write access, defined in the viewer class, as follows. 
         
-        WARNING: use carefully, as this may overwrite class or instance members
+        key:str = QSettings key
         
-        The values are expected to be built-in Python types, EXCLUDING:
+        value: 
+        EITHER: tuple (str, str) = (getter method name, setter method name)
+                where:
+                    getter method name: name of instance or :class: method that
+                                        returns a Python object (CAUTION: when
+                                        the method returns SEVERAL obejcts they
+                                        will be captured in a tuple!)
+                                        
+                    setter method name: name of the instance or :class: method that
+                                        accepts ONE Python object as parameter
+                                        of the same type as the return value of
+                                        the getter method
+        
+        OR:     tuple (str, ) = property
+                where: property is the name of a descriptor with read-write access
+        
+        The values are returned by the getter method is expected to be built-in 
+        Python types that can be easily converted to a QVariant, EXCLUDING:
         - context managers
         - modules
         - classes
@@ -217,25 +261,15 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):
         
         NOTE: No type checking is performed.
         
-        Support for one level of nested mappings:
-        When the key is not an attribute/descriptor of the viewer but the
-        mapped value is a (nested) mapping type where all keys are str AND 
-        represent a descriptor or attribute of the viewer, then the nested mapping
-        is used to read-write the decsriptor or attribute of the viewer, with the
-        'parent' key being used as 'prefix'.
-        
-        This mechanism ensures a 'pseudo-grouping' of configurables inside the
-        Scipyen.conf file used by QSettings.
-        
         """
         # TODO 2021-08-25 16:47:16
         # if using traitlets.config framework then make functions to write atomic
         # qsettings keyts to the conf file, as the configurble is changed
-        return self._qtconfigurables
+        return self._qtcfg
     
     @property
     def configurables(self):
-        return self._configurables
+        return self._cfg
 
     @property
     def isTopLevel(self):
@@ -573,10 +607,11 @@ def syncWindowSettings(qsettings:QtCore.QSettings,
                 if val is not None:
                     saveQSettingsKey(qsettings, gname, key_prefix, key, val())
             else:
-                setter = getattr(win, getset[1])
-                default = val()
-                newval = loadQSettingsKey(qsettings, gname, key_prefix, key, val)
-                setter(newval)
+                setter = getattr(win, getset[1], None)
+                if setter is not None:
+                    default = val()
+                    newval = loadQSettingsKey(qsettings, gname, key_prefix, key, val)
+                    setter(newval)
             
     return gname, pfx
     
@@ -779,3 +814,18 @@ def loadQSettingsKey(qsettings:QtCore.QSettings,
     return ret
     
     
+class TestWSGui(QtWidgets.QMainWindow, WorkspaceGuiMixin):
+    _qtcfg = {"Something": ("something",)}
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        WorkspaceGuiMixin.__init__(self, parent=parent, title="Test WorkspaceGuiMixin")
+        self._something = "test window"
+        
+    @property
+    def something(self):
+        return self._something
+    
+    @something.setter
+    def something(self, val):
+        self._something = val
+        

@@ -366,7 +366,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     defaultEventColor    = mpl.colors.to_rgba("xkcd:crimson")
     defaultEpochColor    = mpl.colors.to_rgba("xkcd:coral")
     
-    _ownqtcfg = Bunch({"VisibleDocks": ("visibleDocks",)})
+    #_ownqtcfg = Bunch({"VisibleDocks": ("visibleDocks",)})
+    _qtcfg = Bunch({"VisibleDocks": ("visibleDocks",)})
 
     def __init__(self, 
                  x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
@@ -591,6 +592,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         super().__init__(data=y, parent=parent, ID=ID,
                          win_title=win_title, doc_title=doc_title,
                          frameIndex=frameIndex, *args, **kwargs)
+        
+        #self._qtcfg.update(ScipyenFrameViewer._qtcfg)
         
         #self._qtconfigurables.visibleDocks = Bunch()
         
@@ -1030,9 +1033,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.actionDetect_Triggers.triggered.connect(self.slot_detectTriggers)
         self.actionDetect_Triggers.setEnabled(False)
-        
-        self._qtconfigurables.visibleDocks = Bunch(((n, w.isVisible()) for n, w in self.dockWidgets.items()))
-        
         
     def addCursors(self, cursorType="c", *where, **kwargs):
         """Manually adds a set of cursors to the selected axes in the SignalViewer window.

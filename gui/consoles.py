@@ -2402,7 +2402,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         #return frontend.execute(**kwargs)
 
 # NOTE: use Jupyter (IPython >= 4.x and qtconsole / qt5 by default)
-class ScipyenConsole(RichJupyterWidget):
+class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     """Console with in-process kernel manager for pythonic command interface.
     Uses an in-process kernel generated and managed by QtInProcessKernelManager.
     """
@@ -2421,6 +2421,7 @@ class ScipyenConsole(RichJupyterWidget):
         
         '''
         super(RichJupyterWidget, self).__init__()
+        WorkspaceGuiMixin.__init__(self, parent=mainWindow)
         
         #if isinstance(mainWindow, (ScipyenWindow, type(None))):
         if type(mainWindow).__name__ ==  "ScipyenWindow":
@@ -2511,6 +2512,14 @@ class ScipyenConsole(RichJupyterWidget):
             value = QtCore.Qt.LayoutDirectionAuto
                 
         self._control.setLayoutDirection(value)
+        
+    @property
+    def isTopLevel(self):
+        """Overrides WorkspaceGuiMixin.isToplevel; always True for ScipyenConsole.
+        This is because console inherits from RichJupyterWidget where 'parent'
+        is a traitlets.Instance property, and for ScipyenConsole is None.
+        """
+        return True
 
     def _save_settings_(self):
         saveWindowSettings(self.qsettings, self, group_name=self.__class__.__name__)
