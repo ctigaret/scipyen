@@ -97,6 +97,7 @@ def main():
         gc.enable()
 
         #import pudb
+        #app.exec()
         
         # 2. initialize main window
         mainWindow = mainwindow.ScipyenWindow(app, settings = scipyen_config.scipyen_config)

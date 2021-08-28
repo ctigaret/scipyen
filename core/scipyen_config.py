@@ -54,11 +54,18 @@ import confuse
 from types import new_class
 from functools import partial
 
+from matplotlib.figure import Figure
+from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
+from PyQt5.QtWidgets import (QWidget, QMainWindow)
+from PyQt5.QtCore import (QSettings, QVariant)
+
 import traitlets
 from traitlets.utils.bunch import Bunch
 import traitlets.config
 from .traitcontainers import DataBag
 from core import traitutils
+from core.prog import safeWrapper
+
 
 # BEGIN NOTE: 2021-01-10 13:17:58
 # LazyConfig inherits form confuse.Configuration, but its read() method must be 
@@ -80,57 +87,632 @@ from core import traitutils
 scipyen_config = confuse.LazyConfig("Scipyen", "scipyen_defaults")
 if not scipyen_config._materialized:# make sure this is done only once
     scipyen_config.read() 
+    
+@safeWrapper
+def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]) -> typing.Tuple[str, str]:
+    """Generates a QSettings group name and, optionally, a prefix for a window.
+    
+    Parameters:
+    ===========
+    win: QMainWindow, QWidget, or matplotlib Figure
+    
+    Returns:
+    =======
+    
+    A tuple of str (group_name, prefix), where:
+    
+        * group_name is the name of the settings group in the QSettings .conf 
+            file (on Linux this is $HOME/.config/Scipyen/Scipyen.conf)
+    
+        * prefix is to be prepended to the QSettings key name (pseudo-subgroups)
+         and may be the empty string.
+        
+    For Scipyen's top-level instances of QMainWindow (see NOTE 1):
+        * 'group_name' is the name of the viewer's class
+        * 'prefix' is the empty string.
+        
+    For Scipyen's viewers that are not 'top-level':
+        * 'group_name' is the name of the viewer's parent class
+        * 'prefix' is composed of the name of the viewer's class and a persistent
+            tag string that differentiates the specific win instance from other
+            instances of the same class as win.
+            
+    This ensures that the QSettings are consistent among all the instances 
+    of the viewer. For example, if there are several ImageViewer instances,
+    the window geometry, colormap and other GUI-related settings are those
+    of the last ImageViewer window being closed.
+    
+    Since there can be any number of ImageViewer windows open during a Scipyen
+    session, managing the settings for each individual instance is not only 
+    difficult, but does not make sense.
+        
+    For QMainWindow instances that are managed by a Scipyen top-level window it
+    is assumed that there is a maximum number of such instances, and managing 
+    their settings individually not only is possible but it may also make more 
+    sense.
+    
+    The typical example is that of LSCaT where the main GUI window is a 
+    'top-level' Scipyen viewer and manages a fixed number of ImageViewer windows
+    (up to the number of image channels). The settings for these individual
+    ImageViewer windows need to be persistent across sessions and managed
+    individually (e.g., a given channel should always be viewed in the same 
+    colormap, etc).
+    
+    NOTE 1: A 'top-level' window is any Scipyen viewer that operates directly in 
+            Scipyen's workspace and is managed by Scipyen's main window.
+            
+            These include Scipyen's main window (ScipyenWindow), the console
+            classes (ScipyenConsole, ExternalConsole, and ExternalConsoleWindow)
+            and all matplotlib figures managed by matplotlib.pyplot
+            
+    """
+    pfx = ""
+    
+    if isinstance(win, QMainWindow):
+        #if isinstance(win, WorkspaceGuiMixin): 
+        # cannot have here this as importing gui.workspacegui would trigger 
+        # recursive import cycles
+        if hasattr(win, "isTopLevel"): # (this is a WorkspaceGuiMixin)
+            if win.parent() is None or win.isTopLevel:
+                gname = win.__class__.__name__
+            else:
+                gname = win.parent().__class__.__name__
+                pfx = win.__class__.__name__
+        else:
+            # again cannot import ScipyenWindow directly 'cause it will trigger
+            # recursive import cycles
+            if win.parent() is None or "ScipyenWindow" in win.parent().__class__.__name__:
+                gname = win.__class__.__name__
+            else:
+                gname = win.parent().__class__.__name__
+                pfx = win.__class__.__name__
+                
+    elif isinstance(win, Figure):
+        gname = win.canvas.__class__.__name__
+                
+    else:
+        gname = win.__class__.__name__
+        
+    return gname, pfx
 
-def make_configurable(klassname:str, kwargs:Bunch):
-    """
-    klassname:str the name of the configurable klass
-    kwargs:traitlets.utils.bunch.Bunch (a dict, unwrapped) with :
-        key: name of the configured parameter
-        value: Bunch with three mandatory keys:
-            "default": the default value for the named configured parameter
-            "help": a help string (may be empty) or None
-            
-    """
-    if not isinstance(klassname, str):
-        raise TypeError("'klassname' expected a str; got %s instead" % type(klassname).__name__)
+#@safeWrapper
+def saveQSettingsKey(qsettings:QSettings, 
+                    gname:str, pfx:str, key:str, val:typing.Any) -> None:
+    if len(gname.strip()) == 0:
+        gname = "General"
+    key_name = "%s%s" % (pfx, key)
+    #print("saveQSettingsKey group %s key %s, value %s (%s)" % (gname, key_name, val, type(val)))
+    qsettings.beginGroup(gname)
+    qsettings.setValue(key_name, val)
+    qsettings.endGroup()
     
-    if len(klassname.strip()) == 0:
-        raise ValueError("'klassname' cannot be an empty string")
-    
-    if not isinstance(kwargs, Bunch):
-        raise TypeError("'kwargs' expected a traitlets.utils.bunch.Bunch; got %s instead" % type(kwargs).__name__)
-    
-    if any([s not in kwargs for s in ("default", "help")]):
-        raise ValueError("'kwargs must contain Bunch with ")
-    
-    def _exec_body_(ns, kwargs):
-        """Generates the body of the configurable subclass
-        """
-        for key, val in kwargs:
-            if not isinstance(val, Bunch) or any([s not in val for s in ("default", "help")]):
-                raise ValueError("Expecting Bunch with 'default' and 'help' keys")
-            
-            myclass = type(val.default)
-            myhelp = val.help
-            
-            traitclass = traitutils.TRAITSMAP.get(myclass, (None, ))[0]
-            if traitclass is None:
-                traitclass = traitlets.Any
-            
-            ns[key] = traitclass(val.default, help=myhelp).tag(config=True)
-            
-    new_klass = new_class(klassname, bases = (traitlets.config.Configurable,),
-                          exec_body = partial(_exec_body_, kwargs=kwargs))
-    
-    return new_klass()
+#@safeWrapper
+def loadQSettingsKey(qsettings:QSettings,
+                     gname:str, pfx:str, key:str, default:typing.Any) -> typing.Any:
+    if len(gname.strip()) == 0:
+        gname = "General"
+    key_name = "%s%s" % (pfx, key)
+    #print("loadQSettingsKey group %s key %s, default %s (%s)" % (gname, key_name, type(default).__name__, default))
+    qsettings.beginGroup(gname)
+    ret = qsettings.value(key_name, default)
+    qsettings.endGroup()
+    return ret
 
-class ScipyenConfigurable(traitlets.config.Configurable):
-    """Superclass of all non-gui configurations - testing do not use
+def syncScipyenSettings():
+    pass
+    
+def syncQSettings(qsettings:QSettings, 
+                    win:typing.Union[QMainWindow, QWidget, Figure], 
+                    group_name:typing.Optional[str]=None,
+                    prefix:typing.Optional[str]=None,
+                    save:bool=True)-> typing.Tuple[str, str]:
+    """Synchronize user-specifc settings with the Scipyen's Qt configuration file.
+    
+    The Scipyen's configuration file is in native format, and on Linux it usually
+    is $HOME/.config/Scipyen/Scipyen.conf. For details, please see QSettings 
+    class documentation in Qt Assistant, or at:
+    https://doc.qt.io/qt-5/qsettings.html
+    
+    The direction of synchronization is determined by the :bool: value of the 
+    'save' parameter: when True, the settings are save to the file; otherwise,
+    they are loaded.
+    
+    The general idea is that the QSettings conf file only supports one level of
+    grouping for qsetting key/value entries. Subgroups can be emulated with
+    distinct prefixes to the qsettings key.
+    
+    What exactly is synchronized is specified in the class attributes '_qtcfg'
+    and '_ownqtcfg' of win.
+    
+    All window classes in Scipyen that inherit from gui.workspacegui.WorkspaceGuiMixin
+    have at least the '_qtcfg' attribute.
+    
+    _qtcfg is a mapping of QSettings key names to a tuple of str containing:
+    * either a single element - corresponding to an instance property with read/write access
+    * or two elements corresponding to the getter and setter method (in this order)
+        for the particular setting
+        
+    By default, '_qtcfg' is:
+    
+    {'WindowSize':      ('size',        'resize'),
+     'WindowPosition':  ('pos',         'move'),
+     'WindowGeometry':  ('geometry',    'setGeometry'),
+     'WindowState':     ('saveState',   'restoreState')
+     }
+     
+    In subclasses of WorkspaceGuiMixin '_qtcfg' should be augmented by a similar
+    mapping in '_ownqtcfg'
+    
+    E.g., for SignalViewer, the '_ownqtcfg' is 
+    
+    {'VisibleDocks': ('visibleDocks',)}
+    
+    where 'visibleDocks' is a dynamic property that retrieves a dict 
+    {dock_name1: visible bool, dock_name2: visible bool, <etc...>} and its 
+    setter expects the same.
+    
+    The '_qtcfg'-based mechanism ensures that the following keys are always
+    synchronized whenever the win's class provides 'getter' and 'setter' methods
+    for access:
+    
+    QSettings key     Getter method                   Setter method
+    ------------------------------------------------------------------------------
+    Window size       win.size()      -> QSize        win.resisze(QSize)
+    Window position   win.pos()       -> QPoint       win.move(QPoint)
+    Window geometry   win.geometry()  -> QRect        win.setGeometry(QRect)
+    Window state      win.saveState() -> QByteArray   win.restoreState(QByteArray)
+    
+    Of these, the first three are available for all objects derived from QWidget
+    (including RichJupyterWidget,such as Cipyen's console); the window state is 
+    only available for objects derived from QMainWindow.
+    
+    This mechanism can be bypassed in order to save/load QSettings keys directly
+    using the QSettings API, or, for a more consistent group and key nomenclature, 
+    via qSettingsGroupPfx(), followed by saveQSettingsKey() or loadQsettingsKey()
+    functions in this module.
+    
+    Settings are always saved in groups inside the Scipyen.conf file. The group's
+    name is determined automatically, or it can be specified.
+    
+    Because the conf file only supports one level of group nesting (i.e. no 
+    "sub-groups") an optional extra-nesting level is emulated by prepending
+    a custom prefix to the setting's name (or key).
+    
+    Parameters:
+    ==========
+    
+    qsettings: QtCore.QSettings. Typically, Scipyen's global QSettings.
+    
+    win: QMainWindow or matplotlib Figure. The window for which the settings are
+        loaded.
+    
+    group_name:str, optional, default is None. The qsettings group name under 
+        which the settings will be saved.
+        
+        When specified, this will override the automatically determined group 
+        name (see below).
+    
+        When group_name is None, the group name is determined from win's type 
+        as follows:
+        
+        * When win is a matplotlib Figure instance, group name is set to the 
+            class name of the Figure's canvas 
+            
+        * When win is an instance of a QMainWindow (this includes Scipyen's main
+            window, all Scipyen viewer windows, and ExternalConsoleWindow):
+            
+            * for instances of WorkspaceGuiMixin:
+                * if win is top level, or win.parent() is None:
+                    group name is the name of the win's class
+                    
+                * otherwise:
+                    group name is set to the class name of win.parent(); 
+                    prefix is set to the win's class class name in order to
+                    specify the settings entries
+            
+            * otherwise, the win is considered top level and the group name is
+            set to the win's class name
+            
+        For any other window types, the group name is set to the window's class 
+        name (for now, this is only the case for ScipyenConsole which inherits 
+        from QWidget, and not from QMainWindow).
+        
+    prefix: str (optional, default is None)
+        When given, it will be prepended to the settings entry name. This is 
+        useful to distinguish between several windows of the same type which are
+        children of the same parent, yet need distinct settings.
+        
+    custom: A key(str) : value(typing.Any) mapping for additional entries.
+    
+        The values in the mapping are default values used when their keys are 
+        not found in qsettings.
+        
+        If found, their values will be mapped to the corresponding key in 'custom'
+        
+        Since 'custom' is passed by reference, the new settings values can be 
+        accessed directly from there, in the caller namespace.
+        
+    Returns:
+    ========
+    
+    A tuple: (group_name, prefix) 
+        group_name is the qsettings group name under which the win's settings 
+            were saved
+            
+        prefix is th prefix prepended to each setting name
+        
+        These are useful to append settings later
+    
     """
-    name = traitlets.Unicode("defaultname", help="object name").tag(config=True)
+    
+    gname, pfx = qSettingsGroupPfx(win)
+    
+    if isinstance(group_name, str) and len(group_name.strip()):
+        # NOTE: 2021-08-24 15:04:31 override internally determined group name
+        gname = group_name
+        
+    if isinstance(prefix, str) and len(prefix.strip()):
+        # NOTE: 2021-08-24 15:04:31 override internally determined group name
+        pfx = prefix
+        
+    if isinstance(pfx, str) and len(pfx.strip()):
+        key_prefix = "%s_" % pfx
+    else:
+        key_prefix=""
+        
+    settings = dict()
+    
+    qtcfg = dict()
+    qtcfg.update(getattr(win, "_qtcfg", {}))
+    qtcfg.update(getattr(win, "_ownqtcfg", {}))
+    
+    #qtcfg.update(getattr(type(win), "_qtcfg", {}))
+    #qtcfg.update(getattr(type(win), "_ownqtcfg", {}))
     
     
+    for key, getset in qtcfg.items():
+        # NOTE: 2021-08-28 21:59:43
+        # val, below, can be a function, or the value of a property
+        # in the former case it SHOULD have a '__call__' attribute;
+        # in the latter, it is whatever the property.fget returns (which may still be
+        # a function or method, with a '__call__' attribute!)
+        
+        gettername = getset[0]
+
+        if not isinstance(gettername, str) or len(gettername.strip()) == 0:
+            continue
+        
+        getter = inspect.getattr_static(win, gettername, None)
+        
+        if isinstance(getter, property):
+            val = getattr(win, gettername)
+            
+        elif getter is not None: # in case gettername does not exist as a win's attribute name
+            # getter may by a function/method, or a sip.wrapper (for Qt objects)
+            val = getattr(win, gettername)()
+        
+        else:
+            continue
+            
+        #action = "save" if save else "load"
+        #print("syncQSettings, %s: win: %s, key: %s, getset: %s, gname: %s, pfx: %s, val %s (%s)" % (action, win.__class__.__name__, key, str(getset), gname, pfx, type(val).__name__, val))
+        
+        if save:
+            saveQSettingsKey(qsettings, gname, key_prefix, key, val)
+            
+        else:
+            if len(getset) == 2:
+                settername = getset[1]
+                
+            else:
+                settername = getset[0]
+                
+            setter = inspect.getattr_static(win, settername, None)
+            
+            default = val
+            
+            newval = loadQSettingsKey(qsettings, gname, key_prefix, key, default)
+            
+            if isinstance(setter, property):
+                #print("win.%s = %s" % (settername, newval))
+                setattr(win, settername, newval)
+                
+            elif setter is not None:
+                setter = getattr(win, settername)
+                setter(newval)
+                
+            else:
+                continue
+            
+        
+        #if len(getset) == 1:
+            #if save:
+                ##if inspect.isfunction(val) or inspect.isbuiltin(val) or inspect.ismethod(val):
+                #if hasattr(val, "__call__"):
+                    #saveQSettingsKey(qsettings, gname, key_prefix, key, val())
+                    
+                #elif val is not None:
+                    #saveQSettingsKey(qsettings, gname, key_prefix, key, val)
+                    
+            #else:
+                #if inspect.isfunction(val):
+                    #default = val()
+                #else:
+                    #default = val
+                    
+                #newval = loadQSettingsKey(qsettings, gname, key_prefix, key, default)
+                ## NOTE: when getset is a 1-tuple will raise if getset[0] is not
+                ## a read/write property
+                
+                #if isinstance(setter, property):
+                    #setattr(win, setter, newval)
+                    
+                #elif setter is not None:
+                    #setter
+                #else:
+                    #continue
+                #setattr(win, getset[0], newval)
+            
+        #elif len(getset) == 2:
+            #if save:
+                #if inspect.isfunction(val) or inspect.isbuiltin(val):
+                    #saveQSettingsKey(qsettings, gname, key_prefix, key, val())
+                #elif val is not None:
+                    #saveQSettingsKey(qsettings, gname, key_prefix, key, val)
+            #else:
+                #setter = getattr(win, getset[1], None)
+                #if setter is not None:
+                    #if inspect.isfunction(val) or inspect.isbuiltin(val):
+                        #default = val()
+                    #else:
+                        #default = val
                         
+                    #newval = loadQSettingsKey(qsettings, gname, key_prefix, key, default)
+                    
+                    #if inspect.isfunction(setter):
+                        #setter(newval)
+                    #else:
+                        #setattr(win, getset[1], newval)
+            
+        #elif len(getset) == 3:
+            #default = getset[2]
+            #if save:
+                #if inspect.isfunction(val):
+                    #saveQSettingsKey(qsettings, gname, key_prefix, key, val())
+                    
+                #elif val is not None:
+                    #saveQSettingsKey(qsettings, gname, key_prefix, key, val)
+            #else:
+                #setter = getattr(win, getset[1], None)
+                #if setter is not None:
+                    #newval = loadQSettingsKey(qsettings, gname, key_prefix, key, default)
+                    #setter(newval)
+            
+    return gname, pfx
+    
+class ScipyenConfigurable(object):
+    """Defines the makeConfigurable decorator for settings management
+    
+    See ScipyenConfigurable.makeConfigurable documentation for details
+    
+    Unrelated to traitlets.config.Configurable - not not confuse!
+    
+    """
+    @classmethod
+    def makeConfigurable(cls, confname:str, conftype:str="Qt"):
+        """Decorator to set up a type's property as a configurable.
+        
+        A configurable is an attribute (typically, a data descriptor) that can 
+        be saved as a persistent setting of an object, to be restored in a later
+        Scipyen session.
+        
+        This is achieved by augmenting the type with an attribute that maps an 
+        arbitrary setting name (str) to a tuple containing the names of the
+        getter and setter methods for the particular data descriptor defined in 
+        the object's type.
+        
+        Depending on the third argument of the initializer, the new type 
+        attribute is  called '_qtcfg', or '_cfg' and takes the form:
+        
+        {
+            SettingName1: (getter_method1_name, setter_method1_name),
+            SettingName2: (getter_method2_name, setter_method2_name),
+            ... etc...
+        }
+        
+        The '_qtcfg' and '_cfg' mappings are used by syncQSettings and 
+        syncScipyenSettings, respectively
+        
+        When the tuple contains only one str, this is assumed to be the name of
+        a read/write property. CAUTION: this may raise AttributeError when the
+        property is read-only and an attempt is made to set it to a value loaded
+        from the config file.
+        
+        WARNING This behaviour may change in the future, enforcing the read/write
+        property to be represented by a tuple of (getter, setter) names even when 
+        they are the same.
+        
+        Of course, the '_qtcfg' and '_cfg' type attributes can be also set 
+        manually (i.e. 'hardcoded') in any user-defined type. This is useful 
+        when the user-defined type is derived (inherits) from a type defined in 
+        a thid party library (and thus cannot be modified), provided that:
+        
+        1) the designer of the new type already KNOWS what are the getter/setter
+        methods for a settings 
+        
+        2) the setter accepts the same data type as returned by the getter
+        
+        For example, see WorkspaceGuiMixin._qtcfg which uses 
+        PyQt5.QWidgets.QMainWindow method names for window size, position, etc)
+        
+        Usage scenarios:
+        
+        1) As a decorator for data descriptors in user-defined classes - this is 
+        a shorthand for manually defining '_qtcfg' and/or '_cfg' as above.
+        
+        Let 'SomeType' a user-defined type, where the designer has defined a
+        read-write property called 'someprop':
+        
+        # this defines the property 'someprop' of 'SomeType' as read-only
+        # because this is the first thing that the Python compiler sees when reading
+        # the source code, and therefore 'someprop' will only have its 'fget'
+        # defined as a function.
+        @property           
+        def someprop(self):
+            return ...
+            
+        # this adds write capability to the 'someprop' property of 'SomeType'
+        # now, the compiler rightly set the property's 'fset' attribute to a 
+        # function
+        @someprop.setter    
+        def someprop(self, val):
+            ...
+            
+        To covert 'someprop' into a Qt setting, decorate _AT_LEAST_ the setter
+        so that the property can be used in both ways (read/write)
+        
+        # this will make it a read-only settings: it can be saved to, or loaded
+        # from the config file, but if 'SomeType' does not also define a setter,
+        # attempts to set a value loaded from the config file will raise
+        # AttributeError
+        # NOTE that this happens because when the 'someprop' property is first
+        # defined, it is by default read-only (i.e., its 'fset' method is an
+        # empty wrapper)
+        @makeConfigurable(SomeType, 'SomeProp') # 'Qt' is the default
+        @property
+        def someprop(self):
+            ...
+            
+        # this will overwrite mechanism the effect of the above by explicitly
+        # mapping the settings name 'SomeProp' to ('someprop' , 'someprop')
+        # in SomeType._qtcfg attribute
+        #
+        # Hence, as 'SomeType' is defining a setter for 'someprop', the 
+        # decorator needs only to be used here.
+        #
+        @makeConfigurable(SomeType, 'SomeProp') # 'Qt' is the default
+        @someprop.setter
+        def someprop(self):
+            ...
+                
+        Parameters:
+        ==========
+        
+        cls: type = the type of the object where the property to be set as a 
+            configurable, is defined
+            
+        confname: str = the name of the configuration (or setting) element
+        
+        conftype: str = 'Qt', 'default', or anything else (optional, default is 'Qt')
+        
+            When 'type' is the 'Qt', (the default) then this is a setting to be 
+            saved in / loaded from the Scipyen's QSettings conf file 
+            (typically, $HOME/.config/Scipyen/Scipyen.conf).
+            
+            When 'type' is 'default', then this is a setting to be saved in, or
+            loaded from, the config_default.yaml file
+            (typically, in the root directory of where Scipyen is installed, 
+            assuming it has read/write access to the user)
+            
+            Otherwise, it will be considerd to be a setting to be saved in the 
+            user's config.yaml fileLoaders
+            (typically, in $HOME/.config/Scipyen/config.yaml)
+            
+        """
+        #print("makeConfigurable: cls", cls, "confname", confname, "conftype", conftype)
+        if not isinstance(confname, str) or len(confname.strip()) == 0:
+            return f # fails silently
+        
+        def wrapper(f):
+            if isinstance(f, property):
+                gs = []
+                if inspect.isfunction(f.fget):
+                    propname = f.fget.__qualname__.split(".")[-1]
+                    gs.append(propname)
+                    
+                if inspect.isfunction(f.fset):
+                    propname = f.fset.__qualname__.split(".")[-1]
+                    gs.append(propname)
+                    
+                if conftype is "Qt":
+                    if hasattr(cls, "_qtcfg") and isinstance(cls._qtcfg, dict):
+                        cls._qtcfg.update({confname: tuple(gs)})
+                        
+                    else:
+                        cls._qtcfg = Bunch({confname: tuple(gs)})
+
+                elif conftype is "default":
+                    # TODO: 2021-08-28 14:55:28
+                    # implement saving to defaults
+                    pass
+            
+                else:
+                    if hasattr(cls, "_cfg") and isinstance(cls._cfg, dict):
+                        cls._cfg.update({confname: tuple(gs)})
+                        
+                    else:
+                        cls._cfg = Bunch({confname: tuple(gs)})
+                        
+            return f
+        
+        return wrapper
+
+    @property
+    def configurables(self):
+        return getattr(self, "_cfg", None) # only present in derived classes
+    
+    @property
+    def qtconfigurables(self):
+        """A str -> type mapping of configurable properties for QSettings.
+        
+        The keys of the mapping (str) are attributes or descriptors with read &
+        write access, defined in the viewer class, as follows. 
+        
+        key:str = QSettings key
+        
+        value: 
+        EITHER: tuple (str, str) = (getter method name, setter method name)
+                where:
+                    getter method name: name of instance or :class: method that
+                                        returns a Python object (CAUTION: when
+                                        the method returns SEVERAL obejcts they
+                                        will be captured in a tuple!)
+                                        
+                    setter method name: name of the instance or :class: method that
+                                        accepts ONE Python object as parameter
+                                        of the same type as the return value of
+                                        the getter method
+        
+        OR:     tuple (str, ) = property
+                where: property is the name of a descriptor with read-write access
+                CAUTION: If the propert is read-only, trying to set values
+                loaded from configuration file will raise AttributeError
+                
+                WARNING: this behaviour is on its way out, and two method names
+                will be required for read-write settings (even if they refer to
+                the same method).
+        
+        The values are returned by the getter method is expected to be built-in 
+        Python types that can be easily converted to a QVariant, EXCLUDING:
+        - context managers
+        - modules
+        - classes
+        - functions and methods
+        - code objects
+        - type objects
+        - Ellipsis
+        - NotImplemented
+        - stack frame objects
+        - traceback objects
+        
+        NOTE: No type checking is performed.
+        
+        """
+        # TODO 2021-08-25 16:47:16
+        # if using traitlets.config framework then define observer functions to 
+        # write atomic qsettings keys to the conf file, as the configurble is changed
+        return getattr(self, "_cfg", None) # only present in derived classes
+
 class ScipyenConfiguration(DataBag):
     """Superclass of all non-gui configurations
     """

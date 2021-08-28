@@ -2492,6 +2492,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     def scrollBarPosition(self):
         return self._control.layoutDirection()
         
+    @WorkspaceGuiMixin.makeConfigurable("ScrollBarPosition")
     @scrollBarPosition.setter
     def scrollBarPosition(self, value:typing.Union[int, str]):
         if isinstance(value, str):
@@ -2521,22 +2522,26 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
         """
         return True
 
+    #@safeWrapper
     def _save_settings_(self):
-        saveWindowSettings(self.qsettings, self, group_name=self.__class__.__name__)
-        self.qsettings.beginGroup(self.__class__.__name__)
+        gname, pfx = saveWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
+        self.qsettings.beginGroup(gname)
+        #self.qsettings.beginGroup(self.__class__.__name__)
         self.qsettings.setValue("FontFamily", self.font.family())
         self.qsettings.setValue("FontPointSize", self.font.pointSize())
         self.qsettings.setValue("FontStyle", self.font.style())
         self.qsettings.setValue("FontWeight", self.font.weight())
         self.qsettings.setValue("Scheme", self.custom_pygment)
         self.qsettings.setValue("Colors", self.custom_colors)
-        self.qsettings.setValue("ScrollBarPosition", self.scrollBarPosition)
+        #self.qsettings.setValue("ScrollBarPosition", self.scrollBarPosition)
         self.qsettings.endGroup()
 
+    #@safeWrapper
     def _load_settings_(self):
         # located in $HOME/.config/Scipyen/Scipyen.conf
-        loadWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
-        self.qsettings.beginGroup(self.__class__.__name__)
+        gname, pfx = loadWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
+        #self.qsettings.beginGroup(self.__class__.__name__)
+        self.qsettings.beginGroup(gname)
         fontFamily = self.qsettings.value("FontFamily", self.defaultFixedFont.family())
         fontSize = int(self.qsettings.value("FontPointSize", self.defaultFixedFont.pointSize()))
         fontStyle = int(self.qsettings.value("FontStyle", self.defaultFixedFont.style()))
