@@ -2137,7 +2137,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
         
         self.console.show()
-        self.console.set_pygment(self.console.custom_pygment) # must be applied on visible console!
+        self.console.set_pygment(self.console._console_pygment) # must be applied on visible console!
         
     # NOTE: 2016-03-20 21:18:32
     # to run code inside the console and use the console as stdout, 

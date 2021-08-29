@@ -39,6 +39,7 @@ import signal
 import json
 import sys, typing, traceback, itertools
 from functools import partial, partialmethod
+from collections import OrderedDict
 from warnings import warn
 
 
@@ -87,9 +88,19 @@ from core.extipyutils_client import (init_commands, execute, ForeignCall,
                                     nrn_ipython_initialization_cmd,)
 from core.strutils import str2symbol
 
+from core.scipyen_config import ScipyenConfigurable
+
 from gui.workspacegui import (WorkspaceGuiMixin, 
                               saveWindowSettings, loadWindowSettings,
                               )
+
+from gui.guiutils import (get_font_style, get_font_weight,)
+
+makeConfigurable = WorkspaceGuiMixin.makeConfigurable
+
+consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.LayoutDirection) ) , key = lambda x: x[1]))
+
+defaultFixedFont = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
 
 flags = dict(base_flags)
 qt_flags = {
@@ -135,52 +146,54 @@ def available_pygments():
 def get_available_syntax_styles():
     return sorted(list(pstyles.get_all_styles()))
 
-class ExternalConsoleWidget(RichJupyterWidget):
+class ExternalConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
+    """Not used
+    """
     def __init__(self, *args, **kw):
         super().__init__(*args, **kw)
         
-    def _handle_shutdown_reply(self, msg):
-        """ Handle shutdown signal, only if from other console.
-        """
-        self.log.debug("shutdown: %s", msg.get('content', ''))
-        restart = msg.get('content', {}).get('restart', False)
-        if not self._hidden and not self.from_here(msg):
-            # got shutdown reply, request came from session other than ours
-            if restart:
-                # someone restarted the kernel, handle it
-                self._handle_kernel_restarted(died=False)
-            else:
-                # kernel was shutdown permanently
-                # this triggers exit_requested if the kernel was local,
-                # and a dialog if the kernel was remote,
-                # so we don't suddenly clear the qtconsole without asking.
-                if self._local_kernel:
-                    self.exit_requested.emit(self)
-                else:
-                    title = self.window().windowTitle()
-                    reply = QtWidgets.QMessageBox.question(self, title,
-                        "Kernel has been shutdown permanently. "
-                        "Close the Console?",
-                        QtWidgets.QMessageBox.Yes,QtWidgets.QMessageBox.No)
-                    if reply == QtWidgets.QMessageBox.Yes:
-                        self.exit_requested.emit(self)
+    #def _handle_shutdown_reply(self, msg):
+        #""" Handle shutdown signal, only if from other console.
+        #"""
+        #self.log.debug("shutdown: %s", msg.get('content', ''))
+        #restart = msg.get('content', {}).get('restart', False)
+        #if not self._hidden and not self.from_here(msg):
+            ## got shutdown reply, request came from session other than ours
+            #if restart:
+                ## someone restarted the kernel, handle it
+                #self._handle_kernel_restarted(died=False)
+            #else:
+                ## kernel was shutdown permanently
+                ## this triggers exit_requested if the kernel was local,
+                ## and a dialog if the kernel was remote,
+                ## so we don't suddenly clear the qtconsole without asking.
+                #if self._local_kernel:
+                    #self.exit_requested.emit(self)
+                #else:
+                    #title = self.window().windowTitle()
+                    #reply = QtWidgets.QMessageBox.question(self, title,
+                        #"Kernel has been shutdown permanently. "
+                        #"Close the Console?",
+                        #QtWidgets.QMessageBox.Yes,QtWidgets.QMessageBox.No)
+                    #if reply == QtWidgets.QMessageBox.Yes:
+                        #self.exit_requested.emit(self)
 
-    def _handle_status(self, msg):
-        """Handle status message"""
-        # This is where a busy/idle indicator would be triggered,
-        # when we make one.
-        state = msg['content'].get('execution_state', '')
-        if state == 'starting':
-            # kernel started while we were running
-            if self._executing:
-                self._handle_kernel_restarted(died=True)
-        elif state == 'idle':
-            pass
-        elif state == 'busy':
-            pass
+    #def _handle_status(self, msg):
+        #"""Handle status message"""
+        ## This is where a busy/idle indicator would be triggered,
+        ## when we make one.
+        #state = msg['content'].get('execution_state', '')
+        #if state == 'starting':
+            ## kernel started while we were running
+            #if self._executing:
+                #self._handle_kernel_restarted(died=True)
+        #elif state == 'idle':
+            #pass
+        #elif state == 'busy':
+            #pass
 
 
-class ExternalConsoleWindow(MainWindow):
+class ExternalConsoleWindow(MainWindow, ScipyenConfigurable):
     """Inherits qtconsole.mainwindow.MainWindow with a few added perks.
     """
     # NOTE 2020-07-08 23:24:47
@@ -196,6 +209,8 @@ class ExternalConsoleWindow(MainWindow):
     sig_kernel_disconnect = pyqtSignal(dict)
     #sig_will_close = pyqtSignal()
     
+    # NOTE: 2021-08-29 19:09:24
+    # all widget factories currently generate a RichJupyterWidget
     def __init__(self, app, consoleapp,
                     confirm_exit=True,
                     new_frontend_factory=None,                  # ExternalIPython.new_frontend_master
@@ -233,11 +248,21 @@ class ExternalConsoleWindow(MainWindow):
         
         # NOTE 2020-07-09 00:41:55
         # no menu bar or tab bar at this time!
-        self.defaultFixedFont = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
-        self.qsettings = QtCore.QSettings()
-        self._console_font_ = None
+        self.defaultFixedFont = defaultFixedFont
+        self._consoleFont = self.defaultFixedFont
         self._layout_direction_ = QtCore.Qt.LeftToRight
-        self._load_settings_()
+        
+        #self._initial_style = self.style()
+        #self._initial_style_sheet = self.style_sheet
+        
+        self._console_pygment=""
+        self._console_colors=""
+        
+        self.qsettings = QtCore.QSettings()
+        # NOTE: Whis won;t have any effect here because during __init__ there's
+        # no widget (RichJupyterWidget) yet
+        
+        #self._load_settings_()
         # NOTE: 2021-01-23 21:15:52 
         # this is the parent (running) Scipyen application, not
         # the ExternalIPython! - this is another 
@@ -250,6 +275,7 @@ class ExternalConsoleWindow(MainWindow):
 
         icon = QtGui.QIcon.fromTheme("JupyterQtConsole")
         self.setWindowIcon(icon)
+        self.setAcceptDrops(True)
         
         # NOTE: 2021-01-24 14:31:09
         # maps connection file (str) to a dict which in turn maps keys to
@@ -295,6 +321,20 @@ class ExternalConsoleWindow(MainWindow):
         
         self._cached_connections_ = dict()
         
+    def _widget(self):
+        """Consistent retrieval of console widget - for look and feel settings
+        """
+        widget = self.active_frontend
+        if widget is None:
+            if self.tab_widget.count():
+                widget = self.tab_widget.widget(0)
+                
+            else:
+                widget = None
+                
+        return widget
+        
+        
     def _supplement_file_menu_(self):
         """To be called separately after calling self.__init__(...).
         This is because _init__() does not initialize the menus: we don't get 
@@ -333,76 +373,453 @@ class ExternalConsoleWindow(MainWindow):
 
         else:
             self.add_menu_action(self.kernel_menu, self.initialize_neuron_act)
+            
+    def _supplement_view_menu_(self):
+        ctrl = "Meta" if sys.platform == 'darwin' else "Ctrl"
+        self.choose_font_act = QtWidgets.QAction("Font", self, shortcut=ctrl+"F",
+                                                 triggered = self.choose_font)
+        
+        self.add_menu_action(self.view_menu, self.choose_font_act)
+        
+    def choose_font(self):
+        currentFont = self.consoleFont
+        selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
+        if ok:
+            self.setFont(selectedFont) 
+        
         
     def _load_settings_(self):
+        print("ExternalConsoleWindow._load_settings_()")
+        print("\t isVisible:", self.isVisible())
+        print("\t tabs:", self.tab_widget.count())
+        if not self.isVisible() or self.tab_widget.count() == 0:
+            return
         # located in $HOME/.config/Scipyen/Scipyen.conf
         loadWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
-        self.qsettings.beginGroup(self.__class__.__name__)
-        fontFamily = self.qsettings.value("FontFamily", self.defaultFixedFont.family())
-        fontSize = int(self.qsettings.value("FontPointSize", self.defaultFixedFont.pointSize()))
-        fontStyle = int(self.qsettings.value("FontStyle", self.defaultFixedFont.style()))
-        fontWeight = int(self.qsettings.value("FontWeight", self.defaultFixedFont.weight()))
+        #self.qsettings.beginGroup(self.__class__.__name__)
+        #fontFamily = self.qsettings.value("FontFamily", self.defaultFixedFont.family())
+        #fontSize = int(self.qsettings.value("FontPointSize", self.defaultFixedFont.pointSize()))
+        #fontStyle = int(self.qsettings.value("FontStyle", self.defaultFixedFont.style()))
+        #fontWeight = int(self.qsettings.value("FontWeight", self.defaultFixedFont.weight()))
         
-        self._layout_direction_ = int(self.qsettings.value("ScrollBarPosition", QtCore.Qt.LeftToRight))
-        self.qsettings.endGroup()
+        ##self._layout_direction_ = int(self.qsettings.value("ScrollBarPosition", QtCore.Qt.LeftToRight))
+        #self.qsettings.endGroup()
 
-        self._console_font_ = QtGui.QFont(fontFamily, fontSize, fontWeight, italic = fontStyle > 0)
+        #self._console_font_ = QtGui.QFont(fontFamily, fontSize, fontWeight, italic = fontStyle > 0)
         
-        self.setAcceptDrops(True)
-        self.setScrollBarPosition(self._layout_direction_)
+        #self.setAcceptDrops(True)
+        #self.setScrollBarPosition(self._layout_direction_)
         
-    def getScrollBarPosition(self, widget=None):
+    @property
+    def scrollBarPosition(self):
+        widget = self._widget()
         if widget is None:
-            widget = self.active_frontend
-            if widget is None:
-                widget = self.tab_widget.widget(0)
-                
+            return self._layout_direction_
+
         if getattr(widget, "_control", None):
-            return widget._control.layoutDirection()
+            self._layout_direction_ = widget._control.layoutDirection()
         
-        #return QtCore.Qt.LeftToRight
         return self._layout_direction_
     
-    def setScrollBarPosition(self, layout:typing.Union[int, str]):
-        if isinstance(layout, str):
-            if layout.lower().strip() in ("right", "r"):
-                layout = QtCore.Qt.LeftToRight
-            elif layout.lower().strip() in ("left", "l"):
-                layout = QtCore.Qt.RightToLeft
-            else :
-                layout = QtCore.Qt.LayoutDirectionAuto
+    @makeConfigurable("ScrollBarPosition")
+    @scrollBarPosition.setter
+    def scrollBarPosition(self, value:typing.Union[int, str, QtCore.Qt.LayoutDirection]):
+        if isinstance(value, str):
+            if value.lower().strip() in ("right", "r"):
+                value = QtCore.Qt.LeftToRight
                 
+            elif value.lower().strip() in ("left", "l"):
+                value = QtCore.Qt.RightToLeft
+                
+            elif value in consoleLayoutDirection:
+                value = consoleLayoutDirection[value]
+                
+            else:
+                try:
+                    value = int(value)
+                    
+                except:
+                    value = QtCore.Qt.LayoutDirectionAuto
+                
+        if isinstance(value, int):
+            if value not in (QtCore.Qt.LeftToRight, QtCore.Qt.RightToLeft):
+                value = QtCore.Qt.LayoutDirectionAuto
+                
+        elif not isinstance(value, QtCore.Qt.LayoutDirection):
+            value = QtCore.Qt.LayoutDirectionAuto
+            
         for k in range(self.tab_widget.count()):
-            if hasattr(self.tab_widget.widget(k), "_control"):
-                self.tab_widget.widget(k)._control.setLayoutDirection(layout)
+            widget = self.tab_widget.widget(k)
+            
+            if getattr(widget, "_control", None):
+                widget._control.setLayoutDirection(value)
+                    
+        self._layout_direction_ = value
+        
+    @property
+    def consoleFont(self):
+        # so that is doesn't override QMainWindow.font()
+        return self._consoleFont
+    
+    @consoleFont.setter
+    def consoleFont(self, val:QtGui.QFont):
+        for k in range(self.tab_widget.count()):
+            self.tab_widget.widget(k).font = val # to force display update
+        
+        self._consoleFont = val
                 
-        self._layout_direction_ = layout
+    @property
+    def fontFamily(self) -> str:
+        widget = self._widget()
+        if widget is None:
+            ret = self._consoleFont.family()
+        else:
+            ret = widget.font.family()
+        
+        return ret
+    
+    @makeConfigurable("FontFamily")
+    @fontFamily.setter
+    def fontFamily(self, val:str) -> None:
+        widget = self._widget()
+        if widget is None:
+            font = self._consoleFont
+        else:
+            font = widget.font
+            
+        font.setFamily(val)
+        
+        for k in range(self.tab_widget.count()):
+            self.tab_widget.widget(k).font = font # to force display update
+            
+        self._consoleFont = font
+        
+    @property
+    def fontSize(self) -> int:
+        widget = self._widget()
+        if widget is None:
+            ret = self._consoleFont.pointSize()
+        else:
+            ret = widget.font.pointSize()
+        
+        return ret
+    
+    @makeConfigurable("FontPointSize")
+    @fontSize.setter
+    def fontSize(self, val:int) -> None:
+        widget = self._widget()
+        if widget is None:
+            font = self._consoleFont
+        else:
+            font = widget.font
+
+        font.setPointSize(int(val))
+
+        for k in range(self.tab_widget.count()):
+            self.tab_widget.widget(k).font = font # to force display update
+
+        self._consoleFont = font
+        
+    @property
+    def fontStyle(self) -> typing.Union[int, QtGui.QFont.Style]:
+        widget = self._widget()
+        if widget is None:
+            ret = self._consoleFont.style()
+        else:
+            ret = widget.font.style()
+        
+        return ret
+        
+    @makeConfigurable("FontStyle")
+    @fontStyle.setter
+    def fontStyle(self, val:typing.Union[int, QtGui.QFont.Style, str]) -> None:
+        style = get_font_style(val) 
+        widget = self._widget()
+        if widget is None:
+            font = self._consoleFont
+        else:
+            font = widget.font
+
+        font.setStyle(style)
+
+        for k in range(self.tab_widget.count()):
+            self.tab_widget.widget(k).font = font # to force display update
+        
+        self._consoleFont = font
+        
+    @property
+    def fontWeight(self) -> typing.Union[int, QtGui.QFont.Weight]:
+        widget = self._widget()
+        if widget is None:
+            ret = self._consoleFont.weight()
+        else:
+            ret = widget.font.weight()
+        
+        return ret
+        
+    @makeConfigurable("FontWeight")
+    @fontWeight.setter
+    def fontWeight(self, val:typing.Union[int, QtGui.QFont.Weight, str]) -> None:
+        weight = get_font_weight(val)
+        widget = self._widget()
+        if widget is None:
+            font = self._consoleFont
+        else:
+            font = widget.font
+            
+        font.setWeight(style)
+
+        for k in range(self.tab_widget.count()):
+            self.tab_widget.widget(k).font = font # to force display update
+        
+        self._consoleFont = font
+        
+    @property
+    def colors(self) -> str:
+        return self._console_colors
+    
+    @makeConfigurable("ConsoleColors")
+    @colors.setter
+    def colors(self, val:str):
+        style = self._console_pygment
+        self.set_pygment(style, val)
+
+    @property
+    def syntaxStyle(self):
+        """Name of the syntax highlight pygment (str)
+        """
+        widget = self._widget()
+        if widget is None:
+            ret = "default"
+        else:
+            ret = widget.syntax_style
+            
+        return ret
+    
+    @makeConfigurable("SyntaxStyle")
+    @syntaxStyle.setter
+    def syntaxStyle(self, style:str):
+        colors = self._console_colors
+        self.set_pygment(style, colors)
+        
+    @property
+    def isTopLevel(self) -> bool:
+        """Overrides WorkspaceGuiMixin.isToplevel; always True for ScipyenConsole.
+        This is because console inherits from RichJupyterWidget where 'parent'
+        is a traitlets.Instance property, and for ScipyenConsole is None.
+        """
+        return True
+
+    def set_pygment(self, scheme:typing.Optional[str]="", 
+                    colors:typing.Optional[str]=None):
+        """Sets up style sheet for console colors and syntax highlighting style.
+        
+        Changes apply to ALL tabs!
+        
+        The console widget (a RichJupyterWidget) takes:
+        a) a style specified in a style sheet - used for the general appearance of the console 
+        (background and ormopt colors, etc)
+        b) a color syntax highlight scheme - used for syntax highlighting
+        
+        
+        This allows bypassing any style/colors specified in 
+        ~./jupyter/jupyter_qtconsole_config.py
+        
+        Parameter:
+        -------------
+        
+        scheme: str (optional, default is the empty string) - name of available 
+                syntax style (pygment).
+                
+                For a list of available pygment names, see
+                
+                available_pygments() in this module
+                
+                When empty or None, reverts to the defaults as set by the jupyter 
+                configuration file.
+                
+        colors: str (optional, default is None) console color set. 
+            There are, by defult, three color sets:
+            'light' or 'lightbg', 
+            'dark' or 'linux',
+            'nocolor'
+            
+        """
+        import pkg_resources
+        #print("console.set_pygment scheme:", scheme, "colors:", colors)
+        if scheme is None or (isinstance(scheme, str) and len(scheme.strip()) == 0):
+            for k in range(self.tab_widget.count()):
+                self.tab_widget.widget(k).set_default_style()
+            #self.set_default_style()
+            #self._control.style = self._initial_style
+            #self.style_sheet = self._initial_style_sheet
+            return
+        
+        # NOTE: 2020-12-23 11:15:50
+        # code below is modified from qtconsoleapp module, plus my comments;
+        # find the value for colors: there are three color sets for prompts:
+        # 1. light or lightbg (i.e. colors suitable for schemes with light background)
+        # 2. dark or linux (i.e colors suitable for schemes with dark background)
+        # 3. nocolor - for black and white scheme
+        if isinstance(colors, str) and len(colors.strip()): # force colors irrespective of scheme
+            colors=colors.lower()
+            if colors in ('lightbg', 'light'):
+                colors='lightbg'
+            elif colors in ('dark', 'linux'):
+                colors='linux'
+            else:
+                colors='nocolor'
+        
+        else: # (colors is "" or anything else)
+            # make an informed choice of colors, according to whether the scheme
+            # is bright (light) or dark
+            if scheme=='bw':
+                colors='nocolor'
+            elif styles.dark_style(scheme):
+                colors='linux'
+            else:
+                colors='lightbg'
+        #else:
+            #colors=None
+            
+        if scheme in available_pygments():
+            #print("found %s scheme" % scheme)
+            # rules of thumb:
+            #
+            # 1. the syntax highlighting scheme is set by setting the console 
+            # (RichJupyterWidget) 'syntax_style' attribute to scheme. 
+            #
+            # 2. the style sheet gives the widget colors ("style") - so we always 
+            #   need a style sheet, and we "pygment" the console by setting its
+            #   'style_sheet' attribute. NOTE that schemes do not always provide
+            #   prompt styling colors, therefore we need to set up a style sheet 
+            #   dynamically based on the colors guessed according to whether the
+            #   scheme is a "dark" one or not.
+            #
+            try:
+                sheetfile = pkg_resources.resource_filename("jupyter_qtconsole_colorschemes", "%s.css" % scheme)
+                
+                if os.path.isfile(sheetfile):
+                    with open(sheetfile) as f:
+                        sheet = f.read()
+                        
+                else:
+                    #print("no style sheet found for %s" % scheme)
+                    sheet = styles.sheet_from_template(scheme, colors)
+                    #if colors:
+                        #sheet = styles.sheet_from_template(scheme, colors)
+                    #else:
+                        #sheet = styles.sheet_from_template(scheme)
+                    
+                # remember these changes - to save them in _save_settings_()
+                self._console_pygment = scheme
+                self._console_colors = colors
+                #self._custom_style_sheet = sheet
+                #self._custom_syntax_scheme = scheme
+                
+                for k in range(self.tab_widget.count()):
+                    widget = self.tab_widget.widget(k)
+                    widget.style_sheet = sheet
+                    widget.syntax_style = scheme
+                    # also need to call notifiers - this is the order in which they
+                    # are called in qtconsoleapp module ('JupyterConsoleApp.init_colors')
+                    # not sure whether it makes a difference but stick to it for now
+                    widget._syntax_style_changed() # to update display
+                    widget._style_sheet_changed()
+                    
+                    # NOTE: 2021-08-29 22:06:45
+                    # to update the prompt colors
+                    if widget.kernel_client:
+                        widget.kernel_client.execute("pass", silent=True)
+                    
+                    # NOTE: 2021-01-08 14:23:14
+                    # These two will affect all Jupyter console apps in Scipyen that
+                    # will be launched AFTER the internal console has been initiated. 
+                    # These include the ExternalIPython.
+                    #JupyterWidget.style_sheet = sheet
+                    #JupyterWidget.syntax_style = scheme
+                
+            except:
+                traceback.print_exc()
+                #pass
+            
+            # not needed (for now)
+            #style = pstyles.get_style_by_name(scheme)
+            #try:
+                ##self.syntax_style=scheme
+                #self._control.style = style
+                #self._highlighter.set_style (scheme)
+                #self._custom_syntax_style = style
+                #self._syntax_style_changed()
+            #except:
+                #traceback.print_exc()
+                #pass
+
+    #def getScrollBarPosition(self, widget=None):
+        #"""DEPRECATED
+        #"""
+        #if widget is None:
+            #widget = self.active_frontend
+            #if widget is None:
+                #widget = self.tab_widget.widget(0)
+                
+        #if getattr(widget, "_control", None):
+            #return widget._control.layoutDirection()
+        
+        ##return QtCore.Qt.LeftToRight
+        #return self._layout_direction_
+    
+    #def setScrollBarPosition(self, layout:typing.Union[int, str]):
+        #"""DEPRECATED
+        #"""
+        #if isinstance(layout, str):
+            #if layout.lower().strip() in ("right", "r"):
+                #layout = QtCore.Qt.LeftToRight
+            #elif layout.lower().strip() in ("left", "l"):
+                #layout = QtCore.Qt.RightToLeft
+            #else :
+                #layout = QtCore.Qt.LayoutDirectionAuto
+                
+        #for k in range(self.tab_widget.count()):
+            #if hasattr(self.tab_widget.widget(k), "_control"):
+                #self.tab_widget.widget(k)._control.setLayoutDirection(layout)
+                
+        #self._layout_direction_ = layout
         
     @safeWrapper
     def _save_settings_(self):
-        saveWindowSettings(self.qsettings, self, group_name=self.__class__.__name__)
-        self.qsettings.beginGroup(self.__class__.__name__)
-        self.qsettings.setValue("ScrollBarPosition", self.getScrollBarPosition())
+        print("ExternalConsoleWindow._save_settings_")
+        if self.tab_widget.count() == 0:
+            return
+        saveWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
+        #self.qsettings.beginGroup(self.__class__.__name__)
+        #self.qsettings.setValue("ScrollBarPosition", self.getScrollBarPosition())
         
-        if self.active_frontend:
-            font = self.active_frontend.font
-            self.qsettings.setValue("FontFamily", font.family())
-            self.qsettings.setValue("FontPointSize", font.pointSize())
-            self.qsettings.setValue("FontStyle", font.style())
-            self.qsettings.setValue("FontWeight", font.weight())
+        #if self.active_frontend:
+            #font = self.active_frontend.font
+            #self.qsettings.setValue("FontFamily", font.family())
+            #self.qsettings.setValue("FontPointSize", font.pointSize())
+            #self.qsettings.setValue("FontStyle", font.style())
+            #self.qsettings.setValue("FontWeight", font.weight())
             
-        self.qsettings.endGroup()
+        #self.qsettings.endGroup()
             
     @safeWrapper
     def _save_tab_settings_(self, widget):
-        font = widget.font
-        self.qsettings.beginGroup(self.__class__.__name__)
-        self.qsettings.setValue("FontFamily", font.family())
-        self.qsettings.setValue("FontPointSize", font.pointSize())
-        self.qsettings.setValue("FontStyle", font.style())
-        self.qsettings.setValue("FontWeight", font.weight())
-        self.qsettings.setValue("ScrollBarPosition", self.getScrollBarPosition(widget))
-        self.qsettings.endGroup()
+        ndx = self.tab_widget.indexOf(widget)
+        if ndx < 0:
+            return
+        
+        pfx = self.tab_widget.tabText(ndx).replace(" ", "_")
+        
+        #font = widget.font
+        #self.qsettings.beginGroup(self.__class__.__name__)
+        #self.qsettings.setValue("FontFamily", font.family())
+        #self.qsettings.setValue("FontPointSize", font.pointSize())
+        #self.qsettings.setValue("FontStyle", font.style())
+        #self.qsettings.setValue("FontWeight", font.weight())
+        #self.qsettings.setValue("ScrollBarPosition", self.getScrollBarPosition(widget))
+        #self.qsettings.endGroup()
         
     def create_tab_with_existing_kernel(self, code=None, **kwargs):
         """create a new frontend attached to an external kernel in a new tab"""
@@ -979,7 +1396,7 @@ class ExternalConsoleWindow(MainWindow):
                 
         # NOTE 2020-07-08 21:24:28
         # set our own font
-        frontend.font = self._console_font_
+        #frontend.font = self._console_font_
         
         #print("adding tab for widget", name)
         self.tab_widget.addTab(frontend, name)
@@ -1028,6 +1445,8 @@ class ExternalConsoleWindow(MainWindow):
         if external_slave:
             # force listing of user_ns in remote kernel for our display purposes
             frontend.kernel_client.shell_channel.send(frontend.kernel_client.session.msg("kernel_info_request"))
+            
+        self._load_settings_()
 
     def closeEvent(self, event):
         """ Forward the close event to every tabs contained by the windows
@@ -1092,6 +1511,7 @@ class ExternalConsoleWindow(MainWindow):
 
         # let's be sure "tab" and "closing widget" are respectively the index
         # of the tab to close and a reference to the frontend to close
+        
         if type(current_tab) is not int :
             current_tab = self.tab_widget.indexOf(current_tab)
         closing_widget=self.tab_widget.widget(current_tab)
@@ -1107,6 +1527,8 @@ class ExternalConsoleWindow(MainWindow):
         # widgets to exit
         if closing_widget is None:
             return
+        
+        self._save_settings_()
 
         #print("closing widget _keep_kernel_on_exit =", None if not hasattr(closing_widget,"_keep_kernel_on_exit") else closing_widget._keep_kernel_on_exit)
         #print("closing widget _hidden =", None if not hasattr(closing_widget,"_hidden") else closing_widget._hidden)
@@ -1685,7 +2107,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         kernel_client = kernel_manager.client()
         kernel_client.start_channels(shell=True, iopub=True)
         widget = self.widget_factory(config=self.config,
-                                     local_kernel=True)
+                                     local_kernel=True) # a RichJupyterWidget
         self.init_colors(widget)
         self.init_layout(widget)
         widget.kernel_manager = kernel_manager
@@ -1759,21 +2181,15 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         #print("ExternalIPython.new_frontend_slave: connection_file =", kernel_client.connection_file)
         return widget
     
-    def init_layout(self, widget=None):
-        """Apply scrollbar position saved in settings ('ExternalConsole/ScrollBarPosition')
-        """
-        if widget and getattr(widget, "_control", None):
-            widget._control.setLayoutDirection(self.window.getScrollBarPosition())
+    #def init_layout(self, widget=None): # don't remove yet
+        #"""Apply scrollbar position saved in settings ('ExternalConsole/ScrollBarPosition')
+        #"""
+        #if widget and getattr(widget, "_control", None):
+            #widget._control.setLayoutDirection(self.window.getScrollBarPosition())
     
     def init_qt_elements(self):
         # Create the widget.
         base_path = os.path.abspath(os.path.dirname(__file__))
-        #icon_path = os.path.join(base_path, 'resources', 'icon', 'JupyterConsole.svg')
-        #icon_path = os.path.join(base_path, 'resources', 'images', 'ipython.svg')
-        #self.app.icon = QtGui.QIcon(icon_path)
-        #self.app.icon = QtGui.QIcon.fromTheme("pattern-python-devel")
-        #self.app.icon = QtGui.QIcon.fromTheme("ipython")
-        #self.app.icon = QtGui.QIcon.fromTheme("IPython-3.6")
         
         ip = self.ip
         local_kernel = (not self.existing) or is_local_ip(ip)
@@ -1788,7 +2204,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         self.widget = self.widget_factory(config=self.config,
                                         local_kernel=local_kernel)
         self.init_colors(self.widget)
-        self.init_layout(self.widget)
+        #self.init_layout(self.widget) # don't remove yet
         self.widget._existing = self.existing
         self.widget._may_close = not self.existing
         self.widget._confirm_exit = self.confirm_exit
@@ -1803,6 +2219,8 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         self.window.init_menu_bar()
         self.window._supplement_file_menu_()
         self.window._supplement_kernel_menu_()
+        self.window._supplement_view_menu_()
+        
         
         # NOTE 2020-07-09 01:05:35
         # run general kernel intialization python commands here, as this function
@@ -1820,6 +2238,8 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
             self.window.menuBar().setVisible(False)
 
         self.window.setWindowTitle('External Scipyen Console')
+        
+        self.window._load_settings_()
         
     def _scipyen_init_exec_(self, client):
         client.execute(code="\n".join(init_commands), silent=True, store_history=False)
@@ -1944,7 +2364,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         # ORIGINAL: self.init_qt_app()
         # We use the currently running QApplication (which is Scipyen started by
         # scipyen.main())
-        self.app = QtWidgets.QApplication.instance() # this is Scipyen app!
+        self.app = QtWidgets.QApplication.instance() # this is the Scipyen app!
         
         # NOTE: 2021-01-15 14:51:38
         # this one (JupyterApp.initialize) parses argv and sets up the 
@@ -1983,6 +2403,8 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
             self.window.showMaximized()
         else:
             self.window.show()
+            
+        self.window._load_settings_()
         self.window.raise_()
 
         # Start the application main loop.
@@ -1992,15 +2414,17 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
     def launch(cls, argv=None, existing:typing.Optional[str]=None, **kwargs):
         # the launch_instance mechanism in jupyter and qtconsole does not return
         # an instance of this python "app"
-        app = cls.instance(**kwargs)
+        # NOTE: 2021-08-29 21:49:44
+        # Do NOT confuse this with Scipyen app (self.app)
+        # In fact it is a reference to ExternalIPython, which is returned below
+        app = cls.instance(**kwargs) # 
         # TODO 2021-01-15 15:39:44
         # allow launching with an external kernel
         if isinstance(existing, str) and len(existing.strip()):
             app.existing = existing
         app.initialize(argv)
         app.start()
-        #app.consoleapp = app
-        
+
         return app
     
     #### BEGIN some useful properties
@@ -2038,13 +2462,13 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
     
     @property
     def scrollBarPosition(self):
-        #return self.window.scrollBarPosition
-        return self.window.getScrollBarPosition()
+        return self.window.scrollBarPosition
+        #return self.window.getScrollBarPosition()
     
     @scrollBarPosition.setter
     def scrollBarPosition(self, value):
-        #self.window.scrollBarPosition = value
-        self.window.setScrollBarPosition(value)
+        self.window.scrollBarPosition = value
+        #self.window.setScrollBarPosition(value)
     
     #### END some useful properties
     
@@ -2175,6 +2599,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         
         
         def _exec_call_(call, kc, **kwargs):
+            # kc is the kernel client
             # allow kwargs to override named parameters but protect against 
             # overriding the execution code; 
             # NOTE user_expressions are still vulnerable to this
@@ -2253,7 +2678,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
             
         elif isinstance(where, str):
             if where == "all":
-                fronends = [self.window.get_frontend(k) for k in self.window.tab_widget.count()]
+                frontends = [self.window.get_frontend(k) for k in self.window.tab_widget.count()]
                 clients = [f.kernel_client for f in frontends]
                 
                 if len(clients):
@@ -2460,29 +2885,28 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
         
         self.drop_cache=None
         
-        self.defaultFixedFont = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
+        self.defaultFixedFont = defaultFixedFont
         
         self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_X), self)
         
         self.clear_shortcut.activated.connect(self.slot_clearConsole)
         
-        self._initial_style = self.style()
-        self._initial_style_sheet = self.style_sheet
-        #self._custom_syntax_style = None
-        #self._custom_syntax_scheme = None
-        #self._custom_style_sheet = None
-        self.custom_pygment=""
-        self.custom_colors=""
+        #self._initial_style = self.style()
+        #self._initial_style_sheet = self.style_sheet
+        self._console_pygment=""
+        self._console_colors=""
         
         self.qsettings = QtCore.QSettings()
         
-        # will also set self.custom_pygment and self.custom_colors
+        # will also set self._console_pygment and self._console_colors
         self._load_settings_()
+        
+        self.setAcceptDrops(True)
         
         # NOTE: 2021-07-18 10:17:26 - FIXME bug or feature?
         # the line below won't have effect unless the RichJupyterWidget is visible
         # e.g. after calling show()
-        self.set_pygment(self.custom_pygment) 
+        #self.set_pygment(self._console_pygment) 
         
     def closeEvent(self, evt):
         self._save_settings_()
@@ -2492,9 +2916,9 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     def scrollBarPosition(self):
         return self._control.layoutDirection()
         
-    @WorkspaceGuiMixin.makeConfigurable("ScrollBarPosition")
+    @makeConfigurable("ScrollBarPosition")
     @scrollBarPosition.setter
-    def scrollBarPosition(self, value:typing.Union[int, str]):
+    def scrollBarPosition(self, value:typing.Union[int, str, QtCore.Qt.LayoutDirection]):
         if isinstance(value, str):
             if value.lower().strip() in ("right", "r"):
                 value = QtCore.Qt.LeftToRight
@@ -2502,20 +2926,95 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
             elif value.lower().strip() in ("left", "l"):
                 value = QtCore.Qt.RightToLeft
                 
-            else:
-                value = QtCore.Qt.LayoutDirectionAuto
+            elif value in consoleLayoutDirection:
+                value = consoleLayoutDirection[value]
                 
-        elif isinstance(value, int):
+            else:
+                try:
+                    value = int(value)
+                    
+                except:
+                    value = QtCore.Qt.LayoutDirectionAuto
+                
+        if isinstance(value, int):
             if value not in (QtCore.Qt.LeftToRight, QtCore.Qt.RightToLeft):
                 value = QtCore.Qt.LayoutDirectionAuto
                 
-        else:
+        elif not isinstance(value, QtCore.Qt.LayoutDirection):
             value = QtCore.Qt.LayoutDirectionAuto
                 
         self._control.setLayoutDirection(value)
         
     @property
-    def isTopLevel(self):
+    def fontFamily(self) -> str:
+        return self.font.family()
+    
+    @makeConfigurable("FontFamily")
+    @fontFamily.setter
+    def fontFamily(self, val:str) -> None:
+        font = self.font
+        font.setFamily(val)
+        self.font = font
+        
+    @property
+    def fontSize(self) -> int:
+        return self.font.pointSize()
+    
+    @makeConfigurable("FontPointSize")
+    @fontSize.setter
+    def fontSize(self, val:int) -> None:
+        font = self.font
+        font.setPointSize(int(val))
+        self.font = font
+        
+    @property
+    def fontStyle(self) -> typing.Union[int, QtGui.QFont.Style]:
+        return self.font.style()
+        
+    @makeConfigurable("FontStyle")
+    @fontStyle.setter
+    def fontStyle(self, val:typing.Union[int, QtGui.QFont.Style, str]) -> None:
+        style = get_font_style(val) 
+        font  = self.font
+        font.setStyle(style)
+        self.font = font
+        
+    @property
+    def fontWeight(self) -> typing.Union[int, QtGui.QFont.Weight]:
+        return self.font.weight()
+
+    @makeConfigurable("FontWeight")
+    @fontWeight.setter
+    def fontWeight(self, val:typing.Union[int, QtGui.QFont.Weight, str]) -> None:
+        weight = get_font_weight(val)
+        font = self.font
+        font.setWeight(weight)
+        self.font = font
+        
+    @property
+    def colors(self) -> str:
+        return self._console_colors
+    
+    @makeConfigurable("ConsoleColors")
+    @colors.setter
+    def colors(self, val:str):
+        style = self._console_pygment
+        self.set_pygment(style, val)
+
+    @property
+    def syntaxStyle(self):
+        """Name of the syntax highlight pygment (str)
+        """
+        return self.syntax_style
+    
+    @makeConfigurable("SyntaxStyle")
+    @syntaxStyle.setter
+    def syntaxStyle(self, style:str):
+        colors = self._console_colors
+        self.set_pygment(style, colors)
+        
+    @property
+    def isTopLevel(self) -> bool:
         """Overrides WorkspaceGuiMixin.isToplevel; always True for ScipyenConsole.
         This is because console inherits from RichJupyterWidget where 'parent'
         is a traitlets.Instance property, and for ScipyenConsole is None.
@@ -2525,53 +3024,53 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     #@safeWrapper
     def _save_settings_(self):
         gname, pfx = saveWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
-        self.qsettings.beginGroup(gname)
-        #self.qsettings.beginGroup(self.__class__.__name__)
-        self.qsettings.setValue("FontFamily", self.font.family())
-        self.qsettings.setValue("FontPointSize", self.font.pointSize())
-        self.qsettings.setValue("FontStyle", self.font.style())
-        self.qsettings.setValue("FontWeight", self.font.weight())
-        self.qsettings.setValue("Scheme", self.custom_pygment)
-        self.qsettings.setValue("Colors", self.custom_colors)
-        #self.qsettings.setValue("ScrollBarPosition", self.scrollBarPosition)
-        self.qsettings.endGroup()
+        #self.qsettings.beginGroup(gname)
+        ##self.qsettings.beginGroup(self.__class__.__name__)
+        #self.qsettings.setValue("FontFamily", self.font.family())
+        #self.qsettings.setValue("FontPointSize", self.font.pointSize())
+        #self.qsettings.setValue("FontStyle", self.font.style())
+        #self.qsettings.setValue("FontWeight", self.font.weight())
+        #self.qsettings.setValue("Scheme", self._console_pygment)
+        #self.qsettings.setValue("Colors", self._console_colors)
+        ##self.qsettings.setValue("ScrollBarPosition", self.scrollBarPosition)
+        #self.qsettings.endGroup()
 
     #@safeWrapper
     def _load_settings_(self):
         # located in $HOME/.config/Scipyen/Scipyen.conf
         gname, pfx = loadWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
         #self.qsettings.beginGroup(self.__class__.__name__)
-        self.qsettings.beginGroup(gname)
-        fontFamily = self.qsettings.value("FontFamily", self.defaultFixedFont.family())
-        fontSize = int(self.qsettings.value("FontPointSize", self.defaultFixedFont.pointSize()))
-        fontStyle = int(self.qsettings.value("FontStyle", self.defaultFixedFont.style()))
-        fontWeight = int(self.qsettings.value("FontWeight", self.defaultFixedFont.weight()))
+        #self.qsettings.beginGroup(gname)
+        #fontFamily = self.qsettings.value("FontFamily", self.defaultFixedFont.family())
+        #fontSize = int(self.qsettings.value("FontPointSize", self.defaultFixedFont.pointSize()))
+        #fontStyle = int(self.qsettings.value("FontStyle", self.defaultFixedFont.style()))
+        #fontWeight = int(self.qsettings.value("FontWeight", self.defaultFixedFont.weight()))
         
-        layout_direction = int(self.qsettings.value("ScrollBarPosition", QtCore.Qt.LeftToRight))
-        self.custom_pygment = self.qsettings.value("Scheme", "")
-        self.custom_colors = self.qsettings.value("Colors", None)
-        self.qsettings.endGroup()
+        #layout_direction = int(self.qsettings.value("ScrollBarPosition", QtCore.Qt.LeftToRight))
+        #self._console_pygment = self.qsettings.value("Scheme", "")
+        #self._console_colors = self.qsettings.value("Colors", None)
+        #self.qsettings.endGroup()
         
-        console_font = QtGui.QFont(fontFamily, fontSize, fontWeight, italic = fontStyle > 0)
+        #console_font = QtGui.QFont(fontFamily, fontSize, fontWeight, italic = fontStyle > 0)
         
         
-        self.font = console_font
+        #self.font = console_font
 
-        #self.move(winPos)
-        #self.resize(winSize)
-        self.setAcceptDrops(True)
+        ##self.move(winPos)
+        ##self.resize(winSize)
+        #self.setAcceptDrops(True)
         
-        self.scrollBarPosition = layout_direction
+        #self.scrollBarPosition = layout_direction
         
-        #print(self.custom_pygment)
-        if len(self.custom_pygment.strip()):
-            self.set_pygment(scheme=self.custom_pygment)
-            # FIXME: 2021-07-17 23:37:12
-            # looks like setting colors messes up the pygment
-            #if isinstance(self.custom_colors, str) and len(self.custom_colors.strip()):
-                #self.set_pygment(scheme=self.custom_pygment, colors=self.custom_colors)
-            #else:
-                #self.set_pygment(scheme=self.custom_pygment)
+        ##print(self._console_pygment)
+        #if len(self._console_pygment.strip()):
+            #self.set_pygment(scheme=self._console_pygment)
+            ## FIXME: 2021-07-17 23:37:12
+            ## looks like setting colors messes up the pygment
+            ##if isinstance(self._console_colors, str) and len(self._console_colors.strip()):
+                ##self.set_pygment(scheme=self._console_pygment, colors=self._console_colors)
+            ##else:
+                ##self.set_pygment(scheme=self._console_pygment)
         
         
     def dragEnterEvent(self, evt):
@@ -2792,7 +3291,8 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     def slot_clearConsole(self):
         self.ipkernel.shell.run_line_magic("clear", "", 2)
         
-    def set_pygment(self, scheme:typing.Optional[str]="", colors:typing.Optional[str]=None):
+    def set_pygment(self, scheme:typing.Optional[str]="", 
+                    colors:typing.Optional[str]=None):
         """Sets up style sheet for console colors and syntax highlighting style.
         
         The console widget (a RichJupyterWidget) takes:
@@ -2827,8 +3327,9 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
         import pkg_resources
         #print("console.set_pygment scheme:", scheme, "colors:", colors)
         if scheme is None or (isinstance(scheme, str) and len(scheme.strip()) == 0):
-            self._control.style = self._initial_style
-            self.style_sheet = self._initial_style_sheet
+            self.set_default_style()
+            #self._control.style = self._initial_style
+            #self.style_sheet = self._initial_style_sheet
             return
         
         # NOTE: 2020-12-23 11:15:50
@@ -2896,8 +3397,8 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
                 self._style_sheet_changed()
                 
                 # remember these changes - to save them in _save_settings_()
-                self.custom_pygment = scheme
-                self.custom_colors = colors
+                self._console_pygment = scheme
+                self._console_colors = colors
                 #self._custom_style_sheet = sheet
                 #self._custom_syntax_scheme = scheme
                 
@@ -2905,8 +3406,8 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
                 # These two will affect all Jupyter console apps in Scipyen that
                 # will be launched AFTER the internal console has been initiated. 
                 # These include the ExternalIPython.
-                JupyterWidget.style_sheet = sheet
-                JupyterWidget.syntax_style = scheme
+                #JupyterWidget.style_sheet = sheet
+                #JupyterWidget.syntax_style = scheme
                 
             except:
                 traceback.print_exc()

@@ -1541,14 +1541,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #### BEGIN - to revisit
         self._temp_python_filename_   = None # cached file name for python source (for loading or running)
         
-        self._save_settings_guard_ = False
+        #self._save_settings_guard_ = False
         
         self._copy_varnames_quoted_ = False
         
         self._copy_varnames_separator_ = " "
         #### END - to revisit
         
-        self._setup_console_pygments_()
+        #self._setup_console_pygments_()
         
         self.setupUi(self)
         
@@ -2137,7 +2137,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
         
         self.console.show()
-        self.console.set_pygment(self.console.custom_pygment) # must be applied on visible console!
+        #self.console.set_pygment(self.console.custom_pygment) # must be applied on visible console!
         
     # NOTE: 2016-03-20 21:18:32
     # to run code inside the console and use the console as stdout, 
@@ -3137,9 +3137,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.console.close()
             self.console = None
             
-        if not self._save_settings_guard_:
-            self.saveSettings()
-            self._save_settings_guard_ = True
+        self.saveSettings()
+        #if not self._save_settings_guard_:
+            #self._save_settings_guard_ = True
             
         evt.accept()
         
@@ -3151,9 +3151,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         pass
         
     def saveWindowSettings(self):
-        saveWindowSettings(self.qsettings, self)
+        gname, pfx = saveWindowSettings(self.qsettings, self)
         
-        self.qsettings.beginGroup(self.__class__.__name__)
+        self.qsettings.beginGroup(gname)
         
         #consoleFont = self.console.font
         #self.qsettings.setValue("ConsoleFont", consoleFont)
@@ -3186,13 +3186,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #### NOTE: user-defined gui handlers (viewers) for variable types, or user-changed
         # configuration of gui handlers
         # FIXME 2021-07-17 22:55:17 
-        # Not written to Scipyen.conf 
+        # Not written to Scipyen.conf -- WHY ??? because nested groups aren't
+        # supported by QSettings
         self.qsettings.beginGroup("Custom_GUI_Handlers")
         for viewerClass in VTH.gui_handlers.keys():
-            self.qsettings.beginGroup(viewerClass.__name__)
+            pfx = viewerClass.__name__
+            
             if viewerClass not in VTH.default_handlers.keys():
-                # store user-define handlers
-                self.qsettings.setValue("action", VTH.gui_handlers[viewerClass]["action"])
+                # store user-defines handlers
+                self.qsettings.setValue("%s_action" % pfx, VTH.gui_handlers[viewerClass]["action"])
                 
                 if isinstance(VTH.gui_handlers[viewerClass]["types"], type):
                     type_names = [VTH.gui_handlers[viewerClass]["types"]._name__]
@@ -3200,7 +3202,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 else:
                     type_names = [t.__name__ for t in VTH.gui_handlers[viewerClass]["types"]] 
                     
-                self.qsettings.setValue("types", type_names)
+                self.qsettings.setValue("%s_types" % pfx, type_names)
                 
             else:
                 # store customizations for built-in handlers:
@@ -3214,27 +3216,24 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     else:
                         type_names = [t.__name__ for t in VTH.gui_handlers[viewerClass]["types"]]
                         
-                    self.qsettings.setValue("types", VTH.gui_handlers[viewerClass]["types"])
+                    self.qsettings.setValue("%s_types" % pfx, VTH.gui_handlers[viewerClass]["types"])
                 
                 if VTH.gui_handlers[viewerClass]["action"] is not default_action_name:
-                    self.qsettings.setValue("action", VTH.gui_handlers[viewerClass]["action"])
+                    self.qsettings.setValue("%s_action" % pfx, VTH.gui_handlers[viewerClass]["action"])
         
-            self.qsettings.endGroup()
-            
         self.qsettings.endGroup()
         
-    def _setup_console_pygments_(self):
-        from qtconsole.jupyter_widget import JupyterWidget
-        settings = QtCore.QSettings()
-        custom_pygment = settings.value("Console/Scheme", None)
-        custom_colors = settings.value("Console/Colors", "")
+    #def _setup_console_pygments_(self):
+        #from qtconsole.jupyter_widget import JupyterWidget
+        #settings = QtCore.QSettings()
+        #custom_pygment = settings.value("Console/Scheme", None)
+        #custom_colors = settings.value("Console/Colors", "")
         
-        if custom_pygment:
-            JupyterWidget.style_sheet = consoles.styles.sheet_from_template(custom_pygment,
-                                                                   custom_colors)
+        #if custom_pygment:
+            #JupyterWidget.style_sheet = consoles.styles.sheet_from_template(custom_pygment,
+                                                                   #custom_colors)
             
-            JupyterWidget.syntax_style = custom_pygment
-        
+            #JupyterWidget.syntax_style = custom_pygment
         
     #@processtimefunc
     def loadSettings(self):
@@ -3245,9 +3244,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         pass
     
     def loadWindowSettings(self):
-        loadWindowSettings(self.qsettings, self)#, group_name = self.__class__.__name__)
+        gname, prefix = loadWindowSettings(self.qsettings, self)#, group_name = self.__class__.__name__)
         
-        self.qsettings.beginGroup(self.__class__.__name__)
+        self.qsettings.beginGroup(gname)
             
         #consoleFontSize = self.qsettings.value("ConsoleFontSize",8.)
         #consoleFont = self.qsettings.value("ConsoleFont", QtGui.QFont("Monospace"))
@@ -3346,28 +3345,39 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.qsettings.beginGroup("Custom_GUI_Handlers")
         
+        for viewerClass in VTH.gui_handlers.keys():
+            pfx = viewerClass.__name__
+            
+            if viewerClass not in VTH.default_handlers.keys():
+                action = self.qsettings.value("%s_action" % pfx, "View")
+                type_names_list = self.qsettings.value("%s_types" % pfx, ["type(None)"])
+                types = [eval(t_name) for t_name in type_names_list]
+                if len(types) == 0:
+                    continue
+                VTH.register(viewerClass, types, actionName=action)
+        
         # FIXME: 2019-11-03 22:56:20 -- inconsistency
         # what if a viewer doesn't have any types defined?
         # by default it would be skipped from the auto-menus, but
         # if one uses VTH.register() then types must be defined!
-        for viewerGroup in self.qsettings.childGroups():
-            customViewer = [v for v in VTH.gui_handlers.keys() if v.__name__ == viewerGroup]
-            if len(customViewer):
-                viewerClass = customViewer[0]
-                self.qsettings.beginGroup(viewerGroup)
-                if "action" in self.qsettings.childKeys():
-                    action = self.qsettings.value("action", "View")
+        #for viewerGroup in self.qsettings.childGroups():
+            #customViewer = [v for v in VTH.gui_handlers.keys() if v.__name__ == viewerGroup]
+            #if len(customViewer):
+                #viewerClass = customViewer[0]
+                #self.qsettings.beginGroup(viewerGroup)
+                #if "action" in self.qsettings.childKeys():
+                    #action = self.qsettings.value("action", "View")
                     
-                if "types" in self.qsettings.childKeys():
-                    type_names_list = self.qsettings.value("types", ["type(None)"])
-                    types = [eval(t_name) for t_name in type_names_list]
+                #if "types" in self.qsettings.childKeys():
+                    #type_names_list = self.qsettings.value("types", ["type(None)"])
+                    #types = [eval(t_name) for t_name in type_names_list]
                     
-                if len(types) == 0: # see FIXME: 2019-11-03 22:56:20
-                    self.qsettings.endGroup()
-                    continue
+                #if len(types) == 0: # see FIXME: 2019-11-03 22:56:20
+                    #self.qsettings.endGroup()
+                    #continue
                 
-                VTH.register(viewerClass, types, actionName=action)
-                self.qsettings.endGroup()
+                #VTH.register(viewerClass, types, actionName=action)
+                #self.qsettings.endGroup()
             
         self.qsettings.endGroup()
     
