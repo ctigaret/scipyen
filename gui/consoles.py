@@ -2038,8 +2038,8 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
             self.widget_factory = RichJupyterWidget
 
     # the factory for creating a widget
-    widget_factory = Any(RichJupyterWidget)
-    #widget_factory = Any(ExternalConsoleWidget)
+    #widget_factory = Any(RichJupyterWidget)
+    widget_factory = Any(ExternalConsoleWidget)
 
     def parse_command_line(self, argv=None):
         super().parse_command_line(argv)
