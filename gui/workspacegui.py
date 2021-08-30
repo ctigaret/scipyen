@@ -327,12 +327,12 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     inheritance chain. This is done. e.g. in SignalViewer where the inheritance 
     chains is:
     
-    SignalViewer <- ScipyenFrameViewer <- ScipyenViewer <- WorkspaceGuiMixin
+    SignalViewer <- ScipyenFrameViewer <- ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
     
     or
     
     3) by decorating the desired property in the derived type with the 
-    @makeConfigurable  decorator (defined in this module)
+    @makeConfigurable  decorator (instance method of ScipyenConfigurable)
     
     """
     # NOTE: 2021-08-26 11:32:25
@@ -738,29 +738,29 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
         #self._another = val
         
         
-class TestGuiCfg(QtWidgets.QMainWindow, ScipyenConfigurable):
-    def __init__(self, parent=None):
-        super().__init__(parent=parent)
-        self._something = "test window"
-        self._another = "funny prop"
+#class TestGuiCfg(QtWidgets.QMainWindow, ScipyenConfigurable):
+    #def __init__(self, parent=None):
+        #super().__init__(parent=parent)
+        #self._something = "test window"
+        #self._another = "funny prop"
         
-    @property
-    def something(self):
-        return self._something
+    #@property
+    #def something(self):
+        #return self._something
     
-    @ScipyenConfigurable.makeConfigurable("Something")
-    @something.setter
-    def something(self, val):
-        self._something = val
+    #@ScipyenConfigurable.makeConfigurable("Something")
+    #@something.setter
+    #def something(self, val):
+        #self._something = val
         
-    @property
-    def another(self):
-        return self._another
+    #@property
+    #def another(self):
+        #return self._another
     
-    @ScipyenConfigurable.makeConfigurable("Another", "")
-    @another.setter
-    def another(self, val):
-        self._another = val
+    #@ScipyenConfigurable.makeConfigurable("Another", "")
+    #@another.setter
+    #def another(self, val):
+        #self._another = val
         
         
         

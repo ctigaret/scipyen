@@ -88,7 +88,8 @@ from core.extipyutils_client import (init_commands, execute, ForeignCall,
                                     nrn_ipython_initialization_cmd,)
 from core.strutils import str2symbol
 
-from core.scipyen_config import ScipyenConfigurable
+from core.scipyen_config import (ScipyenConfigurable, makeConfigurable, 
+                                 markConfigurable)
 
 from gui.workspacegui import (WorkspaceGuiMixin, 
                               saveWindowSettings, loadWindowSettings,
@@ -96,7 +97,7 @@ from gui.workspacegui import (WorkspaceGuiMixin,
 
 from gui.guiutils import (get_font_style, get_font_weight,)
 
-makeConfigurable = WorkspaceGuiMixin.makeConfigurable
+#makeConfigurable = WorkspaceGuiMixin.makeConfigurable
 
 consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.LayoutDirection) ) , key = lambda x: x[1]))
 
@@ -159,7 +160,7 @@ class ExternalConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     def scrollBarPosition(self):
         return self._control.layoutDirection()
         
-    @makeConfigurable("ScrollBarPosition")
+    #@ExternalConsoleWidget.makeConfigurable("ScrollBarPosition")
     @scrollBarPosition.setter
     def scrollBarPosition(self, value:typing.Union[int, str, QtCore.Qt.LayoutDirection]):
         if isinstance(value, str):
@@ -192,7 +193,7 @@ class ExternalConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     def fontFamily(self) -> str:
         return self.font.family()
     
-    @makeConfigurable("FontFamily")
+    #@ExternalConsoleWidget.makeConfigurable("FontFamily")
     @fontFamily.setter
     def fontFamily(self, val:str) -> None:
         font = self.font
@@ -203,7 +204,7 @@ class ExternalConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     def fontSize(self) -> int:
         return self.font.pointSize()
     
-    @makeConfigurable("FontPointSize")
+    #@ExternalConsoleWidget.makeConfigurable("FontPointSize")
     @fontSize.setter
     def fontSize(self, val:int) -> None:
         font = self.font
@@ -214,7 +215,7 @@ class ExternalConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     def fontStyle(self) -> typing.Union[int, QtGui.QFont.Style]:
         return self.font.style()
         
-    @makeConfigurable("FontStyle")
+    #@ExternalConsoleWidget.makeConfigurable("FontStyle")
     @fontStyle.setter
     def fontStyle(self, val:typing.Union[int, QtGui.QFont.Style, str]) -> None:
         style = get_font_style(val) 
@@ -226,7 +227,7 @@ class ExternalConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     def fontWeight(self) -> typing.Union[int, QtGui.QFont.Weight]:
         return self.font.weight()
 
-    @makeConfigurable("FontWeight")
+    #@ExternalConsoleWidget.makeConfigurable("FontWeight")
     @fontWeight.setter
     def fontWeight(self, val:typing.Union[int, QtGui.QFont.Weight, str]) -> None:
         weight = get_font_weight(val)
@@ -238,7 +239,7 @@ class ExternalConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     def colors(self) -> str:
         return self._console_colors
     
-    @makeConfigurable("ConsoleColors")
+    #@ExternalConsoleWidget.makeConfigurable("ConsoleColors")
     @colors.setter
     def colors(self, val:str):
         style = self._console_pygment
@@ -250,7 +251,7 @@ class ExternalConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         """
         return self.syntax_style
     
-    @makeConfigurable("SyntaxStyle")
+    #@ExternalConsoleWidget.makeConfigurable("SyntaxStyle")
     @syntaxStyle.setter
     def syntaxStyle(self, style:str):
         colors = self._console_colors
@@ -2676,7 +2677,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         self.window.raise_()
 
         # Start the application main loop.
-        #self.app.exec_() # already happening
+        #self.app.exec_() # Don't use here! we already have a GUI (Qt) event loop
 
     @classmethod
     def launch(cls, argv=None, existing:typing.Optional[str]=None, **kwargs):
@@ -3095,6 +3096,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         #return frontend.execute(**kwargs)
 
 # NOTE: use Jupyter (IPython >= 4.x and qtconsole / qt5 by default)
+@makeConfigurable
 class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     """Console with in-process kernel manager for pythonic command interface.
     Uses an in-process kernel generated and managed by QtInProcessKernelManager.
@@ -3176,6 +3178,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
         # e.g. after calling show()
         #self.set_pygment(self._console_pygment) 
         
+    #@makeConfigurable("CloseEvent", "Qt")
     def closeEvent(self, evt):
         self._save_settings_()
         evt.accept()
@@ -3184,7 +3187,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     def scrollBarPosition(self):
         return self._control.layoutDirection()
         
-    @makeConfigurable("ScrollBarPosition")
+    #@makeConfigurable("ScrollBarPosition", "Qt")
     @scrollBarPosition.setter
     def scrollBarPosition(self, value:typing.Union[int, str, QtCore.Qt.LayoutDirection]):
         if isinstance(value, str):
@@ -3217,7 +3220,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     def fontFamily(self) -> str:
         return self.font.family()
     
-    @makeConfigurable("FontFamily")
+    #@makeConfigurable("FontFamily", "Qt")
     @fontFamily.setter
     def fontFamily(self, val:str) -> None:
         font = self.font
@@ -3228,7 +3231,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     def fontSize(self) -> int:
         return self.font.pointSize()
     
-    @makeConfigurable("FontPointSize")
+    #@makeConfigurable("FontPointSize", "Qt")
     @fontSize.setter
     def fontSize(self, val:int) -> None:
         font = self.font
@@ -3239,7 +3242,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     def fontStyle(self) -> typing.Union[int, QtGui.QFont.Style]:
         return self.font.style()
         
-    @makeConfigurable("FontStyle")
+    #@makeConfigurable("FontStyle", "Qt")
     @fontStyle.setter
     def fontStyle(self, val:typing.Union[int, QtGui.QFont.Style, str]) -> None:
         style = get_font_style(val) 
@@ -3251,7 +3254,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     def fontWeight(self) -> typing.Union[int, QtGui.QFont.Weight]:
         return self.font.weight()
 
-    @makeConfigurable("FontWeight")
+    #@makeConfigurable("FontWeight", "Qt")
     @fontWeight.setter
     def fontWeight(self, val:typing.Union[int, QtGui.QFont.Weight, str]) -> None:
         weight = get_font_weight(val)
@@ -3263,7 +3266,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     def colors(self) -> str:
         return self._console_colors
     
-    @makeConfigurable("ConsoleColors")
+    #@markConfigurable("ConsoleColors", "Qt")
     @colors.setter
     def colors(self, val:str):
         style = self._console_pygment
@@ -3275,7 +3278,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
         """
         return self.syntax_style
     
-    @makeConfigurable("SyntaxStyle")
+    #@makeConfigurable("SyntaxStyle", "Qt")
     @syntaxStyle.setter
     def syntaxStyle(self, style:str):
         colors = self._console_colors
@@ -3291,10 +3294,12 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
 
     #@safeWrapper
     def _save_settings_(self):
+        return
         gname, pfx = saveWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
 
     #@safeWrapper
     def _load_settings_(self):
+        return
         # located in $HOME/.config/Scipyen/Scipyen.conf
         gname, pfx = loadWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
         
