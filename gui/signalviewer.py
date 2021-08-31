@@ -366,7 +366,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     defaultEventColor    = mpl.colors.to_rgba("xkcd:crimson")
     defaultEpochColor    = mpl.colors.to_rgba("xkcd:coral")
     
-    #_ownqtcfg = Bunch({"VisibleDocks": ("visibleDocks",)})
     _qtcfg = Bunch({"VisibleDocks": Bunch({"getter":"visibleDocks","setter":"visibleDocks"})})
 
     def __init__(self, 

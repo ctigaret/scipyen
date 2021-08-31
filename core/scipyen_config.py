@@ -499,41 +499,39 @@ def syncQSettings(qsettings:QSettings,
     
     The general idea is that the QSettings conf file only supports one level of
     grouping for qsetting key/value entries. Subgroups can be emulated with
-    distinct prefixes to the qsettings key.
+    distinct prefixes to the qsettings key as described below.
     
-    What exactly is synchronized is specified in the class attributes '_qtcfg'
-    and '_ownqtcfg' of win.
+    What exactly is synchronized is specified in the ::class:: attribute '_qtcfg'
+    of 'win'.
     
     All window classes in Scipyen that inherit from gui.workspacegui.WorkspaceGuiMixin
-    have at least the '_qtcfg' attribute.
+    have at least the '_qtcfg' attribute which is a mapping of the form:
     
-    _qtcfg is a mapping of QSettings key names to a tuple of str containing:
-    * either a single element - corresponding to an instance property with read/write access
-    * or two elements corresponding to the getter and setter method (in this order)
-        for the particular setting
+    {setting_name: {'getter': getter_name, 'setter': setter_name}}
+    
+    , where:
+    
+    seting_name (str) if the name of the QSettings element (or 'key') in 
+        Scipyen.conf file
         
-    By default, '_qtcfg' is a nested Bunch:
+    getter_name (str) is the name of the property or method that returns the
+        value which is to be assigned as value to the QSettings 'key' in the 
+        Scipyen.conf file
+        
+    setter_name (str) is the name of the read-write property or method that takes
+        the value of the QSettings 'key' in Scipyen.conf as sole argument.
+        
+    As defined in QorkspaceGuiMixin, '_qtcfg' is a nested Bunch:
     
-    {"WindowSize":       {"get":"size",        "set":"resize"},
-     "WindowPosition":   {"get":"pos",         "set":"move"},
-     "WindowGeometry":   {"get":"geometry",    "set":"setGeometry"},
-     "WindowState":      {"get":"saveState",   "set":"restoreState"}
+    {"WindowSize":       {"getter":"size",        "setter":"resize"},
+     "WindowPosition":   {"getter":"pos",         "setter":"move"},
+     "WindowGeometry":   {"getter":"geometry",    "setter":"setGeometry"},
+     "WindowState":      {"getter":"saveState",   "setter":"restoreState"}
     }
     
-    In subclasses of WorkspaceGuiMixin '_qtcfg' should be augmented by a similar
-    mapping in '_ownqtcfg'
-    
-    E.g., for SignalViewer, the '_ownqtcfg' is 
-    
-    {'VisibleDocks': ('visibleDocks',)}
-    
-    where 'visibleDocks' is a dynamic property that retrieves a dict 
-    {dock_name1: visible bool, dock_name2: visible bool, <etc...>} and its 
-    setter expects the same.
-    
-    The '_qtcfg'-based mechanism ensures that the following keys are always
-    synchronized whenever the win's class provides 'getter' and 'setter' methods
-    for access:
+    This mechanism ensures that the following keys are always synchronized with
+    the Scipyen.conf file contents for the standard QMainWindow and QWidget
+    settings.
     
     QSettings key     Getter method                   Setter method
     ------------------------------------------------------------------------------
@@ -542,21 +540,53 @@ def syncQSettings(qsettings:QSettings,
     Window geometry   win.geometry()  -> QRect        win.setGeometry(QRect)
     Window state      win.saveState() -> QByteArray   win.restoreState(QByteArray)
     
-    Of these, the first three are available for all objects derived from QWidget
-    (including RichJupyterWidget,such as Cipyen's console); the window state is 
-    only available for objects derived from QMainWindow.
+    Subclasses derived from WorkspaceGuiMixin can add their own configurables to
+    be managed via QSettings framework and Scipyen.conf file using one of the
+    folowing strategies:
     
-    This mechanism can be bypassed in order to save/load QSettings keys directly
-    using the QSettings API, or, for a more consistent group and key nomenclature, 
-    via qSettingsGroupPfx(), followed by saveQSettingsKey() or loadQsettingsKey()
-    functions in this module.
+    1) define their own '_qtcfg' which will be augmented with 
+    WorkspaceGuiMixin._qtcfg upon initialization
+    
+    2) be decorated with the makeConfigurable class decorator; this requires
+    that selected read-write properties, as well as getter and setter methods,
+    to be decorated with markConfigurable function decorator.
+    
+    3) define an '_ownqtcfg' attribute fo the same form as _qtcfg: this will be
+    taken into account by this function (this strategy is historic)
+    
+    Classes that do NOT inherit from WorkspaceGuiMixin SHOULD use the strategies
+    (2) and (3) - see gui.consoles.ExternalConsoleWidget for example.
+    
+    NOTE For ::classes:: derived from QWidget, only the first three are available
+    (this includes RichJupyterWidget-derived types such as Scipyen's console);
+    the window state is only available for objects derived from QMainWindow.
+    
+    E.g., for SignalViewer._qtcfg is 
+    
+    {"VisibleDocks": {"getter":"visibleDocks","setter":"visibleDocks"}}
+    
+    where 'visibleDocks' is a dynamic property that retrieves a dict 
+    {dock_name1: visible bool, dock_name2: visible bool, <etc...>} and its 
+    setter expects the same.
+    
+    If SignalViewer did not inherit from WorkspaceGuiMixin, the scipyen_config
+    framework would not save/restore the standard QMainWindow parameters
+    size, geometry, position and state.
     
     Settings are always saved in groups inside the Scipyen.conf file. The group's
-    name is determined automatically, or it can be specified.
+    name is determined automatically using 'qSettingsGroupPfx', or it can be 
+    manually specified.
     
-    Because the conf file only supports one level of group nesting (i.e. no 
-    "sub-groups") an optional extra-nesting level is emulated by prepending
-    a custom prefix to the setting's name (or key).
+    Because the QSettings Scipyen.conf file only supports one level of grouping 
+    (i.e. no "sub-groups") an optional extra-nesting level is emulated by 
+    prepending a custom prefix to the setting's name (or key). This can be 
+    determined automatically via 'qSettingsGroupPfx' or set manually.
+    
+    Finaly, this mechanism can be bypassed in order to save/load QSettings keys
+    directly using the QSettings API, and hardcoding appropriate methods in the
+    ::class:: defintion. For a more consistent group and key nomenclature, use
+    the qSettingsGroupPfx(), followed by saveQSettingsKey() or loadQsettingsKey()
+    functions in this module.
     
     Parameters:
     ==========
