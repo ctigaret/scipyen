@@ -162,7 +162,7 @@ from core.scipyenmagics import ScipyenMagics
 # available directly in the console
 from core.workspacefunctions import * 
 from core import scipyen_config as scipyenconf
-from core.scipyen_config import confuse
+from core.scipyen_config import (makeConfigurable, markConfigurable, confuse, )
 from core import plots as plots
 from core import datatypes as dt
 from core import neoutils
@@ -1182,6 +1182,7 @@ class VTH(object):
         if viewerClass in VTH.default_handlers:
             VTH.gui_handlers[viewerClass] = deepcopy(VTH.default_handlers[viewerClass])
 
+@makeConfigurable
 class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
