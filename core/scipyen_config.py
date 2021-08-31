@@ -569,14 +569,14 @@ def syncQSettings(qsettings:QSettings,
     * or two elements corresponding to the getter and setter method (in this order)
         for the particular setting
         
-    By default, '_qtcfg' is:
+    By default, '_qtcfg' is a nested Bunch:
     
-    {'WindowSize':      ('size',        'resize'),
-     'WindowPosition':  ('pos',         'move'),
-     'WindowGeometry':  ('geometry',    'setGeometry'),
-     'WindowState':     ('saveState',   'restoreState')
-     }
-     
+    {"WindowSize":       {"get":"size",        "set":"resize"},
+     "WindowPosition":   {"get":"pos",         "set":"move"},
+     "WindowGeometry":   {"get":"geometry",    "set":"setGeometry"},
+     "WindowState":      {"get":"saveState",   "set":"restoreState"}
+    }
+    
     In subclasses of WorkspaceGuiMixin '_qtcfg' should be augmented by a similar
     mapping in '_ownqtcfg'
     
@@ -707,14 +707,14 @@ def syncQSettings(qsettings:QSettings,
     #qtcfg.update(getattr(type(win), "_ownqtcfg", {}))
     
     
-    for key, getset in qtcfg.items():
+    for key, confname in qtcfg.items():
         # NOTE: 2021-08-28 21:59:43
         # val, below, can be a function, or the value of a property
         # in the former case it SHOULD have a '__call__' attribute;
         # in the latter, it is whatever the property.fget returns (which may still be
         # a function or method, with a '__call__' attribute!)
         
-        gettername = getset[0]
+        gettername = confname.get
 
         if not isinstance(gettername, str) or len(gettername.strip()) == 0:
             continue
@@ -738,11 +738,7 @@ def syncQSettings(qsettings:QSettings,
             saveQSettingsKey(qsettings, gname, key_prefix, key, val)
             
         else:
-            if len(getset) == 2:
-                settername = getset[1]
-                
-            else:
-                settername = getset[0]
+            settername = confname.set
                 
             setter = inspect.getattr_static(win, settername, None)
             

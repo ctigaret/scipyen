@@ -593,7 +593,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                          win_title=win_title, doc_title=doc_title,
                          frameIndex=frameIndex, *args, **kwargs)
         
-        self._qtcfg.update(ScipyenFrameViewer._qtcfg)
+        #self._qtcfg.update(ScipyenFrameViewer._qtcfg)
         
         #self._qtconfigurables.visibleDocks = Bunch()
         

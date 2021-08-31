@@ -367,7 +367,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     defaultEpochColor    = mpl.colors.to_rgba("xkcd:coral")
     
     #_ownqtcfg = Bunch({"VisibleDocks": ("visibleDocks",)})
-    _qtcfg = Bunch({"VisibleDocks": ("visibleDocks",)})
+    _qtcfg = Bunch({"VisibleDocks": Bunch({"get":"visibleDocks","set":"visibleDocks"})})
 
     def __init__(self, 
                  x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 

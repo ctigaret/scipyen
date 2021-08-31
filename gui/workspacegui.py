@@ -354,10 +354,11 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     #
     #
     #
-    _qtcfg = Bunch({"WindowSize":       ("size",        "resize"),
-                    "WindowPosition":   ("pos",         "move"),
-                    "WindowGeometry":   ("geometry",    "setGeometry"),
-                    "WindowState":      ("saveState",   "restoreState")})
+    _qtcfg = Bunch({"WindowSize":       Bunch({"get":"size",        "set":"resize"}),
+                    "WindowPosition":   Bunch({"get":"pos",         "set":"move"}),
+                    "WindowGeometry":   Bunch({"get":"geometry",    "set":"setGeometry"}),
+                    "WindowState":      Bunch({"get":"saveState",   "set":"restoreState"}),
+                    })
     
     _ownqtcfg = Bunch()
     
