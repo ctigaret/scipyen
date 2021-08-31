@@ -88,342 +88,285 @@ scipyen_config = confuse.LazyConfig("Scipyen", "scipyen_defaults")
 if not scipyen_config._materialized:# make sure this is done only once
     scipyen_config.read() 
     
-def makeConfigurable(cls, strict:bool=False):
+def makeConfigurable(cls):
     """Class decorator.
     
-    For all cls members that are callable checks if they are marked for a 
-    setting getter/setter
+    Auguments the decorated ::class:: with the attributes '_qtcfg' and _'cfg'
+    which are mappings that describe what settings are to be saved to / loaded 
+    from the Scipyen.conf ('_qtcfg') or config.yaml ('_cfg') files for the
+    decorated ::class::.
     
-    To use, decorate the ::class:: definition with @makeConfigurable
-    the decorate the relevant instance methods and properties with 
-    @markConfigurable decorated defined in this module.
+    Saving/loading of settings in Scipyen are managed by functions in this 
+    module, typicaly called via the instance methods '_save_settings_' and 
+    '_load_settings_' defined manually in the decorated ::class::
+    
+    '_qtcfg' and '_cfg' are Bunch objects, which are dict types providing
+    attribute access to the values mapped to their keys (see traitlets.Bunch), 
+    and have the same structure, as follows:
+    
+    {SettingsName: Bunch({'getter':getter_name, 'setter':setter_name})}
+    
+    For example, gui.workspacegui.WorkspaceGuiMixin has _qtcfg 'hardcoded' as:
+    
+    Bunch({"WindowSize":       Bunch({"getter":"size",        "setter":"resize"}),
+           "WindowPosition":   Bunch({"getter":"pos",         "setter":"move"}),
+           "WindowGeometry":   Bunch({"getter":"geometry",    "setter":"setGeometry"}),
+           "WindowState":      Bunch({"getter":"saveState",   "setter":"restoreState"}),
+           })
+                    
+    and gui.signalviewer.SignalViewer has '_qtcfg' hardcoded as:
+    
+    Bunch({"VisibleDocks": Bunch({"getter":"visibleDocks","setter":"visibleDocks"})})
+    
+    which is merged with that of WorkspaceGuiMixin upon intialization.
+    
+    This class decorator provides an alternative to manual harcoding of _qtcfg
+    and _cfg, by working in tandem with the 'markConfigurable' decorator.
+    
+    Briefly, markConfigurable decorates selected methods that work as a 
+    getter/setter pair, or properties defined in the ::class::, to be used in
+    saving/loading settings to/from configuration files.
+    
+    In addition, the decorator also inserts two instance read-only properties:
+    'qtconfigurables' -> returns _qtcfg
+    'configurables' -> returns _cfg
+    
+    NOTE: 
+        the 'getter' retrieves the value of an attribute that needs to be stored
+            (saved) as a setting
+            
+        the 'setter' assigns the value loaded from a settings file to an
+        attribute 
+    
+        The values (objects) returned by the getter method and expected by the
+        setter SHOULD be built-in Python types that can be easily converted to a
+        QVariant, EXCLUDING:
+        - context managers
+        - modules
+        - classes
+        - functions and methods
+        - code objects
+        - type objects
+        - Ellipsis
+        - NotImplemented
+        - stack frame objects
+        - traceback objects
+        
+        CAUTION: No type checking is performed.
+        
+    The makeConfigurable decorator uses the methods and properties decorated
+    with markConfiugrable decorator to augment (or create, if not existing) 
+    the _qtcfg and _cfg mappings.
+    
+    Usage:
+    ======
+    Decorate the ::class:: definition with @makeConfigurable
+    then decorate the relevant instance methods and properties with 
+    @markConfigurable decorator defined in this module.
     
     For read-write properties, it is only relevant to decorate the *.setter 
     (where * is the property name).
     
-    For read-only, the property getter needs to be decorated
+    For read-only properties, only the property getter needs to be decorated    
+    (NOTE:there is no much use for a setting to be read-only on the ::class::
+    side)
     
+    For callable attributes (i.e., methods) make sure you pass the same confname 
+    and conftype to the markConfigurable decorator, but indicate which is the 
+    getter/setter by setting the markConfigurable 'setter' parameter accordingly
+    
+    
+    See documentation for markConfigurable for details.
     """
+    # in the ::class:: definition, a property setter is always defined after a
+    # property getter (otherwise the source code won't compile)
+    # however, getter and setter methods MAY be defined in ANY order so as we
+    # loop through them a setting may first appear as getter-only, or as 
+    # setter-only
+    if not hasattr(cls, "_qtcfg"):
+        cls._qtcfg = Bunch()
+        
+    if not hasattr(cls, "_cfg"):
+        cls._qtcfg = Bunch()
+        
+    def _qtconfigurables(instance):
+        return instance._qtcfg
     
+    def _configurables(instance):
+        return instance._cfg
+        
+    if not hasattr(cls, "qtconfigurables"):
+        cls.qtconfigurables = property(fget = _qtconfigurables, doc = "Mapping of QSettings configurables")
+        
+    if not hasattr(cls, "configurables"):
+        cls.configurables = property(fget = _configurables, doc = "Mapping of confuse configurables")
+        
+    #print("makeConfigurable %s: _qtcfg = %s, _cfg = %s" % (cls.__name__, cls._qtcfg, cls._cfg))
+        
     for name, fn in inspect.getmembers(cls):
+        getterdict = Bunch()
+        setterdict = Bunch()
+        confdict = Bunch()
         if isinstance(fn, property):
-            #gs = []
-            cfg = Bunch()
-            confnametype = tuple()
+            #print("\tproperty %s of %s" % (fn, cls.__name__))
             if inspect.isfunction(fn.fget) and hasattr(fn.fget, "configurable_getter"):
-                cfg.update(fn.fget.configurable_getter)
+                getterdict = fn.fget.configurable_getter
+                #print("\t\tgetterdict %s" % getterdict)
                 
-                if inspect.isfunction(fn.fset) and hasattr(fn.fset, "configurable_setter"):
-                    setcfg = fn.fset.configurable_setter
-                    if setcfg.type != cfg.type:
-                        continue
+            if inspect.isfunction(fn.fset) and hasattr(fn.fset, "configurable_setter"):
+                setterdict = fn.fset.configurable_setter
+                #print("\t\tsetterdict %s" % setterdict)
                     
-                    if 
-                    if len(fn.fset.configurable_setter[0].strip()) == 0:
-                        print("no configurable name for property setter %s" % fn.fset.__name__)
-                        continue
-                    if strict:
-                        if fn.fset.configurable_getter != confnametype:
-                            print("mismatch in config name/type between getter %s: %s and setter %s: %s" % (fn.fget.__name__, str(fn.fget.conigurable_getter), fn.fset.__name__, fn.fset.configurable_getter))
-                            continue
-                    confnametype = fn.fset.configurable
-                    cfg[]
-                    gs.append(fn.fset.__name__)
-                    
-            if len(gs):
-                if confnametype[1] == "Qt":
-                    if not hasattr(cls, "_qtcfg") or not isinstance(cls._qtcfg, Bunch):
-                        cls._qtcfg = Bunch()
-                    cls._qtcfg.update({confnametype[0]: tuple(gs)})
-                else:
-                    if not hasattr(cls, "_cfg") or not isinstance(cls._cfg, Bunch):
-                        cls._cfg = Bunch()
-                    cls._cfg.update({confnametype[0]: tuple(gs)})
+        elif inspect.isfunction(fn):
+            #print("\tmethod/function %s of %s" % (fn.__name__, cls.__name__))
+            if hasattr(fn, "configurable_getter"):
+                getterdict = fn.configurable_getter
+                #print("\t\tgetterdict %s" % getterdict)
                 
-        elif inspect.isfunction(f):
-            #gs = []
-            #confnametype = tuple()
-            if hasattr(f, "configurable_getter"):
-                # NOTE: 2021-08-30 23:34:41
-                # getter may be defined AFTER the setter
-                confnametype = f.configurable_getter
-                if len(confnametype[0].strip()) == 0:
+            if hasattr(fn, "configurable_setter"):
+                setterdict = fn.configurable_setter
+                #print("\t\tsetterdict %s" % setterdict)
+                
+        else:
+            continue # skip members that are not methods or properties
+        
+        if len(getterdict): 
+            confdict.update(getterdict)
+            
+            if len(setterdict): 
+                # this is executed in case of properties, as they are the only
+                # ones providing BOTH a getterdict and setterdict, when decorated
+                # so we check here that
+                if setterdict.type != getterdict.type or setterdict.name != getterdict.name:
                     continue
                 
-                #gs.append(f.__name__)
+                confdict.update(setterdict)
                 
-                # get a ref to either cls._qtcfg or cls._cfg
-                if confnametype[1] == "Qt":
-                    if not hasattr(cls, "_qtcfg") or not isinstance(cls._qtcfg, Bunch):
-                        cls._qtcfg = Bunch()
-                        
-                    cfg = cls._qtcfg
-                    
-                else:
-                    if not hasattr(cls, "_cfg") or not isinstance(cls._cfg, Bunch):
-                        cls._cfg = Bunch()
-                        
-                    cfg = cls._cfg 
-                        
-                if confnametype[0] in cfg:
-                    gettersetter = cfg[confnametype[0]]
-                    
-                    if len(gettersetter) == 1: # a setter might have been defined
-                        cfg[confnametype[0]] = (f.__name__, gettersetter[0])
-                        
-                    else:
-                        cfg[confnametype[0]] = (f.__name__, gettersetter[1])
-                        
-                else:
-                    cfg[confnametype[0]] = (f.__name__, )
-                    
-                    
-            elif hasattr(f, "configurable_setter"):
-                # NOTE: 2021-08-30 23:35:26
-                # the setter may be defined BEFORE the getter
-                confnametype = f.configurable_setter
-                if len(confnametype[0].strip()) == 0:
-                    continue
+        elif len(setterdict):
+            confdict.update(setterdict)
+            
+        
+        #print("\t\tconfdict %s" % confdict)
+            
+        if len(confdict):
+            cfg = Bunch()
+            #cfg = getattr(cls, "_qcfg", Bunch()) if confdict.type.lower() == "qt" else getattr(cls, "_cfg", Bunch())
+            
+            cfgget = confdict.get("getter", None)
+            cfgset = confdict.get("setter", None)
+            
+            cfgdict = Bunch()
+            if cfgget is not None:
+                cfgdict.getter = cfgget
+            
+            if cfgset is not None:
+                cfgdict.setter = cfgset
                 
-                # get a ref to either cls._qtcfg or cls._cfg
-                if confnametype[1] == "Qt":
-                    if not hasattr(cls, "_qtcfg") or not isinstance(cls._qtcfg, Bunch):
-                        cls._qtcfg = Bunch()
-                        
-                    cfg = cls._qtcfg
-                    
-                else:
-                    if not hasattr(cls, "_cfg") or not isinstance(cls._cfg, Bunch):
-                        cls._cfg = Bunch()
-                        
-                    cfg = cls._cfg 
-                        
-                if confnametype[0] in cfg:
-                    gettersetter = cfg[confnametype[0]]
-                    
-                    if len(gettersetter) == 1: # a getter has been defined
-                        cfg[confnametype[0]] = (gettersetter[0], f.__name__)
-                        
-                    else:
-                        # just replace the setter
-                        cfg[confnametype[0]] = (gettersetter[1], f.__name__)
-                        
-                else:
-                    cfg[confnametype[0]] = (f.__name__, )
-                    
+            #print("\t\tcfgdict %s" % cfgdict)
+            if len(cfgdict):
+                cfg[confdict.name] = cfgdict
+            
+            #print("\t\tupdated cfg of %s: %s" % (cls.__name__, cfg))
+            
+            if confdict.type.lower() == "qt":
+                cls._qtcfg.update(cfg)
+                
+            else:
+                cls._cfg.update(cfg)
             
     return cls
     
 def markConfigurable(confname:str, conftype:str="", setter:bool=True):
-    """Decorator for instance methods & properties
+    """Decorator for instance methods & properties.
     
-    f: the method/property
+    Properties and methods decorates with this will be collected by the ::class::
+    decorator makeConfigurable to enable saving/loading used settings for that 
+    ::class::
+    
+    See documentation of makeConfigurable for details.
+    
+    Parameters:
+    ===========
+    
+    confname: str: the name of the settings parameter (arbitrary but indicative 
+        of what it represents)
+        
+        If this is an empty string, the decorator does nothing.
+    
     conftype: str, optional, default is '' (the empty str)
-        When conftype is 'Qt' this is markes as a QSettings settings element
+        When 'conftype' is 'Qt' (case-insensitive) the decorated method or
+        property will be used as getter/setter in the QSettings framework.
+        
+        Otherwise, the decorated methos or property will be used as getter/setter
+        in the confuse framework.
+        
+    setter: bool, default is True - required for methods only, where it indicates
+        whether the decorated method is a setter (when True) or a getter (when 
+        False)
+        
+        NOTE: for properties, this is determined by the decorated property's
+        'fget' and 'fset' attributes.
+        
+        For a read-only property, 'fset' is None.
+        
+        For a read-write property, both 'fget' and 'fset' are functions.
+        
+    Returns:
+    =======
+    f: the decorated method or property object, augmented as described below.
+        
+    What it does:
+    ============
+    
+    1) When f is a property:
+    
+    * if f.fget is a function, adds to it a 'configurable_getter' attribute:
+            
+    f.fget.configurable_getter = {'type': conftype, 'name': confname, 'getter':f.fget.__name__}
+            
+    * if f.fset is a function, adds to it a 'configurable_setter' attribute:
+        
+    f.fset.configurable_setter = {'type':conftype, 'name': confname, 'setter': f.fset.__name__}
+    
+    2) When f is a method function:
+    
+    * if setter is False, adds to it a 'configurable_getter' attribute:
+        
+    f.configurable_getter = {'type': conftype, 'name': confname, 'getter':f.__name__}
+    
+    * if setter is True, adds to it a 'configurable_setter' attribute:
+    
+    f.configurrable_setter = {'type': conftype, 'name': confname, 'setter':f.__name__}
+    
+    These attributes will be parsed by the ::class:: decorator makeConfigurable
+    to construct the ::class:: attributes '_qtcfg' and '_cfg' according to the
+    value of 'conftype'
+    
     """
     if not isinstance(confname, str) or len(confname.strip()) == 0:
-        return f # fails silently
+        return f # fail silently
+    
+    if not isinstance(conftype, str):
+        return f # fail silently
+    
+    conftype = conftype.lower()
     
     def wrapper(f):
         if isinstance(f, property):
             if inspect.isfunction(f.fget):
-                setattr(f.fget, "configurable_getter", Bunch({"type":conftype, confname: Bunch({"get":f.fget.__name__})}))
+                setattr(f.fget, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.fget.__name__}))
                 
             if inspect.isfunction(f.fset):
-                setattr(f.fset, "configurable_setter", Bunch({"type":conftype, confname: Bunch({"set":f.fset.__name__})}))
+                setattr(f.fset, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.fset.__name__}))
                 
         elif inspect.isfunction(f):
-            if setter:
-                setattr(f, "configurable_setter", Bunch({"type":conftype, confname: Bunch({"set":f.__name__})}))#(confname, conftype))
+            if setter is True:
+                setattr(f, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.__name__}))
             else:
-                setattr(f, "configurable_getter", Bunch({"type": conftype, confname: Bunch({"get":f.__name__})}))#(confname, conftype))
+                setattr(f, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.__name__}))
         return f
     
     return wrapper
-    
-def makeConfigurable_old(confname:str, conftype:typing.Optional[str]=None):
-    """Decorator to set up a type's property as a configurable.
-    
-    A configurable is an attribute (typically, a data descriptor) that can 
-    be saved as a persistent setting of an object, to be restored in a later
-    Scipyen session.
-    
-    This is achieved by augmenting the type with an attribute that maps an 
-    arbitrary setting name (str) to a tuple containing the names of the
-    getter and setter methods for the particular data descriptor defined in 
-    the object's type.
-    
-    Depending on the third argument of the initializer, the new type 
-    attribute is  called '_qtcfg', or '_cfg' and takes the form:
-    
-    {
-        SettingName1: (getter_method1_name, setter_method1_name),
-        SettingName2: (getter_method2_name, setter_method2_name),
-        ... etc...
-    }
-    
-    The '_qtcfg' and '_cfg' mappings are used by syncQSettings and 
-    syncScipyenSettings, respectively
-    
-    When the tuple contains only one str, this is assumed to be the name of
-    a read/write property. CAUTION: this may raise AttributeError when the
-    property is read-only and an attempt is made to set it to a value loaded
-    from the config file.
-    
-    WARNING This behaviour may change in the future, enforcing the read/write
-    property to be represented by a tuple of (getter, setter) names even when 
-    they are the same.
-    
-    Of course, the '_qtcfg' and '_cfg' type attributes can be also set 
-    manually (i.e. 'hardcoded') in any user-defined type. This is useful 
-    when the user-defined type is derived (inherits) from a type defined in 
-    a thid party library (and thus cannot be modified), provided that:
-    
-    1) the designer of the new type already KNOWS what are the getter/setter
-    methods for a settings 
-    
-    2) the setter accepts the same data type as returned by the getter
-    
-    For example, see WorkspaceGuiMixin._qtcfg which uses 
-    PyQt5.QWidgets.QMainWindow method names for window size, position, etc)
-    
-    Usage scenarios:
-    
-    1) As a decorator for data descriptors in user-defined classes - this is 
-    a shorthand for manually defining '_qtcfg' and/or '_cfg' as above.
-    
-    Let 'SomeType' a user-defined type, where the designer has defined a
-    read-write property called 'someprop':
-    
-    # this defines the property 'someprop' of 'SomeType' as read-only
-    # because this is the first thing that the Python compiler sees when reading
-    # the source code, and therefore 'someprop' will only have its 'fget'
-    # defined as a function.
-    @property           
-    def someprop(self):
-        return ...
-        
-    # this adds write capability to the 'someprop' property of 'SomeType'
-    # now, the compiler rightly set the property's 'fset' attribute to a 
-    # function
-    @someprop.setter    
-    def someprop(self, val):
-        ...
-        
-    To covert 'someprop' into a Qt setting, decorate _AT_LEAST_ the setter
-    so that the property can be used in both ways (read/write)
-    
-    # this will make it a read-only settings: it can be saved to, or loaded
-    # from the config file, but if 'SomeType' does not also define a setter,
-    # attempts to set a value loaded from the config file will raise
-    # AttributeError
-    # NOTE that this happens because when the 'someprop' property is first
-    # defined, it is by default read-only (i.e., its 'fset' method is an
-    # empty wrapper)
-    @makeConfigurable(SomeType, 'SomeProp') # 'Qt' is the default
-    @property
-    def someprop(self):
-        ...
-        
-    # this will overwrite mechanism the effect of the above by explicitly
-    # mapping the settings name 'SomeProp' to ('someprop' , 'someprop')
-    # in SomeType._qtcfg attribute
-    #
-    # Hence, as 'SomeType' is defining a setter for 'someprop', the 
-    # decorator needs only to be used here.
-    #
-    @makeConfigurable(SomeType, 'SomeProp') # 'Qt' is the default
-    @someprop.setter
-    def someprop(self):
-        ...
-            
-    Parameters:
-    ==========
-    
-    cls: type = the type of the object where the property to be set as a 
-        configurable, is defined
-        
-    confname: str = the name of the configuration (or setting) element
-    
-    conftype: str = 'Qt', 'default', or anything else (optional, default is 'Qt')
-    
-        When 'type' is the 'Qt', (the default) then this is a setting to be 
-        saved in / loaded from the Scipyen's QSettings conf file 
-        (typically, $HOME/.config/Scipyen/Scipyen.conf).
-        
-        When 'type' is 'default', then this is a setting to be saved in, or
-        loaded from, the config_default.yaml file
-        (typically, in the root directory of where Scipyen is installed, 
-        assuming it has read/write access to the user)
-        
-        Otherwise, it will be considerd to be a setting to be saved in the 
-        user's config.yaml fileLoaders
-        (typically, in $HOME/.config/Scipyen/config.yaml)
-        
-    """
-    print("makeConfigurable: confname", confname, "conftype", conftype)
-    if not isinstance(confname, str) or len(confname.strip()) == 0:
-        return f # fails silently
-    
-    def wrapper(f, *args, **kwargs):
-        print("\t f", f, "args", *args, "kwargs", **kwargs)
-        @wraps(f)
-        def _impl_(self, *args, **kwargs):
-            return self
-        
-        gs = []
-        
-        if isinstance(f, property):
-            if inspect.isfunction(f.fget):
-                propname = f.fget.__qualname__.split(".")[-1]
-                gs.append(propname)
-                
-            if inspect.isfunction(f.fset):
-                propname = f.fset.__qualname__.split(".")[-1]
-                gs.append(propname)
-                
-        #elif inspect.isfunction(f):
-            
-                
-            print("\t gs", gs)
-                
-            if conftype is "Qt":
-                #if hasattr(self, "_qtcfg") and isinstance(self._qtcfg, dict):
-                    #self._qtcfg.update({confname: tuple(gs)})
-                    
-                #else:
-                    #self._qtcfg = Bunch({confname: tuple(gs)})
-                    
-                if hasattr(self.__class__, "_qtcfg") and isinstance(self.__class__._qtcfg, dict):
-                    self.__class__._qtcfg.update({confname: tuple(gs)})
-                    
-                else:
-                    self.__class__._qtcfg = Bunch({confname: tuple(gs)})
-
-            elif conftype is "default":
-                # TODO: 2021-08-28 14:55:28
-                # implement saving to defaults
-                pass
-        
-            else:
-                #if hasattr(self, "_cfg") and isinstance(self._cfg, dict):
-                    #self._cfg.update({confname: tuple(gs)})
-                    
-                #else:
-                    #self._cfg = Bunch({confname: tuple(gs)})
-                    
-                if hasattr(self.__class__, "_cfg") and isinstance(self.__class__._cfg, dict):
-                    self.__class__._cfg.update({confname: tuple(gs)})
-                    
-                else:
-                    self.__class__._cfg = Bunch({confname: tuple(gs)})
-                
-            return f
-        
-        return _impl_
-    
-    return wrapper
-
     
 @safeWrapper
 def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]) -> typing.Tuple[str, str]:
@@ -684,6 +627,7 @@ def syncQSettings(qsettings:QSettings,
     
     gname, pfx = qSettingsGroupPfx(win)
     
+    
     if isinstance(group_name, str) and len(group_name.strip()):
         # NOTE: 2021-08-24 15:04:31 override internally determined group name
         gname = group_name
@@ -697,24 +641,24 @@ def syncQSettings(qsettings:QSettings,
     else:
         key_prefix=""
         
-    settings = dict()
+    #action = "save" if save else "load"
+    #print("syncQSettings %s: win = %s, gname = %s, key_prefix = %s" % (action, win, gname, key_prefix))
     
-    qtcfg = dict()
-    qtcfg.update(getattr(win, "_qtcfg", {}))
-    qtcfg.update(getattr(win, "_ownqtcfg", {}))
+    qtcfg = Bunch()
+    qtcfg.update(getattr(win, "_qtcfg", Bunch()))
+    qtcfg.update(getattr(win, "_ownqtcfg", Bunch()))
     
-    #qtcfg.update(getattr(type(win), "_qtcfg", {}))
-    #qtcfg.update(getattr(type(win), "_ownqtcfg", {}))
+    #print("\tqtcfg for %s: %s" % (win.__class__.__name__, qtcfg))
     
-    
-    for key, confname in qtcfg.items():
+    for confname, getset in qtcfg.items():
         # NOTE: 2021-08-28 21:59:43
         # val, below, can be a function, or the value of a property
         # in the former case it SHOULD have a '__call__' attribute;
         # in the latter, it is whatever the property.fget returns (which may still be
         # a function or method, with a '__call__' attribute!)
-        
-        gettername = confname.get
+        #print("\tconfname = %s" % confname)
+        gettername = getset.get("getter", None)
+        #print("\t\tgettername = %s" % gettername)
 
         if not isinstance(gettername, str) or len(gettername.strip()) == 0:
             continue
@@ -723,10 +667,12 @@ def syncQSettings(qsettings:QSettings,
         
         if isinstance(getter, property):
             val = getattr(win, gettername)
+            #print("\t\tgetter win.%s -> %s" % (gettername, val))
             
         elif getter is not None: # in case gettername does not exist as a win's attribute name
             # getter may by a function/method, or a sip.wrapper (for Qt objects)
             val = getattr(win, gettername)()
+            #print("\t\tgetter win.%s() -> %s" % (gettername, val))
         
         else:
             continue
@@ -735,22 +681,27 @@ def syncQSettings(qsettings:QSettings,
         #print("syncQSettings, %s: win: %s, key: %s, getset: %s, gname: %s, pfx: %s, val %s (%s)" % (action, win.__class__.__name__, key, str(getset), gname, pfx, type(val).__name__, val))
         
         if save:
-            saveQSettingsKey(qsettings, gname, key_prefix, key, val)
+            saveQSettingsKey(qsettings, gname, key_prefix, confname, val)
             
         else:
-            settername = confname.set
+            settername = getset.get("setter", None)
+            #print("\t\tsettername = %s" % settername)
+            
+            if not isinstance(settername, str) or len(settername.strip()) == 0:
+                continue
                 
             setter = inspect.getattr_static(win, settername, None)
             
             default = val
             
-            newval = loadQSettingsKey(qsettings, gname, key_prefix, key, default)
+            newval = loadQSettingsKey(qsettings, gname, key_prefix, confname, default)
             
             if isinstance(setter, property):
-                #print("win.%s = %s" % (settername, newval))
+                #print("\t\tsetter win.%s = %s" % (settername, newval))
                 setattr(win, settername, newval)
                 
             elif setter is not None:
+                #print("\t\tsetter win.%s(%s)" % (settername, newval))
                 setter = getattr(win, settername)
                 setter(newval)
                 
@@ -759,242 +710,6 @@ def syncQSettings(qsettings:QSettings,
             
     return gname, pfx
     
-class ScipyenConfigurable(object):
-    """Defines the makeConfigurable decorator for settings management
-    
-    See ScipyenConfigurable.makeConfigurable documentation for details
-    
-    Unrelated to traitlets.config.Configurable - not not confuse!
-    
-    """
-    #def makeConfigurable(self, confname:str, conftype:str="Qt"):
-    
-    #@classmethod
-    #def makeConfigurable(cls, confname:str, conftype:str="Qt"):
-        #"""Decorator to set up a type's property as a configurable.
-        
-        #A configurable is an attribute (typically, a data descriptor) that can 
-        #be saved as a persistent setting of an object, to be restored in a later
-        #Scipyen session.
-        
-        #This is achieved by augmenting the type with an attribute that maps an 
-        #arbitrary setting name (str) to a tuple containing the names of the
-        #getter and setter methods for the particular data descriptor defined in 
-        #the object's type.
-        
-        #Depending on the third argument of the initializer, the new type 
-        #attribute is  called '_qtcfg', or '_cfg' and takes the form:
-        
-        #{
-            #SettingName1: (getter_method1_name, setter_method1_name),
-            #SettingName2: (getter_method2_name, setter_method2_name),
-            #... etc...
-        #}
-        
-        #The '_qtcfg' and '_cfg' mappings are used by syncQSettings and 
-        #syncScipyenSettings, respectively
-        
-        #When the tuple contains only one str, this is assumed to be the name of
-        #a read/write property. CAUTION: this may raise AttributeError when the
-        #property is read-only and an attempt is made to set it to a value loaded
-        #from the config file.
-        
-        #WARNING This behaviour may change in the future, enforcing the read/write
-        #property to be represented by a tuple of (getter, setter) names even when 
-        #they are the same.
-        
-        #Of course, the '_qtcfg' and '_cfg' type attributes can be also set 
-        #manually (i.e. 'hardcoded') in any user-defined type. This is useful 
-        #when the user-defined type is derived (inherits) from a type defined in 
-        #a thid party library (and thus cannot be modified), provided that:
-        
-        #1) the designer of the new type already KNOWS what are the getter/setter
-        #methods for a settings 
-        
-        #2) the setter accepts the same data type as returned by the getter
-        
-        #For example, see WorkspaceGuiMixin._qtcfg which uses 
-        #PyQt5.QWidgets.QMainWindow method names for window size, position, etc)
-        
-        #Usage scenarios:
-        
-        #1) As a decorator for data descriptors in user-defined classes - this is 
-        #a shorthand for manually defining '_qtcfg' and/or '_cfg' as above.
-        
-        #Let 'SomeType' a user-defined type, where the designer has defined a
-        #read-write property called 'someprop':
-        
-        ## this defines the property 'someprop' of 'SomeType' as read-only
-        ## because this is the first thing that the Python compiler sees when reading
-        ## the source code, and therefore 'someprop' will only have its 'fget'
-        ## defined as a function.
-        #@property           
-        #def someprop(self):
-            #return ...
-            
-        ## this adds write capability to the 'someprop' property of 'SomeType'
-        ## now, the compiler rightly set the property's 'fset' attribute to a 
-        ## function
-        #@someprop.setter    
-        #def someprop(self, val):
-            #...
-            
-        #To covert 'someprop' into a Qt setting, decorate _AT_LEAST_ the setter
-        #so that the property can be used in both ways (read/write)
-        
-        ## this will make it a read-only settings: it can be saved to, or loaded
-        ## from the config file, but if 'SomeType' does not also define a setter,
-        ## attempts to set a value loaded from the config file will raise
-        ## AttributeError
-        ## NOTE that this happens because when the 'someprop' property is first
-        ## defined, it is by default read-only (i.e., its 'fset' method is an
-        ## empty wrapper)
-        #@makeConfigurable(SomeType, 'SomeProp') # 'Qt' is the default
-        #@property
-        #def someprop(self):
-            #...
-            
-        ## this will overwrite mechanism the effect of the above by explicitly
-        ## mapping the settings name 'SomeProp' to ('someprop' , 'someprop')
-        ## in SomeType._qtcfg attribute
-        ##
-        ## Hence, as 'SomeType' is defining a setter for 'someprop', the 
-        ## decorator needs only to be used here.
-        ##
-        #@makeConfigurable(SomeType, 'SomeProp') # 'Qt' is the default
-        #@someprop.setter
-        #def someprop(self):
-            #...
-                
-        #Parameters:
-        #==========
-        
-        #cls: type = the type of the object where the property to be set as a 
-            #configurable, is defined
-            
-        #confname: str = the name of the configuration (or setting) element
-        
-        #conftype: str = 'Qt', 'default', or anything else (optional, default is 'Qt')
-        
-            #When 'type' is the 'Qt', (the default) then this is a setting to be 
-            #saved in / loaded from the Scipyen's QSettings conf file 
-            #(typically, $HOME/.config/Scipyen/Scipyen.conf).
-            
-            #When 'type' is 'default', then this is a setting to be saved in, or
-            #loaded from, the config_default.yaml file
-            #(typically, in the root directory of where Scipyen is installed, 
-            #assuming it has read/write access to the user)
-            
-            #Otherwise, it will be considerd to be a setting to be saved in the 
-            #user's config.yaml fileLoaders
-            #(typically, in $HOME/.config/Scipyen/config.yaml)
-            
-        #"""
-        #print("makeConfigurable: cls", cls, "confname", confname, "conftype", conftype)
-        #if not isinstance(confname, str) or len(confname.strip()) == 0:
-            #return f # fails silently
-        
-        #def wrapper(f):
-            #if isinstance(f, property):
-                #gs = []
-                #if inspect.isfunction(f.fget):
-                    #propname = f.fget.__qualname__.split(".")[-1]
-                    #gs.append(propname)
-                    
-                #if inspect.isfunction(f.fset):
-                    #propname = f.fset.__qualname__.split(".")[-1]
-                    #gs.append(propname)
-                    
-                #if conftype is "Qt":
-                    ##if hasattr(self, "_qtcfg") and isinstance(self._qtcfg, dict):
-                        ##self._qtcfg.update({confname: tuple(gs)})
-                        
-                    ##else:
-                        ##self._qtcfg = Bunch({confname: tuple(gs)})
-                    #if hasattr(cls, "_qtcfg") and isinstance(cls._qtcfg, dict):
-                        #cls._qtcfg.update({confname: tuple(gs)})
-                        
-                    #else:
-                        #cls._qtcfg = Bunch({confname: tuple(gs)})
-
-                #elif conftype is "default":
-                    ## TODO: 2021-08-28 14:55:28
-                    ## implement saving to defaults
-                    #pass
-            
-                #else:
-                    ##if hasattr(self, "_cfg") and isinstance(self._cfg, dict):
-                        ##self._cfg.update({confname: tuple(gs)})
-                        
-                    ##else:
-                        ##self._cfg = Bunch({confname: tuple(gs)})
-                        
-                    #if hasattr(cls, "_cfg") and isinstance(cls._cfg, dict):
-                        #cls._cfg.update({confname: tuple(gs)})
-                        
-                    #else:
-                        #cls._cfg = Bunch({confname: tuple(gs)})
-                        
-            #return f
-        
-        #return wrapper
-
-    @property
-    def configurables(self):
-        return getattr(self, "_cfg", None) # only present in derived classes
-    
-    @property
-    def qtconfigurables(self):
-        """A str -> type mapping of configurable properties for QSettings.
-        
-        The keys of the mapping (str) are attributes or descriptors with read &
-        write access, defined in the viewer class, as follows. 
-        
-        key:str = QSettings key
-        
-        value: 
-        EITHER: tuple (str, str) = (getter method name, setter method name)
-                where:
-                    getter method name: name of instance or :class: method that
-                                        returns a Python object (CAUTION: when
-                                        the method returns SEVERAL obejcts they
-                                        will be captured in a tuple!)
-                                        
-                    setter method name: name of the instance or :class: method that
-                                        accepts ONE Python object as parameter
-                                        of the same type as the return value of
-                                        the getter method
-        
-        OR:     tuple (str, ) = property
-                where: property is the name of a descriptor with read-write access
-                CAUTION: If the propert is read-only, trying to set values
-                loaded from configuration file will raise AttributeError
-                
-                WARNING: this behaviour is on its way out, and two method names
-                will be required for read-write settings (even if they refer to
-                the same method).
-        
-        The values are returned by the getter method is expected to be built-in 
-        Python types that can be easily converted to a QVariant, EXCLUDING:
-        - context managers
-        - modules
-        - classes
-        - functions and methods
-        - code objects
-        - type objects
-        - Ellipsis
-        - NotImplemented
-        - stack frame objects
-        - traceback objects
-        
-        NOTE: No type checking is performed.
-        
-        """
-        # TODO 2021-08-25 16:47:16
-        # if using traitlets.config framework then define observer functions to 
-        # write atomic qsettings keys to the conf file, as the configurble is changed
-        return getattr(self, "_cfg", None) # only present in derived classes
-
 class ScipyenConfiguration(DataBag):
     """Superclass of all non-gui configurations
     """

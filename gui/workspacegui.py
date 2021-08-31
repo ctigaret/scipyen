@@ -11,186 +11,9 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 #from traitlets.config import SingletonConfigurable
 from core.utilities import safeWrapper
 from core.workspacefunctions import user_workspace
-from core.scipyen_config import (ScipyenConfigurable, syncQSettings)
+from core.scipyen_config import (syncQSettings, makeConfigurable, markConfigurable)
 from gui.pictgui import ItemsListDialog
 
-
-#class makeConfigurable(object):
-    #"""Decorator to set up a type's property as a configurable.
-    
-        #A configurable is an attribute that can be saved as a persistent setting
-        #of an object, to be restored in a later Scipyen session.
-        
-        #This is achieved by adding a type attribute that maps the setting name
-        #(which can be arbitrary) to a tuple containing the names of the getter 
-        #and setter methods defined in the object's type.
-        
-        #Depending on the third argument of the initializer, the new attribute is
-        #called '_qtcfg', or '_cfg' and takes the form:
-        
-        #{
-            #SettingName1: (getter_method1_name, setter_method1_name),
-            #SettingName2: (getter_method2_name, setter_method2_name),
-            #... etc...
-        #}
-        
-        #When the tuple contains only one str, this is assumed to be the name of
-        #a read/write property. CAUTION: this may raise AttributeError when the
-        #property is read-only and a attempt is made to set it to a value loaded
-        #from the config file.
-        
-        #WARNING This behaviour may change in the future, enforcing the read/write
-        #property to be represented by a tuple of (getter, setter) names even when 
-        #they are the same.
-        
-        #Of course, the '_qtcfg' and '_cfg' type attributes can be also set 
-        #manually (i.e. 'hardcoded') in any user-defined type. This is useful 
-        #when the user-defined type is derived (inherits) from a type defined in 
-        #a thid party library (and thus cannot be modified), provided that:
-        
-        #1) the designer of the new type already KNOWS what are the getter/setter
-        #methods for a settings 
-        
-        #2) the setter accepts the same data type as returned by the getter
-        
-        #For example, see WorkspaceGuiMixin._qtcfg which uses 
-        #PyQt5.QWidgets.QMainWindow method names for window size, position, etc)
-        
-        #Usage scenarios:
-        
-        #1) As a decorator for data descriptors in user-defined classes - this is 
-        #a shorthand for manually defining '_qtcfg' and/or '_cfg' as above.
-        
-        #Let 'SomeType' a user-defined type, where the designer has defined a
-        #read-write property called 'someprop':
-        
-        ## this defines the property 'someprop' of 'SomeType' as read-only
-        ## because this is the first thing that the Python compiler sees when reading
-        ## the source code, and therefore 'someprop' will only have its 'fget'
-        ## defined as a function.
-        #@property           
-        #def someprop(self):
-            #return ...
-            
-        ## this adds write capability to the 'someprop' property of 'SomeType'
-        ## now, the compiler rightly set the property's 'fset' attribute to a 
-        ## function
-        #@someprop.setter    
-        #def someprop(self, val):
-            #...
-            
-        #To covert 'someprop' into a Qt setting, decorate _AT_LEAST_ the setter
-        #so that the property can be used in both ways (read/write)
-        
-        ## this will make it a read-only settings: it can be saved to, or loaded
-        ## from the config file, but if 'SomeType' does not also define a setter,
-        ## attempts to set a value loaded from the config file will raise
-        ## AttributeError
-        ## NOTE that this happens because when the 'someprop' property is first
-        ## defined, it is by default read-only (i.e., its 'fset' method is an
-        ## empty wrapper)
-        #@makeConfigurable(SomeType, 'SomeProp') # 'Qt' is the default
-        #@property
-        #def someprop(self):
-            #...
-            
-        ## this will overwrite mechanism the effect of the above by explicitly
-        ## mapping the settings name 'SomeProp' to ('someprop' , 'someprop')
-        ## in SomeType._qtcfg attribute
-        ##
-        ## Hence, as 'SomeType' is defining a setter for 'someprop', the 
-        ## decorator needs only to be used here.
-        ##
-        #@makeConfigurable(SomeType, 'SomeProp') # 'Qt' is the default
-        #@someprop.setter
-        #def someprop(self):
-            #...
-            
-        
-        
-        
-    #"""
-    #def __init__(self, klass:type, confname:str, type:str="Qt"):
-        #"""Arguments to the decorator:
-        #klass: type = the where the property needs to be flagged as configurable
-        
-        #confname: str = the name of the configuration 'key'
-        
-        #type:str = 'Qt', 'default', or anything else (optional, default is 'Qt')
-        
-            #When 'type' is the 'Qt', (the default) then this is a setting to be 
-            #saved in / loaded from the Scipyen's QSettings conf file 
-            #(typically, $HOME/.config/Scipyen/Scipyen.conf).
-            
-            #When 'type' is 'default', then this is a setting to be saved in, or
-            #loaded from, the config_default.yaml file
-            #(typically, in the root directory of where Scipyen is installed, 
-            #assuming it has read/write access to the user)
-            
-            #Otherwise, it will be considerd to be a setting to be saved in the 
-            #user's config.yaml fileLoaders
-            #(typically, in $HOME/.config/Scipyen/config.yaml)
-            
-        #"""
-        #self._klass_ = klass
-        #self._confname_ = confname
-        #self._conftype_ = type
-        
-    #def __call__(self, f):
-        ##print("in makeConfigurable.__call__")
-        ## NOTE: 2021-08-28 10:43:26
-        ## make sure 'f' is a property that has getter and setter
-        ## we don't use the actual f.getter and f.setter here because they're
-        ## builtin_function_or_method and their __qualname__ is decoupled from
-        ## the owner klass;
-        ##locals = sys._getframe(1).f_locals
-        ##print("locals", locals)
-        ##globals = sys._getframe(1).f_globals
-        ##print("globals", globals)
-        
-        #if isinstance(f, property):
-            ##print("property", f) 
-            #gs = []
-            ## NOTE: 2021-08-28 13:43:00
-            ## when f.fset is not a function, f is a read-only property
-            ## ATTENTION for backward compatibility this is NOT picked up in 
-            ## syncQSettings(). I.e., when confname is mapped to a 1-tuple in 
-            ## klass._qtcfg this is _ASSUMED_ to be a read-write property
-            ##
-            #if inspect.isfunction(f.fget):
-                #propname = f.fget.__qualname__.split(".")[-1]
-                #gs.append(propname)
-                
-            #if inspect.isfunction(f.fset):
-                #propname = f.fset.__qualname__.split(".")[-1]
-                #gs.append(propname)
-                
-            #if self._conftype_ is 'Qt':
-                ## NOTE: 2021-08-28 13:58:20
-                ## klass._qtcfg is handled in syncQSettings()
-                #if hasattr(self._klass_, "_qtcfg") and isinstance(self._klass_._qtcfg, dict):
-                    #self._klass_._qtcfg.update({self._confname_: tuple(gs)})
-                    
-                #else:
-                    #self._klass_._qtcfg = Bunch({self._confname_ : tuple(gs)})
-                    
-            #elif self._conftype_ is 'default':
-                ## TODO 2021-08-28 13:58:00
-                ## implement handling of default non-Qt settings
-                #pass
-            #else:
-                #if hasattr(self._klass_, "_cfg") and isinstance(self._klass_._cfg, dict):
-                    #self._klass_._cfg.update({self._confname_: tuple(gs)})
-                    
-                #else:
-                    #self._klass_._cfg = Bunch({self._confname_ : tuple(gs)})
-                    
-                
-        ##else:
-            ##print(f, "is not a property")
-                    
-        #return f
-    
 class GuiMessages(object):
     @safeWrapper
     def errorMessage(self, title, text):
@@ -293,7 +116,8 @@ class FileIOGui(object):
             
         return dirName
 
-class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
+@makeConfigurable
+class WorkspaceGuiMixin(GuiMessages, FileIOGui):#, ScipyenConfigurable):
     """Mixin type for windows that need to be aware of Scipyen's main workspace.
     
     Also provides:
@@ -354,10 +178,10 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     #
     #
     #
-    _qtcfg = Bunch({"WindowSize":       Bunch({"get":"size",        "set":"resize"}),
-                    "WindowPosition":   Bunch({"get":"pos",         "set":"move"}),
-                    "WindowGeometry":   Bunch({"get":"geometry",    "set":"setGeometry"}),
-                    "WindowState":      Bunch({"get":"saveState",   "set":"restoreState"}),
+    _qtcfg = Bunch({"WindowSize":       Bunch({"getter":"size",        "setter":"resize"}),
+                    "WindowPosition":   Bunch({"getter":"pos",         "setter":"move"}),
+                    "WindowGeometry":   Bunch({"getter":"geometry",    "setter":"setGeometry"}),
+                    "WindowState":      Bunch({"getter":"saveState",   "setter":"restoreState"}),
                     })
     
     _ownqtcfg = Bunch()
@@ -399,62 +223,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         if isinstance(title, str) and len(title.strip()):
             self.setWindowTitle(title)
             
-    #@property
-    #def qtconfigurables(self):
-        #"""A str -> type mapping of configurable properties for QSettings.
-        
-        #The keys of the mapping (str) are attributes or descriptors with read &
-        #write access, defined in the viewer class, as follows. 
-        
-        #key:str = QSettings key
-        
-        #value: 
-        #EITHER: tuple (str, str) = (getter method name, setter method name)
-                #where:
-                    #getter method name: name of instance or :class: method that
-                                        #returns a Python object (CAUTION: when
-                                        #the method returns SEVERAL obejcts they
-                                        #will be captured in a tuple!)
-                                        
-                    #setter method name: name of the instance or :class: method that
-                                        #accepts ONE Python object as parameter
-                                        #of the same type as the return value of
-                                        #the getter method
-        
-        #OR:     tuple (str, ) = property
-                #where: property is the name of a descriptor with read-write access
-                #CAUTION: If the propert is read-only, trying to set values
-                #loaded from configuration file will raise AttributeError
-                
-                #WARNING: this behaviour is on its way out, and two method names
-                #will be required for read-write settings (even if they refer to
-                #the same method).
-        
-        #The values are returned by the getter method is expected to be built-in 
-        #Python types that can be easily converted to a QVariant, EXCLUDING:
-        #- context managers
-        #- modules
-        #- classes
-        #- functions and methods
-        #- code objects
-        #- type objects
-        #- Ellipsis
-        #- NotImplemented
-        #- stack frame objects
-        #- traceback objects
-        
-        #NOTE: No type checking is performed.
-        
-        #"""
-        ## TODO 2021-08-25 16:47:16
-        ## if using traitlets.config framework then make functions to write atomic
-        ## qsettings keyts to the conf file, as the configurble is changed
-        #return self._qtcfg
-    
-    #@property
-    #def configurables(self):
-        #return self._cfg
-
     @property
     def isTopLevel(self):
         """Returns True when this window is a top level window in Scipyen.

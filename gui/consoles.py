@@ -88,8 +88,7 @@ from core.extipyutils_client import (init_commands, execute, ForeignCall,
                                     nrn_ipython_initialization_cmd,)
 from core.strutils import str2symbol
 
-from core.scipyen_config import (ScipyenConfigurable, makeConfigurable, 
-                                 markConfigurable)
+from core.scipyen_config import (makeConfigurable, markConfigurable)
 
 from gui.workspacegui import (WorkspaceGuiMixin, 
                               saveWindowSettings, loadWindowSettings,
@@ -147,7 +146,7 @@ def available_pygments():
 def get_available_syntax_styles():
     return sorted(list(pstyles.get_all_styles()))
 
-class ExternalConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
+class ExternalConsoleWidget(RichJupyterWidget):
     """Not used
     """
     def __init__(self, *args, **kw):
@@ -3178,7 +3177,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
         # e.g. after calling show()
         #self.set_pygment(self._console_pygment) 
         
-    #@makeConfigurable("CloseEvent", "Qt")
+    ####@markConfigurable("CloseEvent", "Qt") # for testig only!
     def closeEvent(self, evt):
         self._save_settings_()
         evt.accept()
@@ -3187,7 +3186,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     def scrollBarPosition(self):
         return self._control.layoutDirection()
         
-    #@makeConfigurable("ScrollBarPosition", "Qt")
+    @markConfigurable("ScrollBarPosition", "Qt")
     @scrollBarPosition.setter
     def scrollBarPosition(self, value:typing.Union[int, str, QtCore.Qt.LayoutDirection]):
         if isinstance(value, str):
@@ -3220,7 +3219,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     def fontFamily(self) -> str:
         return self.font.family()
     
-    #@makeConfigurable("FontFamily", "Qt")
+    @markConfigurable("FontFamily", "Qt")
     @fontFamily.setter
     def fontFamily(self, val:str) -> None:
         font = self.font
@@ -3231,7 +3230,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     def fontSize(self) -> int:
         return self.font.pointSize()
     
-    #@makeConfigurable("FontPointSize", "Qt")
+    @markConfigurable("FontPointSize", "Qt")
     @fontSize.setter
     def fontSize(self, val:int) -> None:
         font = self.font
@@ -3242,7 +3241,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     def fontStyle(self) -> typing.Union[int, QtGui.QFont.Style]:
         return self.font.style()
         
-    #@makeConfigurable("FontStyle", "Qt")
+    @markConfigurable("FontStyle", "Qt")
     @fontStyle.setter
     def fontStyle(self, val:typing.Union[int, QtGui.QFont.Style, str]) -> None:
         style = get_font_style(val) 
@@ -3254,7 +3253,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     def fontWeight(self) -> typing.Union[int, QtGui.QFont.Weight]:
         return self.font.weight()
 
-    #@makeConfigurable("FontWeight", "Qt")
+    @markConfigurable("FontWeight", "Qt")
     @fontWeight.setter
     def fontWeight(self, val:typing.Union[int, QtGui.QFont.Weight, str]) -> None:
         weight = get_font_weight(val)
@@ -3266,7 +3265,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     def colors(self) -> str:
         return self._console_colors
     
-    #@markConfigurable("ConsoleColors", "Qt")
+    @markConfigurable("ConsoleColors", "Qt")
     @colors.setter
     def colors(self, val:str):
         style = self._console_pygment
@@ -3278,7 +3277,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
         """
         return self.syntax_style
     
-    #@makeConfigurable("SyntaxStyle", "Qt")
+    @markConfigurable("SyntaxStyle", "Qt")
     @syntaxStyle.setter
     def syntaxStyle(self, style:str):
         colors = self._console_colors
@@ -3294,12 +3293,12 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
 
     #@safeWrapper
     def _save_settings_(self):
-        return
+        #return
         gname, pfx = saveWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
 
     #@safeWrapper
     def _load_settings_(self):
-        return
+        #return
         # located in $HOME/.config/Scipyen/Scipyen.conf
         gname, pfx = loadWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
         
