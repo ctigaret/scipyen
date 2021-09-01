@@ -256,8 +256,6 @@ class DataBag(Bunch):
             
         self.__observer__ = DataBagTraitsObserver(**dd)
         
-        #self.__itself__ = None
-        
         super().__init__(*args, **kwargs)
         
         if self in dd.keys():
@@ -367,14 +365,8 @@ class DataBag(Bunch):
                 
         else:
             # add a new trait
-            #if hasattr(val, "__iter__") and 
-            #if val is self:
-                #return
-                #val = self.as_dict()
-                #raise ValueError("One cannot add a trait to oneself!")
-            
             if key not in ("__observer__", "__hidden__") and key not in self.__hidden__.keys():
-                if val is self:
+                if val is self or isinstance(val, DataBag):
                     trdict = {key: dynamic_trait(val, allow_none = self.allow_none, content_traits=False, force_trait=traitlets.Any)}
                     #trdict = {key: traitlets.Any(val, allow_none = True)}
                 else:

@@ -11,7 +11,8 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 #from traitlets.config import SingletonConfigurable
 from core.utilities import safeWrapper
 from core.workspacefunctions import user_workspace
-from core.scipyen_config import (syncQSettings, makeConfigurable, markConfigurable)
+from core.scipyen_config import (ScipyenConfigurable,
+                                 syncQSettings, makeConfigurable, markConfigurable, confuse)
 from gui.pictgui import ItemsListDialog
 
 class GuiMessages(object):
@@ -117,7 +118,7 @@ class FileIOGui(object):
         return dirName
 
 #@makeConfigurable
-class WorkspaceGuiMixin(GuiMessages, FileIOGui):#, ScipyenConfigurable):
+class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     """Mixin type for windows that need to be aware of Scipyen's main workspace.
     
     Also provides:
@@ -191,8 +192,10 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):#, ScipyenConfigurable):
     _owncfg = Bunch()
     
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
+                 settings:typing.Optional[confuse.LazyConfig] = None, 
                  title="", **kwargs):
-        print("WorkspaceGuiMixin __init__ %s" % self.__class__.__name__)
+        #print("WorkspaceGuiMixin __init__ %s" % self.__class__.__name__)
+        ScipyenConfigurable.__init__(self, settings = settings)
         #if self.__class__ is not WorkspaceGuiMixin and getattr(self.__class__, "_is_configurable", None) is not True:
             #if hasattr(self.__class__, "_qtcfg"):
                 #print("WorkspaceGuiMixin __init__ updating _qtcfg from %s" % self.__class__.__name__)

@@ -82,10 +82,10 @@ class ScanDataOptions(DataBag):
                            lower = lower, 
                            upper = upper)
         
-        super().__init__(options, 
-                         mutable_types=mutable_types, 
-                         use_casting=use_casting,
-                         allow_none=allow_none)
+        #super().__init__(options, 
+                         #mutable_types=mutable_types, 
+                         #use_casting=use_casting,
+                         #allow_none=allow_none)
         
     @property
     def defaults(self):
