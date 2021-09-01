@@ -116,7 +116,7 @@ class FileIOGui(object):
             
         return dirName
 
-@makeConfigurable
+#@makeConfigurable
 class WorkspaceGuiMixin(GuiMessages, FileIOGui):#, ScipyenConfigurable):
     """Mixin type for windows that need to be aware of Scipyen's main workspace.
     
@@ -192,11 +192,13 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui):#, ScipyenConfigurable):
     
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
                  title="", **kwargs):
-        if self.__class__ is not WorkspaceGuiMixin:
-            if hasattr(self.__class__, "_qtcfg"):
-                subclassqtcfg = getattr(self.__class__, "_qtcfg")
-                subclassqtcfg.update(WorkspaceGuiMixin._qtcfg)
-                setattr(self.__class__, "_qtcfg", subclassqtcfg)
+        print("WorkspaceGuiMixin __init__ %s" % self.__class__.__name__)
+        #if self.__class__ is not WorkspaceGuiMixin and getattr(self.__class__, "_is_configurable", None) is not True:
+            #if hasattr(self.__class__, "_qtcfg"):
+                #print("WorkspaceGuiMixin __init__ updating _qtcfg from %s" % self.__class__.__name__)
+                #subclassqtcfg = getattr(self.__class__, "_qtcfg")
+                #subclassqtcfg.update(WorkspaceGuiMixin._qtcfg)
+                #setattr(self.__class__, "_qtcfg", subclassqtcfg)
                 
         self._scipyenWindow_ = None
         

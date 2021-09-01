@@ -183,11 +183,14 @@ def makeConfigurable(cls):
     # however, getter and setter methods MAY be defined in ANY order so as we
     # loop through them a setting may first appear as getter-only, or as 
     # setter-only
+    
+    print("makeConfigurable cls %s" % cls.__name__)
+    
     if not hasattr(cls, "_qtcfg"):
         cls._qtcfg = Bunch()
         
     if not hasattr(cls, "_cfg"):
-        cls._qtcfg = Bunch()
+        cls._cfg = Bunch()
         
     def _qtconfigurables(instance):
         return instance._qtcfg
@@ -273,7 +276,28 @@ def makeConfigurable(cls):
                 
             else:
                 cls._cfg.update(cfg)
+                
+    #spurious_qtcfg_keys = list()
+                
+    #for key, val in cls._qtcfg.items():
+        #no_getter = False
+        #no_setter = False
+        #if "getter" in val and not hasattr(cls, val.getter):
+            #no_getter = True
+            #print("%s does not have a %s getter" % (cls.__name__, val.getter))
             
+        #if "setter" in val and not hasattr(cls, val.setter):
+            #no_setter = True
+            #print("%s does not have a %s setter" % (cls.__name__, val.setter))
+            
+        #if no_getter and no_setter:
+            #spurious_qtcfg_keys.append(key)
+            
+    #for key in spurious_qtcfg_keys:
+        #del(cls._qtcfg[key])
+        
+    cls._is_configurable = True
+    
     return cls
     
 def markConfigurable(confname:str, conftype:str="", setter:bool=True):
