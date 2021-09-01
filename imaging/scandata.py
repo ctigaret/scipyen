@@ -49,6 +49,8 @@ DEFAULTS["Channels"]["Bleed"]["Ind2Ref"] = 0.
 
 
 class ScanDataOptions(DataBag):
+    """Do not use
+    """
     def __init__(self, detection_predicate=1.3, roi_width = 10, roi_auto_width=False,
                   reference="Ch1", indicator="Ch2", 
                   bleed_ref_ind = 0., bleed_ind_ref = 0., 
@@ -58,12 +60,17 @@ class ScanDataOptions(DataBag):
                   peak_begin = 0.15 * pq.s, peak_end = 0.3 * pq.s,
                   initial=[], lower=[], upper=[], **kwargs):
         
-        mutable_types = kwargs.pop("mutable_types", False)
+        mutable_types = kwargs.pop("use_mutable", False)
         use_casting = kwargs.pop("use_casting", False)
         allow_none = kwargs.pop("allow_none", False)
         
         
-        options = self.__defaults__(detection_predicate = detection_predicate, 
+        DataBag.__init__(self, use_mutable=mutable_types, 
+                         use_casting=use_casting,
+                         allow_none=allow_none, 
+                         **kwargs)
+        
+        self.options = self.__defaults__(detection_predicate = detection_predicate, 
                            roi_width = roi_width, 
                            roi_auto_width=roi_auto_width,
                            reference = reference,
@@ -81,7 +88,6 @@ class ScanDataOptions(DataBag):
                            initial = initial, 
                            lower = lower, 
                            upper = upper)
-        
         #super().__init__(options, 
                          #mutable_types=mutable_types, 
                          #use_casting=use_casting,
@@ -9957,11 +9963,9 @@ class ScanData(object):
         #if "MinimumR2" not in value["Discrimination"].keys():
             #value["Discrimination"]["MinimumR2"] = 0.5
             
-        if isinstance(value, ScanDataOptions):
-            self._analysis_options_ = value
-            
-        else: # plain dict
+        if isinstance(value, dict):
             self._analysis_options_ = deepcopy(value)
+            
         
     @property
     def metadata_keys(self):

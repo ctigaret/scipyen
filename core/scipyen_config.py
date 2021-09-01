@@ -674,91 +674,10 @@ def syncSettings(settings:typing.Union[QSettings, confuse.Configuration], obj,
     
     """
     
-    if isinstance(obj, (QMainWindow, QWidget, Figure)):
-        pass
-    
-    gname, pfx = qSettingsGroupPfx(obj)
-    
-    
-    if isinstance(group_name, str) and len(group_name.strip()):
-        # NOTE: 2021-08-24 15:04:31 override internally determined group name
-        gname = group_name
-        
-    if isinstance(prefix, str) and len(prefix.strip()):
-        # NOTE: 2021-08-24 15:04:31 override internally determined group name
-        pfx = prefix
-        
-    if isinstance(pfx, str) and len(pfx.strip()):
-        key_prefix = "%s_" % pfx
-    else:
-        key_prefix=""
-        
-    #action = "save" if save else "load"
-    #print("syncQSettings %s: win = %s, gname = %s, key_prefix = %s" % (action, win, gname, key_prefix))
-    
-    qtcfg = Bunch()
-    qtcfg.update(getattr(win, "_qtcfg", Bunch()))
-    qtcfg.update(getattr(win, "_ownqtcfg", Bunch()))
-    
-    #print("\tqtcfg for %s: %s" % (win.__class__.__name__, qtcfg))
-    
-    for confname, getset in qtcfg.items():
-        # NOTE: 2021-08-28 21:59:43
-        # val, below, can be a function, or the value of a property
-        # in the former case it SHOULD have a '__call__' attribute;
-        # in the latter, it is whatever the property.fget returns (which may still be
-        # a function or method, with a '__call__' attribute!)
-        #print("\tconfname = %s" % confname)
-        gettername = getset.get("getter", None)
-        #print("\t\tgettername = %s" % gettername)
-
-        if not isinstance(gettername, str) or len(gettername.strip()) == 0:
-            continue
-        
-        getter = inspect.getattr_static(win, gettername, None)
-        
-        if isinstance(getter, property):
-            val = getattr(win, gettername)
-            #print("\t\tgetter win.%s -> %s" % (gettername, val))
-            
-        elif getter is not None: # in case gettername does not exist as a win's attribute name
-            # getter may by a function/method, or a sip.wrapper (for Qt objects)
-            val = getattr(win, gettername)()
-            #print("\t\tgetter win.%s() -> %s" % (gettername, val))
-        
-        else:
-            continue
-            
-        #action = "save" if save else "load"
-        #print("syncQSettings, %s: win: %s, key: %s, getset: %s, gname: %s, pfx: %s, val %s (%s)" % (action, win.__class__.__name__, key, str(getset), gname, pfx, type(val).__name__, val))
-        
-        if save:
-            saveQSettingsKey(qsettings, gname, key_prefix, confname, val)
-            
-        else:
-            settername = getset.get("setter", None)
-            #print("\t\tsettername = %s" % settername)
-            
-            if not isinstance(settername, str) or len(settername.strip()) == 0:
-                continue
-                
-            setter = inspect.getattr_static(win, settername, None)
-            
-            default = val
-            
-            newval = loadQSettingsKey(qsettings, gname, key_prefix, confname, default)
-            
-            if isinstance(setter, property):
-                #print("\t\tsetter win.%s = %s" % (settername, newval))
-                setattr(win, settername, newval)
-                
-            elif setter is not None:
-                #print("\t\tsetter win.%s(%s)" % (settername, newval))
-                setter = getattr(win, settername)
-                setter(newval)
-                
-            else:
-                continue
+    if isinstance(obj, ScipyenConfigurable):
+        if isinstance(settings, QSettings):
+            cfg = obj.configurables()
+            return syncQSettings(settings, obj, group_name=group_name,prefix=prefix,save=save)
             
     return gname, pfx
 
