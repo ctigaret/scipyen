@@ -20,7 +20,6 @@ import neo
 #import signalviewer as sv
 from . import tiwt
 from . import models
-from . import datatypes as dt
 #from . import datatypes as dt
 #from .patchneo import *
 #### END pict.core modules

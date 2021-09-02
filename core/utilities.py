@@ -1904,9 +1904,8 @@ class NestedFinder(object):
             self._item_as_index_ = item
             
         return deepcopy(self._result_)
-        
     
-    def findkey(self, key_or_indexing_obj):
+    def findkey(self, obj):
         """Search for value given an atomic key or indexing object
         Returns a sequence of (path, value) tuples, where path is a list of
         indexing objects (or keys) from the top to the item's nesting level,
@@ -1914,10 +1913,10 @@ class NestedFinder(object):
         
         Calls self.find(key_or_indexing_obj, False)
         """
-        return self.find(key_or_indexing_obj, False)
+        return self.find(obj, False)
     
-    def findindex(self, key_or_indexing_obj):
-        """Calls self.findkey(key_or_indexing_obj)
+    def findindex(self, obj):
+        """Calls self.findkey(key_or_indexing_obj).
         """
         return self.findkey(key_or_indexing_obj)
     

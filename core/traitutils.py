@@ -81,7 +81,7 @@ TRAITSMAP = {           # use casting versions
     #function:   (Any,)
     }
 
-def enhanced_set(instance, obj, value):
+def enhanced_traitlet_set(instance, obj, value):
     """Overrides traitlets.TraitType.set to check for special hash.
     This is supposed to also detect changes in the order of elements in sequences.
     """
@@ -127,7 +127,7 @@ def enhanced_set(instance, obj, value):
         # comparison above returns something other than True/False
         obj._notify_trait(instance.name, old_value, new_value)
 
-def _dynatrtyp_exec_body_(ns, setfn = enhanced_set):
+def _dynatrtyp_exec_body_(ns, setfn = enhanced_traitlet_set):
     #print("ns:", ns)
     ns["info_text"]="Trait that is sensitive to content change"
     ns["hashed"] = 0
@@ -302,7 +302,7 @@ def dynamic_trait(x, *args, **kwargs):
     set_function: a function of the signature f(instance, obj, value)
         Optional, default is None
         
-        When None, the generated trait type uses the function enhanced_set 
+        When None, the generated trait type uses the function enhanced_traitlet_set 
         defined in this module.
         
         For details see traitlets.TraitType.set()
@@ -356,7 +356,7 @@ def dynamic_trait(x, *args, **kwargs):
     #print("traitclass", traitclass)
     
     if not isfunction(set_function) or len(signature(set_function).parameters) != 3:
-        set_function = enhanced_set
+        set_function = enhanced_traitlet_set
 
     exec_body_fn = partial(_dynatrtyp_exec_body_, setfn=set_function)
     
@@ -396,7 +396,7 @@ class TraitSetMixin(object):
         """Overrides List.set to check for special hash.
         This is supposed to also detect changes in the order of elements.
         """
-        enhanced_set(self, obj, value)
+        enhanced_traitlet_set(self, obj, value)
         
 class TraitsObserver(HasTraits):
     """ CAUTION do not use yet

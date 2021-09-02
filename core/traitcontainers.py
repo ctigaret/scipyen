@@ -264,13 +264,14 @@ class DataBag(Bunch):
         dtrait = partial(dynamic_trait, allow_none=self.__hidden__.allow_none) 
         
         trdict = dict(map(lambda x: (x[0], dtrait(x[1]) if x[1] is not self else dtrait(x[1], force_trait=traitlets.Any)), dd.items()))
+        #trdict = dict(map(lambda x: (x[0], dtrait(x[1]) if (x[1] is not self and not isinstance(x[1], DataBag)) else dtrait(x[1], force_trait=traitlets.Any)), dd.items()))
         
         self.__hidden__.length = len(trdict)
 
         self.__observer__.add_traits(**trdict)
         
     def __setitem__(self, key, val):
-        """Implements indexed (subscript) assignment: self[key] = val
+        """Implements indexed (subscript) assignment: obj[key] = val
         """
             
         # NOTE 2020-07-04 17:32:16 :
@@ -397,7 +398,7 @@ class DataBag(Bunch):
         return pformat(d)
     
     def __getitem__(self, key):
-        """Implements bag[key] (subscript access, or "bracket syntax"")
+        """Implements obj[key] (subscript access, or "bracket syntax"")
         """
         try:
             obs = object.__getattribute__(self, "__observer__")
@@ -406,7 +407,7 @@ class DataBag(Bunch):
             raise
     
     def __getattr__(self, key):
-        """Implements bag.key (attribute access, or "dot syntax")
+        """Implements obj.key (attribute access, or "dot syntax")
         """
         try:
             obs = object.__getattribute__(self, "__observer__")
@@ -430,7 +431,7 @@ class DataBag(Bunch):
         return sum((hash(v) for v in self.items()))
         
     def __delitem__(self, key):
-        """Implements del a[key] where a is a DataBag and key is a str
+        """Implements del obj[key] where a is a DataBag and key is a str
         """
         try:
             obs = object.__getattribute__(self, "__observer__")
