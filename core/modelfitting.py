@@ -2,43 +2,128 @@
 
 """
 from abc import (ABCMeta, ABC, abstractmethod)
-import typing, types
-from inspect import getmro
-from functools import partial
-from traitlets import Bunch
-import numpy as np
-import quantities as pq
+import typing
 import numbers
+import traceback
+from inspect import getmro
+from functools import (partial, wraps)
+from traitlets import Bunch
+from pprint import pprint
+import numpy as np
+import sympy as sp
 import quantities as pq
 from scipy import cluster, optimize, signal, integrate #, where
 import vigra
 import neo
 from core.traitcontainers import DataBag
-from core.traitutils import dynamic_trait
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 
-class FitModel(ABC):
-    _parameter_names_ = tuple()
-    _default_initial_ = list()
-    _default_lower_ = list()
-    _default_upper_ = list()
+class ModelExpression(object):
+    """Class decorator to pass an expression to the model.
     
+    Can use this instead of directly hardcoding the expression in the definition
+    if the fit model ::class::.
+    
+    This is useful to dynamically create new FitModel ::classes:: 
+    
+    WARNING: Either way, the expression must be buit in terms of the parameter
+    names built in the model ::class:: (without the 'self.' prefix)
+    
+    """
+    #def __init__(self, paramnames:tuple, expression:str):
+        #self._paramnames_ = paramnames
+        #self._expression_ = expression
+        
+    def __init__(self, expression:str=""):
+        self._expression_ = expression
+        
+    def __call__(self, klass):
+        if not isinstance(self._expression_, str) or len(self._expression_.strip()) == 0:
+            klass._model_expression_ = ""
+            klass._sympexpr_ = None
+            return klass
+        
+        if len(klass._parameter_names_) == 0:
+            klass._model_expression_ = ""
+            klass._sympexpr_ = None
+            return klass
+        
+        klass._model_expression_ = self._expression_
+        
+        symbols         = sp.symbols(klass._parameter_names_)
+        selfsymbols     = sp.symbols(["self.%s" % s for s in klass._parameter_names_])
+        
+        try:
+            sympyexpr       = sp.sympify(klass._model_expression_)
+            rule            = dict(((s, ss) for s, ss in zip(symbols, selfsymbols)))
+            selfsympexpr    = sympyexpr.xreplace(rule)
+            
+            klass._sympexpr_ = selfsympexpr
+            
+        except:
+            traceback.print_exc()
+            klass._sympexpr_ = None
+        
+        return klass
+    
+
+class FitModelMeta(type):
+    """Metaclass that generates properties for the model parameters.
+    Each model parameter gets three read/write properties named after the 
+    parameter's name or suffixed with '_lb' or '_ub', respectively, for the
+    initial value, lower and upper bound values.
+    """
+    def __new__(klass, name, bases, classdict):
+        if name not in (c.__name__ for c in bases):
+            if "_parameter_names_" in classdict:
+                for paramname in classdict["_parameter_names_"]:
+                    props = klass.make_param_properties(paramname, name)
+                    classdict[paramname]           = props[0]
+                    classdict["%s_lb" % paramname] = props[1]
+                    classdict["%s_ub" % paramname] = props[2]
+        
+        return super().__new__(klass, name, bases, classdict)
+        
+    def __init__(klass, name, bases, classdict):
+        super().__init__(name, bases, classdict)
+        
     @staticmethod
-    def _new_class_props_(ns, new_props={}):
-        ns.update(new_props)
+    def make_param_properties(param, classname):
+        def fget(instance):
+            return instance.initial[param]
         
-    @classmethod
-    def _make_properties_(cls, param_names):
-        """sets up dynamic properties
-        """
-        return dict(((name, property(fget = lambda x:   x.initial.__getitem__(name), 
-                                     fset = lambda x,y: x.initial.__setitem__(name, y)) ) for name in param_names))
+        def fset(instance, val):
+            instance.initial[param] = val
+            
+        def fget_lower(instance):
+            return instance.lower[param]
+            
+        def fset_lower(instance, val):
+            instance.lower[param] = val
+            
+        def fget_upper(instance):
+            return instance.upper[param]
+            
+        def fset_upper(instance, val):
+            instance.upper[param] = val
+            
+        initial = property(fget=fget,       fset=fset,       doc = "Initial value of %s model parameter '%s'"     % (classname, param))
+        lower   = property(fget=fget_lower, fset=fset_lower, doc = "Lower bound value of %s model parameter '%s'" % (classname, param))
+        upper   = property(fget=fget_upper, fset=fset_upper, doc = "Upper bound value of %s model parameter '%s'" % (classname, param))
         
+        return (initial, lower, upper)
+
+class FitModel(metaclass=FitModelMeta):
+    _parameter_names_   = tuple()
+    _default_initial_   = list()
+    _default_lower_     = list()
+    _default_upper_     = list()
+    _model_expression_  = str()
     
     def __init__(self, **kwargs):
-        object.__setattr__(self, "initial", DataBag())
-        object.__setattr__(self, "lower",   DataBag())
-        object.__setattr__(self, "upper",   DataBag())
+        self.initial = DataBag()
+        self.lower   = DataBag()
+        self.upper   = DataBag()
         # NOTE: 2021-09-02 15:06:03
         # override this in derived for a more sophisticated initialization
         for k, name in enumerate(self._parameter_names_):
@@ -46,21 +131,28 @@ class FitModel(ABC):
             self.lower[name]   = kwargs.get(name, self._default_lower_[k])
             self.upper[name]   = kwargs.get(name, self._default_upper_[k])
             
-        if self.__class__ is not FitModel:
-            param_properties = self.__class__._make_properties_(self.__class__._parameter_names_)
-            
-            exec_body = partial(self.__class__._new_class_props_, new_props = param_properties)
-            
-            self.__class__ = types.new_class(self.__class__.__name__, 
-                                            bases = getmro(self.__class__)[1:], 
-                                            exec_body = exec_body)
+
+    #def __repr__(self):
+        #pass
         
-    @abstractmethod
+
     def __call__(self, x):
-        pass
+        if isinstance(self._sympexpr_, sp.core.expr.Expr):
+            f = sp.lambdify(x, self._sympexpr_, "numpy")
+            return f(x)
     
     def fit(self, x):
         pass
+    
+    @property
+    def expression(self):
+        return str(self._model_expression_)
+    
+    @property
+    def parameter_names(self):
+        """Model parameter names wrapped in a tuple
+        """
+        return self._parameter_names_
     
     @property
     def defaults(self) -> Bunch:
@@ -108,19 +200,35 @@ class FitModel(ABC):
                             
         
                 
+@ModelExpression('a * exp(-(x-x0)/tau) + offset')
 class ExponentialDecay(FitModel):
-    _parameter_names_ = ("offset", "a", "x0", "tau")
-    _default_initial_ = (0., 1., 0., 0.1)
-    _default_lower_ = tuple([None] * len(_parameter_names_))
-    _default_upper_ = tuple([None] * len(_parameter_names_))
+    _parameter_names_   = ("offset", "a", "x0", "tau")
+    _default_initial_   = (0., 1., 0., 0.1)
+    _default_lower_     = tuple([None] * len(_parameter_names_))
+    _default_upper_     = tuple([None] * len(_parameter_names_))
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        #for k,n in enumerate(self._parameter_names_):
-            #self.initial[n] = kwargs.get(n, self._default_initial_[k])
-            #self.lower[n]   = kwargs.get(n, self._default_lower_[k])
-            #self.upper[n]   = kwargs.get(n, self._default_upper_[k])
-        
+            
+    #def __call__(self, x:np.ndarray):
+        #print(self._selfexpr_)
+        #return self.a * np.exp(-(x-self.x0)/self.tau) + self.offset
+    
+    def fit(self, x):
+        pass
+    
+class ExponentialDecay2(FitModel):
+    """Demonstrates defining a new fit model without a decorator.
+    The attribute _model_expression_ needs to be harcoded in the definition
+    """
+    _parameter_names_   = ("offset", "a", "x0", "tau")
+    _default_initial_   = (0., 1., 0., 0.1)
+    _default_lower_     = tuple([None] * len(_parameter_names_))
+    _default_upper_     = tuple([None] * len(_parameter_names_))
+    _model_expression_  = 'a * exp(-(x-x0)/tau) + offset'
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
             
     def __call__(self, x:np.ndarray):
         return self.a * np.exp(-(x-self.x0)/self.tau) + self.offset
