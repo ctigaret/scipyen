@@ -5,18 +5,28 @@ from abc import (ABCMeta, ABC, abstractmethod)
 import typing
 import numbers
 import traceback
+import tokenize
+from io import BytesIO
+from contextlib import (contextmanager, ContextDecorator,)
+import inspect
 from inspect import getmro
 from functools import (partial, wraps)
+#import six
 from traitlets import Bunch
 from pprint import pprint
 import numpy as np
-import sympy as sp
+import scipy
+#import sympy as sp
+#import sympy.parsing.sympy_parser as symparser
 import quantities as pq
 from scipy import cluster, optimize, signal, integrate #, where
 import vigra
 import neo
 from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+from core.utilities import reverse_mapping_lookup
+
+#@contextmanager
 
 class ModelExpression(object):
     """Class decorator to pass an expression to the model.
@@ -30,14 +40,14 @@ class ModelExpression(object):
     names built in the model ::class:: (without the 'self.' prefix)
     
     """
-    #def __init__(self, paramnames:tuple, expression:str):
-        #self._paramnames_ = paramnames
-        #self._expression_ = expression
-        
-    def __init__(self, expression:str=""):
+    def __init__(self, expression:str="", modules = (np, scipy, cluster, optimize, signal, integrate)):
+        # NOTE: the decorator already receives a ::class:: object 
         self._expression_ = expression
+        self._modules_ = modules
         
     def __call__(self, klass):
+        """Decorates the ::class::
+        """
         if not isinstance(self._expression_, str) or len(self._expression_.strip()) == 0:
             klass._model_expression_ = ""
             klass._sympexpr_ = None
@@ -49,22 +59,70 @@ class ModelExpression(object):
             return klass
         
         klass._model_expression_ = self._expression_
-        
-        symbols         = sp.symbols(klass._parameter_names_)
-        selfsymbols     = sp.symbols(["self.%s" % s for s in klass._parameter_names_])
-        
-        try:
-            sympyexpr       = sp.sympify(klass._model_expression_)
-            rule            = dict(((s, ss) for s, ss in zip(symbols, selfsymbols)))
-            selfsympexpr    = sympyexpr.xreplace(rule)
-            
-            klass._sympexpr_ = selfsympexpr
-            
-        except:
-            traceback.print_exc()
-            klass._sympexpr_ = None
+        klass._call_expression_  = self._adapt_tokens_(klass)
         
         return klass
+    
+    def _adapt_tokens_(self, klass:type):
+        ret = list()
+        expr = klass._model_expression_
+        
+        for tokeninfo in tokenize.tokenize(BytesIO(expr.encode('utf-8')).readline):
+            if tokeninfo.type == tokenize.NAME:
+                if tokeninfo.string in klass._parameter_names_:
+                    ret.extend([(tokenize.NAME, "self.%s" % tokeninfo.string)])
+                else:
+                    newtokstr = self._make_canon_(tokeninfo.string)
+                    if tokeninfo.string == newtokstr:
+                        ret.append(tokeninfo)
+                    else:
+                        ret.extend([(tokenize.NAME, newtokstr)])
+                        
+            else:
+                ret.append(tokeninfo)
+                        
+        return tokenize.untokenize(ret).decode('utf-8')
+    
+    def _make_canon_(self, name:str):
+        frame = inspect.currentframe()
+        #print("globals in current frame:\n")
+        #pprint(frame.f_globals)
+        #print("locals in current frame:\n")
+        #pprint(frame.f_locals)
+        for m in self._modules_:
+            if name in m.__dict__:
+                # name is a member of module 'm'
+                # now check if module 'm' is available here
+                if m in frame.f_globals.values():
+                    # 'm' i availbale => get the symbol under which it is bound
+                    # in the f_globals
+                    
+                    # this is either a str, a tuple (when 'm' is bound to more
+                    # than one symbol) or None when 'm' has not been imported
+                    # here - in the latter case we do nothing
+                    # TODO 2021-09-04 22:05:27 FIXME: try to import 'm' if not
+                    # already imported
+                    m_name = reverse_mapping_lookup(frame.f_globals, m)
+                    
+                    if isinstance(m_name, tuple):
+                        # m_name is a tuple if 'm' is bound under several symbols
+                        # get the first one
+                        if len(m_name):
+                            m_name = m_name[0]
+                        else: # this should never occur
+                            m_name = None
+                        
+                    if m_name is None:
+                        continue # see TODO/FIXME above
+                
+            # first, try to find if m is in this :class: module namespace
+            # as an alias
+            
+                return "%s.%s" % (m_name, name)
+
+            
+        return name
+        
     
 
 class FitModelMeta(type):
@@ -72,6 +130,9 @@ class FitModelMeta(type):
     Each model parameter gets three read/write properties named after the 
     parameter's name or suffixed with '_lb' or '_ub', respectively, for the
     initial value, lower and upper bound values.
+    
+    To be used with any :class: derived from FitModel, where a _parameter_names_
+    attribute is defined as a tuple of strings (the names of the model's parameters)
     """
     def __new__(klass, name, bases, classdict):
         if name not in (c.__name__ for c in bases):
@@ -114,6 +175,39 @@ class FitModelMeta(type):
         return (initial, lower, upper)
 
 class FitModel(metaclass=FitModelMeta):
+    """Top parent :class: for all fit models
+    
+    To drive from it:
+    1) define a new :class: with the body where AT LEAST the :class: attribute
+        '_parameter_names_' is defined as a tuple of strings (the parameter names)
+        
+        See, for example, the ExponentialDecay :class: where '_parameter_names_'
+        is: 
+            ("offset", "a", "x0", "tau")
+            
+    2) decorate the new :class: with @ModelExpression parameterized with:
+        * a str: the model expression containing the parameters named as in the
+            '_parameter_names_' :class: attribute
+            
+            For example, in the case of ExponentialDecay this is:
+            
+                'a * exp(-(x-x0)/tau) + offset'
+            
+        * a list of imported modules where the functions used in the expression
+            are defined.
+            
+            These modules must be accessible from the namespace where the new 
+            :class: is defined.
+            
+            For the model classes defined in this module, by default this
+            contains the following modules imported here:
+            
+            np, scipy, cluster, optimize, signal, integrate
+            
+            with 'np' an alias to numpy
+    
+    
+    """
     _parameter_names_   = tuple()
     _default_initial_   = list()
     _default_lower_     = list()
@@ -137,9 +231,9 @@ class FitModel(metaclass=FitModelMeta):
         
 
     def __call__(self, x):
-        if isinstance(self._sympexpr_, sp.core.expr.Expr):
-            f = sp.lambdify(x, self._sympexpr_, "numpy")
-            return f(x)
+        if isinstance(self._call_expression_, str) and len(self._call_expression_.strip()):
+            #print(self._call_expression_)
+            return eval(self._call_expression_)
     
     def fit(self, x):
         pass
