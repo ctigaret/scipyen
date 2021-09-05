@@ -1182,6 +1182,7 @@ class VTH(object):
         if viewerClass in VTH.default_handlers:
             VTH.gui_handlers[viewerClass] = deepcopy(VTH.default_handlers[viewerClass])
 
+@makeConfigurable
 class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
@@ -1489,18 +1490,24 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                  parent:typing.Optional[QtWidgets.QWidget]=None,
                  *args, **kwargs) -> None:
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: python3 way
-        WorkspaceGuiMixin.__init__(self, parent=self)
+        WorkspaceGuiMixin.__init__(self, parent=self, settings=settings)
         self.app                        = app
-        self.recentFiles                = collections.OrderedDict()
-        self.recentDirectories          = collections.deque()
-        self.fileSystemFilterHistory    = collections.deque()
-        self.commandHistoryFinderList   = collections.deque()
-        self.recentVariablesList        = collections.deque()
-        self.recentlyRunScripts         = collections.deque()
+        
+        #### BEGIN configurables; for each of these we define a read-write property
+        # decorated with markConfigurable
+        self._recentFiles                = collections.OrderedDict()
+        self._recentDirectories          = collections.deque()
+        self._fileSystemFilterHistory    = collections.deque()
+        self._lastFileSystemFilter       = str()
+        self._recentVariablesList        = collections.deque()
+        self._lastVariableFind           = str()
+        self._commandHistoryFinderList   = collections.deque()
+        self._lastCommandFind            = str()
+        self._recentlyRunScripts         = collections.deque()
         self._recent_scripts_dict_      = dict()
-        self.lastFileSystemFilter       = str()
-        self.lastVariableFind           = str()
-        self.lastCommandFind            = str()
+        self._showFilesFilter           = False
+        # ### END configurables
+        
         self.navPrevDir                 = collections.deque()
         self.navNextDir                 = collections.deque()
         self.currentDir                 = None
@@ -1655,6 +1662,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.__class__._instance = self # FIXME: what's this for?!? - flag as singleton?
         
+    #### BEGIN Properties
     @property
     def scipyenSettings(self):
         return self._scipyen_settings_
@@ -1664,6 +1672,179 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._scipyen_settings_ = value
         self.workspace["scipyen_settings"] = self._scipyen_settings_
         
+    @property
+    def recentFiles(self) -> collections.OrderedDict:
+        return self._recentFiles
+    
+    @markConfigurable("RecentFiles", "Qt")
+    @recentFiles.setter
+    def recentFiles(self, val:typing.Optional[typing.Union[collections.OrderedDict, tuple, list]]=None) -> None:
+        if isinstance(val, collections.OrderedDict):
+            self._recentFiles = val
+        elif isinstance(val, (tuple, list)):
+            self._recentFiles = collections.OrderedDict(zip(val, ["vigra"] * len(val)))
+        else:
+            self._recentFiles = collections.OrderedDict()
+            
+        self._refreshRecentFilesMenu_()
+            
+    @property
+    def recentDirectories(self) -> collections.deque:
+        return self._recentDirectories
+    
+    @markConfigurable("RecentDirectories", "Qt")
+    @recentDirectories.setter
+    def recentDirectories(self, val:typing.Optional[typing.Union[collections.deque, list, tuple]]=None) -> None:
+        if isinstance(val, (collections.deque, list, tuple)):
+            self._recentDirectories = collections.deque(sorted((s for s in val)))
+        else:
+            self._recentDirectories = collections.deque()
+            
+        if len(self._recentDirectories) == 0:
+            self._recentDirectories.appendleft(os.getcwd())
+            
+        self.slot_changeDirectory(self._recentDirectories[0])
+            
+        self._refreshRecentDirectoriesMenu_()
+        self._refreshRecentDirsComboBox_()
+            
+    @property
+    def fileSystemFilterHistory(self) -> collections.deque:
+        return self._fileSystemFilterHistory
+    
+    @markConfigurable("RecentFileSystemFilters", "Qt")
+    @fileSystemFilterHistory.setter
+    def fileSystemFilterHistory(self, 
+                                val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
+        if isinstance(val, (collections.deque, list, tuple)):
+            self._fileSystemFilterHistory = collections.deque(sorted((s for s in val)))
+            
+        else:
+            self._fileSystemFilterHistory = collections.deque()
+            
+        if len(self._fileSystemFilterHistory):
+            self.fileSystemFilter.clear()
+            for item in self._fileSystemFilterHistory:
+                if isinstance(item, str):
+                    self.fileSystemFilter.addItem(item)
+            
+    @property
+    def lastFileSystemFilter(self) -> str:
+        return self._lastFileSystemFilter
+    
+    @markConfigurable("LastFileSystemFilter", "Qt")
+    @lastFileSystemFilter.setter
+    def lastFileSystemFilter(self, val:typing.Optional[str] = None) -> None:
+        if isinstance(val, str):
+            self._lastFileSystemFilter = val
+        else:
+            self._lastFileSystemFilter = str()
+            
+        self.fileSystemFilter.setCurrentText(self._lastFileSystemFilter)
+        self.fileSystemModel.setNameFilters(self._lastFileSystemFilter.split())
+        
+    @property
+    def showFileSystemFilter(self) -> bool:
+        return self._showFilesFilter
+    
+    @markConfigurable("FilesFilterVisible", "Qt")
+    @showFileSystemFilter.setter
+    def showFileSystemFilter(self, val:typing.Optional[typing.Union[bool, str, int]]=None) -> None:
+        if isinstance(val, str) and val.strip().lower() == "true":
+            val = True
+        elif isinstance(val, int) and val > 0:
+            val = True
+            
+        self._showFilesFilter = val is True
+        
+        self.filesFilterFrame.setVisible(self._showFilesFilter)
+            
+    @property
+    def variableSearches(self) -> collections.deque:
+        return self._recentVariablesList
+    
+    @markConfigurable("VariableSearch", "Qt")
+    @variableSearches.setter
+    def variableSearches(self, 
+                         val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
+        if isinstance(val, (collections.deque, list, tuple)):
+            self._recentVariablesList = collections.deque(sorted((s for s in val)))
+            
+        else:
+            self._recentVariablesList = collections.deque
+            
+        if len(self._recentVariablesList):
+            self.varNameFilterFinderComboBox.clear()
+            for item in self._recentVariablesList:
+                self.varNameFilterFinderComboBox.addItem(item)
+                
+        self.varNameFilterFinderComboBox.setCurrentText("")
+    
+    @property
+    def lastVariableSearch(self) -> str:
+        return self._lastVariableFind
+    
+    @markConfigurable("LastVariableSearch", "Qt")
+    @lastVariableSearch.setter
+    def lastVariableSearch(self, val:typing.Optional[str]=None) -> None:
+        if isinstance(val, str):
+            self._lastVariableFind = val
+        else:
+            self._lastVariableFind = str()
+            
+    @property
+    def commandSearches(self) -> collections.deque:
+        return self._commandHistoryFinderList
+    
+    @markConfigurable("CommandSearch", "Qt")
+    @commandSearches.setter
+    def commandSearches(self, 
+                        val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
+        if isinstance(val, (collections.deque, list, tuple)):
+            self._commandHistoryFinderList = collections.deque(sorted((s for s in val)))
+            
+        else:
+            self._commandHistoryFinderList = collections.deque()
+            
+        if len(self._commandHistoryFinderList):
+            self.commandFinderComboBox.clear()
+            for item in self._commandHistoryFinderList:
+                self.commandFinderComboBox.addItem(item)
+                
+        self.commandFinderComboBox.setCurrentText("")
+            
+    @property
+    def lastCommandSearch(self) -> str:
+        return self._lastCommandFind
+    
+    @markConfigurable("LastCommandSearch", "Qt")
+    @lastCommandSearch.setter
+    def lastCommandSearch(self, val:typing.Optional[str]=None) -> None:
+        if isinstance(val, str):
+            self._lastCommandFind = val
+        else:
+            self._lastCommandFind = str()
+            
+    @property
+    def recentRunScripts(self) -> collections.deque:
+        return self._recentlyRunScripts
+    
+    @markConfigurable("RecentScripts", "Qt")
+    @recentRunScripts.setter
+    def recentRunScripts(self, 
+                         val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
+        if isinstance(val, (collections.deque, list, tuple)):
+            self._recentlyRunScripts = collections.deque(sorted((s for s in val if os.path.isfile(s))))
+            
+        else:
+            self._recentlyRunScripts = collections.deque()
+            
+        self._refreshRecentScriptsMenu_()
+    
+    #### END   Properties
+    
+    #### BEGIN PyQt slots
+    
     @pyqtSlot()
     def slot_launchExternalRunningIPython(self):
         self._init_ExternalIPython_(new="connection")
@@ -1683,6 +1864,19 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_launchExternalRunningIPythonNeuron(self):
         self._init_ExternalIPython_(new="neuron_ext")
         
+    @pyqtSlot()
+    @safeWrapper
+    def slot_initQtConsole(self):
+        self._init_QtConsole_()
+        
+        self.shell.events.register("pre_execute", self.workspaceModel.pre_execute)
+        self.shell.events.register("post_execute", self.workspaceModel.post_execute)
+        
+        self.slot_changeDirectory(self.recentDirectories[0])
+        
+    #### END   PyQt slots
+    
+    #### BEGIN Methods
     @safeWrapper
     def _init_ExternalIPython_(self, new:str = ""):
         """External IPython launcher.
@@ -1849,16 +2043,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                     if isinstance(new, str) and str == "neuron_ext":
                         self.external_console.window.start_neuron_in_current_tab()
 
-        
-    @pyqtSlot()
-    @safeWrapper
-    def slot_initQtConsole(self):
-        self._init_QtConsole_()
-        
-        self.shell.events.register("pre_execute", self.workspaceModel.pre_execute)
-        self.shell.events.register("post_execute", self.workspaceModel.post_execute)
-        
-        self.slot_changeDirectory(self.recentDirectories[0])
+    #### END   Methods
+    
         
     @safeWrapper
     def _init_QtConsole_(self):
@@ -3153,36 +3339,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def saveWindowSettings(self):
         gname, pfx = saveWindowSettings(self.qsettings, self)
         
-        self.qsettings.beginGroup(gname)
-        
-        #consoleFont = self.console.font
-        #self.qsettings.setValue("ConsoleFont", consoleFont)
-        #self.qsettings.setValue("ConsoleFontSize", consoleFont.pointSizeF())
-        #self.qsettings.setValue("ScipyenWindow/Editor", self.scipyenEditor)
-        
-        self.qsettings.setValue("RecentFiles", self.recentFiles)
-        self.qsettings.setValue("RecentDirectories", self.recentDirectories)
-        self.qsettings.setValue("RecentScripts", self.recentlyRunScripts)
-        
-        if len(self.fileSystemFilterHistory) > 0:
-            self.qsettings.setValue("RecentFileSystemFilters", self.fileSystemFilterHistory)
-
-        self.qsettings.setValue("LastFileSystemFilter", self.lastFileSystemFilter)
-        
-        if len(self.recentVariablesList) > 0:
-            self.qsettings.setValue("VariableSearch", self.recentVariablesList)
-            
-        self.qsettings.setValue("LastVariableSearch", self.lastVariableFind)
-        
-        if len(self.commandHistoryFinderList) > 0:
-            self.qsettings.setValue("CommandSearch", self.commandHistoryFinderList)
-            
-        self.qsettings.setValue("LastCommandSearch", self.lastCommandFind)
-        
-        self.qsettings.setValue("FilesFilterVisible", self.filesFilterFrame.isVisible())
-        
-        self.qsettings.endGroup()
-        
         #### NOTE: user-defined gui handlers (viewers) for variable types, or user-changed
         # configuration of gui handlers
         # FIXME 2021-07-17 22:55:17 
@@ -3246,102 +3402,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def loadWindowSettings(self):
         gname, prefix = loadWindowSettings(self.qsettings, self)#, group_name = self.__class__.__name__)
         
-        self.qsettings.beginGroup(gname)
-            
-        #consoleFontSize = self.qsettings.value("ConsoleFontSize",8.)
-        #consoleFont = self.qsettings.value("ConsoleFont", QtGui.QFont("Monospace"))
-        
-        #consoleFont.setPointSizeF(float(consoleFontSize))
-        
-        #self.console._set_font(consoleFont)
-        
-        self.recentVariablesList        = self.qsettings.value("VariableSearch", collections.deque())
-        
-        if len(self.recentVariablesList) > 0:
-            for item in self.recentVariablesList:
-                self.varNameFilterFinderComboBox.addItem(item)
-                
-        self.lastVariableFind           = self.qsettings.value("LastVariableSearch", str())
-        
-        self.commandHistoryFinderList   = self.qsettings.value("CommandSearch", collections.deque())
-        
-        self.lastCommandFind            = self.qsettings.value("LastCommandSearch", str())
-        
-        used_file_filters = [s for s in self.qsettings.value("RecentFileSystemFilters", collections.deque()) if isinstance(s, str)]
-        
-        self.fileSystemFilterHistory    = collections.deque(sorted(used_file_filters))
-        
-        self.lastFileSystemFilter       = self.qsettings.value("LastFileSystemFilter", str())
-        
-        try:
-            self.recentFiles = self.qsettings.value("RecentFiles", collections.OrderedDict())
-            
-        except:
-            self.recentFiles = collections.OrderedDict()
-        
-        self.recentDirectories = self.qsettings.value("RecentDirectories", collections.deque())
-        
-        recentScripts = self.qsettings.value("RecentScripts", collections.deque())
-        
-        for script_file in recentScripts:
-            if os.path.isfile(script_file):
-                self.recentlyRunScripts.append(script_file)
-                
-        # NOTE: 2017-09-21 22:14:55
-        # leave this empty at GUI startup!
-        self.varNameFilterFinderComboBox.setCurrentText("")
-        
-        if len(self.commandHistoryFinderList) > 0:
-            for item in self.commandHistoryFinderList:
-                self.commandFinderComboBox.addItem(item)
-
-        # NOTE: 2017-09-21 22:16:47
-        # leave this empty at GUI startup!
-        self.commandFinderComboBox.setCurrentText("")
-        
-        if len(self.fileSystemFilterHistory) > 0:
-            for item in self.fileSystemFilterHistory:
-                if isinstance(item, str):
-                    self.fileSystemFilter.addItem(item)
-                    
-                else:
-                    self.fileSystemFilter.addItem("")
-        
-        self.fileSystemFilter.setCurrentText(self.lastFileSystemFilter)
-        self.fileSystemModel.setNameFilters(self.lastFileSystemFilter.split())
-
-        if isinstance(self.recentFiles, (tuple, list)) and len(self.recentFiles):
-            self.recentFiles = collections.OrderedDict(zip(self.recentFiles, ["vigra"] * len(self.recentFiles)))
-
-        if self.recentFiles is None:
-            self.recentFiles = collections.OrderedDict()
-
-        if len(self.recentDirectories) == 0:
-            self.recentDirectories.appendleft(os.getcwd()) # this ensures recentDirectories is never empty
-        
-        self._refreshRecentFilesMenu_()
-
-
-        self._refreshRecentDirectoriesMenu_()
-        self._refreshRecentDirsComboBox_()
-        self._refreshRecentScriptsMenu_()
-        
-        if len(self.recentDirectories):
-            self.slot_changeDirectory(self.recentDirectories[0])
-            
-        showFilesFilter = self.qsettings.value("FilesFilterVisible", False)
-        
-        #print("showFilesFilter %s" % showFilesFilter)
-        
-        if isinstance(showFilesFilter, str):
-            showFilesFilter = showFilesFilter.strip().lower() == "true"
-            
-        elif not isinstance(showFilesFilter, bool):
-            showFilesFilter = False
-            
-        self.filesFilterFrame.setVisible(showFilesFilter)
-        
-        self.qsettings.endGroup() # settings for ScipyenWindow group
         
         self.qsettings.beginGroup("Custom_GUI_Handlers")
         
@@ -3759,22 +3819,22 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: 2017-06-29 21:49:39
         Pictio now uses the mimetypes module
         '''
-        if self.recentFiles is None:
-            self.recentFiles = collections.OrderedDict()
+        if self._recentFiles is None:
+            self._recentFiles = collections.OrderedDict()
 
-        if len(self.recentFiles) == 0:
-            self.recentFiles[item] = loader
+        if len(self._recentFiles) == 0:
+            self._recentFiles[item] = loader
         else:
-            recFNames = list(self.recentFiles.keys())
+            recFNames = list(self._recentFiles.keys())
 
             if item not in recFNames:
-                if len(self.recentFiles) == ScipyenWindow.maxRecentFiles:
-                    del(self.recentFiles[recFNames[-1]])
+                if len(self._recentFiles) == ScipyenWindow.maxRecentFiles:
+                    del(self._recentFiles[recFNames[-1]])
 
-                self.recentFiles[item] = loader
+                self._recentFiles[item] = loader
                 
-            elif self.recentFiles[item] != loader:
-                self.recentFiles[item] = loader
+            elif self._recentFiles[item] != loader:
+                self._recentFiles[item] = loader
 
         self._refreshRecentFilesMenu_()
         
@@ -3788,8 +3848,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         '''
         self.recentFilesMenu.clear()
         
-        if len(self.recentFiles) > 0:
-            for item in self.recentFiles.keys():
+        if len(self._recentFiles) > 0:
+            for item in self._recentFiles.keys():
                 action = self.recentFilesMenu.addAction(item)
                 action.triggered.connect(self.slot_loadRecentFile)
                 
@@ -3799,14 +3859,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
     def _refreshRecentDirsComboBox_(self):
         self.directoryComboBox.clear()
-        if len(self.recentDirectories) > 0:
-            for item in self.recentDirectories:
+        if len(self._recentDirectories) > 0:
+            for item in self._recentDirectories:
                 self.directoryComboBox.addItem(item)
         
         self.directoryComboBox.setCurrentIndex(0)
         
     def _clearRecentFiles_(self):
-        self.recentFiles.clear()
+        self._recentFiles.clear()
         self._refreshRecentFilesMenu_()
         
     def _refreshRecentDirs_(self):
@@ -3827,15 +3887,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             clearDirAction.triggered.connect(self._clearRecentDirectories_)
             
     def _clearRecentDirectories_(self):
-        self.recentDirectories.clear()
+        self._recentDirectories.clear()
         self._refreshRecentDirs_()
         
     def _refreshRecentScriptsMenu_(self):
         self.recentScriptsMenu.clear()
         self._recent_scripts_dict_.clear()
         
-        if len(self.recentlyRunScripts) > 0:
-            for s in self.recentlyRunScripts:
+        if len(self.recentRunScripts) > 0:
+            for s in self.recentRunScripts:
                 s_name = os.path.basename(s)
                 self._recent_scripts_dict_[s] = s_name
                 action = self.recentScriptsMenu.addAction(s_name)

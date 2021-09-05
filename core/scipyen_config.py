@@ -678,6 +678,10 @@ def syncSettings(settings:typing.Union[QSettings, confuse.Configuration], obj,
         if isinstance(settings, QSettings):
             cfg = obj.configurables()
             return syncQSettings(settings, obj, group_name=group_name,prefix=prefix,save=save)
+        
+        
+        elif isinstance(settings, dict):
+            pass
             
     return gname, pfx
 
@@ -1027,9 +1031,6 @@ class ScipyenConfigurable(object):
         cfg = self.configurables()
         qtcfg = cfg["qt"]
         cfcfg = cfg["conf"]
-        
-        
-        
         
     
     def saveSettings(self):

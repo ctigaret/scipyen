@@ -292,10 +292,11 @@ class FitModel(metaclass=FitModelMeta):
                         else:
                             self.upper[name] = v
                             
-        
-                
 @ModelExpression('a * exp(-(x-x0)/tau) + offset')
 class ExponentialDecay(FitModel):
+    """Fit model :class: decorated with ModelExpression.
+    
+    """
     _parameter_names_   = ("offset", "a", "x0", "tau")
     _default_initial_   = (0., 1., 0., 0.1)
     _default_lower_     = tuple([None] * len(_parameter_names_))
@@ -304,13 +305,6 @@ class ExponentialDecay(FitModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
             
-    #def __call__(self, x:np.ndarray):
-        #print(self._selfexpr_)
-        #return self.a * np.exp(-(x-self.x0)/self.tau) + self.offset
-    
-    def fit(self, x):
-        pass
-    
 class ExponentialDecay2(FitModel):
     """Demonstrates defining a new fit model without a decorator.
     The attribute _model_expression_ needs to be harcoded in the definition

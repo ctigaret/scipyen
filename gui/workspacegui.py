@@ -196,12 +196,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                  title="", **kwargs):
         #print("WorkspaceGuiMixin __init__ %s" % self.__class__.__name__)
         ScipyenConfigurable.__init__(self, settings = settings)
-        #if self.__class__ is not WorkspaceGuiMixin and getattr(self.__class__, "_is_configurable", None) is not True:
-            #if hasattr(self.__class__, "_qtcfg"):
-                #print("WorkspaceGuiMixin __init__ updating _qtcfg from %s" % self.__class__.__name__)
-                #subclassqtcfg = getattr(self.__class__, "_qtcfg")
-                #subclassqtcfg.update(WorkspaceGuiMixin._qtcfg)
-                #setattr(self.__class__, "_qtcfg", subclassqtcfg)
                 
         self._scipyenWindow_ = None
         
