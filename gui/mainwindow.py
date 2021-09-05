@@ -1182,7 +1182,7 @@ class VTH(object):
         if viewerClass in VTH.default_handlers:
             VTH.gui_handlers[viewerClass] = deepcopy(VTH.default_handlers[viewerClass])
 
-@makeConfigurable
+#@makeConfigurable
 class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
@@ -1202,9 +1202,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             return cls._instance
     
     pluginActions = []
-    
-    maxRecentFiles = 10 # TODO: make this user-configurable
-    maxRecentDirectories = 100 # TODO: make this user-configurable
     
     # NOTE: 2016-04-17 16:11:56
     # argument and return variable parsing moved to _installPluginFunction_
@@ -1522,6 +1519,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.external_console           = None
         
+        self._maxRecentFiles = 10 # TODO: make this user-configurable
+        self._maxRecentDirectories = 100 # TODO: make this user-configurable
+    
         #pg.setConfigOptions(editorCommand=self.scipyenEditor)
         
         #self._default_scipyen_settings_ = defaults
@@ -1672,11 +1672,33 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._scipyen_settings_ = value
         self.workspace["scipyen_settings"] = self._scipyen_settings_
         
+        
+    @property
+    def maxRecentFiles(self) -> int:
+        return self._maxRecentFiles
+    
+    @markConfigurable("MaxRecentFiles", "Qt")
+    @maxRecentFiles.setter
+    def maxRecentFiles(self, val:int):
+        if isinstance(val, int) and val >= 0:
+            self._maxRecentFiles = val
+            
+            
+    @property
+    def maxRecentDirectories(self) -> int:
+        return self._maxRecentDirectories
+    
+    @markConfigurable("MaxRecentDirectories", "Qt", default=10)
+    @maxRecentDirectories.setter
+    def maxRecentDirectories(self, val:int):
+        if isinstance(val, int) and val >= 0:
+            self._maxRecentDirectories = val
+        
     @property
     def recentFiles(self) -> collections.OrderedDict:
         return self._recentFiles
     
-    @markConfigurable("RecentFiles", "Qt")
+    @markConfigurable("RecentFiles", "Qt", default=10)
     @recentFiles.setter
     def recentFiles(self, val:typing.Optional[typing.Union[collections.OrderedDict, tuple, list]]=None) -> None:
         if isinstance(val, collections.OrderedDict):
@@ -1696,17 +1718,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @recentDirectories.setter
     def recentDirectories(self, val:typing.Optional[typing.Union[collections.deque, list, tuple]]=None) -> None:
         if isinstance(val, (collections.deque, list, tuple)):
-            self._recentDirectories = collections.deque(sorted((s for s in val)))
+            self._recentDirectories = collections.deque(val)
         else:
             self._recentDirectories = collections.deque()
             
         if len(self._recentDirectories) == 0:
             self._recentDirectories.appendleft(os.getcwd())
             
-        self.slot_changeDirectory(self._recentDirectories[0])
-            
-        self._refreshRecentDirectoriesMenu_()
-        self._refreshRecentDirsComboBox_()
+        self.slot_changeDirectory(self._recentDirectories[0]) # alse refreshes gui
             
     @property
     def fileSystemFilterHistory(self) -> collections.deque:
@@ -1717,7 +1736,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def fileSystemFilterHistory(self, 
                                 val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
         if isinstance(val, (collections.deque, list, tuple)):
-            self._fileSystemFilterHistory = collections.deque(sorted((s for s in val)))
+            self._fileSystemFilterHistory = collections.deque(val)
             
         else:
             self._fileSystemFilterHistory = collections.deque()
@@ -1768,7 +1787,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def variableSearches(self, 
                          val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
         if isinstance(val, (collections.deque, list, tuple)):
-            self._recentVariablesList = collections.deque(sorted((s for s in val)))
+            self._recentVariablesList = collections.deque(val)
+            #self._recentVariablesList = collections.deque(sorted((s for s in val)))
             
         else:
             self._recentVariablesList = collections.deque
@@ -1801,7 +1821,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def commandSearches(self, 
                         val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
         if isinstance(val, (collections.deque, list, tuple)):
-            self._commandHistoryFinderList = collections.deque(sorted((s for s in val)))
+            self._commandHistoryFinderList = collections.deque(val)
+            #self._commandHistoryFinderList = collections.deque(sorted((s for s in val)))
             
         else:
             self._commandHistoryFinderList = collections.deque()
@@ -1834,7 +1855,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def recentRunScripts(self, 
                          val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
         if isinstance(val, (collections.deque, list, tuple)):
-            self._recentlyRunScripts = collections.deque(sorted((s for s in val if os.path.isfile(s))))
+            self._recentlyRunScripts = collections.deque((s for s in val if os.path.isfile(s)))
+            #self._recentlyRunScripts = collections.deque(sorted((s for s in val if os.path.isfile(s))))
             
         else:
             self._recentlyRunScripts = collections.deque()
@@ -3828,7 +3850,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             recFNames = list(self._recentFiles.keys())
 
             if item not in recFNames:
-                if len(self._recentFiles) == ScipyenWindow.maxRecentFiles:
+                if len(self._recentFiles) == self._maxRecentFiles:
                     del(self._recentFiles[recFNames[-1]])
 
                 self._recentFiles[item] = loader
@@ -4327,6 +4349,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 self.external_console.execute("".join(["os.chdir('", targetDir,"')"]))
                 
             self._setRecentDirectory_(targetDir)
+            
             self.fileSystemModel.setRootPath(targetDir)
             self.fileSystemTreeView.scrollTo(self.fileSystemModel.index(targetDir))
             self.fileSystemTreeView.setRootIndex(self.fileSystemModel.index(targetDir))
@@ -4344,18 +4367,21 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def _setRecentDirectory_(self, newDir):
         if newDir in self.recentDirectories:
+            # move newDir to top of stack
             if newDir != self.recentDirectories[0]:
                 self.recentDirectories.remove(newDir)
                 self.recentDirectories.appendleft(newDir)
-                self._refreshRecentDirs_()
+                #self._refreshRecentDirs_()
                 
         else:
-            if len(self.recentDirectories) == ScipyenWindow.maxRecentDirectories:
+            # add Newdir, 
+            if len(self.recentDirectories) == self._maxRecentDirectories:
                 self.recentDirectories.pop()
 
             self.recentDirectories.appendleft(newDir)
-            self._refreshRecentDirs_()
             
+        self._refreshRecentDirs_()
+        
     @safeWrapper
     def _sendFileNamesToConsole_(self, *args):
         #print(args)

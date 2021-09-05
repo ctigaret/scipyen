@@ -12,7 +12,7 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from core.utilities import safeWrapper
 from core.workspacefunctions import user_workspace
 from core.scipyen_config import (ScipyenConfigurable,
-                                 syncQSettings, makeConfigurable, markConfigurable, confuse)
+                                 syncQtSettings, makeConfigurable, markConfigurable, confuse)
 from gui.pictgui import ItemsListDialog
 
 class GuiMessages(object):
@@ -117,7 +117,6 @@ class FileIOGui(object):
             
         return dirName
 
-#@makeConfigurable
 class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     """Mixin type for windows that need to be aware of Scipyen's main workspace.
     
@@ -374,10 +373,10 @@ def saveWindowSettings(qsettings:QtCore.QSettings,
         These are useful to append settings later
         
         
-    NOTE: Delegates to core.scipyen_config.syncQSettings
+    NOTE: Delegates to core.scipyen_config.syncQtSettings
     
     """
-    return syncQSettings(qsettings, win, group_name, prefix, True)
+    return syncQtSettings(qsettings, win, group_name, prefix, True)
     
 def loadWindowSettings(qsettings:QtCore.QSettings, 
                        win:typing.Union[QtWidgets.QMainWindow, mpl.figure.Figure], 
@@ -472,10 +471,10 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
         
         These are useful to append settings later
     
-    NOTE: Delegates to core.scipyen_config.syncQSettings
+    NOTE: Delegates to core.scipyen_config.syncQtSettings
     
     """
-    return syncQSettings(qsettings, win, group_name, prefix, False)
+    return syncQtSettings(qsettings, win, group_name, prefix, False)
 
 #class TestWSGui(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     #_qtcfg = {"Something": ("something",)} # Something MAY BE read-only !

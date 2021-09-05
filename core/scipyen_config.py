@@ -365,7 +365,7 @@ def markConfigurable(confname:str, conftype:str="",
     
     * if setter is True, adds to it a 'configurable_setter' attribute:
     
-    f.configurrable_setter = {'type': conftype, 'name': confname, 'setter':f.__name__, 'default'None}
+    f.configurable_setter = {'type': conftype, 'name': confname, 'setter':f.__name__, 'default'None}
     
     In the above the 'default' field is mapped to the value of the 'default'
     parameter of this decorator function.
@@ -684,7 +684,7 @@ def syncSettings(settings:typing.Union[QSettings, confuse.Configuration], obj,
         group_name is the qsettings group name under which the win's settings 
             were saved
             
-        prefix is th prefix prepended to each setting name
+        prefix is the prefix prepended to each setting name
         
         These are useful to append settings later
     
@@ -692,8 +692,7 @@ def syncSettings(settings:typing.Union[QSettings, confuse.Configuration], obj,
     
     if isinstance(obj, ScipyenConfigurable):
         if isinstance(settings, QSettings):
-            cfg = obj.configurables()
-            return syncQSettings(settings, obj, group_name=group_name,prefix=prefix,save=save)
+            return syncQtSettings(settings, obj, group_name=group_name,prefix=prefix,save=save)
         
         
         elif isinstance(settings, dict):
@@ -701,7 +700,7 @@ def syncSettings(settings:typing.Union[QSettings, confuse.Configuration], obj,
             
     return gname, pfx
 
-def syncQSettings(qsettings:QSettings, 
+def syncQtSettings(qsettings:QSettings, 
                     win:typing.Union[QMainWindow, QWidget, Figure], 
                     group_name:typing.Optional[str]=None,
                     prefix:typing.Optional[str]=None,
@@ -892,7 +891,7 @@ def syncQSettings(qsettings:QSettings,
         key_prefix=""
         
     #action = "save" if save else "load"
-    #print("syncQSettings %s: win = %s, gname = %s, key_prefix = %s" % (action, win, gname, key_prefix))
+    #print("syncQtSettings %s: win = %s, gname = %s, key_prefix = %s" % (action, win, gname, key_prefix))
     
     if hasattr(win, "qtconfigurables"):
         qtcfg = win.qtconfigurables
@@ -931,7 +930,7 @@ def syncQSettings(qsettings:QSettings,
             continue
             
         #action = "save" if save else "load"
-        #print("syncQSettings, %s: win: %s, key: %s, getset: %s, gname: %s, pfx: %s, val %s (%s)" % (action, win.__class__.__name__, key, str(getset), gname, pfx, type(val).__name__, val))
+        #print("syncQtSettings, %s: win: %s, key: %s, getset: %s, gname: %s, pfx: %s, val %s (%s)" % (action, win.__class__.__name__, key, str(getset), gname, pfx, type(val).__name__, val))
         
         if save:
             saveQSettingsKey(qsettings, gname, key_prefix, confname, val)
@@ -963,6 +962,27 @@ def syncQSettings(qsettings:QSettings,
             
     return gname, pfx
 
+def syncClassSettings(settings:dict, obj, group_nameOptional[str]=None,
+                    prefix:typing.Optional[str]=None,
+                    save:bool=True) -> None:
+    # TODO: 2021-09-05 20:54:08
+    # access the user configuration:
+    #   user_src = [s for s in scipyen_settings.sources if s.default][0]
+    # to save:
+    #   generate settings_dict from obj.clsconfigurables by mapping the keys to
+    #   values obtained by calling the corresponding getters (use either getattr
+    #   or call the getter) -- see syncQtSettings for how to obtain the getter 
+    #   and call it
+    #   then update the user configuration in confse lazy config
+    #   user_src.update(settings_dict) - but make sure you wrap this dict in a
+    #   dict, mapped to obj.__clas__.__name__ as key
+    #   then call save_config(scipyen_settings) defined in this module
+    # to load:
+    #   cfg = user_src.get(obj.__class__.__name_lookup__, Bunch())
+    #   the gop through cfg and apply the setter
+    #   to find the setter look at syncQtSettings on how to access the setter and
+    #   to call it
+    pass
 
 class ScipyenConfigurable(object):
     def __init__(self, settings:typing.Optional[confuse.LazyConfig]=None):
@@ -1062,8 +1082,8 @@ class ScipyenConfigurable(object):
         return  self.configurables["qt"]
     
     @property
-    def appconfigurables(self):
-        return self.cconfigurables["conf"]
+    def clsconfigurables(self):
+        return self.configurables["conf"]
     
     def loadSettings(self):
         cfg = self.configurables()
