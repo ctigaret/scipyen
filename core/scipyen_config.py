@@ -194,92 +194,108 @@ def makeConfigurable(cls):
     if not hasattr(cls, "_cfg"):
         cls._cfg = Bunch()
         
-    def _qtconfigurables(instance):
-        return instance._qtcfg
-    
     def _configurables(instance):
-        return instance._cfg
+        ret = Bunch(qt = Bunch(),conf = Bunch())
+        for name, fn in inspect.getmembers(cls):
+            getterdict = Bunch()
+            setterdict = Bunch()
+            confdict = Bunch()
+            if isinstance(fn, property):
+                #print("\tproperty %s of %s" % (fn, cls.__name__))
+                if inspect.isfunction(fn.fget) and hasattr(fn.fget, "configurable_getter"):
+                    getterdict = fn.fget.configurable_getter
+                    #print("\t\tgetterdict %s" % getterdict)
+                    
+                if inspect.isfunction(fn.fset) and hasattr(fn.fset, "configurable_setter"):
+                    setterdict = fn.fset.configurable_setter
+                    #print("\t\tsetterdict %s" % setterdict)
+                        
+            elif inspect.isfunction(fn):
+                #print("\tmethod/function %s of %s" % (fn.__name__, cls.__name__))
+                if hasattr(fn, "configurable_getter"):
+                    getterdict = fn.configurable_getter
+                    #print("\t\tgetterdict %s" % getterdict)
+                    
+                if hasattr(fn, "configurable_setter"):
+                    setterdict = fn.configurable_setter
+                    #print("\t\tsetterdict %s" % setterdict)
+                    
+            else:
+                continue # skip members that are not methods or properties
+            
+            if len(getterdict): 
+                confdict.update(getterdict)
+                
+                if len(setterdict): 
+                    # this is executed in case of properties, as they are the only
+                    # ones providing BOTH a getterdict and setterdict, when decorated
+                    # so we check here that
+                    if setterdict.type != getterdict.type or setterdict.name != getterdict.name:
+                        continue
+                    
+                    confdict.update(setterdict)
+                    
+            elif len(setterdict):
+                confdict.update(setterdict)
+                
+            
+            #print("\t\tconfdict %s" % confdict)
+                
+            if len(confdict):
+                cfg = Bunch()
+                #cfg = getattr(cls, "_qcfg", Bunch()) if confdict.type.lower() == "qt" else getattr(cls, "_cfg", Bunch())
+                
+                cfgget = confdict.get("getter", None)
+                cfgset = confdict.get("setter", None)
+                cfgdfl = confdict.get("default", None)
+                
+                cfgdict = Bunch()
+                if cfgget is not None:
+                    cfgdict.getter = cfgget
+                
+                if cfgset is not None:
+                    cfgdict.setter = cfgset
+                    
+                cfgdict.default = cfgdfl
+                    
+                #print("\t\tcfgdict %s" % cfgdict)
+                if len(cfgdict):
+                    cfg[confdict.name] = cfgdict
+                
+                #print("\t\tupdated cfg of %s: %s" % (cls.__name__, cfg))
+                
+                if confdict.type.lower() == "qt":
+                    ret.qt.update(cfg)
+                    #cls._qtcfg.update(cfg)
+                    
+                else:
+                    ret.conf.update(cfg)
+                    #cls._cfg.update(cfg)
+                    
+            return ret
+                    
+        
+        
+    def _qtconfigurables(instance):
+        return instance.configurables.qt
+        #return instance._qtcfg
+    
+    def _clsconfigurables(instance):
+        return instance._configurableas.conf
+        #return instance._cfg
         
     if not hasattr(cls, "qtconfigurables"):
-        cls.qtconfigurables = property(fget = _qtconfigurables, doc = "Mapping of QSettings configurables")
+        cls.qtconfigurables = property(fget = _qtconfigurables, doc = "QSettings configurables")
+        
+    if not hasattr(cls, "appconfigurables"):
+        cls.appconfigurables = property(fget = _clsconfigurables, doc = "Class configurables")
         
     if not hasattr(cls, "configurables"):
-        cls.configurables = property(fget = _configurables, doc = "Mapping of confuse configurables")
+        cls.configurables = property(fget = _configurables, doc = "All configurables")
         
     #print("makeConfigurable %s: _qtcfg = %s, _cfg = %s" % (cls.__name__, cls._qtcfg, cls._cfg))
         
-    for name, fn in inspect.getmembers(cls):
-        getterdict = Bunch()
-        setterdict = Bunch()
-        confdict = Bunch()
-        if isinstance(fn, property):
-            #print("\tproperty %s of %s" % (fn, cls.__name__))
-            if inspect.isfunction(fn.fget) and hasattr(fn.fget, "configurable_getter"):
-                getterdict = fn.fget.configurable_getter
-                #print("\t\tgetterdict %s" % getterdict)
-                
-            if inspect.isfunction(fn.fset) and hasattr(fn.fset, "configurable_setter"):
-                setterdict = fn.fset.configurable_setter
-                #print("\t\tsetterdict %s" % setterdict)
-                    
-        elif inspect.isfunction(fn):
-            #print("\tmethod/function %s of %s" % (fn.__name__, cls.__name__))
-            if hasattr(fn, "configurable_getter"):
-                getterdict = fn.configurable_getter
-                #print("\t\tgetterdict %s" % getterdict)
-                
-            if hasattr(fn, "configurable_setter"):
-                setterdict = fn.configurable_setter
-                #print("\t\tsetterdict %s" % setterdict)
-                
-        else:
-            continue # skip members that are not methods or properties
-        
-        if len(getterdict): 
-            confdict.update(getterdict)
-            
-            if len(setterdict): 
-                # this is executed in case of properties, as they are the only
-                # ones providing BOTH a getterdict and setterdict, when decorated
-                # so we check here that
-                if setterdict.type != getterdict.type or setterdict.name != getterdict.name:
-                    continue
-                
-                confdict.update(setterdict)
-                
-        elif len(setterdict):
-            confdict.update(setterdict)
-            
-        
-        #print("\t\tconfdict %s" % confdict)
-            
-        if len(confdict):
-            cfg = Bunch()
-            #cfg = getattr(cls, "_qcfg", Bunch()) if confdict.type.lower() == "qt" else getattr(cls, "_cfg", Bunch())
-            
-            cfgget = confdict.get("getter", None)
-            cfgset = confdict.get("setter", None)
-            
-            cfgdict = Bunch()
-            if cfgget is not None:
-                cfgdict.getter = cfgget
-            
-            if cfgset is not None:
-                cfgdict.setter = cfgset
-                
-            #print("\t\tcfgdict %s" % cfgdict)
-            if len(cfgdict):
-                cfg[confdict.name] = cfgdict
-            
-            #print("\t\tupdated cfg of %s: %s" % (cls.__name__, cfg))
-            
-            if confdict.type.lower() == "qt":
-                cls._qtcfg.update(cfg)
-                
-            else:
-                cls._cfg.update(cfg)
-                
-    cls._is_configurable = True
+    #cls._is_configurable = True
     
     return cls
     
@@ -878,12 +894,15 @@ def syncQSettings(qsettings:QSettings,
     #action = "save" if save else "load"
     #print("syncQSettings %s: win = %s, gname = %s, key_prefix = %s" % (action, win, gname, key_prefix))
     
-    qtcfg = Bunch()
-    qtcfg.update(getattr(win, "_qtcfg", Bunch()))
-    qtcfg.update(getattr(win, "_ownqtcfg", Bunch()))
+    if hasattr(win, "qtconfigurables"):
+        qtcfg = win.qtconfigurables
+    else:
+        qtcfg = Bunch()
+        qtcfg.update(getattr(win, "_qtcfg", Bunch()))
+        qtcfg.update(getattr(win, "_ownqtcfg", Bunch()))
     
     #print("\tqtcfg for %s: %s" % (win.__class__.__name__, qtcfg))
-    
+
     for confname, getset in qtcfg.items():
         # NOTE: 2021-08-28 21:59:43
         # val, below, can be a function, or the value of a property
@@ -952,6 +971,7 @@ class ScipyenConfigurable(object):
         self._scipyen_settings_  = settings
         #klass = self.__class__ # this is normally the derived ::class::
         
+    @property
     def configurables(self) -> Bunch:
         """Collects configurables for this ::class:: in a mapping.
         
@@ -1021,11 +1041,29 @@ class ScipyenConfigurable(object):
                 
                 if confdict.type.lower() == "qt":
                     ret.qt.update(kcfg)
+                    if hasattr(cls, "_qtcfg"):
+                        ret.qt.update(cls._qtcfg)
+                        
+                    if hasattr(cls, "_ownqtcfg"):
+                        ret.qt.update(cls._ownqtcfg)
                     
                 else:
                     ret.conf.update(kcfg)
+                    if hasattr(cls, "_cfg"):
+                        ret.conf.update(cls._cfg)
+                        
+                    if hasattr(cls, "_owncfg"):
+                        ret.conf.update(cls._owncfg)
             
         return ret
+    
+    @property
+    def qtconfigurables(self):
+        return  self.configurables["qt"]
+    
+    @property
+    def appconfigurables(self):
+        return self.cconfigurables["conf"]
     
     def loadSettings(self):
         cfg = self.configurables()
