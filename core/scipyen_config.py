@@ -53,6 +53,7 @@ import inspect, typing, types
 import confuse
 #from types import new_class
 from functools import (partial, wraps)
+from pprint import pprint
 
 from matplotlib.figure import Figure
 from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
@@ -65,7 +66,7 @@ import traitlets.config
 from .traitcontainers import DataBag
 from core import traitutils
 from core.prog import safeWrapper
-#from iolib.pictio import save_settings as save_config
+#from iolib.pictio import save_settings as write_config
 
 
 # BEGIN NOTE: 2021-01-10 13:17:58
@@ -79,6 +80,33 @@ from core.prog import safeWrapper
 # The second parameter is the name of a shim module (empty) just in order to set
 # the path correctly for where the default configuration yaml file is located
 
+#
+# Usage examples:
+# 
+#   # create (or modify) a user-specific configurable at the LazyConfig level
+#   scipyen_settings["key"].set(value)
+#
+#   # OR: access the user config source directly:
+#
+#   # get user-specific configuration
+#   user_src = [s for s in scipyen_config.sources if  not s.default]
+#
+#   manipulate e.g. add/set a key/value:
+#
+#   user_src["key"] = value
+#
+#   # in either case 'key' can be retrived directly from confiug source or from
+#   #   the LazyConfig a result
+#
+#
+#   scipyen_config["key"].get() -> value
+#
+#   when not sure if 'key' exists, call:
+#
+#   ret = scipyen_config["key"].get(None) -> None if 'key' doesn't exist
+#  
+#   save using write_config() defined here
+
 # ATTENTION 2021-08-17 14:33:10
 # do not confuse this with 'config' from console - for IPyton configuration - or
 # with other package-specific configurations, in particular those that rely
@@ -89,6 +117,25 @@ scipyen_config = confuse.LazyConfig("Scipyen", "scipyen_defaults")
 
 if not scipyen_config._materialized:# make sure this is done only once
     scipyen_config.read() 
+    
+scipyen_user_config_source = [s for s in scipyen_config.sources if not s.default][0]
+
+def configsrc2bunch(src:typing.Union[confuse.ConfigSource, Bunch]):
+    """Creates a nested Bunch from this confuse.ConfigSource
+    
+    Useful for loading configurable values from a source.
+    
+    WARNING: If data is a confuse.ConfigSource or traitlets.Bunch, its contents 
+    are considered to be configurables (including being nested in several levels).
+    
+    Any other mapping type (including dict) will be stored directly as is, so 
+    that a value of dict type is stored as such, and its contents will not be
+    considered a collection of configurables.
+    
+    """
+    return Bunch(((k, configsrc2bunch(v)) if isinstance(v, (confuse.ConfigSource, Bunch)) else (k,v) for k,v in src.items()))
+
+
     
 def makeConfigurable(cls):
     """Class decorator.
@@ -301,7 +348,8 @@ def makeConfigurable(cls):
     
 def markConfigurable(confname:str, conftype:str="", 
                      setter:bool=True, 
-                     default:typing.Optional[typing.Any]=None):
+                     default:typing.Optional[typing.Any]=None,
+                     trait_notifier:typing.Optional[typing.Union[bool, DataBag]] = None):
     """Decorator for instance methods & properties.
     
     Properties and methods decorates with this will be collected by the ::class::
@@ -337,8 +385,9 @@ def markConfigurable(confname:str, conftype:str="",
         For a read-write property, both 'fget' and 'fset' are functions.
         
     default: any type (optional, default is None)
-        When present it is used to supply a default value to the setter, in case
-        the configuration file doesn't have one
+        When present it is used to supply a 'factory' default value to the setter,
+        in case the configuration file doesn't have one.
+        
         
     Returns:
     =======
@@ -388,16 +437,45 @@ def markConfigurable(confname:str, conftype:str="",
     conftype = conftype.lower()
     
     def wrapper(f):
+        # NOTE 2021-09-06 10:42:49
+        # applies only to read-write properties
+        # hence only decorate xxx.setter if defined
         if isinstance(f, property):
-            if inspect.isfunction(f.fget):
-                setattr(f.fget, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.fget.__name__}))
-                
-            if inspect.isfunction(f.fset):
+            if all((inspect.isfunction(func) for func in (f.fget, f.fset))):
+                setattr(f.fget, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.fget.__name__, "default": default}))
                 setattr(f.fset, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.fset.__name__, "default": default}))
+                
+                if conftype != "qt" and isinstance(trait_notifier, (bool, DataBag)):
+                    f.fset.configurable_setter["trait_notifier"] = trait_notifier
+                    def newfset(instance, *args, **kwargs):
+                        f.fset.__call__(instance, *args, **kwargs)
+                        if isinstance(trait_notifier, DataBag):
+                            trait_notifier[confname] = args[0]
+                            
+                        elif trait_notifier is True and isinstance(getattr(instance, "configurable_traits", None), DataBag):
+                            instance.configurable_traits[confname] = args[0]
+                            
+                    setattr(newfset, "configurable_setter", f.fset.configurable_setter)
+                    
+                    return property(fget = f.fget, fset = f.fset, doc = f.__doc__)
                 
         elif inspect.isfunction(f):
             if setter is True:
-                setattr(f, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.__name__}))
+                setattr(f, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default}))
+                if conftype != "qt" and isinstance(trait_notifier, (bool, DataBag)):
+                    f.configurable_setter["trait_notifier"] = trait_notifier
+                    def newf(instance, *args, **kwargs):
+                        f(instance, *args, **kwargs)
+                        if isinstance(trait_notifier, DataBag):
+                            trait_notifier[confname] = args[0]
+                            
+                        elif trait_notifier is True and isinstance(getattr(instance, "configurable_traits", None), DataBag):
+                            instance.configurable_traits[confname] = args[0]
+                            
+                    setattr(newf, "configurable_setter", f.configurable_setter)
+                    
+                    return newf
+                
             else:
                 setattr(f, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.__name__, "default": default}))
         return f
@@ -514,9 +592,6 @@ def loadQSettingsKey(qsettings:QSettings,
     qsettings.endGroup()
     return ret
 
-def syncScipyenSettings():
-    pass
-    
 def syncSettings(settings:typing.Union[QSettings, confuse.Configuration], obj,
                 group_name:typing.Optional[str]=None,
                 prefix:typing.Optional[str]=None,
@@ -962,9 +1037,16 @@ def syncQtSettings(qsettings:QSettings,
             
     return gname, pfx
 
-def syncClassSettings(settings:dict, obj, group_nameOptional[str]=None,
+def syncClassSettings(settings:dict, obj, group_name:typing.Optional[str]=None,
                     prefix:typing.Optional[str]=None,
                     save:bool=True) -> None:
+    """Write non-gui configurables to user-specific scipyen settings
+    
+    Parameters:
+    ===========
+    settings: mapping of str keys (class configurable names) to values
+    
+    """
     # TODO: 2021-09-05 20:54:08
     # access the user configuration:
     #   user_src = [s for s in scipyen_settings.sources if s.default][0]
@@ -976,20 +1058,54 @@ def syncClassSettings(settings:dict, obj, group_nameOptional[str]=None,
     #   then update the user configuration in confse lazy config
     #   user_src.update(settings_dict) - but make sure you wrap this dict in a
     #   dict, mapped to obj.__clas__.__name__ as key
-    #   then call save_config(scipyen_settings) defined in this module
+    #   then call write_config(scipyen_settings) defined in this module
     # to load:
-    #   cfg = user_src.get(obj.__class__.__name_lookup__, Bunch())
-    #   the gop through cfg and apply the setter
+    #   cfg = user_src.get(obj.__class__.__name__, Bunch())
+    #   then go through cfg and apply the setter
     #   to find the setter look at syncQtSettings on how to access the setter and
     #   to call it
-    pass
+    if hasattr(obj, "clsconfigurables"):
+        cfg = obj.clsconfigurables
+        
+        cfdict = Bunch({obj.__class__.__name__: Bunch()})
+        
+        for confname, getset in cfg.items():
+            gettername = getset.get("getter", None)
+        
+            if not isinstance(gettername, str) or len(gettername.strip()) == 0:
+                continue
+            
+            getter = inspect.getattr_static(obj, gettername, None)
+            
+            if isinstance(getter, property):
+                val = getattr(obj, gettername)
+                #print("\t\tgetter win.%s -> %s" % (gettername, val))
+                
+            elif getter is not None: # in case gettername does not exist as a win's attribute name
+                # getter may by a function/method, or a sip.wrapper (for Qt objects)
+                val = getattr(obj, gettername)()
+                #print("\t\tgetter win.%s() -> %s" % (gettername, val))
+            
+            else:
+                continue
+            
+        pass
 
 class ScipyenConfigurable(object):
-    def __init__(self, settings:typing.Optional[confuse.LazyConfig]=None):
+    """Superclass for Scipyen's configurable types
+    """
+    def __init__(self):
         super().__init__()
         self.qsettings = QtCore.QSettings("Scipyen", "Scipyen")
-        self._scipyen_settings_  = settings
-        #klass = self.__class__ # this is normally the derived ::class::
+        self._scipyen_settings_  = scipyen_config
+        self._user_settings_src_ = scipyen_user_config_source
+        self.configurable_traits = DataBag()
+        self.configurable_traits.observe(self._observe_configurables_)
+        
+    def _observe_configurables_(self, change):
+        cfg = Bunch({self.__class__.__name__: Bunch({change.name:change.new})})
+        pprint(cfg)
+        
         
     @property
     def configurables(self) -> Bunch:
@@ -997,7 +1113,11 @@ class ScipyenConfigurable(object):
         
         The mapping has two fields: 'qt' and 'conf' that describe what settings
         are to be saved to / loaded from the Scipyen.conf ('qt') or config.yaml 
-        ('conf') files
+        ('conf') files.
+        
+        Each field is a mapping of str keys (the name of the configurable as
+        it would be stored in the config file) to a dict that identifies the
+        getter, setter, configuration type, and a 'factory default' value.
         
         """
         cls = self.__class__ # this is normally the derived type
@@ -1046,6 +1166,7 @@ class ScipyenConfigurable(object):
                 cfgget = confdict.get("getter", None)
                 cfgset = confdict.get("setter", None)
                 cfgdfl = confdict.get("default", None)
+                cfgtrt = confdict.get("trait_notifier", None)
                 
                 cfgdict = Bunch()
                 if cfgget is not None:
@@ -1055,6 +1176,7 @@ class ScipyenConfigurable(object):
                     cfgdict.setter = cfgset
                     
                 cfgdict.default = cfgdfl
+                cfgdict.trait_notifier = cfgtrt
                     
                 if len(cfgdict):
                     kcfg[confdict.name] = cfgdict
@@ -1086,13 +1208,50 @@ class ScipyenConfigurable(object):
         return self.configurables["conf"]
     
     def loadSettings(self):
-        cfg = self.configurables()
-        qtcfg = cfg["qt"]
-        cfcfg = cfg["conf"]
+        cfg = self.configurables
+        # NOTE 2021-09-06 17:37:14
+        # keep Qt settings segregated
+        cfcfg = self.configurables.get("conf", {})
         
-    
-    def saveSettings(self):
-        pass
+        if len(cfcfg) == 0:
+            return
+        
+        user_conf = scipyen_settings[self.__class__.__name__].get(None)
+        
+        if isinstance(user_conf, dict):
+            for k, v in user_conf.items():
+                getset = cfcfg.get(k, {})
+                settername = getset.get("setter", None)
+                
+                if not isinstance(settername, str) or len(settername.strip())==0:
+                    continue
+                
+                trait_notifier = getset.get("trait_notifier", None)
+                
+                if not isinstance(trait_notifier, (bool, DataBag)):
+                    continue
+                
+                if trait_notifier is True and isinstance(getattr(self, "configurable_traits", None), DataBag):
+                    trait_notifier = self.configurable_traits
+                    
+                else:
+                    continue
+                    
+                with trait_notifier.hold_trait_notifications():
+                    default = getset.get("default", None)
+                    
+                    setter = inspect.getattr_static(self, settername, None)
+
+                    if isinstance(setter, property):
+                        setattr(self, settername, v)
+                        
+                    elif setter is not None:
+                        setter = getattr(self, settername)
+                        setter(val)
+               
+            
+    #def saveSettings(self):
+        #pass
         
         
     
@@ -1272,7 +1431,7 @@ def get_config_dir(configuration:confuse.Configuration=scipyen_config) -> str:
     return configuration.config_dir()
 
 @safeWrapper
-def save_config(config:typing.Optional[confuse.Configuration]=None, 
+def write_config(config:typing.Optional[confuse.Configuration]=None, 
                 filename:typing.Optional[str]=None, 
                 full:bool=True, redact:bool=False, as_default:bool=False,
                 default_only:bool=False) -> bool:

@@ -2534,7 +2534,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             expensive updates of the workspace viewer after each variable.
             
         """
-        print("ScipyenWindow.removeFromWorkspace", value)
+        #print("ScipyenWindow.removeFromWorkspace", value)
         if isinstance(value, str) and by_name:
             self.workspace.pop(value, None)
             
@@ -3401,26 +3401,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.qsettings.endGroup()
         
-    #def _setup_console_pygments_(self):
-        #from qtconsole.jupyter_widget import JupyterWidget
-        #settings = QtCore.QSettings()
-        #custom_pygment = settings.value("Console/Scheme", None)
-        #custom_colors = settings.value("Console/Colors", "")
-        
-        #if custom_pygment:
-            #JupyterWidget.style_sheet = consoles.styles.sheet_from_template(custom_pygment,
-                                                                   #custom_colors)
-            
-            #JupyterWidget.syntax_style = custom_pygment
-        
     #@processtimefunc
     def loadSettings(self):
         self.loadWindowSettings()
-        self.loadAppSettings()
+        super(ScipyenConfigurable, self).loadSettings()
+        #self.loadAppSettings()
         
-    def loadAppSettings(self):
-        pass
-    
     def loadWindowSettings(self):
         gname, prefix = loadWindowSettings(self.qsettings, self)#, group_name = self.__class__.__name__)
         

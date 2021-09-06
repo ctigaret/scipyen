@@ -194,7 +194,8 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                  settings:typing.Optional[confuse.LazyConfig] = None, 
                  title="", **kwargs):
         #print("WorkspaceGuiMixin __init__ %s" % self.__class__.__name__)
-        ScipyenConfigurable.__init__(self, settings = settings)
+        ScipyenConfigurable.__init__(self)
+        #ScipyenConfigurable.__init__(self, settings = settings)
                 
         self._scipyenWindow_ = None
         
@@ -475,59 +476,3 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
     
     """
     return syncQtSettings(qsettings, win, group_name, prefix, False)
-
-#class TestWSGui(QtWidgets.QMainWindow, WorkspaceGuiMixin):
-    #_qtcfg = {"Something": ("something",)} # Something MAY BE read-only !
-    ##_qtcfg = {"Something": ("something","something")} # Something is read-write
-    #def __init__(self, parent=None):
-        #super().__init__(parent=parent)
-        #WorkspaceGuiMixin.__init__(self, parent=parent, title="Test WorkspaceGuiMixin")
-        #self._something = "test window"
-        #self._another = "funny prop"
-        
-    #@property
-    #def something(self):
-        #return self._something
-    
-    #@something.setter
-    #def something(self, val):
-        #self._something = val
-        
-    ##@makeConfigurable(self.__class__, "Another") # 'self' is not defined here!
-    #@property
-    #def another(self):
-        #return self._another
-    
-    ##@makeConfigurable("Another")
-    #@WorkspaceGuiMixin.makeConfigurable("Another") # 'TestWSGui' is not defined yet!
-    #@another.setter
-    #def another(self, val):
-        #self._another = val
-        
-        
-#class TestGuiCfg(QtWidgets.QMainWindow, ScipyenConfigurable):
-    #def __init__(self, parent=None):
-        #super().__init__(parent=parent)
-        #self._something = "test window"
-        #self._another = "funny prop"
-        
-    #@property
-    #def something(self):
-        #return self._something
-    
-    #@ScipyenConfigurable.makeConfigurable("Something")
-    #@something.setter
-    #def something(self, val):
-        #self._something = val
-        
-    #@property
-    #def another(self):
-        #return self._another
-    
-    #@ScipyenConfigurable.makeConfigurable("Another", "")
-    #@another.setter
-    #def another(self, val):
-        #self._another = val
-        
-        
-        
