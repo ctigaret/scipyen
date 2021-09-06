@@ -1821,7 +1821,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def commandSearches(self, 
                         val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
         if isinstance(val, (collections.deque, list, tuple)):
-            self._commandHistoryFinderList = collections.deque(sorted((s for s in val)))
+            self._commandHistoryFinderList = collections.deque(val)
+            #self._commandHistoryFinderList = collections.deque(sorted((s for s in val)))
             
         else:
             self._commandHistoryFinderList = collections.deque()
@@ -1854,7 +1855,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def recentRunScripts(self, 
                          val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
         if isinstance(val, (collections.deque, list, tuple)):
-            self._recentlyRunScripts = collections.deque(sorted((s for s in val if os.path.isfile(s))))
+            self._recentlyRunScripts = collections.deque((s for s in val if os.path.isfile(s)))
+            #self._recentlyRunScripts = collections.deque(sorted((s for s in val if os.path.isfile(s))))
             
         else:
             self._recentlyRunScripts = collections.deque()
@@ -2532,7 +2534,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             expensive updates of the workspace viewer after each variable.
             
         """
-        print("ScipyenWindow.removeFromWorkspace", value)
+        #print("ScipyenWindow.removeFromWorkspace", value)
         if isinstance(value, str) and by_name:
             self.workspace.pop(value, None)
             
@@ -3399,26 +3401,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.qsettings.endGroup()
         
-    #def _setup_console_pygments_(self):
-        #from qtconsole.jupyter_widget import JupyterWidget
-        #settings = QtCore.QSettings()
-        #custom_pygment = settings.value("Console/Scheme", None)
-        #custom_colors = settings.value("Console/Colors", "")
-        
-        #if custom_pygment:
-            #JupyterWidget.style_sheet = consoles.styles.sheet_from_template(custom_pygment,
-                                                                   #custom_colors)
-            
-            #JupyterWidget.syntax_style = custom_pygment
-        
     #@processtimefunc
     def loadSettings(self):
-        self.loadWindowSettings()
-        self.loadAppSettings()
+        #self.loadWindowSettings()
+        super(WorkspaceGuiMixin, self).loadSettings() # this inherits from ScipyenConfigurable
+        #self.loadAppSettings()
         
-    def loadAppSettings(self):
-        pass
-    
     def loadWindowSettings(self):
         gname, prefix = loadWindowSettings(self.qsettings, self)#, group_name = self.__class__.__name__)
         

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import typing, warnings, os, inspect, sys
 from pprint import pprint
-from functools import singledispatch, update_wrapper, wraps
 #### BEGIN Configurable objects with traitlets.config
 from traitlets import (config, Bunch)
 #### END Configurable objects with traitlets.config
@@ -11,9 +10,11 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 #from traitlets.config import SingletonConfigurable
 from core.utilities import safeWrapper
 from core.workspacefunctions import user_workspace
-from core.scipyen_config import (ScipyenConfigurable,
+from core.scipyen_config import (ScipyenConfigurable, ScipyenConfigurable2, 
                                  syncQtSettings, makeConfigurable, markConfigurable, confuse)
 from gui.pictgui import ItemsListDialog
+
+#ScipyenConfigurable = ScipyenConfigurable2 # NOTE remove before release
 
 class GuiMessages(object):
     @safeWrapper

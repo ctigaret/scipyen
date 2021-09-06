@@ -88,7 +88,7 @@ from core.extipyutils_client import (init_commands, execute, ForeignCall,
                                     nrn_ipython_initialization_cmd,)
 from core.strutils import str2symbol
 
-from core.scipyen_config import (makeConfigurable, markConfigurable)
+from core.scipyen_config import (makeConfigurable, markConfigurable, ScipyenConfigurable)
 
 from gui.workspacegui import (WorkspaceGuiMixin, 
                               saveWindowSettings, loadWindowSettings,
@@ -146,12 +146,13 @@ def available_pygments():
 def get_available_syntax_styles():
     return sorted(list(pstyles.get_all_styles()))
 
-@makeConfigurable
-class ExternalConsoleWidget(RichJupyterWidget):
+#@makeConfigurable
+class ExternalConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     """
     """
     def __init__(self, *args, **kw):
         super(RichJupyterWidget, self).__init__(*args, **kw)
+        super(ScipyenConfigurable, self).__init__()
         self._console_pygment = ""
         self._console_colors = ""
         self.qsettings = QtCore.QSettings()
@@ -2781,7 +2782,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         #return frontend.execute(**kwargs)
 
 # NOTE: use Jupyter (IPython >= 4.x and qtconsole / qt5 by default)
-@makeConfigurable
+#@makeConfigurable
 class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
     """Console with in-process kernel manager for pythonic command interface.
     Uses an in-process kernel generated and managed by QtInProcessKernelManager.

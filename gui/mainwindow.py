@@ -3404,7 +3404,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     #@processtimefunc
     def loadSettings(self):
         self.loadWindowSettings()
-        super(ScipyenConfigurable, self).loadSettings()
+        super(WorkspaceGuiMixin, self).loadSettings() # this inherits from ScipyenConfigurable
         #self.loadAppSettings()
         
     def loadWindowSettings(self):
