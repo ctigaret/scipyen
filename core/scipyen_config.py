@@ -140,73 +140,90 @@ def configsrc2bunch(src:typing.Union[confuse.ConfigSource, Bunch]):
 def makeConfigurable(cls, configurables:typing.Optional[Bunch]=None):
     """Class decorator.
     
-    Auguments the decorated ::class:: with the attributes '_qtcfg' and _'cfg'
-    which are mappings that describe what settings are to be saved to / loaded 
-    from the Scipyen.conf ('_qtcfg') or config.yaml ('_cfg') files for the
-    decorated ::class::.
+    Auguments the decorated ::class:: with functionality for loading/saving
+    configurable parameters (options) to/from configuration files.
     
-    Saving/loading of settings in Scipyen are managed by functions in this 
-    module, typicaly called via the instance methods '_save_settings_' and 
-    '_load_settings_' defined manually in the decorated ::class::
+    Parameters:
+    ===========
+    cls: a :class: 
     
-    '_qtcfg' and '_cfg' are Bunch objects, which are dict types providing
-    attribute access to the values mapped to their keys (see traitlets.Bunch), 
-    and have the same structure, as follows:
+    configurables: traitlets.Bunch. Optional (default is None)
+
+        When given, it is expected ot have the following structure:
+        
+    {SettingsName: Bunch({'type':           'qt' or any str - case insensitive,
+                          'getter':         getter method or property,
+                          'setter':         setter method_or property,
+                          'default':        default value or None,
+                          'trait_notifier': DataBag instance, bool, or None,
+                          },
+                    )}
+                          
+        where SeetingsName is the name of the configuration.
     
-    {SettingsName: Bunch({'getter':getter_name, 'setter':setter_name})}
+        In the inner Bunch, only the first two fields (or 'keys') are mandatory 
+        and represent the method or property, respectively, for retrieving and
+        assigning the value of the instance attribute associated with 
+        SettingsName (see NOTE, below)
+        
+    By default (when 'configurables' is None or an empty mapping) the function
+    uses the :class: attributes (methods, properties) decorated with 
+    'markConfigurable' to determine what is configurable in the decorated 
+    :class:.
     
-    For example, gui.workspacegui.WorkspaceGuiMixin has _qtcfg 'hardcoded' as:
-    
-    Bunch({"WindowSize":       Bunch({"getter":"size",        "setter":"resize"}),
-           "WindowPosition":   Bunch({"getter":"pos",         "setter":"move"}),
-           "WindowGeometry":   Bunch({"getter":"geometry",    "setter":"setGeometry"}),
-           "WindowState":      Bunch({"getter":"saveState",   "setter":"restoreState"}),
-           })
-                    
-    and gui.signalviewer.SignalViewer has '_qtcfg' hardcoded as:
-    
-    Bunch({"VisibleDocks": Bunch({"getter":"visibleDocks","setter":"visibleDocks"})})
-    
-    which is merged with that of WorkspaceGuiMixin upon intialization.
-    
-    This class decorator provides an alternative to manual harcoding of _qtcfg
-    and _cfg, by working in tandem with the 'markConfigurable' decorator.
-    
-    Briefly, markConfigurable decorates selected methods that work as a 
+    Briefly, 'markConfigurable' decorates selected methods that work as a 
     getter/setter pair, or properties defined in the ::class::, to be used in
     saving/loading settings to/from configuration files.
     
-    In addition, the decorator also inserts two instance read-only properties:
-    'qtconfigurables' -> returns _qtcfg
-    'configurables' -> returns _cfg
     
     NOTE: 
-        the 'getter' retrieves the value of an attribute that needs to be stored
-            (saved) as a setting
+        The 'getter' is a method or property that retrieves the value of an 
+        attribute in order for it to be stored (saved) in a configuration
+        file, under the name given by the 'SettingsName' key.
             
-        the 'setter' assigns the value loaded from a settings file to an
-        attribute 
+        The 'setter' if a method or property that assigns the value loaded from
+        a configuration file to an attribute of an instance of the :class:
     
-        The values (objects) returned by the getter method and expected by the
-        setter SHOULD be built-in Python types that can be easily converted to a
-        QVariant, EXCLUDING:
-        - context managers
-        - modules
-        - classes
-        - functions and methods
-        - code objects
-        - type objects
-        - Ellipsis
-        - NotImplemented
-        - stack frame objects
-        - traceback objects
+        Scipyen manages two kinds of persistent configurations:
+        
+        1) Qt GUI related settings.
+            These are stored in a Scipyen.conf file in Scipyen's configuration 
+            directory, using QtCore.QSettings framework and are appropriate for 
+            :classes: that inherit from Qt :clases: such as QtWidgets.QWidget 
+            and QtWidgets.QMainWindow.
+            
+            This allows for persistent storage of Qt objects that can be
+            serialized (such as QSize, QPoint, QRect, QColor, QByteArray, etc.), 
+            transparently via QSettings.
+            
+            
+        2) Settings not related to GUI.
+            These are persistent configuration options for various non-GUI
+            components of Scipyen (e.g., ScanData options, TriggerProtocol
+            options, etc) such as the relative/absolute numeric tolerances used
+            in numerical algorithms and so on.
+        
+            The configuration is stored in YAML format in a 'config.yaml' file
+            in Scipyen's configuration directory, which supports deeply nested
+            dict-like structures.
+        
+    
+            The values (objects) returned by the getter method and expected by
+            the setter SHOULD be built-in Python types EXCLUDING:
+            - types inheriting from Qt types
+            - context managers
+            - modules
+            - classes
+            - functions and methods
+            - code objects
+            - type objects
+            - Ellipsis
+            - NotImplemented
+            - stack frame objects
+            - traceback objects
         
         CAUTION: No type checking is performed.
         
-    The makeConfigurable decorator uses the methods and properties decorated
-    with markConfiugrable decorator to augment (or create, if not existing) 
-    the _qtcfg and _cfg mappings.
-    
     Usage:
     ======
     Decorate the ::class:: definition with @makeConfigurable
@@ -215,10 +232,6 @@ def makeConfigurable(cls, configurables:typing.Optional[Bunch]=None):
     
     For read-write properties, it is only relevant to decorate the *.setter 
     (where * is the property name).
-    
-    For read-only properties, only the property getter needs to be decorated    
-    (NOTE:there is no much use for a setting to be read-only on the ::class::
-    side)
     
     For callable attributes (i.e., methods) make sure you pass the same confname 
     and conftype to the markConfigurable decorator, but indicate which is the 
@@ -235,36 +248,18 @@ def makeConfigurable(cls, configurables:typing.Optional[Bunch]=None):
     
     #print("makeConfigurable cls %s" % cls.__name__)
     
-    if not hasattr(cls, "qsettings"):
-        cls.qsettings = QtCore.QSettings("Scipyen", "Scipyen")
-        
-    if not hasattr(cls, "_scipyen_settings_"):
-        cls._scipyen_settings_ = scipyen_config
-        
     def _observe_configurables_(instance, change):
         cfg = Bunch({instance.__class__.__name__: Bunch({change.name:change.new})})
         pprint(cfg)
-        
-    #if not hasattr(cls, "_observe_configurables_"):
-        #cls._observe_configurables_ = _observe_configurables_
-        
-    #def _new_init_(instance, *args, **kwargs):
-        #cls.__init__(instance, *args, *kwargs)
-        #instance.configurable_traits = DataBag()
-        #instance.configurable_traits.observe(instance._observe_configurables_)
-        
-    #cls.__init__ = _new_init_
         
     def _configurables(instance):
         return collect_configurables(instance.__class__)
                     
     def _qtconfigurables(instance):
         return collect_configurables(instance.__class__).get("qt", Bunch())
-        #return instance._qtcfg
     
     def _clsconfigurables(instance):
         return collect_configurables(instance.__class__).get("conf", Bunch())
-        #return instance._cfg
         
     def _loadSettings_(instance):
         cfg = collect_configurables(instance.__class__)
@@ -307,16 +302,28 @@ def makeConfigurable(cls, configurables:typing.Optional[Bunch]=None):
         if len(qtcfg):
             syncQtSettings(cls.qsettings, instance, False)
         
-    if not hasattr(cls, "qtconfigurables"):
-        cls.qtconfigurables = property(fget = _qtconfigurables, doc = "QSettings configurables")
+    def _exec_body_(ns, extra={}):
         
-    if not hasattr(cls, "clsconfigurables"):
-        cls.clsconfigurables = property(fget = _clsconfigurables, doc = "Class configurables")
+        ns.update(extra)
         
-    if not hasattr(cls, "configurables"):
-        cls.configurables = property(fget = _configurables, doc = "All configurables")
-        
-    def _exec_body_(ns):
+        if not isinstance(ns.get("_scipyen_settings_", None), confuse.Configuration):
+            ns["_scipyen_settings_"] = scipyen_config
+            
+        if not isinstance(ns.get("_user_settings_src_", None), confuse.ConfigSource):
+            ns["_user_settings_src_"] = scipyen_user_config_source
+            
+        if not isinstance(ns.get("qsettings", None), QtCore.QSettings):
+            ns["qsettings"] = QtCore.QSettings("Scipyen", "Scipyen") # user scope, application-level
+            
+        if not isinstance(ns.get("configurables", None), property):
+            ns["configurables"] = property(fget = _configurables, doc = "All configurables")
+            
+        if not isinstance(ns.get("qtconfigurables", None), property):
+            ns["qtconfigurables"] = property(fget = _qtconfigurables, doc = "QSettings configurables")
+            
+        if not isinstance(ns.get("clsconfigurables", None), property):
+            ns["clsconfigurables"] = property(fget = _clsconfigurables, doc = "Class configurables")
+            
         if not inspect.isfunction(ns.get("_observe_configurables_", None)):
             ns["_observe_configurables_"] = _observe_configurables_
             
@@ -324,11 +331,52 @@ def makeConfigurable(cls, configurables:typing.Optional[Bunch]=None):
             ns["configurable_traits"] = DataBag()
             
         ns["configurable_traits"].observe(ns["_observe_configurables_"])
+        
         if not inspect.isfunction(ns.get("loadSettings", None)):
             ns["loadSettings"] = _loadSettings_
-        
+            
+    new_configurables = dict()
+    
+    if isinstance(configurables, dict) and len(configurables):
+        for confname, confdict in configurables.items():
+            if all((s in confdict for s in ("type", "getter", "setter"))):
+                getname = confdict["getter"]
+                setname = confdict["setter"]
+                conftype = confdict["type"]
+                default = confdict.get("default", None)
+                trait_notifier = confdict.get("trait_notifier", None)
+                
+                if getname == setname:
+                    # this SHOULD be a property with getter and setter
+                    prop = getattr(cls, getname, None)
+                    
+                    if isinstance(prop, property):
+                        new_configurables[getname] = markConfigurable(confname,
+                                                                       conftype,
+                                                                       True,
+                                                                       default=default,
+                                                                       trait_notifier=trait_notifier)(prop)
+                        
+                else:
+                    getterfunc = getattr(cls, getname, None)
+                    setterfunc = getattr(cls, setname, None)
+                    if all((inspect.isfunction(f) for f in (getterfunc, setterfunc))):
+                        new_configurables[getname] = markConfigurable(confname,
+                                                                      conftype,
+                                                                      False,
+                                                                      default=default,
+                                                                      trait_notifier=trait_notifier)(getterfunc)
+                        
+                        new_configurables[setname] = markConfigurable(confname,
+                                                                      conftype,
+                                                                      True,
+                                                                      default=default,
+                                                                      trait_notifier=trait_notifier)(setterfunc)
+                        
+                        
     # exec body populates the namespace of the instance
-    new_cls = new_class(cls.__name__, bases = cls.__bases__, exec_body=_exec_body_)
+    new_cls = new_class(cls.__name__, bases = cls.__bases__, 
+                        exec_body = partial(_exec_body_, extra = new_configurables))
         
     return new_cls
     
@@ -341,6 +389,16 @@ def markConfigurable(confname:str, conftype:str="",
     Properties and methods decorates with this will be collected by the ::class::
     decorator makeConfigurable to enable saving/loading used settings for that 
     ::class::
+    
+    Can also be called directly:
+    
+    1) pass an instance method (a function):
+    
+    func  = markConfigurable(cofnname, conftype, setter, 
+                             default=default_val,
+                             trait_notifier=<some_databag OR bool>)(obj.method)
+                             
+    Where func is a bound method, the new (decorated) version of obj.method.
     
     See documentation of makeConfigurable for details.
     
@@ -428,7 +486,6 @@ def markConfigurable(confname:str, conftype:str="",
         # hence only decorate xxx.setter if defined
         if isinstance(f, property):
             if all((inspect.isfunction(func) for func in (f.fget, f.fset))):
-                setattr(f.fget, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.fget.__name__, "default": default}))
                 setattr(f.fset, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.fset.__name__, "default": default}))
                 
                 if conftype != "qt" and isinstance(trait_notifier, (bool, DataBag)):
@@ -768,8 +825,9 @@ def syncQtSettings(qsettings:QSettings,
     else:
         key_prefix=""
         
-    #action = "save" if save else "load"
-    #print("syncQtSettings %s: win = %s, gname = %s, key_prefix = %s" % (action, win, gname, key_prefix))
+    #print("syncQtSettings %s: win = %s, gname = %s, key_prefix = %s" % ("save" if save else "load", win, gname, key_prefix))
+    print("\n***\nsyncQtSettings %s: win = %s" % ("save" if save else "load", win, ))
+    print("\tgname = '%s', key_prefix = '%s'" % (gname, key_prefix))
     
     if hasattr(win, "qtconfigurables"):
         qtcfg = win.qtconfigurables
@@ -915,7 +973,21 @@ def collect_configurables(cls):
                 kcfg[confdict.name] = cfgdict
             
             if confdict.type.lower() == "qt":
-                ret.qt.update(kcfg)
+                # NOTE: 2021-09-07 17:15:41
+                # make sure cfgdict has both getter AND setter; this is required
+                # particularly for distinct getter and setter methods (e.g.
+                # 'size' vs 'resize', etc)
+                if "getter" not in kcfg[confdict.name] and "setter" in kcfg[confdict.name]:
+                    if confdict.name in ret.qt and "getter" in ret.qt[confdict.name]:
+                        ret.qt.update(kcfg)
+                        
+                elif "getter" in kcfg[confdict.name] and "setter" not in kcfg[confdict.name]:
+                    if confdict.name in ret.qt and "setter" in ret.qt[confdict.name]:
+                        ret.qt.update(kcfg)
+                        
+                elif all((s in kcfg[confdict.name] for s in ("getter", "setter"))):
+                    ret.qt.update(kcfg)
+                    
                 if hasattr(cls, "_qtcfg"):
                     ret.qt.update(cls._qtcfg)
                     
@@ -923,7 +995,19 @@ def collect_configurables(cls):
                     ret.qt.update(cls._ownqtcfg)
                 
             else:
-                ret.conf.update(kcfg)
+                # see NOTE: 2021-09-07 17:15:41 for why we check this here
+                if "getter" not in kcfg[confdict.name] and "setter" in kcfg[confdict.name]:
+                    if confdict.name in ret.conf and "getter" in ret.conf[confdict.name]:
+                        ret.conf.update(kcfg)
+                        
+                elif "getter" in kcfg[confdict.name] and "setter" not in kcfg[confdict.name]:
+                    if confdict.name in ret.conf and "setter" in ret.conf[confdict.name]:
+                        ret.conf.update(kcfg)
+                        
+                elif all((s in kcfg[confdict.name] for s in ("getter", "setter"))):
+                    ret.conf.update(kcfg)
+                    
+                #ret.conf.update(kcfg)
                 if hasattr(cls, "_cfg"):
                     ret.conf.update(cls._cfg)
                     
@@ -933,7 +1017,16 @@ def collect_configurables(cls):
     return ret
 
 class ScipyenConfigurable(object):
-    """Superclass for Scipyen's configurable types
+    """Superclass for Scipyen's configurable types.
+    
+    Implements functionality to deal with non-Qt settings made persistent across
+    Scipyen sessions.
+    
+    Qt-based GUI settings (where appropriate) are dealt with separately, by either
+    inheriting from gui.workspacegui.WorkspaceGuiMixin, or by directly using
+    the loadWindowSettings and saveWindowSettings in the gui.workspacegui module,
+    or the syncQtSettings defined in this module.
+    
     """
     qsettings = QtCore.QSettings("Scipyen", "Scipyen")
     _scipyen_settings_  = scipyen_config
@@ -982,6 +1075,7 @@ class ScipyenConfigurable(object):
         return self.configurables["conf"]
     
     def loadSettings(self):
+        print("ScipyenConfigurable <%s>.loadSettings" % self.__class__.__name__)
         cfg = self.configurables
         # NOTE 2021-09-06 17:37:14
         # keep Qt settings segregated
@@ -1038,7 +1132,7 @@ class ScipyenConfigurable2(object):
     
     def __init__(self):
         super().__init__()
-        #self.qsettings = QtCore.QSettings("Scipyen", "Scipyen")
+        #self.qsettings = qsettings
         #self._scipyen_settings_  = scipyen_config
         #self._user_settings_src_ = scipyen_user_config_source
         self.configurable_traits = DataBag()

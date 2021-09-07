@@ -192,6 +192,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     _owncfg = Bunch()
     
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
+                 qsettings: typing.Optional[QtCore.QSettings] = None,
                  settings:typing.Optional[confuse.LazyConfig] = None, 
                  title="", **kwargs):
         #print("WorkspaceGuiMixin __init__ %s" % self.__class__.__name__)
@@ -477,3 +478,28 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
     
     """
     return syncQtSettings(qsettings, win, group_name, prefix, False)
+
+
+class TestGuiWindow(QtWidgets.QMainWindow, ScipyenConfigurable2):
+    def __init__(self, parent=None, *args, **kwargs):
+        super(QtWidgets.QMainWindow,self).__init__(parent=parent)
+        super(ScipyenConfigurable2, self).__init__()
+        
+        self.setVisible(True)
+        
+    def closeEvent(self, evt):
+        saveWindowSettings(self.qsettings, self)
+        evt.accept()
+
+@makeConfigurable
+class TestGuiWindow2(QtWidgets.QMainWindow):
+    def __init__(self, parent=None, *args, **kwargs):
+        super(QtWidgets.QMainWindow,self).__init__(parent=parent)
+        #super(ScipyenConfigurable2, self).__init__()
+        
+        self.setVisible(True)
+        
+    def closeEvent(self, evt):
+        saveWindowSettings(self.qsettings, self)
+        evt.accept()
+        

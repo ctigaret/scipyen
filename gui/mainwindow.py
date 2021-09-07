@@ -1095,7 +1095,8 @@ class VTH(object):
         return obj_type in VTH.gui_handlers[viewer_type]["types"]
         
     def is_supported_ancestor_type(obj_type, viewer_type):
-        return any([t in obj_type.mro() for t in VTH.gui_handlers[viewer_type]["types"]])
+        return any([t in inspect.getmro(obj_type) for t in VTH.gui_handlers[viewer_type]["types"]])
+        #return any([t in obj_type.mro() for t in VTH.gui_handlers[viewer_type]["types"]])
         
     def get_handlers_for_type(obj_type):
         #viewers = [viewer_type for viewer_type in VTH.gui_handlers.keys() if VTH.is_supported_type(obj_type, viewer_type)]
@@ -1162,7 +1163,7 @@ class VTH(object):
         else:
             vartype = type(variable)
             
-        if vartype in VTH.gui_handlers.keys():
+        if vartype in VTH.gui_handlers.keys() or QtWidgets.QWidget in inspect.getmro(vartype):
             return 
             
         actionNames = [value["action"] for key, value in VTH.gui_handlers.items() if any([v in value["types"] for v in inspect.getmro(vartype)])]
@@ -1486,6 +1487,25 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                  settings:typing.Optional[confuse.LazyConfig]=None, 
                  parent:typing.Optional[QtWidgets.QWidget]=None,
                  *args, **kwargs) -> None:
+        """Scipyen's main window initializer (constructor).
+        
+        Parameters:
+        ===========
+        app: QtWidgets.QApplication. The PyQt5 application instance. 
+            This instance runs the main GUI event loop and therefore there can 
+            be only one throughout a Scipyen session (i.e., is a 'singleton').
+            
+            All Scipyen facilities (or 'apps', e.g., LSCaT, LTP, both internal 
+            and external consoles, etc.) run under this event loop, which should
+            not be confused with the IPython's REPL that runs with each console.
+        
+        settings: confuse.LazyConfig Optional (default is None) 
+            The database containing non-Qt configuration data, global to Scipyen.
+            This is where configurable objects (including facilities or 'apps')
+            store their non-Qt related settings.
+        
+        parent: QtWidgets.QWidget.
+        """
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: python3 way
         WorkspaceGuiMixin.__init__(self, parent=self, settings=settings)
         self.app                        = app
@@ -1538,6 +1558,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._scipyen_settings_         = settings 
         
         # NOTE: Qt GUI settings in $HOME/.config/Scipyen/Scipyen.conf
+        # this can only be accessed once the Qt application is up and running i.e.
+        # executing its (gui) event loop
+        # therefore, unlike the confuse-based scipyen_settings, this cannot be 
+        # loaded in scipyen_config module!
         self.qsettings                   = QtCore.QSettings("Scipyen", "Scipyen")
 
         # NOTE: 2021-08-17 12:29:29
@@ -2780,6 +2804,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot(QtCore.QModelIndex)
     @safeWrapper
     def slot_variableItemActivated(self, ndx):
+        """Called by double-click of left mouse button on item in workspace
+        """
         source_ns = self.workspaceModel.item(ndx.row(), standard_obj_summary_headers.index("Workspace")).text()
         
         if source_ns != "Internal": # avoid standard menu for data in remote kernels
@@ -2791,7 +2817,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         item = self.workspace[self.workspaceModel.currentItemName]
         
-        if isinstance(item, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+        if QtWidgets.QWidget in inspect.getmro(type(item)):
+            item.show()
+        
+        #if isinstance(item, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+        if isinstance(item, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
             self._setCurrentWindow(item)
             
         else:
@@ -2852,9 +2882,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
             specialViewMenu = cm.addMenu("View")
             
-            for actionName in VTH.get_actionNames(varType):
-                action = specialViewMenu.addAction(actionName)
-                action.triggered.connect(self.slot_autoSelectViewer)
+            if QtWidgets.QWidget in inspect.getmro(varType):
+                action = specialViewMenu.addAction("Show")
+                action.triggered.connect(self.workspace[varName].show)
+                
+            else:
+                for actionName in VTH.get_actionNames(varType):
+                    action = specialViewMenu.addAction(actionName)
+                    action.triggered.connect(self.slot_autoSelectViewer)
                 
         else:
             # several variables selected
@@ -3408,6 +3443,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #self.loadAppSettings()
         
     def loadWindowSettings(self):
+        print("%s.loadWindowSettings" % self.__class__.__name__)
         gname, prefix = loadWindowSettings(self.qsettings, self)#, group_name = self.__class__.__name__)
         
         
