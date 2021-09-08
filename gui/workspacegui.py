@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import typing, warnings, os, inspect, sys
+import typing, warnings, os, inspect, sys, traceback
 from pprint import pprint
 #### BEGIN Configurable objects with traitlets.config
 from traitlets import (config, Bunch)
@@ -521,20 +521,35 @@ class TestGuiWindow2(QtWidgets.QMainWindow):
         evt.accept()
         
         
-def _test_load_settings_(instance):
-    print(instance.qtconfigurables)
+def _test_load_settings_(instance): # for illustration purposes
+    print("_test_load_settings_: instance %s <%s>" % (instance, instance.__class__))
+    pprint(instance.qtconfigurables)
+    loadWindowSettings(instance.qsettings, instance)
     
 def _test_save_settings_(instance):
-    print(instance.qtconfigurables)
+    print("_test_save_settings_: instance %s <%s>" % (instance, instance.__class__))
+    pprint(instance.qtconfigurables)
+    saveWindowSettings(instance.qsettings, instance)
         
 def _test_new_init_(instance, *args, **kwargs):
-    instance.__cls__.__init__(instance, *args, **kwargs)
-    instance.__load_settings__()
+    print("_test_new_init_: instance %s <%s>" % (instance, instance.__class__))
+    instance.__class__.__init__(instance, *args, **kwargs)
+    bases = instance.__class__.__bases__
+    instance._load_settings_()
+    instance.__class__.setVisible(instance,True) # this is for illustration purposes as the source :class: is QMainWindow
+    instance.__class__.show(instance) # this is for illustration purposes as the source :class: is QMainWindow
     
 def _test_new_close_event_(instance, evt):
     instance._save_settings_()
-    instance.closeEvent(evt)
-    evt.accept()
+    bases = instance.__class__.__bases__
+    for cls in bases:
+        if hasattr(cls, "closeEvent"):
+            try:
+                cls.closeEvent(instance,evt)
+                evt.accept()
+            except:
+                traceback.print_exc()
+            break
     
 config_extras = Bunch({"_load_settings_": _test_load_settings_,
                        "_save_settings_": _test_save_settings_,

@@ -495,7 +495,8 @@ def makeConfigurable(configurables:typing.Optional[Bunch]=None,
                 ns["_user_settings_src_"] = scipyen_user_config_source
                 
             if not isinstance(ns.get("qsettings", None), QtCore.QSettings):
-                ns["qsettings"] = QtCore.QSettings("Scipyen", "Scipyen") # user scope, application-level
+                ns["qsettings"] = QtCore.QSettings(QtCore.QCoreApplication.organizationName(),
+                                                   QtCore.QCoreApplication.applicationName()) # user scope, application-level
                 
             if not isinstance(ns.get("configurables", None), property):
                 ns["configurables"] = property(fget = _configurables, doc = "All configurables")
@@ -552,13 +553,16 @@ def makeConfigurable(configurables:typing.Optional[Bunch]=None,
                         # when this decorator is applied to a mixin like ScipyenConfigurable2
                         # getname and setname may not be available inside the mixin,
                         # although they may be available inside the other bases
-                        getterfunc = getattr(cls, getname, None)
-                        setterfunc = getattr(cls, setname, None)
+                        #getterfunc = getattr(cls, getname, None)
+                        #setterfunc = getattr(cls, setname, None)
+                        getterfunc = inspect.getattr_static(cls, getname, None)
+                        setterfunc = inspect.getattr_static(cls, setname, None)
                         #print("\t\tin %s" % cls.__name__)
                         #print("\t\tgetterfunc: %s (%s):" % (getterfunc, getattr(getterfunc, "__qualname__", None)))
                         #print("\t\tsetterfunc: %s (%s):" % (setterfunc, getattr(setterfunc, "__qualname__", None)))
                         #print()
-                        if all((inspect.isfunction(f) or inspect.isbuiltin(f) for f in (getterfunc, setterfunc))):
+                        if all((any((inspect.isfunction(f), inspect.isbuiltin(f), inspect.ismethoddescriptor(f)))  for f in (getterfunc, setterfunc))):
+                        #if all((inspect.isfunction(f) or inspect.isbuiltin(f) for f in (getterfunc, setterfunc))):
                             
                             new_configurables[getname] = markConfigurable(confname,
                                                                         conftype,
@@ -772,6 +776,7 @@ def markConfigurable(confname:str, conftype:str="",
             # builtin_function_or_method callable types (C function & method) 
             # cannot be augmented as above (they're read-only); therefore, we
             # we must wrap on the fly
+            #print("trait_notifier", trait_notifier)
             if setter is True:
                 configurable_setter = Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default})
 
@@ -783,12 +788,15 @@ def markConfigurable(confname:str, conftype:str="",
                     if isinstance(trait_notifier, DataBag):
                         configurable_setter["trait_notifier"] = trait_notifier
                         
+                #@wraps(f)
                 def newf(instance, *args, **kwargs):
                     """Calls the owner's setter method & updates the trait notifier.
                     This only has effect when trait notifier is a DataBag
                     that is observing.
                     """
+                    print(type(instance))
                     f(instance, *args, **kwargs)
+                    #instance.f(*args, **kwargs)
                     if isinstance(trait_notifier, DataBag):
                         trait_notifier[confname] = args[0]
                         
@@ -799,7 +807,9 @@ def markConfigurable(confname:str, conftype:str="",
             else:
                 configurable_getter = Bunch({"type": conftype, "name": confname, "getter":f.__name__, "default": default})
                 
+                #@wraps(f)
                 def newf(instance, *args, **kwargs):
+                    #return instance.f(*args, **kwargs)
                     return f(instance, *args, **kwargs)
                 
                 setattr(newf, "configurable_getter", configurable_getter)
