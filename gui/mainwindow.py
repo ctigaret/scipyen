@@ -1558,11 +1558,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._scipyen_settings_         = settings 
         
         # NOTE: Qt GUI settings in $HOME/.config/Scipyen/Scipyen.conf
-        # this can only be accessed once the Qt application is up and running i.e.
-        # executing its (gui) event loop
-        # therefore, unlike the confuse-based scipyen_settings, this cannot be 
-        # loaded in scipyen_config module!
-        self.qsettings                   = QtCore.QSettings("Scipyen", "Scipyen")
+        # this can only be accessed once the Qt application is instantiated in
+        # order for its organizationName and applicationName to be set
+        # Since the ScipyenWindow instance is the first Scipyen object that
+        # comes alive, the qsettings must be set up here and not rely on what is
+        # inherited from ScipyenConfigurable (indirectly via WorkspaceGuiMixin)
+        self.qsettings = QtCore.QSettings(QtCore.QCoreApplication.organizationName(),
+                                          QtCore.QCoreApplication.applicationName())
+        #self.qsettings                   = QtCore.QSettings("Scipyen", "Scipyen")
 
         # NOTE: 2021-08-17 12:29:29
         # directory where scipyen is installed
@@ -3367,6 +3370,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.close()
         
     def closeEvent(self, evt):
+        #open_windows = ((name, obj) for (name, obj) in self.workspace.items() if isinstance(obj, QtWidgets.QWidget))
         if self.external_console is not None:
             self.external_console.window.closeEvent(evt)
             if not evt.isAccepted():
@@ -3380,9 +3384,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.console.close()
             self.console = None
             
+        open_windows = (obj for obj in self.workspace.values() if isinstance(obj, QtWidgets.QWidget) and obj.isVisible())
+        
+        for o in open_windows:
+            o.close()
+        
         self.saveSettings()
-        #if not self._save_settings_guard_:
-            #self._save_settings_guard_ = True
             
         evt.accept()
         

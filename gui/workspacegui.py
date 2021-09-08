@@ -182,7 +182,10 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     #           where: property is the name of a descriptor with read-write access
     #
     #
+    # CAUTION: If present it will override whatever is set by ScipyenConfigurable
+    # or makeConfigurable / markConfigurable decorators
     #
+    # WARNING: These must be present here to augment ScipyenConfigurable
     _qtcfg = Bunch({"WindowSize":       Bunch({"getter":"size",        "setter":"resize"}),
                     "WindowPosition":   Bunch({"getter":"pos",         "setter":"move"}),
                     "WindowGeometry":   Bunch({"getter":"geometry",    "setter":"setGeometry"}),
@@ -383,6 +386,7 @@ def saveWindowSettings(qsettings:QtCore.QSettings,
     NOTE: Delegates to core.scipyen_config.syncQtSettings
     
     """
+    print("saveWindowSettings %s" % win.__class__.__name__)
     return syncQtSettings(qsettings, win, group_name, prefix, True)
     
 def loadWindowSettings(qsettings:QtCore.QSettings, 
@@ -484,18 +488,25 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
     return syncQtSettings(qsettings, win, group_name, prefix, False)
 
 
-#class TestGuiWindow(QtWidgets.QMainWindow, ScipyenConfigurable2):
-    #def __init__(self, parent=None, *args, **kwargs):
-        #super(QtWidgets.QMainWindow,self).__init__(parent=parent)
+class TestGuiWindow(QtWidgets.QMainWindow, ScipyenConfigurable2, ):
+    def __init__(self, parent=None, *args, **kwargs):
+        #super().__init__(parent=parent)
         #super(ScipyenConfigurable2, self).__init__()
+        super(QtWidgets.QMainWindow,self).__init__(parent=parent)
         
-        #self.setVisible(True)
+        self.setVisible(True)
         
-    #def closeEvent(self, evt):
-        #saveWindowSettings(self.qsettings, self)
-        #evt.accept()
+    def closeEvent(self, evt):
+        print("%s.closeEvent" % self.__class__.__name__)
+        super(QtWidgets.QMainWindow, self).closeEvent(evt)
+        saveWindowSettings(self.qsettings, self)
+        evt.accept()
 
-@makeConfigurable(configurables = Bunch({"WindowSize": Bunch({"type":"qt","getter":"size", "setter":"resize"})}))
+@makeConfigurable(configurables = Bunch({"WindowSize": Bunch({"type":"qt","getter":"size", "setter":"resize"}),
+                                         "WindowPosition": Bunch({"type":"qt", "getter":"pos","setter":"move"}),
+                                         "WindowGeometry": Bunch({"type":"qt", "getter":"geometry", "setter":"setGeometry"}),
+                                         "WindowState": Bunch({"type":"qt","getter":"saveState", "setter":"restoreState"}),
+                                         }))
 class TestGuiWindow2(QtWidgets.QMainWindow):
     def __init__(self, parent=None, *args, **kwargs):
         super(QtWidgets.QMainWindow,self).__init__(parent=parent)
@@ -504,6 +515,35 @@ class TestGuiWindow2(QtWidgets.QMainWindow):
         self.setVisible(True)
         
     def closeEvent(self, evt):
+        print("%s.closeEvent" % self.__class__.__name__)
+        super(QtWidgets.QMainWindow, self).closeEvent(evt)
         saveWindowSettings(self.qsettings, self)
         evt.accept()
         
+        
+def _test_load_settings_(instance):
+    print(instance.qtconfigurables)
+    
+def _test_save_settings_(instance):
+    print(instance.qtconfigurables)
+        
+def _test_new_init_(instance, *args, **kwargs):
+    instance.__cls__.__init__(instance, *args, **kwargs)
+    instance.__load_settings__()
+    
+def _test_new_close_event_(instance, evt):
+    instance._save_settings_()
+    instance.closeEvent(evt)
+    evt.accept()
+    
+config_extras = Bunch({"_load_settings_": _test_load_settings_,
+                       "_save_settings_": _test_save_settings_,
+                       "_init__": _test_new_init_,
+                       "closeEvent": _test_new_close_event_})
+
+TestGuiWindow3 = makeConfigurable(configurables = Bunch({"WindowSize": Bunch({"type":"qt","getter":"size", "setter":"resize"}),
+                                         "WindowPosition": Bunch({"type":"qt", "getter":"pos","setter":"move"}),
+                                         "WindowGeometry": Bunch({"type":"qt", "getter":"geometry", "setter":"setGeometry"}),
+                                         "WindowState": Bunch({"type":"qt","getter":"saveState", "setter":"restoreState"}),
+                                         }),
+                                  extras = config_extras)(QtWidgets.QMainWindow)
