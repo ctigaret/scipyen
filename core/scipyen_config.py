@@ -137,7 +137,7 @@ def configsrc2bunch(src:typing.Union[confuse.ConfigSource, Bunch]):
 
 
     
-def makeConfigurable(cls, configurables:typing.Optional[Bunch]=None):
+def makeConfigurable(configurables:typing.Optional[Bunch]=None):
     """Class decorator.
     
     Auguments the decorated ::class:: with functionality for loading/saving
@@ -248,137 +248,139 @@ def makeConfigurable(cls, configurables:typing.Optional[Bunch]=None):
     
     #print("makeConfigurable cls %s" % cls.__name__)
     
-    def _observe_configurables_(instance, change):
-        cfg = Bunch({instance.__class__.__name__: Bunch({change.name:change.new})})
-        pprint(cfg)
-        
-    def _configurables(instance):
-        return collect_configurables(instance.__class__)
-                    
-    def _qtconfigurables(instance):
-        return collect_configurables(instance.__class__).get("qt", Bunch())
-    
-    def _clsconfigurables(instance):
-        return collect_configurables(instance.__class__).get("conf", Bunch())
-        
-    def _loadSettings_(instance):
-        cfg = collect_configurables(instance.__class__)
-        cfcfg = cfg.get("conf", Bunch())
-        qtcfg = cfg.get("qt", Bunch())
-        
-        if len(cfcfg):
-            user_conf = scipyen_settings[instance.__class__.__name__].get(None)
+    def _klass_wrapper_(cls):
+        def _observe_configurables_(instance, change):
+            cfg = Bunch({instance.__class__.__name__: Bunch({change.name:change.new})})
+            pprint(cfg)
             
-            if isinstance(user_conf, dict):
-                for k, v in user_conf.items():
-                    getset = cfcfg.get(k, {})
-                    settername = getset.get("setter", None)
-                    
-                    if not isinstance(settername, str) or len(settername.strip())==0:
-                        continue
-                    
-                    trait_notifier = getset.get("trait_notifier", None)
-                    
-                    if not isinstance(trait_notifier, (bool, DataBag)):
-                        continue
-                    
-                    if trait_notifier is True and isinstance(getattr(instance, "configurable_traits", None), DataBag):
-                        trait_notifier = instance.configurable_traits
+        def _configurables(instance):
+            return collect_configurables(instance.__class__)
                         
-                    else:
-                        continue
-                        
-                    with trait_notifier.hold_trait_notifications():
-                        default = getset.get("default", None)
-                        
-                        setter = inspect.getattr_static(instance, settername, None)
-
-                        if isinstance(setter, property):
-                            setattr(instance, settername, v)
-                            
-                        elif setter is not None:
-                            setter = getattr(instance, settername)
-                            setter(val)
-        if len(qtcfg):
-            syncQtSettings(cls.qsettings, instance, False)
+        def _qtconfigurables(instance):
+            return collect_configurables(instance.__class__).get("qt", Bunch())
         
-    def _exec_body_(ns, extra={}):
-        
-        ns.update(extra)
-        
-        if not isinstance(ns.get("_scipyen_settings_", None), confuse.Configuration):
-            ns["_scipyen_settings_"] = scipyen_config
+        def _clsconfigurables(instance):
+            return collect_configurables(instance.__class__).get("conf", Bunch())
             
-        if not isinstance(ns.get("_user_settings_src_", None), confuse.ConfigSource):
-            ns["_user_settings_src_"] = scipyen_user_config_source
+        def _loadSettings_(instance):
+            cfg = collect_configurables(instance.__class__)
+            cfcfg = cfg.get("conf", Bunch())
+            qtcfg = cfg.get("qt", Bunch())
             
-        if not isinstance(ns.get("qsettings", None), QtCore.QSettings):
-            ns["qsettings"] = QtCore.QSettings("Scipyen", "Scipyen") # user scope, application-level
-            
-        if not isinstance(ns.get("configurables", None), property):
-            ns["configurables"] = property(fget = _configurables, doc = "All configurables")
-            
-        if not isinstance(ns.get("qtconfigurables", None), property):
-            ns["qtconfigurables"] = property(fget = _qtconfigurables, doc = "QSettings configurables")
-            
-        if not isinstance(ns.get("clsconfigurables", None), property):
-            ns["clsconfigurables"] = property(fget = _clsconfigurables, doc = "Class configurables")
-            
-        if not inspect.isfunction(ns.get("_observe_configurables_", None)):
-            ns["_observe_configurables_"] = _observe_configurables_
-            
-        if not isinstance (ns.get("configurable_traits", None), DataBag):
-            ns["configurable_traits"] = DataBag()
-            
-        ns["configurable_traits"].observe(ns["_observe_configurables_"])
-        
-        if not inspect.isfunction(ns.get("loadSettings", None)):
-            ns["loadSettings"] = _loadSettings_
-            
-    new_configurables = dict()
-    
-    if isinstance(configurables, dict) and len(configurables):
-        for confname, confdict in configurables.items():
-            if all((s in confdict for s in ("type", "getter", "setter"))):
-                getname = confdict["getter"]
-                setname = confdict["setter"]
-                conftype = confdict["type"]
-                default = confdict.get("default", None)
-                trait_notifier = confdict.get("trait_notifier", None)
+            if len(cfcfg):
+                user_conf = scipyen_settings[instance.__class__.__name__].get(None)
                 
-                if getname == setname:
-                    # this SHOULD be a property with getter and setter
-                    prop = getattr(cls, getname, None)
-                    
-                    if isinstance(prop, property):
-                        new_configurables[getname] = markConfigurable(confname,
-                                                                       conftype,
-                                                                       True,
-                                                                       default=default,
-                                                                       trait_notifier=trait_notifier)(prop)
+                if isinstance(user_conf, dict):
+                    for k, v in user_conf.items():
+                        getset = cfcfg.get(k, {})
+                        settername = getset.get("setter", None)
                         
-                else:
-                    getterfunc = getattr(cls, getname, None)
-                    setterfunc = getattr(cls, setname, None)
-                    if all((inspect.isfunction(f) for f in (getterfunc, setterfunc))):
-                        new_configurables[getname] = markConfigurable(confname,
-                                                                      conftype,
-                                                                      False,
-                                                                      default=default,
-                                                                      trait_notifier=trait_notifier)(getterfunc)
+                        if not isinstance(settername, str) or len(settername.strip())==0:
+                            continue
                         
-                        new_configurables[setname] = markConfigurable(confname,
-                                                                      conftype,
-                                                                      True,
-                                                                      default=default,
-                                                                      trait_notifier=trait_notifier)(setterfunc)
+                        trait_notifier = getset.get("trait_notifier", None)
                         
+                        if not isinstance(trait_notifier, (bool, DataBag)):
+                            continue
                         
-    # exec body populates the namespace of the instance
-    new_cls = new_class(cls.__name__, bases = cls.__bases__, 
-                        exec_body = partial(_exec_body_, extra = new_configurables))
+                        if trait_notifier is True and isinstance(getattr(instance, "configurable_traits", None), DataBag):
+                            trait_notifier = instance.configurable_traits
+                            
+                        else:
+                            continue
+                            
+                        with trait_notifier.hold_trait_notifications():
+                            default = getset.get("default", None)
+                            
+                            setter = inspect.getattr_static(instance, settername, None)
+
+                            if isinstance(setter, property):
+                                setattr(instance, settername, v)
+                                
+                            elif setter is not None:
+                                setter = getattr(instance, settername)
+                                setter(val)
+            if len(qtcfg):
+                syncQtSettings(cls.qsettings, instance, False)
+            
+        def _exec_body_(ns, extra={}):
+            
+            ns.update(extra)
+            
+            if not isinstance(ns.get("_scipyen_settings_", None), confuse.Configuration):
+                ns["_scipyen_settings_"] = scipyen_config
+                
+            if not isinstance(ns.get("_user_settings_src_", None), confuse.ConfigSource):
+                ns["_user_settings_src_"] = scipyen_user_config_source
+                
+            if not isinstance(ns.get("qsettings", None), QtCore.QSettings):
+                ns["qsettings"] = QtCore.QSettings("Scipyen", "Scipyen") # user scope, application-level
+                
+            if not isinstance(ns.get("configurables", None), property):
+                ns["configurables"] = property(fget = _configurables, doc = "All configurables")
+                
+            if not isinstance(ns.get("qtconfigurables", None), property):
+                ns["qtconfigurables"] = property(fget = _qtconfigurables, doc = "QSettings configurables")
+                
+            if not isinstance(ns.get("clsconfigurables", None), property):
+                ns["clsconfigurables"] = property(fget = _clsconfigurables, doc = "Class configurables")
+                
+            if not inspect.isfunction(ns.get("_observe_configurables_", None)):
+                ns["_observe_configurables_"] = _observe_configurables_
+                
+            if not isinstance (ns.get("configurable_traits", None), DataBag):
+                ns["configurable_traits"] = DataBag()
+                
+            ns["configurable_traits"].observe(ns["_observe_configurables_"])
+            
+            if not inspect.isfunction(ns.get("loadSettings", None)):
+                ns["loadSettings"] = _loadSettings_
+                
+        new_configurables = dict()
         
-    return new_cls
+        if isinstance(configurables, dict) and len(configurables):
+            for confname, confdict in configurables.items():
+                if all((s in confdict for s in ("type", "getter", "setter"))):
+                    getname = confdict["getter"]
+                    setname = confdict["setter"]
+                    conftype = confdict["type"]
+                    default = confdict.get("default", None)
+                    trait_notifier = confdict.get("trait_notifier", None)
+                    
+                    if getname == setname:
+                        # this SHOULD be a property with getter and setter
+                        prop = getattr(cls, getname, None)
+                        
+                        if isinstance(prop, property):
+                            new_configurables[getname] = markConfigurable(confname,
+                                                                        conftype,
+                                                                        True,
+                                                                        default=default,
+                                                                        trait_notifier=trait_notifier)(prop)
+                            
+                    else:
+                        getterfunc = getattr(cls, getname, None)
+                        setterfunc = getattr(cls, setname, None)
+                        if all((inspect.isfunction(f) for f in (getterfunc, setterfunc))):
+                            new_configurables[getname] = markConfigurable(confname,
+                                                                        conftype,
+                                                                        False,
+                                                                        default=default,
+                                                                        trait_notifier=trait_notifier)(getterfunc)
+                            
+                            new_configurables[setname] = markConfigurable(confname,
+                                                                        conftype,
+                                                                        True,
+                                                                        default=default,
+                                                                        trait_notifier=trait_notifier)(setterfunc)
+                            
+        # exec body populates the namespace of the instance
+        new_cls = new_class(cls.__name__, bases = cls.__bases__, 
+                            exec_body = partial(_exec_body_, extra = new_configurables))
+        
+        return new_cls
+    
+    return _klass_wrapper_
     
 def markConfigurable(confname:str, conftype:str="", 
                      setter:bool=True, 
@@ -486,34 +488,66 @@ def markConfigurable(confname:str, conftype:str="",
         # hence only decorate xxx.setter if defined
         if isinstance(f, property):
             if all((inspect.isfunction(func) for func in (f.fget, f.fset))):
+                setattr(f.fget, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.fget.__name__, "default": default}))
                 setattr(f.fset, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.fset.__name__, "default": default}))
                 
                 if conftype != "qt" and isinstance(trait_notifier, (bool, DataBag)):
-                    f.fset.configurable_setter["trait_notifier"] = trait_notifier
-                    def newfset(instance, *args, **kwargs):
-                        f.fset.__call__(instance, *args, **kwargs)
-                        if isinstance(trait_notifier, DataBag):
-                            trait_notifier[confname] = args[0]
-                            
-                        elif trait_notifier is True and isinstance(getattr(instance, "configurable_traits", None), DataBag):
-                            instance.configurable_traits[confname] = args[0]
-                            
-                    setattr(newfset, "configurable_setter", f.fset.configurable_setter)
+                    # NOTE: 2021-09-08 09:14:16
+                    # for non-qt configurable properties ONLY:
+                    # if trait_notifier is defined, then replace f.fset with a 
+                    # new function that also updates the trait_notifier
+                    # 'trait_notifier' is supposed to be a DataBag with a
+                    # registered observer handler, OR a bool which when True, 
+                    # expects the :class: owner of the property to provide such
+                    # a DataBag via the attribute 'configurable_traits'
                     
-                    return property(fget = f.fget, fset = f.fset, doc = f.__doc__)
+                    if isinstance(trait_notifier, bool) and trait_notifier is True:
+                        trait_notifier = getattr(instance, "configurable_traits", None)
+                        
+                    if isinstance(trait_notifier, DataBag):
+                        f.fset.configurable_setter["trait_notifier"] = trait_notifier
+                        
+                        def newfset(instance, *args, **kwargs):
+                            """Calls the owner's property fset function & updates the trait notifier.
+                            This only has effect when trait notifier is a DataBag
+                            that is observing.
+                            """
+                            f.fset.__call__(instance, *args, **kwargs)
+                            trait_notifier[confname] = args[0]
+                            #if isinstance(trait_notifier, DataBag):
+                                
+                            #elif trait_notifier is True and isinstance(getattr(instance, "configurable_traits", None), DataBag):
+                                #instance.configurable_traits[confname] = args[0]
+                                
+                        setattr(newfset, "configurable_setter", f.fset.configurable_setter)
+                        
+                        return property(fget = f.fget, fset = newfset, doc = f.__doc__)
                 
         elif inspect.isfunction(f):
             if setter is True:
                 setattr(f, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default}))
+                
                 if conftype != "qt" and isinstance(trait_notifier, (bool, DataBag)):
-                    f.configurable_setter["trait_notifier"] = trait_notifier
+                    # see NOTE: 2021-09-08 09:14:16
+                    if isinstance(trait_notifier, bool) and trait_notifier is True:
+                        trait_notifier = getattr(instance, "configurable_traits", None)
+                        
+                    if isinstance(trait_notifier, DataBag):
+                        f.configurable_setter["trait_notifier"] = trait_notifier
+                        
+                    #f.configurable_setter["trait_notifier"] = trait_notifier
                     def newf(instance, *args, **kwargs):
+                        """Calls the owner's setter method & updates the trait notifier.
+                        This only has effect when trait notifier is a DataBag
+                        that is observing.
+                        """
                         f(instance, *args, **kwargs)
-                        if isinstance(trait_notifier, DataBag):
-                            trait_notifier[confname] = args[0]
+                        trait_notifier[confname] = args[0]
+                        #if isinstance(trait_notifier, DataBag):
+                            #trait_notifier[confname] = args[0]
                             
-                        elif trait_notifier is True and isinstance(getattr(instance, "configurable_traits", None), DataBag):
-                            instance.configurable_traits[confname] = args[0]
+                        #elif trait_notifier is True and isinstance(getattr(instance, "configurable_traits", None), DataBag):
+                            #instance.configurable_traits[confname] = args[0]
                             
                     setattr(newf, "configurable_setter", f.configurable_setter)
                     
@@ -1116,6 +1150,8 @@ class ScipyenConfigurable(object):
                             setter = getattr(self, settername)
                             setter(val)
                 
+        else:
+            print("\tNo non-qt configurables found")
         #if len(qtcfg):
             #syncQtSettings(self.qsettings, self, False)
             #loadwindowSettings(self.qsettings, self)

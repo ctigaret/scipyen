@@ -11,7 +11,11 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from core.utilities import safeWrapper
 from core.workspacefunctions import user_workspace
 from core.scipyen_config import (ScipyenConfigurable, ScipyenConfigurable2, 
-                                 syncQtSettings, makeConfigurable, markConfigurable, confuse)
+                                 syncQtSettings, 
+                                 makeConfigurable, 
+                                 markConfigurable, 
+                                 confuse)
+
 from gui.pictgui import ItemsListDialog
 
 #ScipyenConfigurable = ScipyenConfigurable2 # NOTE remove before release
@@ -480,18 +484,18 @@ def loadWindowSettings(qsettings:QtCore.QSettings,
     return syncQtSettings(qsettings, win, group_name, prefix, False)
 
 
-class TestGuiWindow(QtWidgets.QMainWindow, ScipyenConfigurable2):
-    def __init__(self, parent=None, *args, **kwargs):
-        super(QtWidgets.QMainWindow,self).__init__(parent=parent)
-        super(ScipyenConfigurable2, self).__init__()
+#class TestGuiWindow(QtWidgets.QMainWindow, ScipyenConfigurable2):
+    #def __init__(self, parent=None, *args, **kwargs):
+        #super(QtWidgets.QMainWindow,self).__init__(parent=parent)
+        #super(ScipyenConfigurable2, self).__init__()
         
-        self.setVisible(True)
+        #self.setVisible(True)
         
-    def closeEvent(self, evt):
-        saveWindowSettings(self.qsettings, self)
-        evt.accept()
+    #def closeEvent(self, evt):
+        #saveWindowSettings(self.qsettings, self)
+        #evt.accept()
 
-@makeConfigurable
+@makeConfigurable(configurables = Bunch({"WindowSize": Bunch({"type":"qt","getter":"size", "setter":"resize"})}))
 class TestGuiWindow2(QtWidgets.QMainWindow):
     def __init__(self, parent=None, *args, **kwargs):
         super(QtWidgets.QMainWindow,self).__init__(parent=parent)

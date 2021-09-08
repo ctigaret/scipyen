@@ -88,7 +88,8 @@ from core.extipyutils_client import (init_commands, execute, ForeignCall,
                                     nrn_ipython_initialization_cmd,)
 from core.strutils import str2symbol
 
-from core.scipyen_config import (makeConfigurable, markConfigurable, ScipyenConfigurable)
+from core.scipyen_config import (makeConfigurable, markConfigurable, 
+                                 ScipyenConfigurable)
 
 from gui.workspacegui import (WorkspaceGuiMixin, 
                               saveWindowSettings, loadWindowSettings,
@@ -2864,7 +2865,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
         # e.g. after calling show()
         #self.set_pygment(self._console_pygment) 
         
-    ####@markConfigurable("CloseEvent", "Qt") # for testig only!
+    ####@markConfigurable("CloseEvent", "Qt") # for testing only!
     def closeEvent(self, evt):
         self._save_settings_()
         evt.accept()
@@ -2988,6 +2989,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
         #return
         # located in $HOME/.config/Scipyen/Scipyen.conf
         gname, pfx = loadWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
+        super(WorkspaceGuiMixin, self).loadSettings()
         
     def dragEnterEvent(self, evt):
         #if "text/plain" in evt.mimeData().formats():
