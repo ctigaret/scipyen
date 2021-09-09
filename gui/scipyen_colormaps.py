@@ -6,6 +6,7 @@ and our ow custom color maps
 
 """
 import os,traceback, warnings
+import numbers
 # NOTE: 2020-11-28 10:20:06
 # upgrade to matplotlib 3.3.x
 # register new colormaps upon importing this module
@@ -21,7 +22,7 @@ import matplotlib.pyplot as plt
 import matplotlib.mlab as mlb
 from matplotlib import cm as cm
 from matplotlib import colors as colors
-
+from traitlets import Bunch
 from PyQt5 import QtCore, QtGui
 
 try:
@@ -72,7 +73,7 @@ standardPalette = (
     (128,   0, 128)  # "dark violet"
 )
 
-standardPaletteDict = {
+standardPaletteDict = Bunch({
     "white":            (255, 255, 255), # 
     "light gray":       (192, 192, 192), # 
     "gray":             (160, 160, 160), # 
@@ -99,9 +100,9 @@ standardPaletteDict = {
     "dark light blue":  (  0, 128, 128), # 
     "dark blue":        (  0,   0, 128), # 
     "dark violet":      (128,   0, 128)  # 
-}
+})
 
-svgPalette = dict(
+svgPalette = Bunch(
     aliceblue	= (240, 248, 255),
     antiquewhite	= (250, 235, 215),
     aqua	= ( 0, 255, 255),
@@ -251,18 +252,18 @@ svgPalette = dict(
     yellowgreen	= (154, 205, 50),
     )
 
-qtGlobalColors = dict((x,n) for x, n in vars(QtCore.Qt).items() if isinstance(n, QtCore.Qt.GlobalColor))
-qtGlobalColorsQual = dict(("QtCore.Qt.%s" % x,n) for x, n in vars(QtCore.Qt).items() if isinstance(n, QtCore.Qt.GlobalColor))
+qtGlobalColors = Bunch((x,n) for x, n in vars(QtCore.Qt).items() if isinstance(n, QtCore.Qt.GlobalColor))
+qtGlobalColorsQual = Bunch(("QtCore.Qt.%s" % x,n) for x, n in vars(QtCore.Qt).items() if isinstance(n, QtCore.Qt.GlobalColor))
 
 # NOTE: 2021-05-17 15:44:15 Matplotlib color palettes are dicts that map a color
 # name (str) to a str in the "#rrggb" format EXCEPT for BASE_COLORS where the 
 # name is mapped to a 3- tuple of r, g, b floats (0-1)!
-mplBase = dict((x, tuple(float(v) for v in y)) for x,y in colors.BASE_COLORS.items())    # matplotlib base colors
-mplCSS4 = colors.CSS4_COLORS    # matplotlib X11/CSS4 colors - the same as SVG ones
-mplTab  = colors.TABLEAU_COLORS # matplotlib Tableau colors
-mplXKCD = colors.XKCD_COLORS    # matplotlib XKCD colors
+mplBase = Bunch((x, mpl.colors.rgb2hex(tuple(float(v) for v in y))) for x,y in colors.BASE_COLORS.items())    # matplotlib base colors
+mplCSS4 = Bunch(colors.CSS4_COLORS)    # matplotlib X11/CSS4 colors - the same as matplotlib's SVG palette
+mplTab  = Bunch(colors.TABLEAU_COLORS) # matplotlib Tableau colors
+mplXKCD = Bunch(colors.XKCD_COLORS)    # matplotlib XKCD colors
 
-mplColors = dict()
+mplColors = Bunch()
 for d in (mplBase, mplCSS4, mplTab, mplXKCD):
     mplColors.update(d)
     
@@ -308,6 +309,75 @@ __green_fire_blue_data = {"red": [(0.0,  0.0,  0.0),
 #_cm.register_cmap(name="GreenFireBlue", data=__green_fire_blue_data, lut=256)
 
 CustomColorMaps = {"GreenFireBlue": __green_fire_blue_data}
+
+def rgb2mpl(val:typing.Union[list, tuple]):
+    """Converts Qt style R, G, B (int) triplet into matplotlib R,G,B (float).
+    Performs the inverse of mpl2rgb.
+    """
+    if not isinstance(val, (tuple, list)):
+        raise TypeError("Expecting a sequence; got %s instead" % str(val))
+    
+    if all((v >= 0 and v <= 1 for v in val)):
+        if len(val) != 3:
+            raise ValueError("Expecting an R, G, B triplet; got %s instead" % str(val))
+        return val
+    
+    elif all((isinstance(v, int) and v in range(256) for v in val)):
+        if len(val) not in range(3,5):
+            raise ValueError("Expecting an R, G, B (A) sequence; got %s instead" % str(val))
+        return tuple((v/255. for v in val[0:3]))
+    
+    else:
+        raise ValueError("Sequence must contain floats in [0,1] or integers in [0,255]")
+        
+def mpl2rgb(val:typing.Union[list, tuple]):
+    """Converts matplotlib style R,G,B (float) triplet into Qt R, G, B (int)
+    Performs the inverse of rgb2mpl.
+    """
+    if not isinstance(val, (tuple, list)):
+        raise TypeError("Expecting a sequence; got %s instead" % str(val))
+    if len(val) != 3:
+        raise ValueError("Expecting an R, G, B triplet; got %s instead" % str(val))
+    
+    if all((v >= 0 and v <= 1 for v in val)):
+        return tuple((int(v*255) for v in val))
+    
+    elif all((isinstance(v, int) and v in range(256) for v in val)):
+        return val
+    
+    else:
+        raise ValueError("Sequence must contain floats in [0,1] or integers in [0,255]")
+        
+def qcolor(val):
+    if isinstance(val, QtGui.QColor):
+        return val
+    
+    elif isinstance(val, (tuple, list)):
+        return QtGui.QColor.fromRgb(*mpl2rgb(val))
+    
+    elif isinstance(val, str):
+        if QtGui.QColor.isValidColor(val):
+            return QtGui.QColor(val)
+        
+        elif val in standardPaletteDict:
+            return QtGui.QColor.fromRgb(standardPaletteDict[val])
+            
+        elif val in svgPalette:
+            return QtGui.QColor.fromRgb(svgPalette[val])
+        
+        elif val in qtGlobalColors:
+            return QtGui.QColor(val)
+        
+        elif val in mplColors:
+            return QtGui.QColor(mplColors[val])
+        
+        elif val in mplColors.values():
+            return QtGui.QColor(val)
+        
+    else:
+        raise TypeError("Expecting a QColor, numeric 3- or 4-tuple, or str (color name or Hex representation); got %s instead" % val)
+            
+        
 
 def standardQColor(i:int) -> QtGui.QColor:
     return paletteQColor(standardPalette, i)

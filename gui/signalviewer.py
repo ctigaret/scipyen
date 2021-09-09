@@ -160,6 +160,7 @@ from ephys.ephys import (cursors2epoch, )
 #from . import imageviewer as iv
 from . import pictgui as pgui
 from . import quickdialog as qd
+from . import scipyen_colormaps as colormaps
 #from .pictgui import GraphicsObjectType, GraphicsObject, PathElements, Tier2PathElements, SignalCursor, Path, Start, Move, Line, Cubic, Rect, Ellipse, Quad, Arc, ArcMove
 from .scipyenviewer import (ScipyenViewer, ScipyenFrameViewer,Bunch)
 from .dictviewer import (InteractiveTreeWidget, DataViewer,)
@@ -740,7 +741,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("CrosshairCursorColor", trait_notifier=True)
     @crosshairCursorColor.setter
     def crosshairCursorColor(self, val):
-        self._cursorColors_["crosshair"] = QtGui.QColor(val).name(QtGui.QColor.HexArgb)
+        qcolor = colormaps.qcolor(val)
+        self._cursorColors_["crosshair"] = qcolor.name(QtGui.QColor.HexArgb)
         for cursor in self.crosshairCursors:
             cursor.pen.setColor(QtGui.QColor(self._cursorColors_["crosshair"]))
             cursor.update()
@@ -752,7 +754,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("HorizontalCursorColor", trait_notifier=True)
     @horizontalCursorColor.setter
     def horizontalCursorColor(self, val):
-        self._cursorColors_["horizontal"] = QtGui.QColor(val).name(QtGui.QColor.HexArgb)
+        qcolor = colormaps.qcolor(val)
+        self._cursorColors_["horizontal"] = qcolor.name(QtGui.QColor.HexArgb)
         for cursor in self.horizontalCursors:
             cursor.pen.setColor(QtGui.QColor(self._cursorColors_["horizontal"]))
             cursor.update()
@@ -761,10 +764,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def verticalCursorColor(self):
         return self._cursorColors_["vertical"]
     
-    @markConfigurable("VerticalCursorColor", trait_notifier=True)
+    @markConfigurable("VerticalCursorColor")
     @verticalCursorColor.setter
     def verticalCursorColor(self, val):
-        self._cursorColors_["vertical"] = QtGui.QColor(val).name(QtGui.QColor.HexArgb)
+        qcolor = colormaps.qcolor(val)
+        cname = qcolor.name(QtGui.QColor.HexArgb)
+        self._cursorColors_["vertical"] = cname
+        if hasattr(self, "configurable_traits"):
+            self.configurable_traits["VerticalCursorColor"] = cname
         for cursor in self.verticalCursors:
             cursor.pen.setColor(QtGui.QColor(self._cursorColors_["vertical"]))
             cursor.update()
@@ -787,7 +794,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("LinkedCrosshairCursorColor", trait_notifier=True)
     @linkedCrosshairCursorColor.setter
     def linkedCrosshairCursorColor(self, val):
-        self._linkedCursorColors_["crosshair"] = QtGui.QColor(val).name(QtGui.QColor.HexArgb)
+        qcolor = colormaps.qcolor(val)
+        self._linkedCursorColors_["crosshair"] = qcolor.name(QtGui.QColor.HexArgb)
         for cursor in self.crosshairCursors:
             cursor.linkedPen.setColor(QtGui.QColor(self._linkedCursorColors_["crosshair"]))
             cursor.update()
@@ -799,7 +807,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("LinkedHorizontalCursorColor", trait_notifier=True)
     @linkedHorizontalCursorColor.setter
     def linkedHorizontalCursorColor(self, val):
-        self._linkedCursorColors_["horizontal"] = QtGui.QColor(val).name(QtGui.QColor.HexArgb)
+        qcolor = colormaps.qcolor(val)
+        self._linkedCursorColors_["horizontal"] = qcolor.name(QtGui.QColor.HexArgb)
         for cursor in self.horizontalCursors:
             cursor.linkedPen.setColor(QtGui.QColor(self._linkedCursorColors_["horizontal"]))
             cursor.update()
@@ -811,7 +820,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("LinkedVerticalCursorColor", trait_notifier=True)
     @linkedVerticalCursorColor.setter
     def linkedVerticalCursorColor(self, val):
-        self._linkedCursorColors_["vertical"] = QtGui.QColor(val).name(QtGui.QColor.HexArgb)
+        qcolor = colormaps.qcolor(val)
+        self._linkedCursorColors_["vertical"] = qcolor.name(QtGui.QColor.HexArgb)
         for cursor in self.verticalCursors:
             cursor.linkedPen.setColor(QtGui.QColor(self._linkedCursorColors_["vertical"]))
             cursor.update()
@@ -2169,21 +2179,27 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             crsPrefix = "v"
             
             ywindow = 0.0
-            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["vertical"]), style=QtCore.Qt.SolidLine)
-            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["vertical"]), style=QtCore.Qt.SolidLine)
+            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+            pen.setCosmetic(True)
+            linkedPen.setCosmetic(True)
             
         elif cursor_type in ("horizontal", "h", SignalCursor.SignalCursorTypes.horizontal):
             cursorDict = self.horizontalSignalCursors
             crsPrefix = "h"
             xwindow = 0.0
-            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["horizontal"]), style=QtCore.Qt.SolidLine)
-            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["horizontal"]), style=QtCore.Qt.SolidLine)
+            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["horizontal"]), 1, QtCore.Qt.SolidLine)
+            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["horizontal"]), 1, QtCore.Qt.SolidLine)
+            pen.setCosmetic(True)
+            linkedPen.setCosmetic(True)
             
         elif cursor_type in ("crosshair", "c", SignalCursor.SignalCursorTypes.crosshair):
             cursorDict = self.crosshairSignalCursors
             crsPrefix = "c"
-            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["crosshair"]), style=QtCore.Qt.SolidLine)
-            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["crosshair"]), style=QtCore.Qt.SolidLine)
+            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["crosshair"]), 1, QtCore.Qt.SolidLine)
+            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["crosshair"]), 1, QtCore.Qt.SolidLine)
+            pen.setCosmetic(True)
+            linkedPen.setCosmetic(True)
             
         else:
             raise ValueError("unsupported cursor type %s" % cursor_type)
