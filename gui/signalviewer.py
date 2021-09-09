@@ -86,6 +86,7 @@ CHANGELOG
 import sys, os, traceback, numbers, warnings, weakref, inspect, typing
 
 import collections, itertools
+from traitlets import Bunch
 
 from itertools import (cycle, accumulate, chain, )
 from operator import attrgetter, itemgetter, methodcaller
@@ -146,6 +147,7 @@ from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.triggerprotocols import TriggerProtocol
 #from core.utilities import (unique, get_nested_value, set_nested_value,)
 from core.workspacefunctions import validate_varname
+from core.scipyen_config import markConfigurable
 
 from imaging.vigrautils import vigraKernel1D_to_ndarray
 
@@ -359,14 +361,22 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     defaultCursorWindowSizeY = 0.001
 
     mpl_prop_cycle = plt.rcParams['axes.prop_cycle']
-    defaultLineColorsList = ["#000000"] + ["b", "r", "g", "c", "m", "y"]  + mpl_prop_cycle.by_key()['color']
-    defaultOverlaidLineColorList = [mpl.colors.to_rgba(c, alpha=0.5) for c in defaultLineColorsList]
-        
-    defaultSpikeColor    = mpl.colors.to_rgba("xkcd:navy")
-    defaultEventColor    = mpl.colors.to_rgba("xkcd:crimson")
-    defaultEpochColor    = mpl.colors.to_rgba("xkcd:coral")
     
-    _qtcfg = Bunch({"VisibleDocks": Bunch({"getter":"visibleDocks","setter":"visibleDocks"})})
+    defaultLineColorsList = ["#000000"] + ["blue", "red", "green", "cyan", "magenta", "yellow"]  + mpl_prop_cycle.by_key()['color']
+    #defaultLineColorsList = ["#000000"] + list((QtGui.QColor(c).name(QtGui.QColor.HexArgb) for c in ("blue", "red", "green", "cyan", "magenta", "yellow")))  + mpl_prop_cycle.by_key()['color']
+    
+    defaultOverlaidLineColorList = (mpl.colors.rgb2hex(mpl.colors.to_rgba(c, alpha=0.5)) for c in defaultLineColorsList)
+        
+    defaultSpikeColor    = mpl.colors.rgb2hex(mpl.colors.to_rgba("xkcd:navy"))
+    defaultEventColor    = mpl.colors.rgb2hex(mpl.colors.to_rgba("xkcd:crimson"))
+    defaultEpochColor    = mpl.colors.rgb2hex(mpl.colors.to_rgba("xkcd:coral"))
+    
+    default_antialias = True
+    
+    defaultCursorColors = Bunch({"crosshair":"#C173B088", "horizontal":"#B1D28F88", "vertical":"#ff007f88"})
+    defaultLinkedCursorColors = Bunch({"crosshair":QtGui.QColor(defaultCursorColors["crosshair"]).darker().name(QtGui.QColor.HexArgb),
+                                       "horizontal":QtGui.QColor(defaultCursorColors["horizontal"]).darker().name(QtGui.QColor.HexArgb),
+                                       "vertical":QtGui.QColor(defaultCursorColors["vertical"]).darker().name(QtGui.QColor.HexArgb)})
 
     def __init__(self, 
                  x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
@@ -403,6 +413,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.y = y
         
         self._plot_names_ = dict() # maps item row position to name
+        
+        self._cursorWindowSizeX_ = self.defaultCursorWindowSizeX
+        self._cursorWindowSizeY_ = self.defaultCursorWindowSizeY
         
         self.crosshairSignalCursors = dict() # a dict of SignalCursors mapping str name to cursor object
         self.verticalSignalCursors = dict()
@@ -529,7 +542,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # list of analog signal names selected from what is available in the current 
         # frame, using the combobox for analog signals
         # this includes signals in numpy arrays
-        self.guiSelectedSignalNames= list() # list of signal names sl
+        self.guiSelectedSignalNames = list() # list of signal names sl
         
         #self.guiSelectedIrregularSignals = list() # signal indices in collection
         # list of irregularly sampled signal names selected from what is available
@@ -561,7 +574,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._cursor_coordinates_text_  = ""
         
         #### BEGIN generic plot options
-        self.default_antialias = True
+        #self.default_antialias = True
         
         self.antialias = self.default_antialias
         
@@ -573,12 +586,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.selectedDataCursor = None
         
-        self.cursorColors = {"crosshair":"#C173B088", "horizontal":"#B1D28F88", "vertical":"#ff007f88"}
+        self._cursorColors_ = self.defaultCursorColors
         #self.cursorColors = {"crosshair":"#C173B088", "horizontal":"#B1D28F88", "vertical":"#F2BB8888"}
         #self.linkedCursorColors = {"crosshair":"#B14F9A88", "horizontal":"#77B75388","vertical":"#F29B6888"}
-        self.linkedCursorColors = {"crosshair":pg.mkColor(self.cursorColors["crosshair"]).darker(),
-                                   "horizontal":pg.mkColor(self.cursorColors["horizontal"]).darker(),
-                                   "vertical":pg.mkColor(self.cursorColors["vertical"]).darker()}
+        self._linkedCursorColors_ = self.defaultLinkedCursorColors
         #### END generic plot options
         
         # NOTE: 2021-08-25 09:42:54
@@ -591,10 +602,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         super().__init__(data=y, parent=parent, ID=ID,
                          win_title=win_title, doc_title=doc_title,
                          frameIndex=frameIndex, *args, **kwargs)
-        
-        #self._qtcfg.update(ScipyenFrameViewer._qtcfg)
-        
-        #self._qtconfigurables.visibleDocks = Bunch()
         
         #self.loadSettings() # now called by ScipyenViewer.__init__()
 
@@ -685,6 +692,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def visibleDocks(self):
         return dict(((name, w.isVisible()) for name, w in self.__dict__.items() if isinstance(w, QtWidgets.QDockWidget)))
     
+    @markConfigurable("VisibleDocks", "qt")
     @visibleDocks.setter
     def visibleDocks(self, val):
         if isinstance(val, dict):
@@ -692,6 +700,122 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             for k, v in val.items():
                 if k in dw:
                     dw[k].setVisible(v is True) # just to make sure v is a bool
+                    
+    @property
+    def cursorWindowSizeX(self):
+        return self._cursorWindowSizeX_
+    
+    @markConfigurable("CursorXWindow", trait_notifier=True)
+    @cursorWindowSizeX.setter
+    def cursorWindowSizeX(self, val):
+        self._cursorWindowSizeX_ = val
+        
+    @property
+    def cursorWindowSizeY(self):
+        return self._cursorWindowSizeY_
+    
+    @markConfigurable("CursorYWindow", trait_notifier=True)
+    @cursorWindowSizeY.setter
+    def cursorWindowSizeY(self, val):
+        self._cursorWindowSizeY_ = val
+        
+    @property
+    def cursorColors(self)->dict:
+        return self._cursorColors_
+    
+    @cursorColors.setter
+    def cursorColors(self, val):
+        if isinstance(val, dict) and all((s in val for s in ("crosshair", "horizontal", "vertical"))):
+            self.crosshairCursorColor = QtGui.QColor(val["crosshair"]).name(QtGui.QColor.HexArgb)
+            self.horizontalCursorColor = QtGui.QColor(val["horizontal"]).name(QtGui.QColor.HexArgb)
+            self.verticalCursorColor = QtGui.QColor(val["vertical"]).name(QtGui.QColor.HexArgb)
+            #self.crosshairCursorColor = pg.mkColor(val["crosshair"]).name(QtGui.QColor.HexArgb)
+            #self.horizontalCursorColor = pg.mkColor(val["horizontal"]).name(QtGui.QColor.HexArgb)
+            #self.verticalCursorColor = pg.mkColor(val["vertical"]).name(QtGui.QColor.HexArgb)
+
+    @property
+    def crosshairCursorColor(self):
+        return self._cursorColors_["crosshair"]
+    
+    @markConfigurable("CrosshairCursorColor", trait_notifier=True)
+    @crosshairCursorColor.setter
+    def crosshairCursorColor(self, val):
+        self._cursorColors_["crosshair"] = QtGui.QColor(val).name(QtGui.QColor.HexArgb)
+        for cursor in self.crosshairCursors:
+            cursor.pen.setColor(QtGui.QColor(self._cursorColors_["crosshair"]))
+            cursor.update()
+                
+    @property
+    def horizontalCursorColor(self):
+        return self._cursorColors_["horizontal"]
+    
+    @markConfigurable("HorizontalCursorColor", trait_notifier=True)
+    @horizontalCursorColor.setter
+    def horizontalCursorColor(self, val):
+        self._cursorColors_["horizontal"] = QtGui.QColor(val).name(QtGui.QColor.HexArgb)
+        for cursor in self.horizontalCursors:
+            cursor.pen.setColor(QtGui.QColor(self._cursorColors_["horizontal"]))
+            cursor.update()
+                
+    @property
+    def verticalCursorColor(self):
+        return self._cursorColors_["vertical"]
+    
+    @markConfigurable("VerticalCursorColor", trait_notifier=True)
+    @verticalCursorColor.setter
+    def verticalCursorColor(self, val):
+        self._cursorColors_["vertical"] = QtGui.QColor(val).name(QtGui.QColor.HexArgb)
+        for cursor in self.verticalCursors:
+            cursor.pen.setColor(QtGui.QColor(self._cursorColors_["vertical"]))
+            cursor.update()
+        
+    @property
+    def linkedCursorColors(self):
+        return self._linkedCursorColors_
+    
+    @linkedCursorColors.setter
+    def linkedCursorColors(self, val):
+        if isinstance(val, dict) and all((s in val for s in ("crosshair", "horizontal", "vertical"))):
+            self.linkedCrosshairCursorColor = QtGui.QColor(val["crosshair"]).name(QtGui.QColor.HexArgb)
+            self.linkedHorizontalCursorColor = QtGui.QColor(val["horizontal"]).name(QtGui.QColor.HexArgb)
+            self.linkedVerticalCursorColor = QtGui.QColor(val["vertical"]).name(QtGui.QColor.HexArgb)
+            
+    @property
+    def linkedCrosshairCursorColor(self):
+        return self._linkedCursorColors_["crosshair"]
+    
+    @markConfigurable("LinkedCrosshairCursorColor", trait_notifier=True)
+    @linkedCrosshairCursorColor.setter
+    def linkedCrosshairCursorColor(self, val):
+        self._linkedCursorColors_["crosshair"] = QtGui.QColor(val).name(QtGui.QColor.HexArgb)
+        for cursor in self.crosshairCursors:
+            cursor.linkedPen.setColor(QtGui.QColor(self._linkedCursorColors_["crosshair"]))
+            cursor.update()
+    
+    @property
+    def linkedHorizontalCursorColor(self):
+        return self._linkedCursorColors_["horizontal"]
+    
+    @markConfigurable("LinkedHorizontalCursorColor", trait_notifier=True)
+    @linkedHorizontalCursorColor.setter
+    def linkedHorizontalCursorColor(self, val):
+        self._linkedCursorColors_["horizontal"] = QtGui.QColor(val).name(QtGui.QColor.HexArgb)
+        for cursor in self.horizontalCursors:
+            cursor.linkedPen.setColor(QtGui.QColor(self._linkedCursorColors_["horizontal"]))
+            cursor.update()
+    
+    @property
+    def linkedVerticalCursorColor(self):
+        return self._linkedCursorColors_["vertical"]
+    
+    @markConfigurable("LinkedVerticalCursorColor", trait_notifier=True)
+    @linkedVerticalCursorColor.setter
+    def linkedVerticalCursorColor(self, val):
+        self._linkedCursorColors_["vertical"] = QtGui.QColor(val).name(QtGui.QColor.HexArgb)
+        for cursor in self.verticalCursors:
+            cursor.linkedPen.setColor(QtGui.QColor(self._linkedCursorColors_["vertical"]))
+            cursor.update()
+        
                 
     def _update_annotations_(self, data=None):
         self.dataAnnotations.clear()
@@ -2045,21 +2169,21 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             crsPrefix = "v"
             
             ywindow = 0.0
-            pen = pg.mkPen(pg.mkColor(self.cursorColors["vertical"]), style=QtCore.Qt.SolidLine)
-            linkedPen = pg.mkPen(pg.mkColor(self.linkedCursorColors["vertical"]), style=QtCore.Qt.SolidLine)
+            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["vertical"]), style=QtCore.Qt.SolidLine)
+            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["vertical"]), style=QtCore.Qt.SolidLine)
             
         elif cursor_type in ("horizontal", "h", SignalCursor.SignalCursorTypes.horizontal):
             cursorDict = self.horizontalSignalCursors
             crsPrefix = "h"
             xwindow = 0.0
-            pen = pg.mkPen(pg.mkColor(self.cursorColors["horizontal"]), style=QtCore.Qt.SolidLine)
-            linkedPen = pg.mkPen(pg.mkColor(self.linkedCursorColors["horizontal"]), style=QtCore.Qt.SolidLine)
+            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["horizontal"]), style=QtCore.Qt.SolidLine)
+            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["horizontal"]), style=QtCore.Qt.SolidLine)
             
         elif cursor_type in ("crosshair", "c", SignalCursor.SignalCursorTypes.crosshair):
             cursorDict = self.crosshairSignalCursors
             crsPrefix = "c"
-            pen = pg.mkPen(pg.mkColor(self.cursorColors["crosshair"]), style=QtCore.Qt.SolidLine)
-            linkedPen = pg.mkPen(pg.mkColor(self.linkedCursorColors["crosshair"]), style=QtCore.Qt.SolidLine)
+            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["crosshair"]), style=QtCore.Qt.SolidLine)
+            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["crosshair"]), style=QtCore.Qt.SolidLine)
             
         else:
             raise ValueError("unsupported cursor type %s" % cursor_type)
@@ -2294,7 +2418,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             out = QtGui.QImage(int(self.fig.scene().width()), int(self.fig.scene().height()))
             
-            out.fill(pg.mkColor(pg.getConfigOption("background")))
+            out.fill(QtGui.QColor(pg.getConfigOption("background")))
             
             painter = QtGui.QPainter(out)
             self.fig.scene().render(painter)
@@ -5110,6 +5234,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             height_interval = 1/len(trains_dict)
             
             colors = cycle(self.defaultLineColorsList)
+            
             labelStyle = {"color": "#000000"}
 
             trains_x_list = list()
@@ -5132,7 +5257,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                         symbol="spike",
                                         pen=None,
                                         name=data_name,
-                                        symbolPen=pg.mkPen(pg.mkColor(next(colors))))
+                                        symbolPen=QtGui.QPen(QtGui.QColor(next(colors))))
                 
             spike_train_axis.axes["left"]["item"].setPen(None)
             spike_train_axis.axes["left"]["item"].setLabel("Spike Trains", **labelStyle)
@@ -5326,6 +5451,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                      xlabel = "%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
                                      ylabel = "%s (%s)" % (sig_name, signal.units.dimensionality),
                                      name=sig_name,
+                                     symbol=None,
                                      **kwargs)
             
             kAx += 1
@@ -5363,6 +5489,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                      sig.magnitude,
                                      xlabel = "Time (%s)" % sig.t_start.units.dimensionality,
                                      ylabel = "%s (%s)" % (sig.name, signal.units.dimensionality),
+                                     symbol = None,
                                      **kwargs)
             
             kAx += 1
@@ -5375,6 +5502,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             spike_train_axis = self.signalsLayout.getItem(kAx,0)
             
             symbolcolors = cycle(self.defaultLineColorsList)
+            symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
+            symbolPen.setCosmetic(True)
+            
+            
             labelStyle = {"color": "#000000"}
             
             height_interval = 1/len(spiketrains) 
@@ -5399,10 +5530,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             self._plot_numeric_data_(spike_train_axis,
                                         tr_x, tr_y, 
-                                        symbol="spike",
                                         pen=None,
                                         name=data_name,
-                                        symbolPen = pg.mkPen(color="k", cosmetic=True, width=1),
+                                        symbol="spike",
+                                        symbolPen = symbolPen,
                                         symbolcolorcycle = symbolcolors)
                 
             spike_train_axis.axes["left"]["item"].setPen(None)
@@ -5419,6 +5550,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             event_axis = self.signalsLayout.getItem(kAx, 0)
             
             symbolcolors = cycle(self.defaultLineColorsList)
+            symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
+            symbolPen.setCosmetic(True)
+            
             labelStyle = {"color": "#000000"}
             
             height_interval = 1/len(events)
@@ -5463,9 +5597,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
                 self._plot_numeric_data_(event_axis,
                                             ev_x, ev_y, 
-                                            symbol="spike", 
                                             pen=None, 
                                             name=data_name,
+                                            symbol="spike", 
                                             symbolcolorcycle=symbolcolors)
                 
             event_axis.axes["left"]["item"].setPen(None)
@@ -5676,22 +5810,36 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if y.ndim > 2:
             raise TypeError("y expected to be an array with up to 2 dimensions; for %s dimensions instead" % y.ndim)
         
-        cycle_line_colors = "pen" not in kwargs
-
+        #cycle_line_colors = "pen" not in kwargs
+        
+        # NOTE: 2021-09-09 18:30:20
+        # when symbol is present we don't draw the connection line
+        symbol = kwargs.get("symbol", None)
+        
+        if symbol is None:
+            pen = kwargs.get("pen", None)
+            
+            if not isinstance(pen, QtGui.QPen):
+                pen = QtGui.QPen(QtGui.QColor("black"),1)
+                pen.setCosmetic(True)
+                kwargs["pen"] = pen
+                
+        else:
+            kwargs["pen"] = None
+            symbolPen = kwargs.get("symbolPen",QtGui.QPen(QtGui.QColor("black"),1))
+            symbolPen.setCosmetic(True)
+            kwargs["symbolPen"] = symbolPen
+        
         #pen = pg.mkPen(pg.mkColor("k"))
-        symbolPen = kwargs.get("symbolPen",pg.mkPen(color="k", cosmetic=True, width=1))
+        #symbolPen = kwargs.get("symbolPen",pg.mkPen(color="k", cosmetic=True, width=1))
         
         plotDataItems = [i for i in plotItem.listDataItems() if isinstance(i, pg.PlotDataItem)]
+        
+        colors = cycle(self.defaultLineColorsList)
         
         if "name" not in kwargs:
             kwargs["name"]=name
             
-        #if kwargs.get("pen", None) is None:
-            #kwargs["pen"] = pen
-            
-        if "symbol" not in kwargs:
-            kwargs["symbol"] = None
-        
         if y.ndim == 1:
             y_nan_ndx = np.isnan(y)
             
@@ -5722,7 +5870,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 plotItem.plot(x=xx, y=yy, **kwargs)
         
         elif y.ndim == 2:
-            colors = cycle(self.defaultLineColorsList)
             
             if y.shape[1] < len(plotDataItems):
                 for item in plotDataItems[y.shape[1]:]:
@@ -5743,18 +5890,27 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 if xx.size == 0 or yy.size == 0: # nothing left to plot
                     continue
                     
-                if cycle_line_colors:
-                    pen = pg.mkPen(pg.mkColor(next(colors)))
+                if symbol is None:
+                    if isinstance(pen, QtGui.QPen):
+                        color = next(colors)
+                        pen.setColor(QtGui.QColor(color))
+                        pen.setCosmetic(True)
                     #pen.setColor(pg.mkColor(next(colors)))
+                    
                     kwargs["pen"] = pen
                     
-                if isinstance(symbolcolorcycle, itertools.cycle):
-                    symbolPen.setColor(pg.mkColor(next(symbolcolorcycle)))
-                    kwargs["symbolPen"] = symbolPen
+                    kwargs["symbol"] = None
                     
                 else:
-                    if kwargs.get("symbolPen", None) is None:
+                    kwargs["pen"] = None
+                    
+                    if isinstance(symbolcolorcycle, itertools.cycle):
+                        symbolPen.setColor(QtGui.QColor(next(symbolcolorcycle)))
                         kwargs["symbolPen"] = symbolPen
+                        
+                    else:
+                        if kwargs.get("symbolPen", None) is None:
+                            kwargs["symbolPen"] = symbolPen
                     
                 if k < len(plotDataItems):
                     plotDataItems[k].clear()
@@ -6063,18 +6219,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         if len(obj) and isinstance(obj[0], pg.PlotItem):
             self._focussed_plot_item_ = obj[0]
-            #self._focussed_plot_item_.vb.border.setStyle(QtCore.Qt.SolidLine)
-            #self._focussed_plot_item_.vb.border.setColor(QtGui.QGuiApplication.palette().highlight().color())
-            #for ax in self.axes:
-                #if ax is not self._focussed_plot_item_:
-                    #ax.vb.border.setStyle(QtCore.Qt.NoPen)
-                    #ax.vb.border.setColor(QtGui.QGuiApplication.palette().color(QtGui.QPalette.Base))
-            
         else:
             self._focussed_plot_item_ = None
-            #for ax in self.axes:
-                #ax.vb.border.setStyle(QtCore.Qt.NoPen)
-                #ax.vb.border.setColor(QtGui.QGuiApplication.palette().color(QtGui.QPalette.Base))
             
     @pyqtSlot(object)
     @safeWrapper
@@ -6085,8 +6231,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.reportMouseCoordinatesInAxis(pos, self._focussed_plot_item_)
                 
         else:
-            #self.mouseCursorCoordinateStatus.clear()
-            #self._mouse_coordinates_text_ = ""
             self._update_coordinates_viewer_()
             
     @safeWrapper
@@ -6117,15 +6261,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.statusBar().showMessage(self._mouse_coordinates_text_)
                 
             else:
-                #self._mouse_coordinates_text_ = ""
                 self.statusBar().clearMessage()
                 
             self._update_coordinates_viewer_()
     
     def _update_coordinates_viewer_(self):
         self.coordinatesViewer.setPlainText(self._cursor_coordinates_text_)
-        #self.coordinatesViewer.setPlainText("\n".join([self._mouse_coordinates_text_,
-                                                        #self._cursor_coordinates_text_]))
         
     @pyqtSlot(object)
     @safeWrapper
@@ -6140,7 +6281,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         if isinstance(focusItem, pg.ViewBox):
             plotitems, rc = zip(*self.axesWithLayoutPositions)
-            #plotitems = self.plotItems
             
             focusedPlotItems = [i for i in plotitems if i.vb is focusItem]
             

@@ -163,6 +163,7 @@ from core.scipyenmagics import ScipyenMagics
 from core.workspacefunctions import * 
 from core import scipyen_config as scipyenconf
 from core.scipyen_config import (makeConfigurable, markConfigurable, confuse, )
+from core.scipyen_config import scipyen_config as scipyen_settings
 from core import plots as plots
 from core import datatypes as dt
 from core import neoutils
@@ -1507,8 +1508,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         parent: QtWidgets.QWidget.
         """
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: python3 way
-        WorkspaceGuiMixin.__init__(self, parent=self, settings=settings)
-        self.app                        = app
+        WorkspaceGuiMixin.__init__(self, parent=self)#, settings=settings)
+        self.app = app
         
         #### BEGIN configurables; for each of these we define a read-write property
         # decorated with markConfigurable
@@ -1550,12 +1551,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # passed from scipyen.main(), this is 
         # confuse.LazyConfig("Scipyen", "scipyen_defaults")
         # and is aliased in the workspace as 'scipyen_settings'
+        # NOTE: 2021-09-09 12:00:19
+        # obsoletes NOTE: 2021-08-17 13:09:38; imported directly from core.scipyen_config
         # From console, the user configuration file name is accessed as 
         # scipyen_settings.user_config_path()
         # --> $HOME/.config/Scipyen/config.yaml
         # WARNING this has nothing to do with %config magic in IPython (available
         # in Scipyen's consoles)
-        self._scipyen_settings_         = settings 
+        self._scipyen_settings_         = scipyen_settings 
         
         # NOTE: Qt GUI settings in $HOME/.config/Scipyen/Scipyen.conf
         # this can only be accessed once the Qt application is instantiated in
@@ -2133,11 +2136,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         ipkernel    The InProcess kernel backend of the shell   mainWindow.ipkernel
         
-        scipyen_defaults                                    
-                    The confuse.LazyConfig object with the      mainWindow.scipyenDefaultSettings
-                    Scipyen package default non-gui options
-                    (located in scipyen top directory)
-                    
         scipyen_settings
                     The confuse.LazyConfig object with custom
                     non-gui configuration for Scipyen saved in
@@ -3384,12 +3382,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.console.close()
             self.console = None
             
-        open_windows = (obj for obj in self.workspace.values() if isinstance(obj, QtWidgets.QWidget) and obj.isVisible())
-        
-        for o in open_windows:
-            o.close()
-        
         self.saveSettings()
+        
+        #self.app.closeAllWindows()
+        #open_windows = (obj for obj in self.workspace.values() if isinstance(obj, QtWidgets.QWidget) and type(obj) not in VTH.gui_handlers and obj.isVisible())
+        
+        #for o in open_windows:
+            #o.close()
+        
             
         evt.accept()
         
@@ -3445,12 +3445,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
     #@processtimefunc
     def loadSettings(self):
+        """Overrides ScipyenConfigurable.loadSettings()"""
         self.loadWindowSettings()
-        super(WorkspaceGuiMixin, self).loadSettings() # this inherits from ScipyenConfigurable
-        #self.loadAppSettings()
+        super(WorkspaceGuiMixin, self).loadSettings() # inherited from ScipyenConfigurable
         
     def loadWindowSettings(self):
-        print("%s.loadWindowSettings" % self.__class__.__name__)
+        #print("%s.loadWindowSettings" % self.__class__.__name__)
         gname, prefix = loadWindowSettings(self.qsettings, self)#, group_name = self.__class__.__name__)
         
         

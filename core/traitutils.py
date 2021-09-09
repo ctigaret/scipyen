@@ -71,8 +71,10 @@ TRAITSMAP = {           # use casting versions
     frozenset:  (Set,),
     tuple:      (Tuple,),
     dict:       (Dict,),
-    EnumMeta:   (UseEnum,),
-    Enum:       (UseEnum,), # IntEnum inherits from int and Enum
+    EnumMeta:   (Any,),
+    Enum:       (Any,), # IntEnum inherits from int and Enum
+    #EnumMeta:   (UseEnum,),
+    #Enum:       (UseEnum,), # IntEnum inherits from int and Enum
     type:       (Any,),    # e.g., type(type(None))
     #type:       (Instance,),    # e.g., type(type(None)) # Instance requires arguments to instantiate default value
     property:   (Any,),

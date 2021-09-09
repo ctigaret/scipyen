@@ -24,6 +24,7 @@ class ClickableInfiniteLine(pg.InfiniteLine):
         if ev.button() == QtCore.Qt.LeftButton:
             ev.accept()
             self.sig_double_clicked.emit()
+            
         
 class SignalCursor(QtCore.QObject):
     """SignalCursor object.
@@ -487,6 +488,16 @@ class SignalCursor(QtCore.QObject):
                     self._hl_.label.setFormat("%s: {value:.{%d}}" % (self._cursorId_, self._value_precision_))
                 else:
                     self._hl_.label.setFormat(self._cursorId_)
+                    
+    def update(self):
+        if isinstance(self._vl_, pg.InfiniteLine):
+            self._vl_.update()
+            if isinstance(self._vl_.label, pg.InfLineLabel):
+                self._vl_.label.update()
+        if isinstance(self._hl_, pg.InfiniteLine):
+            self._hl_.update()
+            if isinstance(self._hl_.label, pg.InfLineLabel):
+                self._hl_.label.update()
 
     def setMovableLabels(self, value):
         if isinstance(self._vl_, pg.InfiniteLine):
@@ -928,28 +939,17 @@ class SignalCursor(QtCore.QObject):
                 pos = evt
                 
             if isinstance(pos, (QtCore.QPointF, QtCore.QPoint)):
-                #print("_slot_mouse_event_ pos:", pos)
                 self._update_lines_from_pos_(pos)
             
         else:
             if scene is not None and len(scene.clickEvents):
-                #print("SignalCursor._slot_mouse_event_ scene.clickEvents", scene.clickEvents)
                 mouseClickEvents = [e for e in scene.clickEvents if type(e).__name__ == "MouseClickEvent"]
-                #print("SignalCursor._slot_mouse_event_ mouseClickEvents", mouseClickEvents)
-                # NOTE: 2019-11-28 15:15:37
-                # double-click events do not seem to be captured ?
-                #print("SignalCursor._slot_mouse_event_ is double click", [e.double() for e in mouseClickEvents])
                 
                 if len(mouseClickEvents):
-                    #print("SignalCursor._slot_mouse_event_ modifiers", mouseClickEvents[0].modifiers())
-                    #print("SignalCursor._slot_mouse_event_ double", mouseClickEvents[0].double())
-                    #print("SignalCursor._slot_mouse_event_ double", mouseClickEvents[0].button())
                     items = scene.items(evt)
                     
                     if any([i is not None and i in items for i in (self.vline, self.hline)]):
                         self.sig_cursorSelected.emit(self.ID)
-                        
-                        #print("SignalCursor._slot_mouse_event_", QtWidgets.QApplication.keyboardModifiers())
                         
                         if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
                             self.sig_editMe.emit(self.ID)
@@ -1380,7 +1380,7 @@ class SignalCursor(QtCore.QObject):
             self._hl_.setPen(self._pen_)
             
         if self._vl_ is not None:
-            self._vl_.setPen(self.__pen)
+            self._vl_.setPen(self._pen_)
             
     @property
     def linkedPen(self):

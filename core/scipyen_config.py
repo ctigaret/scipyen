@@ -173,7 +173,7 @@ def configsrc2bunch(src:typing.Union[confuse.ConfigSource, Bunch]):
     
 def makeConfigurable(configurables:typing.Optional[Bunch]=None,
                      extras:typing.Optional[Bunch]=None):
-    """:Class: decorator for configurables management.
+    """DO NOT USE :Class: decorator for configurables management.
     
     Auguments the decorated ::class:: with functionality for loading/saving
     configurable parameters (options) to/from configuration files.
@@ -697,16 +697,23 @@ def markConfigurable(confname:str, conftype:str="",
     
     conftype = conftype.lower()
     
-    def wrapper(f):
+    #if isinstance(trait_notifier, bool) and trait_notifier is True:
+        #trait_notifier = getattr(instance, "configurable_traits", None)
+        
+    def wrapper(f, trn):
         # NOTE 2021-09-06 10:42:49
         # applies only to read-write properties
         # hence only decorate xxx.setter if defined
+        #trait_notifier = globals().get("trait_notifier", None)
+        
+        #print("in wrapper, trait_notifier", trait_notifier)
+
         if isinstance(f, property):
             if all((inspect.isfunction(func) for func in (f.fget, f.fset))):
                 setattr(f.fget, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.fget.__name__, "default": default}))
                 setattr(f.fset, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.fset.__name__, "default": default}))
                 
-                if conftype != "qt" and isinstance(trait_notifier, (bool, DataBag)):
+                if conftype != "qt": #and isinstance(trait_notifier, DataBag):
                     # NOTE: 2021-09-08 09:14:16
                     # for non-qt configurable properties ONLY:
                     # if trait_notifier is defined, then replace f.fset with a 
@@ -716,93 +723,101 @@ def markConfigurable(confname:str, conftype:str="",
                     # expects the :class: owner of the property to provide such
                     # a DataBag via the attribute 'configurable_traits'
                     
-                    if isinstance(trait_notifier, bool) and trait_notifier is True:
-                        trait_notifier = getattr(instance, "configurable_traits", None)
+                    conf_setter = f.fset.configurable_setter
+                    
+                    #["trait_notifier"] = trait_notifier
+                    
+                    def newfset(instance, *args, **kwargs):
+                        """Calls the owner's property fset function & updates the trait notifier.
+                        This only has effect when trait notifier is a DataBag
+                        that is observing.
+                        """
                         
-                    if isinstance(trait_notifier, DataBag):
-                        f.fset.configurable_setter["trait_notifier"] = trait_notifier
+                        trn = kwargs.pop("_trait_notifier_", None)
                         
-                        def newfset(instance, *args, **kwargs):
-                            """Calls the owner's property fset function & updates the trait notifier.
-                            This only has effect when trait notifier is a DataBag
-                            that is observing.
-                            """
-                            f.fset.__call__(instance, *args, **kwargs)
-                            trait_notifier[confname] = args[0]
-                            #if isinstance(trait_notifier, DataBag):
-                                
-                            #elif trait_notifier is True and isinstance(getattr(instance, "configurable_traits", None), DataBag):
-                                #instance.configurable_traits[confname] = args[0]
-                                
-                        setattr(newfset, "configurable_setter", f.fset.configurable_setter)
+                        f.fset.__call__(instance, *args, **kwargs)
                         
-                        return property(fget = f.fget, fset = newfset, doc = f.__doc__)
+                        if trn is True:
+                            trn = getattr(instance, "configurable_traits", None)
+                            
+                        if isinstance(trn, DataBag):
+                            trn[confname] = args[0]
+                            
+                    if isinstance(trn, DataBag):
+                        conf_setter["trait_notifier"] = trn
+                        
+                    setattr(newfset, "configurable_setter", conf_setter)
+                    
+                    #return property(fget = f.fget, fset = newfset, doc = f.__doc__)
+                    return property(fget = f.fget, fset = partial(newfset, _trait_notifier_=trn), doc = f.__doc__)
                 
         elif inspect.isfunction(f):
             if setter is True:
                 setattr(f, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default}))
                 
-                if conftype != "qt" and isinstance(trait_notifier, (bool, DataBag)):
+                if conftype != "qt":# and isinstance(trait_notifier, DataBag):
                     # see NOTE: 2021-09-08 09:14:16
-                    if isinstance(trait_notifier, bool) and trait_notifier is True:
-                        trait_notifier = getattr(instance, "configurable_traits", None)
                         
-                    if isinstance(trait_notifier, DataBag):
-                        f.configurable_setter["trait_notifier"] = trait_notifier
+                    conf_setter = f.configurable_setter #["trait_notifier"] = trait_notifier
                         
-                    #f.configurable_setter["trait_notifier"] = trait_notifier
-                    def newf(instance, *args, **kwargs):
+                    def newf(instance, trn, *args, **kwargs):
                         """Calls the owner's setter method & updates the trait notifier.
                         This only has effect when trait notifier is a DataBag
                         that is observing.
                         """
                         f(instance, *args, **kwargs)
-                        trait_notifier[confname] = args[0]
-                        #if isinstance(trait_notifier, DataBag):
-                            #trait_notifier[confname] = args[0]
+                        
+                        if trn is true:
+                            trn = getattr(instance, "configurable_traits", None)
+                        
+                        if isinstance(trn, DataBag):
+                            trn[confname] = args[0]
                             
-                        #elif trait_notifier is True and isinstance(getattr(instance, "configurable_traits", None), DataBag):
-                            #instance.configurable_traits[confname] = args[0]
-                            
-                    setattr(newf, "configurable_setter", f.configurable_setter)
+                    if isinstance(trn, DataBag):
+                        conf_setter["trait_notifier"] = trn
+                        
+                    setattr(newf, "configurable_setter", conf_setter)
                     
-                    return newf
+                    return partial(newf, trn = trn)
         
             else:
                 setattr(f, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.__name__, "default": default}))
                 
-        elif inspect.isbuiltin(f): 
+        elif inspect.isbuiltin(f): # FIXME 2021-09-09 14:09:04
             # NOTE: 2021-09-08 10:10:07
             # builtin_function_or_method callable types (C function & method) 
             # cannot be augmented as above (they're read-only); therefore, we
             # we must wrap on the fly
             #print("trait_notifier", trait_notifier)
             if setter is True:
-                configurable_setter = Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default})
+                conf_setter = Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default})
 
-                if conftype != "qt" and isinstance(trait_notifier, (bool, DataBag)):
+                #if conftype != "qt":# and isinstance(trait_notifier, DataBag):
                     # see NOTE: 2021-09-08 09:14:16
-                    if isinstance(trait_notifier, bool) and trait_notifier is True:
-                        trait_notifier = getattr(instance, "configurable_traits", None)
-                        
-                    if isinstance(trait_notifier, DataBag):
-                        configurable_setter["trait_notifier"] = trait_notifier
+                    #configurable_setter["trait_notifier"] = trait_notifier
                         
                 #@wraps(f)
-                def newf(instance, *args, **kwargs):
+                def newf(instance,  trn, *args, **kwargs):
                     """Calls the owner's setter method & updates the trait notifier.
                     This only has effect when trait notifier is a DataBag
                     that is observing.
                     """
-                    print(type(instance))
+                    #print(type(instance))
                     f(instance, *args, **kwargs)
-                    #instance.f(*args, **kwargs)
-                    if isinstance(trait_notifier, DataBag):
-                        trait_notifier[confname] = args[0]
-                        
-                setattr(newf, "configurable_setter", configurable_setter)
+                    
+                    if conftype != "qt":
+                        if trn is True:
+                            trn = getattr(instance, "configurable_traits", None)
+                            
+                        if isinstance(trn, DataBag):
+                            trn[confname] = args[0]
+                            
+                if conftype != "qt" and isinstance(trn, DataBag):
+                    conf_setter["trait_notifier"] = trn
+                    
+                setattr(newf, "configurable_setter", conf_setter)
                 
-                return newf
+                return partial(newf, trn=trn)
                 
             else:
                 configurable_getter = Bunch({"type": conftype, "name": confname, "getter":f.__name__, "default": default})
@@ -818,7 +833,7 @@ def markConfigurable(confname:str, conftype:str="",
         
         return f
     
-    return wrapper
+    return partial(wrapper, trn = trait_notifier)
     
 @safeWrapper
 def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]) -> typing.Tuple[str, str]:
@@ -1205,6 +1220,8 @@ def collect_configurables(cls):
     getter, setter, configuration type, and a 'factory default' value.
     
     """
+    if not inspect.isclass(cls):
+        cls = cls.__class__
     #cls = instance.__class__ # this is normally the derived type
     
     ret = Bunch({"qt": Bunch(), "conf": Bunch()})
@@ -1245,36 +1262,13 @@ def collect_configurables(cls):
         elif len(setterdict):
             confdict.update(setterdict)
             
-            
+        #print("scipyen_config.collect_configurables %s: confdict" % cls.__name__)
+        #pprint(confdict)
+        
         if len(confdict):
             #print("%s confdict" % cls.__name__, confdict)
-            if confdict.type.lower() == "qt":
-                target = ret.qt
-                if hasattr(cls, "_qtcfg"):
-                    d1 = cls._qtcfg
-                else:
-                    d1 = dict()
-                    
-                if hasattr(cls, "_ownqtcfg"):
-                    d2 = cls._ownqtcfg
-                    
-                else:
-                    d2 = dict()
-                    
-            else:
-                target = ret.conf
-                if hasattr(cls, "_cfg"):
-                    d1 = cls._cfg
-                else:
-                    d1 = dict()
-                    
-                if hasattr(cls, "_owncfg"):
-                    d2 = cls._owncfg
-                else:
-                    d2 = dict()
-                    
-            #kcfg = Bunch()
-            
+            target = ret.qt if confdict.type.lower() == "qt" else ret.conf
+
             cfgget = confdict.get("getter", None)
             cfgset = confdict.get("setter", None)
             cfgdfl = confdict.get("default", None)
@@ -1291,20 +1285,18 @@ def collect_configurables(cls):
             cfgdict.default = cfgdfl
             cfgdict.trait_notifier = cfgtrt
                 
-            #kcfg[confdict.name] = cfgdict
-            
-            #if len(cfgdict):
-                #kcfg[confdict.name] = cfgdict
-                
             if confdict.name not in target:
                 target[confdict.name] = cfgdict
                 
             else:
                 target[confdict.name].update(cfgdict)
                 
-            target.update(d1)
-            target.update(d2)
             
+    ret.qt.update(getattr(cls, "_qtcfg", dict()))
+    ret.qt.update(getattr(cls, "_ownqtcfg", dict()))
+    ret.conf.update(getattr(cls, "_cfg", dict()))
+    ret.conf.update(getattr(cls, "_owncfg", dict()))
+    
     return ret
 
 class ScipyenConfigurable(object):

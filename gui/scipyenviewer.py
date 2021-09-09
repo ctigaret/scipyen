@@ -176,7 +176,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             self._ID_  = self.winId()
 
         # GUI (Qt) settings saved in $HOME/.config/Scipyen/Scipyen.conf
-        self.qsettings = QtCore.QSettings() 
+        #self.qsettings = QtCore.QSettings() 
         # NOTE: 2021-05-04 21:42:12 About settings
         # handling settings in the superclass only works for window geometry
         # and related stuff on the Qt side.
@@ -358,7 +358,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             
     #@abstractmethod
     def saveViewerSettings(self):
-        """Must be implemented in the subclass
+        """Must be ovedrridden in the subclass
         """
         pass
     

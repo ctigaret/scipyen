@@ -161,7 +161,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     or
     
     3) by decorating the desired property in the derived type with the 
-    @makeConfigurable  decorator (instance method of ScipyenConfigurable)
+    @markConfigurable  decorator
     
     """
     # NOTE: 2021-08-26 11:32:25
@@ -198,9 +198,11 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     
     _owncfg = Bunch()
     
+    #def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
+                 #qsettings: typing.Optional[QtCore.QSettings] = None,
+                 #settings:typing.Optional[confuse.LazyConfig] = None, 
+                 #title="", **kwargs):
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
-                 qsettings: typing.Optional[QtCore.QSettings] = None,
-                 settings:typing.Optional[confuse.LazyConfig] = None, 
                  title="", **kwargs):
         #print("WorkspaceGuiMixin __init__ %s" % self.__class__.__name__)
         ScipyenConfigurable.__init__(self)
@@ -386,7 +388,7 @@ def saveWindowSettings(qsettings:QtCore.QSettings,
     NOTE: Delegates to core.scipyen_config.syncQtSettings
     
     """
-    print("saveWindowSettings %s" % win.__class__.__name__)
+    #print("saveWindowSettings %s" % win.__class__.__name__)
     return syncQtSettings(qsettings, win, group_name, prefix, True)
     
 def loadWindowSettings(qsettings:QtCore.QSettings, 

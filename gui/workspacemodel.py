@@ -581,12 +581,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
     def pre_execute(self):
         self.cached_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.is_user_var(item[0], item[1])])
-        self.observed_vars.unobserve(self.var_observer)
-        
-        self.observed_vars.clear()
-        
-        self.observed_vars.update(self.cached_vars)
-        self.observed_vars.observe(self.var_observer)
+
+        with self.observed_vars.hold_trait_notifications():
+            self.observed_vars.clear()
+            
+            self.observed_vars.update(self.cached_vars)
         
     def post_execute(self):
         self.update()
