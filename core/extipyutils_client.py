@@ -74,7 +74,16 @@ from core.traitcontainers import DataBag
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
+__scipyen_path__ =  os.path.dirname(__module_path__)
+
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
+
+__virtual_env_dir__ = os.environ.get("VIRTUAL_ENV", None)
+if isinstance(__virtual_env_dir__, str) and len(__virtual_env_dir__.strip()):
+    __virtual_site_packages__ = os.path.join(__virtual_env_dir__, "lib", "python%i.%i" % sys.version_info[0:2], "site-packages")
+    
+else:
+    __virtual_site_packages__ = None
 
 nrn_ipython_initialization_file = os.path.join(os.path.dirname(__module_path__),"neuron_python", "nrn_ipython.py")
 nrn_ipython_initialization_cmd = "".join(["run -i -n ", nrn_ipython_initialization_file, " 'gui'"])
@@ -86,25 +95,32 @@ nrn_ipython_initialization_cmd = "".join(["run -i -n ", nrn_ipython_initializati
 # figure out how to use Qt5 Agg in the external ipython (mpl.use("Qt5Agg") crashes
 # the kernel when a mpl figure is shown)
 # for now stick with inline figures
-init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, importlib",
-                 "import traceback, keyword, inspect, itertools, functools, collections",
-                 "import signal, pickle, json, csv",
-                 "import numpy as np",
-                 "import scipy",
-                 "import pandas as pd",
-                 "import seaborn as sb",
-                 "from importlib import reload",
-                 "from pprint import pprint",
-                 "import matplotlib as mpl",
-                 "mpl.rcParams['savefig.format'] = 'svg'",
-                 "mpl.rcParams['xtick.direction'] = 'in'",
-                 "mpl.rcParams['ytick.direction'] = 'in'",
-                 "from matplotlib import pyplot as plt",
-                 "from matplotlib import cm",
-                 "import matplotlib.mlab as mlb",
-                 "".join(["sys.path.insert(2, '", os.path.dirname(__module_path__), "')"]),
-                 "from core import extipyutils_host as hostutils",
-                 ]
+init_commands = [
+    "import sys, os, io, warnings, numbers, types, typing, re, importlib",
+    "import traceback, keyword, inspect, itertools, functools, collections",
+    ]
+if __virtual_site_packages__:
+    init_commands.append("".join(["sys.path.insert(2, '", __virtual_site_packages__, "')"]))
+
+init_commands.extend(
+    [
+    "import signal, pickle, json, csv",
+    "import numpy as np",
+    "import scipy",
+    "import pandas as pd",
+    "import seaborn as sb",
+    "from importlib import reload",
+    "from pprint import pprint",
+    "import matplotlib as mpl",
+    "mpl.rcParams['savefig.format'] = 'svg'",
+    "mpl.rcParams['xtick.direction'] = 'in'",
+    "mpl.rcParams['ytick.direction'] = 'in'",
+    "from matplotlib import pyplot as plt",
+    "from matplotlib import cm",
+    "import matplotlib.mlab as mlb",
+    "".join(["sys.path.insert(2, '", __scipyen_path__, "')"]),
+    "from core import extipyutils_host as hostutils",
+    ])
 
 #init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, importlib",
                  #"import traceback, keyword, inspect, itertools, functools, collections",

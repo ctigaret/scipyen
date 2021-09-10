@@ -1995,7 +1995,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         if not isinstance(self.external_console, consoles.ExternalIPython):
             # NOTE: 2021-01-30 13:52:58
-            # there is no runnin ExternalIPython instance
+            # there is no running ExternalIPython instance
             if isinstance(new, str) and new in ("connection", "neuron_ext"):
                 connection_file, file_type = QtWidgets.QFileDialog.getOpenFileName(self,
                                                             "Connect to Existing Kernel",
@@ -2035,7 +2035,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
         else:
             # NOTE: 2021-01-30 13:53:37
-            # an instance of ExternalIPyton is already running
+            # an instance of ExternalIPython is already running
             frontend_factory = None
             #print("\texternal console exists")
             if self.external_console.window.active_frontend is None:

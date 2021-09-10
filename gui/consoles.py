@@ -1365,6 +1365,12 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             #self.sig_will_close.emit()
             self._kernel_counter = 0
             self._external_kernel_counter = 0
+            if self.consoleapp.kernel_manager is not None:
+                try:
+                    self.consoleapp.kernel_manager.shutdown_kernel(now=True, restart=False)
+                except Exception as e:
+                    traceback.print_exc()
+                
             event.accept()
             return
         
