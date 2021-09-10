@@ -562,7 +562,7 @@ class QuickDialog(QtWidgets.QDialog):
     def tryAccept(self):
         for i in self.widgets:
             try:
-                if i.validate() == 0:
+                if not isinstance(i, QtWidgets.QAbstractSpinBox) and i.validate() == 0:
                     return
             except AttributeError:
                 continue

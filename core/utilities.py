@@ -279,17 +279,10 @@ def gethash(x:typing.Any) -> Number:
         return _sumarr(_x) + hash(_x.dtype)
 
     try:
-        #if isinstance(x, dict): # order is not important
-            ##print("gethash(dict)")
-            #return hash(type(x)) + sum((gethash(v) for v in x.values() if v is not x))
+        if is_hashable(x):
+            return hash(x)
         
-        #elif isinstance(x, (set, frozenset)): # order is not important
-            #return hash(type(x)) + sum((gethash(v) for v in x))
-        
-        #elif isinstance(x, (list, deque)):
-            #return hash(type(x)) + sum(hashiterable(x))
-        
-        if isinstance(x, pq.Quantity):
+        elif isinstance(x, pq.Quantity):
             return hash(type(x)) + _sumarrdtype(x) + hash(x.dimensionality)
         
         elif isinstance(x, vigra.VigraArray):

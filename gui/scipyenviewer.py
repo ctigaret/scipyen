@@ -175,6 +175,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         else:
             self._ID_  = self.winId()
 
+        self._configureUI_()
+        
         # GUI (Qt) settings saved in $HOME/.config/Scipyen/Scipyen.conf
         #self.qsettings = QtCore.QSettings() 
         # NOTE: 2021-05-04 21:42:12 About settings
@@ -192,7 +194,15 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # by using overloaded loadViewerSettings(); in contrast, loadWindowSettings
         # defined here and inherited by the subclass works fine.
         
-        self._configureUI_()
+        # NOTE: 2021-08-17 12:59:47
+        # it maybe tempting to call this from inside self._configureUI_()
+        # HOWEVER: self.loadSettings() calls self.loadWindowSettings() then 
+        # self.loadViewerSettings(), which MAY depend on some data being loaded
+        # already in the viewer window.
+        # Therefore, it is best to call self.loadSettings() now i.e., it at the 
+        # very end of the __init__(), after all essential stuff is done.
+        self.loadSettings()
+            
         
         # NOTE: 2021-08-17 12:59:02
         # setData ALMOST SURELY needs the ui elements to be initialized - hence 
@@ -202,15 +212,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             
         else:
             self.update_title(win_title = win_title, doc_title = doc_title)
-            
-        # NOTE: 2021-08-17 12:59:47
-        # it maybe tempting to call this from inside self._configureUI_()
-        # HOWEVER: self.loadSettings() calls self.loadWindowSettings() then 
-        # self.loadViewerSettings(), which MAY depend on some data being loaded
-        # already in the viewer window.
-        # Therefore, it is best to call self.loadSettings() now i.e., it at the 
-        # very end of the __init__(), after all essential stuff is done.
-        self.loadSettings()
             
     def update_title(self, doc_title: (str, type(None)) = None, 
                      win_title: (str, type(None)) = None,
@@ -318,15 +319,15 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         pass
     
     #@abstractmethod
-    def saveSettings(self):
-        """ Must override in subclasses
-        NOTE: 2021-05-04 21:53:04
-        This saveSettings has access to all the subclass attributes (which is
-        fully initialized by the time this is called).
-        see NOTE: 2019-11-09 09:30:38 for details
-        """
-        self.saveWindowSettings()
-        self.saveViewerSettings()
+    #def saveSettings(self): # NOTE:2021-09-10 11:43:01 inherited from ScipyenConfigurable
+        #""" Must override in subclasses
+        #NOTE: 2021-05-04 21:53:04
+        #This saveSettings has access to all the subclass attributes (which is
+        #fully initialized by the time this is called).
+        #see NOTE: 2019-11-09 09:30:38 for details
+        #"""
+        #self.saveWindowSettings()
+        #self.saveViewerSettings()
     
     def saveWindowSettings(self):
         """Save viewer's window settings in Scipyen's configuration file.
@@ -356,32 +357,32 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         if self.isTopLevel and self.isVisible(): # isTopLevel inherited from WorkspaceGuiMixin
             saveWindowSettings(self.qsettings, self)
             
-    #@abstractmethod
-    def saveViewerSettings(self):
-        """Must be ovedrridden in the subclass
-        """
-        pass
+    ##@abstractmethod
+    #def saveViewerSettings(self):
+        #"""Must be ovedrridden in the subclass
+        #"""
+        #pass
     
     #@abstractmethod
-    def loadSettings(self):
-        """Must override in subclasses
-        NOTE: 2021-05-04 21:42:12 About settings
-        Handling settings in the superclass only works for window geometry
-        and related stuff on the Qt side.
+    #def loadSettings(self): # NOTE: 2021-09-10 11:43:35 inherited from ScipyenConfigurable
+        #"""Must override in subclasses
+        #NOTE: 2021-05-04 21:42:12 About settings
+        #Handling settings in the superclass only works for window geometry
+        #and related stuff on the Qt side.
         
-        Purely "pythonic" settings requires the subclass to be initialized in
-        order for these to work.
-        The prime example is the colorMap settings in ImageViewer:
-        if the settings are loaded during the superclass _init__() (i.e., here),
-        the attributes referenced there (e.g. colorMap) are not yet available ,
-        hence the assignment of a color map fails silently
+        #Purely "pythonic" settings requires the subclass to be initialized in
+        #order for these to work.
+        #The prime example is the colorMap settings in ImageViewer:
+        #if the settings are loaded during the superclass _init__() (i.e., here),
+        #the attributes referenced there (e.g. colorMap) are not yet available ,
+        #hence the assignment of a color map fails silently
         
-        The solution is to manage these non-Qt settings in the subclass code
-        by using overloaded loadViewerSettings(); in contrast, loadWindowSettings
-        defined here and inherited by the subclass works fine.
-        """
-        self.loadWindowSettings()
-        self.loadViewerSettings()
+        #The solution is to manage these non-Qt settings in the subclass code
+        #by using overloaded loadViewerSettings(); in contrast, loadWindowSettings
+        #defined here and inherited by the subclass works fine.
+        #"""
+        #self.loadWindowSettings()
+        #self.loadViewerSettings()
     
     def loadWindowSettings(self):
         """Restores viewer's settings from Scipyen's configuration file.

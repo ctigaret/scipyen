@@ -64,7 +64,8 @@ TRAITSMAP = {           # use casting versions
     float:      (CFloat,),
     complex:    (CComplex,),
     bytes:      (CBytes,),
-    str:        (CUnicode,),
+    str:        (Unicode,),
+    #str:        (CUnicode,),
     list:       (List,),
     deque:      (List,),
     set:        (Set,),
@@ -88,6 +89,7 @@ def enhanced_traitlet_set(instance, obj, value):
     This is supposed to also detect changes in the order of elements in sequences.
     """
     #print("enhanced set for %s" % type(instance).__name__)
+    #print("enhanced set for %s; value %s" % (type(instance).__name__, value))
     
     new_value = instance._validate(obj, value)
     
@@ -95,22 +97,19 @@ def enhanced_traitlet_set(instance, obj, value):
         old_value = obj._trait_values[instance.name]
     except KeyError:
         old_value = instance.default_value
+        
 
     obj._trait_values[instance.name] = new_value
     
     try:
         new_hash = gethash(new_value)
+        #print("\told %s (hash %s)\n\tnew %s (hash %s)" % (old_value, instance.hashed, new_value, new_hash))
         #print(instance.name, "old hashed", instance.hashed, "new_hash", new_hash)
         silent = (new_hash == instance.hashed)
         
         if not silent:
             instance.hashed = new_hash
             
-        
-        ##silent = bool(old_value == new_value)
-        
-        #print("%s: silent before hash" % instance.name, silent)
-        
         ## NOTE: 2021-08-19 16:17:23
         ## check for change in contents
         #if silent is not False:

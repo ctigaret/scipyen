@@ -67,6 +67,8 @@ import traitlets.config
 from .traitcontainers import DataBag
 from core import traitutils
 from core.prog import safeWrapper
+from core.workspacefunctions import user_workspace
+
 #from iolib.pictio import save_settings as write_config
 
 
@@ -470,7 +472,7 @@ def makeConfigurable(configurables:typing.Optional[Bunch]=None,
                         else:
                             continue
                             
-                        with trait_notifier.hold_trait_notifications():
+                        with trait_notifier.observer.hold_trait_notifications():
                             default = getset.get("default", None)
                             
                             setter = inspect.getattr_static(instance, settername, None)
@@ -603,21 +605,10 @@ def markConfigurable(confname:str, conftype:str="",
                      trait_notifier:typing.Optional[typing.Union[bool, DataBag]] = None):
     """Decorator for instance methods & properties.
     
-    Properties and methods decorates with this will be collected by the ::class::
-    decorator makeConfigurable to enable saving/loading used settings for that 
-    ::class::
+    Decorates instance properties and methods that access instance attributes 
+    considered to be persistent configuration options.
     
-    Can also be called directly:
-    
-    1) pass an instance method (a function):
-    
-    func  = markConfigurable(cofnname, conftype, setter, 
-                             default=default_val,
-                             trait_notifier=<some_databag OR bool>)(obj.method)
-                             
-    Where func is a bound method, the new (decorated) version of obj.method.
-    
-    See documentation of makeConfigurable for details.
+    These are managed by Scipyen's QSettings and confuse frameworks.
     
     Parameters:
     ===========
@@ -649,11 +640,105 @@ def markConfigurable(confname:str, conftype:str="",
         When present it is used to supply a 'factory' default value to the setter,
         in case the configuration file doesn't have one.
         
+    trait_notifier: bool or a DataBag with registered observer handles
+        Optional default is None.
+        
+        When trait_notifier is True, the :class: that owns the decorated property
+        or method MUST have an instance attribute 'configurable_traits' with type
+        DataBag. Owner derived from ScipyenConfigurable inherit this attribute
+        directly from ScipyenConfigurable.
+        
+        The handler used by the trait notifier's 'observe' function can be an
+        ubound function, or an instance method. For ScipyenConfigurable-derived
+        :classes: this is the '_observe_configurables_' method, which simply 
+        synchronizes the configurable value with the  user's config.yaml file
+        (see above).
+        
+        To customize these actions in the owner :class: use any combination of 
+        (a) and (b) options, or the option (c), below:
+        
+        a) override the 'configurable_traits' DataBag attribute in the :class:
+        b) override the '_observe_configurables_' method in the :class:
+        c) outside the :class:, define a DataBag trait notifier and a handler, 
+            register the handler with the notifier (notifier.observe(...)) then
+            pass the notifier as parameter to this decorator.
+        
+        WARNING:
+        The default strategy is to assume that the object passed to the setter
+        method or property is directly assigned to the owner instance attribute.
+        Acordingly, the trait notifier passed as parameter to the decorator will
+        use this object directly. 
+        
+        This has unintended consequences when the setter generates the attribute 
+        value dynamically e.g. it uses the passed object to compute a value for
+        the instance attribute. 
+        
+        In this case the trait notifier should be called directly from within 
+        the setter's body, instead of via this decorator. 
+        
+        Neveretheless, the decorator is still useful for LOADING the attribute
+        value from config.yaml (provided this is what the setter expects).
+        
+        CAUTION: Always make sure the getter returns the same type of data as 
+        that expected by the setter!
+        
         
     Returns:
     =======
     f: the decorated method or property object, augmented as described below.
         
+    Usage:
+    ======
+    
+    1) For read/write properties, decorate the setter's definition, e.g.:
+    
+    @property
+    def someprop(self):
+        return self._my_prop_
+        
+    # below, the property is a configurable that will be synchronized with the
+    # config.yaml file in the user's Scipyen config directory:
+    # '$HOME/.config/Scipyen/config.yaml'
+    @markConfigurable("MyProperty", trait_notifier=True)
+    @someprop.setter(self, val)
+    def someprop(self, val):
+        self._my_prop_ = val
+        
+        
+    @property
+    def someQtProp(self):
+        return self._my_qt_thing_
+    
+    # below, the property is a configurable that will be synchronized with the
+    # QSettings Scipyen.conf file in the user's Scipyen config directory:
+    # '$HOME/.config/Scipyen/Scipyen.conf'
+    @markConfigurable("MyQtThing", "qt")
+    @someQtProp.setter
+    def someQtProp(self, val):
+        self._my_qt_thing_ = val
+        
+    2) For getter and setter methods, BOTH must be decorated, e.g.:
+    
+    @markConfigurable("MyProperty", setter=False, trait_notifier=True)
+    def get_my_prop(self):
+        return self._my_prop_
+        
+    @markConfigurable("MyProperty", setter=True, trait_notifier=True)
+    def set_my_prop(self, val):
+        self._my_prop_ = val
+        
+    3) Call directly:
+    
+    3.1) pass an instance method (a function):
+    
+    func  = markConfigurable(cofnname, conftype, setter, 
+                             default=default_val,
+                             trait_notifier=<some_databag OR bool>)(obj.method)
+                             
+    Where func is a bound method, the new (decorated) version of obj.method.
+    
+    See documentation of makeConfigurable for details - FIXME.
+    
     What it does:
     ============
     
@@ -661,32 +746,32 @@ def markConfigurable(confname:str, conftype:str="",
     
     * if f.fget is a function, adds to it a 'configurable_getter' attribute:
             
-    f.fget.configurable_getter = {'type': conftype, 'name': confname, 'getter':f.fget.__name__}
+        f.fget.configurable_getter = {'type': conftype, 
+                                      'name': confname, 
+                                      'getter':f.fget.__name__, 
+                                      'default':None,
+                                      'trait_notifier':obj}
             
     * if f.fset is a function, adds to it a 'configurable_setter' attribute:
-        
-    f.fset.configurable_setter = {'type':conftype, 'name': confname, 'setter': f.fset.__name__, 'default':None}
-    
+        f.fset.configurable_getter = {'type': conftype, 
+                                      'name': confname, 
+                                      'setter':f.fget.__name__, 
+                                      'default':None,
+                                      'trait_notifier':obj}
+            
     2) When f is a method function:
     
-    * if setter is False, adds to it a 'configurable_getter' attribute:
+    * if setter is False, adds to it a 'configurable_getter' attribute as for
+        'f.fget' aboe
         
-    f.configurable_getter = {'type': conftype, 'name': confname, 'getter':f.__name__}
-    
-    * if setter is True, adds to it a 'configurable_setter' attribute:
-    
-    f.configurable_setter = {'type': conftype, 'name': confname, 'setter':f.__name__, 'default'None}
-    
-    In the above the 'default' field is mapped to the value of the 'default'
-    parameter of this decorator function.
+    * if setter is True, adds to it a 'configurable_setter' attribute as for
+        'f.fset' above
     
     CAUTION: the 'default' values are references to python objects; make sure
     they still exist; it is better to leave this parameter to its default (None)
-    
-    
-    These attributes will be parsed by the ::class:: decorator makeConfigurable
-    to construct the ::class:: attributes '_qtcfg' and '_cfg' according to the
-    value of 'conftype'
+        
+    The decorated methods and properties will be used by collect_configurables()
+    defined in this module to set up a mapping of configuraiton options.
     
     """
     if not isinstance(confname, str) or len(confname.strip()) == 0:
@@ -697,18 +782,15 @@ def markConfigurable(confname:str, conftype:str="",
     
     conftype = conftype.lower()
     
-    #if isinstance(trait_notifier, bool) and trait_notifier is True:
-        #trait_notifier = getattr(instance, "configurable_traits", None)
-        
     def wrapper(f, trn):
-        # NOTE 2021-09-06 10:42:49
-        # applies only to read-write properties
-        # hence only decorate xxx.setter if defined
-        #trait_notifier = globals().get("trait_notifier", None)
-        
-        #print("in wrapper, trait_notifier", trait_notifier)
-
+        # TODO 2021-09-10 09:55:54
+        # check if still works with supplied notifier
+        # FIXME 2021-09-10 10:05:55
+        # not sure the default really works/is necessary
         if isinstance(f, property):
+            # NOTE 2021-09-06 10:42:49
+            # applies only to read-write properties
+            # hence only decorate xxx.setter if defined
             if all((inspect.isfunction(func) for func in (f.fget, f.fset))):
                 setattr(f.fget, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.fget.__name__, "default": default}))
                 setattr(f.fset, "configurable_setter", Bunch({"type": conftype, "name": confname, "setter":f.fset.__name__, "default": default}))
@@ -724,8 +806,6 @@ def markConfigurable(confname:str, conftype:str="",
                     # a DataBag via the attribute 'configurable_traits'
                     
                     conf_setter = f.fset.configurable_setter
-                    
-                    #["trait_notifier"] = trait_notifier
                     
                     def newfset(instance, *args, **kwargs):
                         """Calls the owner's property fset function & updates the trait notifier.
@@ -746,10 +826,11 @@ def markConfigurable(confname:str, conftype:str="",
                     if isinstance(trn, DataBag):
                         conf_setter["trait_notifier"] = trn
                         
-                    setattr(newfset, "configurable_setter", conf_setter)
+                    parset = partial(newfset, _trait_notifier_=trn)
                     
-                    #return property(fget = f.fget, fset = newfset, doc = f.__doc__)
-                    return property(fget = f.fget, fset = partial(newfset, _trait_notifier_=trn), doc = f.__doc__)
+                    setattr(parset, "configurable_setter", conf_setter)
+                    
+                    return property(fget = f.fget, fset = parset, doc = f.__doc__)
                 
         elif inspect.isfunction(f):
             if setter is True:
@@ -776,9 +857,11 @@ def markConfigurable(confname:str, conftype:str="",
                     if isinstance(trn, DataBag):
                         conf_setter["trait_notifier"] = trn
                         
-                    setattr(newf, "configurable_setter", conf_setter)
+                    parset = partial(newf, trn = trn)
                     
-                    return partial(newf, trn = trn)
+                    setattr(parset, "configurable_setter", conf_setter)
+                    
+                    return parset 
         
             else:
                 setattr(f, "configurable_getter", Bunch({"type": conftype, "name": confname, "getter":f.__name__, "default": default}))
@@ -792,11 +875,6 @@ def markConfigurable(confname:str, conftype:str="",
             if setter is True:
                 conf_setter = Bunch({"type": conftype, "name": confname, "setter":f.__name__, "default": default})
 
-                #if conftype != "qt":# and isinstance(trait_notifier, DataBag):
-                    # see NOTE: 2021-09-08 09:14:16
-                    #configurable_setter["trait_notifier"] = trait_notifier
-                        
-                #@wraps(f)
                 def newf(instance,  trn, *args, **kwargs):
                     """Calls the owner's setter method & updates the trait notifier.
                     This only has effect when trait notifier is a DataBag
@@ -815,9 +893,11 @@ def markConfigurable(confname:str, conftype:str="",
                 if conftype != "qt" and isinstance(trn, DataBag):
                     conf_setter["trait_notifier"] = trn
                     
-                setattr(newf, "configurable_setter", conf_setter)
+                parset = partial(newf, trn=trn)
+                    
+                setattr(parset, "configurable_setter", conf_setter)
                 
-                return partial(newf, trn=trn)
+                return parset
                 
             else:
                 configurable_getter = Bunch({"type": conftype, "name": confname, "getter":f.__name__, "default": default})
@@ -1231,41 +1311,27 @@ def collect_configurables(cls):
         setterdict = Bunch()
         confdict = Bunch()
         if isinstance(fn, property):
-            if inspect.isfunction(fn.fget) and hasattr(fn.fget, "configurable_getter"):
-                getterdict = fn.fget.configurable_getter
+            if inspect.isfunction(fn.fget) or isinstance(fn.fget, partial):
+                confdict.update(getattr(fn.fget, "configurable_getter", Bunch()))
+            if inspect.isfunction(fn.fset) or isinstance(fn.fset, partial):
+                confdict.update(getattr(fn.fset, "configurable_setter", Bunch()))
                 
-            if inspect.isfunction(fn.fset) and hasattr(fn.fset, "configurable_setter"):
-                setterdict = fn.fset.configurable_setter
+            #if inspect.isfunction(fn.fget) and hasattr(fn.fget, "configurable_getter"):
+                #getterdict = fn.fget.configurable_getter
+                
+            #if inspect.isfunction(fn.fset) and hasattr(fn.fset, "configurable_setter"):
+                #setterdict = fn.fset.configurable_setter
                     
-        elif inspect.isfunction(fn):
-            if hasattr(fn, "configurable_getter"):
-                getterdict = fn.configurable_getter
-                
-            if hasattr(fn, "configurable_setter"):
-                setterdict = fn.configurable_setter
+        elif inspect.isfunction(fn) or isinstance(fn, partial):
+            confdict.update(getattr(fn, "configurable_getter", Bunch()))
+            confdict.update(getattr(fn, "configurable_setter", Bunch()))
                 
         else:
             continue # skip members that are not methods or properties
         
-        if len(getterdict): 
-            confdict.update(getterdict)
-            
-            if len(setterdict): 
-                # this is executed in case of properties, as they are the only
-                # ones providing BOTH a getterdict and setterdict, when decorated
-                # so we check here that
-                if setterdict.type != getterdict.type or setterdict.name != getterdict.name:
-                    continue
-                
-                confdict.update(setterdict)
-                
-        elif len(setterdict):
-            confdict.update(setterdict)
-            
-        #print("scipyen_config.collect_configurables %s: confdict" % cls.__name__)
-        #pprint(confdict)
-        
         if len(confdict):
+            #print("scipyen_config.collect_configurables %s confdict:" % cls.__name__)
+            #pprint(confdict)
             #print("%s confdict" % cls.__name__, confdict)
             target = ret.qt if confdict.type.lower() == "qt" else ret.conf
 
@@ -1319,16 +1385,16 @@ class ScipyenConfigurable(object):
     
     def __init__(self):
         super().__init__()
-        #self.qsettings = QtCore.QSettings("Scipyen", "Scipyen")
-        #self._scipyen_settings_  = scipyen_config
-        #self._user_settings_src_ = scipyen_user_config_source
         self.configurable_traits = DataBag()
         self.configurable_traits.observe(self._observe_configurables_)
         
     def _observe_configurables_(self, change):
         cfg = Bunch({self.__class__.__name__: Bunch({change.name:change.new})})
-        pprint(cfg)
-        
+        #pprint(change)
+        for k,v in cfg.items():
+            scipyen_config[k].set(v)
+            
+        write_config()
         
     @property
     def configurables(self) -> Bunch:
@@ -1351,64 +1417,111 @@ class ScipyenConfigurable(object):
     def qtconfigurables(self):
         """QSettings configurables
         """
-        return  self.configurables["qt"]
+        return  self.configurables.get("qt", Bunch())
     
     @property
     def clsconfigurables(self):
         """Class configurables
         """
-        return self.configurables["conf"]
+        return self.configurables.get("conf", Bunch())
+    
+    def loadWindowSettings(self):
+        """Must override in derived
+        """
+        pass
+    
+    def saveWindowSettings(self):
+        """Must override in derived
+        """
+        pass
+    
+    def __load_config_key_val__(self, settername, val):
+        #print("ScipyenConfigurable.__load_config_key_val__")
+        #print("\tsettername: %s, val: %s" % (settername, val))
+        setter = inspect.getattr_static(self, settername, None)
+        
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            with self.configurable_traits.observer.hold_trait_notifications():
+                #print("\t holds notifications")
+                if isinstance(setter, property):
+                    setattr(self, settername, val)
+                    
+                elif setter is not None:
+                    setter = getattr(self, settername)
+                    setter(val)
+                    
+        else:
+            if isinstance(setter, property):
+                setattr(self, settername, val)
+                
+            elif setter is not None:
+                setter = getattr(self, settername)
+                setter(val)
+                
     
     def loadSettings(self):
         #print("ScipyenConfigurable <%s>.loadSettings" % self.__class__.__name__)
-        cfg = self.configurables
+        
+        cfg = self.clsconfigurables
         # NOTE 2021-09-06 17:37:14
         # keep Qt settings segregated
-        cfcfg = self.configurables.get("conf",Bunch())
-        #qtcfg = self.configurables.get("qt",Bunch())
-        
-        if len(cfcfg):
-            user_conf = scipyen_settings[self.__class__.__name__].get(None)
+        if len(cfg):
+            user_conf = scipyen_config[self.__class__.__name__].get(None)
             
             if isinstance(user_conf, dict):
                 for k, v in user_conf.items():
-                    getset = cfcfg.get(k, {})
+                    getset = cfg.get(k, {})
+                    #print("getset", getset)
                     settername = getset.get("setter", None)
                     
                     if not isinstance(settername, str) or len(settername.strip())==0:
                         continue
                     
-                    trait_notifier = getset.get("trait_notifier", None)
-                    
-                    if not isinstance(trait_notifier, (bool, DataBag)):
-                        continue
-                    
-                    if trait_notifier is True and isinstance(getattr(self, "configurable_traits", None), DataBag):
-                        trait_notifier = self.configurable_traits
-                        
-                    else:
-                        continue
-                        
-                    with trait_notifier.hold_trait_notifications():
-                        default = getset.get("default", None)
-                        
-                        setter = inspect.getattr_static(self, settername, None)
-
-                        if isinstance(setter, property):
-                            setattr(self, settername, v)
-                            
-                        elif setter is not None:
-                            setter = getattr(self, settername)
-                            setter(val)
+                    self.__load_config_key_val__(settername, v)
                 
-        #else:
-            #print("\tNo non-qt configurables found")
-        #if len(qtcfg):
-            #syncQtSettings(self.qsettings, self, False)
-            #loadwindowSettings(self.qsettings, self)
-    #def saveSettings(self):
-        #pass
+        self.loadWindowSettings() # must override in derived
+            
+    def saveSettings(self):
+        """ Must be called with super() if overridden in subclasses
+        NOTE: 2021-05-04 21:53:04
+        This saveSettings has access to all the subclass attributes (which is
+        fully initialized by the time this is called).
+        see NOTE: 2019-11-09 09:30:38 for details
+        """
+        #print("ScipyenConfigurable <%s>.saveSettings" % self.__class__.__name__)
+        cfg = self.clsconfigurables
         
+        if len(cfg):
+            user_conf = scipyen_config[self.__class__.__name__].get(None)
+            changed = False
+            if isinstance(user_conf, dict):
+                for k, v in user_conf.items():
+                    getset = cfg.get(k, {})
+                    gettername = getset.get("getter", None)
+                    
+                    if not isinstance(gettername, str) or len(gettername.strip())==0:
+                        continue
+                    
+                    getter = inspect.getattr_static(self, gettername, None)
+                    
+                    if isinstance(getter, property):
+                        val = getattr(self, gettername)
+                        
+                    elif getter is not None:
+                        getter = getattr(self, gettername)
+                        val  = getter()
+                    #print("\tconf %s, new val %s, saved val %s" % (k, val, v))
+                    if val != v:
+                        user_conf[k] = val
+                        changed = True
+                        
+            if changed:
+                scipyen_config[self.__class__.__name__].set(user_conf)
+                write_config()
+                
+        self.saveWindowSettings() # must override in derived
+        
+    
 # NOTE: 2021-09-08 13:01:30 This WON'T WORK!!!
 # because neither function named in configurables is an attribute of the 
 # decorated :class: ScipyenConfigurable2
@@ -1470,7 +1583,7 @@ class ScipyenConfigurable2(object):
                 else:
                     continue
                     
-                with trait_notifier.hold_trait_notifications():
+                with trait_notifier.observer.hold_trait_notifications():
                     default = getset.get("default", None)
                     
                     setter = inspect.getattr_static(self, settername, None)
@@ -1659,7 +1772,7 @@ def get_config_dir(configuration:confuse.Configuration=scipyen_config) -> str:
     return configuration.config_dir()
 
 @safeWrapper
-def write_config(config:typing.Optional[confuse.Configuration]=None, 
+def write_config(config:typing.Optional[confuse.Configuration]=scipyen_config, 
                 filename:typing.Optional[str]=None, 
                 full:bool=True, redact:bool=False, as_default:bool=False,
                 default_only:bool=False) -> bool:

@@ -148,6 +148,7 @@ from core.triggerprotocols import TriggerProtocol
 #from core.utilities import (unique, get_nested_value, set_nested_value,)
 from core.workspacefunctions import validate_varname
 from core.scipyen_config import markConfigurable
+from core.traitcontainers import DataBag
 
 from imaging.vigrautils import vigraKernel1D_to_ndarray
 
@@ -360,6 +361,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
     defaultCursorWindowSizeX = 0.001
     defaultCursorWindowSizeY = 0.001
+    
+    defaultCursorLabelPrecision = SignalCursor.default_precision
+    
+    defaultCursorsShowValue = False
 
     mpl_prop_cycle = plt.rcParams['axes.prop_cycle']
     
@@ -378,6 +383,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     defaultLinkedCursorColors = Bunch({"crosshair":QtGui.QColor(defaultCursorColors["crosshair"]).darker().name(QtGui.QColor.HexArgb),
                                        "horizontal":QtGui.QColor(defaultCursorColors["horizontal"]).darker().name(QtGui.QColor.HexArgb),
                                        "vertical":QtGui.QColor(defaultCursorColors["vertical"]).darker().name(QtGui.QColor.HexArgb)})
+    
+    defaultCursorHoverColor = "red"
 
     def __init__(self, 
                  x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, 
@@ -421,6 +428,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.crosshairSignalCursors = dict() # a dict of SignalCursors mapping str name to cursor object
         self.verticalSignalCursors = dict()
         self.horizontalSignalCursors = dict()
+        self._cursorHoverColor_ = self.defaultCursorHoverColor
         self._data_cursors_ = collections.ChainMap(self.crosshairSignalCursors, self.horizontalSignalCursors, self.verticalSignalCursors)
         # maps signal name with list of cursors
         # NOTE: 2019-03-08 13:20:50
@@ -588,9 +596,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.selectedDataCursor = None
         
         self._cursorColors_ = self.defaultCursorColors
-        #self.cursorColors = {"crosshair":"#C173B088", "horizontal":"#B1D28F88", "vertical":"#F2BB8888"}
-        #self.linkedCursorColors = {"crosshair":"#B14F9A88", "horizontal":"#77B75388","vertical":"#F29B6888"}
         self._linkedCursorColors_ = self.defaultLinkedCursorColors
+        self._cursorLabelPrecision_ = self.defaultCursorLabelPrecision
+        self._cursorsShowValue_ = self.defaultCursorsShowValue
         #### END generic plot options
         
         # NOTE: 2021-08-25 09:42:54
@@ -599,7 +607,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #   1.1) sets up the UI defined in the .ui file (setupUi)
         #   1.2) populates the qtconfigurables
         #
-        # 2) calls loadSettings
+        # 2) calls loadSettings THEN _configureUI_ (ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable)
         super().__init__(data=y, parent=parent, ID=ID,
                          win_title=win_title, doc_title=doc_title,
                          frameIndex=frameIndex, *args, **kwargs)
@@ -639,55 +647,34 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 doc_title = doc_title,
                                 *args, **kwargs)
                 
-    def saveViewerSettings(self):
-        # TODO: 2021-08-22 22:11:39
-        # migrate to confuse configuration
-        if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-            self.qsettings.setValue("/".join([self.__class__.__name__, "CursorsShowValue"]), 
-                                   self.setCursorsShowValue.isChecked())
+    #def saveViewerSettings(self):
+        ## TODO: 2021-08-22 22:11:39
+        ## migrate to confuse configuration
+        #if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
+            #self.qsettings.setValue("/".join([self.__class__.__name__, "CursorsShowValue"]), 
+                                   #self.setCursorsShowValue.isChecked())
             
             #for dw in self.dockWidgets:
                 #self.qsettings.setValue("/".join([self.__class__.__name__, dw[0]]), dw[1].isVisible())
                 
-    def loadViewerSettings(self):
-        if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-            val = self.qsettings.value("/".join([self.__class__.__name__, "CursorsShowValue"]),"false")
+    #def loadViewerSettings(self):
+        #if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
+            #val = self.qsettings.value("/".join([self.__class__.__name__, "CursorsShowValue"]),"false")
             
-            if isinstance(val, str):
-                cursors_show_value = val.lower().strip() == "true"
+            #if isinstance(val, str):
+                #cursors_show_value = val.lower().strip() == "true"
                 
-            elif isinstance(val ,bool):
-                cursors_show_value = val
+            #elif isinstance(val ,bool):
+                #cursors_show_value = val
                 
-            else:
-                cursors_show_value = False
+            #else:
+                #cursors_show_value = False
                 
-            self.setCursorsShowValue.setChecked(cursors_show_value)
-            #for dn, dw in self.dockWidgets.items():
-                #dock_visible=False
-                
-                #dock_visibility = self.qsettings.value("/".join([self.__class__.__name__, dn]), "false")
-                
-                #if isinstance(dock_visibility, str):
-                    #dock_visible = dock_visibility.lower().strip() == "true"
-                        
-                #elif(isinstance(dock_visibility, bool)):
-                    #dock_visible = dock_visibility
-                    
-                #else:
-                    #dock_visible = True
-                    
-                #if dock_visible:
-                    #dw.setVisible(True)
-                    #dw.show()
-                                
-                #else:
-                    #dw.hide()
+            #self.setCursorsShowValue.setChecked(cursors_show_value)
                 
     @property
     def dockWidgets(self):
         return dict(((name, w) for name, w in self.__dict__.items() if isinstance(w, QtWidgets.QDockWidget)))
-        #return [(name, win) for name, win in self.__dict__.items() if isinstance(win, QtWidgets.QDockWidget)]
         
     @property
     def visibleDocks(self):
@@ -703,22 +690,71 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     dw[k].setVisible(v is True) # just to make sure v is a bool
                     
     @property
+    def cursorLabelPrecision(self) -> int:
+        return self._cursorLabelPrecision_
+    
+    @markConfigurable("CursorLabelPrecision")
+    @cursorLabelPrecision.setter
+    def cursorLabelPrecision(self, val:typing.Union[int, str]):
+        if isinstance(val, str) and val=="auto":
+            pi_precisions = [self.get_axis_xData_precision(ax) for ax in self.plotItems]
+            val = min(pi_precisions)
+        
+        if not isinstance(val, int) or val < 0:
+            val = self.defaultCursorLabelPrecision
+            
+        self._cursorLabelPrecision_ = int(val)
+        
+        for c in self.cursors:
+            c.precision = self._cursorLabelPrecision_
+            
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["CursorLabelPrecision"] = self._cursorLabelPrecision_
+            
+    @property
+    def cursorsShowValue(self) -> bool:
+        return self._cursorsShowValue_
+    
+    @markConfigurable("CursorsShowValue")
+    @cursorsShowValue.setter
+    def cursorsShowValue(self, val):
+        self._cursorsShowValue_ = val is True
+        signal_blocker = QtCore.QSignalBlocker(self.setCursorsShowValue)
+        self.setCursorsShowValue.setChecked(self._cursorsShowValue_)
+        for c in self.cursors:
+            c.setShowValue(self._cursorsShowValue_, self._cursorLabelPrecision_)
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["CursorsShowValue"] = self._cursorsShowValue_
+            
+                    
+    @property
     def cursorWindowSizeX(self):
         return self._cursorWindowSizeX_
     
-    @markConfigurable("CursorXWindow", trait_notifier=True)
+    @markConfigurable("CursorXWindow")
     @cursorWindowSizeX.setter
     def cursorWindowSizeX(self, val):
         self._cursorWindowSizeX_ = val
+        for c in self.cursors:
+            c.xwindow = val
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["CursorXWindow"] = self._cursorWindowSizeX_
+            
+            
         
     @property
     def cursorWindowSizeY(self):
         return self._cursorWindowSizeY_
     
-    @markConfigurable("CursorYWindow", trait_notifier=True)
+    @markConfigurable("CursorYWindow")
     @cursorWindowSizeY.setter
     def cursorWindowSizeY(self, val):
         self._cursorWindowSizeY_ = val
+        for c in self.cursors:
+            c.ywindow = val
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["CursorYWindow"] = self._cursorWindowSizeY_
+            
         
     @property
     def cursorColors(self)->dict:
@@ -730,9 +766,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.crosshairCursorColor = QtGui.QColor(val["crosshair"]).name(QtGui.QColor.HexArgb)
             self.horizontalCursorColor = QtGui.QColor(val["horizontal"]).name(QtGui.QColor.HexArgb)
             self.verticalCursorColor = QtGui.QColor(val["vertical"]).name(QtGui.QColor.HexArgb)
-            #self.crosshairCursorColor = pg.mkColor(val["crosshair"]).name(QtGui.QColor.HexArgb)
-            #self.horizontalCursorColor = pg.mkColor(val["horizontal"]).name(QtGui.QColor.HexArgb)
-            #self.verticalCursorColor = pg.mkColor(val["vertical"]).name(QtGui.QColor.HexArgb)
 
     @property
     def crosshairCursorColor(self):
@@ -742,23 +775,31 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @crosshairCursorColor.setter
     def crosshairCursorColor(self, val):
         qcolor = colormaps.qcolor(val)
-        self._cursorColors_["crosshair"] = qcolor.name(QtGui.QColor.HexArgb)
+        cname = qcolor.name(QtGui.QColor.HexArgb)
+        self._cursorColors_["crosshair"] = cname
         for cursor in self.crosshairCursors:
-            cursor.pen.setColor(QtGui.QColor(self._cursorColors_["crosshair"]))
-            cursor.update()
+            pen = cursor.pen
+            pen.setColor(QtGui.QColor(self._cursorColors_["crosshair"]))
+            cursor.pen = pen
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["CrosshairCursorColor"] = cname
                 
     @property
     def horizontalCursorColor(self):
         return self._cursorColors_["horizontal"]
     
-    @markConfigurable("HorizontalCursorColor", trait_notifier=True)
+    @markConfigurable("HorizontalCursorColor")
     @horizontalCursorColor.setter
     def horizontalCursorColor(self, val):
         qcolor = colormaps.qcolor(val)
-        self._cursorColors_["horizontal"] = qcolor.name(QtGui.QColor.HexArgb)
+        cname = qcolor.name(QtGui.QColor.HexArgb)
+        self._cursorColors_["horizontal"] = cname
         for cursor in self.horizontalCursors:
-            cursor.pen.setColor(QtGui.QColor(self._cursorColors_["horizontal"]))
-            cursor.update()
+            pen = cursor.pen
+            pen.setColor(QtGui.QColor(self._cursorColors_["horizontal"]))
+            cursor.pen = pen
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["HorizontalCursorColor"] = cname
                 
     @property
     def verticalCursorColor(self):
@@ -770,11 +811,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         qcolor = colormaps.qcolor(val)
         cname = qcolor.name(QtGui.QColor.HexArgb)
         self._cursorColors_["vertical"] = cname
-        if hasattr(self, "configurable_traits"):
-            self.configurable_traits["VerticalCursorColor"] = cname
         for cursor in self.verticalCursors:
-            cursor.pen.setColor(QtGui.QColor(self._cursorColors_["vertical"]))
-            cursor.update()
+            pen = cursor.pen
+            pen.setColor(QtGui.QColor(self._cursorColors_["vertical"]))
+            cursor.pen = pen
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["VerticalCursorColor"] = cname
         
     @property
     def linkedCursorColors(self):
@@ -795,11 +837,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @linkedCrosshairCursorColor.setter
     def linkedCrosshairCursorColor(self, val):
         qcolor = colormaps.qcolor(val)
-        self._linkedCursorColors_["crosshair"] = qcolor.name(QtGui.QColor.HexArgb)
+        cname = qcolor.name(QtGui.QColor.HexArgb)
+        self._linkedCursorColors_["crosshair"] = cname
         for cursor in self.crosshairCursors:
-            cursor.linkedPen.setColor(QtGui.QColor(self._linkedCursorColors_["crosshair"]))
-            cursor.update()
-    
+            pen = cursor.linkedPen
+            pen.setColor(QtGui.QColor(self._linkedCursorColors_["crosshair"]))
+            cursor.linkedPen = pen
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["LinkedCrosshairCursorColor"] = cname
+            
     @property
     def linkedHorizontalCursorColor(self):
         return self._linkedCursorColors_["horizontal"]
@@ -808,10 +854,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @linkedHorizontalCursorColor.setter
     def linkedHorizontalCursorColor(self, val):
         qcolor = colormaps.qcolor(val)
-        self._linkedCursorColors_["horizontal"] = qcolor.name(QtGui.QColor.HexArgb)
+        cname = qcolor.name(QtGui.QColor.HexArgb)
+        self._linkedCursorColors_["horizontal"] = cname
         for cursor in self.horizontalCursors:
-            cursor.linkedPen.setColor(QtGui.QColor(self._linkedCursorColors_["horizontal"]))
-            cursor.update()
+            pen = cursor.linkedPen
+            pen.setColor(QtGui.QColor(self._linkedCursorColors_["horizontal"]))
+            cursor.linkedPen = pen
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["LinkedHorizontalCursorColor"] = cname
     
     @property
     def linkedVerticalCursorColor(self):
@@ -821,10 +871,32 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @linkedVerticalCursorColor.setter
     def linkedVerticalCursorColor(self, val):
         qcolor = colormaps.qcolor(val)
-        self._linkedCursorColors_["vertical"] = qcolor.name(QtGui.QColor.HexArgb)
+        cname = qcolor.name(QtGui.QColor.HexArgb)
+        self._linkedCursorColors_["vertical"] = cname
         for cursor in self.verticalCursors:
-            cursor.linkedPen.setColor(QtGui.QColor(self._linkedCursorColors_["vertical"]))
-            cursor.update()
+            pen = cursor.linkedPen
+            pen.setColor(QtGui.QColor(self._linkedCursorColors_["vertical"]))
+            cursor.linkedPen = pen
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["LinkedVerticalCursorColor"] = cname
+        
+    @property
+    def cursorHoverColor(self, val) -> str:
+        return self._cursorHoverColor_
+    
+    @markConfigurable("CursorHoverColor")
+    @cursorHoverColor.setter
+    def cursorHoverColor(self, val):
+        qcolor = colormaps.qcolor(val)
+        cname = qcolor.name(QtGui.QColor.HexArgb)
+        self._cursorHoverColor_ = cname
+        for c in self.cursors:
+            pen = c.hoverPen
+            pen.setColor(QtGui.QColor(self._cursorHoverColor_))
+            c.hoverPen = pen
+            
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["CursorHoverColor"] = self._cursorHoverColor_
         
                 
     def _update_annotations_(self, data=None):
@@ -1013,14 +1085,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.setCursorsShowValue = self.cursorsMenu.addAction("Cursors show value")
         self.setCursorsShowValue.setCheckable(True)
-        self.setCursorsShowValue.setChecked(False)
+        #self.setCursorsShowValue.setChecked(False)
+        self.setCursorsShowValue.setChecked(self._cursorsShowValue_)
         self.setCursorsShowValue.toggled.connect(self._slot_setCursorsShowValue)
         
-        #self.setCursorsShowValue = self.cursorsMenu.addAction("Cursors show value")
-        #self.setCursorsShowValue.setCheckable(True)
-        #self.setCursorsShowValue.setChecked(False)
-        #self.setCursorsShowValue.toggled.connect(self._slot_setCursorsShowValue)
-        
+        self.setCursorsLabelPrecision = self.cursorsMenu.addAction("Cursor label precision...")
+        self.setCursorsLabelPrecision.triggered.connect(self._slot_setCursorLabelPrecision)
         
         self.epochsMenu = QtWidgets.QMenu("Make Epochs")
         
@@ -1093,7 +1163,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.selectSignalComboBox.clear()
         self.selectSignalComboBox.setCurrentIndex(0)
         self.selectSignalComboBox.currentIndexChanged[int].connect(self.slot_analogSignalsComboBoxIndexChanged)
-        #self.selectSignalComboBox.currentIndexChanged[str].connect(self.slot_displayedSignalNameChoiceChanged)
         
         self.plotAnalogSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
         self.plotAnalogSignalsCheckBox.stateChanged[int].connect(self.slot_plotAnalogSignalsCheckStateChanged)
@@ -1101,7 +1170,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.selectIrregularSignalComboBox.clear()
         self.selectIrregularSignalComboBox.setCurrentIndex(0)
         self.selectIrregularSignalComboBox.currentIndexChanged[int].connect(self.slot_irregularSignalsComboBoxIndexChanged)
-        #self.selectIrregularSignalComboBox.currentIndexChanged[str].connect(self.slot_displayedIrregularSignalNameChoiceChanged)
         
         self.plotIrregularSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
         self.plotIrregularSignalsCheckBox.stateChanged[int].connect(self.slot_plotIrregularSignalsCheckStateChanged)
@@ -1120,8 +1188,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.annotationsDockWidget.setWidget(self.annotationsViewer)
         
-        #self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.annotationsDockWidget)
-        
         #print("_configureUI_ sets up annotations dock widget action")
         #### END set up annotations dock widget
         
@@ -1137,29 +1203,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #print("_configureUI_ sets up dock widget actions menu")
         self.docksMenu = QtWidgets.QMenu("Panels", self)
         
-        #self.showAnnotationsDockWidgetAction = self.annotationsDockWidget.toggleViewAction()
         self.showAnnotationsDockWidgetAction = self.docksMenu.addAction("Annotations")
         self.showAnnotationsDockWidgetAction.setObjectName("action_%s" % self.annotationsDockWidget.objectName())
-        #self.showAnnotationsDockWidgetAction.setCheckable(True)
-        #self.showAnnotationsDockWidgetAction.setChecked(True)
-        
-        #self.showAnnotationsDockWidgetAction.toggled[bool].connect(self.slot_displayDockWidget)
-        #self.showAnnotationsDockWidgetAction.triggered.connect(self.slot_displayDockWidget)
-        #self.showAnnotationsDockWidgetAction = self.docksMenu.addAction("Annotations")
-        #self.showAnnotationsDockWidgetAction.triggered.connect(self.slot_dockWidgetRequest)
         self.showAnnotationsDockWidgetAction.triggered.connect(self.slot_showAnnotationsDock)
         
-        #self._show_dock_actions_[self.annotationsDockWidget.objectName()] = self.showAnnotationsDockWidgetAction
-
-        #self.showCoordinatesDockWidgetAction = self.coordinatesDockWidget.toggleViewAction()
         self.showCoordinatesDockWidgetAction = self.docksMenu.addAction("Cursors")
         self.showCoordinatesDockWidgetAction.setObjectName("action_%s" % self.coordinatesDockWidget.objectName())
-        #self.showCoordinatesDockWidgetAction.setCheckable(True)
-        #self.showCoordinatesDockWidgetAction.setChecked(True)
-        
-        #self.showCoordinatesDockWidgetAction.toggled[bool].connect(self.slot_displayDockWidget)
-        #self.showCoordinatesDockWidgetAction.changed.connect(self.slot_dockWidgetRequest)
-        #self.showCoordinatesDockWidgetAction.triggered[bool].connect(self.slot_displayDockWidget)
         self.showCoordinatesDockWidgetAction.triggered.connect(self.slot_showCoordinatesDock)
         
         self.menubar.addMenu(self.docksMenu)
@@ -1392,6 +1441,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 xBounds = xBounds, yBounds = yBounds,
                                 axis = axis, label=label,
                                 follows_mouse=follows_mouse,
+                                precision = self.cursorLabelPrecision,
                                 **kwargs)
         
         self.slot_selectCursor(crsID)
@@ -2010,7 +2060,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     yBounds: typing.Union[tuple, type(None)] = None,
                     axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None,
                     label:typing.Optional[str] = None, 
-                    follows_mouse: bool = False, **kwargs) -> str:
+                    follows_mouse: bool = False, 
+                    precision:typing.Optional[int]=None,
+                    **kwargs) -> str:
         """Creates a cursor.
         kwargs: var-keyword parameters for SignalCursor constructor (pen, etc)
         """
@@ -4710,9 +4762,22 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     @pyqtSlot(bool)
     def _slot_setCursorsShowValue(self, val):
-        for cursor in self._data_cursors_.values():
-            cursor.setShowValue(val)
-    
+        self.cursorsShowValue = val is True
+        #for cursor in self._data_cursors_.values():
+            #cursor.setShowValue(val)
+            
+    @pyqtSlot()
+    def _slot_setCursorLabelPrecision(self):
+        dlg = qd.QuickDialog()
+        wdg = QtWidgets.QSpinBox(parent=dlg)
+        wdg.setValue(self.cursorLabelPrecision)
+        dlg.addLabel("Precision")
+        dlg.addWidget(wdg)
+        if dlg.exec() > 0:
+            val = wdg.value()
+            
+            self.cursorLabelPrecision = val
+
     @pyqtSlot(object, object)
     @safeWrapper
     def _slot_plot_axis_x_range_changed(self, x0, x1):

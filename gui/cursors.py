@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Pyqtgraph-based cursors for signal viewers
 """
-import collections, enum, numbers
+import collections, enum, numbers, typing
 
 from PyQt5 import (QtCore, QtGui, QtWidgets,) 
 from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
@@ -44,12 +44,15 @@ class SignalCursor(QtCore.QObject):
     
     sig_axisPositionChanged = pyqtSignal(tuple, name="sig_axisPositionChanged")
 
+    default_precision = 3
+    
     class SignalCursorTypes(enum.Enum):
         """Enumeration of signal cursor types.
         """
         vertical    = (False, True)
         horizontal  = (True, False)
         crosshair   = (True, True)
+        
         
         @classmethod
         def names(cls):
@@ -100,11 +103,22 @@ class SignalCursor(QtCore.QObject):
                 if len(types):
                     return types[0].name
                 
-    def __init__(self, plot_item, x=None, y=None, xwindow=0.0, ywindow=0.0,
-                 cursor_type = None, cursorID="c", follower=False, parent=None, 
-                 xBounds=None, yBounds=None, 
-                 pen=None, hoverPen=None, linkedPen=None,
-                 movable_label=True, show_value=False, precision=3,
+    def __init__(self, plot_item:pg.PlotItem, 
+                 x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, 
+                 y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, 
+                 xwindow:float=0.0, ywindow:float=0.0,
+                 cursor_type:typing.Optional[typing.Union[str,SignalCursorTypes, tuple, list]] = None, 
+                 cursorID:str="c", 
+                 follower:bool=False, 
+                 parent:typing.Optional[pg.GraphicsItem]=None, 
+                 xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
+                 yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
+                 pen:typing.Optional[QtGui.QPen]=None, 
+                 hoverPen:typing.Optional[QtGui.QPen]=None, 
+                 linkedPen:typing.Optional[QtGui.QPen]=None,
+                 movable_label:bool=True, 
+                 show_value:bool=False, 
+                 precision:int=3,
                  **kwargs):
         
         super(SignalCursor, self).__init__(parent=parent)
@@ -198,7 +212,7 @@ class SignalCursor(QtCore.QObject):
         self._current_plot_item_ = None # for multi-axes cursors
         self._movable_label_ = movable_label
         self._show_value_ = show_value
-        self._value_precision_ = precision
+        self._value_precision_ = precision if isinstance(precision, int) and precision > 0 else self.default_precision
         
         self._setup_(plot_item, x=x, y=y, xwindow=xwindow, ywindow=ywindow, 
                          cursor_type=cursor_type, cursorID=cursorID,
@@ -478,14 +492,17 @@ class SignalCursor(QtCore.QObject):
         if isinstance(self._vl_, pg.InfiniteLine):
             if isinstance(self._vl_.label, pg.InfLineLabel):
                 if self._show_value_:
-                    self._vl_.label.setFormat("%s: {value:.{%d}}" % (self._cursorId_, self._value_precision_))
+                    format_str = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_)
+                    #print(format_str)
+                    self._vl_.label.setFormat(format_str)
                 else:
                     self._vl_.label.setFormat(self._cursorId_)
                     
         if isinstance(self._hl_, pg.InfiniteLine):
             if isinstance(self._hl_.label, pg.InfLineLabel):
                 if self._show_value_:
-                    self._hl_.label.setFormat("%s: {value:.{%d}}" % (self._cursorId_, self._value_precision_))
+                    format_str = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_)
+                    self._hl_.label.setFormat(format_str)
                 else:
                     self._hl_.label.setFormat(self._cursorId_)
                     
@@ -509,7 +526,7 @@ class SignalCursor(QtCore.QObject):
                 self._hl_.label.setMovable(value==True)
                 
                 
-    def setShowValue(self, val, precision=None):
+    def setShowValue(self, val:bool, precision:typing.Optional[int]=None):
         if isinstance(precision, int):
             if precision < 0:
                 raise ValueError("Precision must be >= 0; got %d instead" % precision)
@@ -519,7 +536,6 @@ class SignalCursor(QtCore.QObject):
         elif precision is not None:
             raise TypeError("Precision must be an int >= 0 or None; got %s instead" % precision)
         
-            
         self._show_value_ = val==True
         self._update_labels_()
         
@@ -528,6 +544,17 @@ class SignalCursor(QtCore.QObject):
             raise TypeError("Precision must be an int > = 0; got %s instead" % val)
         
         self._value_precision_ = val
+        
+    @property
+    def precision(self):
+        return self._value_precision_
+    
+    @precision.setter
+    def precision(self, val):
+        if not isinstance(val, int) or val < 0:
+            raise TypeError("Precision must be an int > = 0; got %s instead" % val)
+        self._value_precision_ = val
+        self._update_labels_()
                     
     @pyqtSlot()
     @pyqtSlot(object)
@@ -569,7 +596,9 @@ class SignalCursor(QtCore.QObject):
             else:
                 self._is_selected_ = val
             
-    def setBounds(self, host=None, xBounds=None, yBounds=None):
+    def setBounds(self, host:typing.Optional[pg.GraphicsItem]=None, 
+                  xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
+                  yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None) -> None:
         if host is None:
             host = self._host_graphics_item_
             
@@ -754,9 +783,17 @@ class SignalCursor(QtCore.QObject):
             
         self._add_lines_to_host_()
         
-    def _setup_(self, host, cursor_type="crosshair", x=None, y=None, 
-                  xwindow=None, ywindow=None, follower=False, cursorID=None, 
-                  xBounds=None, yBounds=None, **kwargs):
+    def _setup_(self, host:pg.GraphicsItem, 
+                cursor_type:typing.Union[str,SignalCursorTypes, tuple, list]="crosshair", 
+                x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, 
+                y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, 
+                xwindow:typing.Optional[float]=None, 
+                ywindow:typing.Optional[float]=None, 
+                follower:bool=False, 
+                cursorID:typing.Optional[str]=None, 
+                xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None,
+                yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None,
+                **kwargs) -> None:
         
         #print("SignalCursor._setup_ cursor_type %s" % cursor_type)
         
@@ -1379,8 +1416,15 @@ class SignalCursor(QtCore.QObject):
         if self._hl_ is not None:
             self._hl_.setPen(self._pen_)
             
+            if isinstance(self._hl_.label, pg.InfLineLabel):
+                self._hl_.label.setColor(self._pen_.color())
+            
         if self._vl_ is not None:
             self._vl_.setPen(self._pen_)
+            if isinstance(self._vl_.label, pg.InfLineLabel):
+                self._vl_.label.setColor(self._pen_.color())
+            
+        self.update()
             
     @property
     def linkedPen(self):
@@ -1398,6 +1442,8 @@ class SignalCursor(QtCore.QObject):
             
         if self._vl_ is not None:
             self._vl_.setPen(self._linkedPen_)
+            
+        self.update()
     
     @property
     def hoverPen(self):
@@ -1415,6 +1461,8 @@ class SignalCursor(QtCore.QObject):
             
         if self._vl_ is not None:
             self._vl_.setHoverPen(self._hoverPen_)
+            
+        self.update()
     
     @property
     def cursorTypeName(self):
