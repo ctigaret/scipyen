@@ -593,7 +593,7 @@ class Finder:
             
         
         """
-        from core.datatypes import reverse_mapping_lookup
+        from core.utilities import reverse_mapping_lookup
         ret = None
         if key: # search for key, return its value(s)
             if isinstance(data, dict):

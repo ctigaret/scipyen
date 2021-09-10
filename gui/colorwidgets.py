@@ -79,7 +79,6 @@ class ColorPushButton(QtWidgets.QPushButton):
         self._tPmap = transparentPixmap
         if not self._tPmap:
             self._tPmap = make_transparent_bg()
-        #self._strongTransparentPattern = strongTransparentPattern
         self._alpha = 255
         self._keepAlpha = keepAlphaOnDropPaste
         self._dialog = None
@@ -122,7 +121,7 @@ class ColorPushButton(QtWidgets.QPushButton):
         
     @property
     def color(self) -> QtGui.QColor:
-        return self._color
+        return QtGui.QColor(self._color)
     
     @color.setter
     def color(self, qcolor:QtGui.QColor):
@@ -275,37 +274,6 @@ class ColorPushButton(QtWidgets.QPushButton):
             self.color = self._defaultColor
         
         
-#class ColorPushButton(ColorButtonMixin, QtWidgets.QPushButton):
-    #changedColor = pyqtSignal(QtGui.QColor, name="changedColor")
-    #def __init__(self, color:QtGui.QColor, defaultColor:QtGui.QColor,
-                 #alphaChannelEnabled:bool = True, useDefaultColor=True,
-                 #strongTransparentPattern:bool=False,
-                 #parent:typing.Optional[QtWidgets.QWidget]=None):
-        #super().__init__(color, defaultColor,
-                    #alphaChannelEnabled=alphaChannelEnabled,
-                    #useDefaultColor=useDefaultColor,
-                    #strongTransparentPattern=strongTransparentPattern,
-                    #parent=parent)
-        #QtWidgets.QPushButton.__init__(self, parent=parent)
-        #self.setAcceptDrops(True)
-        #self.clicked.connect(self._chooseColor)
-        
-        
-#class ColorToolButton(ColorButtonMixin, QtWidgets.QToolButton):
-    #changedColor = pyqtSignal(QtGui.QColor, name="changedColor")
-    #def __init__(self, color:QtGui.QColor, defaultColor:QtGui.QColor,
-                 #alphaChannelEnabled:bool = True, useDefaultColor=True,
-                 #strongTransparentPattern:bool=False,
-                 #parent:typing.Optional[QtWidgets.QWidget]=None):
-        #super().__init__(color, defaultColor,
-                         #alphaChannelEnabled=alphaChannelEnabled,
-                         #useDefaultColor=useDefaultColor,
-                         #strongTransparentPattern=strongTransparentPattern,
-                         #parent=parent)
-        #QtWidgets.QToolButton.__init__(self, parent=parent)
-        #self.setAcceptDrops(True)
-        #self.triggered.connect(self._chooseColor)
-    
 class ColorComboDelegate(QtWidgets.QAbstractItemDelegate):
     ItemRoles = IntEnum(value="ItemRoles", names=[("ColorRole", QtCore.Qt.UserRole +1)], 
                         module=__name__, qualname="ColorComboDelegate.ItemRoles")
@@ -418,19 +386,27 @@ class ColorComboBox(QtWidgets.QComboBox):
         if isinstance(color, QtCore.Qt.GlobalColor):
             color = QtGui.QColor(color)
             colorName= color.name()
+            
         elif isinstance(color, str):
             colorName = color
             allColors = getPalette("a")
             if colorName in allColors.keys():
                 color = QtGui.QColor(allColors[colorName])
+            else:
+                color = QtGui.QColor(colorName)
+                
             if not color.isValid():
                 color = QtGui.QColor(QtCore.Qt.white)
                 colorName = color.name()
+                
             else:
                 colorName += " (%s)" % color.name()
                 
         elif not isinstance(color, QtGui.QColor) or not color.isValid():
             color = QtGui.QColor(QtCore.Qt.white)
+            colorName = color.name()
+            
+        else:
             colorName = color.name()
             
         self._customColor = color
@@ -532,7 +508,7 @@ class ColorComboBox(QtWidgets.QComboBox):
                     self.setItemData(k + 1, c.name(), QtCore.Qt.ToolTipRole)
     
     def _setCustomColor(self, color:QtGui.QColor, lookupInPresets:bool=True):
-        from core.datatypes import reverse_mapping_lookup
+        from core.utilities import reverse_mapping_lookup
         if not color.isValid():
             return 
         

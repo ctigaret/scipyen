@@ -423,7 +423,7 @@ def getPalette(name:str="std"):
     elif name in ("qt",):
         return qtGlobalColors
     
-    elif name ("a", "all"):
+    elif name in ("a", "all"):
         ret = dict()
         for d in (standardPaletteDict,qtGlobalColors,svgPalette,mplColors):
             ret.update(d)

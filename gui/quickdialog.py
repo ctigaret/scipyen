@@ -442,7 +442,7 @@ class VariableNameStringInput(StringInput):
             else:
                 ret = QtGui.QValidator.Acceptable
                 
-            print("validate returns: ", ret)
+            #print("validate returns: ", ret)
             return ret
         
         

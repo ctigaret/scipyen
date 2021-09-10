@@ -162,10 +162,10 @@ from ephys.ephys import (cursors2epoch, )
 from . import pictgui as pgui
 from . import quickdialog as qd
 from . import scipyen_colormaps as colormaps
-#from .pictgui import GraphicsObjectType, GraphicsObject, PathElements, Tier2PathElements, SignalCursor, Path, Start, Move, Line, Cubic, Rect, Ellipse, Quad, Arc, ArcMove
 from .scipyenviewer import (ScipyenViewer, ScipyenFrameViewer,Bunch)
 from .dictviewer import (InteractiveTreeWidget, DataViewer,)
 from .cursors import SignalCursor
+from .colorselectionwidget import ColorSelectionWidget, quickColorDialog
 #### END pict.gui modules
 
 # each spike is a small vertical line centered at 0.0, height of 1
@@ -1085,12 +1085,23 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.setCursorsShowValue = self.cursorsMenu.addAction("Cursors show value")
         self.setCursorsShowValue.setCheckable(True)
-        #self.setCursorsShowValue.setChecked(False)
         self.setCursorsShowValue.setChecked(self._cursorsShowValue_)
         self.setCursorsShowValue.toggled.connect(self._slot_setCursorsShowValue)
         
         self.setCursorsLabelPrecision = self.cursorsMenu.addAction("Cursor label precision...")
         self.setCursorsLabelPrecision.triggered.connect(self._slot_setCursorLabelPrecision)
+        
+        self.cursorsColorsMenu = QtWidgets.QMenu("Cursor colors")
+        self.verticalCursorColorsAction = self.cursorsColorsMenu.addAction("Vertical cursor colors")
+        self.verticalCursorColorsAction.triggered.connect(self._slot_setVerticalCursorColors)
+        self.horizontalCursorColorsAction = self.cursorsColorsMenu.addAction("Horizontal cursor colors")
+        self.horizontalCursorColorsAction.triggered.connect(self._slot_setHorizontalCursorColors)
+        self.crosshairCursorColorsAction = self.cursorsColorsMenu.addAction("Crosshair cursor colors")
+        self.crosshairCursorColorsAction.triggered.connect(self._slot_setCrosshairCursorColors)
+        self.cursorHoverColorAction = self.cursorsColorsMenu.addAction("Cursors hover color")
+        self.cursorHoverColorAction.triggered.connect(self._slot_setCursorHoverColor)
+        
+        self.cursorsMenu.addMenu(self.cursorsColorsMenu)
         
         self.epochsMenu = QtWidgets.QMenu("Make Epochs")
         
@@ -1116,6 +1127,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.epochInDataBetweenCursors = self.epochsInDataMenu.addAction("Between Two Cursors")
         self.epochInDataBetweenCursors.triggered.connect(self.slot_epochInDataBetweenCursors)
+        
+        self.cursorsMenu.addSeparator()
         
         self.cursorsMenu.addMenu(self.epochsMenu)
         self.cursorsMenu.addMenu(self.epochsInDataMenu)
@@ -4777,6 +4790,45 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             val = wdg.value()
             
             self.cursorLabelPrecision = val
+            
+            
+    @pyqtSlot()
+    def _slot_setCursorHoverColor(self):
+        ret = quickColorDialog(parent=self, title="Cursor hover color",
+                               labels = {"Select color":QtGui.QColor(self.cursorHoverColor)})
+                               
+        if len(ret):
+            self.cursorHoverColor = ret["Select color"].name(QtGui.QColor.HexArgb)
+            
+    @pyqtSlot()
+    def _slot_setVerticalCursorColors(self):
+        ret = quickColorDialog(parent=self, title="Vertical cursor colors",
+                               labels = {"Normal":QtGui.QColor(self.verticalCursorColor),
+                                         "Linked": QtGui.QColor(self.linkedVerticalCursorColor)})
+                               
+        if len(ret):
+            self.verticalCursorColor = ret["Normal"].name(QtGui.QColor.HexArgb)
+            self.linkedVerticalCursorColor = ret["Linked"].name(QtGui.QColor.HexArgb)
+    
+    @pyqtSlot()
+    def _slot_setHorizontalCursorColors(self):
+        ret = quickColorDialog(parent=self, title="Horizontal cursor colors",
+                               labels = {"Normal":QtGui.QColor(self.horizontalCursorColor),
+                                         "Linked": QtGui.QColor(self.linkedHorizontalCursorColor)})
+                               
+        if len(ret):
+            self.horizontalCursorColor = ret["Normal"].name(QtGui.QColor.HexArgb)
+            self.linkedHorizontalCursorColor = ret["Linked"].name(QtGui.QColor.HexArgb)
+    
+    @pyqtSlot()
+    def _slot_setCrosshairCursorColors(self):
+        ret = quickColorDialog(parent=self, title="Crosshair cursor colors",
+                               labels = {"Normal":QtGui.QColor(self.crosshairCursorColor),
+                                         "Linked": QtGui.QColor(self.linkedCrosshairCursorColor)})
+                               
+        if len(ret):
+            self.crosshairCursorColor = ret["Normal"].name(QtGui.QColor.HexArgb)
+            self.linkedCrosshairCursorColor = ret["Linked"].name(QtGui.QColor.HexArgb)
 
     @pyqtSlot(object, object)
     @safeWrapper

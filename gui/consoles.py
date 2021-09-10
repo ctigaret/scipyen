@@ -1361,6 +1361,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         """
         self._save_settings_()
         if self.tab_widget.count() == 0:
+            #print("no tabs")
             # no tabs, just close
             #self.sig_will_close.emit()
             self._kernel_counter = 0
@@ -1370,7 +1371,9 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                     self.consoleapp.kernel_manager.shutdown_kernel(now=True, restart=False)
                 except Exception as e:
                     traceback.print_exc()
-                
+            #if isinstance(self._scipyenWindow_, QtWidgets.QMainWindow):
+                #self._scipyenWindow_.workspace["external_console"] = None
+                #self._scipyenWindow_.workspace.pop("external_console", None)
             event.accept()
             return
         

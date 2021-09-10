@@ -2320,8 +2320,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.workspace['console'] = self.console # useful for testing functionality; remove upon release
             self.workspace["shell"] = self.shell # alias to self.ipkernel.shell
             self.workspace["scipyen_settings"] = self._scipyen_settings_
-            #self.workspace["scipyen_config"] = self._scipyen_settings_
             self.workspace["scipyen_topdir"] = self._scipyendir_
+            self.workspace["external_console"] = self.external_console
             
             #print("exit" in self.ipkernel.shell.user_ns)
             
