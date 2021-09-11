@@ -671,7 +671,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 #cursors_show_value = False
                 
             #self.setCursorsShowValue.setChecked(cursors_show_value)
-                
+     
+    # ### BEGIN properties
     @property
     def dockWidgets(self):
         return dict(((name, w) for name, w in self.__dict__.items() if isinstance(w, QtWidgets.QDockWidget)))
@@ -761,145 +762,155 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return self._cursorColors_
     
     @cursorColors.setter
-    def cursorColors(self, val):
+    def cursorColors(self, val:dict) -> None:
         if isinstance(val, dict) and all((s in val for s in ("crosshair", "horizontal", "vertical"))):
             self.crosshairCursorColor = QtGui.QColor(val["crosshair"]).name(QtGui.QColor.HexArgb)
             self.horizontalCursorColor = QtGui.QColor(val["horizontal"]).name(QtGui.QColor.HexArgb)
             self.verticalCursorColor = QtGui.QColor(val["vertical"]).name(QtGui.QColor.HexArgb)
 
     @property
-    def crosshairCursorColor(self):
+    def crosshairCursorColor(self) -> str:
         return self._cursorColors_["crosshair"]
     
     @markConfigurable("CrosshairCursorColor", trait_notifier=True)
     @crosshairCursorColor.setter
-    def crosshairCursorColor(self, val):
-        qcolor = colormaps.qcolor(val)
-        cname = qcolor.name(QtGui.QColor.HexArgb)
-        self._cursorColors_["crosshair"] = cname
-        for cursor in self.crosshairCursors:
-            pen = cursor.pen
-            pen.setColor(QtGui.QColor(self._cursorColors_["crosshair"]))
-            cursor.pen = pen
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["CrosshairCursorColor"] = cname
+    def crosshairCursorColor(self, val:str) -> None:
+        self._set_cursors_color(val, "crosshair")
+        #qcolor = colormaps.qcolor(val)
+        #cname = qcolor.name(QtGui.QColor.HexArgb)
+        #self._cursorColors_["crosshair"] = cname
+        #for cursor in self.crosshairCursors:
+            #pen = cursor.pen
+            #pen.setColor(QtGui.QColor(self._cursorColors_["crosshair"]))
+            #cursor.pen = pen
+        #if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            #self.configurable_traits["CrosshairCursorColor"] = cname
                 
     @property
-    def horizontalCursorColor(self):
+    def horizontalCursorColor(self) -> str:
         return self._cursorColors_["horizontal"]
     
     @markConfigurable("HorizontalCursorColor")
     @horizontalCursorColor.setter
-    def horizontalCursorColor(self, val):
-        qcolor = colormaps.qcolor(val)
-        cname = qcolor.name(QtGui.QColor.HexArgb)
-        self._cursorColors_["horizontal"] = cname
-        for cursor in self.horizontalCursors:
-            pen = cursor.pen
-            pen.setColor(QtGui.QColor(self._cursorColors_["horizontal"]))
-            cursor.pen = pen
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["HorizontalCursorColor"] = cname
+    def horizontalCursorColor(self, val:str) -> None:
+        self._set_cursors_color(val, "horizontal")
+        #qcolor = colormaps.qcolor(val)
+        #cname = qcolor.name(QtGui.QColor.HexArgb)
+        #self._cursorColors_["horizontal"] = cname
+        #for cursor in self.horizontalCursors:
+            #pen = cursor.pen
+            #pen.setColor(QtGui.QColor(self._cursorColors_["horizontal"]))
+            #cursor.pen = pen
+        #if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            #self.configurable_traits["HorizontalCursorColor"] = cname
                 
     @property
-    def verticalCursorColor(self):
+    def verticalCursorColor(self) -> str:
         return self._cursorColors_["vertical"]
     
     @markConfigurable("VerticalCursorColor")
     @verticalCursorColor.setter
-    def verticalCursorColor(self, val):
-        #print("new verticalCursorColor %s" % val)
-        qcolor = colormaps.qcolor(val)
-        cname = qcolor.name(QtGui.QColor.HexArgb)
-        self._cursorColors_["vertical"] = cname
-        for cursor in self.verticalCursors:
-            pen = cursor.pen
-            pen.setColor(QtGui.QColor(self._cursorColors_["vertical"]))
-            cursor.pen = pen
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["VerticalCursorColor"] = cname
+    def verticalCursorColor(self, val:str) -> None:
+        self._set_cursors_color(val, "vertical")
+        #name, color = colormaps.get_name_color(val, palette="all")
+        #self._cursorColors_["vertical"] = name
+        #for cursor in self.verticalCursors:
+            #pen = cursor.pen
+            #pen.setColor(color))
+            #cursor.pen = pen
+        
+        #if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            #self.configurable_traits["VerticalCursorColor"] = name
         
     @property
-    def linkedCursorColors(self):
+    def linkedCursorColors(self) -> dict:
         return self._linkedCursorColors_
     
     @linkedCursorColors.setter
-    def linkedCursorColors(self, val):
+    def linkedCursorColors(self, val:dict) -> None:
         if isinstance(val, dict) and all((s in val for s in ("crosshair", "horizontal", "vertical"))):
             self.linkedCrosshairCursorColor = QtGui.QColor(val["crosshair"]).name(QtGui.QColor.HexArgb)
             self.linkedHorizontalCursorColor = QtGui.QColor(val["horizontal"]).name(QtGui.QColor.HexArgb)
             self.linkedVerticalCursorColor = QtGui.QColor(val["vertical"]).name(QtGui.QColor.HexArgb)
             
     @property
-    def linkedCrosshairCursorColor(self):
+    def linkedCrosshairCursorColor(self) -> str:
         return self._linkedCursorColors_["crosshair"]
     
     @markConfigurable("LinkedCrosshairCursorColor", trait_notifier=True)
     @linkedCrosshairCursorColor.setter
-    def linkedCrosshairCursorColor(self, val):
-        qcolor = colormaps.qcolor(val)
-        cname = qcolor.name(QtGui.QColor.HexArgb)
-        self._linkedCursorColors_["crosshair"] = cname
-        for cursor in self.crosshairCursors:
-            pen = cursor.linkedPen
-            pen.setColor(QtGui.QColor(self._linkedCursorColors_["crosshair"]))
-            cursor.linkedPen = pen
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["LinkedCrosshairCursorColor"] = cname
+    def linkedCrosshairCursorColor(self, val:str) -> None:
+        self._set_cursors_color(val, "crosshair", True)
+        #qcolor = colormaps.qcolor(val)
+        #cname = qcolor.name(QtGui.QColor.HexArgb)
+        #self._linkedCursorColors_["crosshair"] = cname
+        #for cursor in self.crosshairCursors:
+            #pen = cursor.linkedPen
+            #pen.setColor(QtGui.QColor(self._linkedCursorColors_["crosshair"]))
+            #cursor.linkedPen = pen
+            
+        #if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            #self.configurable_traits["LinkedCrosshairCursorColor"] = cname
             
     @property
-    def linkedHorizontalCursorColor(self):
+    def linkedHorizontalCursorColor(self) -> str:
         return self._linkedCursorColors_["horizontal"]
     
     @markConfigurable("LinkedHorizontalCursorColor", trait_notifier=True)
     @linkedHorizontalCursorColor.setter
-    def linkedHorizontalCursorColor(self, val):
-        qcolor = colormaps.qcolor(val)
-        cname = qcolor.name(QtGui.QColor.HexArgb)
-        self._linkedCursorColors_["horizontal"] = cname
-        for cursor in self.horizontalCursors:
-            pen = cursor.linkedPen
-            pen.setColor(QtGui.QColor(self._linkedCursorColors_["horizontal"]))
-            cursor.linkedPen = pen
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["LinkedHorizontalCursorColor"] = cname
+    def linkedHorizontalCursorColor(self, val:str) -> None:
+        self._set_cursors_color(val, "horizontal", True)
+        #qcolor = colormaps.qcolor(val)
+        #cname = qcolor.name(QtGui.QColor.HexArgb)
+        #self._linkedCursorColors_["horizontal"] = cname
+        #for cursor in self.horizontalCursors:
+            #pen = cursor.linkedPen
+            #pen.setColor(QtGui.QColor(self._linkedCursorColors_["horizontal"]))
+            #cursor.linkedPen = pen
+        #if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            #self.configurable_traits["LinkedHorizontalCursorColor"] = cname
     
     @property
-    def linkedVerticalCursorColor(self):
+    def linkedVerticalCursorColor(self) -> str:
         return self._linkedCursorColors_["vertical"]
     
     @markConfigurable("LinkedVerticalCursorColor", trait_notifier=True)
     @linkedVerticalCursorColor.setter
-    def linkedVerticalCursorColor(self, val):
+    def linkedVerticalCursorColor(self, val:str) -> None:
+        self._set_cursors_color(val, "vertical", True)
         #print("new linkedVerticalCursorColor %s" % val)
-        qcolor = colormaps.qcolor(val)
-        cname = qcolor.name(QtGui.QColor.HexArgb)
-        self._linkedCursorColors_["vertical"] = cname
-        for cursor in self.verticalCursors:
-            pen = cursor.linkedPen
-            pen.setColor(QtGui.QColor(self._linkedCursorColors_["vertical"]))
-            cursor.linkedPen = pen
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["LinkedVerticalCursorColor"] = cname
+        #qcolor = colormaps.qcolor(val)
+        #cname = qcolor.name(QtGui.QColor.HexArgb)
+        #self._linkedCursorColors_["vertical"] = cname
+        #for cursor in self.verticalCursors:
+            #pen = cursor.linkedPen
+            #pen.setColor(QtGui.QColor(self._linkedCursorColors_["vertical"]))
+            #cursor.linkedPen = pen
+        #if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            #self.configurable_traits["LinkedVerticalCursorColor"] = cname
         
     @property
-    def cursorHoverColor(self, val) -> str:
+    def cursorHoverColor(self) -> str:
         return self._cursorHoverColor_
     
     @markConfigurable("CursorHoverColor")
     @cursorHoverColor.setter
-    def cursorHoverColor(self, val):
-        qcolor = colormaps.qcolor(val)
-        cname = qcolor.name(QtGui.QColor.HexArgb)
-        self._cursorHoverColor_ = cname
-        for c in self.cursors:
-            pen = c.hoverPen
-            pen.setColor(QtGui.QColor(self._cursorHoverColor_))
-            c.hoverPen = pen
+    def cursorHoverColor(self, val:str) -> None:
+        self._set_cursors_color(val, "hover")
+        #qcolor = colormaps.qcolor(val)
+        #cname = qcolor.name(QtGui.QColor.HexArgb)
+        #self._cursorHoverColor_ = cname
+        #for c in self.cursors:
+            #pen = c.hoverPen
+            #pen.setColor(QtGui.QColor(self._cursorHoverColor_))
+            #c.hoverPen = pen
             
-        if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            self.configurable_traits["CursorHoverColor"] = self._cursorHoverColor_
+        #if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            #self.configurable_traits["CursorHoverColor"] = self._cursorHoverColor_
         
+    # ### END properties
+    
+    # ### BEGIN private methods
                 
     def _update_annotations_(self, data=None):
         self.dataAnnotations.clear()
@@ -1231,6 +1242,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionDetect_Triggers.triggered.connect(self.slot_detectTriggers)
         self.actionDetect_Triggers.setEnabled(False)
         
+    # ### END private methods
+
     def addCursors(self, cursorType="c", *where, **kwargs):
         """Manually adds a set of cursors to the selected axes in the SignalViewer window.
         
@@ -1528,145 +1541,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #self._plotOverlayFrame_()
         self.addCursors(cursorType, where, xwindow = xwindow, ywindow = ywindow, labels = labels)
         
-    #def setupLTPCursors(self, LTPOptions, pathway, axis=None):
-        #""" Convenience function for setting up cursors for LTP experiments:
-        
-        #Arguments:
-        #==========
-        
-        #LTPOptions: a dict with the following mandatory key/value pairs:
-        
-            #{'Average': {'Count': 6, 'Every': 6},
-
-            #'Cursors': 
-                #{'Labels':  ['Rbase',
-                            #'Rs',
-                            #'Rin',
-                            #'EPSC0base',
-                            #'EPSC0Peak',
-                            #'EPSC1base',
-                            #'EPSC1peak'],
-
-                #'Pathway0': [0.06,
-                            #0.06579859882206893,
-                            #0.16,
-                            #0.26,
-                            #0.273,
-                            #0.31,
-                            #0.32334583993039734],
-
-                #'Pathway1': [5.06,
-                            #5.065798598822069,
-                            #5.16,
-                            #5.26,
-                            #5.273,
-                            #5.31,
-                            #5.323345839930397],
-
-                #'Windows': [0.01, 0.003, 0.01, 0.01, 0.005, 0.01, 0.005]},
-
-            #'Pathway0': 0,
-
-            #'Pathway1': 1,
-
-            #'Reference': 5,
-
-            #'Signals': ['Im_prim_1', 'Vm_sec_1']}
-            
-        #pathway: int = the pathway for which the cursors are shown: can be 0 or 1
-        
-        #axis: optional default None: an int index into the axis receiving the cursors
-            #(when None, the fist axis i.e. at index 0, is chosen)
-        #"""
-        #if axis is not None:
-            #if isinstance(axis, int):
-                #if axis < 0 or axis >= len(self.axesWithLayoutPositions):
-                    #raise ValueError("When specified, axis must be an integer between 0 and %d" % len(self.axesWithLayoutPositions))
-                
-                #self.currentAxis = axis
-                
-            #else:
-                #raise ValueError("When specified, axis must be an integer between 0 and %d" % len(self.axesWithLayoutPositions))
-            
-        
-        #self.setupCursors("v", LTPOptions["Cursors"]["Pathway%d"%pathway])
-            
-    @pyqtSlot(int)
-    @safeWrapper
-    def slot_analogSignalsComboBoxIndexChanged(self, index):
-        if index == 0:
-            self.guiSelectedSignalNames.clear()
-            
-        elif index == self.selectSignalComboBox.count()-1:
-            self.guiSelectedSignalNames.clear()
-            # TODO call selection dialog
-            
-            current_txt = self.selectSignalComboBox.currentText()
-            
-            available = [self.selectSignalComboBox.itemText(k) for k in range(1, self.selectSignalComboBox.count()-1)]
-            
-            if current_txt in available:
-                preSelected = current_txt
-                
-            else:
-                preSelected = None
-                
-            dlg = pgui.ItemsListDialog(parent=self,
-                                       itemsList = available,
-                                       preSelected=preSelected,
-                                       title="Select Analog Signals to Plot",
-                                       modal = True,
-                                       selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
-            
-            if dlg.exec() == 1:
-                sel_items = dlg.selectedItemsText
-                
-                if len(sel_items):
-                    self.guiSelectedSignalNames[:] = sel_items[:]
-                    
-        else:
-            self.guiSelectedSignalNames = [self.selectSignalComboBox.currentText()]
-
-        self.displayFrame()
-        
-    @pyqtSlot(int)
-    @safeWrapper
-    def slot_plotAnalogSignalsCheckStateChanged(self, state):
-        if state == QtCore.Qt.Checked:
-            self._plot_analogsignals_ = True
-            
-        else:
-            self._plot_analogsignals_ = False
-            
-    @pyqtSlot(int)
-    @safeWrapper
-    def slot_plotIrregularSignalsCheckStateChanged(self, state):
-        if state == QtCore.Qt.Checked:
-            self._plot_irregularsignals_ = True
-            
-        else:
-            self._plot_irregularsignals_ = False
-            
-        self.displayFrame()
-        
-    @pyqtSlot()
-    @safeWrapper
-    def slot_showCoordinatesDock(self):
-        self.coordinatesDockWidget.show()
-        
-    @pyqtSlot()
-    @safeWrapper
-    def slot_showAnnotationsDock(self):
-        self.annotationsDockWidget.show()
-        
-    @pyqtSlot()
-    @safeWrapper
-    def slot_detectTriggers(self):
-        if isinstance(self.y, (neo.Block, neo.Segment)) or (isinstance(self.y, (tuple, list)) and all([isinstance(v, (neo.Block, neo.Segment)) for v in self.y])):
-            from gui.triggerdetectgui import TriggerDetectDialog
-            tdlg = TriggerDetectDialog(ephysdata=self.y, ephysViewer=self, parent=self)
-            tdlg.open()
-        
     @safeWrapper
     def reportCursors(self):
         text = list()
@@ -1782,6 +1656,146 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._cursor_coordinates_text_ = ""
     
         self._update_coordinates_viewer_()
+        
+    #def setupLTPCursors(self, LTPOptions, pathway, axis=None):
+        #""" Convenience function for setting up cursors for LTP experiments:
+        
+        #Arguments:
+        #==========
+        
+        #LTPOptions: a dict with the following mandatory key/value pairs:
+        
+            #{'Average': {'Count': 6, 'Every': 6},
+
+            #'Cursors': 
+                #{'Labels':  ['Rbase',
+                            #'Rs',
+                            #'Rin',
+                            #'EPSC0base',
+                            #'EPSC0Peak',
+                            #'EPSC1base',
+                            #'EPSC1peak'],
+
+                #'Pathway0': [0.06,
+                            #0.06579859882206893,
+                            #0.16,
+                            #0.26,
+                            #0.273,
+                            #0.31,
+                            #0.32334583993039734],
+
+                #'Pathway1': [5.06,
+                            #5.065798598822069,
+                            #5.16,
+                            #5.26,
+                            #5.273,
+                            #5.31,
+                            #5.323345839930397],
+
+                #'Windows': [0.01, 0.003, 0.01, 0.01, 0.005, 0.01, 0.005]},
+
+            #'Pathway0': 0,
+
+            #'Pathway1': 1,
+
+            #'Reference': 5,
+
+            #'Signals': ['Im_prim_1', 'Vm_sec_1']}
+            
+        #pathway: int = the pathway for which the cursors are shown: can be 0 or 1
+        
+        #axis: optional default None: an int index into the axis receiving the cursors
+            #(when None, the fist axis i.e. at index 0, is chosen)
+        #"""
+        #if axis is not None:
+            #if isinstance(axis, int):
+                #if axis < 0 or axis >= len(self.axesWithLayoutPositions):
+                    #raise ValueError("When specified, axis must be an integer between 0 and %d" % len(self.axesWithLayoutPositions))
+                
+                #self.currentAxis = axis
+                
+            #else:
+                #raise ValueError("When specified, axis must be an integer between 0 and %d" % len(self.axesWithLayoutPositions))
+            
+        
+        #self.setupCursors("v", LTPOptions["Cursors"]["Pathway%d"%pathway])
+            
+    # ### BEGIN PyQt slots
+    @pyqtSlot(int)
+    @safeWrapper
+    def slot_analogSignalsComboBoxIndexChanged(self, index):
+        if index == 0:
+            self.guiSelectedSignalNames.clear()
+            
+        elif index == self.selectSignalComboBox.count()-1:
+            self.guiSelectedSignalNames.clear()
+            # TODO call selection dialog
+            
+            current_txt = self.selectSignalComboBox.currentText()
+            
+            available = [self.selectSignalComboBox.itemText(k) for k in range(1, self.selectSignalComboBox.count()-1)]
+            
+            if current_txt in available:
+                preSelected = current_txt
+                
+            else:
+                preSelected = None
+                
+            dlg = pgui.ItemsListDialog(parent=self,
+                                       itemsList = available,
+                                       preSelected=preSelected,
+                                       title="Select Analog Signals to Plot",
+                                       modal = True,
+                                       selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
+            
+            if dlg.exec() == 1:
+                sel_items = dlg.selectedItemsText
+                
+                if len(sel_items):
+                    self.guiSelectedSignalNames[:] = sel_items[:]
+                    
+        else:
+            self.guiSelectedSignalNames = [self.selectSignalComboBox.currentText()]
+
+        self.displayFrame()
+        
+    @pyqtSlot(int)
+    @safeWrapper
+    def slot_plotAnalogSignalsCheckStateChanged(self, state):
+        if state == QtCore.Qt.Checked:
+            self._plot_analogsignals_ = True
+            
+        else:
+            self._plot_analogsignals_ = False
+            
+    @pyqtSlot(int)
+    @safeWrapper
+    def slot_plotIrregularSignalsCheckStateChanged(self, state):
+        if state == QtCore.Qt.Checked:
+            self._plot_irregularsignals_ = True
+            
+        else:
+            self._plot_irregularsignals_ = False
+            
+        self.displayFrame()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_showCoordinatesDock(self):
+        self.coordinatesDockWidget.show()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_showAnnotationsDock(self):
+        self.annotationsDockWidget.show()
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_detectTriggers(self):
+        if isinstance(self.y, (neo.Block, neo.Segment)) or (isinstance(self.y, (tuple, list)) and all([isinstance(v, (neo.Block, neo.Segment)) for v in self.y])):
+            from gui.triggerdetectgui import TriggerDetectDialog
+            tdlg = TriggerDetectDialog(ephysdata=self.y, ephysViewer=self, parent=self)
+            tdlg.open()
         
     @pyqtSlot(str)
     @safeWrapper
@@ -1955,6 +1969,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
         self.displayFrame()
          
+    # ### END PyQt slots
+
     def linkCursors(self, id1, *ids):
         """ Bidirectionally links cursors of the same type.
         Linked cursors move together when either of them is moved by the user.
@@ -2065,7 +2081,54 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         return crsID in self._data_cursors_
     
-    
+    def _set_cursors_color(self, val:typing.Any, cursortype:str, linked:bool=False):
+        """ Common color setter code for cursors
+        
+        Allowed cursortype values are: 'crosshair', 'horizontal', 'vertical' and 
+        'hover', in which case this changes the hover color for all cursors.
+        
+        The hover color is the color of the cursor when hovered by the mouse.
+        
+        linked: Changes the color of the normal (when False, the default) or 
+        linked cursors (when True) os the specified type.
+            Ignored when cursortype is 'hover'
+        
+        """
+        name, color = colormaps.get_name_color(val, palette="all")
+        
+        print("_set_cursors_color name", name, "color", color.name())
+        
+        cursorColorDict = self._linkedCursorColors_ if linked else self._cursorColors_
+        
+        if cursortype == "vertical":
+            cursors = self.verticalCursors
+            traitname = "LinkedVerticalCursorColor" if linked else "VerticalCursorColor"
+            
+        elif cursortype == "horizontal":
+            cursors = self.horizontalCursors
+            traitname = "LinkedHorizontalCursorColor" if linked else "HorizontalCursorColor"
+            
+        elif cursortype == "crosshair":
+            cursors = self.crosshairCursors
+            traitname = "LinkedCrosshairCursorColor" if linked else "CrosshairCursorColor"
+            
+        elif cursortype == "hover":
+            cursors = self.cursors
+            traitname = "CursorHoverColor"
+            
+        else:
+            raise ValueError("Unknown cursor type %s" % cursortype)
+        
+        cursorColorDict[cursortype] = name
+        
+        for cursor in cursors:
+            pen = cursor.pen
+            pen.setColor(color)
+            cursor.pen = pen
+        
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits[traitname] = name
+        
     def _addCursor_(self, cursor_type: typing.Union[str, SignalCursor.SignalCursorTypes], 
                     x: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
                     y: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,

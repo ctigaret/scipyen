@@ -33,6 +33,7 @@ What is new/different from the KWidgetsAddons classes:
     Color palettes moves to gui.scipyen_colormaps module
 """
 import os, typing
+from pprint import pprint
 import numpy as np
 
 from enum import IntEnum
@@ -43,13 +44,16 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from PyQt5.uic import loadUiType as __loadUiType__
 
 from core.prog import (safeWrapper, no_sip_autoconversion)
-
+from core.utilities import reverse_mapping_lookup
 from .painting_shared import (standardPalette, standardPaletteDict, svgPalette,
                               getPalette, paletteQColors, paletteQColor, 
                               standardQColor, svgQColor, mplColors, qtGlobalColors, 
                               canDecode, populateMimeData, fromMimeData,
                               createDrag, make_transparent_bg, make_checkers,
                               comboDelegateBrush,)
+
+from .scipyen_colormaps import qcolor, get_name_color
+
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -314,7 +318,7 @@ class ColorComboDelegate(QtWidgets.QAbstractItemDelegate):
         #print(cv)
         if isinstance(cv, QtGui.QColor):
             if cv.isValid():
-                #print(cv.name(QtGui.QColor.HexArgb))
+                #print("ColorComboDelegate paint: %s" % cv.name(QtGui.QColor.HexArgb))
                 innerColor = cv
                 paletteBrush = False
                 tmpRenderHints = painter.renderHints()
@@ -366,90 +370,72 @@ class ColorComboBox(QtWidgets.QComboBox):
                  transparentPixmap:typing.Optional[QtGui.QPixmap]=None,
                  keepAlphaOnDropPaste=False,
                  parent:typing.Optional[QtWidgets.QWidget]=None):
-        super().__init__(parent=parent)
-        #QtWidgets.QComboBox._init__(self, parent=parent)
-        self._colorList = []
+        
+        colorList = []
         self._colorDict = {}
         
+        self._customColor = None
+        self._customColorName = None
         
         if isinstance(palette, str):
             palette = getPalette(palette)
                 
-        if isinstance(palette, (tuple, list)):
-            self._colorList = [paletteQColor(palette, k) for k in range(len(palette))]
-            self._colorDict = dict(((c.name(QtGui.QColor.HexArgb), c) for c in self._colorList))
+        elif isinstance(palette, (tuple, list)):
+            palette = dict(map(lambda c: get_name_color(c,"all"), palette))
             
-        elif isinstance(palette, dict):
-            self._colorDict = dict([(k, paletteQColor(palette, k)) for k in palette.keys()])
             
-        else:
-            self._colorList = [standardQColor(k) for k in range(len(standardPalette))]
-            self._colorDict = dict(((c.name(QtGui.QColor.HexArgb), c) for c in self._colorList))
+        elif not isinstance(palette, dict):
+            palette = standardPaletteDict
             
-        #print("ColorComboBox.__init__:",self._colorList)
-        #print("ColorComboBox.__init__:",self._colorDict)
-                
-        if isinstance(color, QtCore.Qt.GlobalColor):
-            color = QtGui.QColor(color)
-            colorName= color.name(QtGui.QColor.HexArgb)
+        self._colorDict = dict([(k, paletteQColor(palette, k)) for k in palette.keys()])
+            #colorList = [standardQColor(k) for k in range(len(standardPalette))]
             
-        elif isinstance(color, str):
-            colorName = color
-            allColors = getPalette("a")
-            if colorName in allColors.keys():
-                color = QtGui.QColor(allColors[colorName])
-            else:
-                color = QtGui.QColor(colorName)
-                
-            if not color.isValid():
-                color = QtGui.QColor(QtCore.Qt.white)
-                colorName = color.name(QtGui.QColor.HexArgb)
-                
-            else:
-                colorName += " (%s)" % color.name(QtGui.QColor.HexArgb)
-                
-        elif not isinstance(color, QtGui.QColor) or not color.isValid():
-            color = QtGui.QColor(QtCore.Qt.white)
-            colorName = color.name(QtGui.QColor.HexArgb)
-            
-        else:
-            colorName = color.name(QtGui.QColor.HexArgb)
-            
-        self._customColor = color
+        if color is not None:
+            self._customColorName, self._customColor = get_name_color(color, "all")
         
-        self.setToolTip(colorName)
         #self._customColor = QtGui.QColor(QtCore.Qt.white)
-        self._internalColor = QtGui.QColor()
+        self._internalColor = QtGui.QColor() if self._customColor is None else self._customColor
+        self._internalColorName = self._customColorName
 
         self._tPmap = transparentPixmap
+        
         if not self._tPmap:
             self._tPmap = make_transparent_bg()
             
         self._keepAlpha = keepAlphaOnDropPaste
+        
         self._alpha = 255
         
         self._alphaChannelEnabled = alphaChannelEnabled
         
+        ndx = 1
+                
+        if len(self._colorDict) and self._internalColorName in self._colorDict:
+            nn,cc = zip(*self._colorDict.items())
+            ndx = cc.index(self._internalColorName)
+            
+        elif self._internalColorName:
+            ndx = 0
+            
+        # ### BEGIN initialization of Qt part
+        super().__init__(parent=parent)
+        
         self.setItemDelegate(ColorComboDelegate(self, self._tPmap))
+        
         self._addColors()
         super().activated[int].connect(self._slotActivated)
         super().highlighted[int].connect(self._slotHighlighted)
-        
-        #print("ColorComboBox colorName %s, color %s" % (colorName, self._customColor.name(QtGui.QColor.HexArgb)))
-        
-        if isinstance(self._customColor, QtGui.QColor) and \
-            self._customColor.isValid() and \
-            self._customColor in self._colorDict.values():
-            ndx = [c for c in self._colorDict.values()].index(self._customColor) + 1
-            #print("\tset to %i" % ndx)
-            self.setCurrentIndex(ndx)
+        print("\tset to %i" % ndx)
+        self.setCurrentIndex(ndx)
+        if ndx > 0:
             self._slotActivated(ndx)
-        else:
-            self.setCurrentIndex(1)
-            self._slotActivated(1)
             
         self.setMaxVisibleItems(13)
         self.setAcceptDrops(True)
+        if self._internalColorName:
+            self.setToolTip(self._internalColorName)
+        
+        # ### END initialization of Qt part
         
     @safeWrapper
     def dragEnterEvent(self, ev:QtGui.QDragEnterEvent):
@@ -501,15 +487,9 @@ class ColorComboBox(QtWidgets.QComboBox):
     def _addColors(self):
         self.addItem(self.tr("Custom...", "@item:inlistbox Custom color"))
         
-        #if len(self._colorList):
-            #for k in range(len(self._colorList)):
-                #c = self._colorList[k]
-                #if c.isValid():
-                    #self.addItem("")
-                    #self.setItemData(k + 1, c, ColorComboDelegate.ItemRoles.ColorRole)
-                    #self.setItemData(k + 1, c.name(QtGui.QColor.HexArgb), QtCore.Qt.ToolTipRole)
-                    
-        #elif len(self._colorDict):
+        if isinstance(self._internalColor, QtGui.QColor) and self._internalColor.isValid():
+            self.setItemData(0, self._internalColor, ColorComboDelegate.ItemRoles.ColorRole)
+        
         if len(self._colorDict):
             for k, (name, c) in enumerate(self._colorDict.items()):
                 if c.isValid():
@@ -535,14 +515,6 @@ class ColorComboBox(QtWidgets.QComboBox):
         self._alpha = color.alpha()
         
         if lookupInPresets:
-            #if len(self._colorList) and color in self._colorList:
-                #i = self._colorList.index(color)
-                #self.setCurrentIndex(i+1)
-                #self._internalColor = color
-                #self.setToolTip(color.name(QtGui.QColor.HexArgb))
-                #return
-            
-            #elif len(self._colorDict) and color in self._colorDict.values():
             if len(self._colorDict) and color in self._colorDict.values():
                 name = reverse_mapping_lookup(self._colorDict, color)
                 if isinstance(name, tuple) and len(name):
@@ -592,11 +564,6 @@ class ColorComboBox(QtWidgets.QComboBox):
                 self._customColor = c
                 self._setCustomColor(self._customColor, False)
                 
-        #elif len(self._colorList) and index <= len(self._colorList):
-            #c = self._colorList[index - 1]
-            #if c.isValid():
-                #self._internalColor = c
-                
         elif len(self._colorDict) and index <= len(self._colorDict):
             c = [v for v in self._colorDict.values()][index - 1]
             if c.isValid():
@@ -617,11 +584,6 @@ class ColorComboBox(QtWidgets.QComboBox):
     def _slotHighlighted(self, index:int):
         if index == 0:
             self._internalColor = self._customColor
-            
-        #elif len(self._colorList) and index <= len(self._colorList):
-            #c = self._colorList[index-1]
-            #if c.isValid():
-                #self._internalColor = c
                 
         elif len(self._colorDict) and index <= len(self._colorDict):
             c = [v for v in self._colorDict.values()][index - 1]
@@ -633,10 +595,6 @@ class ColorComboBox(QtWidgets.QComboBox):
             if c.isValid():
                 self._internalColor = c
                 
-        #elif index <= len(self._colorList):
-            #c = self._colorList[index - 1]
-            #if c.isValid():
-                #self._internalColor = c
         else:
             return
         
@@ -664,11 +622,6 @@ class ColorComboBox(QtWidgets.QComboBox):
     def colors(self) -> typing.List[QtGui.QColor]:
         """The list of currently displayed colors (beginning with the custom one)
         """
-        #if len(self._colorList):
-            #if self.color.isValid():
-                #return [self.color] + self._colorList
-            #return self._colorList
-        #elif len(self._colorDict):
         if len(self._colorDict):
             if self.color.isValid():
                 return [self.color] + [c for c in self._colorDict.values()]
@@ -677,7 +630,6 @@ class ColorComboBox(QtWidgets.QComboBox):
             if self.color.isValid():
                 return [self.color] + [QtGui.QColor(*c) for c in standardPalette]
             return [QtGui.QColor(*c) for c in standardPalette]
-            #return [QtGui.QColor(c[0],c[1],c[2]) for c in standardPalette]
     
     @colors.setter
     def colors(self, value:typing.Union[dict,list, str]):
@@ -687,8 +639,8 @@ class ColorComboBox(QtWidgets.QComboBox):
             value = getPalette(value)
             
         if isinstance(value, (tuple, list)):
-            self._colorList = [paletteQColor(value, k) for k in range(len(value))]
-            self._colorDict = dict(((c.name(QtGui.QColor.HexArgb), c) for c in self._colorList))
+            colorList = [paletteQColor(value, k) for k in range(len(value))]
+            self._colorDict = dict(((c.name(QtGui.QColor.HexArgb), c) for c in colorList))
         elif isinstance(value, dict):
             self._colorDict = dict([(k, paletteQColor(value, k)) for k in value.keys()])
         else:
@@ -709,12 +661,6 @@ class ColorComboBox(QtWidgets.QComboBox):
     def colorNames(self) -> typing.List[str]:
         """The list of color names in "#rrggbb" format
         """
-        #if len(self._colorList):
-            #if self.color.isValid():
-                #return [self.color.name(QtGui.QColor.HexArgb)] + [c.name(QtGui.QColor.HexArgb) for c in self._colorList]
-            #return [c.name(QtGui.QColor.HexArgb) for c in self._colorList]
-        
-        #elif len(self._colorDict):
         if len(self._colorDict):
             if self.color.isValid():
                 return [self.color.name(QtGui.QColor.HexArgb)] + [c.name(QtGui.QColor.HexArgb) for c in self._colorDict.values()]
@@ -750,8 +696,12 @@ class ColorComboBox(QtWidgets.QComboBox):
         
         frame = QtCore.QRect(self.style().subControlRect(QtWidgets.QStyle.CC_ComboBox, opt,
                                                         QtWidgets.QStyle.SC_ComboBoxEditField, self))
+        
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         painter.setPen(QtCore.Qt.transparent)
+        
+        #print("ColorComboBox.paintEvent _internalColor %s (is valid: %s)" % (self._internalColor.name(), self._internalColor.isValid()))
+        
         if self._internalColor.alpha() < 255 and isinstance(self._tPmap, QtGui.QPixmap):
             painter.setBrush(QtCore.Qt.NoBrush)
             painter.drawRoundedRect(frame.adjusted(1, 1, -1, -1), 2, 2)
@@ -760,4 +710,5 @@ class ColorComboBox(QtWidgets.QComboBox):
         else:
             painter.setBrush(QtGui.QBrush(self._internalColor))
             painter.drawRoundedRect(frame.adjusted(1, 1, -1, -1), 2, 2)
+            
         painter.end()

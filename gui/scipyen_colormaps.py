@@ -4,9 +4,53 @@ Brings matplotlib's cm and colors modules together with cmocean (if available)
 
 and our ow custom color maps
 
+Currently registered color palettes:
+
+Palette name            Type    Id          Values          Comments:
+================================================================================
+"standardPalette"       list    "std",      (r,g,b)         standard KDE    
+                                "kde",      tuple of int
+                                "standard"
+                                                                
+"standardPaletteDict"   dict    "stdd",     as above        standard KDE
+                                "kded", 
+                                "standardd"
+
+"svgPalette"            dict    "svg",      as above        X11/SVG standard
+                                "x11"
+
+"qtGlobalColors"        dict    "qt"        int (0..19)     Qt standard
+
+"qtGlobalColorsQual"    dict    "qqt"       as above        Qt standard;
+                                                            Keys are 'qualified'
+                                                            e.g. 'QtCore.Qt.blue'
+                                                            instead of 'blue'
+                                                            
+"mplBase"               dict    "base",     str, in hex     matplotlib base
+                                "mplbase"   format          colors
+                                            (#rrggbb)              
+                                            
+"mplCSS4"               dict    "css",      as above        matplotlib CSS/X11
+                                "css4",                     colors (same as
+                                "mplcss",                   X11/SVG standard)
+                                "mplcss4", 
+                                "mplx11"
+                                
+"mplTab"                dict    "tab",      as above        matplotlib TABLEAU
+                                "mpltab"                    colors
+                                
+"mplKXCD"               dict    "kxcd",     as above        matplotlib KXCD
+                                "mplkxcd"                   colors    
+                                
+"mplColors"             dict    "mpl",      as above        all of matplotlib
+                                "mat"                       paletted merged 
+                                                            into a dict
+                                                            
+================================================================================
 """
 import os,traceback, warnings
 import numbers
+import itertools
 # NOTE: 2020-11-28 10:20:06
 # upgrade to matplotlib 3.3.x
 # register new colormaps upon importing this module
@@ -336,49 +380,147 @@ def mpl2rgb(val:typing.Union[list, tuple]):
     """
     if not isinstance(val, (tuple, list)):
         raise TypeError("Expecting a sequence; got %s instead" % str(val))
-    if len(val) != 3:
-        raise ValueError("Expecting an R, G, B triplet; got %s instead" % str(val))
     
-    if all((v >= 0 and v <= 1 for v in val)):
-        return tuple((int(v*255) for v in val))
+    if all((isinstance(v, float) and v >= 0 and v <= 1 for v in val)):
+        if len(val) != 3:
+            raise ValueError("Expecting an R, G, B triplet; got %s instead" % str(val))
+        return tuple((map(lambda f: int(round(f*255)), val)))
     
     elif all((isinstance(v, int) and v in range(256) for v in val)):
+        if len(val) not in range(3,5):
+            raise ValueError("Expecting an R,G,B or R,G,B,A tuple; gt %s instead" % str(val))
         return val
     
     else:
         raise ValueError("Sequence must contain floats in [0,1] or integers in [0,255]")
         
-def qcolor(val):
+def qcolor(val:typing.Union[QtGui.QColor, int, str, typing.Sequence[typing.Union[int, float]]]) -> QtGui.QColor:
+    """Returns a QColor based on val.
+    
+    Parameters:
+    ===========
+    'val' QtGui.QColor, QtCore.Qt.GlobalColor, a str (standard color name) or a 
+        colorspec, which is one of:
+        * hex-format string (#rrggbb or #aarrggbb)
+        * 3- or 4-tuple of int with values in [0,255] (R,G,B or A,R,G,B)
+        * matplotlib style float triplet with values in [0,1] (r,g,b)
+        
+    Bypasses the palette lookup for all val types except when val is a str, in
+    which case returns the color stored in ALL palettes registered with this
+    module.
+    """
     if isinstance(val, QtGui.QColor):
         return val
+    
+    elif isinstance(val, QtCore.Qt.GlobalColor):
+        return QtGui.QColor(val)
     
     elif isinstance(val, (tuple, list)):
         return QtGui.QColor.fromRgb(*mpl2rgb(val))
     
+    elif isinstance(val, int):
+        if val in range(len(qtGlobalColors)):
+            # 0, 1 and 19 are 'color0', 'color1' and the transparent color
+            return QtGui.QColor(val)
+        
+        else:
+            return QtGui.QColor() # invalid color!
+    
     elif isinstance(val, str):
         if QtGui.QColor.isValidColor(val):
+            # this should take care of hex string representations e.g. #ffaabbcc
+            # as well as gobal color names e.g. "blue", "red", etc
             return QtGui.QColor(val)
         
-        elif val in standardPaletteDict:
-            return QtGui.QColor.fromRgb(standardPaletteDict[val])
+        else: # this will almost never get executed but keep here as safety net
+            palette = getPalette("all")
             
-        elif val in svgPalette:
-            return QtGui.QColor.fromRgb(svgPalette[val])
-        
-        elif val in qtGlobalColors:
-            return QtGui.QColor(val)
-        
-        elif val in mplColors:
-            return QtGui.QColor(mplColors[val])
-        
-        elif val in mplColors.values():
-            return QtGui.QColor(val)
-        
+            if val in palette:
+                return paletteQColor(palette, val)
+                #if isinstance(palette[val], (tuple, list)):
+                    #return QtGui.QColor.fromRgb(*mpl2rgb(palette[val]))
+                #else: # might be a str or a Qt.Globalcolor (int)
+                    #return QtGui.QColor(palette[val])
+                
+            else:
+                return QtGui.QColor()# invalid color!
     else:
         raise TypeError("Expecting a QColor, numeric 3- or 4-tuple, or str (color name or Hex representation); got %s instead" % val)
             
+def hexpalette(palette:typing.Union[dict, tuple, list], alpha:bool=True) -> dict:
+    fmt = QtGui.QColor.HexArgb if alpha else QtGui.QColor.HexRgb
+    if isinstance(palette, dict):
+        return dict((k, qcolor(c).name(fmt).lower()) for k,c in palette.items())
+    
+    elif isinstance(palette, (tuple, list)):
+        return dict(("%i" % k, qcolor(c).name(fmt).lower()) for k,c in enumerate(palette))
+    
+    else:
+        raise TypeError("Palette expected a dict or sequence; got %s instead" % type(palette).__name__)
         
-
+def gen_name_color(x:typing.Union[str, tuple, list, QtCore.Qt.GlobalColor, QtGui.QColor], 
+                   palette:typing.Optional[typing.Union[dict, tuple, list, str]]="all", 
+                   alpha:bool=False) -> typing.Generator[typing.Tuple[str, QtGui.QColor], None, None]:
+    """Return a tuple (color name, QColor) given 'x' and optionally, a palette.
+    
+    """
+    fmt = QtGui.QColor.HexArgb if alpha else QtGui.QColor.HexRgb
+    
+    color = qcolor(x)
+    
+    name = x if isinstance(x, str) else color.name(fmt) # fallback!
+    
+    if isinstance(palette, str):
+        palette = getPalette(palette)
+        
+    elif isinstance(palette, (tuple, list)):
+        palette = dict(map(lambda c: get_name_color(c,"all"), palette))
+        
+    if palette:
+        if isinstance(x, str):
+            if x.startswith("#"):
+                if len(x) == 7:
+                    hpal = hexpalette(palette, alpha=False)
+                elif len(x) == 9:
+                    hpal = hexpalette(palette, alpha=True)
+                else:
+                    raise ValueError("%s is not a valid color string")
+                
+                if x in hpal.values():
+                    nn,cc = zip(*hpal.items())
+                    index = cc.index(x)
+                    yield (nn[index], QtGui.QColor(cc[index]))
+                
+            elif x in palette:
+                yield (x, paletteQColor(palette, x))
+                #if isinstance(palette[x], tuple):
+                    #return (x, QtGui.QColor(*palette[x]))
+                #else:
+                    #return (x, QtGui.QColor(palette[x]))
+                
+        elif isinstance(x, (tuple, list, int, QtCore.Qt.GlobalColor)):
+            if x in palette.values():
+                nn,cc = zip(*palette.items())
+                index = cc.index(x)
+                colorspec = cc[index]
+                color = QtGui.QColor(*colorspec) if isinstance(colorspec, (tuple, list)) else QtGui.QColor(colorspec)
+                yield (nn[index], color)
+            
+        elif isinstance(x, QtGui.QColor):
+            #print(x.name(fmt))
+            hpal = hexpalette(palette, alpha=alpha)
+            if name in hpal.values():
+                nn,cc = zip(*hpal.items())
+                index = cc.index(name)
+                yield (nn[index], QtGui.QColor(cc[index]))
+                
+    yield (name, color)
+    
+def get_name_color(x:typing.Union[str, tuple, list, QtCore.Qt.GlobalColor, QtGui.QColor], 
+                   palette:typing.Optional[typing.Union[dict, tuple, list, str]]=None, 
+                   alpha:bool=False) -> typing.Tuple[str, QtGui.QColor]:
+    return next(gen_name_color(x, palette, alpha))
+    
 def standardQColor(i:int) -> QtGui.QColor:
     return paletteQColor(standardPalette, i)
 
@@ -386,9 +528,15 @@ def svgQColor(i:str) -> QtGui.QColor:
     return paletteQColor(svgPalette, i)
 
 def getPalette(name:str="std"):
-    """Returns a defined palette in this module by its module symbol (name).
+    """Returns a defined palette in this module by ann Id (str).
     
-    If no such symbol exist, return standardPalette by default
+    If no such symbol exist, return standardPalette by default.
+    For valid palette Id see module docstring
+    
+    In addition the Id "all" returns a dict with the following palettes merged:
+    standardPaletteDict,qtGlobalColors,svgPalette,mplTab,mplXKCD
+    
+    (mplCSS4 is left out because it contains the same entries as the svgPalette)
     
     """
     if len(name.strip()) == 0:
@@ -409,7 +557,7 @@ def getPalette(name:str="std"):
         return mplBase
     
     elif name in ("css",  "css4", "mplcss", "mplcss4", "mplx11"):
-        return mplCSS4
+        return mplCSS4 # same as svgPalette but in hexrgb format
     
     elif name in ("tab",  "mpltab"):
         return mplTab
@@ -425,7 +573,7 @@ def getPalette(name:str="std"):
     
     elif name in ("a", "all"):
         ret = dict()
-        for d in (standardPaletteDict,qtGlobalColors,svgPalette,mplColors):
+        for d in (standardPaletteDict,qtGlobalColors,svgPalette,mplTab,mplXKCD):
             ret.update(d)
             
         return ret
@@ -447,12 +595,14 @@ def genPaletteQColor(x) -> typing.Generator[QtGui.QColor, None, None]:
     [next(c, QGui.QColor()) for c in map(genPaletteQColor, standardPalette)] -> list of QtGui.QColor objects
     
     """
-    if isinstance(x, (tuple, list)) and len(x) in (3,4):
-        if all([isinstance(v, int) for v in x]):
-            yield QtGui.QColor(*x)
+    if isinstance(x, (tuple, list)):
+        yield QtGui.QColor(*mpl2rgb(x))
+    #if isinstance(x, (tuple, list)) and len(x) in (3,4):
+        #if all([isinstance(v, int) for v in x]):
+            #yield QtGui.QColor(*x)
             
-        elif all([isinstance(v, float) for v in x]):
-            yield QtGui.QColor(*(map(lambda f: int(round(f*255)), x))) # convert 0..1 float into 0..25 int values
+        #elif all([isinstance(v, float) for v in x]):
+            #yield QtGui.QColor(*(map(lambda f: int(round(f*255)), x))) # convert 0..1 float into 0..25 int values
     
     elif isinstance(x, (QtGui.QColor, QtCore.Qt.GlobalColor)):
         yield QtGui.QColor(x)
@@ -475,7 +625,6 @@ def genPaletteQColor(x) -> typing.Generator[QtGui.QColor, None, None]:
                 yield QtGui.QColor(mplTab[parts[-1]])
             elif any(["xkcd" in p for p in parts]):
                 yield QtGui.QColor(mplXKCD[parts[-1]])
-            #elif any([s in parts for s in ("mpl", "mat")]):
             elif any([any([s in p for s in ("mpl", "mat")] for p in parts)]):
                 yield QtGui.QColor(mplColors[parts[-1]])
                 
@@ -530,25 +679,7 @@ def paletteQColors(palette:typing.Union[dict, tuple, list, str]) -> typing.Gener
             
         When a str, this identifies a registered color palette.
         
-        Currently registered color palettes are gioen in the next table:
-        
-        Palette name            Type    Identifiers                 Comments:
-        ========================================================================
-        "standardPalette"       list    "std",  "kde",  "standard", standard KDE
-        "standardPaletteDict"   dict    "stdd", "kded", "standardd" standard KDE
-        "qtGlobalColor"         dict    "qt"                        Qt.GlobalColor colors
-        "svgPalette"            dict    "svg",  "x11"               X11/SVG standard
-        "mplBase"               dict    "base", "mplbase"           matplotlib base
-        "mplCSS4"               dict    "css",  "css4", "mplcss",   matplotlib CSS/X11
-                                        "mplcss4", "mplx11"
-        "mplTab"                dict    "tab",  "mpltab"            matplotlib TABLEAU
-        "mplKXCD"               dict    "kxcd", "mplkxcd"           matplotlib KXCD colors
-        "mplColors"             dict    "mpl",  "mat"               all matplotlib
-                                                                    paletted listed above
-                                                                    merged into a dict
-        <no name>               dict    "all", "a"                  All of the above
-                                                                    merged into a dict
-        ========================================================================
+        See this module's documentation for available palettes
     """
     if isinstance(palette, dict):
         iterable = palette.values()
@@ -557,7 +688,8 @@ def paletteQColors(palette:typing.Union[dict, tuple, list, str]) -> typing.Gener
 
     return (next(c, QtGui.QColor()), palette)
 
-def paletteQColor(palette:typing.Union[dict, list, tuple, str], index:typing.Union[int, str]) -> QtGui.QColor:
+def paletteQColor(palette:typing.Union[dict, list, tuple, str], 
+                  index:typing.Union[int, str]) -> QtGui.QColor:
     """Retrieve color entry from a color palette.
     
     Parameters: 
@@ -566,50 +698,33 @@ def paletteQColor(palette:typing.Union[dict, list, tuple, str], index:typing.Uni
     raised the function will return an invalid QColor.
 
     palette: A sequence, a mapping, or a str (palette name)
-        When a sequence, its elements can be:
-        a) sequences of 3 or 4 int elements: (r, g, b) , or (r, g, b, a)
-            (with 3 elements alpha channel a = 255 is implied)
-        b) QtCore.Qt.GlobalColor objects
-        c) QtGui.QColor objects
-        d) str - color name
-            Either a simple color name (e.g., "red") - represeting an internal
-            Qt.GlobalColor (e.g. QtCore.Qt.red)
+            When a sequence, its elements can be:
+            a) sequences of 3 or 4 int elements: (r, g, b) , or (r, g, b, a)
+                (with 3 elements alpha channel a = 255 is implied)
+            b) QtCore.Qt.GlobalColor objects (or int)
+            c) QtGui.QColor objects
+            d) str - color name (as found in palettes)
+                Either a simple color name (e.g., "red") - represeting an 
+                internal Qt.GlobalColor (e.g. QtCore.Qt.red)
+                
+                or a qualified name e.g., "QtCore.Qt.red" 
+                (which in this example evaluates to the same QColor as above); 
+                
+                Allowed values for the prefix are (case-insensitive):
+                "Qt", "QtCore", "QtCore.Qt", "standard", and "SVG"
+                
+                this form allows the indirect use of colors from several pre-defined
+                palettes including the Qt.GlobalColor and palettes that store colors
+                as name = value mapping.
+                
+            When a mapping (dict), it must contain str keys mapped to:
+                a) tuples of int values with 3 or 4 elements as above
+                b) a QtCore.Qt.GlobalColor object,
+                c) QtGui.QColor object
+                d) a str (another color name, either simple or qualified as above)
             
-            or name qualified by dot-separated prefix e.g. "QtCore.Qt.red" 
-            (which in this example evaluates to the same color as above); 
-            
-            Allowed values for the prefix are (case-insensitive):
-            "Qt", "QtCore", "QtCore.Qt", "standard", and "SVG"
-            
-            this form allows the indirect  use of colors from several pre-defined
-            palettes including the Qt.GlobalColor and palettes that store colors
-            as name = value mapping.
-            
-        When a mapping (dict), it must contain str keys mapped to:
-            a) tuples of int values with 3 or 4 elements as above
-            b) a QtCore.Qt.GlobalColor object,
-            c) QtGui.QColor object
-            d) a str (another color name, either simple or qualified as above)
-            
-        When a str, this identifies a registered color palette.
+            When a str, this the name of a registered color palette, or "all"
         
-        Currently registered color palettes are gioen in the next table:
-        
-        Palette name            Type    Identifiers                 Comments:
-        ========================================================================
-        "standardPalette"       list    "std",  "kde",  "standard", standard KDE
-        "standardPaletteDict"   dict    "stdd", "kded", "standardd" standard KDE
-        "svgPalette"            dict    "svg",  "x11"               X11/SVG standard
-        "mplBase"               dict    "base", "mplbase"           matplotlib base
-        "mplCSS4"               dict    "css",  "css4", "mplcss",   matplotlib CSS/X11
-                                        "mplcss4", "mplx11"
-        "mplTab"                dict    "tab",  "mpltab"            matplotlib TABLEAU
-        "mplKXCD"               dict    "kxcd", "mplkxcd"           matplotlib KXCD colors
-        "mplColors"             dict    "mpl",  "mat"               all matplotlib
-                                                                    paletted listed above
-                                                                    merged into a dict
-                                                                    
-        ========================================================================
                                                                     
     index: int or str
         Index into the palette. 
@@ -761,7 +876,7 @@ def read_colormap(filename:str, name:typing.Optional[str]=None,
     contain a directory name, then it is looked for in the following places,
     (in order):
         * the current working directory
-        * Scipoyen's configuration directory
+        * Scipyen's configuration directory
         * gui/rgb sub-directory in Scipyen's distribution
     
     name:str (optional default is None)
