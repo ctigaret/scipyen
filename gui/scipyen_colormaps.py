@@ -624,6 +624,7 @@ def paletteQColor(palette:typing.Union[dict, list, tuple, str], index:typing.Uni
     """
     if isinstance(palette, str):
         palette = getPalette(palette)
+        
     try:
         entry = palette[index] # CAUTION 2021-05-17 11:21:42 raise error if index is inappropriate for palette
         return next(genPaletteQColor(entry), QtGui.QColor())

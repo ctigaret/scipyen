@@ -6,7 +6,15 @@ from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty)
 from PyQt5.uic import loadUiType as __loadUiType__
 
 from .colorwidgets import (ColorComboBox, ColorPushButton,)
-from .scipyen_colormaps import(paletteQColor, standardQColor, standardPalette,)
+from .painting_shared import (standardPalette, standardPaletteDict, svgPalette,
+                              getPalette, paletteQColors, paletteQColor, 
+                              standardQColor, svgQColor, mplColors, qtGlobalColors, 
+                              canDecode, populateMimeData, fromMimeData,
+                              createDrag,
+                              )
+                                #make_transparent_bg, make_checkers,
+                                #comboDelegateBrush,)
+
 from . import quickdialog
 
 from .stylewidgets import PenComboBox
@@ -47,7 +55,7 @@ class ColorSelectionWidget(QtWidgets.QWidget):
         
     def _configureUI_(self):
         self._layout = QtWidgets.QHBoxLayout(self)
-        self._layout.setSpacing(2)
+        self._layout.setSpacing(0)
         for w in (self._colorComboBox, self._colorPushButton):
             self._layout.addWidget(w)
             
@@ -98,7 +106,8 @@ class ColorSelectionWidget(QtWidgets.QWidget):
 def quickColorDialog(parent:typing.Optional[QtWidgets.QWidget]=None, 
                      title:typing.Optional[str]=None,
                      labels:typing.Optional[typing.Union[dict, typing.List[str]]]=None,
-                     colors:typing.Optional[typing.List[typing.Union[str, QtGui.QColor]]] = None) -> dict:
+                     colors:typing.Optional[typing.List[typing.Union[str, QtGui.QColor]]] = None,
+                     palette:typing.Optional[typing.Union[dict,list, tuple, str]]=None) -> dict:
     
     dlg = quickdialog.QuickDialog(parent=parent, title=title)
     
@@ -139,8 +148,11 @@ def quickColorDialog(parent:typing.Optional[QtWidgets.QWidget]=None,
     
     for label, color in lbl_col.items():
         vgroup = quickdialog.VDialogGroup(group)
-        colorselwidgets[label] = ColorSelectionWidget(color=color, parent=vgroup)
-        vgroup.addWidget(colorselwidgets[label])
+        vgroup.layout.setSpacing(0)
+        #vgroup.defaultAlignment = QtCore.Qt.AlignHCenter
+        colorselwidgets[label] = ColorSelectionWidget(color=color, parent=vgroup, palette=palette)
+        vgroup.addWidget(QtWidgets.QLabel(label, vgroup), alignment=QtCore.Qt.AlignHCenter)
+        vgroup.addWidget(colorselwidgets[label], alignment=QtCore.Qt.AlignHCenter)
         group.addWidget(vgroup)
         
     dlg.addWidget(group)

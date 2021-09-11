@@ -2041,11 +2041,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if self.external_console.window.active_frontend is None:
                 # NOTE: 2021-01-30 13:54:46
                 # console instance exists but does not have an active frontend anymore
-                # therefore kill the running kernel (if any) and start with clean slate
+                # therefore kill the running kernel (if any and running) and start 
+                # with clean slate
                 if (self.external_console.kernel_manager is not None):
                     # kill the current (existing) kernel
                     try:
-                        self.external_console.kernel_manager.shutdown_kernel(now=True, restart=False)
+                        if hasattr(self.external_console.kernel_manager, "is_alive") and self.external_console.kernel_manager.is_alive():
+                            self.external_console.kernel_manager.shutdown_kernel(now=True, restart=False)
                     except Exception as e:
                         traceback.print_exc()
                     

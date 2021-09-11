@@ -808,6 +808,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("VerticalCursorColor")
     @verticalCursorColor.setter
     def verticalCursorColor(self, val):
+        #print("new verticalCursorColor %s" % val)
         qcolor = colormaps.qcolor(val)
         cname = qcolor.name(QtGui.QColor.HexArgb)
         self._cursorColors_["vertical"] = cname
@@ -870,6 +871,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("LinkedVerticalCursorColor", trait_notifier=True)
     @linkedVerticalCursorColor.setter
     def linkedVerticalCursorColor(self, val):
+        #print("new linkedVerticalCursorColor %s" % val)
         qcolor = colormaps.qcolor(val)
         cname = qcolor.name(QtGui.QColor.HexArgb)
         self._linkedCursorColors_["vertical"] = cname
@@ -4795,7 +4797,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot()
     def _slot_setCursorHoverColor(self):
         ret = quickColorDialog(parent=self, title="Cursor hover color",
-                               labels = {"Select color":QtGui.QColor(self.cursorHoverColor)})
+                               labels = {"Select color":QtGui.QColor(self.cursorHoverColor)},
+                               palette="a")
                                
         if len(ret):
             self.cursorHoverColor = ret["Select color"].name(QtGui.QColor.HexArgb)
@@ -4804,7 +4807,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def _slot_setVerticalCursorColors(self):
         ret = quickColorDialog(parent=self, title="Vertical cursor colors",
                                labels = {"Normal":QtGui.QColor(self.verticalCursorColor),
-                                         "Linked": QtGui.QColor(self.linkedVerticalCursorColor)})
+                                         "Linked": QtGui.QColor(self.linkedVerticalCursorColor)},
+                               palette="a")
                                
         if len(ret):
             self.verticalCursorColor = ret["Normal"].name(QtGui.QColor.HexArgb)
@@ -4814,7 +4818,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def _slot_setHorizontalCursorColors(self):
         ret = quickColorDialog(parent=self, title="Horizontal cursor colors",
                                labels = {"Normal":QtGui.QColor(self.horizontalCursorColor),
-                                         "Linked": QtGui.QColor(self.linkedHorizontalCursorColor)})
+                                         "Linked": QtGui.QColor(self.linkedHorizontalCursorColor)},
+                               palette="a")
                                
         if len(ret):
             self.horizontalCursorColor = ret["Normal"].name(QtGui.QColor.HexArgb)
@@ -4824,7 +4829,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def _slot_setCrosshairCursorColors(self):
         ret = quickColorDialog(parent=self, title="Crosshair cursor colors",
                                labels = {"Normal":QtGui.QColor(self.crosshairCursorColor),
-                                         "Linked": QtGui.QColor(self.linkedCrosshairCursorColor)})
+                                         "Linked": QtGui.QColor(self.linkedCrosshairCursorColor)},
+                               palette="a")
                                
         if len(ret):
             self.crosshairCursorColor = ret["Normal"].name(QtGui.QColor.HexArgb)

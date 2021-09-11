@@ -343,6 +343,19 @@ class SignalCursor(QtCore.QObject):
         if not self._follows_mouse_:
             scene.sigMouseMoved.connect(self._slot_mouse_event_)
             
+    def _set_cursor_pen_(self, pen):
+        if self._hl_ is not None:
+            self._hl_.setPen(pen)
+            if isinstance(self._hl_.label, pg.InfLineLabel):
+                self._hl_.label.setColor(pen.color())
+        
+        if self._vl_ is not None:
+            self._vl_.setPen(pen)
+            if isinstance(self._vl_.label, pg.InfLineLabel):
+                self._vl_.label.setColor(pen.color())
+        
+        self.update()
+            
     def _get_plotitem_data_bounds_(self, item):
         plotDataItems = [i for i in item.listDataItems() if isinstance(i, pg.PlotDataItem)]
         
@@ -1401,6 +1414,10 @@ class SignalCursor(QtCore.QObject):
         return self._default_pen_
     
     @property
+    def isLinked(self):
+        return self._linked_
+        
+    @property
     def pen(self):
         """A QtGui.QPen
         """
@@ -1413,19 +1430,12 @@ class SignalCursor(QtCore.QObject):
         
         self._pen_ = val
         
-        if self._hl_ is not None:
-            self._hl_.setPen(self._pen_)
-            
-            if isinstance(self._hl_.label, pg.InfLineLabel):
-                self._hl_.label.setColor(self._pen_.color())
-            
-        if self._vl_ is not None:
-            self._vl_.setPen(self._pen_)
-            if isinstance(self._vl_.label, pg.InfLineLabel):
-                self._vl_.label.setColor(self._pen_.color())
-            
-        self.update()
-            
+        if self._linked_:
+            self._set_cursor_pen_(self._linkedPen_)
+
+        else:
+            self._set_cursor_pen_(self._pen_)
+    
     @property
     def linkedPen(self):
         return self._linkedPen_
@@ -1436,14 +1446,12 @@ class SignalCursor(QtCore.QObject):
             raise TypeError("expecting a QtGui.QPen; got a %s instead" % type(val).__name__)
         
         self._linkedPen_ = val
-            
-        if self._hl_ is not None:
-            self._hl_.setPen(self._linkedPen_)
-            
-        if self._vl_ is not None:
-            self._vl_.setPen(self._linkedPen_)
-            
-        self.update()
+        
+        if self._linked_:
+            self._set_cursor_pen_(self._linkedPen_)
+
+        else:
+            self._set_cursor_pen_(self._pen_)
     
     @property
     def hoverPen(self):

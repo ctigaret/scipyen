@@ -1368,7 +1368,8 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             self._external_kernel_counter = 0
             if self.consoleapp.kernel_manager is not None:
                 try:
-                    self.consoleapp.kernel_manager.shutdown_kernel(now=True, restart=False)
+                    if hasattr(self.consoleapp.kernel_manager, "is_alive") and self.consoleapp.kernel_manager.is_alive():
+                        self.consoleapp.kernel_manager.shutdown_kernel(now=True, restart=False)
                 except Exception as e:
                     traceback.print_exc()
             #if isinstance(self._scipyenWindow_, QtWidgets.QMainWindow):
@@ -2207,7 +2208,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
 
     def init_colors(self, widget):
         """Configure the coloring of the widget"""
-        # Note: This will be dramatically simplified when colors
+        #Note: This will be dramatically simplified when colors
         # are removed from the backend.
 
         #print("ExternalIPython.init_colors(%s)" % widget)
