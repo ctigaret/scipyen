@@ -281,7 +281,7 @@ class SignalCursor(QtCore.QObject):
             self._hl_.addMarker("<|>", 0)
             self._hl_.addMarker("<|>", 1)
             
-            if isinstance(self._hl_.label, pg.InfLineLabel):
+            if isinstance(getattr(self._hl_, "label", None), pg.InfLineLabel):
                 self._hl_.label.setColor(self._pen_.color())
             
         else:
@@ -331,7 +331,7 @@ class SignalCursor(QtCore.QObject):
             self._vl_.addMarker("^", 0)
             self._vl_.addMarker("v", 1)
             
-            if isinstance(self._vl_.label, pg.InfLineLabel):
+            if isinstance(getattr(self._vl_, "label", None), pg.InfLineLabel):
                 self._vl_.label.setColor(self._pen_.color())
             
         else:

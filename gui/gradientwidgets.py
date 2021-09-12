@@ -18,7 +18,7 @@ from core.utilities import (counter_suffix, reverse_dict, reverse_mapping_lookup
 
 from .painting_shared import (HoverPoints, x_less_than, y_less_than,
                               qtGlobalColors, standardPalette, standardPaletteDict, 
-                              svgPalette, getPalette, paletteQColors, paletteQColor, 
+                              svgPalette, getPalette, paletteQColor, 
                               standardQColor, svgQColor, qtGlobalColors, mplColors,
                               make_transparent_bg, make_checkers,
                               comboDelegateBrush,
@@ -32,6 +32,7 @@ from .painting_shared import (HoverPoints, x_less_than, y_less_than,
                               normalizeGradient, 
                               scaleGradient,
                               rescaleGradient,
+                              ColorPalette,
                               )
 
 from .planargraphics import (ColorGradient, colorGradient,)

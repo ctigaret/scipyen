@@ -1,5 +1,6 @@
 import os, typing
 from itertools import (cycle, repeat)
+from traitlets import Bunch
 
 from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml)
 from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty)
@@ -7,10 +8,10 @@ from PyQt5.uic import loadUiType as __loadUiType__
 
 from .colorwidgets import (ColorComboBox, ColorPushButton,)
 from .painting_shared import (standardPalette, standardPaletteDict, svgPalette,
-                              getPalette, paletteQColors, paletteQColor, 
+                              getPalette, paletteQColor, 
                               standardQColor, svgQColor, mplColors, qtGlobalColors, 
                               canDecode, populateMimeData, fromMimeData,
-                              createDrag,
+                              createDrag, get_name_color, ColorPalette,
                               )
                                 #make_transparent_bg, make_checkers,
                                 #comboDelegateBrush,)
@@ -65,29 +66,24 @@ class ColorSelectionWidget(QtWidgets.QWidget):
             self._colorPushButton.color = self._colorComboBox.color
             self._color = self._colorComboBox.color
 
-        self._colorComboBox.activated.connect(self._colorPushButton.slot_setColor)
-        self._colorComboBox.activated.connect(self.colorChanged)
-        self._colorPushButton.changedColor.connect(self._colorComboBox.slot_setColor)
-        self._colorPushButton.changedColor.connect(self.colorChanged)
-            
+        self._colorComboBox.activated.connect(self.slot_setColor)
+        self._colorPushButton.changedColor.connect(self.slot_setColor)
         
     @pyqtSlot(QtGui.QColor)
     def slot_setColor(self, color):
-        self._color = QtGui.QColor(color)
-        sigblock = QCore.QSignalBlocker(self._colorPushButton)
-        self._colorPushButton.color = color
-        self._colorComboBox._setCustomColor(color)
-        
+        self.color = color
         
     @property
     def color(self):
         return QtGui.QColor(self._color)
     
     @color.setter
-    def color(self, value:QtGui.QColor):
-        if isinstance(value, QtGui.QColor) and value.isValid():
+    def color(self, color:QtGui.QColor):
+        if isinstance(color, QtGui.QColor) and color.isValid():
             self._color = color
-            sigblock = QCore.QSignalBlocker(self._colorPushButton)
+            n,c = get_name_color(self._color, "all")
+            print(f"ColorSelectionWidget color.setter {n}, {c}")
+            sigblock = QtCore.QSignalBlocker(self._colorPushButton)
             self._colorPushButton.color = color
             self._colorComboBox._setCustomColor(color)
             self.colorChanged.emit(self._color)
@@ -125,6 +121,7 @@ def quickColorDialog(parent:typing.Optional[QtWidgets.QWidget]=None,
                     lbl = list(labels)
                     lbl.extend("color%i" % k for k in range(len(labels), len(colors)))
                     lbl_col = dict(zip(lbl, colors))
+                    
                 elif len(labels) > len(colors):
                     clr = list(colors)
                     cc = cycle(cl)
@@ -161,10 +158,11 @@ def quickColorDialog(parent:typing.Optional[QtWidgets.QWidget]=None,
         
     dlgret = dlg.exec()
     
-    ret = dict()
+    ret = Bunch()
     
     if dlgret:
-        ret = dict((lbl, w.color) for lbl, w in colorselwidgets.items())
+        f = lambda x: Bunch(name=x[0], color=x[1])
+        ret = Bunch((lbl, f(get_name_color(w.color, "all"))) for lbl, w in colorselwidgets.items())
         
     return ret
         

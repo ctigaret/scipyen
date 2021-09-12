@@ -46,11 +46,11 @@ from PyQt5.uic import loadUiType as __loadUiType__
 from core.prog import (safeWrapper, no_sip_autoconversion)
 from core.utilities import reverse_mapping_lookup
 from .painting_shared import (standardPalette, standardPaletteDict, svgPalette,
-                              getPalette, paletteQColors, paletteQColor, 
+                              getPalette, paletteQColor, 
                               standardQColor, svgQColor, mplColors, qtGlobalColors, 
                               canDecode, populateMimeData, fromMimeData,
                               createDrag, make_transparent_bg, make_checkers,
-                              comboDelegateBrush,)
+                              comboDelegateBrush,ColorPalette)
 
 from .scipyen_colormaps import qcolor, get_name_color
 
@@ -89,7 +89,6 @@ class ColorPushButton(QtWidgets.QPushButton):
         
         self.setAcceptDrops(True)
         self.clicked.connect(self._chooseColor)
-        #print("ColorPushButton color", self.color.name(QtGui.QColor.HexArgb))
         
     @safeWrapper
     def initStyleOption(self, opt:QtWidgets.QStyleOptionButton):
@@ -365,7 +364,7 @@ class ColorComboBox(QtWidgets.QComboBox):
     colorChanged = pyqtSignal(QtGui.QColor, name="colorChanged")
 
     def __init__(self, color:typing.Optional[typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor, str]]=None, 
-                 palette:typing.Optional[typing.Union[list, tuple, dict, str]]=standardPalette,
+                 palette:typing.Optional[typing.Union[list, tuple, dict, str, ColorPalette]]=standardPalette,
                  alphaChannelEnabled:bool=True,
                  transparentPixmap:typing.Optional[QtGui.QPixmap]=None,
                  keepAlphaOnDropPaste=False,
@@ -377,18 +376,21 @@ class ColorComboBox(QtWidgets.QComboBox):
         self._customColor = None
         self._customColorName = None
         
-        if isinstance(palette, str):
-            palette = getPalette(palette)
+        if isinstance(palette, ColorPalette):
+            self._palette = palette
+            
+        elif isinstance(palette, str):
+            self._palette = ColorPalette(collection_name=palette)
                 
         elif isinstance(palette, (tuple, list)):
-            palette = dict(map(lambda c: get_name_color(c,"all"), palette))
+            self._palette = ColorPalette(None,
+                                         palette=dict(map(lambda c: get_name_color(c,"all"), palette)))
+        
+        elif isinstance(palette, dict):
+            self._palette = ColorPalette(None, {"palette": palette})
             
-            
-        elif not isinstance(palette, dict):
-            palette = standardPaletteDict
-            
-        self._colorDict = dict([(k, paletteQColor(palette, k)) for k in palette.keys()])
-            #colorList = [standardQColor(k) for k in range(len(standardPalette))]
+        else:
+            self._palette = ColorPalette(None, {"standard":standardPaletteDict})
             
         if color is not None:
             self._customColorName, self._customColor = get_name_color(color, "all")
@@ -490,13 +492,22 @@ class ColorComboBox(QtWidgets.QComboBox):
         if isinstance(self._internalColor, QtGui.QColor) and self._internalColor.isValid():
             self.setItemData(0, self._internalColor, ColorComboDelegate.ItemRoles.ColorRole)
         
-        if len(self._colorDict):
-            for k, (name, c) in enumerate(self._colorDict.items()):
-                if c.isValid():
-                    self.addItem(name)
-                    self.setItemData(k + 1, self._colorDict[name], 
+        #if len(self._colorDict):
+            #for k, (name, c) in enumerate(self._colorDict.items()):
+                #if c.isValid():
+                    #self.addItem(name)
+                    #self.setItemData(k + 1, self._colorDict[name], 
+                                     #ColorComboDelegate.ItemRoles.ColorRole)
+                    #self.setItemData(k + 1, self._colorDict[name], 
+                                     #QtCore.Qt.ToolTipRole)
+                
+        if len(self._palette):
+            for k, named_c[0], named_c[1] in enumerate(self._palette.named_qcolors):
+                if named_c[1].isValid():
+                    self.addItem(named_c[0])
+                    self.setItemData(k + 1, named_c[1], 
                                      ColorComboDelegate.ItemRoles.ColorRole)
-                    self.setItemData(k + 1, self._colorDict[name], 
+                    self.setItemData(k + 1, named_c[0], 
                                      QtCore.Qt.ToolTipRole)
                 
         else:

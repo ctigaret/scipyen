@@ -25,14 +25,16 @@ from .painting_shared import (make_transparent_bg,
                               standardQtBrushGradients,
                               standardQtBrushTextures,
                               standardPalette, standardPaletteDict, svgPalette,
-                              getPalette, paletteQColors, paletteQColor, 
+                              getPalette, paletteQColor, 
                               standardQColor, svgQColor, mplColors,
                               qtGlobalColors,
                               makeCustomPathStroke,
                               comboDelegateBrush,
                               scaleGradient,
                               normalizeGradient,
-                              rescaleGradient)
+                              rescaleGradient,
+                              ColorPalette,
+                              )
 
 from .quickdialog import QuickDialog
 from .gradientwidgets import GradientDialog

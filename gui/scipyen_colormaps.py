@@ -51,6 +51,7 @@ Palette name            Type    Id          Values          Comments:
 import os,traceback, warnings
 import numbers
 import itertools
+import types
 # NOTE: 2020-11-28 10:20:06
 # upgrade to matplotlib 3.3.x
 # register new colormaps upon importing this module
@@ -87,6 +88,7 @@ except:
     pass
 
 from core import scipyen_config as scipyenconf
+from core.utilities import unique
 
 standardPalette = (
     (255, 255, 255), # "white"
@@ -259,30 +261,30 @@ svgPalette = Bunch(
     palegreen	= (152, 251, 152),
     paleturquoise	= (175, 238, 238),
     palevioletred	= (219, 112, 147),
-    papayawhip	= (255, 239, 213),
+    papayawhip	 = (255, 239, 213),
     peachpuff	= (255, 218, 185),
     peru	= (205, 133, 63),
     pink	= (255, 192, 203),
     plum	= (221, 160, 221),
-    powderblue	= (176, 224, 230),
-    purple	= (128, 0, 128),
+    powderblue	 = (176, 224, 230),
+    purple = (128, 0, 128),
     red	= (255, 0, 0),
     rosybrown	= (188, 143, 143),
     royalblue	= ( 65, 105, 225),
     saddlebrown	= (139, 69, 19),
-    salmon	= (250, 128, 114),
-    sandybrown	= (244, 164, 96),
+    salmon	 = (250, 128, 114),
+    sandybrown	 = (244, 164, 96),
     seagreen	= ( 46, 139, 87),
     seashell	= (255, 245, 238),
-    sienna	= (160, 82, 45),
-    silver	= (192, 192, 192),
+    sienna	 = (160, 82, 45),
+    silver	 = (192, 192, 192),
     skyblue	= (135, 206, 235),
     slateblue	= (106, 90, 205),
     slategray	= (112, 128, 144),
     slategrey	= (112, 128, 144),
     snow	= (255, 250, 250),
-    springgreen	= ( 0, 255, 127),
-    steelblue	= ( 70, 130, 180),
+    springgreen 	= ( 0, 255, 127),
+    steelblue 	= ( 70, 130, 180),
     tan	= (210, 180, 140),
     teal	= ( 0, 128, 128),
     thistle	= (216, 191, 216),
@@ -312,6 +314,182 @@ for d in (mplBase, mplCSS4, mplTab, mplXKCD):
     mplColors.update(d)
     
 del d
+
+all_palettes = Bunch(
+    standardColors=standardPaletteDict,
+    qtGlobalColors=qtGlobalColors,
+    svgColors=svgPalette,
+    matlabColors=mplColors,
+    )
+        
+class ColorPalette(object):
+    def __init__(self, collection_name:typing.Optional[str]="all", **color_collections):
+        """
+        color_collections: mapping name:str = color_collection:dict 
+            
+            Each color collection is either:
+            * a mapping name:str = colorspec:(as below)
+            * a sequence (tuple, list) of colorspecs
+            
+            A colorspec is either:
+            * a hexformat str (#rrggbb or #aarrggbb)
+            * a str (found as key in any of the other color collection dicts)
+                -> useful for making aliases to defined colors
+            * a 3-tuple (R, G, B) of:
+                - float with values in [0,1] (matplotlib style)
+                - int with values in [0,255] (Qt style)
+            * a 4-tuple (R, G, B, A) of int with values in [0,1] (Qt style)
+            * an int (with value in range(20)) or QtCore.QtGlobalColor
+
+        """
+        if isinstance(collection_name, str):
+            g = globals()
+            
+            if isinstance(g.get(collection_name, None), Bunch):
+                color_collections.update({collection_name: g[collection_name]})
+                
+            elif collection_name in ("a", "all"):
+                color_collections.update(all_palettes)
+                
+            else:
+                color_collections.update({collection_name: getPalette(collection_name)})
+                
+        self._mappings_ = Bunch((n, m if isinstance(m, dict) else Bunch(map(lambda x: (get_name_color(x, "all")[0], x), m))) for n,m in color_collections.items())
+        
+    def __getitem_mappings__(self, key):#, default=None):
+        yield from (m.get(key, None) for m in self._mappings_.values())
+        #yield from (m.get(key, default) for m in self._mappings_.values())
+        
+    def __getitem__(self, key):
+        """Implements obj[key] (subscript access, or "bracket syntax"").
+        Returns a colorspec, a tuple of colorspecs (if key is present several times)
+        or None if key is not found.
+        """
+        if key in self.keys():
+            ret = tuple((v for v in self.__getitem_mappings__(key) if v is not None))
+            
+            if len(ret):
+                if len(ret) > 1:
+                    ret = unique(ret)
+                if len(ret) == 1:
+                    return ret[0]
+                return ret
+            
+        elif key in self._mappings_:
+            return self._mappings_[key]
+            
+    def __len__(self):
+        return sum((len(m) for m in self._mappings_.values()))
+            
+    def __str__(self):
+        from pprint import pformat
+        d = dict((k,v) for k,v in self.items())
+        return pformat(d)
+    
+    def __repr__(self):
+        ret = [f"{self.__class__}"]
+        ret.append(f"{len(self)}")
+        ret.append(self.__str__())
+        return "\n".join(ret)
+            
+    def _make_qcolor_(self, colorspec):
+        if isinstance(colorspec, (tuple, list)):
+            if len(colorspec) in range(3,5) and all(isinstance(v, numbers.Number) for v in colorspec):
+                yield QtGui.QColor(*mpl2rgb(colorspec))
+            
+            else:
+                yield from map(lambda x: self._make_qcolor_(x), colorspec)
+                #yield from (self._make_qcolor_(spec) for spec in colorspec)
+            
+        elif isinstance(colorspec, str):
+            if QtGui.QColor.isValidColor(colorspec):
+                yield QtGui.QColor(colorspec)
+
+        elif isinstance(colorspec, QtCore.Qt.GlobalColor):
+            yield QtGui.QColor(colorspec)
+            
+        elif isinstance(colorspec, int) and colorspec in range(20):
+            yield QtGui.QColor(colorspec)
+        
+    def values(self):
+        """Iterator for the colorspecs in this palette
+        """
+        yield from itertools.chain(*(m.values() for m in self._mappings_.values()))
+
+    def keys(self):
+        """Iterator for color names in this palette
+        """
+        yield from itertools.chain(*(m.keys() for m in self._mappings_.values()))
+        
+    def items(self):
+        """Iterator for (color name, color) in the ColorPalette's collections
+        """
+        yield from itertools.chain(*(m.items() for m in self._mappings_.values()))
+        
+    @property
+    def color_collections(self):
+        """Iterates through the color collections used in this ColorPalette
+        """
+        yield from self._mappings_.value()
+        
+    def color_collection(self, name):
+        """Returns a color collection in this ColorPalette palette by its name
+        """
+        return self._mappings_.get(name, None)
+        
+    @property
+    def collection_names(self):
+        """Iterator for the color collection names in this ColorPalette
+        """
+        yield from self._mappings_.keys()
+    
+    @property
+    def contents(self):
+        """Iterator (name, color collection) for this ColorPalette
+        """
+        yield from self._mappings_.items()
+        
+    @property
+    def number_of_collections(self):
+        return len(self._mappings_)
+    
+    @property
+    def qcolors(self):
+        """Iterator for the QColor objects encoded in this ColorPalette
+        """
+        yield from map(lambda x: next(self._make_qcolor_(x)), self.values())
+        
+    @property
+    def named_qcolors(self):
+        """Iterator for (name, QColor).
+        'name' is the palette name of the QColor, which is not necessarily what
+        is returned by QColor.name()
+        """
+        yield from map(lambda x: (x[0], next(self._make_qcolor_(x[1]))), self.items())
+        
+    def qcolor(self, key):
+        colorspec = self[key]
+
+        ret = [q for q in next(self._make_qcolor_(colorspec))]
+        
+        if len(ret):
+            if len(ret) == 1:
+                return ret[0]
+            return ret
+        
+    def key(self, colorspec, show_source:bool=False):
+        """Generator for finding the key(s) for the color with the given colorspec
+        """
+        if show_source:
+            yield from itertools.chain.from_iterable(((k,n) for k, v in m.items() if v == colorspec) for n,m in self._mappings_.items())
+        else:
+            yield from itertools.chain.from_iterable((k for k, v in m.items() if v == colorspec) for n,m in self._mappings_.items())
+    
+    def colorname(self, spec, show_source:bool=False):
+        ret = unique([n for n in self.key(spec, show_source=show_source)])
+        
+        if len(ret):
+            return ret
 
 # NOTE: 2021-05-17 10:11:57
 # About color lookup tables ImageJ "style"
@@ -493,10 +671,6 @@ def gen_name_color(x:typing.Union[str, tuple, list, QtCore.Qt.GlobalColor, QtGui
                 
             elif x in palette:
                 yield (x, paletteQColor(palette, x))
-                #if isinstance(palette[x], tuple):
-                    #return (x, QtGui.QColor(*palette[x]))
-                #else:
-                    #return (x, QtGui.QColor(palette[x]))
                 
         elif isinstance(x, (tuple, list, int, QtCore.Qt.GlobalColor)):
             if x in palette.values():
@@ -573,7 +747,7 @@ def getPalette(name:str="std"):
     
     elif name in ("a", "all"):
         ret = dict()
-        for d in (standardPaletteDict,qtGlobalColors,svgPalette,mplTab,mplXKCD):
+        for d in (qtGlobalColors,svgPalette,mplTab,mplXKCD):
             ret.update(d)
             
         return ret
@@ -597,12 +771,6 @@ def genPaletteQColor(x) -> typing.Generator[QtGui.QColor, None, None]:
     """
     if isinstance(x, (tuple, list)):
         yield QtGui.QColor(*mpl2rgb(x))
-    #if isinstance(x, (tuple, list)) and len(x) in (3,4):
-        #if all([isinstance(v, int) for v in x]):
-            #yield QtGui.QColor(*x)
-            
-        #elif all([isinstance(v, float) for v in x]):
-            #yield QtGui.QColor(*(map(lambda f: int(round(f*255)), x))) # convert 0..1 float into 0..25 int values
     
     elif isinstance(x, (QtGui.QColor, QtCore.Qt.GlobalColor)):
         yield QtGui.QColor(x)
@@ -641,54 +809,54 @@ def genPaletteQColor(x) -> typing.Generator[QtGui.QColor, None, None]:
     yield QtGui.QColor() # invalid color
         
         
-def paletteQColors(palette:typing.Union[dict, tuple, list, str]) -> typing.Generator[typing.Iterator[QtGui.QColor],
-                                                                                None,
-                                                                                None]:
-    """Iterates color entries in a color palette
+#def paletteQColors(palette:typing.Union[dict, tuple, list, str, ColorPalette]) -> typing.Generator[typing.Iterator[QtGui.QColor],
+                                                                                #None,
+                                                                                #None]:
+    #"""Iterates color entries in a color palette
     
-    Parameters: 
-    ===========
-    WARNING: the type of the parameters is not checked; if any exception are 
-    raised the function will return an invalid QColor.
+    #Parameters: 
+    #===========
+    #WARNING: the type of the parameters is not checked; if any exception are 
+    #raised the function will return an invalid QColor.
 
-    palette: A sequence, a mapping, or a str (palette name)
-        When a sequence, its elements can be:
-        a) sequences of 3 or 4 int elements: (r, g, b) , or (r, g, b, a)
-            (with 3 elements alpha channel a = 255 is implied)
-        b) QtCore.Qt.GlobalColor objects
-        c) QtGui.QColor objects
-        d) str - color name
-            Either a simple color name (e.g., "red") - represeting an internal
-            Qt.GlobalColor (e.g. QtCore.Qt.red)
+    #palette: A sequence, a mapping, or a str (palette name)
+        #When a sequence, its elements can be:
+        #a) sequences of 3 or 4 int elements: (r, g, b) , or (r, g, b, a)
+            #(with 3 elements alpha channel a = 255 is implied)
+        #b) QtCore.Qt.GlobalColor objects
+        #c) QtGui.QColor objects
+        #d) str - color name
+            #Either a simple color name (e.g., "red") - represeting an internal
+            #Qt.GlobalColor (e.g. QtCore.Qt.red)
             
-            or name qualified by dot-separated prefix e.g. "QtCore.Qt.red" 
-            (which in this example evaluates to the same color as above); 
+            #or name qualified by dot-separated prefix e.g. "QtCore.Qt.red" 
+            #(which in this example evaluates to the same color as above); 
             
-            Allowed values for the prefix are (case-insensitive):
-            "Qt", "QtCore", "QtCore.Qt", "standard", and "SVG"
+            #Allowed values for the prefix are (case-insensitive):
+            #"Qt", "QtCore", "QtCore.Qt", "standard", and "SVG"
             
-            this form allows the indirect  use of colors from several pre-defined
-            palettes including the Qt.GlobalColor and palettes that store colors
-            as name = value mapping.
+            #this form allows the indirect  use of colors from several pre-defined
+            #palettes including the Qt.GlobalColor and palettes that store colors
+            #as name = value mapping.
             
-        When a mapping (dict), it must contain str keys mapped to:
-            a) tuples of int values with 3 or 4 elements as above
-            b) a QtCore.Qt.GlobalColor object,
-            c) QtGui.QColor object
-            d) a str (another color name, either simple or qualified as above)
+        #When a mapping (dict), it must contain str keys mapped to:
+            #a) tuples of int values with 3 or 4 elements as above
+            #b) a QtCore.Qt.GlobalColor object,
+            #c) QtGui.QColor object
+            #d) a str (another color name, either simple or qualified as above)
             
-        When a str, this identifies a registered color palette.
+        #When a str, this identifies a registered color palette.
         
-        See this module's documentation for available palettes
-    """
-    if isinstance(palette, dict):
-        iterable = palette.values()
-    else:
-        iterable = palette
+        #See this module's documentation for available palettes
+    #"""
+    #if isinstance(palette, dict):
+        #iterable = palette.values()
+    #else:
+        #iterable = palette
 
-    return (next(c, QtGui.QColor()), palette)
+    #return (next(c, QtGui.QColor()), palette)
 
-def paletteQColor(palette:typing.Union[dict, list, tuple, str], 
+def paletteQColor(palette:typing.Union[dict, list, tuple, str, ColorPalette], 
                   index:typing.Union[int, str]) -> QtGui.QColor:
     """Retrieve color entry from a color palette.
     
@@ -740,9 +908,13 @@ def paletteQColor(palette:typing.Union[dict, list, tuple, str],
     if isinstance(palette, str):
         palette = getPalette(palette)
         
-    try:
-        entry = palette[index] # CAUTION 2021-05-17 11:21:42 raise error if index is inappropriate for palette
-        return next(genPaletteQColor(entry), QtGui.QColor())
+    try:# CAUTION 2021-05-17 11:21:42 raise error if index is inappropriate for palette
+        if isinstance(palette, (dict, tuple, list)):
+            entry = palette[index] 
+            return next(genPaletteQColor(entry), QtGui.QColor())
+        
+        elif isinstance(palette, ColorPalette):
+            return palette.qcolor(index)
             
     except:
         return QtGui.QColor()
@@ -750,7 +922,7 @@ def paletteQColor(palette:typing.Union[dict, list, tuple, str],
 def register_colormaps(colormap_dict, prefix:typing.Optional[str]=None, 
                        N:typing.Optional[int]=256,
                        gamma:typing.Optional[float]=1.0):
-    """Register custom colormaps collected in a dictionary.
+    """Register in matplotlib, custom colormaps collected in a dictionary.
     
     Parameters:
     ----------
@@ -774,7 +946,8 @@ def register_colormap(cdata, name:typing.Optional[str]=None,
                       prefix:typing.Optional[str]=None,
                       N:typing.Optional[int]=None, 
                       gamma:typing.Optional[float]=0.1):
-    
+    """Registers a custom colormap with matplotlib.
+    """
     if isinstance(cdata, dict) and all([s in cdata for s in ("red", "green", "blue")]):
         if not (isinstance(name, str) and len(name.strip())):
             name = "LinearSegmentedMap"

@@ -18,16 +18,11 @@ from itertools import chain
 from collections import deque, OrderedDict
 from numbers import Number
 import numpy as np
-#from numpy import ndarray
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
 import pandas as pd
 import quantities as pq
-#from pandas.core.base import PandasObject as PandasObject
-#from quantities import Quantity as Quantity
 import vigra
-
-#import xxhash
 
 try:
     from pyqtgraph import eq # not sure is needed
@@ -2745,7 +2740,7 @@ def sort_with_none(iterable, none_last = True):
 
 def unique(seq, key=None):
     """Returns a sequence of unique elements in sequence 'seq'.
-    
+    Function vrsion of gen_unique
     Parameters:
     -----------
     seq: an iterable sequence (tuple, list, range)
@@ -2758,10 +2753,61 @@ def unique(seq, key=None):
         unique(seq, lambda x: x._some_member_property_or_getter_function_)
     
     Returns:
+    =======
     A sequence containing unique elements in 'seq'.
     
     NOTE: Does not guarantee the order of the unique elements is the same as 
             their order in 'seq'
+            
+    WARNING: Only works with sequences of hashable types.
+    
+    See also gen_unique for a generator version.
+    
+    """
+    if isinstance(seq, tuple):
+        return tuple((item for item in gen_unique(seq)))
+    
+    else:
+        return [item for item in gen_unique(seq)]
+            
+    #if not isinstance(seq, (tuple, list, range)):
+        #raise TypeError("expecting an iterable sequence (i.e., a tuple, a list, or a range); got %sinstead" % type(seq).__name__)
+    
+    #seen = set()
+    
+    #if key is None:
+        #return [x for x in seq if x not in seen and not seen.add(x)]
+    
+    #else:
+        #return [x for x in seq if key not in seen and not seen.add(key)]
+
+def gen_unique(seq, key=None):
+    """Iterates through unique elements in seq
+    
+    Parameters:
+    -----------
+    seq: an iterable sequence (tuple, list, range)
+    
+    key: predicate for uniqueness (optional, default is None)
+        Typically, this is an object returned by a lambda function
+        
+        e.g.
+        
+        unique(seq, lambda x: x._some_member_property_or_getter_function_)
+    
+    Yields:
+    =======
+    Unique elements in 'seq'.
+    
+    NOTE: Does not guarantee the order of the unique elements is the same as 
+            their order in 'seq'
+            
+    WARNING: Only works with sequences of hashable types.
+    
+    See also:
+    ========
+    
+    unique for a function version
     
     """
     if not isinstance(seq, (tuple, list, range)):
@@ -2770,10 +2816,10 @@ def unique(seq, key=None):
     seen = set()
     
     if key is None:
-        return [x for x in seq if x not in seen and not seen.add(x)]
+        yield from (x for x in seq if x not in seen and not seen.add(x))
     
     else:
-        return [x for x in seq if key not in seen and not seen.add(key)]
+        yield from (x for x in seq if key not in seen and not seen.add(key))
 
 
 def __name_lookup__(container: typing.Sequence, name:str, 

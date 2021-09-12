@@ -13,10 +13,10 @@ from core.traitcontainers import DataBag
 
 from .scipyen_colormaps import (qtGlobalColors, standardPalette,
                                 standardPaletteDict, svgPalette,
-                                getPalette, paletteQColors, paletteQColor, 
-                                qcolor,
+                                getPalette, paletteQColor, 
+                                qcolor, get_name_color, 
                                 standardQColor, svgQColor,
-                                qtGlobalColors, mplColors)
+                                qtGlobalColors, mplColors, ColorPalette)
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 

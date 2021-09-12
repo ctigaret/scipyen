@@ -649,34 +649,12 @@ class DataBag(Bunch):
         """
         obs = object.__getattribute__(self, "__observer__")
         return obs._trait_values.values()
-        #try:
-            #if not hasattr(self, "__observer__"):
-                #return tuple()
-            #obs = object.__getattribute__(self, "__observer__")
-            #return obs._trait_values.values()
-            ##yield from (v for v in obs._trait_values.values())
-            ##yield from (obs._trait_values[k] for k in self.keys())
-        #except:
-            #traceback.print_exc()
-            #return tuple()
-            ##yield
     
     def items(self):
         """Generates an items 'view'
         """
         obs = object.__getattribute__(self, "__observer__")
         return obs._trait_values.items()
-        #try:
-            #if not hasattr(self, "__observer__"):
-                #return tuple()
-            #obs = object.__getattribute__(self, "__observer__")
-            #return obs._trait_values.items()
-            ##yield from (i for i in obs._trait_values.items())
-            ##yield from ((k, obs._trait_values[k]) for k in self.keys())
-        #except:
-            #traceback.print_exc()
-            #return tuple()
-            ##yield
         
     @property
     def notifiers(self):
