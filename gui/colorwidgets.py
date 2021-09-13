@@ -380,16 +380,17 @@ class ColorComboBox(QtWidgets.QComboBox):
             self._color_palette = palette
             
         elif isinstance(palette, str):
-            self._color_palette = ColorPalette(collection_name=palette)
+            self._color_palette = ColorPalette(palette = getPalette(palette))
+            #self._color_palette = ColorPalette(collection_name=palette)
                 
         elif isinstance(palette, (tuple, list)):
-            self._color_palette = ColorPalette(palette=dict(map(lambda c: get_name_color(c), palette)))
+            self._color_palette = ColorPalette(palette = dict(map(lambda c: get_name_color(c), palette)))
         
         elif isinstance(palette, dict):
             self._color_palette = ColorPalette(palette = palette)
             
         else:
-            self._color_palette = ColorPalette(palette = standardPaletteDict)
+            self._color_palette = ColorPalette() # the default: same contents as colormaps.defaultPalette
             
         self._customColor = Bunch(name="black", qcolor=QtGui.QColor("black"))
         
@@ -419,7 +420,7 @@ class ColorComboBox(QtWidgets.QComboBox):
                 
         if len(self._color_palette):
             if self._internalColor.name in self._color_palette:
-                ndx = self._color_palette.name_index(self._internalColor.name)
+                ndx = self._color_palette.name_index(self._internalColor.name) + 1
                 
             else:
                 ndx = 0
@@ -434,6 +435,7 @@ class ColorComboBox(QtWidgets.QComboBox):
         super().highlighted[int].connect(self._slotHighlighted)
         #print("\tset to %i" % ndx)
         self.setCurrentIndex(ndx)
+        
         if ndx > 0:
             self._slotActivated(ndx)
             

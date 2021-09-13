@@ -25,7 +25,27 @@ class ClickableInfiniteLine(pg.InfiniteLine):
             ev.accept()
             self.sig_double_clicked.emit()
             
+    def setHoverPen(self, *args, **kwargs):
+        if self.mouseHovering:
+            if isinstance(getattr(self, "label", None), pg.InfLineLabel):
+                self.label.setColor(self.hoverPen.color())
+            
+        super().setHoverPen(*args, **kwargs)
         
+    def setMouseHover(self, hover):
+        if self.mouseHovering == hover:
+            return
+        self.mouseHovering = hover
+        if hover:
+            self.currentPen = self.hoverPen
+        else:
+            self.currentPen = self.pen
+            
+        if isinstance(getattr(self, "label", None), pg.InfLineLabel):
+            self.label.setColor(self.currentPen.color())
+        
+        self.update()
+
 class SignalCursor(QtCore.QObject):
     """SignalCursor object.
     Covers either a SINGLE pyqtgraph.PlotItem (see crosshair.py in pyqtgraph/examples)

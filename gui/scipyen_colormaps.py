@@ -382,6 +382,9 @@ class ColorPalette(object):
         yield from (m.get(key, None) for m in self._mappings_.values())
         #yield from (m.get(key, default) for m in self._mappings_.values())
         
+    def __iter__(self):
+        return self.keys()
+        
     def __contains__(self, key):
         """Implements 'key in obj' idiom.
         Note that this is a strict comparison and therefore useful for testing
@@ -814,8 +817,7 @@ def qcolor(val:typing.Union[QtGui.QColor, int, str, typing.Sequence[typing.Union
         return QtGui.QColor()# invalid color!
         #raise TypeError("Expecting a QColor, numeric 3- or 4-tuple, or str (color name or Hex representation); got %s instead" % val)
             
-def hexpalette(palette:typing.Union[dict, tuple, list], alpha:bool=True) -> dict:
-    fmt = QtGui.QColor.HexArgb if alpha else QtGui.QColor.HexRgb
+def hexpalette(palette:typing.Union[dict, tuple, list], fmt:QtGui.QColor.NameFormat=QtGui.QColor.HexRgb) -> dict:
     if isinstance(palette, dict):
         return dict((k, qcolor(c).name(fmt).lower()) for k,c in palette.items())
     
@@ -827,14 +829,12 @@ def hexpalette(palette:typing.Union[dict, tuple, list], alpha:bool=True) -> dict
         
 def get_name_color(x:typing.Union[str, tuple, list, QtCore.Qt.GlobalColor, QtGui.QColor], 
                    palette:typing.Optional[typing.Union[dict, tuple, list, str, ColorPalette]]=None, 
-                   alpha:bool=False,
                    case_sensitive=False,
-                   tuple_strict=False) -> typing.Generator[typing.Tuple[str, QtGui.QColor], None, None]:
+                   tuple_strict=False,
+                   fmt:QtGui.QColor.NameFormat=QtGui.QColor.HexRgb) -> typing.Generator[typing.Tuple[str, QtGui.QColor], None, None]:
     """Return a tuple (color name, QColor) given 'x' and optionally, a palette.
     
     """
-    fmt = QtGui.QColor.HexArgb if alpha else QtGui.QColor.HexRgb
-    
     color = qcolor(x)
     
     
@@ -847,7 +847,7 @@ def get_name_color(x:typing.Union[str, tuple, list, QtCore.Qt.GlobalColor, QtGui
         palette = getPalette(palette)
         
     elif isinstance(palette, (tuple, list)):
-        palette = dict(map(lambda c: get_name_color(c,ColorPalette(palette=all_palettes)), palette))
+        palette = dict(map(lambda c: get_name_color(c,ColorPalette(fmt=fmt, palette=all_palettes)), palette))
         
     elif isinstance(palette, ColorPalette):
         if x in palette:
@@ -931,9 +931,6 @@ def getPalette(name:str="std"):
     name = name.lower()
     
     if name in ("std", "kde", "standard"):
-        return standardPalette
-    
-    elif name in ("stdd", "kded", "standardd"):
         return standardPaletteDict
     
     elif name in ("svg",  "x11"):
@@ -957,15 +954,15 @@ def getPalette(name:str="std"):
     elif name in ("qt",):
         return qtGlobalColors
     
-    elif name in ("a", "all"):
-        ret = dict()
-        for d in (qtGlobalColors,svgPalette,mplTab,mplXKCD):
-            ret.update(d)
+    #elif name in ("a", "all"):
+        #ret = dict()
+        #for d in (qtGlobalColors,svgPalette,mplTab,mplXKCD):
+            #ret.update(d)
             
-        return ret
+        #return ret
     
     else:
-        return standardPalette
+        return standardPaletteDict
     
     
 def genPaletteQColor(x) -> typing.Generator[QtGui.QColor, None, None]:

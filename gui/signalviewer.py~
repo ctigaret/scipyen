@@ -2024,13 +2024,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             ret = quickColorDialog(parent = self, title = title,
                                    labels = {"Normal":colormaps.qcolor(prop_normal.fget(self)),
-                                             "Linked":colormaps.qcolor(prop_linked.fget(self))},
-                                   palette = "all"
+                                             "Linked":colormaps.qcolor(prop_linked.fget(self))}
                                    )
                                    
             if len(ret):
-                print("ret")
-                pprint(ret)
+                #print("ret")
+                #pprint(ret)
                 prop_normal.fset(self, ret.Normal.name)
                 prop_linked.fset(self, ret.Linked.name)
 
@@ -2038,12 +2037,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             title = "Cursor hover color"
             prop = inspect.getattr_static(self, "cursorHoverColor")
             ret = quickColorDialog(parent = self, title = title,
-                                   labels = {"Select color", colormaps.qcolor(prop.fget(self))},
-                                   palette = "all"
+                                   labels = {"Color":colormaps.qcolor(prop.fget(self))}
                                    )
             
             if len(ret):
-                prop.fset(self, ret["Select color"].name)
+                prop.fset(self, ret.Color.name)
         else:
             raise ValueError("Unknown cursor type %s" % cursortype)
     
@@ -2062,30 +2060,42 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         name, color = colormaps.get_name_color(val)
         
+        print(f"_set_cursors_color {cursortype} (linked: {linked}): {name}")
         
-        cursorColorDict = self._linkedCursorColors_ if linked else self._cursorColors_
         
         if cursortype in ("crosshair", "horizontal", "vertical"):
+            cursorColorDict = self._linkedCursorColors_ if linked else self._cursorColors_
             ctype = cursortype.capitalize()
             lnk = "Linked" if linked else ""
-            print(f"_set_cursors_color for {lnk} {ctype}: color {color.name()} (named: {name})")
+            #print(f"_set_cursors_color for {lnk} {ctype}: color {color.name()} (named: {name})")
             cursors = getattr(self, f"{cursortype}Cursors")
             traitname = f"{lnk}{ctype}CursorColor"
+            cursorColorDict[cursortype] = name
             
         elif cursortype == "hover":
-            print(f"_set_cursors_color for hover: color {color.name()} (named: {name})")
+            #print(f"_set_cursors_color for hover: color {color.name()} (named: {name})")
             cursors = self.cursors
             traitname = "CursorHoverColor"
+            self._cursorHoverColor_ = name
         
         else:
             raise ValueError(f"Unknown cursor type {cursortype}")
         
-        cursorColorDict[cursortype] = name
+        #print(f"_set_cursors_color for {cursortype}: name {name} color {color}; traitname {traitname}")
+        
         
         for cursor in cursors:
-            pen = cursor.pen
-            pen.setColor(color)
-            cursor.pen = pen
+            if cursortype == "hover":
+                pen = cursor.hoverPen
+                pen.setColor(color)
+                cursor.hoverPen = pen
+            else:
+                pen = cursor.linkedPen if linked else cursor.pen
+                pen.setColor(color)
+                if linked:
+                    cursor.linkedPen = pen
+                else:
+                    cursor.pen = pen
         
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits[traitname] = name
@@ -2295,6 +2305,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             raise ValueError("unsupported cursor type %s" % cursor_type)
         
+        hoverPen = QtGui.QPen(QtGui.QColor(self._cursorHoverColor_), 1, QtCore.Qt.SolidLine)
+        hoverPen.setCosmetic(True)
+        
         nCursors = len(cursorDict)
         
         if label is None:
@@ -2316,6 +2329,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                    cursorID = crsId,
                                    linkedPen = linkedPen,
                                    pen = pen, 
+                                   hoverPen=hoverPen,
                                    parent = self, 
                                    follower = follows_mouse, 
                                    xBounds = xBounds,
@@ -4795,8 +4809,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot(bool)
     def _slot_setCursorsShowValue(self, val):
         self.cursorsShowValue = val is True
-        #for cursor in self._data_cursors_.values():
-            #cursor.setShowValue(val)
             
     @pyqtSlot()
     def _slot_setCursorLabelPrecision(self):
@@ -4813,48 +4825,18 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @pyqtSlot()
     def _slot_setCursorHoverColor(self):
         self._gui_chose_cursor_color_("hover")
-        #ret = quickColorDialog(parent=self, title="Cursor hover color",
-                               #labels = {"Select color":QtGui.QColor(self.cursorHoverColor)},
-                               #palette="a")
-                               
-        #if len(ret):
-            #self.cursorHoverColor = ret["Select color"].name(QtGui.QColor.HexArgb)
             
     @pyqtSlot()
     def _slot_setVerticalCursorColors(self):
         self._gui_chose_cursor_color_("vertical")
-        #ret = quickColorDialog(parent=self, title="Vertical cursor colors",
-                               #labels = {"Normal":QtGui.QColor(self.verticalCursorColor),
-                                         #"Linked": QtGui.QColor(self.linkedVerticalCursorColor)},
-                               #palette="a")
-                               
-        #if len(ret):
-            #self.verticalCursorColor = ret["Normal"]
-            #self.linkedVerticalCursorColor = ret["Linked"]
     
     @pyqtSlot()
     def _slot_setHorizontalCursorColors(self):
         self._gui_chose_cursor_color_("horizontal")
-        #ret = quickColorDialog(parent=self, title="Horizontal cursor colors",
-                               #labels = {"Normal":QtGui.QColor(self.horizontalCursorColor),
-                                         #"Linked": QtGui.QColor(self.linkedHorizontalCursorColor)},
-                               #palette="a")
-                               
-        #if len(ret):
-            #self.horizontalCursorColor = ret["Normal"].name(QtGui.QColor.HexArgb)
-            #self.linkedHorizontalCursorColor = ret["Linked"].name(QtGui.QColor.HexArgb)
     
     @pyqtSlot()
     def _slot_setCrosshairCursorColors(self):
         self._gui_chose_cursor_color_("crosshair")
-        #ret = quickColorDialog(parent=self, title="Crosshair cursor colors",
-                               #labels = {"Normal":QtGui.QColor(self.crosshairCursorColor),
-                                         #"Linked": QtGui.QColor(self.linkedCrosshairCursorColor)},
-                               #palette="a")
-                               
-        #if len(ret):
-            #self.crosshairCursorColor = ret["Normal"].name(QtGui.QColor.HexArgb)
-            #self.linkedCrosshairCursorColor = ret["Linked"].name(QtGui.QColor.HexArgb)
 
     @pyqtSlot(object, object)
     @safeWrapper
