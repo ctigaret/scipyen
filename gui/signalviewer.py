@@ -2024,13 +2024,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             ret = quickColorDialog(parent = self, title = title,
                                    labels = {"Normal":colormaps.qcolor(prop_normal.fget(self)),
-                                             "Linked":colormaps.qcolor(prop_linked.fget(self))},
-                                   palette = "all"
+                                             "Linked":colormaps.qcolor(prop_linked.fget(self))}
                                    )
                                    
             if len(ret):
-                print("ret")
-                pprint(ret)
+                #print("ret")
+                #pprint(ret)
                 prop_normal.fset(self, ret.Normal.name)
                 prop_linked.fset(self, ret.Linked.name)
 
@@ -2068,24 +2067,29 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if cursortype in ("crosshair", "horizontal", "vertical"):
             ctype = cursortype.capitalize()
             lnk = "Linked" if linked else ""
-            print(f"_set_cursors_color for {lnk} {ctype}: color {color.name()} (named: {name})")
+            #print(f"_set_cursors_color for {lnk} {ctype}: color {color.name()} (named: {name})")
             cursors = getattr(self, f"{cursortype}Cursors")
             traitname = f"{lnk}{ctype}CursorColor"
             
         elif cursortype == "hover":
-            print(f"_set_cursors_color for hover: color {color.name()} (named: {name})")
+            #print(f"_set_cursors_color for hover: color {color.name()} (named: {name})")
             cursors = self.cursors
             traitname = "CursorHoverColor"
         
         else:
             raise ValueError(f"Unknown cursor type {cursortype}")
         
+        #print(f"_set_cursors_color for {cursortype}: name {name} color {color}; traitname {traitname}")
+        
         cursorColorDict[cursortype] = name
         
         for cursor in cursors:
-            pen = cursor.pen
+            pen = cursor.linkedPen if linked else cursor.pen
             pen.setColor(color)
-            cursor.pen = pen
+            if linked:
+                cursor.linkedPen = pen
+            else:
+                cursor.pen = pen
         
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits[traitname] = name

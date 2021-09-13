@@ -8,7 +8,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 
 from .colorwidgets import (ColorComboBox, ColorPushButton,)
 from .painting_shared import (standardPalette, standardPaletteDict, svgPalette,
-                              getPalette, paletteQColor, 
+                              getPalette, paletteQColor, qcolor,
                               standardQColor, svgQColor, mplColors, qtGlobalColors, 
                               canDecode, populateMimeData, fromMimeData,
                               createDrag, get_name_color, ColorPalette,
@@ -29,28 +29,28 @@ class ColorSelectionWidget(QtWidgets.QWidget):
     
     def __init__(self, color:typing.Optional[QtGui.QColor]=None,
                  defaultColor:typing.Optional[QtGui.QColor]=None,
-                 palette:typing.Optional[typing.Union[dict,list, tuple, str]]=None,
+                 palette:typing.Optional[typing.Union[dict,list, tuple, str, ColorPalette]]=None,
                  useDefaultColor:bool=True,
                  alphaChannelEnabled:bool = True, 
                  transparentPixmap:typing.Optional[QtGui.QPixmap]=None,
                  keepAlphaOnDropPaste:bool=False,
                  parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent=parent)
-        self._color = color
+        self._color = qcolor(color)
 
-        self._colorPushButton = ColorPushButton(color=color, 
+        self._colorComboBox = ColorComboBox(self._color,
+                                            palette=palette,
+                                            alphaChannelEnabled=alphaChannelEnabled,
+                                            transparentPixmap=transparentPixmap,
+                                            parent=self)
+        
+        self._colorPushButton = ColorPushButton(self._color, 
                                                 defaultColor=defaultColor,
                                                 alphaChannelEnabled=alphaChannelEnabled,
                                                 useDefaultColor=useDefaultColor,
                                                 keepAlphaOnDropPaste=keepAlphaOnDropPaste,
                                                 transparentPixmap=transparentPixmap,
                                                 parent=self)
-        
-        self._colorComboBox = ColorComboBox(color,
-                                            palette=palette,
-                                            alphaChannelEnabled=alphaChannelEnabled,
-                                            transparentPixmap=transparentPixmap,
-                                            parent=self)
         
         self._configureUI_()
         
@@ -80,12 +80,15 @@ class ColorSelectionWidget(QtWidgets.QWidget):
     @color.setter
     def color(self, color:QtGui.QColor):
         if isinstance(color, QtGui.QColor) and color.isValid():
+            #print(f"ColorSelectionWidget color.setter {color}")
             self._color = color
-            n,c = get_name_color(self._color, "all")
-            print(f"ColorSelectionWidget color.setter {n}, {c}")
+            n,c = get_name_color(self._color)
+            #print(f"ColorSelectionWidget color.setter {n}, {c}")
             sigblock = QtCore.QSignalBlocker(self._colorPushButton)
-            self._colorPushButton.color = color
-            self._colorComboBox._setCustomColor(color)
+            if self.sender() is self._colorComboBox:
+                self._colorPushButton.color = color
+            else:
+                self._colorComboBox._setCustomColor(color)
             self.colorChanged.emit(self._color)
             
     @property
@@ -147,6 +150,7 @@ def quickColorDialog(parent:typing.Optional[QtWidgets.QWidget]=None,
         vgroup = quickdialog.VDialogGroup(group)
         vgroup.layout.setSpacing(0)
         #vgroup.defaultAlignment = QtCore.Qt.AlignHCenter
+        #print(f"quickColorDialog set up selection widget for {label}")
         colorselwidgets[label] = ColorSelectionWidget(color=color, parent=vgroup, palette=palette)
         vgroup.addWidget(QtWidgets.QLabel(label, vgroup), alignment=QtCore.Qt.AlignHCenter)
         vgroup.addWidget(colorselwidgets[label], alignment=QtCore.Qt.AlignHCenter)
@@ -162,7 +166,7 @@ def quickColorDialog(parent:typing.Optional[QtWidgets.QWidget]=None,
     
     if dlgret:
         f = lambda x: Bunch(name=x[0], color=x[1])
-        ret = Bunch((lbl, f(get_name_color(w.color, "all"))) for lbl, w in colorselwidgets.items())
+        ret = Bunch((lbl, f(get_name_color(w.color))) for lbl, w in colorselwidgets.items())
         
     return ret
         
