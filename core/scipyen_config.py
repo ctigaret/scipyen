@@ -1388,11 +1388,36 @@ class ScipyenConfigurable(object):
         self.configurable_traits = DataBag()
         self.configurable_traits.observe(self._observe_configurables_)
         
+    def _get_parent_(self):
+        parent = None
+        parent_f = inspect.getattr_static(self, "parent", None)
+        if inspect.isfunction(parent_f) or inspect.ismethoddescriptor(parent_f):
+            parent = self.parent()
+            
+        elif isinstance(parent_f, property):
+            parent = parent_f.fget(self)
+            
+        return parent
+
     def _observe_configurables_(self, change):
-        cfg = Bunch({self.__class__.__name__: Bunch({change.name:change.new})})
-        #pprint(change)
-        for k,v in cfg.items():
-            scipyen_config[k].set(v)
+        if hasattr(self, "isTopLevel") and self.isTopLevel:
+            cfg = Bunch({self.__class__.__name__: Bunch({change.name:change.new})})
+        else:
+            parent = self._get_parent_()
+
+            if parent:
+                cfg = dict({parent.__class__.__name__:Bunch({self.__class__.__name__: Bunch({change.name:change.new})})})
+            else:
+                cfg = Bunch({self.__class__.__name__: Bunch({change.name:change.new})})
+            
+        if isinstance(cfg, Bunch):
+            for k,v in cfg.items():
+                scipyen_config[k].set(v)
+                
+        else:
+            for k,v in cfg.items():
+                for kk,vv in v:
+                    scipyen_conf[k][kk].set(vv)
             
         write_config()
         
@@ -1457,19 +1482,33 @@ class ScipyenConfigurable(object):
             elif setter is not None:
                 setter = getattr(self, settername)
                 setter(val)
-                
     
     def loadSettings(self):
-        #print("ScipyenConfigurable <%s>.loadSettings" % self.__class__.__name__)
-        
         cfg = self.clsconfigurables
+            
         # NOTE 2021-09-06 17:37:14
         # keep Qt settings segregated
         if len(cfg):
-            user_conf = scipyen_config[self.__class__.__name__].get(None)
+            top_level_config = scipyen_config[self.__class__.__name__].get(None)
+            if hasattr(self, "isTopLevel") and self.isTopLevel:
+                user_conf = top_level_config
+            else:
+                parent = self._get_parent_()
+                if parent:
+                    user_conf = scipyen_config[parent.__class__.__name__][self.__class__.__name__].get(None)
+                else:
+                    user_conf = top_level_config
             
+            # NOTE: 2021-09-13 23:15:32
+            # allow a non-top level (i.e. a 'client') object to use the top-level
+            # settings just for once
             if isinstance(user_conf, dict):
-                for k, v in user_conf.items():
+                conf = user_conf
+            else:
+                conf = top_level_config
+                
+            if isinstance(conf, dict):
+                for k, v in conf.items():
                     getset = cfg.get(k, {})
                     #print("getset", getset)
                     settername = getset.get("setter", None)
@@ -1478,7 +1517,7 @@ class ScipyenConfigurable(object):
                         continue
                     
                     self.__load_config_key_val__(settername, v)
-                
+                    
         self.loadWindowSettings() # must override in derived
             
     def saveSettings(self):
@@ -1491,8 +1530,21 @@ class ScipyenConfigurable(object):
         #print("ScipyenConfigurable <%s>.saveSettings" % self.__class__.__name__)
         cfg = self.clsconfigurables
         
+        # NOTE: 2021-09-13 23:19:30
+        # usr_conf is set up automatically by the trait_notifier!
+        # here we only do the final save when the configurables goes out of scope
+        # or (for windows) when they are closed (i.e. called from their closeEvent)
+        
         if len(cfg):
-            user_conf = scipyen_config[self.__class__.__name__].get(None)
+            if hasattr(self, "isTopLevel") and self.isTopLevel:
+                user_conf = scipyen_config[self.__class__.__name__].get(None)
+            else:
+                parent = self._get_parent_()
+                if parent:
+                    user_conf = scipyen_config[parent.__class__.__name__][self.__class__.__name__].get(None)
+                else:
+                    user_conf = scipyen_config[self.__class__.__name__].get(None)
+                    
             changed = False
             if isinstance(user_conf, dict):
                 for k, v in user_conf.items():
@@ -1516,7 +1568,15 @@ class ScipyenConfigurable(object):
                         changed = True
                         
             if changed:
-                scipyen_config[self.__class__.__name__].set(user_conf)
+                if hasattr(self, "isTopLevel") and self.isTopLevel:
+                    scipyen_config[self.__class__.__name__].set(user_conf)
+                else:
+                    parent = self._get_parent_()
+                    if parent:
+                        scipyen_config[parent.__class__.__name__][self.__class__.__name__].set(user_conf)
+                    else:
+                        scipyen_config[self.__class__.__name__].set(user_conf)
+
                 write_config()
                 
         self.saveWindowSettings() # must override in derived

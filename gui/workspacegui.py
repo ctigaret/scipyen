@@ -198,10 +198,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     
     _owncfg = Bunch()
     
-    #def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
-                 #qsettings: typing.Optional[QtCore.QSettings] = None,
-                 #settings:typing.Optional[confuse.LazyConfig] = None, 
-                 #title="", **kwargs):
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
                  title="", **kwargs):
         #print("WorkspaceGuiMixin __init__ %s" % self.__class__.__name__)

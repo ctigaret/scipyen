@@ -10358,8 +10358,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         
                     custom = dict()
                     
-                    if hasattr(win, "configurables"):
-                        custom.update(win.configurables.get("visibleDocks"), dict())
+                    if hasattr(win, "qtconfigurables"):
+                        custom.update(win.configurables.get("visibleDocks", dict()))
                     
                     for dn,dw in win.dockWidgets.items():
                         if dn in custom:
