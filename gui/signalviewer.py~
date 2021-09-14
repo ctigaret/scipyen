@@ -180,6 +180,16 @@ if "spike" not in pg.graphicsItems.ScatterPlotItem.Symbols.keys():
     spike.closeSubpath()
     pg.graphicsItems.ScatterPlotItem.Symbols["spike"] = spike
 
+if "event" not in pg.graphicsItems.ScatterPlotItem.Symbols.keys():
+    spike = QtGui.QPainterPath(QtCore.QPointF(-0.1, -0.5))
+    spike.lineTo(QtCore.QPointF(0.0, 0.5))
+    spike.lineTo(QtCore.QPointF(0.1, -0.5))
+    #spike.lineTo(QtCore.QPointF(-0.1, 0.5))
+    #spike.lineTo(QtCore.QPointF(0.1, 0.5))
+    #spike.lineTo(QtCore.QPointF(0.1, -0.5))
+    #spike.closeSubpath()
+    pg.graphicsItems.ScatterPlotItem.Symbols["event"] = spike
+
 """
 canvas events in matplotlib:
 DEPRECATED here
@@ -1021,10 +1031,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.removeCursorAction = self.removeCursorsMenu.addAction("Remove a cursor...")
         self.removeCursorAction.triggered.connect(self.slot_removeCursor)
         
-        self.removeSelectedCursorAction = self.removeCursorsMenu.addAction("Remove Selected SignalCursor")
+        self.removeSelectedCursorAction = self.removeCursorsMenu.addAction("Remove selected cursor")
         self.removeSelectedCursorAction.triggered.connect(self.slot_removeSelectedCursor)
         
-        self.removeAllCursorsAction = self.removeCursorsMenu.addAction("Remove All Cursors")
+        self.removeAllCursorsAction = self.removeCursorsMenu.addAction("Remove all cursors")
         self.removeAllCursorsAction.triggered.connect(self.slot_removeCursors)
         
         self.cursorsMenu.addMenu(self.removeCursorsMenu)
@@ -2060,8 +2070,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         name, color = colormaps.get_name_color(val)
         
-        print(f"_set_cursors_color {cursortype} (linked: {linked}): {name}")
-        
+        #print(f"_set_cursors_color {cursortype} (linked: {linked}): {name}")
         
         if cursortype in ("crosshair", "horizontal", "vertical"):
             cursorColorDict = self._linkedCursorColors_ if linked else self._cursorColors_
@@ -5651,31 +5660,49 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             trains_x_list = list()
             trains_y_list = list()
             
-            for k_spike, spike_train in enumerate(spiketrains):
-                if hasattr(spike_train, "name"):
-                    data_name=spike_train.name
+            max_len = max((len(train.times) for train in spiketrains))
+            xx = [np.full((1,max_len), np.nan) for train in spiketrains]
+            yy = list()
+            
+            for k_train, train in enumerate(spiketrains):
+                if hasattr(train, "name"):
+                    data_name=train.name
                 else:
                     data_name="spikes"
                     
-                x = spike_train.times.flatten()
-                y = np.full(x.shape, height_interval * k_spike + height_interval/2)
+                if len(train.times):
+                    xx[k_train][:,:len(train.times)] = np.atleast_2d(train.times)[:]
+                    yy.append(np.full(xx[k_train].shape, height_interval * k_train + height_interval/2))
+                    
+                #x = train.times.flatten()
+                #y = np.full(x.shape, height_interval * k_train + height_interval/2)
                 
-                trains_x_list.append(x)
-                trains_y_list.append(y)
+                #trains_x_list.append(x)
+                #trains_y_list.append(y)
                 
-            tr_x = np.concatenate(trains_x_list, axis=np.newaxis)
-            tr_y = np.concatenate(trains_y_list, axis=np.newaxis)
-            
             self._plot_numeric_data_(spike_train_axis,
-                                        tr_x, tr_y, 
-                                        pen=None,
-                                        name=data_name,
-                                        symbol="spike",
-                                        symbolPen = symbolPen,
-                                        symbolcolorcycle = symbolcolors)
+                                     np.concatenate(xx).T,
+                                     np.concatenate(yy).T,
+                                     pen=None,
+                                     name=data_name,
+                                     symbol="spike",
+                                     symbolPen = symbolPen,
+                                     symbolcolorcycle = symbolcolors)
+                
+            #tr_x = np.concatenate(trains_x_list, axis=np.newaxis)
+            #tr_y = np.concatenate(trains_y_list, axis=np.newaxis)
+            
+            #self._plot_numeric_data_(spike_train_axis,
+                                        #tr_x, tr_y, 
+                                        #pen=None,
+                                        #name=data_name,
+                                        #symbol="spike",
+                                        #symbolPen = symbolPen,
+                                        #symbolcolorcycle = symbolcolors)
                 
             spike_train_axis.axes["left"]["item"].setPen(None)
             spike_train_axis.axes["left"]["item"].setLabel("Spike Trains", **labelStyle)
+            spike_train_axis.axes["left"]["item"].setStyle(showValues=False)
 
             kAx +=1
                 
@@ -5695,8 +5722,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             height_interval = 1/len(events)
             
-            events_x_list = list()
-            events_y_list = list()
+            max_len =  max((len(event.times) for event in events))
+            xx = [np.full((1,max_len), np.nan) for event in events]
+                
+            yy = list()
             
             for k_event, event in enumerate(events):
                 if hasattr(event, "type"):
@@ -5720,28 +5749,23 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         
                     elif "imaging" in data_name:
                         data_name = "img"
+                
+                if len(event.times):
+                    xx[k_event][:,:len(event.times)] = np.atleast_2d(event.times)[:]
+                    yy.append(np.full(xx[k_event].shape, height_interval * k_event + height_interval/2))
                     
-                x = event.times.flatten()
-                
-                if len(x):
-                    events_x_list.append(x)
 
-                    y = np.full(x.shape, height_interval * k_event + height_interval/2)
-                    events_y_list.append(y)
+            self._plot_numeric_data_(event_axis,
+                                     np.concatenate(xx).T,
+                                     np.concatenate(yy).T,
+                                     pen=None,
+                                     name=data_name,
+                                     symbol="event", 
+                                     symbolcolorcycle=symbolcolors)
             
-            if len(events_x_list):
-                ev_x = np.concatenate(events_x_list, axis=np.newaxis)
-                ev_y = np.concatenate(events_y_list, axis=np.newaxis)
-                
-                self._plot_numeric_data_(event_axis,
-                                            ev_x, ev_y, 
-                                            pen=None, 
-                                            name=data_name,
-                                            symbol="spike", 
-                                            symbolcolorcycle=symbolcolors)
-                
             event_axis.axes["left"]["item"].setPen(None)
             event_axis.axes["left"]["item"].setLabel("Events", **labelStyle)
+            event_axis.axes["left"]["item"].setStyle(showValues=False)
                 
             kAx +=1
             
@@ -5918,6 +5942,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             title:(str, type(None))=None, 
                             name:(str, type(None))=None,
                             symbolcolorcycle:(cycle, type(None))=None,
+                            #overlay:bool = False,
                             *args, **kwargs):
         """ does the actual plotting of signals
         
@@ -5937,13 +5962,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             raise ValueError("x and y have different sizes on their first axes")
         
         if x.ndim > 2:
-            raise TypeError("x expected to be a vector; got an array with %d dimensions instead" % x.ndim)
+            raise TypeError("x expected to be a vector or matrix; got an array with %d dimensions instead" % x.ndim)
         
         if x.ndim == 2:
-            if x.shape[1] > 1:
-                raise TypeError("x expected to be a vector; got an array with %d columns instead" % x.shape[1])
+            if x.shape[1] > 1 and x.shape[1] != y.shape[1]:
+                raise TypeError("x expected to  either a vector or an array with %d columns; got an array with %d columns instead" % x.shape[1])
     
-            x = x.squeeze()
+            #x = x.squeeze()
             
         if y.ndim > 2:
             raise TypeError("y expected to be an array with up to 2 dimensions; for %s dimensions instead" % y.ndim)
@@ -5954,26 +5979,24 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # when symbol is present we don't draw the connection line
         symbol = kwargs.get("symbol", None)
         
-        if symbol is None:
-            pen = kwargs.get("pen", None)
+        pen = kwargs.get("pen", QtGui.QPen(QtGui.QColor("black"),1))
+        if isinstance(pen, QtGui.QPen): # because the caller may have passed 'pen=None'
+            pen.setCosmetic(True)
             
-            if not isinstance(pen, QtGui.QPen):
-                pen = QtGui.QPen(QtGui.QColor("black"),1)
-                pen.setCosmetic(True)
-                kwargs["pen"] = pen
+        symbolPen = kwargs.get("symbolPen",QtGui.QPen(QtGui.QColor("black"),1))
+        if isinstance(symbolPen, QtGui.QPen):# because the caller may have passed 'symbolPen=None'
+            symbolPen.setCosmetic(True)
+        
+        if symbol is None:
+            kwargs["pen"] = pen
+            kwargs["symbolPen"] = None
                 
         else:
             kwargs["pen"] = None
-            symbolPen = kwargs.get("symbolPen",QtGui.QPen(QtGui.QColor("black"),1))
-            symbolPen.setCosmetic(True)
             kwargs["symbolPen"] = symbolPen
-        
-        #pen = pg.mkPen(pg.mkColor("k"))
-        #symbolPen = kwargs.get("symbolPen",pg.mkPen(color="k", cosmetic=True, width=1))
         
         plotDataItems = [i for i in plotItem.listDataItems() if isinstance(i, pg.PlotDataItem)]
         
-        colors = cycle(self.defaultLineColorsList)
         
         if "name" not in kwargs:
             kwargs["name"]=name
@@ -6008,6 +6031,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 plotItem.plot(x=xx, y=yy, **kwargs)
         
         elif y.ndim == 2:
+            colors = cycle(self.defaultLineColorsList)
             
             if y.shape[1] < len(plotDataItems):
                 for item in plotDataItems[y.shape[1]:]:
@@ -6017,25 +6041,31 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 y_ = y[:,k].squeeze()
                 y_nan_ndx = np.isnan(y_)
                 
+                if x.ndim == 2 and x.shape[1] == y.shape[1]:
+                    x_ = x[:,k].squeeze()
+                    
+                else:
+                    x_ = x.squeeze()
+                    
                 if any(y_nan_ndx):
                     yy = y_[~y_nan_ndx]
-                    xx = x[~y_nan_ndx]
+                    xx = x_[~y_nan_ndx]
                     
                 else:
                     yy = y_
-                    xx = x
+                    xx = x_
                 
                 if xx.size == 0 or yy.size == 0: # nothing left to plot
                     continue
                     
                 if symbol is None:
-                    if isinstance(pen, QtGui.QPen):
-                        color = next(colors)
-                        pen.setColor(QtGui.QColor(color))
+                    if isinstance(colors, cycle):
+                        pen = QtGui.QPen(QtGui.QColor(next(colors)))
                         pen.setCosmetic(True)
-                    #pen.setColor(pg.mkColor(next(colors)))
                     
-                    kwargs["pen"] = pen
+                        kwargs["pen"] = pen
+                    else:
+                        kwargs["pen"] = pen # same pen as defined above!
                     
                     kwargs["symbol"] = None
                     
@@ -6043,12 +6073,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     kwargs["pen"] = None
                     
                     if isinstance(symbolcolorcycle, cycle):
-                        symbolPen.setColor(QtGui.QColor(next(symbolcolorcycle)))
+                        symbolPen = QtGui.QPen(QtGui.QColor(next(symbolcolorcycle)), 1)
+                        symbolPen.setCosmetic(True)
                         kwargs["symbolPen"] = symbolPen
                         
                     else:
-                        if kwargs.get("symbolPen", None) is None:
-                            kwargs["symbolPen"] = symbolPen
+                        kwargs["symbolPen"] = symbolPen # same symbol pen as defined above!
                     
                 if k < len(plotDataItems):
                     plotDataItems[k].clear()

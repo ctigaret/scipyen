@@ -17,6 +17,10 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     
     Includes common functionality for all viewer classes defined in Scypien.
     
+    Inherits from WorkspaceGuiMixin which provides accesss to the Scipyen's 
+    workspace and, indirectly, to the management of Qt and non-Qt settings 
+    (through inheritance from ScipyenConfigurable)
+    
     Derived classes:
     -----------------
     DataViewer, MatrixViewer, ScipyenFrameViewer, TableEditor, TextViewer, XMLViewer
@@ -329,33 +333,33 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #self.saveWindowSettings()
         #self.saveViewerSettings()
     
-    def saveWindowSettings(self):
-        """Save viewer's window settings in Scipyen's configuration file.
+    #def saveWindowSettings(self):
+        #"""Save viewer's window settings in Scipyen's configuration file.
         
-        The function saves a set of settings common to all derived viewer 
-        classes:
+        #The function saves a set of settings common to all derived viewer 
+        #classes:
         
-        window size, window position, and window state
+        #window size, window position, and window state
         
-        Subclass-specific (typically, Qt) settings are handled by saveViewerSettings
-        which MUST be implemented in the subclass.
+        #Subclass-specific (typically, Qt) settings are handled by saveViewerSettings
+        #which MUST be implemented in the subclass.
         
-        The configuration file is determined at application (Scipyen) level.
-        See also QtCore.QSettings()
+        #The configuration file is determined at application (Scipyen) level.
+        #See also QtCore.QSettings()
         
-        NOTE: This function only executes when this ScipyenViewer is a 'top level'
-        window (i.e. it is NOT a child of a Scipeyn 'app')
+        #NOTE: This function only executes when this ScipyenViewer is a 'top level'
+        #window (i.e. it is NOT a child of a Scipeyn 'app')
         
-        To save the settings for a child ScipyenViewer window (i.e. managed by a
-        Scipyen 'app') use workspacegui.saveWindowSettings() directly.
+        #To save the settings for a child ScipyenViewer window (i.e. managed by a
+        #Scipyen 'app') use workspacegui.saveWindowSettings() directly.
         
-        The same principle holds for loadWindowSettings()
+        #The same principle holds for loadWindowSettings()
         
-        """
-        #print("ScipyenViewer[%s].saveWindowSettings for %s top level:%s" % (self.__class__.__name__, self.winTitle, self.isTopLevel))
-        #if self.isVisible(): # isTopLevel inherited from WorkspaceGuiMixin
-        if self.isTopLevel and self.isVisible(): # isTopLevel inherited from WorkspaceGuiMixin
-            saveWindowSettings(self.qsettings, self)
+        #"""
+        ##print("ScipyenViewer[%s].saveWindowSettings for %s top level:%s" % (self.__class__.__name__, self.winTitle, self.isTopLevel))
+        ##if self.isVisible(): # isTopLevel inherited from WorkspaceGuiMixin
+        #if self.isTopLevel and self.isVisible(): # isTopLevel inherited from WorkspaceGuiMixin
+            #saveWindowSettings(self.qsettings, self)
             
     ##@abstractmethod
     #def saveViewerSettings(self):
@@ -384,33 +388,33 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #self.loadWindowSettings()
         #self.loadViewerSettings()
     
-    def loadWindowSettings(self):
-        """Restores viewer's settings from Scipyen's configuration file.
+    #def loadWindowSettings(self):
+        #"""Restores viewer's settings from Scipyen's configuration file.
 
-        The function loads a set of settings common to all derived viewer 
-        classes:
+        #The function loads a set of settings common to all derived viewer 
+        #classes:
         
-        window size, window position, and window state
+        #window size, window position, and window state
         
-        Subclass-specific settings are handled by saveViewerSettings which
-        MUST be implemented in the derived subclass.
+        #Subclass-specific settings are handled by saveViewerSettings which
+        #MUST be implemented in the derived subclass.
         
-        The configuration file is determined at application (Scipyen) level.
-        See also QtCore.QSettings()
-        """
-        #if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-        # NOTE: 2021-07-08 09:06:32
-        # window settings are loaded here only if parent is Scipyen's main window
-        # FIXME: 2021-09-14 10:23:46
-        # factor this out this using the 'parent' attribute
-        if self.isTopLevel: # inherited from WorkspaceGuiMixin
-            loadWindowSettings(self.qsettings, self) # module-level function in workspacegui
+        #The configuration file is determined at application (Scipyen) level.
+        #See also QtCore.QSettings()
+        #"""
+        ##if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
+        ## NOTE: 2021-07-08 09:06:32
+        ## window settings are loaded here only if parent is Scipyen's main window
+        ## FIXME: 2021-09-14 10:23:46
+        ## factor this out this using the 'parent' attribute
+        #if self.isTopLevel: # inherited from WorkspaceGuiMixin
+            #loadWindowSettings(self.qsettings, self) # module-level function in workspacegui
 
-    #@abstractmethod
-    def loadViewerSettings(self):
-        """Must be implemented in the subclass
-        """
-        pass
+    ##@abstractmethod
+    #def loadViewerSettings(self):
+        #"""Must be implemented in the subclass
+        #"""
+        #pass
     
     def view(self, data: (object, type(None)), 
                 doc_title: (str, type(None)) = None, 
