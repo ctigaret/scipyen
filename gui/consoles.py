@@ -88,12 +88,10 @@ from core.extipyutils_client import (init_commands, execute, ForeignCall,
                                     nrn_ipython_initialization_cmd,)
 from core.strutils import str2symbol
 
-from core.scipyen_config import (makeConfigurable, markConfigurable, 
-                                 ScipyenConfigurable)
+from core.scipyen_config import (markConfigurable, ScipyenConfigurable,
+                                 saveWindowSettings, loadWindowSettings,)
 
-from gui.workspacegui import (WorkspaceGuiMixin, 
-                              saveWindowSettings, loadWindowSettings,
-                              )
+from gui.workspacegui import WorkspaceGuiMixin
 
 from gui.guiutils import (get_font_style, get_font_weight,)
 

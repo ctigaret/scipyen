@@ -1462,6 +1462,8 @@ def get_time_slice(data, t0, t1=None, window=0, \
     The time slice is a Block or a Segment (depending on the type of "data"
     object) with the time slice of all signals or from selected signals.
     
+    WARNING: All segments are expected to have the same relative start time
+    
     NOTE: neo.AnalogSignals.time_slice() member function fulfills the same role.
     
     Positional parameters:

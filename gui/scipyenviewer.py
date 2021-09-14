@@ -401,6 +401,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
         # NOTE: 2021-07-08 09:06:32
         # window settings are loaded here only if parent is Scipyen's main window
+        # FIXME: 2021-09-14 10:23:46
+        # factor this out this using the 'parent' attribute
         if self.isTopLevel: # inherited from WorkspaceGuiMixin
             loadWindowSettings(self.qsettings, self) # module-level function in workspacegui
 

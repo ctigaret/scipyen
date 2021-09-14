@@ -1021,10 +1021,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.removeCursorAction = self.removeCursorsMenu.addAction("Remove a cursor...")
         self.removeCursorAction.triggered.connect(self.slot_removeCursor)
         
-        self.removeSelectedCursorAction = self.removeCursorsMenu.addAction("Remove Selected SignalCursor")
+        self.removeSelectedCursorAction = self.removeCursorsMenu.addAction("Remove selected cursor")
         self.removeSelectedCursorAction.triggered.connect(self.slot_removeSelectedCursor)
         
-        self.removeAllCursorsAction = self.removeCursorsMenu.addAction("Remove All Cursors")
+        self.removeAllCursorsAction = self.removeCursorsMenu.addAction("Remove all cursors")
         self.removeAllCursorsAction.triggered.connect(self.slot_removeCursors)
         
         self.cursorsMenu.addMenu(self.removeCursorsMenu)

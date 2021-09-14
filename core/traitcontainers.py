@@ -261,14 +261,30 @@ class DataBag(Bunch):
         if self in dd.keys():
             raise ValueError("One cannot set onself as a trait key!")
         
-        dtrait = partial(dynamic_trait, allow_none=self.__hidden__.allow_none) 
+        #dtrait = partial(dynamic_trait, allow_none=self.__hidden__.allow_none) 
         
-        trdict = dict(map(lambda x: (x[0], dtrait(x[1]) if x[1] is not self else dtrait(x[1], force_trait=traitlets.Any)), dd.items()))
+        # NOTE: 2021-09-14 13:00:51 exclude dictionaries (force them to behave as Any)
+        # because of the long processing times
+        
+        trdict = dict(map(lambda x: (x[0], self._light_trait_(x[1])), dd.items()))
+        
+        #trdict = dict(map(lambda x: (x[0], dtrait(x[1]) if (x[1] is not self or not isinstance(x[1], dict)) else dtrait(x[1], force_trait=traitlets.Any)), dd.items()))
         #trdict = dict(map(lambda x: (x[0], dtrait(x[1]) if (x[1] is not self and not isinstance(x[1], DataBag)) else dtrait(x[1], force_trait=traitlets.Any)), dd.items()))
         
         self.__hidden__.length = len(trdict)
 
         self.__observer__.add_traits(**trdict)
+        
+    def _light_trait_(self, obj):
+        if obj is self or isinstance(obj, dict):
+            dtrait = partial(dynamic_trait, allow_none=self.__hidden__.allow_none, content_traits=False,force_trait=traitlets.Any)
+        else:
+            dtrait = partial(dynamic_trait, allow_none=self.__hidden__.allow_none, content_traits=True)
+            
+        return dtrait(obj, force_trait=traitlets.Any)
+        
+        #else:
+            #return trait_factory(obj)
         
     def __setitem__(self, key, val):
         """Implements indexed (subscript) assignment: obj[key] = val
@@ -367,11 +383,13 @@ class DataBag(Bunch):
         else:
             # add a new trait
             if key not in ("__observer__", "__hidden__") and key not in self.__hidden__.keys():
-                if val is self or isinstance(val, DataBag):
-                    trdict = {key: dynamic_trait(val, allow_none = self.allow_none, content_traits=False, force_trait=traitlets.Any)}
-                    #trdict = {key: traitlets.Any(val, allow_none = True)}
-                else:
-                    trdict = {key: dynamic_trait(val, allow_none = self.allow_none, content_traits=True)}
+                #dtrait = partial(dynamic_trait, allow_none=self.__hidden__.allow_none)
+                trdict = {key: self._light_trait_(val)}
+                #if val is self or isinstance(val, DataBag):
+                    ##trdict = {key: dynamic_trait(val, allow_none = self.allow_none, content_traits=False, force_trait=traitlets.Any)}
+                    ##trdict = {key: traitlets.Any(val, allow_none = True)}
+                #else:
+                    #trdict = {key: dynamic_trait(val, allow_none = self.allow_none, content_traits=True)}
                 #trdict = {key:trait_from_type(val, allow_none = self.allow_none, content_traits=True)}
                 obs.add_traits(**trdict)
                 object.__setattr__(obs, key, val)

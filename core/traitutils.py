@@ -180,7 +180,8 @@ def adapt_args_kw(x, args, kw, allow_none):
         if len(args) == 0:
             args = (x.index, )
             
-        for attr in x._all_attrs:
+        #for attr in x._all_attrs:
+        for attr in x._necessary_attrs:
             if attr[0] != "index":
                 if attr[0] not in kw:
                     kw[attr[0]] = getattr(x, attr[0])
@@ -189,7 +190,8 @@ def adapt_args_kw(x, args, kw, allow_none):
         if len(args) == 0:
             args = (x,) # takes units & time units from x
             
-        for attr in x._all_attrs:
+        #for attr in x._all_attrs:
+        for attr in x._necessary_attrs:
             if attr[0] != "signal":
                 if attr[0] not in kw:
                     kw[attr[0]] = getattr(x, attr[0])
@@ -198,37 +200,65 @@ def adapt_args_kw(x, args, kw, allow_none):
         if len(args) < 2:
             args = (x.times, x,)
             
-        for attr in x._all_attrs:
+        #signature = inspect.signature(x.__class__.__init__)
+        
+        #init_params = signature.parameters
+        
+        #for attr in init_params:
+            #if attr[0] not in ("self","times", "signal")
+            
+        #for attr in x._all_attrs:
+        for attr in x.__class__._necessary_attrs:
             if attr[0] not in ("times", "signal"):
                 if attr[0] not in kw:
-                    kw[attr[0]] = getattr(x, attr[0])
+                    kw[attr[0]] = getattr(x, attr[0], None)
+                
+    #elif isinstance(x, datasignal.IrregularlySampledDataSignal):
+        #if len(args) < 2:
+            #args = (x.times, x,)
+            
+        #signature = inspect.signature(x.__class__.__init__)
+        
+        #init_params = signature.parameters
+        
+        ##for attr in init_params:
+            ##if attr[0] not in ("self","times", "signal")
+            
+        ##for attr in x._all_attrs:
+        #for attr in x._necessary_attrs:
+            #if attr[0] not in ("times", "signal", "sampling_period"):
+                #if attr[0] not in kw:
+                    #kw[attr[0]] = getattr(x, attr[0], None)
                 
     elif isinstance(x, neo.SpikeTrain):
         if len(args)  == 0:
             args = (x.times, x.t_stop,)
             
-        for attr in x._all_attrs:
+        #for attr in x._all_attrs:
+        for attr in x._necessary_attrs:
             if attr[0] not in ("times", "t_stop"):
                 if attr[0] not in kw:
-                    kw[attr[0]] = getattr(x, attr[0])
+                    kw[attr[0]] = getattr(x, attr[0], None)
         
     elif isinstance(x, neo.ImageSequence):
         if len(args) == 0:
             args = (x, )
             
-        for attr in x._all_attrs:
+        #for attr in x._all_attrs:
+        for attr in x._necessary_attrs:
             if attr[0] != "image_data":
                 if attr[0] not in kw:
-                    kw[attr[0]] = getattr(x, attr[0])
+                    kw[attr[0]] = getattr(x, attr[0], None)
         
     elif isinstance(x, (neo.Segment, neo.Block, neo.Unit)):
         if len(args) == 0:
             args = (x, )
         
     elif isinstance(x, (neo.Epoch, neo.Event)):
-        for attr in x._all_attrs:
+        #for attr in x._all_attrs:
+        for attr in x._necessary_attrs:
             if attr[0] not in kw:
-                kw[attr[0]] = getattr(x, attr[0])
+                kw[attr[0]] = getattr(x, attr[0], None)
         
     elif isinstance(x, pq.Quantity):
         if "units" not in kw:

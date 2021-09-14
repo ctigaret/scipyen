@@ -3123,6 +3123,12 @@ def extract_AP_train(vm:neo.AnalogSignal,im:neo.AnalogSignal,
                                                           adcrange=adcrange,
                                                           adcscale=adcscale)
     
+    
+    #print(f"d = {d} ({type(d)}), u = {u} ({type(u)})")
+    if d.ndim> 0:
+        d = d[0]
+    if u.ndim > 0:
+        u = u[0]
     #if d < u:
         #raise RuntimeError("Expecting a depolarizing current injection; got a hyperpolarizing current injection instead")
     
@@ -4278,7 +4284,7 @@ def ap_phase_plot_data(vm, dvdt=None, smooth_window=None):
         if h is not None:
             dvdt = ephys.convolve(dvdt, h)
             
-    ret = dt.IrregularlySampledDataSignal(vm.magnitude * vm.units, 
+    ret = IrregularlySampledDataSignal(vm.magnitude * vm.units, 
                                           dvdt.magnitude * dvdt.units, 
                                           name="dV/dt",
                                           description="Phase plot data of %s" % vm.name)
@@ -5221,7 +5227,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
                                                                    #units = i_units,
                                                                    #time_units = t_units)
         
-        ret["Injected_current"]     = dt.IrregularlySampledDataSignal(domain = seg_index,
+        ret["Injected_current"]     = IrregularlySampledDataSignal(domain = seg_index,
                                                                    signal = Iinj,
                                                                    units = i_units,
                                                                    dtype = np.dtype("float64"),
@@ -5269,28 +5275,28 @@ def analyse_AP_step_injection_series(data, **kwargs):
         
         nAPs = [seg_res["AP_analysis"]["Number_of_APs"] for seg_res in ret["Depolarising_steps"]]
         
-        ret["First_AP_threshold"]   = dt.IrregularlySampledDataSignal(domain = Iinj,
+        ret["First_AP_threshold"]   = IrregularlySampledDataSignal(domain = Iinj,
                                                                    signal = apThr,
                                                                    units = vstep.units,
                                                                    dtype = np.dtype("float64"),
                                                                    domain_units = i_units,
                                                                    name="First AP Onset")
         
-        ret["First_AP_latency"]     = dt.IrregularlySampledDataSignal(domain = Iinj,
+        ret["First_AP_latency"]     = IrregularlySampledDataSignal(domain = Iinj,
                                                                    signal = apLatency,
                                                                    units = vstep.times.units, 
                                                                    dtype = np.dtype("float64"),
                                                                    domain_units = i_units,
                                                                    name = "First AP latency")
         
-        ret["Mean_AP_Frequency"]    = dt.IrregularlySampledDataSignal(domain = Iinj,
+        ret["Mean_AP_Frequency"]    = IrregularlySampledDataSignal(domain = Iinj,
                                                                    signal = apFrequency,
                                                                    units = apFrequency[0].units, 
                                                                    dtype = np.dtype("float64"),
                                                                    domain_units = i_units,
                                                                    name="Mean AP Frequency")
         
-        ret["Number_of_APs"]        = dt.IrregularlySampledDataSignal(domain = Iinj,
+        ret["Number_of_APs"]        = IrregularlySampledDataSignal(domain = Iinj,
                                                                    signal = nAPs, 
                                                                    units = pq.dimensionless,
                                                                    dtype = np.dtype("float64"),
@@ -5870,10 +5876,10 @@ def get_AP_frequency_vs_injected_current(data, isi=None, name=None, description=
     else:
         raise TypeError("isi expected to be None, an int or a sequence of two int")
     
-    #result = dt.IrregularlySampledDataSignal(domain=iinj_domain,
+    #result = IrregularlySampledDataSignal(domain=iinj_domain,
                                                 #signal=signal,
                                                 #units = pq.Hz, domain_units = pq.pA)
-    result = dt.IrregularlySampledDataSignal(domain=iinj,
+    result = IrregularlySampledDataSignal(domain=iinj,
                                                 signal=signal,
                                                 units = pq.Hz, domain_units = pq.pA)
 
@@ -6041,7 +6047,7 @@ def get_AP_params_in_series(data,
                 for ap in step["AP_analysis"][container]:
                     params.append(ap[param_name]) # scalar Quantities, one per AP
                     
-                param_array = dt.IrregularlySampledDataSignal([k for k in range(len(params))], params,
+                param_array = IrregularlySampledDataSignal([k for k in range(len(params))], params,
                                                               units = params[0].units,
                                                               domain_units = pq.dimensionless,
                                                               name=param_name)
@@ -6069,12 +6075,12 @@ def get_AP_params_in_series(data,
             ivar_list.append(step["AP_analysis"][ivar_name]) # Quantity with length of 1
             
     if all([isinstance(v, (float, np.float64)) or v.size==1 for v in var_list]):
-        result = dt.IrregularlySampledDataSignal(ivar_list, var_list,
+        result = IrregularlySampledDataSignal(ivar_list, var_list,
                                                 domain_units = ivar_list[0].units,
                                                 units = var_list[0].units,
                                                 name=param_name)
     else:
-        ivar_data = dt.IrregularlySampledDataSignal([k for k in range(len(ivar_list))], ivar_list,
+        ivar_data = IrregularlySampledDataSignal([k for k in range(len(ivar_list))], ivar_list,
                                              domain_units = pq.dimensionless,
                                              units = ivar_list[0].units,
                                              name = ivar_name)
@@ -7572,8 +7578,8 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
         
 def measure_AHP(signal):
     """Returns the peak and its integral (Simpson)
-    Signal = neo.AnalogSignal with t_start at 0 s and units of mV mwith one data channel
-    Thypically this is an AHP waveform already extracted using other functions in this module.
+    Signal = neo.AnalogSignal with t_start at 0 s and units of mV with one data channel
+    Typically this is an AHP waveform already extracted using other functions in this module.
     
     """
     from scipy import integrate

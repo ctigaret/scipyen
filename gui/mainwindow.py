@@ -162,7 +162,8 @@ from core.scipyenmagics import ScipyenMagics
 # available directly in the console
 from core.workspacefunctions import * 
 from core import scipyen_config as scipyenconf
-from core.scipyen_config import (makeConfigurable, markConfigurable, confuse, )
+from core.scipyen_config import (markConfigurable, confuse, 
+                                 saveWindowSettings, loadWindowSettings, )
 from core.scipyen_config import scipyen_config as scipyen_settings
 from core import plots as plots
 from core import datatypes as dt
@@ -239,8 +240,7 @@ from . import colorwidgets
 from . import stylewidgets
 from . import gradientwidgets
 
-from .workspacegui import (WorkspaceGuiMixin, 
-                           saveWindowSettings, loadWindowSettings, )
+from .workspacegui import (WorkspaceGuiMixin)
 from .workspacemodel import WorkspaceModel
 
 # qtconsole.styles and pygments.styles, respectively:

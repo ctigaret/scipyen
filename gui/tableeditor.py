@@ -13,6 +13,7 @@ import os, inspect, warnings, traceback, datetime, typing
 
 #### BEGIN 3rd party modules
 import pandas as pd
+import quantities as pq
 #import xarray as xa
 import numpy as np
 import neo
@@ -576,7 +577,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
                         if section == 0:
                             if isinstance(self._modelData_, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
-                                return QtCore.QVariant("%s (%s)" % (self._modelData_.domain_name, self._modelData_.domain.dimensionality))
+                                domain_name = getattr(self._modelData_,"domain_name", None)
+                                domain = getattr(self._modelData_, "domain", None)
+                                if domain_name is not None and domain is not None:
+                                    return QtCore.QVariant("%s (%s)" % (self._modelData_.domain_name, self._modelData_.domain.dimensionality))
+                                else:
+                                    return QtCore.QVariant("Sample")
                                                        
                             else:
                                 return QtCore.QVariant("Time (%s)" % self._modelData_.times.dimensionality)
@@ -660,6 +666,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 else:
                     ret = self._modelData_[row, col-1]
                     ret_type = type(ret).__name__
+                    
+                if isinstance(ret, pq.Quantity):
+                    ret = ret.magnitude
                     
             elif isinstance(self._modelData_, np.ndarray):
                 if self._modelData_.ndim  == 0: # e.g. pq object
