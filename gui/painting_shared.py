@@ -1,6 +1,7 @@
 import numbers, os, typing, inspect, traceback
 from enum import IntEnum, auto
-from collections import OrderedDict
+#from collections import OrderedDict
+from traitlets import Bunch
 
 from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
@@ -52,41 +53,41 @@ FontStyleType = typing.Union[int, QtGui.QFont.Style]
 
 FontWeightType = typing.Union[int, QtGui.QFont.Weight]
 
-standardQtFontStyles = OrderedDict(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Style)), key = lambda x: x[1]))
+standardQtFontStyles = Bunch(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Style)), key = lambda x: x[1]))
 
-standardQtFontWeights = OrderedDict(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Weight)), key = lambda x: x[1]))
+standardQtFontWeights = Bunch(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Weight)), key = lambda x: x[1]))
 
 
-standardQtPenStyles = OrderedDict(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenStyle) and val < 10),
+standardQtPenStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenStyle) and val < 10),
                            key = lambda x: x[1]))
 
-standardQtPenJoinStyles = OrderedDict(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenJoinStyle) and val <= 256),
+standardQtPenJoinStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenJoinStyle) and val <= 256),
                            key = lambda x: x[1]))
 
-standardQtPenCapStyles = OrderedDict(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenCapStyle) and val <= 32),
+standardQtPenCapStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenCapStyle) and val <= 32),
                            key = lambda x: x[1]))
 
 customDashStyles = {"Custom": [10., 5., 10., 5., 10., 5., 1., 5., 1., 5., 1., 5.]}
 
-standardQtGradientPresets = OrderedDict(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Preset) and name != "NumPresets")))
+standardQtGradientPresets = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Preset) and name != "NumPresets")))
 
-standardQtGradientSpreads = OrderedDict(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Spread) )))
+standardQtGradientSpreads = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Spread) )))
 
-standardQtGradientTypes = OrderedDict(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type)),
+standardQtGradientTypes = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type)),
                                       key = lambda x: x[1]))
-validQtGradientTypes = OrderedDict(sorted(((name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type) and value < 3),
+validQtGradientTypes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type) and value < 3),
                                       key = lambda x: x[1]))
 
-standardQtBrushStyles = OrderedDict(sorted(((name, value) for name, value in vars(QtCore.Qt).items() if isinstance(value, QtCore.Qt.BrushStyle)),
+standardQtBrushStyles = Bunch(sorted(((name, value) for name, value in vars(QtCore.Qt).items() if isinstance(value, QtCore.Qt.BrushStyle)),
                                            key = lambda x: x[1]))
 
-standardQtBrushPatterns = OrderedDict(sorted(((name, value) for name, value in standardQtBrushStyles.items() if all((s not in name for s in ("Gradient", "Texture")))),
+standardQtBrushPatterns = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if all((s not in name for s in ("Gradient", "Texture")))),
                                            key = lambda x: x[1]))
 
-standardQtBrushGradients = OrderedDict(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Gradient" in name),
+standardQtBrushGradients = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Gradient" in name),
                                            key = lambda x: x[1]))
 
-standardQtBrushTextures = OrderedDict(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Texture" in name),
+standardQtBrushTextures = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Texture" in name),
                                            key = lambda x: x[1]))
 
 def populateMimeData(mimeData:QtCore.QMimeData, color:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]):
