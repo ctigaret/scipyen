@@ -216,6 +216,35 @@ def filterfalse_type(iterable:typing.Iterable, klass:typing.Type) -> typing.Iter
     """
     return filter(lambda x: not isinstance(x, klass), iterable)
 
+def filter_attr(iterable:typing.Iterable, **kwargs):
+    """Alternative version of filter_attribute.
+    
+    Fails silently.
+    
+    Var-keyword parameters:
+    =======================
+    attr_name:str ->  predicate:function or value (any). 
+        When the attr_name is mapped to a function, this is expected to be a
+        unary predicate of the form f(x) -> bool, with the value compared against
+        the attr, being hardcoded within.
+        
+        When attr_name is mapped to any other type, the predicate will be the
+        stock python's identity operator (operator.eq).
+        
+        CAUTION when comparing against numpy arrays one should supply a custom
+        comparison function that takes into account the array shape, etc.
+        
+        WARNING The python's stock operator.eq DOES NOT WORK with numpy arrays!
+    """
+    
+    return itertools.chain.from_iterable((filter(lambda x: f(getattr(x, n, None)) if inspect.isfunction(f) else f == getattr(x, n, None),
+                                                 iterable) for n,f in kwargs.items()))
+
+def filterfalse_attr(iterable:typing.Iterable, **kwargs):
+    return itertools.chain.from_iterable((filter(lambda x: not f(getattr(x, n, None)) if inspect.isfunction(f) else f != getattr(x, n, None),
+                                                 iterable) for n,f in kwargs.items()))
+
+    
 
 def filter_attribute(iterable:typing.Iterable,attribute:str, value:typing.Any, 
                      predicate:typing.Callable[...,bool]=lambda x,y: x==y,
@@ -241,7 +270,8 @@ def filter_attribute(iterable:typing.Iterable,attribute:str, value:typing.Any,
         
     """
     return filter(lambda x: predicate(getattr(x, attribute, None) if silentfail else getattr(x, attribute),
-                                      value), iterable)
+                                      value),
+                  iterable)
     
 def filterfalse_attribute(iterable:typing.Iterable, attribute:str, value:typing.Any, 
                      predicate:typing.Callable[...,bool]=lambda x,y: x==y,

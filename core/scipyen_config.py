@@ -1073,6 +1073,7 @@ class ScipyenConfigurable(object):
                 user_conf = top_level_config
             else:
                 parent = self._get_parent_()
+                
                 if parent:
                     user_conf = scipyen_config[parent.__class__.__name__][self.__class__.__name__].get(None)
                 else:

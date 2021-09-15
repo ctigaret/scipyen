@@ -205,7 +205,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # already in the viewer window.
         # Therefore, it is best to call self.loadSettings() now i.e., it at the 
         # very end of the __init__(), after all essential stuff is done.
-        self.loadSettings()
+        self.loadSettings() # called from ScipyenConfigurable (via WorkspaceGuiMixin)
             
         
         # NOTE: 2021-08-17 12:59:02

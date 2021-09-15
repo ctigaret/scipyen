@@ -56,6 +56,7 @@ from enum import Enum, IntEnum
 #### END core python modules
 
 #### BEGIN 3rd party modules
+from traitlets import Bunch
 import numpy as np
 import quantities as pq
 import pyqtgraph as pgraph
@@ -80,9 +81,12 @@ from PyQt5.uic import loadUiType as __loadUiType__
 from core import utilities
 from core.prog import (safeWrapper, deprecation, iter_attribute,
                        filter_type, filterfalse_type, 
-                       filter_attribute, filterfalse_attribute)
+                       filter_attribute, filterfalse_attribute,
+                       filter_attr, filterfalse_attr)
+
 from core import strutils as strutils
 from core import datatypes as dt
+from core.scipyen_config import markConfigurable
 
 from imaging import (axisutils, axiscalibration, vigrautils as vu,)
 from imaging.axisutils import (axisTypeFlags, defaultAxisTypeName, 
@@ -97,6 +101,7 @@ from iolib import pictio as pio
 
 #### BEGIN scipyen gui modules
 from .scipyenviewer import ScipyenViewer, ScipyenFrameViewer
+
 
 from . import signalviewer as sv
 from . import pictgui as pgui
@@ -1944,8 +1949,9 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     #### BEGIN public methods
     
     @safeWrapper
-    def roi(self, value:typing.Any, attribute:str="name", 
-            predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y) -> typing.Iterator:
+    def roi(self, value:typing.Optional[typing.Any]=None, attribute:str="name", 
+            predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y,
+            **kwargs) -> typing.Iterator:
         """Iterates through ROIs (non-cursor PlanarGraphics) with a specific attribute.
         
         Parameters:
@@ -1972,6 +1978,15 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
             Optional: default is the identity (lambda x,y: x==y)
             
+        Var-keyword parameters:
+        =======================
+        attribute_name:str -> attribute predicate and value: function
+            This is an alternative syntax that supercedes the value, attribute
+            parameter described above
+            
+            e.g.:
+            roi(name=lambda x: x=="some_name")
+            
         Returns:
         ========
         An iterator for PlanarGraphics objects (not cursors) having the named 
@@ -1980,6 +1995,14 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         By default, the function returns an iterator of ROIs by their name.
         
         """
+        
+        if len(**kwargs):
+            ret = list()
+            for n,f in kwargs.items():
+                if isinstance(f, function):
+                    ret.append(filter_attribute(self.rois, n, ))
+            
+        
         return filter_attribute(self.rois, attribute, value, predicate)
         
     @safeWrapper
@@ -2165,7 +2188,50 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     #
     # "colormap" = singleton or list of colortables or None
     #
-  
+    
+    # NOTE: 2021-09-15 10:40:44 KISS!
+    # for cursor & roi label backgrounds we should limit ourselved to one of:
+    # a) transparent
+    # b) any color (although preferable either black or white)
+    # and this is applied across the board (i.e. all cursors & rois)
+    #
+    # Regarding hover color, the same one-for-all rule should apply: use the same
+    # hover color for any graphics item we hover (if we decide to use hover color, 
+    # which might be nice!)
+    #
+    # Also, NOTE that these are defaults for top level imageviewer windows only.
+    # Client windows will have to set their own cursor/roi colors by supplying
+    # the appropriate parameter to the cursor/roi creation method in this :class:
+    #
+    #
+    # To get/set the color for a SPECIFIC graphics item (cursor or ROI) use the
+    # getter / setter methods
+    #
+    # getPlanarGraphicsColor / setPlanarGraphicsColor; NOTE these are NOT defined
+    # as configurables for this :class:. Instead they should be linked into (i.e.,
+    # called, perhaps, indirectly, by) a configurable getter/setter of the 
+    # viewer's owner :class: such as LSCaTWindow. In this way the appearance of
+    # a subset of planargraphics of a certain type (which share a common meaning)
+    # appear similarly
+    #
+    
+    
+    defaultRoisColor = "#aaff00"
+    
+    defaultCursorColors = Bunch({"crosshair_cursor":"#C173B088", 
+                                 "horizontal_cursor":"#B1D28F88", 
+                                 "vertical_cursor":"#ff007f88",
+                                 "point_cursor":"#aaaa00"})
+    
+    defaultLinkedCursorColors = Bunch({"crosshair_cursor":QtGui.QColor(defaultCursorColors["crosshair_cursor"]).darker().name(QtGui.QColor.HexArgb),
+                                       "horizontal_cursor":QtGui.QColor(defaultCursorColors["horizontal_cursor"]).darker().name(QtGui.QColor.HexArgb),
+                                       "vertical_cursor":QtGui.QColor(defaultCursorColors["vertical_cursor"]).darker().name(QtGui.QColor.HexArgb),
+                                       "point_cursor":QtGui.QColor(defaultCursorColors["point_cursor"]).darker().name(QtGui.QColor.HexArgb)})
+    
+    defaultGraphicsLabelBackgroundColor = QtCore.Qt.transparent
+    
+    defaultGraphicsHoverColor = "red"
+
     def __init__(self, data: (vigra.VigraArray, vigra.filters.Kernel2D, np.ndarray, QtGui.QImage, QtGui.QPixmap, tuple, list) = None,
                  parent: (QtWidgets.QMainWindow, type(None)) = None, 
                  ID:(int, type(None)) = None,
@@ -2185,18 +2251,25 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         #self._separateChannels           = False
         
-        self.cursorsColor               = None
-        self.linkedCursorsColor         = None
-        self.cursorLabelTextColor       = None
-        self.linkedCursorLabelTextColor = None
-        self.cursorLabelBackgroundColor = None
-        self.roisColor                  = None
-        self.linkedROIsColor            = None
-        self.roiLabelTextColor          = None
-        self.linkedROILabelTextColor    = None
-        self.roiLabelBackgroundColor    = None
-        self.opaqueCursorLabel          = True
-        self.opaqueROILabel             = True
+        self.cursorsColor               = None # to remove
+        self.linkedCursorsColor         = None # to remove
+        self.cursorLabelTextColor       = None # to remove
+        self.linkedCursorLabelTextColor = None # to remove
+        self.cursorLabelBackgroundColor = None # to property
+        self.roisColor                  = None # to property
+        self.linkedROIsColor            = None # to property
+        self.roiLabelTextColor          = None # to remove
+        self.linkedROILabelTextColor    = None # to remove
+        self.roiLabelBackgroundColor    = None # to remove
+        self.opaqueCursorLabel          = True # replace with self._graphicsBackgroundColor_
+        self.opaqueROILabel             = True # replace with self._graphicsBackgroundColor_
+        
+        self._cursorColors_             = self.defaultCursorColors
+        self._graphicsBackgroundColor_  = self.defaultGraphicsLabelBackgroundColor
+        self._linkedCursorColors_       = self.defaultLinkedCursorColors
+        self._roisColor_                = self.defaultRoisColor
+        self._graphicsHoverColor_       = self.defaultGraphicsHoverColor
+        
         
         if displayChannel is None:
             self._displayedChannel_      = "all"
@@ -2257,6 +2330,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         #self.loadSettings() # now called by ScipyenViewer.__init__()
         
+        # TODO: migrate this to ScipyenViewer.__init__
+        # specify supported_types for all viewers.
         if isinstance(data, ImageViewer.supported_types) or any([t in type(data).mro() for t in ImageViewer.supported_types]):
             self.setData(data, doc_title=self._docTitle_)
         
@@ -2279,24 +2354,34 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 self._colorMap = colormaps.get("grey")
             #self.displayFrame()
             
-        return self._colorMap
+        return self._colorMap.name
         
+    @markConfigurable("ColorMap")
     @colorMap.setter
-    def colorMap(self, val):
+    def colorMap(self, val:str):
         """Setter for colorMap
         """
-        if isinstance(val, str):
-            val = colormaps.get(val, None)
-            
-        if not isinstance(val, colormaps.mpl.colors.Colormap):
-            return
+        if not isinstance(val, str):
+            raise TypeError(f"Expecting a str; got {type(val).__name__} instead")
         
+        cmap = colormaps.get(val, None)
+
         if isinstance(self._colorMap, colormaps.mpl.colors.Colormap):
             self._prevColorMap = self._colorMap
         
-        self._colorMap = val
+        self._colorMap = cmap
+        #self._colorMap = val
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["ColorMap"] = val
         
         self.displayFrame()
+        
+    def getPlanarGraphicsColor(self, ID):
+        
+        pass
+    
+    def setPlanarGraphicsColor(self, ID, val):
+        pass
         
     @property
     def currentFrame(self):
@@ -4124,21 +4209,22 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         #self.loadViewerSettings()
             
     def loadViewerSettings(self):
+        pass
         # FIXME TODO 2021-08-22 22:08:19
         # transfer this to confuse settings
         #colorMapName = self.qsettings.value("ImageViewer/ColorMap", None)
-        colorMapName = self.qsettings.value("/".join([self.__class__.__name__, "ColorMap"]), None)
+        #colorMapName = self.qsettings.value("/".join([self.__class__.__name__, "ColorMap"]), None)
         
-        #print("ImageViewer %s loadViewerSettings colorMapName" % self, colorMapName)
+        ##print("ImageViewer %s loadViewerSettings colorMapName" % self, colorMapName)
         
-        if isinstance(colorMapName, str):
-            self._colorMap = colormaps.get(colorMapName, None)
+        #if isinstance(colorMapName, str):
+            #self._colorMap = colormaps.get(colorMapName, None)
                 
-        elif isinstance(colorMapName, colormaps.colors.Colormap):
-            self._colorMap = colorMapName
+        #elif isinstance(colorMapName, colormaps.colors.Colormap):
+            #self._colorMap = colorMapName
             
-        else:
-            self._colorMap = None
+        #else:
+            #self._colorMap = None
         
         #color = self.qsettings.value("/".join([self.__class__.__name__, "CursorColor"]), None)
         #if isinstance(color, QtGui.QColor) and color.isValid():
@@ -4189,11 +4275,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             #self.opaqueROILabel = color
             
     def saveViewerSettings(self):
-        if isinstance(self._colorMap, colormaps.colors.Colormap):
-            self.qsettings.setValue("/".join([self.__class__.__name__, "ColorMap"]), self._colorMap.name)
+        pass
+        #if isinstance(self._colorMap, colormaps.colors.Colormap):
+            #self.qsettings.setValue("/".join([self.__class__.__name__, "ColorMap"]), self._colorMap.name)
             
-        else:
-            self.qsettings.setValue("/".join([self.__class__.__name__, "ColorMap"]), None)
+        #else:
+            #self.qsettings.setValue("/".join([self.__class__.__name__, "ColorMap"]), None)
         
         #self.qsettings.setValue("/".join([self.__class__.__name__, "CursorColor"]), self.cursorsColor)
         #self.qsettings.setValue("/".join([self.__class__.__name__, "CursorLabelTextColor"]), self.cursorLabelTextColor)

@@ -536,7 +536,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                                        (255, 0, 255, 50),
                                                        (0, 255, 255, 50)]
         
-        self.train_plot_options = dict()
+        #self.train_plot_options = dict()
         
         # NOTE: 2019-04-28 18:03:20
         # contrary to online documentation for pyqtgraph 0.10.0, the source code
@@ -546,7 +546,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # also, there is no mention of "hoverBrush" or "hoverPen" anywhere in the
         # source code for LinearRegionItem or its superclass UIGraphicsItem
         # in fact, hovering just modifes the brush by doubling its alpha value
-        self.train_plot_options["train_pen"] = None 
+        #self.train_plot_options["train_pen"] = None 
         #self.train_plot_options["train_brush"] = None
         
         ## for future use, maybe (see NOTE: 2019-04-28 18:03:20)
@@ -4261,7 +4261,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.epoch_plot_options["epoch_hoverPen"] = kwargs.pop("epoch_hoverPen", None)
         self.epoch_plot_options["epoch_hoverBrush"] = kwargs.pop("epoch_hoverBrush", None)
         
-        self.train_plot_options["train_pen"] = kwargs.pop("train_pen", None)
+        #self.train_plot_options["train_pen"] = kwargs.pop("train_pen", None)
         
         if isinstance(interval, neo.Epoch):
             # NOTE: 2019-01-24 21:05:34

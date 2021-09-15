@@ -613,8 +613,26 @@ e.g. pip install -I numpy
         C:\Users\xxx>scipyenv\Scripts\activate -->
         (scipyenv) C:\Users\xxx\scipyenv>
         (scipyenv) C:\Users\xxx\scipyenv>pip install PyQt5 --> installs PyQt5-5.5.4, PyQt5-Qt5-5.15.2,PyQt5-sip-12.9.0
-        ... proceed with python modules installation as above WHILE in 
-        (scipyenv) C:\Users\xxx\scipyenv (i.e. with environment activated)
+        
+    
+    create C:\Users\xxx\Scripts directory, add it to the registered %PATH%
+    environment variable
+    
+    setx path "%path%;%userprofile%\Scripts;"
+    
+    then restart the command prompt
+    
+    Inside the Scripts directory place the following as scipyact.bat
+    @echo off
+    %userprofile%\scipyenv\Scripts\activate
+    echo on
+    
+    to activate scipyenv inside the command prompt just type 'scipyact'
+
+    
+    
+    ... proceed with python modules installation as above WHILE in: 
+    (scipyenv) C:\Users\xxx\scipyenv (i.e. with environment activated)
         
     Qt (Open source edition) - 
     visual studio community 2019 -  C++ environment only (use python from above, 
