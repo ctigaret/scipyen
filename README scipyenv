@@ -286,8 +286,34 @@ e.g. pip install -I numpy
     scikit-learn    (joblib, threadpoolctl)
     scikit-image    (imageio, networkx, decorator, pywavelets, tifffile)
     seaborn         (pandas, pillow, cycler, python-dateutil, pyparsing, six)
-    bohek           (for jupyterlab plotting from neuron)
+    bohek           (for jupyterlab plotting from neuron; also install tornado, typing_extension)
     
+    quantities
+    pandas          (pytz)
+    nixio
+    neo
+    pyqtgraph
+    statsmodels     (patsy)
+    pingouin        (urllib3, idna, chardet, certifi, requests, littleutils, 
+                     tabulate, pandas_flavor, outdated, xarray)
+    pywavelets      (installed by scikit-learn)
+    researchpy
+    h5py            required for vigra
+    nose            required for vigra                            
+    sphinx          required for vigra    
+                    also installs:
+                    (sphinxcontrib-serializinghtml, sphinxcontrib-qthelp, 
+                    sphinxcontrib-jsmath, sphinxcontrib-htmlhelp, sphinxcontrib-devhelp, 
+                    sphinxcontrib-applehelp, snowballstemmer, imagesize, docutils, 
+                    babel, alabaster)
+    qimage2ndarray
+    imreg_dft                               
+    xarray      
+    pyxdg
+    python-magic    Python interface to the libmagic file type identification library
+    nested_lookup
+    dpath
+
     jupyter         (zipp, typing-extensions, ipython-genutils, traitlets,
                     pyrsistent, importlib-metadata, attrs, wcwidth, tornado, pyzmq,
                     ptyprocess, parso, jupyter-core, jsonschema, webencodings, pygments,
@@ -333,31 +359,6 @@ e.g. pip install -I numpy
     nodejs - requires installation of a more recent Node.js version (>- 12.0.0)
         in the local environment
         
-    quantities
-    pandas          (pytz)
-    nixio
-    neo
-    pyqtgraph
-    statsmodels     (patsy)
-    pingouin        (urllib3, idna, chardet, certifi, requests, littleutils, 
-                     tabulate, pandas_flavor, outdated, xarray)
-    pywavelets      (installed by scikit-learn)
-    researchpy
-    h5py            required for vigra
-    nose            required for vigra                            
-    sphinx          required for vigra    
-                    also installs:
-                    (sphinxcontrib-serializinghtml, sphinxcontrib-qthelp, 
-                    sphinxcontrib-jsmath, sphinxcontrib-htmlhelp, sphinxcontrib-devhelp, 
-                    sphinxcontrib-applehelp, snowballstemmer, imagesize, docutils, 
-                    babel, alabaster)
-    qimage2ndarray
-    imreg_dft                               
-    xarray      
-    pyxdg
-    python-magic    Python interface to the libmagic file type identification library
-    nested_lookup
-    dpath
     
     *** Install Python libraries for storing configuration options unrelated to the GUI:
         NOTE: this is still experimental - testing various configuration libraries
@@ -384,7 +385,8 @@ e.g. pip install -I numpy
     matlab_kernel   (wurlitzer)
     
     Other modules - functionality complementary to NEURON:
-        pyneuroml NeuroML reader
+        pyneuroml reader
+            (NOTE: pyneuroml may rewquire installation of NeuroML inside scipyenv)
         neurom - SWC reader
         pylmeasure
 
@@ -599,5 +601,26 @@ e.g. pip install -I numpy
     10.3 cvapp -- not installed, not used - import 3D data from NEURON directly
     
     
+    =======================================
+    NOTE: 2021-09-15 09:02:26 On Windows 10
+    =======================================
+    
+    python 3.9 (windows installer): choose to place executable on PATH
+    virtualenv:
+        C:\Users\xxx>pip install virtualenv
+        C:\Users\xxx>virtualenv scipyenv
+        C:\Users\xxx>cd scipyenv
+        C:\Users\xxx>scipyenv\Scripts\activate -->
+        (scipyenv) C:\Users\xxx\scipyenv>
+        (scipyenv) C:\Users\xxx\scipyenv>pip install PyQt5 --> installs PyQt5-5.5.4, PyQt5-Qt5-5.15.2,PyQt5-sip-12.9.0
+        ... proceed with python modules installation as above WHILE in 
+        (scipyenv) C:\Users\xxx\scipyenv (i.e. with environment activated)
+        
+    Qt (Open source edition) - 
+    visual studio community 2019 -  C++ environment only (use python from above, 
+                                don't use visual studio's own python)
     
     
+    Download vigra binary with sources and documentation for Visual Studio including dependencies
+    https://github.com/ukoethe/vigra/releases/download/Version-1-11-1/vigra-1.11.1-win64-vc14.zip
+    Extract in C:\Users\xxx\vigra-1.11.1-win64-vc14 => will create vigra-1.11.1 directory in there
