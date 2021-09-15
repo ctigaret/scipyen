@@ -5563,6 +5563,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         #### BEGIN plot analog signals 
         for k, signal in enumerate(selected_analogs):
+            signal_axis = self.signalsLayout.getItem(kAx,0)
             if isinstance(signal, neo.AnalogSignal):
                 domain_name = "Time"
                 
@@ -5601,12 +5602,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                      symbol=None,
                                      **kwargs)
             
+            signal_axis.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
+                                               autoReduceTextSpace=False)
+            
             kAx += 1
          
         #### END plot analog signals
         
         #### BEGIN plot irregularly sampled signals
         for k, signal in enumerate(selected_irregs):
+            signal_axis = self.signalsLayout.getItem(kAx,0)
             if isinstance(signal, neo.IrregularlySampledSignal):
                 domain_name = "Time"
                 
@@ -5638,6 +5643,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                      ylabel = "%s (%s)" % (sig.name, signal.units.dimensionality),
                                      symbol = None,
                                      **kwargs)
+            
+            signal_axis.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
+                                               autoReduceTextSpace=False)
             
             kAx += 1
         
