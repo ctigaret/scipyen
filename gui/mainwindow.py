@@ -1508,7 +1508,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         parent: QtWidgets.QWidget.
         """
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: python3 way
-        WorkspaceGuiMixin.__init__(self, parent=self)#, settings=settings)
+        #WorkspaceGuiMixin.__init__(self, parent=self)#, settings=settings)
         self.app = app
         
         #### BEGIN configurables; for each of these we define a read-write property
@@ -1558,7 +1558,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # --> $HOME/.config/Scipyen/config.yaml
         # WARNING this has nothing to do with %config magic in IPython (available
         # in Scipyen's consoles)
-        self._scipyen_settings_         = scipyen_settings 
+        #self._scipyen_settings_         = scipyen_settings 
         
         # NOTE: Qt GUI settings in $HOME/.config/Scipyen/Scipyen.conf
         # this can only be accessed once the Qt application is instantiated in
@@ -1566,8 +1566,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # Since the ScipyenWindow instance is the first Scipyen object that
         # comes alive, the qsettings must be set up here and not rely on what is
         # inherited from ScipyenConfigurable (indirectly via WorkspaceGuiMixin)
-        self.qsettings = QtCore.QSettings(QtCore.QCoreApplication.organizationName(),
-                                          QtCore.QCoreApplication.applicationName())
+        #self.qsettings = QtCore.QSettings(QtCore.QCoreApplication.organizationName(),
+                                          #QtCore.QCoreApplication.applicationName())
         #self.qsettings                   = QtCore.QSettings("Scipyen", "Scipyen")
 
         # NOTE: 2021-08-17 12:29:29
@@ -1585,11 +1585,23 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._copy_varnames_separator_ = " "
         #### END - to revisit
         
+                # NOTE: 2021-08-17 12:38:41 see also NOTE: 2021-08-17 10:05:20 in scipyen.py
+        #self._default_GUI_style = self.app.style()
+        self._current_GUI_style_name = "Default"
+        self._prev_gui_style_name = self._current_GUI_style_name
+        
         #self._setup_console_pygments_()
         
-        self.setupUi(self)
         
         #self._defaultCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
+        
+        # NOTE: WARNING 2021-09-16 14:32:03
+        # this must be called AFTER all class and instance attributes used in the 
+        # configurables mechanism have been defined
+        # Any such attribute defined further below will NOT be found by the 
+        # mechanism (e.g. syncQtSettings)
+        self.setupUi(self)
+        WorkspaceGuiMixin.__init__(self, parent=self)#, settings=settings)
         
         self.scriptsManager = ScriptManagerWindow(parent=self)
         self.scriptsManager.signal_executeScript[str].connect(self._slot_runPythonScriptFromManager)
@@ -1643,11 +1655,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #self.setWindowIcon(icon) # this doesn't work? -- next line does
         QtWidgets.QApplication.setWindowIcon(icon)
 
-        # NOTE: 2021-08-17 12:38:41 see also NOTE: 2021-08-17 10:05:20 in scipyen.py
-        #self._default_GUI_style = self.app.style()
-        self._current_GUI_style_name = "Default"
-        
-        
         # -----------------
         # connect widget actions through signal/slot mechanism
         # NOTE: 2017-07-04 16:28:52
@@ -1713,6 +1720,22 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if isinstance(val, int) and val >= 0:
             self._maxRecentFiles = val
             
+    @property
+    def guiStyle(self) -> str:
+        return self._current_GUI_style_name
+    
+    @markConfigurable("WidgetStyle", "qt", default="Default")
+    @guiStyle.setter
+    def guiStyle(self, val:str) -> None:
+        if not isinstance(val, str) or val not in self._available_Qt_style_names_:
+            return
+        
+        if val =="Default":
+            self.app.setStyle(QtWidgets.QApplication.style())
+        else:
+            self.app.setStyle(val)
+            
+        self._current_GUI_style_name = val
             
     @property
     def maxRecentDirectories(self) -> int:
@@ -3448,8 +3471,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     #@processtimefunc
     def loadSettings(self):
         """Overrides ScipyenConfigurable.loadSettings()"""
-        self.loadWindowSettings()
+        #print(self.__class__)
+        #print("qtconfigurables", self.qtconfigurables)
         super(WorkspaceGuiMixin, self).loadSettings() # inherited from ScipyenConfigurable
+        #self.loadWindowSettings()
         
     def loadWindowSettings(self):
         #print("%s.loadWindowSettings" % self.__class__.__name__)
@@ -5545,14 +5570,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
     @pyqtSlot(str)
     @safeWrapper
-    def _slot_set_app_gui_style_(self, value):
-        if value == "Default":
+    def _slot_test_gui_style(self, val:str)->None:
+        self._prev_gui_style_name = self._current_GUI_style_name
+        
+        if val == "Default":
             self.app.setStyle(QtWidgets.QApplication.style())
             self._current_GUI_style_name = "Default"
         else:
-            self.app.setStyle(value)
-            self._current_GUI_style_name = value
-        
+            self.app.setStyle(val)
+            self._current_GUI_style_name = val
+            
     @pyqtSlot()
     @safeWrapper
     def _slot_set_Application_style(self):
@@ -5561,15 +5588,19 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                             title="Choose Application GUI Style",
                             preSelected = self._current_GUI_style_name)
         
-        d.itemSelected.connect(self._slot_set_app_gui_style_)
+        d.itemSelected.connect(self._slot_test_gui_style)
         
         a = d.exec()
         
         if a == QtWidgets.QDialog.Accepted:
-            self._slot_set_app_gui_style_(self._current_GUI_style_name)
-            
+            sel = d.selectedItemsText
+            if len(sel):
+                style = sel[0]
+                
+            self.guiStyle = style
+                
         else:
-            self._slot_set_app_gui_style_("Default")
+            self.guiStyle = self._prev_gui_style_name
 
     @pyqtSlot(tuple)
     def slot_windowRemoved(self, name_obj):

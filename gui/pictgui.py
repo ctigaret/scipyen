@@ -338,6 +338,8 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         self.listWidget.itemClicked.connect(self.selectItem)
         self.listWidget.itemDoubleClicked.connect(self.selectAndGo)
 
+        self.selectionMode = selectmode
+        
         if isinstance(itemsList, (tuple, list)) and \
             all([isinstance(i, str) for i in itemsList]):
             
@@ -348,8 +350,6 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
                 self.preSelected = preSelected
                 
             self.setItems(itemsList)
-            
-        self.selectionMode = selectmode
             
     @pyqtSlot(str)
     def slot_locateSelectName(self, txt):
@@ -419,10 +419,10 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
             longestItem = itemsList[longestItemNdx]
             
             for k, s in enumerate(self.preSelected):
-                ndx = self.preSelected.index(s)
-                self.listWidget.item(ndx).setSelected(True)
-                if k == 0:
-                    self.listWidget.setCurrentRow(ndx)
+                ndx = itemsList.index(s)
+                item = self.listWidget.item(ndx)
+                self.listWidget.setCurrentItem(item)
+                self.listWidget.scrollToItem(item)
                 
             fm = QtGui.QFontMetrics(self.listWidget.font())
             w = fm.width(longestItem) * 1.1

@@ -251,6 +251,7 @@ def makeCustomPathStroke(path:QtGui.QPainterPath,
     
     return path
 
+@safeWrapper
 def gradient2radial(gradient:QtGui.QGradient, 
                    centerRadius:float = 1., 
                    focalRadius:float = 0.,
@@ -270,6 +271,7 @@ def gradient2radial(gradient:QtGui.QGradient,
         ret = QtGui.QRadialGradient(center, centerRadius, focalPoint, focalRadius)
 
     elif isinstance(gradient, QtGui.QGradient):
+        # see NOTE: 2021-09-16 17:55:08
         if gradient.type() == QtGui.QGradient.RadialGradient:
             ret = sip.cast(gradient, QtGui.QRadialGradient)
             ret.setCenterRadius(centerRadius)
@@ -307,6 +309,7 @@ def gradient2radial(gradient:QtGui.QGradient,
 
 g2r = gradient2radial
     
+@safeWrapper
 def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
     if isinstance(gradient, QtGui.QLinearGradient):
         return gradient
@@ -320,6 +323,8 @@ def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
         ret = QtGui.QLinearGradient(l.p1(), l.p2())
 
     elif isinstance(gradient, QtGui.QGradient):
+        # NOTE: 2021-09-16 17:55:08
+        # type() for a generic QGradient by default returns QtGui.QGradient.LinearGradient
         if gradient.type() == QtGui.QGradient.LinearGradient:
             return sip.cast(gradient, QtGui.QLinearGradient)
         
@@ -347,6 +352,7 @@ def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
     
 g2l = gradient2linear
 
+@safeWrapper
 def gradient2conical(gradient:QtGui.QGradient) -> QtGui.QConicalGradient:
     if isinstance(gradient, QtGui.QConicalGradient):
         return gradient
@@ -360,6 +366,7 @@ def gradient2conical(gradient:QtGui.QGradient) -> QtGui.QConicalGradient:
         ret = QtGui.QConicalGradient(l.p1(), l.angle())
         
     elif isinstance(gradient, QtGui.QGradient):
+        # see NOTE: 2021-09-16 17:55:08
         if gradient.type() == QtGui.QGradient.ConicalGradient:
             return sip.cast(gradient, QtGui.QConicalGradient)
         
@@ -1170,4 +1177,3 @@ def printPoints(points:typing.Union[QtGui.QPolygonF, QtGui.QPolygon, typing.Sequ
     else:
         return ret
         
-    

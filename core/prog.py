@@ -5,6 +5,8 @@ Decorators, context managers, and helper functions & classes for programming
 
 #print("{}: {}".format(__file__, __name__))
 
+from pprint import pprint
+
 import enum, io, os, re, itertools, sys, time, traceback, types, typing
 import importlib, inspect, pathlib, warnings
 from functools import singledispatch, update_wrapper, wraps
@@ -236,7 +238,7 @@ def filter_attr(iterable:typing.Iterable, **kwargs):
         
         WARNING The python's stock operator.eq DOES NOT WORK with numpy arrays!
     """
-    
+    #pprint(kwargs)
     return itertools.chain.from_iterable((filter(lambda x: f(getattr(x, n, None)) if inspect.isfunction(f) else f == getattr(x, n, None),
                                                  iterable) for n,f in kwargs.items()))
 
@@ -245,7 +247,6 @@ def filterfalse_attr(iterable:typing.Iterable, **kwargs):
                                                  iterable) for n,f in kwargs.items()))
 
     
-
 def filter_attribute(iterable:typing.Iterable,attribute:str, value:typing.Any, 
                      predicate:typing.Callable[...,bool]=lambda x,y: x==y,
                      silentfail:bool=True) -> typing.Iterator:

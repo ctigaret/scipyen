@@ -215,10 +215,20 @@ def markConfigurable(confname:str, conftype:str="",
     trait_notifier: bool or a DataBag with registered observer handles
         Optional default is None.
         
-        When trait_notifier is True, the :class: that owns the decorated property
+        When 'trait_notifier' is True, the :class: that owns the decorated property
         or method MUST have an instance attribute 'configurable_traits' with type
         DataBag. Owner derived from ScipyenConfigurable inherit this attribute
         directly from ScipyenConfigurable.
+        
+        When 'trait_notifier' is a DataBag, the DataBag is an object independent
+        of the :class: where this decorator is used. In this case, the DataBag
+        object:
+        * MUST be accessible from the scope of the caller
+        * SHOULD be "observed" by an appropriate callback function (handler).
+        
+        When trait_notifier is None, then changes ot the confuigurables can be
+        hardcoded directly in the observed setter method or property (see. e.g,
+        SignalViewer and ImageViewer)
         
         The handler used by the trait notifier's 'observe' function can be an
         ubound function, or an instance method. For ScipyenConfigurable-derived
@@ -246,14 +256,14 @@ def markConfigurable(confname:str, conftype:str="",
         the instance attribute. 
         
         In this case the trait notifier should be called directly from within 
-        the setter's body, instead of via this decorator. 
+        the setter's body, instead of via this decorator (and leave the value
+        of 'trait_notifier' to its default None). 
         
         Neveretheless, the decorator is still useful for LOADING the attribute
         value from config.yaml (provided this is what the setter expects).
         
         CAUTION: Always make sure the getter returns the same type of data as 
         that expected by the setter!
-        
         
     Returns:
     =======
@@ -271,6 +281,7 @@ def markConfigurable(confname:str, conftype:str="",
     # below, the property is a configurable that will be synchronized with the
     # config.yaml file in the user's Scipyen config directory:
     # '$HOME/.config/Scipyen/config.yaml'
+    
     @markConfigurable("MyProperty", trait_notifier=True)
     @someprop.setter(self, val)
     def someprop(self, val):
@@ -452,7 +463,6 @@ def markConfigurable(confname:str, conftype:str="",
                     This only has effect when trait notifier is a DataBag
                     that is observing.
                     """
-                    #print(type(instance))
                     f(instance, *args, **kwargs)
                     
                     if conftype != "qt":
@@ -474,9 +484,7 @@ def markConfigurable(confname:str, conftype:str="",
             else:
                 configurable_getter = Bunch({"type": conftype, "name": confname, "getter":f.__name__, "default": default})
                 
-                #@wraps(f)
                 def newf(instance, *args, **kwargs):
-                    #return instance.f(*args, **kwargs)
                     return f(instance, *args, **kwargs)
                 
                 setattr(newf, "configurable_getter", configurable_getter)
@@ -817,6 +825,7 @@ def syncQtSettings(qsettings:QSettings,
         
         if isinstance(getter, property):
             val = getattr(win, gettername)
+            #val = getter.fget(win)
             #print("\t\tgetter win.%s -> %s" % (gettername, val))
             
         elif getter is not None: # in case gettername does not exist as a win's attribute name
@@ -1023,7 +1032,7 @@ class ScipyenConfigurable(object):
         return self.configurables.get("conf", Bunch())
     
     def loadWindowSettings(self):
-        """Derived :class: shoudl override this for custom behaviour
+        """Derived :class: should override this for custom behaviour
         Here, this method only loads window (Qt) settings for "top level" 
         windows and  widgets.
         """

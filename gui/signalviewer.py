@@ -184,10 +184,7 @@ if "event" not in pg.graphicsItems.ScatterPlotItem.Symbols.keys():
     spike = QtGui.QPainterPath(QtCore.QPointF(-0.1, 0.5))
     spike.lineTo(QtCore.QPointF(0.0, -0.5))
     spike.lineTo(QtCore.QPointF(0.1, 0.5))
-    #spike.lineTo(QtCore.QPointF(-0.1, 0.5))
-    #spike.lineTo(QtCore.QPointF(0.1, 0.5))
-    #spike.lineTo(QtCore.QPointF(0.1, -0.5))
-    #spike.closeSubpath()
+    spike.closeSubpath()
     pg.graphicsItems.ScatterPlotItem.Symbols["event"] = spike
 
 """
@@ -618,14 +615,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         # NOTE: 2021-08-25 09:42:54
         # ScipyenFrameViewer initialization - also does the following:
-        # 1) calls self._configureUI_():
+        # 1) calls self._configureUI_() overridden here:
         #   1.1) sets up the UI defined in the .ui file (setupUi)
-        #   1.2) populates the qtconfigurables
         #
-        # 2) calls loadSettings THEN _configureUI_ (ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable)
-        super().__init__(data=y, parent=parent, ID=ID,
-                         win_title=win_title, doc_title=doc_title,
-                         frameIndex=frameIndex, *args, **kwargs)
+        # 3) calls self.loadSettings inherited from 
+        # ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
+        super().__init__(data=y, parent=parent, ID=ID, win_title=win_title, 
+                         doc_title=doc_title, frameIndex=frameIndex, *args, **kwargs)
         
         #self.loadSettings() # now called by ScipyenViewer.__init__()
 
@@ -662,31 +658,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 doc_title = doc_title,
                                 *args, **kwargs)
                 
-    #def saveViewerSettings(self):
-        ## TODO: 2021-08-22 22:11:39
-        ## migrate to confuse configuration
-        #if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-            #self.qsettings.setValue("/".join([self.__class__.__name__, "CursorsShowValue"]), 
-                                   #self.setCursorsShowValue.isChecked())
-            
-            #for dw in self.dockWidgets:
-                #self.qsettings.setValue("/".join([self.__class__.__name__, dw[0]]), dw[1].isVisible())
-                
-    #def loadViewerSettings(self):
-        #if type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-            #val = self.qsettings.value("/".join([self.__class__.__name__, "CursorsShowValue"]),"false")
-            
-            #if isinstance(val, str):
-                #cursors_show_value = val.lower().strip() == "true"
-                
-            #elif isinstance(val ,bool):
-                #cursors_show_value = val
-                
-            #else:
-                #cursors_show_value = False
-                
-            #self.setCursorsShowValue.setChecked(cursors_show_value)
-     
     # ### BEGIN properties
     @property
     def dockWidgets(self):

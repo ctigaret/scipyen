@@ -937,7 +937,6 @@ class GradientWidget(QtWidgets.QWidget):
             self._absoluteFocalRadiusButton.setChecked(True)
             self._focalRadiusSpinBox.setEnabled(True)
         
-        #self._updatePresetName()
         self._updatePresetsCombo()
         
     def _setupGradients(self):
@@ -1141,6 +1140,8 @@ class GradientWidget(QtWidgets.QWidget):
                                             QtWidgets.QSizePolicy.Fixed)
         
         self.mainGroupLayout = QtWidgets.QVBoxLayout(self.mainGroup)
+        self.mainGroupLayout.addWidget(self.presetsGroup)
+        
         self.mainGroupLayout.addWidget(self.editorGroup)
         self.typeSpreadGroup = QtWidgets.QGroupBox(self.mainGroup)
         
@@ -1154,8 +1155,6 @@ class GradientWidget(QtWidgets.QWidget):
         
         self.mainGroupLayout.addWidget(self.radialParamsGroup)
 
-        self.mainGroupLayout.addWidget(self.presetsGroup)
-        
         self.editorGroupLayout = QtWidgets.QVBoxLayout(self.editorGroup)
         self.editorGroupLayout.addWidget(self._editor)
         
@@ -1892,13 +1891,20 @@ class GradientDialog(QtWidgets.QDialog):
         self.layout.addWidget(self.buttons)
         
     @property
+    def qGradient(self) -> QtGui.QGradient:
+        return self.gw.gradient
+        
+    @property
+    def gradient(self) -> ColorGradient:
+        return colorGradient(self.gw.gradient)
+    
+    @property
     def colorGradient(self) -> ColorGradient:
-        return colorGradient(self.gradient)
+        return self.gradient
+    
         
 def set_shade_points(points:typing.Union[QtGui.QPolygonF, list], shade:ShadeWidget) -> None:
     shade.hoverPoints.points = QtGui.QPolygonF(points)
     shade.hoverPoints.setPointLock(0, HoverPoints.LockType.LockToLeft)
     shade.hoverPoints.setPointLock(-1, HoverPoints.LockType.LockToRight)
-    #shade.hoverPoints.setPointLock(len(points) - 1, HoverPoints.LockType.LockToLeft)
-    #shade.hoverPoints.setPointLock(points.size() - 1, HoverPoints.LockType.LockToRight)
     shade.update()

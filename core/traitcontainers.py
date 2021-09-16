@@ -219,7 +219,7 @@ class DataBag(Bunch):
             e.g. trait expects an int, and the supplied value is a float => the 
             trait will get int(value).
             
-        mutable_types: bool, default is False
+        use_mutable: bool, default is False
             When True, allows a new value type to be assigned to an EXISTING
             attribute.
             
