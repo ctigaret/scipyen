@@ -62,19 +62,29 @@ class GuiMessages(object):
 class FileIOGui(object):
     @safeWrapper
     def chooseFile(self, caption:typing.Optional[str]=None, fileFilter:typing.Optional[str]=None, 
-                   single:typing.Optional[bool]=True,
+                   single:typing.Optional[bool]=True, save:bool=False,
                    targetDir:typing.Optional[str]=None) -> typing.Tuple[typing.Union[str, typing.List[str]], str]:
         """Launcher of file open dialog
         
         Parameters:
         ----------
         caption: str, optional default is None - The caption of the file chooser dialog
+        
         fileFilter: str, optional, default is None - The file filter for choosing
             from a specific subset of tile types. When present, it must have a 
             specific format, e.g. "Pickle Files (*.pkl);;Text Files (*.txt)"
             
+            See QtWidget.QDialog.getOpenFileName for details about fileFilter
+            
         single:bool, optional (default: True)
            When False, the file chooser dialog will allow opening several files
+           
+           Ignored when 'save' is True (see below)
+           
+        save:bool, default False
+            When True, signals the intention to SAVE to the selected file name, 
+            and 'single' will eb ignored
+            In this case it will ask for confirmation to overwrite the file.
            
         targetDir:str, optional (default is None) Target directory from where 
             files are chosen.
@@ -100,7 +110,7 @@ class FileIOGui(object):
             if len(targetDir.strip()) == 0 or not os.path.isdir(targetDir):
                 targetDir = os.getcwd()
                 
-        opener = QtWidgets.QFileDialog.getOpenFileName if single else QtWidgets.QFileDialog.getOpenFileNames
+        opener = QtWidgets.QFileDialog.getSaveFileName if save is True else QtWidgets.QFileDialog.getOpenFileName if single else QtWidgets.QFileDialog.getOpenFileNames
         
         if isinstance(caption, str) and len(caption.strip()):
             opener = partial(opener, caption=caption)

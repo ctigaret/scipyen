@@ -1,13 +1,16 @@
 import array, os, typing, numbers
 from collections import OrderedDict
-import numpy as np
+from traitlets import Bunch
 from enum import IntEnum
+
+import numpy as np
 
 from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from PyQt5.uic import loadUiType as __loadUiType__
 
 from core.prog import (safeWrapper, no_sip_autoconversion)
+from core.utilities import reverse_mapping_lookup
 
 from .painting_shared import (make_transparent_bg,
                               standardQtPenStyles,
@@ -30,15 +33,17 @@ from .painting_shared import (make_transparent_bg,
                               qtGlobalColors,
                               makeCustomPathStroke,
                               comboDelegateBrush,
+                              gradientCoordinates,
                               scaleGradient,
                               normalizeGradient,
                               rescaleGradient,
                               ColorPalette,
+                              ColorGradient,
+                              Brush, Pen,
                               )
 
 from .quickdialog import QuickDialog
 from .gradientwidgets import GradientDialog
-from .planargraphics import ColorGradient
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -485,23 +490,6 @@ class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
             else:
                 brush = QtGui.QBrush(make_transparent_bg(strong=True))
                 
-            #elif brushStyle in standardQtBrushGradients.values():
-                #brush = QtGui.QBrush(brushStyle)
-                ##brush = QtGui.QBrush(QtGui.QGradient(standardQtGradientPresets["AboveTheSky"]))
-                ##if brushStyle QtCore.Qt.LinearGradientPattern:
-                    ##gradient = QtGui.QLinearGradient()
-                ## TODO: 2021-05-20 13:17:00
-                ## set a default preset & call GUI to choose one and/or edit gradient
-                ## then construct a QGradient on that and construct the brush on that
-                ##return
-            #elif brushStyle in standardQtBrushTextures.values():
-                ## TODO: 2021-05-20 13:17:55
-                ## set a default texture & call GUI to choose an image or pixmap
-                ## then create a brush on that!
-                ##return
-            #else:
-                #brush = QtGui.QBrush(QtCore.Qt.NoBrush)
-                
             painter.setBrush(brush)
             
             painter.drawRoundedRect(innerRect, 2, 2)
@@ -631,7 +619,6 @@ class BrushComboBox(QtWidgets.QComboBox):
             
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         painter.setPen(QtCore.Qt.transparent)
-        #painter.setPen(penColor)
         if isinstance(self._internalStyle, BrushStyleType._subs_tree()[1:]):
             if isinstance(self._internalStyle, QtGui.QGradient):
                 g = scaleGradient(self._internalStyle, frame) 
@@ -742,11 +729,10 @@ class BrushComboBox(QtWidgets.QComboBox):
     @safeWrapper
     def _slotGradientDialogFinished(self, value:int):
         if value == QtGui.QDialog.Accepted:
-            self._setCustomStyle("Custom", self._gradientDialog.gw.normalizedGradient)
+            self._setCustomStyle("Custom", self._gradientDialog.qGradient)
+            #print(f"_slotGradientDialogFinished gradient coords {gradientCoordinates(self._gradientDialog.qGradient)}")
             self.activated[object].emit(self._internalStyle)
             
-        pass
-        
     def _addStyles(self):
         for k, (name, value) in enumerate(self._styles.items()):
             if name in ("Gradient...", "Pixmap...", "Image..."):
@@ -775,7 +761,12 @@ class BrushComboBox(QtWidgets.QComboBox):
         self.clear()
         self._addStyles()
         self._customStyle = value
-        self._internalStyle = value
+        self._internalStyle = value # used in paintEvent
+        
+        if isinstance(self._customStyle, QtGui.QGradient):
+            print(f"{self.__class__.__name__} custom gradient {gradientCoordinates(self._customStyle)}")
+        
+        # below is used for the drop-down list
         index = [n for n in self._styles.keys()].index(name)
         self.setItemData(index, name, QtCore.Qt.ToolTipRole)
         self.setItemData(index, self._internalStyle, BrushComboDelegate.ItemRoles.BrushRole)

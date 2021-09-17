@@ -1560,31 +1560,10 @@ def segment_to_atf(segment, fileName=None,
     except Exception as e:
         traceback.print_exc()
         csvfile.close()
-
-
-    #elif isinstance(data, np.ndarray):
-        #if header is not None:
-            #if isinstance(header, (tuple, list)):
-                #if data.ndim != 2:
-                    #raise ValueError("When header is given, data is expected to have two dimensions; instead, it has %d" % data.ndim)
-                
-                #if len(header) != data.shape[1]:
-                    #raise ValueError("When header is given, it must have as many elements as columns in data (%d); instead it has %d" %(data.shape[1], len(header)))
-                
-                #if isinstance(header, tuple):
-                    #headerlist = list(header)
-                    
-                #else:
-                    #headerlist = header
-
-            #elif isinstance(header, np.ndarray) and header.dtype.str.startswith("<U") and header.shape[1]==data.shape[1]:
-                #headerlist = [list(r) for r in header]
-                
-            #else:
-                #raise TypeError("Unexpected data type for header; should have been a list or tuple with %d element or a np.ndarray with %d columns and %s dtype; instead I've got %s" %(data.shape[1], data.shape[1], "<U10", type(header).__name__))
             
-        #else:
-            #headerlist = None
+def saveText(s, fileName):
+    with open(fileName, mode="wt") as fileDest:
+        fileDest.write(s)
             
 @safeWrapper
 def writeCsv(data, fileName=None, header=None):
@@ -2094,12 +2073,8 @@ def export_to_hdf5(obj, filenameOrGroup, name=None):
         else:
             obj_group = f.create_group("object", track_order=True)
             
-    
-
     f.close()
     
-
-
 @safeWrapper
 def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None, 
              ws:typing.Optional[dict]=None, mode:str="pkl", **kwargs):

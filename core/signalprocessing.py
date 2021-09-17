@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Functions for processing generic 1D signals (numpy array).
-For signal processing on signal types (e.g. neo.AnalogSignals or datatypes.DataSignal)
+For signal processing on elecctorphysiology signal types (e.g. neo.AnalogSignals or datatypes.DataSignal)
 please use the "ephys" module.
 """
 

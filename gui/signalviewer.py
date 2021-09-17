@@ -170,7 +170,7 @@ from . import scipyen_colormaps as colormaps
 from .scipyenviewer import (ScipyenViewer, ScipyenFrameViewer,Bunch)
 from .dictviewer import (InteractiveTreeWidget, DataViewer,)
 from .cursors import SignalCursor
-from .colorselectionwidget import ColorSelectionWidget, quickColorDialog
+from .colorwidgets import ColorSelectionWidget, quickColorDialog
 #### END pict.gui modules
 
 # each spike is a small vertical line centered at 0.0, height of 1

@@ -2669,8 +2669,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_historyContextMenuRequest(self, point):
         cm = QtWidgets.QMenu("Selected history", self)
         copyHistorySelection = cm.addAction("Copy")
+        copyHistorySelection.setToolTip("Copy selected history to clipboard")
         copyHistorySelection.triggered.connect(self._copyHistorySelection_)
         cm.popup(self.historyTreeWidget.mapToGlobal(point), copyHistorySelection)
+        saveHistorySelection = cm.addAction("Save...")
+        saveHistorySelection.setToolTip("Save selected history to file")
+        saveHistorySelection.triggered.connect(self._saveHistorySelection_)
         
     @pyqtSlot()
     @safeWrapper
@@ -2819,6 +2823,18 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             self.app.clipboard().clear() # don't leave gremlins
             
+    def _saveHistorySelection_(self):
+        cmd = self._getHistoryBlockAsCommand_()
+        
+        if isinstance(cmd, str) and len(cmd.strip()):
+            fn, _ = self.chooseFile(caption = "Save selected history to file",
+                                    save=True,
+                                    fileFilter="Python source code (*.py);;Text Files (*.txt);;All files (*.*)")
+            if len(fn.strip()):
+                pio.saveText(cmd+"\n", fn)
+                #with open(fn, mode="wt") as destfile:
+                    
+                    
         
     @pyqtSlot(QtCore.QModelIndex)
     @safeWrapper

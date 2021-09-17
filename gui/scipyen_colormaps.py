@@ -801,7 +801,7 @@ def qcolor(val:typing.Union[QtGui.QColor, int, str, typing.Sequence[typing.Union
     elif isinstance(val, str):
         if QtGui.QColor.isValidColor(val):
             # this should take care of hex string representations e.g. #ffaabbcc
-            # as well as gobal color names e.g. "blue", "red", etc
+            # as well as gobal and standard color names e.g. "blue", "red", etc
             return QtGui.QColor(val)
         
         else: # this will almost never get executed but keep here as safety net
@@ -815,7 +815,6 @@ def qcolor(val:typing.Union[QtGui.QColor, int, str, typing.Sequence[typing.Union
     else:
         warnings.warn(f"Invalid color specification: {val}")
         return QtGui.QColor()# invalid color!
-        #raise TypeError("Expecting a QColor, numeric 3- or 4-tuple, or str (color name or Hex representation); got %s instead" % val)
             
 def hexpalette(palette:typing.Union[dict, tuple, list], fmt:QtGui.QColor.NameFormat=QtGui.QColor.HexRgb) -> dict:
     if isinstance(palette, dict):
