@@ -162,7 +162,8 @@ from core.scipyenmagics import ScipyenMagics
 # available directly in the console
 from core.workspacefunctions import * 
 from core import scipyen_config as scipyenconf
-from core.scipyen_config import (makeConfigurable, markConfigurable, confuse, )
+from core.scipyen_config import (markConfigurable, confuse, 
+                                 saveWindowSettings, loadWindowSettings, )
 from core.scipyen_config import scipyen_config as scipyen_settings
 from core import plots as plots
 from core import datatypes as dt
@@ -239,8 +240,7 @@ from . import colorwidgets
 from . import stylewidgets
 from . import gradientwidgets
 
-from .workspacegui import (WorkspaceGuiMixin, 
-                           saveWindowSettings, loadWindowSettings, )
+from .workspacegui import (WorkspaceGuiMixin)
 from .workspacemodel import WorkspaceModel
 
 # qtconsole.styles and pygments.styles, respectively:
@@ -723,7 +723,7 @@ class WindowManager(__QMainWindow__):
         
         self._setCurrentWindow(viewer)
         
-class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
+class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, WorkspaceGuiMixin):
     signal_forgetScripts = pyqtSignal(object)
     signal_executeScript = pyqtSignal(str)
     signal_importScript = pyqtSignal(str)
@@ -733,29 +733,35 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
     signal_pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
     signal_pythonFileAdded = pyqtSignal(str)
     
+    
+    # NOTE recent run scripts is managed by ScipyenWindow instance mainWindow
+    # FIXME 2021-09-18 14:16:14 Change this so that it is managed instead by 
+    # ScriptManager
+    # We then need to connect pasting/dropping script file onto Scipyen mainWindow
+    # or the internal console to script execution and adding of script file to
+    # the internal scripts list  here.
+    
     def __init__(self, parent=None):
-        super(ScriptManagerWindow, self).__init__(parent)
+        super(ScriptManager, self).__init__(parent)
         self.setupUi(self)
+        WorkspaceGuiMixin.__init__(self, parent=parent)
         self._configureUI_()
         
-        self.scriptsTable.customContextMenuRequested[QtCore.QPoint].connect(self.slot_customContextMenuRequested)
-        self.scriptsTable.cellDoubleClicked[int, int].connect(self.slot_cellDoubleClick)
         
         self.setWindowTitle("Scipyen Script Manager")
         
-        self.qsettings = QtCore.QSettings()
-        
         self.loadSettings()
-        
-        self.acceptDrops = True
-        self.scriptsTable.acceptDrops = True
         
     def _configureUI_(self):
         addScript = self.menuScripts.addAction("Add scripts...")
         addScript.triggered.connect(self.slot_addScripts)
-        #pass
-        #self.menubar.insertMenu(self.mainMenu.menuAction())
+        self.scriptsTable.customContextMenuRequested[QtCore.QPoint].connect(self.slot_customContextMenuRequested)
+        self.scriptsTable.cellDoubleClicked[int, int].connect(self.slot_cellDoubleClick)
+        self.acceptDrops = True
+        self.scriptsTable.acceptDrops = True
         
+    def closeEvent(self, evt):
+        self.saveSettings()
         
     def loadSettings(self):
         loadWindowSettings(self.qsettings, self)
@@ -890,8 +896,11 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
             if isinstance(fileName, tuple):
                 fileName = fileName[0] # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
                 
-            if isinstance(fileName, str) and len(fileName) > 0 and os.path.isfile(fileName):
-                self.signal_pythonFileAdded.emit(fileName)
+            #if isinstance(fileName, str) and len(fileName) > 0 and os.path.isfile(fileName):
+                #self.signal_pythonFileAdded.emit(fileName)
+            if pio.checkFileReadAccess(fileName):
+                self._script.append(fileName)
+                #self.signal_pythonFileAdded.emit(fileName)
 
     @pyqtSlot()
     @safeWrapper
@@ -901,8 +910,10 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
         # NOTE: returns a tuple (path list, filter)
         fileNames, fileFilter = QtWidgets.QFileDialog.getOpenFileNames(self, caption=u"Run python script", filter="Python script (*.py)", directory = targetDir)
         
-        for fileName in fileNames:
-            self.signal_pythonFileAdded.emit(fileName)
+        if pio.checkFileReadAccess(fileNames):
+            self._scripts.extend(fileNames)
+        #for fileName in fileNames:
+            #self.signal_pythonFileAdded.emit(fileName)
         
         
     @pyqtSlot()
@@ -1184,7 +1195,6 @@ class VTH(object):
         if viewerClass in VTH.default_handlers:
             VTH.gui_handlers[viewerClass] = deepcopy(VTH.default_handlers[viewerClass])
 
-#@makeConfigurable
 class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
@@ -1508,7 +1518,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         parent: QtWidgets.QWidget.
         """
         super().__init__(parent) # 2016-08-04 17:39:06 NOTE: python3 way
-        WorkspaceGuiMixin.__init__(self, parent=self)#, settings=settings)
+        #WorkspaceGuiMixin.__init__(self, parent=self)#, settings=settings)
         self.app = app
         
         #### BEGIN configurables; for each of these we define a read-write property
@@ -1558,7 +1568,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # --> $HOME/.config/Scipyen/config.yaml
         # WARNING this has nothing to do with %config magic in IPython (available
         # in Scipyen's consoles)
-        self._scipyen_settings_         = scipyen_settings 
+        #self._scipyen_settings_         = scipyen_settings 
         
         # NOTE: Qt GUI settings in $HOME/.config/Scipyen/Scipyen.conf
         # this can only be accessed once the Qt application is instantiated in
@@ -1566,8 +1576,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # Since the ScipyenWindow instance is the first Scipyen object that
         # comes alive, the qsettings must be set up here and not rely on what is
         # inherited from ScipyenConfigurable (indirectly via WorkspaceGuiMixin)
-        self.qsettings = QtCore.QSettings(QtCore.QCoreApplication.organizationName(),
-                                          QtCore.QCoreApplication.applicationName())
+        #self.qsettings = QtCore.QSettings(QtCore.QCoreApplication.organizationName(),
+                                          #QtCore.QCoreApplication.applicationName())
         #self.qsettings                   = QtCore.QSettings("Scipyen", "Scipyen")
 
         # NOTE: 2021-08-17 12:29:29
@@ -1585,13 +1595,25 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._copy_varnames_separator_ = " "
         #### END - to revisit
         
+                # NOTE: 2021-08-17 12:38:41 see also NOTE: 2021-08-17 10:05:20 in scipyen.py
+        #self._default_GUI_style = self.app.style()
+        self._current_GUI_style_name = "Default"
+        self._prev_gui_style_name = self._current_GUI_style_name
+        
         #self._setup_console_pygments_()
         
-        self.setupUi(self)
         
         #self._defaultCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
         
-        self.scriptsManager = ScriptManagerWindow(parent=self)
+        # NOTE: WARNING 2021-09-16 14:32:03
+        # this must be called AFTER all class and instance attributes used in the 
+        # configurables mechanism have been defined
+        # Any such attribute defined further below will NOT be found by the 
+        # mechanism (e.g. syncQtSettings)
+        self.setupUi(self)
+        WorkspaceGuiMixin.__init__(self, parent=self)#, settings=settings)
+        
+        self.scriptsManager = ScriptManager(parent=self)
         self.scriptsManager.signal_executeScript[str].connect(self._slot_runPythonScriptFromManager)
         self.scriptsManager.signal_importScript[str].connect(self._slot_importPythonScriptFromManager)
         self.scriptsManager.signal_pasteScript[str].connect(self._slot_pastePythonScriptFromManager)
@@ -1643,11 +1665,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #self.setWindowIcon(icon) # this doesn't work? -- next line does
         QtWidgets.QApplication.setWindowIcon(icon)
 
-        # NOTE: 2021-08-17 12:38:41 see also NOTE: 2021-08-17 10:05:20 in scipyen.py
-        #self._default_GUI_style = self.app.style()
-        self._current_GUI_style_name = "Default"
-        
-        
         # -----------------
         # connect widget actions through signal/slot mechanism
         # NOTE: 2017-07-04 16:28:52
@@ -1713,6 +1730,22 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if isinstance(val, int) and val >= 0:
             self._maxRecentFiles = val
             
+    @property
+    def guiStyle(self) -> str:
+        return self._current_GUI_style_name
+    
+    @markConfigurable("WidgetStyle", "qt", default="Default")
+    @guiStyle.setter
+    def guiStyle(self, val:str) -> None:
+        if not isinstance(val, str) or val not in self._available_Qt_style_names_:
+            return
+        
+        if val =="Default":
+            self.app.setStyle(QtWidgets.QApplication.style())
+        else:
+            self.app.setStyle(val)
+            
+        self._current_GUI_style_name = val
             
     @property
     def maxRecentDirectories(self) -> int:
@@ -1880,7 +1913,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def recentRunScripts(self) -> collections.deque:
         return self._recentlyRunScripts
     
-    @markConfigurable("RecentScripts", "Qt")
+    #@markConfigurable("RecentScripts", "Qt")
     @recentRunScripts.setter
     def recentRunScripts(self, 
                          val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
@@ -2041,11 +2074,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             if self.external_console.window.active_frontend is None:
                 # NOTE: 2021-01-30 13:54:46
                 # console instance exists but does not have an active frontend anymore
-                # therefore kill the running kernel (if any) and start with clean slate
+                # therefore kill the running kernel (if any and running) and start 
+                # with clean slate
                 if (self.external_console.kernel_manager is not None):
                     # kill the current (existing) kernel
                     try:
-                        self.external_console.kernel_manager.shutdown_kernel(now=True, restart=False)
+                        if hasattr(self.external_console.kernel_manager, "is_alive") and self.external_console.kernel_manager.is_alive():
+                            self.external_console.kernel_manager.shutdown_kernel(now=True, restart=False)
                     except Exception as e:
                         traceback.print_exc()
                     
@@ -2320,7 +2355,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.workspace['console'] = self.console # useful for testing functionality; remove upon release
             self.workspace["shell"] = self.shell # alias to self.ipkernel.shell
             self.workspace["scipyen_settings"] = self._scipyen_settings_
-            #self.workspace["scipyen_config"] = self._scipyen_settings_
             self.workspace["scipyen_topdir"] = self._scipyendir_
             self.workspace["external_console"] = self.external_console
             
@@ -2645,8 +2679,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_historyContextMenuRequest(self, point):
         cm = QtWidgets.QMenu("Selected history", self)
         copyHistorySelection = cm.addAction("Copy")
+        copyHistorySelection.setToolTip("Copy selected history to clipboard")
         copyHistorySelection.triggered.connect(self._copyHistorySelection_)
         cm.popup(self.historyTreeWidget.mapToGlobal(point), copyHistorySelection)
+        saveHistorySelection = cm.addAction("Save...")
+        saveHistorySelection.setToolTip("Save selected history to file")
+        saveHistorySelection.triggered.connect(self._saveHistorySelection_)
         
     @pyqtSlot()
     @safeWrapper
@@ -2795,6 +2833,18 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             self.app.clipboard().clear() # don't leave gremlins
             
+    def _saveHistorySelection_(self):
+        cmd = self._getHistoryBlockAsCommand_()
+        
+        if isinstance(cmd, str) and len(cmd.strip()):
+            fn, _ = self.chooseFile(caption = "Save selected history to file",
+                                    save=True,
+                                    fileFilter="Python source code (*.py);;Text Files (*.txt);;All files (*.*)")
+            if len(fn.strip()):
+                pio.saveText(cmd+"\n", fn)
+                #with open(fn, mode="wt") as destfile:
+                    
+                    
         
     @pyqtSlot(QtCore.QModelIndex)
     @safeWrapper
@@ -3447,8 +3497,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     #@processtimefunc
     def loadSettings(self):
         """Overrides ScipyenConfigurable.loadSettings()"""
-        self.loadWindowSettings()
+        #print(self.__class__)
+        #print("qtconfigurables", self.qtconfigurables)
         super(WorkspaceGuiMixin, self).loadSettings() # inherited from ScipyenConfigurable
+        #self.loadWindowSettings()
         
     def loadWindowSettings(self):
         #print("%s.loadWindowSettings" % self.__class__.__name__)
@@ -4694,14 +4746,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 #self._temp_python_filename_ = fileName
                 #self._slot_python_code_to_console()
                 
-                if fileName not in self.recentlyRunScripts:
-                    self.recentlyRunScripts.appendleft(fileName)
+                if fileName not in self.recentRunScripts:
+                    self.recentRunScripts.appendleft(fileName)
                     self._refreshRecentScriptsMenu_()
                     
                 else:
-                    if fileName != self.recentlyRunScripts[0]:
-                        self.recentlyRunScripts.remove(fileName)
-                        self.recentlyRunScripts.appendleft(fileName)
+                    if fileName != self.recentRunScripts[0]:
+                        self.recentRunScripts.remove(fileName)
+                        self.recentRunScripts.appendleft(fileName)
                         self._refreshRecentScriptsMenu_()
                         
     @pyqtSlot()
@@ -4730,14 +4782,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 # TODO check if this is a legitimate ASCII file containing python code
                 self._run_python_source_code_(fileName, paste=False)
                 
-                if fileName not in self.recentlyRunScripts:
-                    self.recentlyRunScripts.appendleft(fileName)
+                if fileName not in self.recentRunScripts:
+                    self.recentRunScripts.appendleft(fileName)
                     self._refreshRecentScriptsMenu_()
                     
                 else:
-                    if fileName != self.recentlyRunScripts[0]:
-                        self.recentlyRunScripts.remove(fileName)
-                        self.recentlyRunScripts.appendleft(fileName)
+                    if fileName != self.recentRunScripts[0]:
+                        self.recentRunScripts.remove(fileName)
+                        self.recentRunScripts.appendleft(fileName)
                         self._refreshRecentScriptsMenu_()
                         
     @pyqtSlot(str, QtCore.QPoint)
@@ -5195,14 +5247,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if isinstance(self._temp_python_filename_, str) and len(self._temp_python_filename_.strip()) and os.path.isfile(self._temp_python_filename_):
             self._run_python_source_code_(self._temp_python_filename_, paste=True)
             
-            if self._temp_python_filename_ not in self.recentlyRunScripts:
-                self.recentlyRunScripts.appendleft(self._temp_python_filename_)
+            if self._temp_python_filename_ not in self.recentRunScripts:
+                self.recentRunScripts.appendleft(self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
                 
             else:
-                if self._temp_python_filename_ != self.recentlyRunScripts[0]:
-                    self.recentlyRunScripts.remove(self._temp_python_filename_)
-                    self.recentlyRunScripts.appendleft(self._temp_python_filename_)
+                if self._temp_python_filename_ != self.recentRunScripts[0]:
+                    self.recentRunScripts.remove(self._temp_python_filename_)
+                    self.recentRunScripts.appendleft(self._temp_python_filename_)
                     self._refreshRecentScriptsMenu_()
                     
     @pyqtSlot()
@@ -5220,12 +5272,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def _slot_forgetScripts_(self, o):
         if isinstance(o, str):
-            if o in self.recentlyRunScripts:
-                self.recentlyRunScripts.remove(o)
+            if o in self.recentRunScripts:
+                self.recentRunScripts.remove(o)
                 
         elif isinstance(o, (tuple, list)) and all([isinstance(v, str) for v in o]):
             for v in o:
-                self.recentlyRunScripts.remove(v)
+                self.recentRunScripts.remove(v)
                 
         self._refreshRecentScriptsMenu_()
         
@@ -5235,14 +5287,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if isinstance(self._temp_python_filename_, str) and len(self._temp_python_filename_.strip()) and os.path.isfile(self._temp_python_filename_):
             self._import_python_module_file_(self._temp_python_filename_)
         
-            if self._temp_python_filename_ not in self.recentlyRunScripts:
-                self.recentlyRunScripts.appendleft(self._temp_python_filename_)
+            if self._temp_python_filename_ not in self.recentRunScripts:
+                self.recentRunScripts.appendleft(self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
                 
             else:
-                if self._temp_python_filename_ != self.recentlyRunScripts[0]:
-                    self.recentlyRunScripts.remove(self._temp_python_filename_)
-                    self.recentlyRunScripts.appendleft(self._temp_python_filename_)
+                if self._temp_python_filename_ != self.recentRunScripts[0]:
+                    self.recentRunScripts.remove(self._temp_python_filename_)
+                    self.recentRunScripts.appendleft(self._temp_python_filename_)
                     self._refreshRecentScriptsMenu_()
                 
             self._temp_python_filename_ = None
@@ -5488,14 +5540,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def _slot_registerPythonSource_(self):
         if isinstance(self._temp_python_filename_, str) and len(self._temp_python_filename_.strip()) and os.path.isfile(self._temp_python_filename_):
-            if self._temp_python_filename_ not in self.recentlyRunScripts:
-                self.recentlyRunScripts.appendleft(self._temp_python_filename_)
+            if self._temp_python_filename_ not in self.recentRunScripts:
+                self.recentRunScripts.appendleft(self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
                 
             else:
-                if self._temp_python_filename_ != self.recentlyRunScripts[0]:
-                    self.recentlyRunScripts.remove(self._temp_python_filename_)
-                    self.recentlyRunScripts.appendleft(self._temp_python_filename_)
+                if self._temp_python_filename_ != self.recentRunScripts[0]:
+                    self.recentRunScripts.remove(self._temp_python_filename_)
+                    self.recentRunScripts.appendleft(self._temp_python_filename_)
                     self._refreshRecentScriptsMenu_()
                 
             self._temp_python_filename_ = None
@@ -5511,20 +5563,22 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
             self._run_python_source_code_(self._temp_python_filename_, paste=False)
 
-            if self._temp_python_filename_ not in self.recentlyRunScripts:
-                self.recentlyRunScripts.appendleft(self._temp_python_filename_)
+            if self._temp_python_filename_ not in self.recentRunScripts:
+                self.recentRunScripts.appendleft(self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
                 
             else:
-                if self._temp_python_filename_ != self.recentlyRunScripts[0]:
-                    self.recentlyRunScripts.remove(self._temp_python_filename_)
-                    self.recentlyRunScripts.appendleft(self._temp_python_filename_)
-                    self._refreshRecentScriptsMenu_()
-                
+                if self._temp_python_filename_ != self.recentRunScripts[0]:
+                    self.recentRunScripts.remove(self._temp_python_filename_)
+                    self.recentRunScripts.appendleft(self._temp_python_filename_)
+                    #self._refreshRecentScriptsMenu_()
+                    
             self._temp_python_filename_ = None
             
     def _run_python_source_code_(self, fileName, paste=False):
-        self.statusbar.showMessage("Running %s" % os.path.basename(fileName))
+        bfn = os.path.basename(fileName)
+        msg = f"Sending {bfn} to console" if paste else f"Running {bfn} in console"
+        self.statusbar.showMessage(msg)
         if os.path.isfile(fileName):
             if paste:
                 text = pio.loadFile(fileName)
@@ -5544,14 +5598,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
     @pyqtSlot(str)
     @safeWrapper
-    def _slot_set_app_gui_style_(self, value):
-        if value == "Default":
+    def _slot_test_gui_style(self, val:str)->None:
+        self._prev_gui_style_name = self._current_GUI_style_name
+        
+        if val == "Default":
             self.app.setStyle(QtWidgets.QApplication.style())
             self._current_GUI_style_name = "Default"
         else:
-            self.app.setStyle(value)
-            self._current_GUI_style_name = value
-        
+            self.app.setStyle(val)
+            self._current_GUI_style_name = val
+            
     @pyqtSlot()
     @safeWrapper
     def _slot_set_Application_style(self):
@@ -5560,15 +5616,19 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                             title="Choose Application GUI Style",
                             preSelected = self._current_GUI_style_name)
         
-        d.itemSelected.connect(self._slot_set_app_gui_style_)
+        d.itemSelected.connect(self._slot_test_gui_style)
         
         a = d.exec()
         
         if a == QtWidgets.QDialog.Accepted:
-            self._slot_set_app_gui_style_(self._current_GUI_style_name)
-            
+            sel = d.selectedItemsText
+            if len(sel):
+                style = sel[0]
+                
+            self.guiStyle = style
+                
         else:
-            self._slot_set_app_gui_style_("Default")
+            self.guiStyle = self._prev_gui_style_name
 
     @pyqtSlot(tuple)
     def slot_windowRemoved(self, name_obj):

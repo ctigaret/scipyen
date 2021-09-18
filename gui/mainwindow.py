@@ -723,7 +723,7 @@ class WindowManager(__QMainWindow__):
         
         self._setCurrentWindow(viewer)
         
-class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
+class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, WorkspaceGuiMixin):
     signal_forgetScripts = pyqtSignal(object)
     signal_executeScript = pyqtSignal(str)
     signal_importScript = pyqtSignal(str)
@@ -733,29 +733,35 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
     signal_pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
     signal_pythonFileAdded = pyqtSignal(str)
     
+    
+    # NOTE recent run scripts is managed by ScipyenWindow instance mainWindow
+    # FIXME 2021-09-18 14:16:14 Change this so that it is managed instead by 
+    # ScriptManager
+    # We then need to connect pasting/dropping script file onto Scipyen mainWindow
+    # or the internal console to script execution and adding of script file to
+    # the internal scripts list  here.
+    
     def __init__(self, parent=None):
-        super(ScriptManagerWindow, self).__init__(parent)
+        super(ScriptManager, self).__init__(parent)
         self.setupUi(self)
+        WorkspaceGuiMixin.__init__(self, parent=parent)
         self._configureUI_()
         
-        self.scriptsTable.customContextMenuRequested[QtCore.QPoint].connect(self.slot_customContextMenuRequested)
-        self.scriptsTable.cellDoubleClicked[int, int].connect(self.slot_cellDoubleClick)
         
         self.setWindowTitle("Scipyen Script Manager")
         
-        self.qsettings = QtCore.QSettings()
-        
         self.loadSettings()
-        
-        self.acceptDrops = True
-        self.scriptsTable.acceptDrops = True
         
     def _configureUI_(self):
         addScript = self.menuScripts.addAction("Add scripts...")
         addScript.triggered.connect(self.slot_addScripts)
-        #pass
-        #self.menubar.insertMenu(self.mainMenu.menuAction())
+        self.scriptsTable.customContextMenuRequested[QtCore.QPoint].connect(self.slot_customContextMenuRequested)
+        self.scriptsTable.cellDoubleClicked[int, int].connect(self.slot_cellDoubleClick)
+        self.acceptDrops = True
+        self.scriptsTable.acceptDrops = True
         
+    def closeEvent(self, evt):
+        self.saveSettings()
         
     def loadSettings(self):
         loadWindowSettings(self.qsettings, self)
@@ -890,8 +896,11 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
             if isinstance(fileName, tuple):
                 fileName = fileName[0] # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
                 
-            if isinstance(fileName, str) and len(fileName) > 0 and os.path.isfile(fileName):
-                self.signal_pythonFileAdded.emit(fileName)
+            #if isinstance(fileName, str) and len(fileName) > 0 and os.path.isfile(fileName):
+                #self.signal_pythonFileAdded.emit(fileName)
+            if pio.checkFileReadAccess(fileName):
+                self._script.append(fileName)
+                #self.signal_pythonFileAdded.emit(fileName)
 
     @pyqtSlot()
     @safeWrapper
@@ -901,8 +910,10 @@ class ScriptManagerWindow(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__):
         # NOTE: returns a tuple (path list, filter)
         fileNames, fileFilter = QtWidgets.QFileDialog.getOpenFileNames(self, caption=u"Run python script", filter="Python script (*.py)", directory = targetDir)
         
-        for fileName in fileNames:
-            self.signal_pythonFileAdded.emit(fileName)
+        if pio.checkFileReadAccess(fileNames):
+            self._scripts.extend(fileNames)
+        #for fileName in fileNames:
+            #self.signal_pythonFileAdded.emit(fileName)
         
         
     @pyqtSlot()
@@ -1184,7 +1195,6 @@ class VTH(object):
         if viewerClass in VTH.default_handlers:
             VTH.gui_handlers[viewerClass] = deepcopy(VTH.default_handlers[viewerClass])
 
-#@makeConfigurable
 class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
@@ -1603,7 +1613,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.setupUi(self)
         WorkspaceGuiMixin.__init__(self, parent=self)#, settings=settings)
         
-        self.scriptsManager = ScriptManagerWindow(parent=self)
+        self.scriptsManager = ScriptManager(parent=self)
         self.scriptsManager.signal_executeScript[str].connect(self._slot_runPythonScriptFromManager)
         self.scriptsManager.signal_importScript[str].connect(self._slot_importPythonScriptFromManager)
         self.scriptsManager.signal_pasteScript[str].connect(self._slot_pastePythonScriptFromManager)
@@ -1903,7 +1913,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def recentRunScripts(self) -> collections.deque:
         return self._recentlyRunScripts
     
-    @markConfigurable("RecentScripts", "Qt")
+    #@markConfigurable("RecentScripts", "Qt")
     @recentRunScripts.setter
     def recentRunScripts(self, 
                          val:typing.Optional[typing.Union[collections.deque, list, tuple]] = None) -> None:
@@ -3442,7 +3452,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         pass
         
     def saveWindowSettings(self):
-        gname, pfx = saveWindowSettings(self.qsettings, self)
+        gname, pfx = saveWindowSettings(self.qsettings, self, group_name = self.__class__.__name__)
         
         #### NOTE: user-defined gui handlers (viewers) for variable types, or user-changed
         # configuration of gui handlers
@@ -3494,7 +3504,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
     def loadWindowSettings(self):
         #print("%s.loadWindowSettings" % self.__class__.__name__)
-        gname, prefix = loadWindowSettings(self.qsettings, self)#, group_name = self.__class__.__name__)
+        gname, prefix = loadWindowSettings(self.qsettings, self, group_name = self.__class__.__name__)
         
         
         self.qsettings.beginGroup("Custom_GUI_Handlers")
@@ -4736,14 +4746,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 #self._temp_python_filename_ = fileName
                 #self._slot_python_code_to_console()
                 
-                if fileName not in self.recentlyRunScripts:
-                    self.recentlyRunScripts.appendleft(fileName)
+                if fileName not in self.recentRunScripts:
+                    self.recentRunScripts.appendleft(fileName)
                     self._refreshRecentScriptsMenu_()
                     
                 else:
-                    if fileName != self.recentlyRunScripts[0]:
-                        self.recentlyRunScripts.remove(fileName)
-                        self.recentlyRunScripts.appendleft(fileName)
+                    if fileName != self.recentRunScripts[0]:
+                        self.recentRunScripts.remove(fileName)
+                        self.recentRunScripts.appendleft(fileName)
                         self._refreshRecentScriptsMenu_()
                         
     @pyqtSlot()
@@ -4772,14 +4782,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 # TODO check if this is a legitimate ASCII file containing python code
                 self._run_python_source_code_(fileName, paste=False)
                 
-                if fileName not in self.recentlyRunScripts:
-                    self.recentlyRunScripts.appendleft(fileName)
+                if fileName not in self.recentRunScripts:
+                    self.recentRunScripts.appendleft(fileName)
                     self._refreshRecentScriptsMenu_()
                     
                 else:
-                    if fileName != self.recentlyRunScripts[0]:
-                        self.recentlyRunScripts.remove(fileName)
-                        self.recentlyRunScripts.appendleft(fileName)
+                    if fileName != self.recentRunScripts[0]:
+                        self.recentRunScripts.remove(fileName)
+                        self.recentRunScripts.appendleft(fileName)
                         self._refreshRecentScriptsMenu_()
                         
     @pyqtSlot(str, QtCore.QPoint)
@@ -5237,14 +5247,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if isinstance(self._temp_python_filename_, str) and len(self._temp_python_filename_.strip()) and os.path.isfile(self._temp_python_filename_):
             self._run_python_source_code_(self._temp_python_filename_, paste=True)
             
-            if self._temp_python_filename_ not in self.recentlyRunScripts:
-                self.recentlyRunScripts.appendleft(self._temp_python_filename_)
+            if self._temp_python_filename_ not in self.recentRunScripts:
+                self.recentRunScripts.appendleft(self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
                 
             else:
-                if self._temp_python_filename_ != self.recentlyRunScripts[0]:
-                    self.recentlyRunScripts.remove(self._temp_python_filename_)
-                    self.recentlyRunScripts.appendleft(self._temp_python_filename_)
+                if self._temp_python_filename_ != self.recentRunScripts[0]:
+                    self.recentRunScripts.remove(self._temp_python_filename_)
+                    self.recentRunScripts.appendleft(self._temp_python_filename_)
                     self._refreshRecentScriptsMenu_()
                     
     @pyqtSlot()
@@ -5262,12 +5272,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def _slot_forgetScripts_(self, o):
         if isinstance(o, str):
-            if o in self.recentlyRunScripts:
-                self.recentlyRunScripts.remove(o)
+            if o in self.recentRunScripts:
+                self.recentRunScripts.remove(o)
                 
         elif isinstance(o, (tuple, list)) and all([isinstance(v, str) for v in o]):
             for v in o:
-                self.recentlyRunScripts.remove(v)
+                self.recentRunScripts.remove(v)
                 
         self._refreshRecentScriptsMenu_()
         
@@ -5277,14 +5287,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if isinstance(self._temp_python_filename_, str) and len(self._temp_python_filename_.strip()) and os.path.isfile(self._temp_python_filename_):
             self._import_python_module_file_(self._temp_python_filename_)
         
-            if self._temp_python_filename_ not in self.recentlyRunScripts:
-                self.recentlyRunScripts.appendleft(self._temp_python_filename_)
+            if self._temp_python_filename_ not in self.recentRunScripts:
+                self.recentRunScripts.appendleft(self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
                 
             else:
-                if self._temp_python_filename_ != self.recentlyRunScripts[0]:
-                    self.recentlyRunScripts.remove(self._temp_python_filename_)
-                    self.recentlyRunScripts.appendleft(self._temp_python_filename_)
+                if self._temp_python_filename_ != self.recentRunScripts[0]:
+                    self.recentRunScripts.remove(self._temp_python_filename_)
+                    self.recentRunScripts.appendleft(self._temp_python_filename_)
                     self._refreshRecentScriptsMenu_()
                 
             self._temp_python_filename_ = None
@@ -5530,14 +5540,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def _slot_registerPythonSource_(self):
         if isinstance(self._temp_python_filename_, str) and len(self._temp_python_filename_.strip()) and os.path.isfile(self._temp_python_filename_):
-            if self._temp_python_filename_ not in self.recentlyRunScripts:
-                self.recentlyRunScripts.appendleft(self._temp_python_filename_)
+            if self._temp_python_filename_ not in self.recentRunScripts:
+                self.recentRunScripts.appendleft(self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
                 
             else:
-                if self._temp_python_filename_ != self.recentlyRunScripts[0]:
-                    self.recentlyRunScripts.remove(self._temp_python_filename_)
-                    self.recentlyRunScripts.appendleft(self._temp_python_filename_)
+                if self._temp_python_filename_ != self.recentRunScripts[0]:
+                    self.recentRunScripts.remove(self._temp_python_filename_)
+                    self.recentRunScripts.appendleft(self._temp_python_filename_)
                     self._refreshRecentScriptsMenu_()
                 
             self._temp_python_filename_ = None
@@ -5553,20 +5563,22 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
             self._run_python_source_code_(self._temp_python_filename_, paste=False)
 
-            if self._temp_python_filename_ not in self.recentlyRunScripts:
-                self.recentlyRunScripts.appendleft(self._temp_python_filename_)
+            if self._temp_python_filename_ not in self.recentRunScripts:
+                self.recentRunScripts.appendleft(self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
                 
             else:
-                if self._temp_python_filename_ != self.recentlyRunScripts[0]:
-                    self.recentlyRunScripts.remove(self._temp_python_filename_)
-                    self.recentlyRunScripts.appendleft(self._temp_python_filename_)
-                    self._refreshRecentScriptsMenu_()
-                
+                if self._temp_python_filename_ != self.recentRunScripts[0]:
+                    self.recentRunScripts.remove(self._temp_python_filename_)
+                    self.recentRunScripts.appendleft(self._temp_python_filename_)
+                    #self._refreshRecentScriptsMenu_()
+                    
             self._temp_python_filename_ = None
             
     def _run_python_source_code_(self, fileName, paste=False):
-        self.statusbar.showMessage("Running %s" % os.path.basename(fileName))
+        bfn = os.path.basename(fileName)
+        msg = f"Sending {bfn} to console" if paste else f"Running {bfn} in console"
+        self.statusbar.showMessage(msg)
         if os.path.isfile(fileName):
             if paste:
                 text = pio.loadFile(fileName)

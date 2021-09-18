@@ -136,45 +136,117 @@ class FileIOGui(object):
 class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     """Mixin type for windows that need to be aware of Scipyen's main workspace.
     
-    Also provides:
-    1) common functionality needed in Scipyen's windows, including QSettings
-        maganement
-    2) a custom ID useful when the window is a child of a Scipyen "app" (e.g.,
-     LSCaT) instead of beign top level
-     
-    To save a standardized set of window-specifc settings to the QSettings .conf
-    file, in the derived type, override the instance methos closeEvent() to 
-    call 'saveWindowSettings()' defined in this module.
+    Provides:
+    1) Factored-out common functionality needed in Scipyen's windows:
+        1.1) Standard dialogs for importing data from the workspace, file open 
+        & save operations
+        
+        1.2) Message dialogs
     
-    To load a standardized set of window-specific settings from the QSettings
-    .conf file call 'loadWindowSettings()' defined in this module.
+    2) Management of Qt and non-Qt configurables, inherited from 
+        core.scipyen_config.ScipyenConfigurable (see details there)
+        
+        2.1) Auguments ScipyenConfigurable with standard Qt configurables for
+        :classes: derived from Qt QMainWindow and QWidget: size, position, 
+        geometry and state (for QWindow-based :classes: only)
+        
+    3) Distinction between QWindow objects that are direct children of Scipyen's
+    main window (so-called "top-level" windows) and those that are children of 
+    one of Scipyen's 'apps'.
+        Top-level windows include viewers launched directly by double-clicking
+        on variables in the workspace, Scipyens consoles, and the main windows
+        for the so-called Scipyen 'apps'.
+        
+        The latter run code which requires a customized GUI (provided by their
+        own main window) including children windows of data viewers.
+        
+    About configurables.
+    ====================
     
-    The standardized window-specific settings are window size, position, geometry
-    and (whenever possible ) state.
+    The management of Qt and non-Qt settings is provided by ScipyenConfigurable.
     
-    In addition, further settings can be defined by either
+    Classes that inherit from WorkspaceGuiMixin indirectly inherit the following
+    from ScipyenConfigurable:
     
-    1) populating the '_qtcfg' attribute of the derived window type with new
-    entries (see self.qtconfigurables for details),  - this will be updated with
-    WorkspaceGuiMixin._qtcfg contents upon initialization of the derived type,
+    * the methods 'self.loadSettings' and 'self.saveSettings' that load/save the
+        Qt configurables ot her Scipyen.conf file.
+        
+    * the attribute 'configurable_traits' - a DataBag that observes changes to
+        non-Qt configurable instance attributes ('traits')
+        
+    * the (private) method _observe_configurables_ which is notified by the
+        'configurable_traits' of attribute changes and synchronizes their value 
+        with the config.yaml file.
+    
+    In order to save/load persistent configurations from/to Scipyen's 
+    configuration files, a GUI :class: that inherits from WorkspaceGuiMixin
+    needs to:
+    
+    1) have python property setter, as well as the getter & setter methods for 
+    the relevant attributes DECORATED with the markConfigurable decorator
+    (defined in core.scipyen_config module). This decorator 'flags' these
+    instance attributes as Qt or  non-Qt configurables.
+    
+    2) Call self.loadSettings() in its own __init__ method body.
+        This is required for BOTH Qt and non-Qt configurables.
+        
+        For this to work with Qt configurables, loadSettings() needs to be 
+        executed AFTER the GUI components have been defined and added to the 
+        :class: attributes. In classes generated with Qt Designer, this is 
+        not before calling self.setupUi(self) which initializes the GUI 
+        components basd on a designer *.ui file, and certainly AFTER further 
+        UI components are added manually.
+        
+        NOTE that loadSettings() may be overridden in the derived :class:.
+        
+    3) Call self.saveSetting() at an appropriate point during the life-time of 
+        the instance of the :class:. 
+        
+        For Qt-based settings ('qtconfigurables') this is typically called upon
+        closing the window or widget. A convenient way is to override the 
+        'closeEvent' method of the Qt base :class: to call saveSettings from
+        within the new closeEvent body.
+        
+        The non-Qt configurables are synchronized with the config.yaml file
+        whenever the configurable_traits notifies their change.
+        
+        However, saveSettings ensures that all changes in the 
+        non-Qt configurables are saved to the config.yaml file.
+        
+    In Scipyen. the window classes that inherit from WorkspaceGuiMixin are
+    ScipyenWindow (the main window of Scipyen), the ScriptManager, the consoles
+    (ScipyenConsole, ExternalConsoleWindow, ExternalConsoleWidget) and all the
+    defined data viewer classes (QMainWindow-based). For the latter, the
+    inheritance chain is:
+    
+    <<data viewer :class:>> <- ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
     
     or
     
-    2) creating in the derievd type an attribute named '_ownqtcfg' - a mapping 
-    of a similar structure to '_qtcfg'.
-    
-    NOTE: this only needs to be done in the most derived type in a long
-    inheritance chain. This is done. e.g. in SignalViewer where the inheritance 
-    chains is:
-    
-    SignalViewer <- ScipyenFrameViewer <- ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
-    
-    or
-    
-    3) by decorating the desired property in the derived type with the 
-    @markConfigurable  decorator
+    <<data viewer :class:>> <- ScipyenFrameViewer <- ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
     
     """
+    #In addition, further settings can be defined by either
+    
+    #1) populating the '_qtcfg' attribute of the derived window type with new
+    #entries (see self.qtconfigurables for details),  - this will be updated with
+    #WorkspaceGuiMixin._qtcfg contents upon initialization of the derived type,
+    
+    #or
+    
+    #2) creating in the derievd type an attribute named '_ownqtcfg' - a mapping 
+    #of a similar structure to '_qtcfg'.
+    
+    #NOTE: this only needs to be done in the most derived type in a long
+    #inheritance chain. This is done. e.g. in SignalViewer where the inheritance 
+    #chains is:
+    
+    #SignalViewer <- ScipyenFrameViewer <- ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
+    
+    #or
+    
+    #3) by decorating the desired property in the derived type with the 
+    #@markConfigurable  decorator
     # NOTE: 2021-08-26 11:32:25
     # key:str = QSettings key
     # value: 
@@ -238,7 +310,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                         break
                 
         if isinstance(title, str) and len(title.strip()):
-            self.setWindowTitle(title)
+            self.setWindowTitle(title)  
             
     @property
     def isTopLevel(self):

@@ -2138,3 +2138,11 @@ def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None,
             save(x, name=name, mode=mode, ws = ws)
         
     
+def checkFileReadAccess(x):
+    if isinstance(x, str):
+        return os.path.isfile(x) and os.access(x, os.R_OK)
+    
+    if isinstance(x, (tuple, list, collections.deque)):
+        return all((isinstance(v, str) and os.path.isfile(v) and os.access(v, R_OK)) for v in x)
+    
+    return False

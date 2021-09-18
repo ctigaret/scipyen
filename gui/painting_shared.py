@@ -405,14 +405,14 @@ def gradient2conical(gradient:QtGui.QGradient) -> QtGui.QConicalGradient:
 
 g2c = gradient2conical
 
-def linearcoords(x, precision, precision:typing.Optional[int]=None) -> tuple:
+def linearcoords(x:QtGui.QLinearGradient, precision:typing.Optional[int]=None) -> tuple:
     ret = (x.start().x(), x.start().y(), x.finalStop().x(), x.finalStop().y())
     if precision is not None:
         return tuple(np.around(v,precision) for v in ret)
     
     return ret
     
-def radialcoords(x, precision, precision:typing.Optional[int]=None) -> tuple:
+def radialcoords(x:QtGui.QRadialGradient, precision:typing.Optional[int]=None) -> tuple:
     
     ret = (x.center().x(),     x.center().y(),     x.centerRadius(), 
            x.focalPoint().x(), x.focalPoint().y(), x.focalRadius())
@@ -422,11 +422,11 @@ def radialcoords(x, precision, precision:typing.Optional[int]=None) -> tuple:
     
     return ret
     
-def conicalcoords(x, precision, precision:typing.Optional[int]=None) -> tuple:
+def conicalcoords(x:QtGui.QConicalGradient, precision:typing.Optional[int]=None) -> tuple:
     ret = (x.center().x(), x.center().y(), x.angle())
     
     if precision is not None:
-        return tuple(np.around(v,precsion) for v in ret)
+        return tuple(np.around(v,precision) for v in ret)
     
     return ret
     

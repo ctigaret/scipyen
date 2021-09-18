@@ -56,6 +56,7 @@ from types import new_class
 from functools import (partial, wraps,)
 from pprint import pprint
 
+import matplotlib as mpl # needed to expose the mro of Figure.canvas
 from matplotlib.figure import Figure
 from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 from PyQt5.QtWidgets import (QWidget, QMainWindow)
@@ -779,8 +780,10 @@ def syncQtSettings(qsettings:QSettings,
     
     """
     
-    gname, pfx = qSettingsGroupPfx(win)
+    gname = ""
+    pfx = ""
     
+    #gname, pfx = qSettingsGroupPfx(win)
     
     if isinstance(group_name, str) and len(group_name.strip()):
         # NOTE: 2021-08-24 15:04:31 override internally determined group name
@@ -795,12 +798,33 @@ def syncQtSettings(qsettings:QSettings,
     else:
         key_prefix=""
         
-    #print("syncQtSettings %s: win = %s, gname = %s, key_prefix = %s" % ("save" if save else "load", win, gname, key_prefix))
-    #print("\n***\nsyncQtSettings %s: win = %s" % ("save" if save else "load", win, ))
-    #print("\tgname = '%s', key_prefix = '%s'" % (gname, key_prefix))
+    print("syncQtSettings %s: win = %s, gname = %s, key_prefix = %s" % ("save" if save else "load", win, gname, key_prefix))
+    print("\n***\nsyncQtSettings %s: win = %s" % ("save" if save else "load", win, ))
+    print("\tgname = '%s', key_prefix = '%s'" % (gname, key_prefix))
     
     if hasattr(win, "qtconfigurables"):
         qtcfg = win.qtconfigurables
+        
+    elif issubclass(win, (mpl.backend_bases.FigureCanvasBase, win, QtWidgets.QWidget)):
+        # executed when a :class: inherits from matplotlib.Figure AND ScipyenConfigurable
+        qtcfg = Bunch({"WindowSize":       Bunch({"getter":"size",        "setter":"resize"}),
+                       "WindowPosition":   Bunch({"getter":"pos",         "setter":"move"}),
+                       "WindowGeometry":   Bunch({"getter":"geometry",    "setter":"setGeometry"}),
+                      })
+        
+    elif isinstance(win, Figure):
+        # "freestanding" case: loadWindowSettings is called manually to save/store
+        # window size & pos & geometry 
+        canvas = getattr(win, "canvas", None)
+        
+        if issubclass(canvas, (mpl.backend_bases.FigureCanvasBase, win, QtWidgets.QWidget)):
+            qtcfg = Bunch({"WindowSize":       Bunch({"getter":"size",        "setter":"resize"}),
+                        "WindowPosition":   Bunch({"getter":"pos",         "setter":"move"}),
+                        "WindowGeometry":   Bunch({"getter":"geometry",    "setter":"setGeometry"}),
+                        })
+            
+            win = canvas
+        
     else:
         qtcfg = Bunch()
         qtcfg.update(getattr(win, "_qtcfg", Bunch()))
@@ -1032,21 +1056,52 @@ class ScipyenConfigurable(object):
         return self.configurables.get("conf", Bunch())
     
     def loadWindowSettings(self):
-        """Derived :class: should override this for custom behaviour
-        Here, this method only loads window (Qt) settings for "top level" 
-        windows and  widgets.
+        """Laods window settings
         """
         if hasattr(self, "isTopLevel") and self.isTopLevel: # inherited from WorkspaceGuiMixin
-            loadWindowSettings(self.qsettings, self) # module-level function here
+            loadWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="") # module-level function here
+            return
+
+        parent = self._get_parent()
+        
+        if parent:
+            if "ScipyenWindow" in parent.__class__.__name__:
+                loadWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="") # module-level function here
+                return
+            
+            loadWindowSettings(self.qsettings, self, group_name = parent.__class__.__name__, prefix=self.__class__.__name__) # module-level function here
+            return 
+        
+        if isinstance(self, Figure): # this presupposes self is an instance that also inherits from matplotlib Figure
+            if issubclass(self.canvas, (mpl.backend_bases.FigureCanvasBase, win, QtWidgets.QWidget)):
+                loadWindowSettings(ScipyenConfigurable.qsettings, self.canvas, group_name = self.canvas.__class__.__name__, prefix="")
+            return
+        print(f"self.loadWindowSettings {self.__class__.__name__}")
+        loadWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="")
     
     def saveWindowSettings(self):
-        """Should override in derived
-        Here, this method only saves window (Qt) settings for "top level" 
-        windows and  widgets.
+        """
         """
         if hasattr(self, "isTopLevel") and self.isTopLevel and self.isVisible(): # isTopLevel inherited from WorkspaceGuiMixin
-            saveWindowSettings(self.qsettings, self)# module-level function here
-        #pass
+            saveWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="")# module-level function here
+            return
+        
+        parent = self._get_parent()
+        
+        if parent:
+            if "ScipyenWindow" in parent.__class__.__name__:
+                saveWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="") # module-level function here
+                return
+            
+            saveWindowSettings(self.qsettings, self, group_name = parent.__class__.__name__, prefix=self.__class__.__name__) # module-level function here
+            return 
+        
+        if isinstance(self, Figure):# this presupposes self is an instance that also inherits from matplotlib Figure
+            if issubclass(self.canvas, (mpl.backend_bases.FigureCanvasBase, win, QtWidgets.QWidget)):
+                saveWindowSettings(ScipyenConfigurable.qsettings, self.canvas, group_name = self.canvas.__class__.__name__, prefix="")
+            return
+        
+        saveWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="")
     
     def __load_config_key_val__(self, settername, val):
         #print("ScipyenConfigurable.__load_config_key_val__")
@@ -1169,7 +1224,7 @@ class ScipyenConfigurable(object):
 
                 write_config()
                 
-        if issubclass(self.__class__, QtWidgets.QWidget):
+        if issubclass(self.__class__, (QtWidgets.QWidget, Figure)):
             self.saveWindowSettings()
         
 class ScipyenConfiguration(DataBag):
