@@ -2791,8 +2791,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         #return frontend.execute(**kwargs)
 
 # NOTE: use Jupyter (IPython >= 4.x and qtconsole / qt5 by default)
-#@makeConfigurable
-class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
+class ScipyenConsoleWidget(RichJupyterWidget):
     """Console with in-process kernel manager for pythonic command interface.
     Uses an in-process kernel generated and managed by QtInProcessKernelManager.
     """
@@ -2811,7 +2810,7 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
         
         '''
         super(RichJupyterWidget, self).__init__()
-        WorkspaceGuiMixin.__init__(self, parent=mainWindow)
+        #WorkspaceGuiMixin.__init__(self, parent=mainWindow)
         
         #if isinstance(mainWindow, (ScipyenWindow, type(None))):
         if type(mainWindow).__name__ ==  "ScipyenWindow":
@@ -2838,7 +2837,6 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
         #u'\n\nTo clear this window at any time type %clear at the prompt'+\
         #u'\n\nFor further details type console_info()'
         
-        #self.kernel.shell.push(kwarg)
         self.kernel_client = self.kernel_manager.client()
         self.kernel_client.start_channels()
         
@@ -2856,148 +2854,17 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
         
         self.clear_shortcut.activated.connect(self.slot_clearConsole)
         
-        #self._initial_style = self.style()
-        #self._initial_style_sheet = self.style_sheet
         self._console_pygment=""
         self._console_colors=""
-        
-        self.qsettings = QtCore.QSettings()
-        
-        # will also set self._console_pygment and self._console_colors
-        self._load_settings_()
-        
-        self.setAcceptDrops(True)
         
         # NOTE: 2021-07-18 10:17:26 - FIXME bug or feature?
         # the line below won't have effect unless the RichJupyterWidget is visible
         # e.g. after calling show()
         #self.set_pygment(self._console_pygment) 
         
-    ####@markConfigurable("CloseEvent", "Qt") # for testing only!
     def closeEvent(self, evt):
-        self._save_settings_()
+        self.saveSettings() # inherited from ScipyenConfigurable via WorkspaceGuiMixin
         evt.accept()
-
-    @property
-    def scrollBarPosition(self):
-        return self._control.layoutDirection()
-        
-    @markConfigurable("ScrollBarPosition", "Qt")
-    @scrollBarPosition.setter
-    def scrollBarPosition(self, value:typing.Union[int, str, QtCore.Qt.LayoutDirection]):
-        if isinstance(value, str):
-            if value.lower().strip() in ("right", "r"):
-                value = QtCore.Qt.LeftToRight
-                
-            elif value.lower().strip() in ("left", "l"):
-                value = QtCore.Qt.RightToLeft
-                
-            elif value in consoleLayoutDirection:
-                value = consoleLayoutDirection[value]
-                
-            else:
-                try:
-                    value = int(value)
-                    
-                except:
-                    value = QtCore.Qt.LayoutDirectionAuto
-                
-        if isinstance(value, int):
-            if value not in (QtCore.Qt.LeftToRight, QtCore.Qt.RightToLeft):
-                value = QtCore.Qt.LayoutDirectionAuto
-                
-        elif not isinstance(value, QtCore.Qt.LayoutDirection):
-            value = QtCore.Qt.LayoutDirectionAuto
-                
-        self._control.setLayoutDirection(value)
-        
-    @property
-    def fontFamily(self) -> str:
-        return self.font.family()
-    
-    @markConfigurable("FontFamily", "Qt")
-    @fontFamily.setter
-    def fontFamily(self, val:str) -> None:
-        font = self.font
-        font.setFamily(val)
-        self.font = font
-        
-    @property
-    def fontSize(self) -> int:
-        return self.font.pointSize()
-    
-    @markConfigurable("FontPointSize", "Qt")
-    @fontSize.setter
-    def fontSize(self, val:int) -> None:
-        font = self.font
-        font.setPointSize(int(val))
-        self.font = font
-        
-    @property
-    def fontStyle(self) -> typing.Union[int, QtGui.QFont.Style]:
-        return self.font.style()
-        
-    @markConfigurable("FontStyle", "Qt")
-    @fontStyle.setter
-    def fontStyle(self, val:typing.Union[int, QtGui.QFont.Style, str]) -> None:
-        style = get_font_style(val) 
-        font  = self.font
-        font.setStyle(style)
-        self.font = font
-        
-    @property
-    def fontWeight(self) -> typing.Union[int, QtGui.QFont.Weight]:
-        return self.font.weight()
-
-    @markConfigurable("FontWeight", "Qt")
-    @fontWeight.setter
-    def fontWeight(self, val:typing.Union[int, QtGui.QFont.Weight, str]) -> None:
-        weight = get_font_weight(val)
-        font = self.font
-        font.setWeight(weight)
-        self.font = font
-        
-    @property
-    def colors(self) -> str:
-        return self._console_colors
-    
-    @markConfigurable("ConsoleColors", "Qt")
-    @colors.setter
-    def colors(self, val:str):
-        style = self._console_pygment
-        self.set_pygment(style, val)
-
-    @property
-    def syntaxStyle(self):
-        """Name of the syntax highlight pygment (str)
-        """
-        return self.syntax_style
-    
-    @markConfigurable("SyntaxStyle", "Qt")
-    @syntaxStyle.setter
-    def syntaxStyle(self, style:str):
-        colors = self._console_colors
-        self.set_pygment(style, colors)
-        
-    @property
-    def isTopLevel(self) -> bool:
-        """Overrides WorkspaceGuiMixin.isToplevel; always True for ScipyenConsole.
-        This is because console inherits from RichJupyterWidget where 'parent'
-        is a traitlets.Instance property, and for ScipyenConsole is None.
-        """
-        return True
-
-    #@safeWrapper
-    def _save_settings_(self):
-        #return
-        gname, pfx = saveWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
-
-    #@safeWrapper
-    def _load_settings_(self):
-        #return
-        # located in $HOME/.config/Scipyen/Scipyen.conf
-        gname, pfx = loadWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
-        super(WorkspaceGuiMixin, self).loadSettings()
         
     def dragEnterEvent(self, evt):
         #if "text/plain" in evt.mimeData().formats():
@@ -3168,8 +3035,6 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
             self.drop_cache=None
                 
         evt.accept()
-        
-        
         
         #NOTE:
         #NOTE: Other considered options:
@@ -3351,18 +3216,132 @@ class ScipyenConsole(RichJupyterWidget, WorkspaceGuiMixin):
                 #traceback.print_exc()
                 #pass
             
-# TODO 2016-03-24 13:47:48 
-# I quite like the stock Qt console of IPython that is launched by qtconsoleapp
-# - it's a customized QMainWindow with a rich ipython widget as the actual "console"
-#   with a lot of nice bells and whistles: magics listing, help, etc, but also
-#   functionality that I don't want/need: tabbed consoles (with new or the same kernel),
-#   possibility to restart/stop the current kernel
-#
-#   Therefore I'm deriving from it and override functions I find not necessary for picty
-#
-#   Actually it might be just damn simpler to generate my own console main window class
-#
-#   TODO
-#class _PictConsole(ConsoleMainWindow):
-    #pass
+class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
+    # TODO Menu bar and toolbar for the following functionalities:
+    # 1) console appearance:
+    # * colors
+    # * syntaxStyle
+    # * fonts
+    # * scrollbar position
+    # 2) copy/paste
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.consoleWidget = ScipyenConsoleWidget(mainWindow=parent)
+        self.consoleWidget.setAcceptDrops(True)
+        self.setCentralWidget(self.consoleWidget)
+        WorkspaceGuiMixin.__init__(self, parent=parent)
+        self.loadSettings()
+        
+    def closeEvent(self,evt):
+        self.saveSettings()
+        evt.accept()
+        
+    def execute(self, *args, **kwargs):
+        self.consoleWidget.execute(*args, **kwargs)
+        
+    @property
+    def kernel_manager(self):
+        return self.consoleWidget.kernel_manager
+    
+    @property
+    def scrollBarPosition(self):
+        return self.consoleWidget._control.layoutDirection()
+        
+    @markConfigurable("ScrollBarPosition", "Qt")
+    @scrollBarPosition.setter
+    def scrollBarPosition(self, value:typing.Union[int, str, QtCore.Qt.LayoutDirection]):
+        if isinstance(value, str):
+            if value.lower().strip() in ("right", "r"):
+                value = QtCore.Qt.LeftToRight
+                
+            elif value.lower().strip() in ("left", "l"):
+                value = QtCore.Qt.RightToLeft
+                
+            elif value in consoleLayoutDirection:
+                value = consoleLayoutDirection[value]
+                
+            else:
+                try:
+                    value = int(value)
+                    
+                except:
+                    value = QtCore.Qt.LayoutDirectionAuto
+                
+        if isinstance(value, int):
+            if value not in (QtCore.Qt.LeftToRight, QtCore.Qt.RightToLeft):
+                value = QtCore.Qt.LayoutDirectionAuto
+                
+        elif not isinstance(value, QtCore.Qt.LayoutDirection):
+            value = QtCore.Qt.LayoutDirectionAuto
+                
+        self.consoleWidget._control.setLayoutDirection(value)
+    @property
+    def fontFamily(self) -> str:
+        return self.consoleWidget.font.family()
+    
+    @markConfigurable("FontFamily", "Qt")
+    @fontFamily.setter
+    def fontFamily(self, val:str) -> None:
+        font = self.consoleWidget.font
+        font.setFamily(val)
+        self.consoleWidget.font = font
+        
+    @property
+    def fontSize(self) -> int:
+        return self.consoleWidget.font.pointSize()
+    
+    @markConfigurable("FontPointSize", "Qt")
+    @fontSize.setter
+    def fontSize(self, val:int) -> None:
+        font = self.consoleWidget.font
+        font.setPointSize(int(val))
+        self.consoleWidget.font = font
 
+    @property
+    def fontStyle(self) -> typing.Union[int, QtGui.QFont.Style]:
+        return self.consoleWidget.font.style()
+        
+    @markConfigurable("FontStyle", "Qt")
+    @fontStyle.setter
+    def fontStyle(self, val:typing.Union[int, QtGui.QFont.Style, str]) -> None:
+        style = get_font_style(val) 
+        font  = self.consoleWidget.font
+        font.setStyle(style)
+        self.consoleWidget.font = font
+
+    @property
+    def fontWeight(self) -> typing.Union[int, QtGui.QFont.Weight]:
+        return self.consoleWidget.font.weight()
+
+    @markConfigurable("FontWeight", "Qt")
+    @fontWeight.setter
+    def fontWeight(self, val:typing.Union[int, QtGui.QFont.Weight, str]) -> None:
+        weight = get_font_weight(val)
+        font = self.consoleWidget.font
+        font.setWeight(weight)
+        self.consoleWidget.font = font
+
+    @property
+    def colors(self) -> str:
+        return self.consoleWidget._console_colors
+    
+    @markConfigurable("ConsoleColors", "Qt")
+    @colors.setter
+    def colors(self, val:str):
+        style = self.consoleWidget._console_pygment
+        self.consoleWidget.set_pygment(style, val)
+
+    @property
+    def syntaxStyle(self):
+        """Name of the syntax highlight pygment (str)
+        """
+        return self.consoleWidget.syntax_style
+    
+    @markConfigurable("SyntaxStyle", "Qt")
+    @syntaxStyle.setter
+    def syntaxStyle(self, style:str):
+        colors = self.consoleWidget._console_colors
+        self.consoleWidget.set_pygment(style, colors)
+ 
+    def writeText(self, text):
+        self.consoleWidget.writeText(text)

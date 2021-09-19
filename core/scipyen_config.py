@@ -798,9 +798,9 @@ def syncQtSettings(qsettings:QSettings,
     else:
         key_prefix=""
         
-    print("syncQtSettings %s: win = %s, gname = %s, key_prefix = %s" % ("save" if save else "load", win, gname, key_prefix))
-    print("\n***\nsyncQtSettings %s: win = %s" % ("save" if save else "load", win, ))
-    print("\tgname = '%s', key_prefix = '%s'" % (gname, key_prefix))
+    #print("syncQtSettings %s: win = %s, gname = %s, key_prefix = %s" % ("save" if save else "load", win, gname, key_prefix))
+    #print("\n***\nsyncQtSettings %s: win = %s" % ("save" if save else "load", win, ))
+    #print("\tgname = '%s', key_prefix = '%s'" % (gname, key_prefix))
     
     if hasattr(win, "qtconfigurables"):
         qtcfg = win.qtconfigurables

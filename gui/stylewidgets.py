@@ -699,7 +699,6 @@ class BrushComboBox(QtWidgets.QComboBox):
                 
             if val is not None:
                 self._setCustomStyle(name, val)
-                #self._setCustomStyle(name, val, True)
                 self.activated[object].emit(self._internalStyle)
                 
             return
