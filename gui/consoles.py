@@ -3224,17 +3224,32 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     # * fonts
     # * scrollbar position
     # 2) copy/paste
+    historyItemsDropped = pyqtSignal()
+    workspaceItemsDropped = pyqtSignal()
+    #workspaceItemsDropped = pyqtSignal(bool)
+    loadUrls = pyqtSignal(object, bool, QtCore.QPoint)
+    pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
+    executed = pyqtSignal()
+    
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.consoleWidget = ScipyenConsoleWidget(mainWindow=parent)
         self.consoleWidget.setAcceptDrops(True)
         self.setCentralWidget(self.consoleWidget)
+        self.consoleWidget.historyItemsDropped.connect(self.historyItemsDropped)
+        self.consoleWidget.workspaceItemsDropped.connect(self.workspaceItemsDropped)
+        self.consoleWidget.loadUrls.connect(self.loadUrls)
+        self.consoleWidget.pythonFileReceived.connect(self.pythonFileReceived)
+        self.consoleWidget.executed.connect(self.executed)
         WorkspaceGuiMixin.__init__(self, parent=parent)
         self.loadSettings()
         
     def closeEvent(self,evt):
         self.saveSettings()
         evt.accept()
+    
+    def paste(self, *args, **kwargs):
+        self.consoleWidget.paste(*args, **kwargs)
         
     def execute(self, *args, **kwargs):
         self.consoleWidget.execute(*args, **kwargs)

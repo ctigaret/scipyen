@@ -1402,7 +1402,8 @@ class GradientWidget(QtWidgets.QWidget):
             else:
                 return
             
-        #print("\tresolved to:", reverse_mapping_lookup(standardQtGradientTypes, gradient.type()))
+        print("gradient:", gradient)
+        print("\tresolved to:", reverse_mapping_lookup(standardQtGradientTypes, gradient.type()))
         stops = gradient.stops()
         
         g = scaleGradient(gradient, self._renderer.rect())

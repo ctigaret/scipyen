@@ -2251,8 +2251,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         if not isinstance(self.console, consoles.ScipyenConsole):
             self.console = consoles.ScipyenConsole(parent=self)
-            self.console.consoleWidget.executed.connect(self.slot_updateHistory)
-            self.console.consoleWidget.executed.connect(self.slot_updateCwd)
+            self.console.executed.connect(self.slot_updateHistory)
+            self.console.executed.connect(self.slot_updateCwd)
             
             self.ipkernel = self.console.consoleWidget.ipkernel
             self.shell = self.ipkernel.shell
@@ -2286,10 +2286,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
             #NOTE: 2017-03-21 22:55:57 much better!
             # connect signals emitted by the console when processing a drop event
-            self.console.consoleWidget.historyItemsDropped.connect(self.slot_pasteHistorySelection) 
-            self.console.consoleWidget.workspaceItemsDropped.connect(self.slot_pasteWorkspaceSelection)
-            self.console.consoleWidget.loadUrls[object, bool, QtCore.QPoint].connect(self.slot_loadDroppedURLs)
-            self.console.consoleWidget.pythonFileReceived[str, QtCore.QPoint].connect(self.slot_handlePythonTextFile)
+            self.console.historyItemsDropped.connect(self.slot_pasteHistorySelection) 
+            self.console.workspaceItemsDropped.connect(self.slot_pasteWorkspaceSelection)
+            self.console.loadUrls[object, bool, QtCore.QPoint].connect(self.slot_loadDroppedURLs)
+            self.console.pythonFileReceived[str, QtCore.QPoint].connect(self.slot_handlePythonTextFile)
 
             self.historyTreeWidget.insertTopLevelItems(0, items)
             self.historyTreeWidget.scrollToItem(self.currentSessionTreeWidgetItem)
@@ -2544,7 +2544,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def _helpOnConsole_(self):
-        self.console.consoleWidget.execute("console_info()")
+        self.console.execute("console_info()")
         
     @pyqtSlot()
     def slot_refreshWorkspaceView(self):
@@ -3008,8 +3008,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
             if not self.viewVar(self.workspaceModel.currentItemName, newWindow=newWindow):
                 # view (display) object in console is no handler exists
-                self.console.consoleWidget.execute(self.workspaceModel.currentItemName)
-                #self.console.execute(self.workspaceModel.currentItemName)
+                self.console.execute(self.workspaceModel.currentItemName)
                 
     @safeWrapper
     def _genExternalVarContextMenu(self, indexList, cm):
