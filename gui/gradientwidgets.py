@@ -36,7 +36,8 @@ from .painting_shared import (HoverPoints, x_less_than, y_less_than,
                               ColorPalette,
                               ColorGradient, 
                               colorGradient,
-                              restrict_point)
+                              restrict_point, 
+                              printPoints)
 
 from . import quickdialog as qd
 
@@ -573,7 +574,6 @@ class GradientRenderer(QtWidgets.QWidget):
             self._gradient = g
             gline = gradientLine(g, self._renderer.rect())
             self.hoverPoints.points = QtGui.QPolygonF((gline.p1(), gline.p2()))
-            #self.hoverPoints.points = self._calculateHoverPointCoordinates(g)
             self._stops[:] = g.stops()
 
             if isinstance(g, QtGui.QRadialGradient):
@@ -741,29 +741,6 @@ class GradientRenderer(QtWidgets.QWidget):
     def _restrictPoint(self, p:QtCore.QPointF) -> QtCore.QPointF:
         return restrict_point(p, self.width(), self.height())
             
-    def _calculateHoverPointCoordinates(self, gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient]):
-        objectStopsLine = self._getStopsLine(gradient)
-        
-        print("_calculateHoverPointCoordinates objectStopsLine", objectStopsLine)
-        
-        # NOTE: 2021-06-09 21:40:36
-        # this is why this works with both "normalized" and "unormalized" gradients.
-        #scaleX = 1. if np.isclose(objectStopsLine.dx(), 0.) else 0.8 * self.width()  / abs(objectStopsLine.dx())
-        #scaleY = 1. if np.isclose(objectStopsLine.dy(), 0.) else 0.8 * self.height() / abs(objectStopsLine.dy())
-        
-        self.scaleX = 1. if np.isclose(objectStopsLine.dx(), 0.) else self.width()  / abs(objectStopsLine.dx())
-        self.scaleY = 1. if np.isclose(objectStopsLine.dy(), 0.) else self.height() / abs(objectStopsLine.dy())
-        
-        logicalStopsLine = QtGui.QTransform.fromScale(self.scaleX, self.scaleY).map(objectStopsLine)
-        logicalStopsLine.translate(self.rect().center() - logicalStopsLine.center())
-        
-        logicalStopsLine.setP1(self._restrictPoint(logicalStopsLine.p1()))
-        logicalStopsLine.setP2(self._restrictPoint(logicalStopsLine.p2()))
-        
-        print("_calculateHoverPointCoordinates logicalStopsLine", logicalStopsLine)
-        
-        return QtGui.QPolygonF((logicalStopsLine.p1(), logicalStopsLine.p2()))
-
     @safeWrapper
     def paint(self, p:QtGui.QPainter) -> None:
         # NOTE: 2021-05-27 08:17:19
@@ -1311,7 +1288,8 @@ class GradientWidget(QtWidgets.QWidget):
         
     def _showGradient(self, 
                       gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient, QtGui.QGradient, QtGui.QGradient.Preset, str, ColorGradient],
-                      gradientType:typing.Optional[typing.Union[QtGui.QGradient.Type, str]]=QtGui.QGradient.LinearGradient) -> None:
+                      gradientType:typing.Optional[typing.Union[QtGui.QGradient.Type, str]]=QtGui.QGradient.LinearGradient,
+                      points:typing.Optional[QtGui.QPolygonF] = None) -> None:
         """Displays gradient.
         
         If gradient is generic (QtGui.QGradient) then the concrete gradient type
@@ -1402,21 +1380,25 @@ class GradientWidget(QtWidgets.QWidget):
             else:
                 return
             
-        print("gradient:", gradient)
-        print("\tresolved to:", reverse_mapping_lookup(standardQtGradientTypes, gradient.type()))
+        #print("GradientWidget._showGradient gradient:", gradient)
+        #print("\tresolved to:", reverse_mapping_lookup(standardQtGradientTypes, gradient.type()))
         stops = gradient.stops()
         
-        g = scaleGradient(gradient, self._renderer.rect())
-        gline = gradientLine(g, self._renderer.rect()) 
-        hoverStops = QtGui.QPolygonF((gline.p1(), gline.p2()))
-        #hoverStops = self._renderer._calculateHoverPointCoordinates(g)
-        #hoverStops = self._renderer._calculateHoverPointCoordinates(gradient)
+        #print(f"GradientWidget._showGradient, points: {points}")
+        
+        if isinstance(points, (QtGui.QPolygonF, QtGui.QPolygon)) and len(points)==2:
+            hoverStops =QtGui.QPolygonF(points)
+        else:
+            g = scaleGradient(gradient, self._renderer.rect())
+            gline = gradientLine(g, self._renderer.rect()) 
+            hoverStops = QtGui.QPolygonF((gline.p1(), gline.p2()))
         # NOTE: 2021-06-21 08:33:39
         # renderer doesn't know about the editor, and editor doesn't know about
         # renderer; therefore, the gradient stops must be sent to both
         self._editor.setGradientStops(stops)
         self._renderer.gradientStops = stops
         self._renderer.hoverPoints.points = hoverStops
+        #printPoints(self._renderer.hoverPoints.points)
         self._renderer.update()
         
         if isinstance(gradient, QtGui.QLinearGradient):
@@ -1666,41 +1648,35 @@ class GradientWidget(QtWidgets.QWidget):
         self._changePresetBy(0)
         self._resetTitle()
             
-    def _calculateGradientLine(self) -> QtCore.QLineF:
-        """ Inverse of self._renderer._calculateHoverPointCoordinates(...)"""
+    def _getRendererGradientLine(self) -> QtCore.QLineF:
+        """ Returns the QLineF through the renderer's hoverpoints"""
         g = self._renderer.gradient # always one of QLinearGradient, QRadialGradient, QConicalGradient
         hoverStopsLine = QtCore.QLineF(*(p for p in self._renderer.hoverPoints.points))
-        #hoverStopsLine.translate(hoverStopsLine.center() - self._renderer.rect().center())
-        
-        print(f"_calculateGradientLine {hoverStopsLine}")
-        
         return hoverStopsLine
         
-        #return QtGui.QTransform.fromScale(1/self._renderer.scaleX, 1/self._renderer.scaleY).map(hoverStopsLine)
-    
+    #@property
+    #def normalizedGradient_old(self) -> QtGui.QGradient:
+        #g = self._renderer.gradient # always one of QLinearGradient, QRadialGradient, QConicalGradient
+        #line = self._getRendererGradientLine()
+        #if isinstance(g, QtGui.QLinearGradient):
+            #ret = QtGui.QLinearGradient(line.p1(), line.p2())
+            
+        #elif isinstance(g, QtGui.QRadialGradient):
+            #radiusScale = 1/min([self._renderer.width(), self._renderer.height()])
+            #ret = QtGui.QRadialGradient(line.p1(), g.centerRadius() * radiusScale,
+                                        #line.p2(), g.focalRadius()  * radiusScale)
+            
+        #else: # conical gradient
+            #ret = QtGui.QConicalGradient(line.p1(), g.angle())
+            
+        #ret.setStops(g.stops())
+        #ret.setSpread(g.spread())
+        #ret.setCoordinateMode(g.coordinateMode())
+        
+        #return ret
+        
     @property
     def normalizedGradient(self) -> QtGui.QGradient:
-        g = self._renderer.gradient # always one of QLinearGradient, QRadialGradient, QConicalGradient
-        line = self._calculateGradientLine()
-        if isinstance(g, QtGui.QLinearGradient):
-            ret = QtGui.QLinearGradient(line.p1(), line.p2())
-            
-        elif isinstance(g, QtGui.QRadialGradient):
-            radiusScale = 1/min([self._renderer.width(), self._renderer.height()])
-            ret = QtGui.QRadialGradient(line.p1(), g.centerRadius() * radiusScale,
-                                        line.p2(), g.focalRadius()  * radiusScale)
-            
-        else: # conical gradient
-            ret = QtGui.QConicalGradient(line.p1(), g.angle())
-            
-        ret.setStops(g.stops())
-        ret.setSpread(g.spread())
-        ret.setCoordinateMode(g.coordinateMode())
-        
-        return ret
-        
-    @property
-    def normalizedGradient1(self) -> QtGui.QGradient:
         """The currently displayed gradient normalized to the renderer's size
         """
         #return normalizeGradient(self.gradient, self._renderer.sizeHint())
@@ -1720,8 +1696,11 @@ class GradientWidget(QtWidgets.QWidget):
         Furthermore, the gradient is not processed in any particular way: its
         coordinates, coordinate mode and spread are left unchanged 
         """
-        #return self.normalizedGradient
-        return self.normalizedGradient1
+        return self.normalizedGradient
+    
+    @property
+    def gradientWithPoints(self) -> typing.Tuple[QtGui.QGradient, QtGui.QPolygonF]:
+        return (self.normalizedGradient, self._renderer.hoverPoints.points)
     
     @property
     def customGradients(self):
@@ -1737,7 +1716,8 @@ class GradientWidget(QtWidgets.QWidget):
         return scaleGradient(self.normalizedGradient, rect)
     
     def setGradient(self, val:typing.Union[QtGui.QGradient, QtGui.QGradient.Preset, str],
-                    gradientType:typing.Optional[typing.Union[QtGui.QGradient.Type, str]]=None) -> None:
+                    gradientType:typing.Optional[typing.Union[QtGui.QGradient.Type, str]]=None,
+                    points:typing.Optional[QtGui.QPolygonF] = None) -> None:
         """Sets the display to show a gradient.
         
         The gradient is NOT added to the internal list of gradients.
@@ -1745,9 +1725,13 @@ class GradientWidget(QtWidgets.QWidget):
         """
         if not isinstance(val, (QtGui.QGradient, QtGui.QGradient.Preset, str, ColorGradient)):
             return
-        print("GradientWidget.setGradient", val)
-        self._showGradient(val, gradientType)
+        #print("GradientWidget.setGradient", val)
+        self._showGradient(val, gradientType, points=points)
         self.slot_gradientModified()
+        
+    #def setGradientWithPoints(self, val:typing.Union[QtGui.QGradient, QtGui.QGradient.Preset, str],
+                              #gradientType:typing.Optional[typing.Union[QtGui.QGradient.Type, str]]=None,
+                              #points:typing.)
             
     @pyqtSlot()
     def setAutoCenterRadius(self)-> None:
@@ -1885,14 +1869,27 @@ class GradientDialog(QtWidgets.QDialog):
     @property
     def qGradient(self) -> QtGui.QGradient:
         return self.gw.gradient
+    
+    @property
+    def qGradientWithPoints(self) -> typing.Tuple[QtGui.QGradient, QtGui.QPolygonF]:
+        return self.gw.gradientWithPoints
         
     @property
     def gradient(self) -> ColorGradient:
         return colorGradient(self.gw.gradient)
     
     @property
+    def gradientWithPoints(self) -> ColorGradient:
+        grad, points = self.gw.gradientWithPoints
+        return colorGradient(self.gw.gradient), points
+    
+    @property
     def colorGradient(self) -> ColorGradient:
         return self.gradient
+    
+    @property
+    def colorGradientWithPoints(self) -> ColorGradient:
+        return self.gradientWithPoints
     
         
 def set_shade_points(points:typing.Union[QtGui.QPolygonF, list], shade:ShadeWidget) -> None:

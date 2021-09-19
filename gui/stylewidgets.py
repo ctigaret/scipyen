@@ -197,10 +197,14 @@ class PenComboDelegate(QtWidgets.QAbstractItemDelegate):
             return QtCore.QSize(50, option.fontMetrics.height() + 2 * self.LayoutMetrics.FrameMargin)
     
 class PenComboBox(QtWidgets.QComboBox):
-    # see 
-    #   qt examples/widgets/painting/pathstroke
-    #   qt examples/widgets/painting/pinterpaths
-    
+    """Use to select a QPen stroke, cap or join style
+    See:
+      qt examples/widgets/painting/pathstroke
+      qt examples/widgets/painting/pinterpaths
+      
+    The selected pen stroke/cap/join style is available as the 'value' property
+      
+    """
     activated = pyqtSignal(object, name="activated") # overloads QComboBox.activated[int] signal
     highlighted = pyqtSignal(object, name="highlighted")
     styleChanged = pyqtSignal(object, name="styleChanged")
@@ -284,16 +288,10 @@ class PenComboBox(QtWidgets.QComboBox):
         self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
     
     def _addStyles(self):
-        #if all([isinstance(v, QtCore.Qt.PenStyle) for v in self._styles.values()]):
-        #elif all([isinstance(v, QtCore.Qt.PenCapStyle, QtCore.Qt.PenJoinStyle) for v in self._styles.values()]):
         styles =  [(name, val) for name, val in self._styles.items()]
         
-        #if self._styling in ("cap", "join"):
-            #styles =  [(name, val) for name, val in self._styles.items()]
-
         if self._styling == "stroke":
             styles =  [(name, val) for name, val in self._styles.items() if val > QtCore.Qt.NoPen and val < QtCore.Qt.CustomDashLine]
-            #styles =  [(name, val) for name, val in standardQtPenStyles.items() if val > QtCore.Qt.NoPen and val < QtCore.Qt.CustomDashLine]
         
             styles += [("No Pen", QtCore.Qt.NoPen)]
         
@@ -425,6 +423,13 @@ class PenComboBox(QtWidgets.QComboBox):
         if isinstance(value, str) and value.lower() in ("cap", "join", "stroke"):
             self._styling = value
             self.itemDelegate().styling = value
+            
+    @property
+    def value(self):
+        """Returns a QPen stroke style, cap style or join style, depending on 
+        which styling has been used to initialize this instance of PenComboBox
+        """
+        return self._internalStyle
         
 class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
     ItemRoles = IntEnum(value="ItemRoles", names=[("BrushRole", QtCore.Qt.UserRole +1)], 
@@ -524,11 +529,15 @@ class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
         return QtCore.QSize(50, option.fontMetrics.height() + 2 * self.LayoutMetrics.FrameMargin)
     
 class BrushComboBox(QtWidgets.QComboBox):
-    # NOTE: 2021-05-20 21:22:12
-    # brush gradients: see 
-    #   qt examples/widgets/painting/gradients
-    #   qt examples/widgets/painting/pathstroke
-    #   qt examples/widgets/painting/painterpaths
+    """Selection of brush styles, texture and gradients, including custom ones.
+
+    For brush gradients see 
+      qt examples/widgets/painting/gradients
+      qt examples/widgets/painting/pathstroke
+      qt examples/widgets/painting/painterpaths
+      
+    The selected QBrush is available as the 'qBrush' and 'value' properties.
+    """
     activated = pyqtSignal(object, name="activated") # overloads QComboBox.activated[int] signal
     highlighted = pyqtSignal(object, name="highlighted")
     styleChanged = pyqtSignal(object, name="styleChanged")
@@ -552,8 +561,9 @@ class BrushComboBox(QtWidgets.QComboBox):
         self._update_styles_()
         self._internalStyle = [v for v in self._standardStyles.values()][0]
         
+        self._brush = None
+        
         if isinstance(style, (QtGui.QGradient, QtGui.QBitmap, QtGui.QPixmap, QtGui.QImage)):
-            self._presetStyle
             self._styles["Custom"] = style
             self._styles.move_to_end("Custom", last=False)
             
@@ -566,6 +576,8 @@ class BrushComboBox(QtWidgets.QComboBox):
         
         super().activated[int].connect(self._slotActivated)
         super().highlighted[int].connect(self._slotHighlighted)
+        
+        self._gradientRendererPoints = None
         
         self._gradientDialog = GradientDialog(parent=self)
         self._gradientDialog.finished[int].connect(self._slotGradientDialogFinished)
@@ -581,8 +593,17 @@ class BrushComboBox(QtWidgets.QComboBox):
         self._styles.update(self._customStyles)
         self._styles.update(self._interactiveStyles)
         
+    @property
+    def qBrush(self):
+        return self._brush
+        
+    @property
+    def value(self):
+        """Returns a QBrush
+        """
+        return self._brush
+        
     def paintEvent(self, ev:QtGui.QPaintEvent):
-        #print("BrushComboBox.paintEvent internal style", self._internalStyle, "(type %s)" % type(self._internalStyle))
         painter = QtWidgets.QStylePainter(self)
 
         #### Draw styled widget
@@ -622,16 +643,16 @@ class BrushComboBox(QtWidgets.QComboBox):
         if isinstance(self._internalStyle, BrushStyleType._subs_tree()[1:]):
             if isinstance(self._internalStyle, QtGui.QGradient):
                 g = scaleGradient(self._internalStyle, frame) 
-                brush = QtGui.QBrush(g)
+                self._brush = QtGui.QBrush(g)
             elif self._internalStyle in standardQtBrushPatterns.values():
-                brush = QtGui.QBrush(self._internalStyle)
-                brush.setColor(penColor) 
+                self._brush = QtGui.QBrush(self._internalStyle)
+                self._brush.setColor(penColor) 
             elif isinstance(self._internalStyle, (QtGui.QBitmap, QtGui.QPixmap, QtGui.QImage)):
-                brush = QtGui.QBrush(self._internalStyle)
+                self._brush = QtGui.QBrush(self._internalStyle)
             else:
-                brush = QtGui.QBrush(make_transparent_bg(strong=True))
+                self._brush = QtGui.QBrush(make_transparent_bg(strong=True))
                 
-            painter.setBrush(brush)
+            painter.setBrush(self._brush)
             
             painter.drawRoundedRect(frame.adjusted(1, 1, -1, -1), 2, 2)
             
@@ -642,10 +663,6 @@ class BrushComboBox(QtWidgets.QComboBox):
     def _slotActivated(self, index:int):
         if self.count() == 0:
             return
-        #gradientBrushIndex = [n for n in self._styles.keys()].index("Gradient...")
-        #pixmapBrushIndex = [n for n in self._styles.keys()].index("Pixmap...")
-        #imageBrushIndex = [n for n in self._styles.keys()].index("Image...")
-        
         customTextureBrushIndices = [k for k, (name,value) in enumerate(self._styles.items()) if isinstance(value, (QtGui.QBitmap, QtGui.QPixmap, QtGui.QImage)) or name in ("Pixmap...", "Image...")]
         customGradientBrushIndices = [k for k, (name,value) in enumerate(self._styles.items()) if isinstance(value, QtGui.QGradient) or name == "Gradient..."]
         
@@ -706,7 +723,7 @@ class BrushComboBox(QtWidgets.QComboBox):
         elif index in customGradientBrushIndices:
             if self._internalStyle is not QtGui.QGradient.NoGradient and \
                 isinstance(self._internalStyle, (ColorGradient, QtGui.QGradient, QtGui.QGradient.Preset, str)):
-                self._gradientDialog.gw.setGradient(self._internalStyle)
+                self._gradientDialog.gw.setGradient(self._internalStyle, points = self._gradientRendererPoints)
             self._gradientDialog.open()
             return
 
@@ -728,8 +745,9 @@ class BrushComboBox(QtWidgets.QComboBox):
     @safeWrapper
     def _slotGradientDialogFinished(self, value:int):
         if value == QtGui.QDialog.Accepted:
-            self._setCustomStyle("Custom", self._gradientDialog.qGradient)
-            #print(f"_slotGradientDialogFinished gradient coords {gradientCoordinates(self._gradientDialog.qGradient)}")
+            qGradient, points = self._gradientDialog.qGradientWithPoints
+            self._gradientRendererPoints = points
+            self._setCustomStyle("Custom", qGradient)
             self.activated[object].emit(self._internalStyle)
             
     def _addStyles(self):
@@ -753,8 +771,6 @@ class BrushComboBox(QtWidgets.QComboBox):
     def _setCustomStyle(self, name:str, value:typing.Union[BrushStyleType, QtGui.QPixmap, QtGui.QImage, QtGui.QGradient]):
         if not isinstance(value, BrushStyleType._subs_tree()[1:]): #and not isinstance(value, (QtGui.QPixmap, QtGui.QImage, QtGui.QGradient)):
             return
-        #print("BrushComboBox._setCustomStyle", name, value)
-
         self._customStyles[name] = value # adds or changes
         self._update_styles_()
         self.clear()
@@ -762,21 +778,10 @@ class BrushComboBox(QtWidgets.QComboBox):
         self._customStyle = value
         self._internalStyle = value # used in paintEvent
         
-        if isinstance(self._customStyle, QtGui.QGradient):
-            print(f"{self.__class__.__name__} custom gradient {gradientCoordinates(self._customStyle)}")
-        
         # below is used for the drop-down list
         index = [n for n in self._styles.keys()].index(name)
         self.setItemData(index, name, QtCore.Qt.ToolTipRole)
         self.setItemData(index, self._internalStyle, BrushComboDelegate.ItemRoles.BrushRole)
         
         self.setCurrentIndex(index)
-        
-    def setGradient(self, name:str, gradient:typing.Union[QtGui.QGradient, ColorGradient]):
-        if not isinstance(name, str) or len(name.strip()) == 0:
-            name = "Custom"
-            
-        #if isinstance(gradient)
-        
-            
         

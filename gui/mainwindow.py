@@ -4520,7 +4520,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_setConsoleFont(self):
-        currentFont = self.console.font
+        # cannot expose RichJupyterWidget.font as a property of the console
+        # window because this will overrride QMainWindow.font()
+        currentFont = self.console.consoleWidget.font
         selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
         if ok:
             self.console._set_font(selectedFont)

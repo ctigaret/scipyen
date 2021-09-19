@@ -452,7 +452,8 @@ def gradientCoordinates(x:QtGui.QGradient, precision:typing.Optional[int]=None) 
     return (0., 0., 0., 0.)
 
 def gradientLine(gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient],
-                    rect:typing.Union[QtCore.QRect, QtCore.QRectF])-> QtGui.QPolygonF:
+                    rect:typing.Union[QtCore.QRect, QtCore.QRectF], 
+                    points:typing.Optional[typing.Union[QtGui.QPolygonF, tuple, list]]=None)-> QtGui.QPolygonF:
     if isinstance(gradient, QtGui.QLinearGradient):
         ret = QtCore.QLineF(gradient.start(), gradient.finalStop())
 
@@ -465,12 +466,37 @@ def gradientLine(gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradi
         # normalized to whatever size the paint device (widget/pimap, etc) has
         # NOTE: 2021-06-09 21:23:57 Not necessarily!!!
         gradCenter = gradient.center() 
-        ret = QtCore.QLineF.fromPolar(min([gradCenter.x(), gradCenter.y()]), gradient.angle())
-
-        translate = rect.center() - ret.center()
         
-        ret.translate(translate)
+        print(f"gradientLine(conical): coordinates {gradientCoordinates(gradient)}")
+        
+        if isinstance(points, (QtGui.QPolygonF, tuple, list)) and len(points) >= 2:
+            p0 = points[0]
+            p1 = points[-1]
+            
+            #length = np.sqrt(QtCore.QPointF.dotProduct(p0, p1))
+            dp = p1-p0
+            length = np.sqrt(sum((dp.x()**2, dp.y()**2)))
+            
+            ret = QtCore.QLineF.fromPolar(p0, length)
+            
+        else:
+            
+            #ret.translate(translate)
     
+            
+            # NOTE: make the length of the line the radius of the circle inscribed in
+            # rect (this radius is by definition the minimum of the x, y coordinates
+            # rect's centre)
+            print(f"rect centre {(rect.center().x(), rect.center().y())}")
+            #translate = gradient.center() - rect.center()
+            #ret = QtCore.QLineF.fromPolar(min((rect.center().x(), rect.center().y())), gradient.angle())
+            ret = QtCore.QLineF.fromPolar(min([gradCenter.x(), gradCenter.y()]), gradient.angle())
+            #translate = rect.center() - ret.center()
+            translate = ret.center() - rect.center()
+            ret.translate(translate)
+            
+        print(f"\t ret: {ret}, length: {ret.length()}; angle: {ret.angle()}")
+
         # NOTE: 2021-06-09 22:07:06 places the center mapped to real coordinates
         #mappedCenter = QtGui.QTransform.fromScale(rect.width(), rect.height()).map(gradient.center())
 
@@ -505,8 +531,6 @@ def rescaleGradient(gradient:QtGui.QGradient, src_rect:typing.Union[QtCore.QRect
         
 def scaleGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, QtCore.QRectF]) -> QtGui.QGradient:
     """ATTENTION/WARNING gradient must have normalized coordinates!
-    
-    FIXME this is NOT angle-preserving!
     
     """
     x = rect.x()
@@ -562,7 +586,7 @@ def normalizeGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, 
     w = rect.width()
     h = rect.height()
     coords = gradientCoordinates(gradient)
-    print(f"painting_shared.normalizeGradient {coords}")
+    #print(f"painting_shared.normalizeGradient {coords}")
     if isinstance(gradient, QtGui.QLinearGradient):
         # x0, y0, x1, y1
         x0 = (coords[0]-x)/w
@@ -801,26 +825,12 @@ class HoverPoints(QtCore.QObject):
     def points(self, points:QtGui.QPolygonF) -> None:
         # NOTE: 2021-05-23 20:57:59
         # QPolygonF has API compatible with list() (on C++ side is a QVector<QPointF>)
-        #if points.size() != self._points.size():
-        #if len(points) != len(self._points):
-            #self._fingerPointMapping.clear() # see NOTE 2021-05-21 21:29:33 touchscreens
-        
         self._points.clear() # just so that refs to QPointF are garbage-collected
         self._points = QtGui.QPolygonF([bound_point(p, self.boundingRect(), 0) for p in points])
-        #self._points = QtGui.QPolygonF([bound_point(p, self.rect(), 0) for p in points])
-        #boundedPoints = [bound_point(points.at(i), self.boundingRect(), 0) for i in range(points.size())]
-
-        #if hasattr(self._widget, "_shadeType"):
-            #printPoints(points, 1, caller = self.points, prefix = self._widget._shadeType.name)
-        #else:
-            #printPoints(points, 1, caller = self.points)
-            
         self._locks.clear()
         
-        #if self._points.size():
         if len(self._points):
             self._locks = [0] * len(self._points)
-            #self._locks = [0] * self._points.size()
             
     @property
     def pointSize(self) -> QtCore.QSize:
@@ -1140,17 +1150,21 @@ class HoverPoints(QtCore.QObject):
                         pos = bounds.topLeft() # paint ABOVE
                         
                 if self._labels is True:
-                    p.drawStaticText(pos, QtGui.QStaticText(f"{i}: {ctr.x()}, {ctr.y()}"))
+                    p.drawStaticText(pos, QtGui.QStaticText(f"{i}: {point.x()}, {point.y()}"))
+                    #p.drawStaticText(pos, QtGui.QStaticText(f"{i}: {ctr.x()}, {ctr.y()}"))
                     
                 elif isinstance(self._labels, str) and len(self._labels.strip()):
-                    p.drawStaticText(pos, QtGui.QStaticText(f"self._labels {i}: {ctr.x()}, {ctr.y()}"))
+                    p.drawStaticText(pos, QtGui.QStaticText(f"self._labels {i}: {point.x()}, {point.y()}"))
+                    #p.drawStaticText(pos, QtGui.QStaticText(f"self._labels {i}: {ctr.x()}, {ctr.y()}"))
                     
                 elif isinstance(self._labels, (tuple, list)) and all((isinstance(l, str) for l in self.l_labels)):
                     if i < len(self._labels):
-                        label = f"{self._labels[i]}: {ctr.x()}, {ctr.y()}"
+                        label = f"{self._labels[i]}: {point.x()}, {point.y()}"
+                        #label = f"{self._labels[i]}: {ctr.x()}, {ctr.y()}"
                         
                     else:
-                        label = f"{i}: {ctr.x()}, {ctr.y()}"
+                        label = f"{i}: {point.x()}, {point.y()}"
+                        #label = f"{i}: {ctr.x()}, {ctr.y()}"
                         
                     p.drawStaticText(pos, QtGui.QStaticText(f"{label}"))
                 
