@@ -3740,8 +3740,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.actionChange_Working_Directory.triggered.connect(self.slot_selectWorkDir)
         self.actionSave_pickle.triggered.connect(self.slot_saveSelectedVariables)
         
-        self.actionConsole_font.triggered.connect(self.slot_setConsoleFont)
-        
         # NOTE: 2017-07-07 22:14:40
         # Shortcut to delete selected items in workspaceView
         # thanks to QtCentre forum (J-P Nurmi)
@@ -4517,16 +4515,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #print("ScipyenWindow.slot_chDirString: \nval = %s; \nprotocol = %s; \ntarget = %s" % (val, protocol, target))
         self.slot_changeDirectory(target)
         
-    @pyqtSlot()
-    @safeWrapper
-    def slot_setConsoleFont(self):
-        # cannot expose RichJupyterWidget.font as a property of the console
-        # window because this will overrride QMainWindow.font()
-        currentFont = self.console.consoleWidget.font
-        selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
-        if ok:
-            self.console._set_font(selectedFont)
-            
     @pyqtSlot()
     @safeWrapper
     def slot_changeDirectory(self, targetDir=None):

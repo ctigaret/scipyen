@@ -103,7 +103,6 @@
     <property name="title">
      <string>Settings</string>
     </property>
-    <addaction name="actionConsole_font"/>
     <addaction name="actionGUI_Style"/>
    </widget>
    <widget class="QMenu" name="menuConsoles">
@@ -124,9 +123,9 @@
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuView"/>
-   <addaction name="menuSettings"/>
    <addaction name="menuViewers"/>
    <addaction name="menuConsoles"/>
+   <addaction name="menuSettings"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
