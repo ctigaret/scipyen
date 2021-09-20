@@ -1387,7 +1387,7 @@ class GradientWidget(QtWidgets.QWidget):
         #print(f"GradientWidget._showGradient, points: {points}")
         
         if isinstance(points, (QtGui.QPolygonF, QtGui.QPolygon)) and len(points)==2:
-            hoverStops =QtGui.QPolygonF(points)
+            hoverStops = QtGui.QPolygonF(points)
         else:
             g = scaleGradient(gradient, self._renderer.rect())
             gline = gradientLine(g, self._renderer.rect()) 
