@@ -118,6 +118,7 @@ init_commands.extend(
     "from matplotlib import pyplot as plt",
     "from matplotlib import cm",
     "import matplotlib.mlab as mlb",
+    "mpl.use('Qt5Agg')",
     "".join(["sys.path.insert(2, '", __scipyen_path__, "')"]),
     "from core import extipyutils_host as hostutils",
     ])
@@ -132,7 +133,6 @@ init_commands.extend(
                  #"from importlib import reload",
                  #"from pprint import pprint",
                  #"import matplotlib as mpl",
-                 #"mpl.use('Qt5Agg')",
                  #"mpl.rcParams['savefig.format'] = 'svg'",
                  #"mpl.rcParams['xtick.direction'] = 'in'",
                  #"mpl.rcParams['ytick.direction'] = 'in'",

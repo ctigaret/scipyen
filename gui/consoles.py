@@ -52,6 +52,7 @@ from traitlets.config.application import catch_config_error
 from traitlets import (
     Dict, Unicode, CBool, Any, Bunch,
 )
+from ipykernel.inprocess.ipkernel import InProcessKernel
 from jupyter_core.paths import jupyter_runtime_dir
 from jupyter_core.application import JupyterApp, base_flags, base_aliases
 
@@ -1987,6 +1988,15 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         if kernel_manager.ipykernel:
             kwargs['extra_arguments'] = self.kernel_argv
         kernel_manager.start_kernel(**kwargs)
+        # NOTE: 2021-09-21 14:22:58
+        # This is NOT an inprocess kernel!
+        # see https://github.com/ipython/ipykernel/issues/319
+        # comment by sdh4
+        # https://github.com/ipython/ipykernel/issues/319#issuecomment-661951992
+        #if not hasattr(kernel_manager.kernel, "io_loop"):
+            #print("try and fix io_loop")
+            #import ipykernel.kernelbase
+            #ipykernel.kernelbase.Kernel.start(kernel_manager.kernel)
         kernel_manager.client_factory = self.kernel_client_class
         kernel_client = kernel_manager.client()
         kernel_client.start_channels(shell=True, iopub=True)
@@ -2040,7 +2050,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         # then override with settings in $HOME/.config/Scipyen/Scipyen.conf
         self.init_colors(widget)
         #self.init_layout(widget)
-        widget._load_settings_()
+        #widget._load_settings_()
         # ### END
         
         widget._existing = True
@@ -2391,6 +2401,8 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
     
     @property
     def scrollBarPosition(self):
+        """Exposes the console window's scrollBarPosition for convenience
+        """
         return self.window.scrollBarPosition
         #return self.window.getScrollBarPosition()
     
@@ -2766,7 +2778,6 @@ class ScipyenConsoleWidget(ConsoleWidget):
     loadUrls = pyqtSignal(object, bool, QtCore.QPoint)
     pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
     
-    #def __init__(self, mainWindow=None):
     def __init__(self, *args, **kwargs):
         ''' ScipyenConsole constructor
         
@@ -2782,7 +2793,20 @@ class ScipyenConsoleWidget(ConsoleWidget):
         self.kernel_manager = QtInProcessKernelManager() # what if gui is NOT Qt?
             
         self.kernel_manager.start_kernel()
+        self.kernel_manager.kernel.eventloop = None
         self.ipkernel = self.kernel_manager.kernel
+        self.ipkernel.gui = "qt"
+        # NOTE: 2021-09-21 14:22:58
+        # see https://github.com/ipython/ipykernel/issues/319
+        # comment by sdh4
+        # https://github.com/ipython/ipykernel/issues/319#issuecomment-661951992
+        #if not hasattr(self.kernel_manager.kernel, "io_loop"):
+            ##print("try and fix io_loop")
+            #import ipykernel.kernelbase
+            #ipykernel.kernelbase.Kernel.start(self.kernel_manager.kernel)
+            #def _bogus_advance_event_loop(kernel):
+                #pass
+            
         
         ## NOTE: 2016-03-20 14:37:37
         ## this must be set BEFORE start_channels is called
@@ -2797,8 +2821,8 @@ class ScipyenConsoleWidget(ConsoleWidget):
         
         self.kernel_client = self.kernel_manager.client()
         self.kernel_client.start_channels()
+        #super(InProcessKernel, self.kernel_manager.kernel).start()
         
-        self.ipkernel.gui = "qt"
         # NOTE: 2019-08-07 16:34:58
         # enforce qt5 backend for matplotlib
         # see NOTE: 2019-08-07 16:34:23 
@@ -2817,6 +2841,18 @@ class ScipyenConsoleWidget(ConsoleWidget):
         # e.g. after calling show()
         #self.set_pygment(self._console_pygment) 
         
+    def _is_complete(self, source, interactive=True):
+        # NOTE: 2021-09-21 16:41:04
+        # from qtconsole.inprocess.QtInProcessRichJupyterWidget
+        shell = self.kernel_manager.kernel.shell
+        status, indent_spaces = \
+            shell.input_transformer_manager.check_complete(source)
+        if indent_spaces is None:
+            indent = ''
+        else:
+            indent = ' ' * indent_spaces
+        return status != 'incomplete', indent
+    
     def closeEvent(self, evt):
         self.saveSettings() # inherited from ScipyenConfigurable via WorkspaceGuiMixin
         evt.accept()

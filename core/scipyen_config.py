@@ -1062,7 +1062,7 @@ class ScipyenConfigurable(object):
             loadWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="") # module-level function here
             return
 
-        parent = self._get_parent()
+        parent = self._get_parent_()
         
         if parent:
             if "ScipyenWindow" in parent.__class__.__name__:
@@ -1086,7 +1086,7 @@ class ScipyenConfigurable(object):
             saveWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="")# module-level function here
             return
         
-        parent = self._get_parent()
+        parent = self._get_parent_()
         
         if parent:
             if "ScipyenWindow" in parent.__class__.__name__:

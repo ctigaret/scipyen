@@ -2170,6 +2170,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         shell       The interactive IPython shell               mainWindow.shell
         
         ipkernel    The InProcess kernel backend of the shell   mainWindow.ipkernel
+        kernel      alias to ipkernel
         
         scipyen_settings
                     The confuse.LazyConfig object with custom
@@ -2323,6 +2324,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             # NOTE: 2016-03-20 20:50:42 -- WRONG!
             # get_ipython() returns an instance of the interactive shell, NOT the kernel
             self.workspace['ipkernel'] = self.ipkernel
+            self.workspace['kernel'] = self.ipkernel
             self.workspace['console'] = self.console # useful for testing functionality; remove upon release
             self.workspace["shell"] = self.shell # alias to self.ipkernel.shell
             self.workspace["scipyen_settings"] = self._scipyen_settings_
@@ -2376,162 +2378,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.console.show()
         self.console.consoleWidget.set_pygment(self.console.consoleWidget._console_pygment) # must be applied on visible console!
-        
-        #if not isinstance(self.console, consoles.ScipyenConsole):
-            #self.console = consoles.ScipyenConsole(mainWindow=self) 
-            #self.console.executed.connect(self.slot_updateHistory)
-            #self.console.executed.connect(self.slot_updateCwd)
-
-            #self.ipkernel = self.console.ipkernel
-            
-            ##NOTE: 2017-03-19 16:21:51 FYI:
-            ##NOTE: The actual shell is an instance of 
-            ##NOTE: ipykernel.inprocess.ipkernel.InProcessInteractiveShell
-            ##NOTE: 
-            ##NOTE: The shell is accessible as self.ipkernel.shell and is the SAME 
-            ##NOTE: object at the one returned by manually calling get_ipython()
-            ##NOTE: at the console
-            ##NOTE:
-            ##NOTE: This inherits from ZMQInteractiveShell which inherits from InteractiveShell
-            ##NOTE:
-            ##NOTE:
-            ##NOTE: Some important & useful function (bound methods) of the shell instance:
-            ##NOTE:
-            ##NOTE: show_banner(banner=None)
-            ##NOTE: to directly execute code inside the shell we can use one of its bound 
-            ##NOTE: methods, inherited all the way from IPython.core.InteractiveShell:
-            ##NOTE:
-            ##NOTE: run_cell (overridden by ipkernel.zmqshell.ZMQInteractiveShell but syntax and functionality are the same)
-            ##NOTE: run_cell_magic 
-            ##NOTE: run_code
-            ##NOTE: runcode, 
-            ##NOTE: run_line_magic
-            ##NOTE:
-
-            ##self.ipkernel.shell.push(self.a, self.testing) # fooling around
-            
-            #self.shell = self.ipkernel.shell
-
-            #self.executionCount = self.ipkernel.shell.execution_count # this is always 1 immediately after initialization
-
-            #self.historyAccessor = HistoryAccessor() # access history database independently of the shell
-                                                    ## should not interfere with the history 
-
-
-            ## NOTE: 2019-08-03 17:03:03
-            ## populate the command history widget
-            #hist = self.historyAccessor.search('*')
-
-            #sessionNo = None
-            
-            #items = list()
-
-            #for session, line, inline in hist:
-                #if sessionNo is None or sessionNo != session:
-                    #sessionNo = session  #cache the session
-                    #sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, [repr(sessionNo)])
-                    #items.append(sessionItem)
-
-                #lineItem = QtWidgets.QTreeWidgetItem(sessionItem, [repr(line), inline])
-                #items.append(lineItem)
-
-            #self.currentSessionTreeWidgetItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, ["Current"])
-            
-            #items.append(self.currentSessionTreeWidgetItem)
-            
-            ##NOTE: 2017-03-21 22:55:57 much better!
-            ## connect signals emitted by the console when processing a drop event
-            #self.console.historyItemsDropped.connect(self.slot_pasteHistorySelection) 
-            #self.console.workspaceItemsDropped.connect(self.slot_pasteWorkspaceSelection)
-            #self.console.loadUrls[object, bool, QtCore.QPoint].connect(self.slot_loadDroppedURLs)
-            #self.console.pythonFileReceived[str, QtCore.QPoint].connect(self.slot_handlePythonTextFile)
-
-            #self.historyTreeWidget.insertTopLevelItems(0, items)
-            #self.historyTreeWidget.scrollToItem(self.currentSessionTreeWidgetItem)
-            #self.historyTreeWidget.setCurrentItem(self.currentSessionTreeWidgetItem)
-
-            ##NOTE: until input has been enetered at the console, this is the LAST session on record NOT the current one!
-            #self.currentSessionID = self.historyAccessor.get_last_session_id()
-            
-            #self.selectedSessionID = None
-
-            ## ------------------------------
-            ## set up a` COMMON workspace
-            ## ------------------------------
-            ##
-            ## NOTE: 2016-03-20 14:29:16
-            ## populate kernel namespace with the imports from this current module 
-            ##
-            ## this effectively is the second time they're being imported, but this time
-            ## in the ipkernel environment
-            ## __module_file_name__ is "pict" so we take all its contents into the kernel
-            ## namespace (they're just references to those objects)
-            #self.workspace = self.ipkernel.shell.user_ns
-            
-            ## NOTE: 2020-11-12 12:51:36
-            ## used by %scipyen_debug line magic
-            #self.workspace["SCIPYEN_DEBUG"] = False 
-            
-            #self.workspace['mainWindow'] = self
-            ##self.workspace["scipyenDefaultSettings"] = self.scipyenDefaultSettings
-
-            ## NOTE: 2016-03-20 20:50:42 -- WRONG!
-            ## get_ipython() returns an instance of the interactive shell, NOT the kernel
-            #self.workspace['ipkernel'] = self.ipkernel
-            #self.workspace['console'] = self.console # useful for testing functionality; remove upon release
-            #self.workspace["shell"] = self.shell # alias to self.ipkernel.shell
-            #self.workspace["scipyen_settings"] = self._scipyen_settings_
-            #self.workspace["scipyen_topdir"] = self._scipyendir_
-            #self.workspace["external_console"] = self.external_console
-            
-            ##print("exit" in self.ipkernel.shell.user_ns)
-            
-            ## NOTE 2020-07-09 11:36:34
-            ## Override ExitAutocall objects in this kernel in order to let the 
-            ## ScipyenMagics "exit" and "quit" to take over.
-            ## By default, self.workspace["exit"] and self.workspace["quit"] are
-            ## the same ExitAutocall object; see IPython.core.autocall module for 
-            ## details
-            ##
-            ## The point of all this is that we quit the Scipyen application when
-            ## either "exit" or "quit" are entered in the internal Scipyen Console
-            ##
-            #self.workspace["_exit_kernel_"] = self.workspace["exit"]
-            #self.workspace.pop("exit", None)
-            #self.workspace["_quit_kernel_"] = self.workspace["quit"]
-            #self.workspace.pop("quit", None)
-            
-            
-            
-            ## TODO/FIXME 2019-08-04 11:06:16
-            ## this does not override ipython's exit: 
-            ## this will have to be called as %exit line magic (i.e. automagic doesn't work)
-            #self.ipkernel.shell.register_magics(ScipyenMagics) 
-            
-            ## NOTE: 2020-11-29 15:57:08
-            ## this imports current module in the user workspace as well
-            
-            #impcmd = ' '.join(['from', "".join(["gui.", __module_file_name__]), 'import *'])
-            
-            #self.ipkernel.shell.run_cell(impcmd)
-            
-            ## hide the variables added to the workspace so far (e.g., ipkernel,
-            ## console, shell, and imported modules) so that they don't show in 
-            ## the workspace browser (the tree view in the User variables pane)
-            ## ATTENTION but there is a catch: this does NOT prevent the user from
-            ## assigning a variable to a symbol bound to one of these variables
-            ## -- effectively "overwriting" them.
-            
-            #self._nonInteractiveVars_.update([i for i in self.workspace.items()])
-
-            ## --------------------------
-            ## finally, customize console window title and show it
-            ## -------------------------
-            #self.console.setWindowTitle(u'Scipyen Console')
-            
-        
-        #self.console.show()
-        #self.console.set_pygment(self.console._console_pygment) # must be applied on visible console!
         
     # NOTE: 2016-03-20 21:18:32
     # to run code inside the console and use the console as stdout, 
