@@ -435,7 +435,7 @@ class GradientRenderer(QtWidgets.QWidget):
         # NOTE: NOT using OpenGL
         #self._prefer_image = False
         #### BEGIN
-        # related to on-ascreen help/description - not needed here
+        # related to on-screen help/description - not needed here (for now)
         #self._document = None
         #self._show_doc = False
         # NOTE 2021-05-23 22:23:16 use make_checkers instead
@@ -464,14 +464,16 @@ class GradientRenderer(QtWidgets.QWidget):
         self._hoverPoints.pointSize = QtCore.QSize(20,20)
         self._hoverPoints.connectionType = HoverPoints.ConnectionType.NoConnection
         self._hoverPoints.editable = False
-        self._hoverPoints.compositionMode = QtGui.QPainter.CompositionMode_Xor
         
         if not isinstance(hoverPoints, QtGui.QPolygonF) or hoverPoints.size() == 0:
             self._hoverPoints.points = QtGui.QPolygonF([QtCore.QPointF(100, 100), QtCore.QPointF(200,200)])
         else:
             self._hoverPoints.points = hoverPoints
             
-        self._hoverPoints.labels = True
+        # NOTE: 2021-09-21 12:54:28
+        # use for debugging - do NOT remove; just comment-out for release
+        #self._hoverPoints.compositionMode = QtGui.QPainter.CompositionMode_Xor
+        #self._hoverPoints.labels = True
         
         self._gradient = None
         
@@ -929,11 +931,14 @@ class GradientWidget(QtWidgets.QWidget):
         self.mainGroup = QtWidgets.QGroupBox(self.mainContentWidget)
         self.mainGroup.setTitle("Gradients")
         
-        self.editorGroup = QtWidgets.QGroupBox(self.mainGroup)
-        self.editorGroup.setTitle("Gradient Editor")
+        # ### BEGIN Gradient editor swatches
+        self.swatchesGroup = QtWidgets.QGroupBox(self.mainGroup)
+        self.swatchesGroup.setTitle("Stops")
         
-        self._editor = GradientEditor(self.editorGroup)
+        self._editor = GradientEditor(self.swatchesGroup)
+        # ### END Gradient editor swatches
         
+        # ### BEGIN Gradient type radial buttons group
         self.typeGroup = QtWidgets.QGroupBox(self.mainGroup)
         self.typeGroup.setTitle("Type")
         
@@ -941,8 +946,11 @@ class GradientWidget(QtWidgets.QWidget):
         self._radialButton = QtWidgets.QRadioButton("Radial", self.typeGroup)
         self._conicalButton = QtWidgets.QRadioButton("Conical", self.typeGroup)
         
+        # ### END Gradient type radial buttons group
+        
+        # ### BEGIN Radial gradient options GUI
         self.radialParamsGroup = QtWidgets.QGroupBox(self.mainGroup)
-        self.radialParamsGroup.setTitle("Radial Gradient Options")
+        self.radialParamsGroup.setTitle("Radii")
         
         self.gradientCenterRadiusGroup = QtWidgets.QGroupBox(self.radialParamsGroup)
         self.gradientCenterRadiusGroup.setTitle("Center Radius")
@@ -1010,6 +1018,9 @@ class GradientWidget(QtWidgets.QWidget):
         self.radialParamsLayout.addWidget(self.gradientCenterRadiusGroup)
         self.radialParamsLayout.addWidget(self.gradientFocalRadiusGroup)
         
+        # ### END Radial gradient options GUI
+        
+        # ### BEGIN Gradient spread radial buttons group
         self.spreadGroup = QtWidgets.QGroupBox(self.mainGroup)
         self.spreadGroup.setTitle("Spread")
         self._padSpreadButton = QtWidgets.QRadioButton("Pad", self.spreadGroup)
@@ -1019,6 +1030,9 @@ class GradientWidget(QtWidgets.QWidget):
         self._repeatSpreadButton = QtWidgets.QRadioButton("Repeat", self.spreadGroup)
         self._repeatSpreadButton.setToolTip("Repeat gradient outside its area")
         
+        # ### END Gradient spread radial buttons group
+        
+        # ### BEGIN Gradient coordinate mode group
         #self.coordinateModeGroup = QtWidgets.QGroupBox(self.mainGroup)
         #self.coordinateModeGroup.setTitle("Coordinate Mode")
         #self._logicalCoordinateButton = QtWidgets.QRadioButton("Logical", self.coordinateModeGroup)
@@ -1036,10 +1050,14 @@ class GradientWidget(QtWidgets.QWidget):
         #self.coordinateModeLayout.addWidget(self._deviceCoordinateButton)
         #self.coordinateModeLayout.addWidget(self._objectCoordinateButton)
         
+        # ### END Gradient coordinate mode group
+        
+        # ### BEGIN Gradient presets group
         
         self.presetsGroup = QtWidgets.QGroupBox(self.mainGroup)
-        self.presetsGroup.setTitle("Gradient Presets")
+        self.presetsGroup.setTitle("Presets")
         self.presetsGroup.setToolTip("Available Gradients (including Qt's presets)")
+        self.presetsGroup.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.prevPresetButton = QtWidgets.QPushButton("", self.presetsGroup)
         self.prevPresetButton.setIcon(QtGui.QIcon.fromTheme("go-previous"))
         self.prevPresetButton.setToolTip("Go back")
@@ -1103,15 +1121,27 @@ class GradientWidget(QtWidgets.QWidget):
         self.reloadPresetsButton.setSizePolicy(QtWidgets.QSizePolicy.Fixed,
                                             QtWidgets.QSizePolicy.Fixed)
         
-        self.mainGroupLayout = QtWidgets.QVBoxLayout(self.mainGroup)
-        self.mainGroupLayout.addWidget(self.presetsGroup)
+        # ### END Gradient presets group
         
-        self.mainGroupLayout.addWidget(self.editorGroup)
+        # ### BEGIN type and spread group
         self.typeSpreadGroup = QtWidgets.QGroupBox(self.mainGroup)
         
         self.typeSpreadLayout = QtWidgets.QHBoxLayout(self.typeSpreadGroup)
         self.typeSpreadLayout.addWidget(self.typeGroup)
         self.typeSpreadLayout.addWidget(self.spreadGroup)
+        
+        # ### END type and spread group
+        
+        #self.toolBox = QtWidgets.QToolBox(self.mainGroup)
+        #self.toolBox.addItem(self.swatchesGroup, "Stops")
+        #self.toolBox.addItem(self.typeSpreadGroup, "Type and Spread")
+        #self.toolBox.addItem(self.radialParamsGroup, "Radii")
+        
+        self.mainGroupLayout = QtWidgets.QVBoxLayout(self.mainGroup)
+        self.mainGroupLayout.addWidget(self.presetsGroup)
+        #self.mainGroupLayout.addWidget(self.toolBox)
+        
+        self.mainGroupLayout.addWidget(self.swatchesGroup)
         self.mainGroupLayout.addWidget(self.typeSpreadGroup)
         #self.mainGroupLayout.addWidget(self.coordinateModeGroup)
         #self.mainGroupLayout.addWidget(self.typeGroup)
@@ -1119,7 +1149,7 @@ class GradientWidget(QtWidgets.QWidget):
         
         self.mainGroupLayout.addWidget(self.radialParamsGroup)
 
-        self.editorGroupLayout = QtWidgets.QVBoxLayout(self.editorGroup)
+        self.editorGroupLayout = QtWidgets.QVBoxLayout(self.swatchesGroup)
         self.editorGroupLayout.addWidget(self._editor)
         
         self.typeGroupLayout = QtWidgets.QVBoxLayout(self.typeGroup)
@@ -1138,7 +1168,6 @@ class GradientWidget(QtWidgets.QWidget):
         #self._logicalCoordinateButton.setChecked(True)
 
         self.presetsGroupLayout = QtWidgets.QVBoxLayout(self.presetsGroup)
-        
         self.presetsBrowseLayout = QtWidgets.QHBoxLayout()
         self.presetsBrowseLayout.addWidget(self.prevPresetButton)
         #self.presetsGroupLayout.addWidget(self._presetButton, 1)
@@ -1204,6 +1233,9 @@ class GradientWidget(QtWidgets.QWidget):
         
         if isinstance(self._title, str) and len(self._title.strip()):
             self.setWindowTitle(self._title)
+            
+        self.radialParamsGroup.setEnabled(self._radialButton.isChecked())
+            
         
     @property
     def defaultGradient(self) -> typing.Optional[QtGui.QGradient]:
@@ -1243,6 +1275,8 @@ class GradientWidget(QtWidgets.QWidget):
             self.setWindowTitle("%s *" % self._title)
         else:
             self.setWindowTitle("%s *" % QtWidgets.QApplication.applicationDisplayName())
+            
+        self.radialParamsGroup.setEnabled(self._radialButton.isChecked())
         
     def _resetTitle(self):
         if isinstance(self._title, str) and len(self._title.strip()):
@@ -1451,6 +1485,8 @@ class GradientWidget(QtWidgets.QWidget):
             if not self._padSpreadButton.isChecked():
                 self._padSpreadButton.setChecked(True)
             self._renderer.spread = QtGui.QGradient.PadSpread
+            
+        self.radialParamsGroup.setEnabled(self._radialButton.isChecked())
             
         if "*" in self.windowTitle():
             if isinstance(self._title, str) and len(self._title.strip()):
