@@ -1324,6 +1324,9 @@ class GradientWidget(QtWidgets.QWidget):
             return
         
         if isinstance(gradient, str) and len(gradient.strip()):
+            # NOTE 2021-09-21 09:21:27: 
+            # initialize a generic gradient from a preset name
+            #print("GradientWidget._showGradient: from str")
             if gradient in self._gradients.keys():
                 gradient = self._gradients[gradient]
                 
@@ -1334,19 +1337,32 @@ class GradientWidget(QtWidgets.QWidget):
                 return
             
         elif isinstance(gradient, QtGui.QGradient.Preset):
+            # NOTE 2021-09-21 09:21:36: 
+            # initialize a generic gradient from a preset
+            #print("GradientWidget._showGradient: from preset")
             gradient = QtGui.QGradient(gradient)
             
         elif isinstance(gradient, ColorGradient):
+            # NOTE 2021-09-21 09:21:54:
+            # initialize a generic gradient from a ColorGradient
+            #print("GradientWidget._showGradient: from ColorGradient")
             gradient = gradient()
+            
+        stops = gradient.stops()
         
+        # NOTE: 2021-09-21 09:24:23
+        # Determine the gradient type - useful especially when a generic gradient
+        # is passed here.
         if not isinstance(gradient, (QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient)):
             # NOTE: 2021-06-10 15:57:28
-            # when gradient is a generic QGradient, use the specified gradientType
-            # to determine how this is done:
-            # when gradientType is a str, convert it to the corresponding 
+            # when gradient is a generic QGradient, (see NOTE 2021-09-21 09:21:27,
+            # and NOTE 2021-09-21 09:21:36) use the specified gradientType to
+            # determine how this is rendered:
+            # NOTE 2021-09-21 09:23:08:
+            # a) when gradientType is a str, convert it to the corresponding 
             #   QtGui.QGradient.Type enum value, if possible, else raise error
-            # when gradientType is neither a str, nor a QtGui.QGradient.Type value
-            #   then use the state of the radial buttons in the 'Type' group
+            # b) when gradientType is neither a str, nor a QtGui.QGradient.Type 
+            #   value then use the radial buttons state in the 'Type' group.
             if isinstance(gradientType, str):
                 if "linear" in gradientType.lower():
                     gradientType = QtGui.QGradient.LinearGradient
@@ -1369,20 +1385,25 @@ class GradientWidget(QtWidgets.QWidget):
                     gradientType = QtGui.QGradient.LinearGradient # default
                 
             if gradientType == QtGui.QGradient.LinearGradient:
-                gradient = sip.cast(gradient, QtGui.QLinearGradient)
+                g = g2l(gradient)
+                #gradient = sip.cast(gradient, QtGui.QLinearGradient)
                 
             elif gradientType == QtGui.QGradient.RadialGradient:
-                gradient = sip.cast(gradient, QtGui.QRadialGradient)
+                g = g2r(gradient)
+                #gradient = sip.cast(gradient, QtGui.QRadialGradient)
                 
             elif gradientType == QtGui.QGradient.ConicalGradient:
-                gradient = sip.cast(gradient, QtGui.QConicalGradient)
+                g = g2c(gradient)
+                #gradient = sip.cast(gradient, QtGui.QConicalGradient)
                 
             else:
                 return
             
+            gradient = g
+            
         #print("GradientWidget._showGradient gradient:", gradient)
         #print("\tresolved to:", reverse_mapping_lookup(standardQtGradientTypes, gradient.type()))
-        stops = gradient.stops()
+        #stops = gradient.stops()
         
         #print(f"GradientWidget._showGradient, points: {points}")
         

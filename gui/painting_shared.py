@@ -383,6 +383,7 @@ def gradient2conical(gradient:QtGui.QGradient) -> QtGui.QConicalGradient:
             return sip.cast(gradient, QtGui.QConicalGradient)
         
         if gradient.type() == QtGui.QGradient.LinearGradient:
+            g = QtGui.QLinearGradient
             g = sip.cast(gradient, QtGui.QLinearGradient)
             l = QtCore.QLineF(g.start(), g.finalStop())
             ret = QtGui.QConicalGradient(l.p1(), l.angle())
@@ -467,27 +468,22 @@ def gradientLine(gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradi
         # NOTE: 2021-06-09 21:23:57 Not necessarily!!!
         gradCenter = gradient.center() 
         
-        print(f"gradientLine(conical): coordinates {gradientCoordinates(gradient)}")
+        #print(f"gradientLine(conical): coordinates {gradientCoordinates(gradient)}")
         
         if isinstance(points, (QtGui.QPolygonF, tuple, list)) and len(points) >= 2:
             p0 = points[0]
             p1 = points[-1]
             
-            #length = np.sqrt(QtCore.QPointF.dotProduct(p0, p1))
             dp = p1-p0
             length = np.sqrt(sum((dp.x()**2, dp.y()**2)))
             
             ret = QtCore.QLineF.fromPolar(p0, length)
             
         else:
-            
-            #ret.translate(translate)
-    
-            
             # NOTE: make the length of the line the radius of the circle inscribed in
             # rect (this radius is by definition the minimum of the x, y coordinates
             # rect's centre)
-            print(f"rect centre {(rect.center().x(), rect.center().y())}")
+            #print(f"rect centre {(rect.center().x(), rect.center().y())}")
             #translate = gradient.center() - rect.center()
             #ret = QtCore.QLineF.fromPolar(min((rect.center().x(), rect.center().y())), gradient.angle())
             ret = QtCore.QLineF.fromPolar(min([gradCenter.x(), gradCenter.y()]), gradient.angle())
@@ -495,7 +491,7 @@ def gradientLine(gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradi
             translate = ret.center() - rect.center()
             ret.translate(translate)
             
-        print(f"\t ret: {ret}, length: {ret.length()}; angle: {ret.angle()}")
+        #print(f"\t ret: {ret}, length: {ret.length()}; angle: {ret.angle()}")
 
         # NOTE: 2021-06-09 22:07:06 places the center mapped to real coordinates
         #mappedCenter = QtGui.QTransform.fromScale(rect.width(), rect.height()).map(gradient.center())
@@ -520,9 +516,6 @@ def gradientLine(gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradi
         ret = QtCore.QLineF(QtCore.QPointF(0,0), QtCore.QPointF(rect.width(), rect.height()))
         
     return ret
-
-    #return QtCore.QLineF(QtCore.QPointF(0,0), QtCore.QPointF(self.width(), self.height()))
-    
 
 def rescaleGradient(gradient:QtGui.QGradient, src_rect:typing.Union[QtCore.QRect, QtCore.QRectF],
                     dest_rect:typing.Union[QtCore.QRect, QtCore.QRectF]) -> QtGui.QGradient:
@@ -576,7 +569,18 @@ def scaleGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, QtCo
         return g
         
     else:
-        raise TypeError("Expecting a concrete QGradient subtype; got %s instead" % type(g).__name__)
+        x0 = coords[0] * w + x
+        y0 = coords[1] * h + y
+        x1 = coords[2] * w + x
+        y1 = coords[3] * h + y
+        g = QtGui.QLinearGradient(x0,y0,x1,y1)
+        g.setStops(gradient.stops())
+        g.setSpread(gradient.spread())
+        g.setCoordinateMode(gradient.coordinateMode())
+        return g
+        # generate a Linear gradieht based o the generic and the rect
+        
+        #raise TypeError("Expecting a concrete QGradient subtype; got %s instead" % type(g).__name__)
 
 def normalizeGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, QtCore.QRectF]) -> QtGui.QGradient:
     """
