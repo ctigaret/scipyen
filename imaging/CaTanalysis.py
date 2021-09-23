@@ -3390,7 +3390,9 @@ def removeMirrorCursor(data, vc):
     data.sceneCursors.pop(vc.name, None)
     
     
-class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
+class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
+    # NOTE: 2021-09-23 10:43:12
+    # ScipyenFrameViewer <- ScipyenViewer <- WorkspaceGuiMixin
     # NOTE: 2021-07-08 10:04:42 About configuration/settings
     #
     # Individual viewers include: sceneviewers, scansviewers, ephysviewers, 
@@ -3698,19 +3700,19 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         for item in signal_slots:
             item[0].disconnect(item[1])
             
-    def saveSettings(self):
-        """Overrides ScipyenViewer.saveSettings
-        """
-        #print("%s.saveSettings %s" % (self.__class__.__name__, self.winTitle))
-        # NOTE: 2021-07-08 10:18:11
-        # Saves the settings for the QMainWindow instances of LSCaTWindow AND of
-        # its (child, or client) viewers
-        self.saveWindowSettings()# overrides ScipyenViewer.saveWindowSettings
+    #def saveSettings(self):
+        #"""Overrides ScipyenViewer.saveSettings
+        #"""
+        ##print("%s.saveSettings %s" % (self.__class__.__name__, self.winTitle))
+        ## NOTE: 2021-07-08 10:18:11
+        ## Saves the settings for the QMainWindow instances of LSCaTWindow AND of
+        ## its (child, or client) viewers
+        #self.saveWindowSettings()# overrides ScipyenViewer.saveWindowSettings
         
-        # NOTE: 2021-07-08 10:19:45
-        # Saves the settings unrelated to the QMainWindow instances of LSCaTWindow
-        # AND of its clien viewers
-        self.saveViewerSettings()
+        ## NOTE: 2021-07-08 10:19:45
+        ## Saves the settings unrelated to the QMainWindow instances of LSCaTWindow
+        ## AND of its clien viewers
+        #self.saveViewerSettings()
     
     #def loadSettings(self):
         ##print("%s.loadSetting" % self.winTitle)
@@ -3791,40 +3793,40 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         # a) they are not top level 
         #print("%s.saveWindowSettings %s" % (self.__class__.__name__, self.winTitle))
         #print("%s.saveWindowSettings %s save client windows settings" % (self.__class__.__name__, self.winTitle))
-        for k, w in enumerate(self.sceneviewers):
-            custom = dict()
-            custom["ColorMap"] = w.colorMap.name
+        #for k, w in enumerate(self.sceneviewers):
+            #custom = dict()
+            #custom["ColorMap"] = w.colorMap.name
             
-            saveWindowSettings(self.qsettings, w, 
-                               prefix="SceneWindow_%d" % k, **custom)
+            #saveWindowSettings(self.qsettings, w, 
+                               #prefix="SceneWindow_%d" % k, **custom)
                 
-        for k, w in enumerate(self.scansviewers):
-            custom = dict()
-            custom["ColorMap"] = w.colorMap.name
+        #for k, w in enumerate(self.scansviewers):
+            #custom = dict()
+            #custom["ColorMap"] = w.colorMap.name
             
-            saveWindowSettings(self.qsettings, w, 
-                               prefix="ScansWindow_%d" % k, **custom)
+            #saveWindowSettings(self.qsettings, w, 
+                               #prefix="ScansWindow_%d" % k, **custom)
                     
-        if len(self.profileviewers):
-            w = self.profileviewers[0]
-            saveWindowSettings(self.qsettings, w, 
-                               prefix="ProfileWindow")
+        #if len(self.profileviewers):
+            #w = self.profileviewers[0]
+            #saveWindowSettings(self.qsettings, w, 
+                               #prefix="ProfileWindow")
                 
-        if len(self.scansblockviewers):
-            w = self.scansblockviewers[0]
-            saveWindowSettings(self.qsettings, w, 
-                               prefix="ScansDataWindow")
+        #if len(self.scansblockviewers):
+            #w = self.scansblockviewers[0]
+            #saveWindowSettings(self.qsettings, w, 
+                               #prefix="ScansDataWindow")
                 
-        if self.reportWindow.isVisible():
-            saveWindowSettings(self.qsettings, w, prefix="ReportWindow")
+        #if self.reportWindow.isVisible():
+            #saveWindowSettings(self.qsettings, w, prefix="ReportWindow")
             
-        if len(self.ephysviewers):
-            w = self.ephysviewers[0]
-            saveWindowSettings(self.qsettings, w, prefix="EphysWindow")
+        #if len(self.ephysviewers):
+            #w = self.ephysviewers[0]
+            #saveWindowSettings(self.qsettings, w, prefix="EphysWindow")
             
-        if len(self.scansblockviewers):
-            w = self.scansblockviewers[0]
-            saveWindowSettings(self.qsettings, w, prefix="SceneDataWindow")
+        #if len(self.scansblockviewers):
+            #w = self.scansblockviewers[0]
+            #saveWindowSettings(self.qsettings, w, prefix="SceneDataWindow")
                 
         #print("%s.saveWindowSettings %s Call super().saveWindowSettings" % (self.__class__.__name__, self.winTitle))
         super().saveWindowSettings() # to save LSCaT window pos, geometry & state
@@ -3833,6 +3835,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
         """Loads settings unrelated to QMainWindowe instance.
         Concerns only the LSCaTWindow and not its client image/signal viewers
         """
+        pass
         # TODO/FIXME 2021-08-23 18:43:36
         # use traitlets.config.Configurable and confuse
         #use_opaque_labels = self.qsettings.value("LSCaTAnalysis/Use_Opaque_Labels", False)
@@ -10282,16 +10285,20 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                             win.signal_graphicsObjectSelected[object].connect(self.slot_graphics_object_selected_in_window, type = QtCore.Qt.QueuedConnection)
                             win.signal_graphicsObjectDeselected.connect(self.slot_graphics_objects_deselected, type = QtCore.Qt.QueuedConnection)
                             
+                            # NOTE: 2021-09-23 11:08:44
+                            # qtconfigruables shoudl now be managed automatically
+                            # by the ScipyenConfigurable superclass.
                             #### BEGIN load window & viewer settings
-                            custom = dict()
-                            custom["ColorMap"] = win.colorMap.name
+                            #custom = dict()
+                            #custom["ColorMap"] = win.colorMap # this is now a str
+                            ##custom["ColorMap"] = win.colorMap.name
                             
-                            loadWindowSettings(self.qsettings, win, 
-                                               prefix = "%s_%d" % (prefix, k), custom=custom)
+                            #loadWindowSettings(self.qsettings, win, 
+                                               #prefix = "%s_%d" % (prefix, k), custom=custom)
                             
-                            cmapname = custom["ColorMap"]
-                            if isinstance(cmapname, str):
-                                win.colorMap = cmapname
+                            #cmapname = custom["ColorMap"]
+                            #if isinstance(cmapname, str):
+                                #win.colorMap = cmapname
                             
                                 
                             ## TODO/FIXME: 2021-07-08 10:30:10
@@ -10356,38 +10363,42 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__, WorkspaceGuiMixin):
                 else:
                     win = sv.SignalViewer(pWin = self._scipyenWindow_, parent=self)
         
-                    custom = dict()
+                    # NOTE: 2021-09-23 11:08:31
+                    # qtconfigurables should now be automatically managed
+                    # by the superclasses (ScipyenConfigurable) for each individual
+                    # viewer
+                    #custom = dict()
                     
-                    if hasattr(win, "qtconfigurables"):
-                        custom.update(win.configurables.get("visibleDocks", dict()))
+                    #if hasattr(win, "qtconfigurables"):
+                        #custom.update(win.configurables.get("visibleDocks", dict()))
                     
-                    for dn,dw in win.dockWidgets.items():
-                        if dn in custom:
-                            custom[dn] = str(custom[dn]).lower()
-                        else:
-                            custom[dn] = str(False).lower()
+                    #for dn,dw in win.dockWidgets.items():
+                        #if dn in custom:
+                            #custom[dn] = str(custom[dn]).lower()
+                        #else:
+                            #custom[dn] = str(False).lower()
                     
-                    loadWindowSettings(self.qsettings, win, 
-                                       prefix = prefix, custom = custom)
+                    #loadWindowSettings(self.qsettings, win, 
+                                       #prefix = prefix, custom = custom)
                 
-                    for dn,dw in win.dockWidgets.items():
-                        dock_visibility = custom[dn]
+                    #for dn,dw in win.dockWidgets.items():
+                        #dock_visibility = custom[dn]
                         
-                        if isinstance(dock_visibility, str):
-                            dock_visible = dock_visibility.lower().strip() == "true"
+                        #if isinstance(dock_visibility, str):
+                            #dock_visible = dock_visibility.lower().strip() == "true"
                             
-                        elif isinstance(dock_visibility, bool):
-                            dock_visible = dock_visibility
+                        #elif isinstance(dock_visibility, bool):
+                            #dock_visible = dock_visibility
                             
-                        else:
-                            dock_visible = False
+                        #else:
+                            #dock_visible = False
                         
-                        if dock_visible:
-                            dw.setVisible(True)
-                            dw.show()
+                        #if dock_visible:
+                            #dw.setVisible(True)
+                            #dw.show()
                                         
-                        else:
-                            dw.hide()
+                        #else:
+                            #dw.hide()
                 
                     viewers.append(win)
                

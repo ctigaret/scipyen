@@ -560,20 +560,28 @@ def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]) -> typing.
         #if isinstance(win, WorkspaceGuiMixin): 
         # cannot have here this as importing gui.workspacegui would trigger 
         # recursive import cycles
-        if hasattr(win, "isTopLevel"): # (this is a WorkspaceGuiMixin)
-            if win.parent() is None or win.isTopLevel:
-                gname = win.__class__.__name__
-            else:
-                gname = win.parent().__class__.__name__
-                pfx = win.__class__.__name__
+        if hasattr(win, "isTopLevel") and win.isTopLevel: # (this is a WorkspaceGuiMixin)
+            gname = win.__class__.__name__
         else:
-            # again cannot import ScipyenWindow directly 'cause it will trigger
-            # recursive import cycles
-            if win.parent() is None or "ScipyenWindow" in win.parent().__class__.__name__:
-                gname = win.__class__.__name__
+            gname = win.parent().__class__.__name__
+            tag = getattr(win, "tag", "")
+            if isinstance(tag, str) and len(tag.strip()):
+                pfx = f"{tag}_{win.__class__.__name__}"
             else:
-                gname = win.parent().__class__.__name__
                 pfx = win.__class__.__name__
+            #if win.parent() is None or win.isTopLevel:
+                #gname = win.__class__.__name__
+            #else:
+                #gname = win.parent().__class__.__name__
+                #pfx = win.__class__.__name__
+        #else:
+            ## again cannot import ScipyenWindow directly 'cause it will trigger
+            ## recursive import cycles
+            #if win.parent() is None or "ScipyenWindow" in win.parent().__class__.__name__:
+                #gname = win.__class__.__name__
+            #else:
+                #gname = win.parent().__class__.__name__
+                #pfx = win.__class__.__name__
                 
     elif isinstance(win, Figure):
         gname = win.canvas.__class__.__name__
@@ -982,6 +990,9 @@ class ScipyenConfigurable(object):
     or the syncQtSettings defined in this module.
     
     """
+    # NOTE: 2021-09-23 11:39:57
+    # added self._tag and tag property getter/setter
+    # to be used for configurables of non-top level windows 
     qsettings = QtCore.QSettings(QtCore.QCoreApplication.organizationName(),
                                  QtCore.QCoreApplication.applicationName())
     #qsettings = QtCore.QSettings("Scipyen", "Scipyen")
@@ -992,6 +1003,7 @@ class ScipyenConfigurable(object):
         super().__init__()
         self.configurable_traits = DataBag()
         self.configurable_traits.observe(self._observe_configurables_)
+        self._tag = ""
         
     def _get_parent_(self):
         parent = None
@@ -1021,10 +1033,19 @@ class ScipyenConfigurable(object):
                 
         else:
             for k,v in cfg.items():
-                for kk,vv in v:
-                    scipyen_conf[k][kk].set(vv)
+                for kk,vv in v.items():
+                    scipyen_config[k][kk].set(vv)
             
         write_config()
+    
+    @property
+    def tag(self) -> str:
+        return self._tag
+    
+    @tag.setter
+    def tag(self, val:str) -> None:
+        if isinstance(val, str) and len(val).strip():
+            self._tag = val
         
     @property
     def configurables(self) -> Bunch:
@@ -1058,49 +1079,56 @@ class ScipyenConfigurable(object):
     def loadWindowSettings(self):
         """Laods window settings
         """
-        if hasattr(self, "isTopLevel") and self.isTopLevel: # inherited from WorkspaceGuiMixin
-            loadWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="") # module-level function here
-            return
+        #if hasattr(self, "isTopLevel") and self.isTopLevel: # inherited from WorkspaceGuiMixin
+            #loadWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="") # module-level function here
+            #return
 
-        parent = self._get_parent_()
+        #parent = self._get_parent_()
         
-        if parent:
-            if "ScipyenWindow" in parent.__class__.__name__:
-                loadWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="") # module-level function here
-                return
+        #if parent:
+            #if "ScipyenWindow" in parent.__class__.__name__:
+                #loadWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="") # module-level function here
+                #return
             
-            loadWindowSettings(self.qsettings, self, group_name = parent.__class__.__name__, prefix=self.__class__.__name__) # module-level function here
-            return 
+            #if isinstance(self, QtWidgets.QMainWindow):
+                #prefix = f""
+                
+            #loadWindowSettings(self.qsettings, self, group_name = parent.__class__.__name__, prefix=self.__class__.__name__) # module-level function here
+            #return 
         
         if isinstance(self, Figure): # this presupposes self is an instance that also inherits from matplotlib Figure
-            if issubclass(self.canvas, (mpl.backend_bases.FigureCanvasBase, win, QtWidgets.QWidget)):
+            if issubclass(self.canvas, (mpl.backend_bases.FigureCanvasBase, QtWidgets.QWidget)):
                 loadWindowSettings(ScipyenConfigurable.qsettings, self.canvas, group_name = self.canvas.__class__.__name__, prefix="")
             return
+        
         print(f"self.loadWindowSettings {self.__class__.__name__}")
-        loadWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="")
+        group_name, prefix = qSettingsGroupPfx(self)
+        loadWindowSettings(self.qsettings, self, group_name = group_name, prefix=prefix)
     
     def saveWindowSettings(self):
         """
         """
-        if hasattr(self, "isTopLevel") and self.isTopLevel and self.isVisible(): # isTopLevel inherited from WorkspaceGuiMixin
-            saveWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="")# module-level function here
-            return
+        #if hasattr(self, "isTopLevel") and self.isTopLevel and self.isVisible(): # isTopLevel inherited from WorkspaceGuiMixin
+            #saveWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="")# module-level function here
+            #return
         
-        parent = self._get_parent_()
+        #parent = self._get_parent_()
         
-        if parent:
-            if "ScipyenWindow" in parent.__class__.__name__:
-                saveWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="") # module-level function here
-                return
+        #if parent:
+            #if "ScipyenWindow" in parent.__class__.__name__:
+                #saveWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="") # module-level function here
+                #return
             
-            saveWindowSettings(self.qsettings, self, group_name = parent.__class__.__name__, prefix=self.__class__.__name__) # module-level function here
-            return 
+            #saveWindowSettings(self.qsettings, self, group_name = parent.__class__.__name__, prefix=self.__class__.__name__) # module-level function here
+            #return 
         
         if isinstance(self, Figure):# this presupposes self is an instance that also inherits from matplotlib Figure
             if issubclass(self.canvas, (mpl.backend_bases.FigureCanvasBase, win, QtWidgets.QWidget)):
                 saveWindowSettings(ScipyenConfigurable.qsettings, self.canvas, group_name = self.canvas.__class__.__name__, prefix="")
             return
         
+        print(f"self.saveWindowSettings {self.__class__.__name__}")
+        group_name, prefix = qSettingsGroupPfx(self)
         saveWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="")
     
     def __load_config_key_val__(self, settername, val):

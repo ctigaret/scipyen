@@ -353,13 +353,17 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
             
     @pyqtSlot(str)
     def slot_locateSelectName(self, txt):
-        found_items = self.listWidget.findItems(txt, QtCore.Qt.MatchContains)
+        found_items = self.listWidget.findItems(txt, QtCore.Qt.MatchContains | QtCore.Qt.MatchCaseSensitive)
         for row in range(self.listWidget.count()):
             self.listWidget.item(row).setSelected(False)
             
         for item in found_items:
             item.setSelected(True)
             self.itemSelected.emit(str(item.text()))
+            
+        sel_indexes = self.listWidget.selectedIndexes()
+        if len(sel_indexes):
+            self.listWidget.scrollTo(sel_indexes[0])
             
     def validateItems(self, itemsList):
         # 2016-08-10 11:51:07

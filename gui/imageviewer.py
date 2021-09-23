@@ -2343,15 +2343,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     ####
     
     @property
-    def colorMap(self):
+    def colorMap(self) -> str:
         """Colormap property.
-        This is a matplotlib.colors.Colormap object.
+        This is the 'name' attribute (str) of a matplotlib.colors.Colormap object.
+        This is so that the name can be safely stored in QSettings.
         
         The property setter accepts a matplotlib.colors.Colormap object or a str
         with a valid colormap name (see gui.sciyen_colormaps module)
         """
         if not isinstance(self._colorMap, colormaps.mpl.colors.Colormap):
-            if isinstance(self, _prevColorMap):
+            if isinstance(self._prevColorMap, colormaps.mpl.colors.Colormap):
                 self._colorMap = self._prevColorMap
             else:
                 self._colorMap = colormaps.get("grey")
@@ -2585,6 +2586,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     @markConfigurable("ColorBarWidth", "qt")
     @colorBarWidth.setter
     def colorBarWidth(self, value):
+        if isinstance(value, str):
+            value = int(value)
+                
         if not isinstance(value, int):
             raise TypeError("Expecting an int; got %s instead" % type(value).__name__)
         
