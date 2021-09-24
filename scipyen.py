@@ -13,12 +13,11 @@ import cProfile
 
 #### BEGIN 3rd party modules
 
-# NOTE: 2019-07-29 12:08:47 these are imported indirectly via pict.gui
 from PyQt5 import (QtCore, QtWidgets, QtGui, )
 #### END 3rd party modules
 
 #### BEGIN Scipyen modules
-from core import scipyen_config # non-gui-related settings
+from core import scipyen_config
 #### END Scipyen modules
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -91,15 +90,17 @@ def main():
         #app.setStyle(QtWidgets.QStyleFactory.create("Breeze"))
         #app.setStyle(MyProxyStyle())
         
-        app.setOrganizationName("Scipyen")
-        app.setApplicationName("Scipyen")
-    
+        app.setApplicationName(scipyen_config.application_name)
+        app.setOrganizationName(scipyen_config.organization_name)
+        
+        #print(f"scipyen.main() global qsettings {qsettings.fileName()}")
+        
         gc.enable()
 
         #import pudb
         
         # 2. initialize main window
-        mainWindow = mainwindow.ScipyenWindow(app)#, settings = scipyen_config.scipyen_config)
+        mainWindow = mainwindow.ScipyenWindow(app)# qsettings = qsettings)
         
         # NOTE: 2021-08-17 10:06:24 FIXME / TODO
         # come up with a nice icon?

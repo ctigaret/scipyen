@@ -45,7 +45,7 @@ normalized_signal_index
 normalized_segment_index
 
 
-IV Generic indexing for the neo framework (provisional)
+IV. Generic indexing for the neo framework (provisional)
 ========================================================
     Structured indices:
     
@@ -979,6 +979,58 @@ def __collection_lookup__(seq: typing.Sequence,
     else:
         return dict()
     
+def is_empty(x:typing.Union[neo.core.container.Container, neo.core.dataobject.DataObject, 
+                            typing.Sequence[typing.Union[neo.core.container.Container,neo.core.dataobject.DataObject]]],
+            ignore:typing.Optional[typing.Union[typing.Sequence[type], type]]=None):
+    """Checks whether x contains any data.
+    Parameters:
+    ==========
+    x: neo container or data object
+    ignore: type, sequence of types, optional (default is None)
+        When present and 'x' is a neo container, the children containers or data
+            objects of the type given in ignore are NOT considered when checking 
+            if 'x' is empty (helpful, e.g., when checking if, say, a neo.Block
+            contains any signals aprt from events, or spike trains, etc.)
+            
+            NOTE: This parameter is only used for neo containers, not data objects
+            (which by definition DO NOT have children containers or data objects)
+    """
+    if isinstance(ignore, type):
+        ignore = [ignore]
+    
+    if ignore is not None:
+        if not isinstance(ignore, (tuple, list)) or not all((isinstance(t, type) for t in ignore)):
+            raise TypeError("'ignore' expected to be a type, a sequence of types;, or None got %s" % ignore)
+        
+    if isinstance(x, neo.core.container.Container):
+        #return sum((len(x.container_children_recur), *(len(c) for c in x.data_children_recur))) == 0
+        if ignore is None:
+            container_children = x.container_children_recur
+            data_children = x.data_children_recur
+            
+        else:
+            container_children = tuple(c for c in x.container_children_recur if not isinstance(c, tuple(ignore)))
+            data_children = tuple(c for c in x.data_children_recur if not isinstance(c, tuple(ignore)))
+            
+        #print(ignore)
+        #print([type(c) for c in data_children])
+        ret = len(container_children) > 0 and len(data_children) > 0
+        #print(ret)
+            
+        if ret:
+            ret &= sum((len(c) for c in data_children))> 0
+            
+        return not ret
+    
+    elif isinstance(x, neo.core.dataobject.DataObject):
+        return len(x) == 0
+            
+    
+    elif isinstance(x, (tuple, list)) and all((isinstance(xx, (neo.core.container.Container, neo.core.dataobject.DataObject)) for xx in x)):
+        return all((is_empty(xx, ignore=ignore) for xx in x))
+    
+    else:
+        raise TypeError("Expecting a neo Container, DataObject or a sequence of these; got %s instead" % type(x).__name__)
         
 def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]],
                index: typing.Union[int, str, range, slice, typing.Sequence],

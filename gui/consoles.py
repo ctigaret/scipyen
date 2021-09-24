@@ -149,7 +149,6 @@ def get_available_syntax_styles():
 
 #current_syntax_styles = get_available_syntax_styles()
 
-#@makeConfigurable
 class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     """
     """
@@ -161,7 +160,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self.available_colors = ("nocolor", "linux", "lightbg")
         self.scrollbar_positions = Bunch({QtCore.Qt.LeftToRight: "right",
                                            QtCore.Qt.RightToLeft: "left"})
-        super(ScipyenConfigurable, self).__init__()
+        ScipyenConfigurable.__init__(self, **kw)
         
     @property
     def scrollBarPosition(self):
@@ -2786,6 +2785,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
         Since August 2016 -- using Jupyter/IPython 4.x and qtconsole
         
         '''
+        self.mainWindow = kwargs.pop("mainWindow", None)
         super().__init__(*args, **kwargs)
 
         # NOTE 2020-07-07 12:32:40

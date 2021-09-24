@@ -1495,7 +1495,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
     #@processtimefunc
     def __init__(self, app:QtWidgets.QApplication, 
-                 settings:typing.Optional[confuse.LazyConfig]=None, 
                  parent:typing.Optional[QtWidgets.QWidget]=None,
                  *args, **kwargs) -> None:
         """Scipyen's main window initializer (constructor).
@@ -1517,8 +1516,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         parent: QtWidgets.QWidget.
         """
-        super().__init__(parent) # 2016-08-04 17:39:06 NOTE: python3 way
-        #WorkspaceGuiMixin.__init__(self, parent=self)#, settings=settings)
+        super().__init__(parent) # 2016-08-04 17:39:06 NOTE: QMainWindow python3 way
         self.app = app
         
         #### BEGIN configurables; for each of these we define a read-write property
@@ -1612,7 +1610,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # mechanism (e.g. syncQtSettings)
         self.setupUi(self)
         WorkspaceGuiMixin.__init__(self, parent=self)#, settings=settings)
-        
         self.scriptsManager = ScriptManager(parent=self)
         self.scriptsManager.signal_executeScript[str].connect(self._slot_runPythonScriptFromManager)
         self.scriptsManager.signal_importScript[str].connect(self._slot_importPythonScriptFromManager)

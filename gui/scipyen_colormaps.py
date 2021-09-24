@@ -4,7 +4,8 @@ Brings matplotlib's cm and colors modules together with cmocean (if available)
 
 and our ow custom color maps
 
-Currently registered color palettes:
+Currently registered color palettes (i.e. repositories of defined colors - DO NO
+confuse with colormaps):
 
 Palette name            Type    Id          Values          Comments:
 ================================================================================
@@ -84,7 +85,9 @@ except:
 
 try:
     import cmasher
+    has_cmasher=True
 except:
+    has_cmasher=False
     pass
 
 from core import scipyen_config as scipyenconf

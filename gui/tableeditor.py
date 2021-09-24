@@ -1162,11 +1162,12 @@ class TableEditor(ScipyenViewer):#, Ui_TableEditor):
     
     view_action_name = "Table"
     
-    def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
+    def __init__(self, data: (object, type(None)) = None, 
+                 parent: (QtWidgets.QMainWindow, type(None)) = None, 
+                 ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
                  *args, **kwargs) -> None:
-        super().__init__(data=data, parent=parent, pWin=pWin, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs) # calls _configureUI_ and loadSettings
+        super().__init__(data=data, parent=parent, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs) # calls _configureUI_ and loadSettings
 
         #self.tableWidget = TableEditorWidget()
         #self.setCentralWidget(self.tableWidget)

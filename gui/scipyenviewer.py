@@ -116,8 +116,9 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def __init__(self, data: (object, type(None))=None, 
                  parent: (QtWidgets.QMainWindow, type(None)) = None, 
                  ID:(int, type(None)) = None,
-                 win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
-                 *args, **kwargs) -> None:
+                 win_title: (str, type(None)) = None, 
+                 doc_title: (str, type(None)) = None,
+                 **kwargs) -> None:
         """Constructor.
         
         Sets up attributes common to all Scipyen's viewers.
@@ -159,7 +160,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             derived subclass.
         """
         super().__init__(parent)
-        WorkspaceGuiMixin.__init__(self, parent=parent)
+        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         
         self._docTitle_ = None
         self._winTitle_ = None # force auto-set in update_title()

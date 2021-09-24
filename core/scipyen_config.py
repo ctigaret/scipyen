@@ -117,11 +117,15 @@ from core.workspacefunctions import user_workspace
 # on environment variables (e.g. pyqtgraph)
 # END NOTE: 2021-01-10 13:17:58
 
-scipyen_config = confuse.LazyConfig("Scipyen", "scipyen_defaults")
+application_name = "Scipyen"
+organization_name = "Scipyen"
+
+scipyen_config = confuse.LazyConfig(application_name, "scipyen_defaults")
 
 if not scipyen_config._materialized:# make sure this is done only once
     scipyen_config.read() 
     
+#print(f"scipyen_config module: global qsettings {qsettings.fileName()}")
 scipyen_user_config_source = [s for s in scipyen_config.sources if not s.default][0]
 
 def _cfg_exec_body_(ns, supplement={}):
@@ -564,24 +568,11 @@ def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]) -> typing.
             gname = win.__class__.__name__
         else:
             gname = win.parent().__class__.__name__
-            tag = getattr(win, "tag", "")
+            tag = getattr(win, "configTag", "")
             if isinstance(tag, str) and len(tag.strip()):
-                pfx = f"{tag}_{win.__class__.__name__}"
+                pfx = f"{win.__class__.__name__}_{tag}"
             else:
                 pfx = win.__class__.__name__
-            #if win.parent() is None or win.isTopLevel:
-                #gname = win.__class__.__name__
-            #else:
-                #gname = win.parent().__class__.__name__
-                #pfx = win.__class__.__name__
-        #else:
-            ## again cannot import ScipyenWindow directly 'cause it will trigger
-            ## recursive import cycles
-            #if win.parent() is None or "ScipyenWindow" in win.parent().__class__.__name__:
-                #gname = win.__class__.__name__
-            #else:
-                #gname = win.parent().__class__.__name__
-                #pfx = win.__class__.__name__
                 
     elif isinstance(win, Figure):
         gname = win.canvas.__class__.__name__
@@ -979,7 +970,7 @@ def collect_configurables(cls):
     return ret
 
 class ScipyenConfigurable(object):
-    """Superclass for Scipyen's configurable types.
+    """Base :class: for Scipyen's configurable types.
     
     Implements functionality to deal with non-Qt settings made persistent across
     Scipyen sessions.
@@ -993,17 +984,17 @@ class ScipyenConfigurable(object):
     # NOTE: 2021-09-23 11:39:57
     # added self._tag and tag property getter/setter
     # to be used for configurables of non-top level windows 
-    qsettings = QtCore.QSettings(QtCore.QCoreApplication.organizationName(),
-                                 QtCore.QCoreApplication.applicationName())
+    qsettings = QtCore.QSettings(organization_name, application_name)
     #qsettings = QtCore.QSettings("Scipyen", "Scipyen")
     _scipyen_settings_  = scipyen_config
     _user_settings_src_ = scipyen_user_config_source
     
-    def __init__(self):
-        super().__init__()
+    def __init__(self, configTag:typing.Optional[str]=None):
+        #super().__init__()
         self.configurable_traits = DataBag()
         self.configurable_traits.observe(self._observe_configurables_)
-        self._tag = ""
+        self._tag = configTag
+        #print(f"ScipyenConfigurable.__init__ qsettings {self.qsettings.fileName()}")
         
     def _get_parent_(self):
         parent = None
@@ -1017,15 +1008,20 @@ class ScipyenConfigurable(object):
         return parent
 
     def _observe_configurables_(self, change):
-        if hasattr(self, "isTopLevel") and self.isTopLevel:
-            cfg = Bunch({self.__class__.__name__: Bunch({change.name:change.new})})
-        else:
-            parent = self._get_parent_()
+        isTop = hasattr(self, "isTopLevel") and self.isTopLevel
+        parent = self._get_parent_()
+        tag = self.configTag
+        
+        cfg = self._make_confuse_config_data_(change, isTop, parent, tag)
+        #if hasattr(self, "isTopLevel") and self.isTopLevel:
+            #cfg = Bunch({self.__class__.__name__: Bunch({change.name:change.new})})
+        #else:
+            #parent = self._get_parent_()
 
-            if parent:
-                cfg = dict({parent.__class__.__name__:Bunch({self.__class__.__name__: Bunch({change.name:change.new})})})
-            else:
-                cfg = Bunch({self.__class__.__name__: Bunch({change.name:change.new})})
+            #if parent:
+                #cfg = dict({parent.__class__.__name__:Bunch({self.__class__.__name__: Bunch({change.name:change.new})})})
+            #else:
+                #cfg = Bunch({self.__class__.__name__: Bunch({change.name:change.new})})
             
         if isinstance(cfg, Bunch):
             for k,v in cfg.items():
@@ -1037,15 +1033,54 @@ class ScipyenConfigurable(object):
                     scipyen_config[k][kk].set(vv)
             
         write_config()
-    
+        
+    def _make_confuse_config_data_(self, change, isTop=True, parent=None, tag=None):
+        if isTop:
+            return Bunch({self.__class__.__name__:Bunch({change.name:change.new})})
+        
+        if parent is not None:
+            if isinstance(tag, str) and len(tag.strip()):
+                return dict({parent.__class__.__name__:Bunch({self.__class__.__name__:Bunch({tag:Bunch({change.name:change.new})})})})
+                
+            return dict({parent.__class__.__name__:Bunch({self.__class__.__name__:Bunch({change.name:change.new})})})
+        
+        return Bunch({self.__class__.__name__:Bunch({change.name:change.new})})
+        
+    def _get_config_view_(self, isTop=True, parent=None, tag=None):
+        if isTop:
+            return scipyen_config[self.__class__.__name__].get(None)
+            
+        if parent is not None:
+            if isinstance(tag, str) and len(tag.strip()):
+                return scipyen_config[parent.__class__.__name__][self.__class__.__name__][tag].get(None)
+            
+            return scipyen_config[parent.__class__.__name__][self.__class__.__name__].get(None)
+        
+        return scipyen_config[self.__class__.__name__].get(None)
+            
+    #def _update_config_view(self, user_conf, isTop, parent=None, tag=None):
+        #if isTop:
+            #scipyen_config[self.__class__.__name__].set(user_conf)
+        #else:
+            #if parent is not None:
+                #if isinstance(tag, str) and len(tag.strip()):
+                    #scipyen_config[parent.__class__.__name__][self.__class__.__name__][tag].set(user_conf)
+                #else:
+                    #scipyen_config[parent.__class__.__name__][self.__class__.__name__].set(user_conf)
+                    
+            #else:
+                #scipyen_config[self.__class__.__name__].set(user_conf)
+        
     @property
-    def tag(self) -> str:
+    def configTag(self) -> str:
         return self._tag
     
-    @tag.setter
-    def tag(self, val:str) -> None:
-        if isinstance(val, str) and len(val).strip():
+    @configTag.setter
+    def configTag(self, val:str) -> None:
+        if isinstance(val, (str, type(None))):
             self._tag = val
+        else:
+            warnings.warn(f"The attempt to set configTag to {val} failed")
         
     @property
     def configurables(self) -> Bunch:
@@ -1079,57 +1114,26 @@ class ScipyenConfigurable(object):
     def loadWindowSettings(self):
         """Laods window settings
         """
-        #if hasattr(self, "isTopLevel") and self.isTopLevel: # inherited from WorkspaceGuiMixin
-            #loadWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="") # module-level function here
-            #return
-
-        #parent = self._get_parent_()
-        
-        #if parent:
-            #if "ScipyenWindow" in parent.__class__.__name__:
-                #loadWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="") # module-level function here
-                #return
-            
-            #if isinstance(self, QtWidgets.QMainWindow):
-                #prefix = f""
-                
-            #loadWindowSettings(self.qsettings, self, group_name = parent.__class__.__name__, prefix=self.__class__.__name__) # module-level function here
-            #return 
-        
         if isinstance(self, Figure): # this presupposes self is an instance that also inherits from matplotlib Figure
             if issubclass(self.canvas, (mpl.backend_bases.FigureCanvasBase, QtWidgets.QWidget)):
                 loadWindowSettings(ScipyenConfigurable.qsettings, self.canvas, group_name = self.canvas.__class__.__name__, prefix="")
             return
         
-        print(f"self.loadWindowSettings {self.__class__.__name__}")
         group_name, prefix = qSettingsGroupPfx(self)
+        #print(f"self.loadWindowSettings {self.__class__.__name__}, group: {group_name}, prefix: {prefix} from {self.qsettings.fileName()}")
         loadWindowSettings(self.qsettings, self, group_name = group_name, prefix=prefix)
     
     def saveWindowSettings(self):
         """
         """
-        #if hasattr(self, "isTopLevel") and self.isTopLevel and self.isVisible(): # isTopLevel inherited from WorkspaceGuiMixin
-            #saveWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="")# module-level function here
-            #return
-        
-        #parent = self._get_parent_()
-        
-        #if parent:
-            #if "ScipyenWindow" in parent.__class__.__name__:
-                #saveWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="") # module-level function here
-                #return
-            
-            #saveWindowSettings(self.qsettings, self, group_name = parent.__class__.__name__, prefix=self.__class__.__name__) # module-level function here
-            #return 
-        
         if isinstance(self, Figure):# this presupposes self is an instance that also inherits from matplotlib Figure
             if issubclass(self.canvas, (mpl.backend_bases.FigureCanvasBase, win, QtWidgets.QWidget)):
                 saveWindowSettings(ScipyenConfigurable.qsettings, self.canvas, group_name = self.canvas.__class__.__name__, prefix="")
             return
         
-        print(f"self.saveWindowSettings {self.__class__.__name__}")
         group_name, prefix = qSettingsGroupPfx(self)
-        saveWindowSettings(self.qsettings, self, group_name = self.__class__.__name__, prefix="")
+        #print(f"self.saveWindowSettings {self.__class__.__name__}, group: {group_name}, prefix: {prefix} to {self.qsettings.fileName()}")
+        saveWindowSettings(self.qsettings, self, group_name=group_name, prefix=prefix)
     
     def __load_config_key_val__(self, settername, val):
         #print("ScipyenConfigurable.__load_config_key_val__")
@@ -1160,29 +1164,15 @@ class ScipyenConfigurable(object):
         # NOTE 2021-09-06 17:37:14
         # keep Qt settings segregated
         if len(cfg):
-            top_level_config = scipyen_config[self.__class__.__name__].get(None)
-            if hasattr(self, "isTopLevel") and self.isTopLevel:
-                user_conf = top_level_config
-            else:
-                parent = self._get_parent_()
-                
-                if parent:
-                    user_conf = scipyen_config[parent.__class__.__name__][self.__class__.__name__].get(None)
-                else:
-                    user_conf = top_level_config
+            isTop = hasattr(self, "isTopLevel") and self.isTopLevel
+            parent = self._get_parent_()
+            tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
             
-            # NOTE: 2021-09-13 23:15:32
-            # allow a non-top level (i.e. a 'client') object to use the top-level
-            # settings just for once
+            user_conf = self._get_config_view_(isTop, parent, tag)
+            
             if isinstance(user_conf, dict):
-                conf = user_conf
-            else:
-                conf = top_level_config
-                
-            if isinstance(conf, dict):
-                for k, v in conf.items():
+                for k, v in user_conf.items():
                     getset = cfg.get(k, {})
-                    #print("getset", getset)
                     settername = getset.get("setter", None)
                     
                     if not isinstance(settername, str) or len(settername.strip())==0:
@@ -1209,16 +1199,14 @@ class ScipyenConfigurable(object):
         # or (for windows) when they are closed (i.e. called from their closeEvent)
         
         if len(cfg):
-            if hasattr(self, "isTopLevel") and self.isTopLevel:
-                user_conf = scipyen_config[self.__class__.__name__].get(None)
-            else:
-                parent = self._get_parent_()
-                if parent:
-                    user_conf = scipyen_config[parent.__class__.__name__][self.__class__.__name__].get(None)
-                else:
-                    user_conf = scipyen_config[self.__class__.__name__].get(None)
-                    
+            isTop = hasattr(self, "isTopLevel") and self.isTopLevel
+            parent = self._get_parent_()
+            tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
+            
+            user_conf = self._get_config_view_(isTop, parent, tag)
+            
             changed = False
+            
             if isinstance(user_conf, dict):
                 for k, v in user_conf.items():
                     getset = cfg.get(k, {})
@@ -1235,21 +1223,14 @@ class ScipyenConfigurable(object):
                     elif getter is not None:
                         getter = getattr(self, gettername)
                         val  = getter()
-                    #print("\tconf %s, new val %s, saved val %s" % (k, val, v))
+
                     if val != v:
-                        user_conf[k] = val
+                        user_conf[k].set(val)
+                        #user_conf[k] = val
                         changed = True
                         
             if changed:
-                if hasattr(self, "isTopLevel") and self.isTopLevel:
-                    scipyen_config[self.__class__.__name__].set(user_conf)
-                else:
-                    parent = self._get_parent_()
-                    if parent:
-                        scipyen_config[parent.__class__.__name__][self.__class__.__name__].set(user_conf)
-                    else:
-                        scipyen_config[self.__class__.__name__].set(user_conf)
-
+                #self._update_config_view(user_conf, isTop, parent, tag)
                 write_config()
                 
         if issubclass(self.__class__, (QtWidgets.QWidget, Figure)):

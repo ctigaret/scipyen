@@ -2329,7 +2329,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         # 2) calls self.loadSettings() inherited from 
         # ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
         super().__init__(data=data, parent=parent, ID=ID, win_title=win_title, 
-                         doc_title=doc_title, frameIndex=frame, *args, *kwargs)
+                         doc_title=doc_title, frameIndex=frame, **kwargs)
         
         #self.loadSettings() # now called by ScipyenViewer.__init__()
         
