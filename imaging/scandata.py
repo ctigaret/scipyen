@@ -1,4 +1,5 @@
-import enum, collections, numbers, configparser, itertools
+import enum, collections, numbers, configparser, itertools, inspect, 
+import types, typing
 from traitlets import Bunch
 import numpy as np
 import quantities as pq
@@ -6,7 +7,7 @@ import neo
 import vigra
 
 
-from core import (prog, traitcontainers, strutils, neoutils,models,)
+from core import (prog, traitcontainers, strutils, neoutils, models,)
 from core.prog import safeWrapper
 from core.traitcontainers import DataBag
 from core.datatypes import (UnitTypes,Genotypes, arbitrary_unit, pixel_unit, 
@@ -47,6 +48,49 @@ DEFAULTS["Channels"]["Indicator"] = "ind"
 DEFAULTS["Channels"]["Bleed"] = DataBag()
 DEFAULTS["Channels"]["Bleed"]["Ref2Ind"] = 0.
 DEFAULTS["Channels"]["Bleed"]["Ind2Ref"] = 0.
+
+class FrameLookup(object):
+    def _checkargs_(self, *args):
+        if len(args) == 1:
+            if inspect.isgenerator(args[0]):
+                return all((self._checkargs_(*args[0])))
+            if isinstance(args[0], (tuple, list)):
+                if len(args[0]) == 2:
+                    if isinstance(args[0][0], int) and args[0][0]>=0 and isinstance(args[0][1], dict) and all((k in ("scans", "scene", "ephys") and isinstance(v, int) and v >= 0 for k,v in args[0][1].items())):
+                        return True
+                    return self._checkargs_(*args[0])
+                else:
+                    return self._checkargs_(*args[0])
+                
+            elif isinstance(args[0], dict):
+                return all((isinstance(k, int) and k >= 0 and isinstance(v, dict) and all((kk in ("scene", "scans", "ephys") and isinstance(vv, int) and vv >=0 for kk,vv in v.items()))) for k,v in args[0].items())
+                                
+
+        else:
+            return all((self._ckeckargs_(a) for a in args))
+            
+    def __init__(self, *args):
+        """
+        *args: (virtual_frame_index, {data_component: data_frame_index}) ... where:
+            virtual_frame_index: int >= 0
+            data_component: str, one of 'scans','scene','ephys'
+            data_frame_index: int >= 0
+            
+        **
+        """
+        if self._ckeckargs_(args):
+            self._map_ = dict(*args)
+            
+        if len(args):
+            if len(args) == 1:
+                if 
+            if all(self._checkargs_(v) for v in args):
+                self._map_ = dict(*args)
+        self._map_ = dict(*args, **kwargs)
+        
+        
+    
+        
 
 class ScanDataOptions(DataBag):
     """Do not use
@@ -2388,7 +2432,7 @@ class ScanData(object):
                 
             else:
                 self._scan_region_scene_profiles_ = neo.Block(name="Scan region scene profiles")
-                self._scan_region_scene_profiles_.segments[:] = [neo.Segment(name="frame_%d" %k, index = k) for k in range(self._scene_frames_)]
+                #self._scan_region_scene_profiles_.segments[:] = [neo.Segment(name="frame_%d" %k, index = k) for k in range(self._scene_frames_)]
             
         if not hasattr(self, "_scan_region_scans_profiles_"):
             if hasattr(self, "__scan_region_scans_profiles__"):
@@ -2400,8 +2444,8 @@ class ScanData(object):
                 self._scan_region_scans_profiles_.name = "Scan region scans profiles"
                 delattr(self, "__scanline_profiles_scans__")
                 
-            #else:
-                #self._scan_region_scans_profiles_ = neo.Block(name="Scan region scans profiles")
+            else:
+                self._scan_region_scans_profiles_ = neo.Block(name="Scan region scans profiles")
                 #self._scan_region_scans_profiles_.segments = [neo.Segment(name="frame_%d" %k, index = k) for k in range(self._scans_frames_)]
                 
         _upgrade_attribute_("__scans_axis_calibrations__", "_scans_axis_calibrations_", list, [AxisCalibration(img) for img in self._scans_])
@@ -2580,30 +2624,30 @@ class ScanData(object):
         
         self.apiversion = ScanData.apiversion
                     
-    def __repr__(self):
-        result = list()
-        result.append("%s: " % self.__class__.__name__)
-        result.append("Name: %s" % self.name)
-        result.append("Type: %s" % self.scanType.name)
-        result.append("Analysis mode: %s" % self.analysisMode.name)
-        result.append("Scene channels: %s" % str(self.sceneChannelNames))
-        result.append("Scene frames: %d" % self.sceneFrames)
-        result.append("Scene frame axis: %s" % self.sceneFrameAxis)
-        result.append("Scans channels: %s" % str(self.scansChannelNames))
-        result.append("Scans frames: %d" % self.scansFrames)
-        result.append("Scans frame axis: %s" % self.scansFrameAxis)
+    #def __repr__(self):
+        #result = list()
+        #result.append("%s: " % self.__class__.__name__)
+        #result.append("Name: %s" % self.name)
+        #result.append("Type: %s" % self.scanType.name)
+        #result.append("Analysis mode: %s" % self.analysisMode.name)
+        #result.append("Scene channels: %s" % str(self.sceneChannelNames))
+        #result.append("Scene frames: %d" % self.sceneFrames)
+        #result.append("Scene frame axis: %s" % self.sceneFrameAxis)
+        #result.append("Scans channels: %s" % str(self.scansChannelNames))
+        #result.append("Scans frames: %d" % self.scansFrames)
+        #result.append("Scans frame axis: %s" % self.scansFrameAxis)
         
-        if len(self.triggerProtocols):
-            protocol_names = [p.name for p in self.triggerProtocols]
-            result.append("Protocols:\n%s" % (", ".join(protocol_names)))
+        #if len(self.triggerProtocols):
+            #protocol_names = [p.name for p in self.triggerProtocols]
+            #result.append("Protocols:\n%s" % (", ".join(protocol_names)))
             
-        result.append("Analysis unit (whole): %s" % self.analysisUnit().__repr__())
+        #result.append("Analysis unit (whole): %s" % self.analysisUnit().__repr__())
         
-        if len(self.analysisUnits):
-            analysis_units = [a.__repr__() for a in self.analysisUnits]
-            result.append("Nested analysis units:\n%s" % " ".join(analysis_units))
+        #if len(self.analysisUnits):
+            #analysis_units = [a.__repr__() for a in self.analysisUnits]
+            #result.append("Nested analysis units:\n%s" % " ".join(analysis_units))
             
-        return "\n".join(result)
+        #return "\n".join(result)
     
     def __str__(self):
         """
@@ -2942,28 +2986,28 @@ class ScanData(object):
         in ScanData
         """
         
-        if self._scans_frames_ == 0:
-            return
+        #if self._scans_frames_ == 0:
+            #return
             
         if isinstance(value, neo.Block): 
-            if len(value.segments) != self._scans_frames_:
+            if len(value.segments) != self.scansFrames:
                 if len(value.segments) == 1:
-                    value.segments *= self._scans_frames_
+                    value.segments *= self.scansFrames
                 else:
                     warnings.warn("Expecting a neo.Block with as many segments as there are scan frames (%d); got %d segments instead" \
-                        % (self._scans_frames_, len(value.segments)), RuntimeWarning)
+                        % (self.scansFrames, len(value.segments)), RuntimeWarning)
                     return
             
             self._electrophysiology_ = value # assigns reference
             
         elif isinstance(value, (tuple, list)) and all([isinstance(v, neo.Segment) for v in value]):
             # set it up from a sequence of neo.Segments
-            if len(value) != self._scans_frames_:
+            if len(value) != self.scansFrames:
                 if len(value) ==1:
-                    value *= self._scans_frames_
+                    value *= self.scansFrames
                 else:
                     warnings.warn("Expecting as many segments as there are scan frames (%d); got %d instead" \
-                        % (self._scans_frames_, len(values)), RuntimeWarning)
+                        % (self.scansFrames, len(values)), RuntimeWarning)
                     
                     return
             
@@ -2976,12 +3020,12 @@ class ScanData(object):
                     s.name = "Frame_%d" % s.index
                     
         elif isinstance(value, neo.Segment):
-            if self._scans_frames_ > 1:
-                value = [value] * self._scans_frames_
+            if self.scansFrames > 1:
+                value = [value] * self.scansFrames
                 
             else:
                 raise TypeError("Expecting as many segments as there are scan frames (%d); got 1 neo.Segment instead" \
-                    % self._scans_frames_)
+                    % self.scansFrames)
                 
             self._electrophysiology_.segments[:] = [value]
             
@@ -4117,7 +4161,7 @@ class ScanData(object):
         
         #### BEGIN 4) manage the scans landmarks
         if len(result.scans):
-            result._scans_frames_ = result.scans[0].shape[result.scans[0].axistags.index(result.scansFrameAxis)]
+            #result._scans_frames_ = result.scans[0].shape[result.scans[0].axistags.index(result.scansFrameAxis)]
             
             # Here we merge scan landmarks:
             # a) if source contains a landmark present in target, we adjust the
@@ -4368,8 +4412,8 @@ class ScanData(object):
             if len(source._scan_region_scans_profiles_.segments):
                 result._scan_region_scans_profiles_.segments += source._scan_region_scans_profiles_.segments
                 
-            else:
-                result._scan_region_scans_profiles_.segments += [neo.Segment(name="frame_%d" % k + result._scans_frames_, index = k + result._scans_frames_) for k in range(source._scans_frames_)]
+            #else:
+                #result._scan_region_scans_profiles_.segments += [neo.Segment(name="frame_%d" % k + result._scans_frames_, index = k + result._scans_frames_) for k in range(source._scans_frames_)]
 
             if len(result.analysisUnits) > 0:
                 result.generateScanRregionProfilesFromScans()
@@ -4435,10 +4479,10 @@ class ScanData(object):
         if len(source._electrophysiology_.segments):
             result._electrophysiology_.segments += [neo_copy(s) for s in source._electrophysiology_.segments]
             
-        else:
+        #else:
             # fill up with empty segments
             # CAUTION may cause problems with SignalViewer
-            result._electrophysiology_.segments += [neo.Segment(name="frame_%d" % k + result._scans_frames_, index = k + result._scans_frames_) for k in range(source._scans_frames_)]
+            #result._electrophysiology_.segments += [neo.Segment(name="frame_%d" % k + result._scans_frames_, index = k + result._scans_frames_) for k in range(source._scans_frames_)]
         
         for k, s in enumerate(result._electrophysiology_.segments):
             s.index = k
@@ -4570,7 +4614,7 @@ class ScanData(object):
             if len(source.triggerProtocols):
                 for p in source.triggerProtocols:
                     pp = p.copy()
-                    pp.segmentIndex = [s + result._scans_frames_ for s in p.segmentIndices()]
+                    pp.segmentIndex = [s + result.nEphysSweeps for s in p.segmentIndices()]
                     #print("ScanData.concatenate: new protocol %s from %s added to %s, with segments" % (pp.name, source_name, self_name), pp.segmentIndices())
                     result.addTriggerProtocol(pp)
             
@@ -10109,16 +10153,21 @@ class ScanData(object):
             "scansBlock", "sceneBlock", 
         """
         
-        data = self._get_data_component_(component)
+        #data = self._get_data_component_(component)
         
-        if isinstance(data, list) and all(isinstance(v, VigraArray) for v in data):
+        if component.lower().strip() in ("scans", "scene"):
             return self.nImageFrames(component)
         
-        elif component in ("ephys", "electrophysiology"):
+        elif component.lower().strip() in ("ephys", "electrophysiology"):
             return self.nEphysSweeps
         
-        elif components.lower().endswith("profiles"):
+        elif component.lower().strip().endswith("profiles"):
             return self.nProfileSweeps(component)
+        
+        elif component.lower().strip().endswith("block"):
+            return self.nDataSweeps(component)
+        
+        return 0
     
     @property
     def nEphysSweeps(self):
@@ -10127,13 +10176,13 @@ class ScanData(object):
         
         return 0
     
-    def nDataSweeps(self, component:str = "scans"):
-        if component.lower().strip() == "scans":
+    def nDataSweeps(self, component:str = "scansBlock"):
+        if component.lower().strip() == "scansblock":
             return self.nScansDataSweeps
-        elif component.lower().strip() == "scene":
+        elif component.lower().strip() == "sceneblock":
             return self.nSceneDataSweeps
         else:
-            raise ValueError(f"Wring component {component}")
+            raise ValueError(f"Wrong component {component}")
     
     @property
     def nScansDataSweeps(self):
@@ -10149,15 +10198,17 @@ class ScanData(object):
         
         return 0
     
-    def nProfileSweeps(self, component:str="scans"):
-        if component.lower().strip() =="scans":
+    def nProfileSweeps(self, component:str="scansProfiles"):
+        if component.lower().strip() =="scansprofiles":
             return self.nScansProfileSweeps
         
-        elif component.lower().strip() =="scans":
+        elif component.lower().strip() =="sceneprofiles":
             return self.nSceneProfileSweeps
         
         else:
             raise ValueError(f"Wrong component {component}")
+        
+        return 0
     
     @property
     def nSceneProfileSweeps(self):
@@ -10183,17 +10234,18 @@ class ScanData(object):
         else:
             raise ValueError(f"Component {data_component} does not contain images")
         
+        return 0
+        
     @property
     def nScansFrames(self):
         # NOTE: 2021-09-25 15:27:14
         # self.scans is ALWAYS a list!
         # For multichannel images, scans can have ONE multi-channel VigraArray, OR
         # several single-channel VigraArrays !!!
-        #if len(self.scans):
-            #return self.scans[0].shape[self.scans[0].axistags.index(self._scans_frame_axis_)]
+        if len(self.scans):
+            return self.scans[0].shape[self.scans[0].axistags.index(self.scansFrameAxis)]
         
-        #return 0
-        return self._scans_frames_
+        return 0
     
     @property
     def nSceneFrames(self):
@@ -10201,9 +10253,8 @@ class ScanData(object):
         # self.scene is ALWAYS a list!
         # For multichannel images, scene can have ONE multi-channel VigraArray, OR
         # several single-channel VigraArrays !!!
-        #if len(self.scene):
-            #return self.scene[0].shape[self.scene[0].axistags.index(self._scene_frame_axis_)]
-        return self._scene_frames_
+        if len(self.scene):
+            return self.scene[0].shape[self.scene[0].axistags.index(self.sceneFrameAxis)]
         return 0
     
     @property
@@ -10213,9 +10264,6 @@ class ScanData(object):
         multi-channel VigraArray
         
         """
-        if len(self.scans) == 0:
-            return
-
         return self._scans_frame_axis_
         
         #FIXME/TODO adapt to a new scenario where all scene image data is a single
@@ -10243,7 +10291,7 @@ class ScanData(object):
             raise ValueError("Axis %s not found in scans." % value)
         
         self._scans_frame_axis_ = value
-        self._scans_frames_ = self.scans[0].shape[self.scans[0].axistags.index(value)]
+        #self._scans_frames_ = self.scans[0].shape[self.scans[0].axistags.index(value)]
         
     @property
     def scansFrameAxisIndex(self):
