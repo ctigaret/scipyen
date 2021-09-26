@@ -5,58 +5,6 @@ import quantities as pq
 from .axiscalibration import AxisCalibration
 from imaging import axisutils
 
-#def defaultFrameAxis(x:vigra.VigraArray) -> str:
-    #"""A 'frame axis' is the axis along which array slices are viewed as 'frames'.
-    #It's just semantics...
-    
-    #Parameters:
-    #----------
-    #x: vigra.VigraArray
-    
-    #Returns:
-    #-------
-    #A str: the key of the 'frame' axis. 
-    
-    #Example 1: For a 3D VigraArray with no channel axis, but where the third 
-    #(i.e. highest-order) axis is a time axis, array slices along this axis are 
-    #considered 'frames' each with data from a particular time instance. 
-    #Similarly, if the higher-order axis is a space axis, the slices along it are
-    #considered 'frames' each with data at a particular space coordinate along 
-    #this axis (as in the case of a confocal image 'stack').
-    
-    #Example 2: For a 4D VigraArray with one channel axis, the channel axis is 
-    #TYPICALLY the one with the highest order, but this is NOT specially enforced
-    #in VIGRA.
-    
-    #If the channel axis IS the axis with the highest order, then the frame axis
-    #is taken to be the next highest order axis. For an array with axistags
-    #(x, y, z(t), c), the axis corresponding to 'z' (or to 't') is considered the
-    #frame axis.
-    
-    #A default frame axis cannot be set for ambiguous situations where the 
-    #VigraArray has:
-    
-    #* 4D without a channel axis 
-    
-    #* 5D (4D and one channel axis)
-    
-    #By default, VigraArray's do not support higher dimensions.
-    
-    #"""
-    ## NOTE: 2021-03-08 13:39:10
-    ## channelIndex is a vigra array property: this is the index of the channel 
-    ## axis (if it exists) or array's ndim otherwise (which therefore indicates
-    ## that a channel axis is NOT defined / DOES NOT exist).
-    ##
-    ## Here, a 'channel' is in VIGRA's sense.
-    #chindex = x.channelIndex
-    
-    #if chindex == x.ndim:
-        ## NOTE: 2021-09-25 23:11:44
-        ## no channel axis; in this case, we take the axis with the highest order
-        ## as the 'frame axis'
-        #return x.axistags[-1].key
-    
 def getFrameLayout(img:vigra.VigraArray, 
                    userFrameAxis:typing.Optional[typing.Union[str, vigra.AxisInfo, int, 
                                                               typing.Sequence[typing.Union[str, vigra.AxisInfo, int]]]]=None) -> typing.Tuple[int, typing.Optional[typing.Union[vigra.AxisInfo, typing.List[vigra.AxisInfo]]], vigra.AxisInfo, vigra.AxisInfo, vigra.AxisInfo]:

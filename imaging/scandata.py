@@ -48,8 +48,6 @@ DEFAULTS["Channels"]["Bleed"] = DataBag()
 DEFAULTS["Channels"]["Bleed"]["Ref2Ind"] = 0.
 DEFAULTS["Channels"]["Bleed"]["Ind2Ref"] = 0.
 
-
-
 class ScanDataOptions(DataBag):
     """Do not use
     """
@@ -2135,11 +2133,11 @@ class ScanData(object):
         
         self._scene_ = list()
         self._scene_frame_axis_ = None
-        self._scene_frames_ = 0
+        #self._scene_frames_ = 0
     
         self._scans_ = list()
         self._scans_frame_axis_ = None
-        self._scans_frames_ = 0
+        #self._scans_frames_ = 0
             
         # CAUTION: the contents of _analysis_options_ are problem-dependent
         # and typically will be changed at application level
@@ -2364,10 +2362,10 @@ class ScanData(object):
         _upgrade_attribute_("__analysis_options__", "_analysis_options_", dict, dict())
         _upgrade_attribute_("__scene__", "_scene_", list, list())
         _upgrade_attribute_("__scene_frame_axis__", "_scene_frame_axis_", (type(None), str), None)
-        _upgrade_attribute_("__scene_frames__", "_scene_frames_", int, 0)
+        #_upgrade_attribute_("__scene_frames__", "_scene_frames_", int, 0)
         _upgrade_attribute_("__scans__", "_scans_", list, list())
         _upgrade_attribute_("__scans_frame_axis__", "_scans_frame_axis_", (type(None), str), None)
-        _upgrade_attribute_("__scans_frames__", "_scans_frames_", int, 0)
+        #_upgrade_attribute_("__scans_frames__", "_scans_frames_", int, 0)
         
         _remove_attribute_("__scene_ind_channel__")
         _remove_attribute_("_scene_ind_channel_")
@@ -2402,9 +2400,9 @@ class ScanData(object):
                 self._scan_region_scans_profiles_.name = "Scan region scans profiles"
                 delattr(self, "__scanline_profiles_scans__")
                 
-            else:
-                self._scan_region_scans_profiles_ = neo.Block(name="Scan region scans profiles")
-                self._scan_region_scans_profiles_.segments = [neo.Segment(name="frame_%d" %k, index = k) for k in range(self._scans_frames_)]
+            #else:
+                #self._scan_region_scans_profiles_ = neo.Block(name="Scan region scans profiles")
+                #self._scan_region_scans_profiles_.segments = [neo.Segment(name="frame_%d" %k, index = k) for k in range(self._scans_frames_)]
                 
         _upgrade_attribute_("__scans_axis_calibrations__", "_scans_axis_calibrations_", list, [AxisCalibration(img) for img in self._scans_])
         
@@ -2694,42 +2692,11 @@ class ScanData(object):
                 # TODO factor this out to a module-level function used by both 
                 # ScanData and ImageViewer !!!
                 
-                if sceneFrameAxis is None: # find out a reasonable frame axis; avoid channel axis
-                    # NOTE: 2021-03-08 13:39:10
-                    # channelIndex is a vigra array property: this is the index 
-                    # of the channel axis (if it exists) or array's ndim otherwise
-                    # (this indicatd a channel axis does NOT exist)
-                    chindex = scene.channelIndex 
-                    
-                    if chindex == scene.ndim: # no explicit channel axis in the array's axistags
-                        # since a frame axis has NOT been specified in the call
-                        # parameters, we take the LAST axis as the frame axis
-                        self._scene_frames_       = scene.shape[-1]
-                        self._scene_frame_axis_   = scene.axistags[-1].key
-                        
-                    else: # an explicit channel axis exists in the array's axistags
-                        # accommodate unusual axes layouts
-                        if chindex < scene.ndim-1: # channel axis somewhere below the highest dimension
-                            self._scene_frames_ = scene.shape[chindex+1] # take frames along the axis on the next highest dimension
-                            self._scene_frame_axis_ = scene.axistags[chindex+1].key
-                            
-                        else: # channel axis is on higest dimension
-                            # take frames along the axis on the next lower dimension
-                            self._scene_frames_ = scene.shape[chindex-1]
-                            self._scene_frame_axis_ = scene.axistags[chindex-1].key
-                            
-                elif isinstance(sceneFrameAxis, str): # check validity
-                    if sceneFrameAxis in scene.axistags:
-                        self._scene_frame_axis_ = sceneFrameAxis
-                        
-                    else:
-                        self._scene_frame_axis_ = scene.axistags[-1].key
-                        
-                    self._scene_frames_ = scene.shape[scene.axistags.index(self._scene_frame_axis_)]
-                    
-                else:
-                    raise TypeError("sceneFrameAxis expected to be a str or None; got %s instead" % type(sceneFrameAxis).__name__)
-                        
+                nframes, frame_axis, width_axis, height_axis = getFrameLayout(scene, sceneFrameAxis)
+                
+                self._scene_frame_axis_ = frame_axis
+                #self._scene_frames_ = nframes
+                
             elif isinstance(scene, (tuple, list)):
                 #print("ScanData._parse_image_arrays_() parsing scene from list")
                 
@@ -2751,42 +2718,22 @@ class ScanData(object):
                 self._scene_ = scene
             
                 self._scene_axis_calibrations_ = [AxisCalibration(s) for s in scene]
-                    
-                if sceneFrameAxis is None:
-                    chindex = scene[0].channelIndex # vigra array property
-                    
-                    if chindex == scene[0].ndim:
-                        self._scene_frames_       = scene[0].shape[-1]
-                        self._scene_frame_axis_   = scene[0].axistags[-1].key
-                        
-                    else:
-                        if chindex < scene[0].ndim-1:
-                            self._scene_frames_       = scene[0].shape[chindex+1]
-                            self._scene_frame_axis_   = scene[0].axistags[chindex+1].key
-                            
-                        else:
-                            self._scene_frames_       = scene[0].shape[chindex-1]
-                            self._scene_frame_axis_   = scene[0].axistags[chindex-1].key
-                            
-                elif isinstance(sceneFrameAxis, str):
-                    if sceneFrameAxis in scene[0].axistags:
-                        self._scene_frame_axis_   = sceneFrameAxis
-                        
-                    else:
-                        self._scene_frame_axis_ = scene[0].axistags[-1].key
-                        
-                    self._scene_frames_       = scene[0].shape[scene[0].axistags.index(self._scene_frame_axis_)]
-                    
-                else:
-                    raise TypeError("sceneFrameAxis expected to be  str or None; got %s instead" % type(sceneFrameAxis).__name__)
                 
+                nframes, frame_axis, width_axis, height_axis = getFrameLayout(scene[0], sceneFrameAxis)
+                
+                self._scene_frame_axis_ = frame_axis
+                #self._scene_frames_ = nframes
+                    
             else:
                 raise TypeError("scene expected to be a VigraArray or a sequence of VigraArrays ; got %s instead" % (type(scene).__name__))
             
             #print("ScanData._parse_image_arrays_() parsing scene region profiles")
-            self._scan_region_scene_profiles_.segments[:] = [neo.Segment(name="frame_%d" %k, index = k) for k in range(self._scene_frames_)]
+            # NOTE: 2021-09-26 10:16:22
+            # pre-allocate segmeents for the can region profiles
+            # FIXME/TODO shouldn't need to do this...
+            #self._scan_region_scene_profiles_.segments[:] = [neo.Segment(name="frame_%d" %k, index = k) for k in range(self._scene_frames_)]
             
-            self._scene_block_.segments[:] = [neo.Segment(name = "frame_%d" % k, index = k) for k in range(self._scene_frames_)]
+            #self._scene_block_.segments[:] = [neo.Segment(name = "frame_%d" % k, index = k) for k in range(self._scene_frames_)]
 
             self._scenecursors_.clear()
             self._scenerois_.clear()
@@ -2804,32 +2751,9 @@ class ScanData(object):
                 
                 self._scans_axis_calibrations_ = [AxisCalibration(scans)]
                 
-                if scansFrameAxis is None:
-                    chindex = scans.channelIndex
-                    
-                    if chindex == scans.ndim:
-                        self._scans_frames_       = scans.shape[-1]
-                        self._scans_frame_axis_   = scans.axistags[-1].key
-                        
-                    else:
-                        if chindex < scans.ndim-1:
-                            self._scans_frames_       = scans.shape[chindex+1]
-                            self._scans_frame_axis_   = scans.axistags[chindex+1].key
-                            
-                        else:
-                            self._scans_frames_       = scans.shape[chindex-1]
-                            self._scans_frame_axis_   = scans.axistags[chindex-1].key
-                            
-                elif isinstance(scansFrameAxis, str):
-                    if scansFrameAxis in scans.axistags:
-                        self._scans_frame_axis_   = scansFrameAxis
-                    else:
-                        self._scans_frame_axis_ = scans.axistags[-1].key
-                    
-                    self._scans_frames_       = scans.shape[scans.axistags.index(self._scans_frame_axis_)]
-                        
-                else:
-                    raise TypeError("scansFrameAxis expected to be a str or None; got %s instead" % (type(scansFrameAxis).__name__))
+                nframes, frame_axis, width_axis, height_axis = getFrameLayout(scans, scansFrameAxis)
+                
+                self._scans_frame_axis_ = frame_axis
                 
             elif isinstance(scans, (tuple, list)):
                 #print("ScanData._parse_image_arrays_() parsing scans from list")
@@ -2853,44 +2777,18 @@ class ScanData(object):
                 
                 self._scans_axis_calibrations_ = [AxisCalibration(s) for s in scans]
                     
-                #print("ScanData._parse_image_arrays_() scans from list: scansFrameAxis", scansFrameAxis)
-                if scansFrameAxis is None:
-                    chindex = scans[0].channelIndex
-                    
-                    if chindex == scans[0].ndim:
-                        self._scans_frames_       = scans[0].shape[-1]
-                        self._scans_frame_axis_   = scans[0].axistags[-1].key
-                        
-                    else:
-                        if chindex < scans[0].ndim-1:
-                            self._scans_frames_       = scans[0].shape[chindex+1]
-                            self._scans_frame_axis_   = scans[0].axistags[chindex+1].key
-                            
-                        else:
-                            self._scans_frames_       = scans[0].shape[chindex-1]
-                            self._scans_frame_axis_   = scans[0].axistags[chindex-1].key
-                    
-                elif isinstance(scansFrameAxis, str):
-                    if scansFrameAxis in scans[0].axistags:
-                        self._scans_frame_axis_   = scansFrameAxis
-                        
-                    else:
-                        self._scans_frame_axis_ = scans[0].axistags[-1].key
-                        
-                    self._scans_frames_       = scans[0].shape[scans[0].axistags.index(self._scans_frame_axis_)]
-                    
-                else:
-                    raise TypeError("scansFrameAxis expected to be a str or None; got %s instead" % type(scansFrameAxis).__name__)
+                nframes, frame_axis, width_axis, height_axis = getFrameLayout(scans[0], scansFrameAxis)
+                self._scans_frame_axis_ = frame_axis
                 
             else:
                 raise TypeError("scans expected to be a VigraArray or a sequence of VigraArray; got %s instead" % (type(scans).__name__))
             
-            if self._scene_frames_ > 1 and self._scene_frames_ != self._scans_frames_:
-                raise ValueError("scene images should either have one frame, or as many frames as the scans images (%d); currently they have %d" % (self._scans_frames_, self._scene_frames_))
+            #if self._scene_frames_ > 1 and self._scene_frames_ != self._scans_frames_:
+                #raise ValueError("scene images should either have one frame, or as many frames as the scans images (%d); currently they have %d" % (self._scans_frames_, self._scene_frames_))
             
-            self._scan_region_scans_profiles_.segments[:] = [neo.Segment(name="frame_%d" %k, index =k) for k in range(self._scans_frames_)]
+            #self._scan_region_scans_profiles_.segments[:] = [neo.Segment(name="frame_%d" %k, index =k) for k in range(self._scans_frames_)]
             
-            self._scans_block_.segments[:] = [neo.Segment(name = "frame_%d" % k, index = k) for k in range(self._scans_frames_)]
+            #self._scans_block_.segments[:] = [neo.Segment(name = "frame_%d" % k, index = k) for k in range(self._scans_frames_)]
             
             self._scanscursors_.clear()
             
@@ -3496,16 +3394,8 @@ class ScanData(object):
         result._analysis_unit_.parent = self
             
         # POD types
-        result._scene_frames_ = self._scene_frames_
-        result._scans_frames_ = self._scans_frames_
-        
-        #result._scans_ref_channel_ =  self._scans_ref_channel_
-        
-        #result._scans_ind_channel_ =  self._scans_ind_channel_
-        
-        #result._scene_ref_channel_ = self._scene_ref_channel_
-        
-        #result._scene_ind_channel_ = self._scene_ind_channel_
+        result._scene_frame_axis_ = self._scene_frame_axis_
+        result._scans_frame_axis_ = self._scans_frame_axis_
         
         result._analysismode_ = self._analysismode_
         
@@ -4082,8 +3972,8 @@ class ScanData(object):
         # concatenate frames for the scene landmarks (or adopt landmarks from 
         # source if not present in target) but make sure to assign correct frame
         # indices !!!
-        if len(result.scene):
-            result._scene_frames_ = result.scene[0].shape[result.scene[0].axistags.index(result.sceneFrameAxis)]
+        #if len(result.scene):
+            #result._scene_frames_ = result.scene[0].shape[result.scene[0].axistags.index(result.sceneFrameAxis)]
             
             # NOTE: 2018-06-17 21:42:21 
             # "merge" scan region of source with that from target
@@ -4215,11 +4105,11 @@ class ScanData(object):
                     
                 #print("after update: ", result.sceneCursors[new_obj.name].name, result.sceneCursors[new_obj.name].frameIndices)
                     
-            if len(source._scan_region_scene_profiles_.segments):
-                result._scan_region_scene_profiles_.segments += source._scan_region_scene_profiles_.segments
+            #if len(source._scan_region_scene_profiles_.segments):
+                #result._scan_region_scene_profiles_.segments += source._scan_region_scene_profiles_.segments
                 
-            else:
-                result._scan_region_scene_profiles_.segments += [neo.Segment(name="frame_%d" % k + result._scene_frames_, index = k + result._scene_frames_) for k in range(source._scene_frames_)]
+            #else:
+                #result._scan_region_scene_profiles_.segments += [neo.Segment(name="frame_%d" % k + result._scene_frames_, index = k + result._scene_frames_) for k in range(source._scene_frames_)]
                 
             result.generateScanRegionProfilesFromScene() # FIXME: what happens when there is no scan region or when scsan region is frameless?
         
@@ -8702,9 +8592,9 @@ class ScanData(object):
             new_units = set()
             
             self._scene_ = new_scene
-            self._scene_frames_ = self._scene_[0].shape[self.sceneFrameAxisIndex]
+            #self._scene_frames_ = self._scene_[0].shape[self.sceneFrameAxisIndex]
             self._scans_ = new_scans
-            self._scans_frames_ = self._scans_[0].shape[self.scansFrameAxisIndex]
+            #self._scans_frames_ = self._scans_[0].shape[self.scansFrameAxisIndex]
             
             for p in del_protocols:
                 p_ndx = self._trigger_protocols_.index(p)
@@ -10076,23 +9966,18 @@ class ScanData(object):
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
         """
+        if len(self.scene) == 0:
+            return
+        
         if not isinstance(value, str):
             raise TypeError("Expecting a str; got %s instead" % type(value).__name__)
         
-        if len(self.scene) == 1:
-            if not value in self.scene.axistags:
-                raise ValueError("Axis %s not found in scene." % value)
-            
-            self._scene_frame_axis_ = value
-            self._scene_frames_ = self.scene[0].shape[self.scene.axistags.index(value)]
-            
-        else:
-            if not value in self.scene[0].axistags:
-                raise ValueError("Axis %s not found in scene. " % value)
-            
-            self._scene_frame_axis_ = value
-            self._scene_frames_ = self.scene[0].shape[self.scene[0].axistags.index(value)]
-            
+        if value not in self.scene[0].axistags:
+            raise ValueError("Axis %s not found in scans." % value)
+        
+        self._scene_frame_axis_ = value
+        self._scene_frames_ = self.scene[0].shape[self.scene[0].axistags.index(value)]
+     
     @property
     def sceneFrameAxisIndex(self):
         """Read-only.
@@ -10207,7 +10092,7 @@ class ScanData(object):
         """
         return self._scans_
     
-    def nFrames(self, component):
+    def nFrames(self, component:str) -> int:
         """Returns the number of image frames(1) or data sweeps(2)
         
         NOTE:
@@ -10218,14 +10103,22 @@ class ScanData(object):
         Parameters:
         ==========
         component: str, one of: 
-            "electrophysiology" "ephys", "scansProfiles", "sceneProfiles", 
-            "scansBlock", "sceneBlock", "scans", "scene"
+            "scans", "scene",
+            "electrophysiology" "ephys", 
+            "scansProfiles", "sceneProfiles", 
+            "scansBlock", "sceneBlock", 
         """
         
         data = self._get_data_component_(component)
         
         if isinstance(data, list) and all(isinstance(v, VigraArray) for v in data):
-            return 
+            return self.nImageFrames(component)
+        
+        elif component in ("ephys", "electrophysiology"):
+            return self.nEphysSweeps
+        
+        elif components.lower().endswith("profiles"):
+            return self.nProfileSweeps(component)
     
     @property
     def nEphysSweeps(self):
@@ -10233,6 +10126,14 @@ class ScanData(object):
             return len(self.ephys.segments)
         
         return 0
+    
+    def nDataSweeps(self, component:str = "scans"):
+        if component.lower().strip() == "scans":
+            return self.nScansDataSweeps
+        elif component.lower().strip() == "scene":
+            return self.nSceneDataSweeps
+        else:
+            raise ValueError(f"Wring component {component}")
     
     @property
     def nScansDataSweeps(self):
@@ -10248,28 +10149,51 @@ class ScanData(object):
         
         return 0
     
+    def nProfileSweeps(self, component:str="scans"):
+        if component.lower().strip() =="scans":
+            return self.nScansProfileSweeps
         
+        elif component.lower().strip() =="scans":
+            return self.nSceneProfileSweeps
         
+        else:
+            raise ValueError(f"Wrong component {component}")
     
     @property
+    def nSceneProfileSweeps(self):
+        if isinstance(self.sceneProfiles, neo.Block) and not neoutils.is_empty(self.sceneProfiles, ignore=(TriggerEvent, neo.Event, neo.Epoch)):
+            return len(self.sceneProfiles.segments)
+        
+        return 0
+    
+    @property
+    def nScansProfileSweeps(self):
+        if isinstance(self.scansProfiles, neo.Block) and not neoutils.is_empty(self.scansProfiles, ignore=(TriggerEvent, neo.Event, neo.Epoch)):
+            return len(self.scansProfiles.segments)
+        
+        return 0
+    
     def nImageFrames(self, data_component:str="scans"):
         if data_component.lower().strip()=="scans":
             return self.nScansFrames
         
-        else:
+        elif data_component.lower().strip()=="scene":
             return self.nSceneFrames
-    
+        
+        else:
+            raise ValueError(f"Component {data_component} does not contain images")
+        
     @property
     def nScansFrames(self):
         # NOTE: 2021-09-25 15:27:14
         # self.scans is ALWAYS a list!
         # For multichannel images, scans can have ONE multi-channel VigraArray, OR
         # several single-channel VigraArrays !!!
-        if len(self.scans):
-            return self.scans[0].shape[self.scans[0].axistags.index(self._scans_frame_axis_)]
+        #if len(self.scans):
+            #return self.scans[0].shape[self.scans[0].axistags.index(self._scans_frame_axis_)]
         
-        return 0
-        #return self._scans_frames_
+        #return 0
+        return self._scans_frames_
     
     @property
     def nSceneFrames(self):
@@ -10277,9 +10201,9 @@ class ScanData(object):
         # self.scene is ALWAYS a list!
         # For multichannel images, scene can have ONE multi-channel VigraArray, OR
         # several single-channel VigraArrays !!!
-        if len(self.scene):
-            return self.scene[0].shape[self.scene[0].axistags.index(self._scene_frame_axis_)]
-        #return self._scene_frames_
+        #if len(self.scene):
+            #return self.scene[0].shape[self.scene[0].axistags.index(self._scene_frame_axis_)]
+        return self._scene_frames_
         return 0
     
     @property

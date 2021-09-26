@@ -12,11 +12,14 @@ from core.datatypes import (arbitrary_unit, pixel_unit,
                             unit_quantity_from_name_or_symbol,
                             )
 
+from core.utilities import reverse_mapping_lookup
+
 from .axisutils import (axisTypeFlags, 
-                            defaultAxisTypeName, defaultAxisTypeSymbol, 
-                            defaultAxisTypeUnits,
-                            axisTypeFromString,
-                            )
+                        defaultAxisTypeName, 
+                        defaultAxisTypeSymbol, 
+                        defaultAxisTypeUnits,
+                        axisTypeFromString,
+                        )
 
 
 class AxisCalibration(object):
@@ -2051,13 +2054,17 @@ class AxisCalibration(object):
         # infer axistype from axiskey, check if is the same as axistype
         typebykey = [k for k in axisTypeFlags if axisTypeFlags[k] == axistype]
         
+        #print(f"AxisCalibration.parseDescriptionString: axistype {axistype}")
+        #print(f"AxisCalibration.parseDescriptionString: typebykey {typebykey}")
+        
         if len(typebykey) == 0:
             axiskey = "?"
             axistype = vigra.AxisType.UnknownAxisType
             
         else:
             if axistype != typebykey:
-                axiskey = axisTypeFlags[axistype]
+                axiskey = reverse_mapping_lookup(axisTypeFlags, axistype)
+                #axiskey = axisTypeFlags[axistype]
         
         # 5) finally, populate the result
         

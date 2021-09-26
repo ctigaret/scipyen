@@ -20,7 +20,7 @@ import neo
 #### BEGIN pict.core modules
 from core import (tiwt, datatypes as dt, strutils, curvefitting as crvf,)
 
-from imaging.axisutils import axisTypeFlags
+from imaging.axisutils import (axisTypeFlags, defaultAxisTypeName)
 
 #from .patchneo import neo
 #### END pict.core modules
@@ -1279,17 +1279,15 @@ def concatenateImages(*images, **kwargs):
     Named parameters:
     ================
 
-    axis    :   the concatenation axis, specified as one of the following types:
+    axis    :   the concatenation axis, specified in one of the following ways:
                 
         int = index of an existing axis (default is 0)
                 
-        str = a valid AxisInfo key for an existing axis or for a new axis to be 
-            added all images at the next higher dimension
+        str = a valid AxisInfo key for an existing axis, or for a new axis to be 
+            added to all images at the next higher dimension
                 
-        AxisInfo object for an existing axis, or for a newaxis (to be added to 
-        the images on their next higher dimension)
-        
-    
+        AxisInfo object for an existing axis, or for a new axis to be added to 
+        the images on their next higher dimension.
         
     ignore: None (default) a string ("units", "origin" or "resolution") or 
         a sequence of any of these strings (e.g. ["units", "origin", "resolution"]) 
@@ -1521,7 +1519,7 @@ Arrays are concatenated in two ways, explained here by examples:
             
             newaxis = vigra.AxisInfo(key = catAxis, typeFlags = axisTypeFlags[catAxis],
                                      resolution=1.0,
-                                     description = dt.defaultAxisTypeName(axisTypeFlags[catAxis]))
+                                     description = defaultAxisTypeName(axisTypeFlags[catAxis]))
             for img in images:
                 new_images.append(insertAxis(img, newaxis, catAxisNdx))
                 
