@@ -14,6 +14,8 @@ utilities to enhance axis and axistags handling
 #### BEGIN core python modules
 from __future__ import print_function
 import collections
+import typing
+from traitlets import Bunch
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -31,12 +33,12 @@ import quantities as pq
 
 # NOTE: 2017-10-20 22:10:39
 # I might (should?) get rid of this
-ALLOWED_AXISTAGS = (['x', 't'], 
-                    ['x', 't', 'c'],
-                    ['x', 'y', 't'],
-                    ['x', 'y', 't', 'c'],
-                    ['x', 'y', 'z', 't'],
-                    ['x', 'y', 'z', 't', 'c'])
+#ALLOWED_AXISTAGS = (['x', 't'], 
+                    #['x', 't', 'c'],
+                    #['x', 'y', 't'],
+                    #['x', 'y', 't', 'c'],
+                    #['x', 'y', 'z', 't'],
+                    #['x', 'y', 'z', 't', 'c'])
 
 # a bit of extension to vigra defaults:
 # KEY:          Type Flags:
@@ -54,33 +56,55 @@ ALLOWED_AXISTAGS = (['x', 't'],
 # ?                 Unknown
 # s                 NonChannel
 # l                 AllAxes
-__standard_axis_tag_keys__ = ["x", "y", "z", "t", "c", "n", "e", "fx", "fy", "fz", "ft"]
-__specific_axis_tag_keys__ = __standard_axis_tag_keys__  + ["a", "f", "ft", "fa"]
-__all_axis_tag_keys__ = __specific_axis_tag_keys__ + ["?", "l"]
+__standard_axis_tag_keys__ = ("x", "y", "z", "t", "c", "n", "e", "fx", "fy", "fz", "ft")
+__specific_axis_tag_keys__ = tuple(list(__standard_axis_tag_keys__)  + ["a", "f", "ft", "fa"])
+__all_axis_tag_keys__ = tuple(list(__specific_axis_tag_keys__) + ["?", "l"])
 
 """Maps vigra.AxisInfo keys (str, lower case) to vigra.AxisType flags
 """
-axisTypeFlags = collections.defaultdict(lambda: vigra.AxisType.UnknownAxisType)
-axisTypeFlags["a"]  = vigra.AxisType.Angle
-axisTypeFlags["c"]  = vigra.AxisType.Channels
-axisTypeFlags["e"]  = vigra.AxisType.Edge
-axisTypeFlags["f"]  = vigra.AxisType.Frequency
-axisTypeFlags["t"]  = vigra.AxisType.Time
-axisTypeFlags["x"]  = vigra.AxisType.Space
-axisTypeFlags["y"]  = vigra.AxisType.Space
-axisTypeFlags["z"]  = vigra.AxisType.Space
-axisTypeFlags["n"]  = vigra.AxisType.Space
-axisTypeFlags["fa"] = vigra.AxisType.Frequency | vigra.AxisType.Angle
-axisTypeFlags["fe"] = vigra.AxisType.Frequency | vigra.AxisType.Edge
-axisTypeFlags["ft"] = vigra.AxisType.Frequency | vigra.AxisType.Time
-axisTypeFlags["fx"] = vigra.AxisType.Frequency | vigra.AxisType.Space
-axisTypeFlags["fy"] = vigra.AxisType.Frequency | vigra.AxisType.Space
-axisTypeFlags["fz"] = vigra.AxisType.Frequency | vigra.AxisType.Space
-axisTypeFlags["fn"] = vigra.AxisType.Frequency | vigra.AxisType.Space
-axisTypeFlags["?"]  = vigra.AxisType.UnknownAxisType
-axisTypeFlags["s"]  = vigra.AxisType.NonChannel
-axisTypeFlags["l"]  = vigra.AxisType.AllAxes
+#axisTypeFlags = collections.defaultdict(lambda: vigra.AxisType.UnknownAxisType)
+#axisTypeFlags["a"]  = vigra.AxisType.Angle
+#axisTypeFlags["c"]  = vigra.AxisType.Channels
+#axisTypeFlags["e"]  = vigra.AxisType.Edge
+#axisTypeFlags["f"]  = vigra.AxisType.Frequency
+#axisTypeFlags["t"]  = vigra.AxisType.Time
+#axisTypeFlags["x"]  = vigra.AxisType.Space
+#axisTypeFlags["y"]  = vigra.AxisType.Space
+#axisTypeFlags["z"]  = vigra.AxisType.Space
+#axisTypeFlags["n"]  = vigra.AxisType.Space
+#axisTypeFlags["fa"] = vigra.AxisType.Frequency | vigra.AxisType.Angle
+#axisTypeFlags["fe"] = vigra.AxisType.Frequency | vigra.AxisType.Edge
+#axisTypeFlags["ft"] = vigra.AxisType.Frequency | vigra.AxisType.Time
+#axisTypeFlags["fx"] = vigra.AxisType.Frequency | vigra.AxisType.Space
+#axisTypeFlags["fy"] = vigra.AxisType.Frequency | vigra.AxisType.Space
+#axisTypeFlags["fz"] = vigra.AxisType.Frequency | vigra.AxisType.Space
+#axisTypeFlags["fn"] = vigra.AxisType.Frequency | vigra.AxisType.Space
+#axisTypeFlags["?"]  = vigra.AxisType.UnknownAxisType
+#axisTypeFlags["s"]  = vigra.AxisType.NonChannel
+#axisTypeFlags["l"]  = vigra.AxisType.AllAxes
 
+axisTypeFlags = Bunch({
+    "a": vigra.AxisType.Angle,
+    "c": vigra.AxisType.Channels,
+    "e": vigra.AxisType.Edge,
+    "f": vigra.AxisType.Frequency,
+    "t": vigra.AxisType.Time,
+    "x": vigra.AxisType.Space,
+    "y": vigra.AxisType.Space,
+    "z": vigra.AxisType.Space,
+    "n": vigra.AxisType.Space,
+    "fa": vigra.AxisType.Frequency | vigra.AxisType.Angle,
+    "fe": vigra.AxisType.Frequency | vigra.AxisType.Edge,
+    "ft": vigra.AxisType.Frequency | vigra.AxisType.Time,
+    "fx": vigra.AxisType.Frequency | vigra.AxisType.Space,
+    "fy": vigra.AxisType.Frequency | vigra.AxisType.Space,
+    "fz": vigra.AxisType.Frequency | vigra.AxisType.Space,
+    "fn": vigra.AxisType.Frequency | vigra.AxisType.Space,
+    "?": vigra.AxisType.UnknownAxisType,
+    "s": vigra.AxisType.NonChannel,
+    "l": vigra.AxisType.AllAxes,
+    }
+    )
 
 
 def makeAxisSpec(tags, dims=None, **tagsizemap):

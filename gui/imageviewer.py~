@@ -56,6 +56,7 @@ from enum import Enum, IntEnum
 #### END core python modules
 
 #### BEGIN 3rd party modules
+from traitlets import Bunch
 import numpy as np
 import quantities as pq
 import pyqtgraph as pgraph
@@ -80,9 +81,13 @@ from PyQt5.uic import loadUiType as __loadUiType__
 from core import utilities
 from core.prog import (safeWrapper, deprecation, iter_attribute,
                        filter_type, filterfalse_type, 
-                       filter_attribute, filterfalse_attribute)
+                       filter_attribute, filterfalse_attribute,
+                       filter_attr, filterfalse_attr)
+
 from core import strutils as strutils
 from core import datatypes as dt
+from core.traitcontainers import DataBag
+from core.scipyen_config import markConfigurable
 
 from imaging import (axisutils, axiscalibration, vigrautils as vu,)
 from imaging.axisutils import (axisTypeFlags, defaultAxisTypeName, 
@@ -97,6 +102,7 @@ from iolib import pictio as pio
 
 #### BEGIN scipyen gui modules
 from .scipyenviewer import ScipyenViewer, ScipyenFrameViewer
+
 
 from . import signalviewer as sv
 from . import pictgui as pgui
@@ -895,7 +901,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         d.promptWidgets.append(showsOpaqueLabel)
         
         # NOTE: 2021-05-04 15:53:58
-        # old style type checks based on PlanarGraphicsrtype kept for backward compatibility
+        # old style type checks based on PlanarGraphicsType kept for backward compatibility
         # NOTE: 2021-05-10 14:27:11 transition to complete removal or PlanarGraphicsType enum
         if isinstance(cursor.backend, pgui.VerticalCursor):
             promptX = quickdialog.FloatInput(d, "X coordinate (pixels):")
@@ -1481,12 +1487,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
         qobj.selectMe[str, bool].connect(self.slot_setSelectedCursor)
         qobj.requestContextMenu.connect(self.slot_graphicsObjectMenuRequested)
-        #qobj.signalBackendChanged.connect(self.slot_cursorChanged)
-        
-        #self.scene.update(self.scene.sceneRect().x(), 
-                          #self.scene.sceneRect().y(),
-                          #self.scene.sceneRect().width(), 
-                          #self.scene.sceneRect().height())
         
         if qobj.backend.hasStateForFrame():
             qobj.show()
@@ -1944,8 +1944,9 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     #### BEGIN public methods
     
     @safeWrapper
-    def roi(self, value:typing.Any, attribute:str="name", 
-            predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y) -> typing.Iterator:
+    def roi(self, value:typing.Optional[typing.Any]=None, attribute:str="name", 
+            predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y,
+            **kwargs) -> typing.Iterator:
         """Iterates through ROIs (non-cursor PlanarGraphics) with a specific attribute.
         
         Parameters:
@@ -1972,6 +1973,15 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
             Optional: default is the identity (lambda x,y: x==y)
             
+        Var-keyword parameters:
+        =======================
+        attribute_name:str -> attribute predicate and value: function
+            This is an alternative syntax that supercedes the value, attribute
+            parameter described above
+            
+            e.g.:
+            roi(name=lambda x: x=="some_name")
+            
         Returns:
         ========
         An iterator for PlanarGraphics objects (not cursors) having the named 
@@ -1980,6 +1990,14 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         By default, the function returns an iterator of ROIs by their name.
         
         """
+        
+        if len(**kwargs):
+            ret = list()
+            for n,f in kwargs.items():
+                if isinstance(f, function):
+                    ret.append(filter_attribute(self.rois, n, ))
+            
+        
         return filter_attribute(self.rois, attribute, value, predicate)
         
     @safeWrapper
@@ -2165,7 +2183,50 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     #
     # "colormap" = singleton or list of colortables or None
     #
-  
+    
+    # NOTE: 2021-09-15 10:40:44 KISS!
+    # for cursor & roi label backgrounds we should limit ourselved to one of:
+    # a) transparent
+    # b) any color (although preferable either black or white)
+    # and this is applied across the board (i.e. all cursors & rois)
+    #
+    # Regarding hover color, the same one-for-all rule should apply: use the same
+    # hover color for any graphics item we hover (if we decide to use hover color, 
+    # which might be nice!)
+    #
+    # Also, NOTE that these are defaults for top level imageviewer windows only.
+    # Client windows will have to set their own cursor/roi colors by supplying
+    # the appropriate parameter to the cursor/roi creation method in this :class:
+    #
+    #
+    # To get/set the color for a SPECIFIC graphics item (cursor or ROI) use the
+    # getter / setter methods
+    #
+    # getPlanarGraphicsColor / setPlanarGraphicsColor; NOTE these are NOT defined
+    # as configurables for this :class:. Instead they should be linked into (i.e.,
+    # called, perhaps, indirectly, by) a configurable getter/setter of the 
+    # viewer's owner :class: such as LSCaTWindow. In this way the appearance of
+    # a subset of planargraphics of a certain type (which share a common meaning)
+    # appear similarly
+    #
+    
+    
+    defaultRoisColor = "#aaff00"
+    
+    defaultCursorColors = Bunch({"crosshair_cursor":"#C173B088", 
+                                 "horizontal_cursor":"#B1D28F88", 
+                                 "vertical_cursor":"#ff007f88",
+                                 "point_cursor":"#aaaa00"})
+    
+    defaultLinkedCursorColors = Bunch({"crosshair_cursor":QtGui.QColor(defaultCursorColors["crosshair_cursor"]).darker().name(QtGui.QColor.HexArgb),
+                                       "horizontal_cursor":QtGui.QColor(defaultCursorColors["horizontal_cursor"]).darker().name(QtGui.QColor.HexArgb),
+                                       "vertical_cursor":QtGui.QColor(defaultCursorColors["vertical_cursor"]).darker().name(QtGui.QColor.HexArgb),
+                                       "point_cursor":QtGui.QColor(defaultCursorColors["point_cursor"]).darker().name(QtGui.QColor.HexArgb)})
+    
+    defaultGraphicsLabelBackgroundColor = QtCore.Qt.transparent
+    
+    defaultGraphicsHoverColor = "red"
+
     def __init__(self, data: (vigra.VigraArray, vigra.filters.Kernel2D, np.ndarray, QtGui.QImage, QtGui.QPixmap, tuple, list) = None,
                  parent: (QtWidgets.QMainWindow, type(None)) = None, 
                  ID:(int, type(None)) = None,
@@ -2176,27 +2237,34 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
 
         self._image_width_ = 0
         self._image_height_ = 0
-        self.imageNormalize             = None
-        self.imageGamma                 = None
-        self.colorMap                   = None
-        self.prevColorMap               = None
-        self.colorbar                   = None
+        self._imageNormalize             = None
+        self._imageGamma                 = None
+        self._colorMap                   = None
+        self._prevColorMap               = None
+        self._colorBar                   = None
         self._colorbar_width_           = 20
         
         #self._separateChannels           = False
         
-        self.cursorsColor               = None
-        self.linkedCursorsColor         = None
-        self.cursorLabelTextColor       = None
-        self.linkedCursorLabelTextColor = None
-        self.cursorLabelBackgroundColor = None
-        self.roisColor                  = None
-        self.linkedROIsColor            = None
-        self.roiLabelTextColor          = None
-        self.linkedROILabelTextColor    = None
-        self.roiLabelBackgroundColor    = None
-        self.opaqueCursorLabel          = True
-        self.opaqueROILabel             = True
+        self.cursorsColor               = None # to remove
+        self.linkedCursorsColor         = None # to remove
+        self.cursorLabelTextColor       = None # to remove
+        self.linkedCursorLabelTextColor = None # to remove
+        self.cursorLabelBackgroundColor = None # to property
+        self.roisColor                  = None # to property
+        self.linkedROIsColor            = None # to property
+        self.roiLabelTextColor          = None # to remove
+        self.linkedROILabelTextColor    = None # to remove
+        self.roiLabelBackgroundColor    = None # to remove
+        self.opaqueCursorLabel          = True # replace with self._graphicsBackgroundColor_
+        self.opaqueROILabel             = True # replace with self._graphicsBackgroundColor_
+        
+        self._cursorColors_             = self.defaultCursorColors
+        self._graphicsBackgroundColor_  = self.defaultGraphicsLabelBackgroundColor
+        self._linkedCursorColors_       = self.defaultLinkedCursorColors
+        self._roisColor_                = self.defaultRoisColor
+        self._graphicsHoverColor_       = self.defaultGraphicsHoverColor
+        
         
         if displayChannel is None:
             self._displayedChannel_      = "all"
@@ -2253,10 +2321,20 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._scaleBarOrigin_            = (0, 0)
         self._scaleBarLength_            = (10,10)
         
-        super().__init__(data=data, parent=parent, ID=ID, win_title=win_title, doc_title=doc_title, frame=frame, *args, *kwargs)
+        # NOTE: 2021-08-25 09:42:54
+        # ScipyenFrameViewer initialization - also does the following:
+        # 1) calls self._configureUI_() overridden here:
+        #   1.1) sets up the UI defined in the .ui file (setupUi)
+        #
+        # 2) calls self.loadSettings() inherited from 
+        # ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
+        super().__init__(data=data, parent=parent, ID=ID, win_title=win_title, 
+                         doc_title=doc_title, frameIndex=frame, **kwargs)
         
         #self.loadSettings() # now called by ScipyenViewer.__init__()
         
+        # TODO: migrate this to ScipyenViewer.__init__
+        # specify supported_types for all viewers.
         if isinstance(data, ImageViewer.supported_types) or any([t in type(data).mro() for t in ImageViewer.supported_types]):
             self.setData(data, doc_title=self._docTitle_)
         
@@ -2264,6 +2342,59 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     # properties
     ####
     
+    @property
+    def colorMap(self) -> str:
+        """Colormap property.
+        This is the 'name' attribute (str) of a matplotlib.colors.Colormap object.
+        This is so that the name can be safely stored in QSettings.
+        
+        The property setter accepts a matplotlib.colors.Colormap object or a str
+        with a valid colormap name (see gui.sciyen_colormaps module)
+        """
+        if not isinstance(self._colorMap, colormaps.mpl.colors.Colormap):
+            if isinstance(self._prevColorMap, colormaps.mpl.colors.Colormap):
+                self._colorMap = self._prevColorMap
+            else:
+                self._colorMap = colormaps.get("grey")
+            #self.displayFrame()
+            
+        return self._colorMap.name
+        
+    @markConfigurable("ColorMap")
+    @colorMap.setter
+    def colorMap(self, val:typing.Union[str, colormaps.mpl.colors.Colormap]):
+        """Setter for colorMap
+        """
+        if isinstance(val, colormaps.mpl.colors.Colormap):
+            cmap_name = val.name
+            cmap = val
+            
+        elif isinstance(val, str):
+            cmap = colormaps.get(val, None)
+            if not isinstance(cmap, colormaps.mpl.colors.Colormap):
+                return
+            cmap_name = val
+                
+        else:
+            raise TypeError(f"Expecting a str or a maptplotlib.cm.Colormap; got {type(val).__name__} instead")
+        
+        if isinstance(self._colorMap, colormaps.mpl.colors.Colormap):
+            self._prevColorMap = self._colorMap
+        
+        self._colorMap = cmap
+        #self._colorMap = val
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["ColorMap"] = cmap_name
+        
+        self.displayFrame()
+        
+    def getPlanarGraphicsColor(self, ID):
+        
+        pass
+    
+    def setPlanarGraphicsColor(self, ID, val):
+        pass
+        
     @property
     def currentFrame(self):
         return self._current_frame_index_
@@ -2332,15 +2463,30 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         return list(set(self.viewerWidget.planarGraphics))
     
     @property
-    def cursors(self):
+    def dataCursors(self):
         """List of Cursor planar graphics.
         This is the list of unique planar graphics cursor backends for the 
         displayed cursors
         """
         return list(self.viewerWidget.cursors)
     
+    def getDataCursors(self, **kwargs):
+        """List of Cursor planar graphics.
+        This is the list of unique planar graphics cursor backends for the 
+        displayed cursors.
+        
+        Optionally, returns a subset of data cursors accoriding to properties
+        specified in var-keyword parameters
+        
+        (see core.prog.filter_attr)
+        """
+        if len(kwargs):
+            return list(filter_attr(self.viewerWidget.cursors, **kwargs))
+        
+        return self.dataCursors
+    
     @safeWrapper
-    def cursor(self, *args, **kwargs):
+    def dataCursor(self, *args, **kwargs):
         """Returns a list of pictgui.Cursor by attribute
         
         Delegates to GraphicsImageViewerWidget.roi(...); by default, compares
@@ -2437,8 +2583,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     def colorBarWidth(self):
         return self._colorbar_width_
     
+    @markConfigurable("ColorBarWidth", "qt")
     @colorBarWidth.setter
     def colorBarWidth(self, value):
+        if isinstance(value, str):
+            value = int(value)
+                
         if not isinstance(value, int):
             raise TypeError("Expecting an int; got %s instead" % type(value).__name__)
         
@@ -2686,8 +2836,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self._setup_color_bar_()
             
         else:
-            if self.colorbar is not None:
-                self.viewerWidget.scene.removeItem(self.colorbar)
+            if self._colorBar is not None:
+                self.viewerWidget.scene.removeItem(self._colorBar)
                 
     def _setup_color_bar_(self):
         #try:
@@ -2724,24 +2874,24 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                                         axis=1).T,
                                         axistags = vigra.VigraArray.defaultAxistags("xy"))
             
-            if self.colorMap is None or self._currentFrameData_.channels > 1:
-                bar_qimage = bar_image.qimage(normalize = self.imageNormalize)
+            if self._colorMap is None or self._currentFrameData_.channels > 1:
+                bar_qimage = bar_image.qimage(normalize = self._imageNormalize)
                 
             else:
-                bar_qimage = self._applyColorTable_(bar_image).qimage(normalize = self.imageNormalize)
+                bar_qimage = self._applyColorTable_(bar_image).qimage(normalize = self._imageNormalize)
                     
                     
-            if self.colorbar is None:
-                self.colorbar =  QtWidgets.QGraphicsItemGroup()
+            if self._colorBar is None:
+                self._colorBar =  QtWidgets.QGraphicsItemGroup()
                 
-                self.viewerWidget.scene.addItem(self.colorbar)
-                #self.colorbar.setPos(bar_x, 0)
+                self.viewerWidget.scene.addItem(self._colorBar)
+                #self._colorBar.setPos(bar_x, 0)
                     
             else:
-                for item in self.colorbar.childItems():
-                    self.colorbar.removeFromGroup(item)
+                for item in self._colorBar.childItems():
+                    self._colorBar.removeFromGroup(item)
                     
-                #self.colorbar.setPos(bar_x, 0)
+                #self._colorBar.setPos(bar_x, 0)
                     
                 
             cbar_pixmap_item = QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap.fromImage(bar_qimage))
@@ -2860,13 +3010,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             back_rect.setBrush(pgraph.mkBrush("w"))
             #back_rect.setZValue(-1)
             
-            self.colorbar.addToGroup(back_rect)
-            self.colorbar.addToGroup(cbar_pixmap_item)
-            self.colorbar.addToGroup(cbar_rect)
+            self._colorBar.addToGroup(back_rect)
+            self._colorBar.addToGroup(cbar_pixmap_item)
+            self._colorBar.addToGroup(cbar_rect)
             
             for k,l in enumerate(tick_lines):
-                self.colorbar.addToGroup(l)
-                self.colorbar.addToGroup(tick_labels[k])
+                self._colorBar.addToGroup(l)
+                self._colorBar.addToGroup(tick_labels[k])
                 
             
             
@@ -3147,15 +3297,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     # private methods
     ####
     
-    def _parseVigraArrayData_(self, img):
+    def _parseVigraArrayData_(self, img:vigra.VigraArray):
         """ Extract information about image axes to figure out how to display it.
         
         For now ImageViewer only accepts images with up to three dimensions.
         
         NOTE:
-        1) a 3D image MAY be represented as a 4D vigra array with a channel axis
+        1) a 3D 'image' (or 'volume') MAY be represented as a 4D vigra array 
+            with a channel axis
         
-        2) a 2D image MAY be prepresented as a 3D vigra array with a channel axis
+        2) a 2D image MAY be represented as a 3D vigra array with a channel axis
         
         img is a vigra.VigraArray object
         
@@ -3232,7 +3383,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             traceback.print_exc()
             return False
         
-    def _applyColorTable_(self, image: vigra.VigraArray):
+    def _applyColorTable_(self, image: vigra.VigraArray, 
+                          colorMap:typing.Optional[colormaps.colors.Colormap]=None):
         """Applies the internal color table to the 2D array.
         
         Parameters:
@@ -3252,11 +3404,14 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         vigra.VigraArray: uint8 image with 4 channels. This is a copy of image, 
         with applied color table (see vigra.colors.applyColortable)
         """
+        if not isinstance(colorMap, colormaps.colors.Colormap):
+            colorMap  = self._colorMap
+            
         if isinstance(image, vigra.VigraArray):
             if np.isnan(image).any():
                 return image
             
-            if not isinstance(self.colorMap, colormaps.colors.Colormap):
+            if not isinstance(colorMap, colormaps.colors.Colormap):
                 return image
             
             if image.min() == image.max():
@@ -3266,7 +3421,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             nMap = colormaps.colors.Normalize(vmin=0, vmax=255)
             
-            sMap = colormaps.cm.ScalarMappable(norm = nMap, cmap = self.colorMap)
+            sMap = colormaps.cm.ScalarMappable(norm = nMap, cmap = colorMap)
             
             sMap.set_array(range(256))
             cTable = sMap.to_rgba(range(256), bytes=True)
@@ -3361,9 +3516,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         return img_view, dimindices
         
     @safeWrapper
-    def displayFrame(self, channel_index = None):
+    def displayFrame(self, channel_index = None, colorMap:typing.Optional[colormaps.colors.Colormap] = None):
         if channel_index is None:
             channel_index = self._displayedChannel_
+            
+        if not isinstance(colorMap, colormaps.colors.Colormap):
+            colorMap = self._colorMap
         
         if isinstance(channel_index, str):
             if channel_index.lower().strip() != "all":
@@ -3383,22 +3541,22 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if isinstance(self._data_, vigra.VigraArray):
             self._currentFrameData_, _ = self._generate_frame_view_(channel_index) # this is an array view !
             
-            if isinstance(self.colorMap, colormaps.colors.Colormap):
+            if isinstance(colorMap, colormaps.colors.Colormap):
                 if self._currentFrameData_.channels == 1:
                     if self._currentFrameData_.channelIndex < self._currentFrameData_.ndim:
                         self._currentFrameData_ = self._currentFrameData_.squeeze()
                         
-                    cFrame = self._applyColorTable_(self._currentFrameData_)
+                    cFrame = self._applyColorTable_(self._currentFrameData_, colorMap)
                     
-                    self.viewerWidget.view(cFrame.qimage(normalize = self.imageNormalize))
+                    self.viewerWidget.view(cFrame.qimage(normalize = self._imageNormalize))
                     
                 else: # don't apply color map to a multi-band frame data
                     #warnings.warn("Cannot apply color map to a multi-band image")
                     self._currentFrameData_ = self._currentFrameData_.squeeze().copy()
-                    self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self.imageNormalize))
+                    self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self._imageNormalize))
             
             else:
-                self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self.imageNormalize))
+                self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self._imageNormalize))
                 
             # TODO FIXME: what if we view a transposed array ???? (e.g. viewing it on
             # Y or X axis instead of the Z or T axis?)
@@ -3677,7 +3835,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.toolBar = QtWidgets.QToolBar("Main", self)
         self.toolBar.setObjectName("%s_Main_Toolbar" % self.__class__.__name__)
         
-        #refreshAction = self.toolBar.addAction(QtGui.QIcon(":/images/view-refresh.svg"), "Refresh")
         refreshAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh")
         refreshAction.triggered.connect(self.slot_refreshDataDisplay)
         
@@ -3703,16 +3860,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @pyqtSlot(str)
     @safeWrapper
-    def slot_testColorMap(self, item):
+    def slot_testColorMap(self, item:str):
         # NOTE 2020-11-28 10:19:07
         # upgrade to matplotlib 3.x
-        #print("ImageViewer.slot_testColorMap %s" % item)
-        if item in colormaps.cm._cmap_registry:
-            self.colorMap = colormaps.cm.get_cmap(name=item, lut=256)
-        else:
-            self.colorMap = colormaps.cm.get_cmap("None", lut=256)
-
-        self.displayFrame()
+        colorMap = colormaps.get(item)
+        self.displayFrame(colorMap=colorMap)
           
     @pyqtSlot()
     @safeWrapper
@@ -3724,31 +3876,34 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             QtWidgets.QMessageBox.information(self,"Choose Color Map","Cannot apply color maps to multi-channel images")
             return
         
-        self.prevColorMap = self.colorMap # cache the current colorMap
+        self._prevColorMap = self._colorMap # cache the current colorMap
         
         # NOTE 2020-11-28 10:19:07
         # upgrade to matplotlib 3.x
         colormapnames = sorted([n for n in colormaps.cm._cmap_registry.keys()])
         
-        if isinstance(self.colorMap, colormaps.colors.Colormap):
+        if isinstance(self._colorMap, colormaps.colors.Colormap):
             d = pgui.ItemsListDialog(self, itemsList=colormapnames,
                                      title="Select color map",
-                                     preSelected=self.colorMap.name)
+                                     preSelected=self._colorMap.name)
             
         else:
             d = pgui.ItemsListDialog(self, itemsList=colormapnames, 
                                      title="Select color map", 
                                      preSelected="None")
             
-        d.itemSelected.connect(self.slot_testColorMap) # this will SET self.colorMap to the selected one
+        d.itemSelected.connect(self.slot_testColorMap) # this will SET self._colorMap to the selected one
     
         a = d.exec_()
 
         if a == QtWidgets.QDialog.Accepted:
+            selItems = d.selectedItemsText
+            if len(selItems):
+                self.colorMap = selItems[0]
             self.displayFrame()
             
         else:
-            self.colorMap = self.prevColorMap
+            self.colorMap = self._prevColorMap
             self.displayFrame()
 
     def _editImageBrightness(self):
@@ -4090,19 +4245,22 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         #self.loadViewerSettings()
             
     def loadViewerSettings(self):
+        pass
+        # FIXME TODO 2021-08-22 22:08:19
+        # transfer this to confuse settings
         #colorMapName = self.qsettings.value("ImageViewer/ColorMap", None)
-        colorMapName = self.qsettings.value("/".join([self.__class__.__name__, "ColorMap"]), None)
+        #colorMapName = self.qsettings.value("/".join([self.__class__.__name__, "ColorMap"]), None)
         
-        #print("ImageViewer %s loadViewerSettings colorMapName" % self, colorMapName)
+        ##print("ImageViewer %s loadViewerSettings colorMapName" % self, colorMapName)
         
-        if isinstance(colorMapName, str):
-            self.colorMap = colormaps.get(colorMapName, None)
+        #if isinstance(colorMapName, str):
+            #self._colorMap = colormaps.get(colorMapName, None)
                 
-        elif isinstance(colorMapName, colormaps.colors.Colormap):
-            self.colorMap = colorMapName
+        #elif isinstance(colorMapName, colormaps.colors.Colormap):
+            #self._colorMap = colorMapName
             
-        else:
-            self.colorMap = None
+        #else:
+            #self._colorMap = None
         
         #color = self.qsettings.value("/".join([self.__class__.__name__, "CursorColor"]), None)
         #if isinstance(color, QtGui.QColor) and color.isValid():
@@ -4152,19 +4310,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         #if isinstance(color, QtGui.QColor) and color.isValid():
             #self.opaqueROILabel = color
             
-    #def saveSettings(self):
-        ## NOTE: 2021-07-08 09:51:30
-        ## saveWindowSettings is inherited rom ScipyenViewer and does nothing if
-        ## self.parent() is not Scipyen's main window
-        #self.saveWindowSettings() # inherited from ScipyenViewer
-        #self.saveViewerSettings()
-        
     def saveViewerSettings(self):
-        if isinstance(self.colorMap, colormaps.colors.Colormap):
-            self.qsettings.setValue("/".join([self.__class__.__name__, "ColorMap"]), self.colorMap.name)
+        pass
+        #if isinstance(self._colorMap, colormaps.colors.Colormap):
+            #self.qsettings.setValue("/".join([self.__class__.__name__, "ColorMap"]), self._colorMap.name)
             
-        else:
-            self.qsettings.setValue("/".join([self.__class__.__name__, "ColorMap"]), None)
+        #else:
+            #self.qsettings.setValue("/".join([self.__class__.__name__, "ColorMap"]), None)
         
         #self.qsettings.setValue("/".join([self.__class__.__name__, "CursorColor"]), self.cursorsColor)
         #self.qsettings.setValue("/".join([self.__class__.__name__, "CursorLabelTextColor"]), self.cursorLabelTextColor)
@@ -4246,16 +4398,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             displaychannel: int, "all", or None (default)
         '''
         
-        self.imageNormalize     = normalize
-        self.imageGamma         = gamma
+        self._imageNormalize     = normalize
+        self._imageGamma         = gamma
         
         if isinstance(colormap, colormaps.colors.Colormap):
-            self.colorMap = colormap
+            self._colorMap = colormap
 
-        if self.colorbar is not None:
-            self.viewerWidget.scene.removeItem(self.colorbar)
+        if self._colorBar is not None:
+            self.viewerWidget.scene.removeItem(self._colorBar)
             
-        self.colorbar = None
+        self._colorBar = None
                 
         if displayChannel is None:
             self._displayedChannel_      = "all"
@@ -4335,26 +4487,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.displayScaleBarAction.setChecked(False)
         #self.displayScaleBarAction.toggled[bool].connect(self.slot_displayScaleBar)
         
-        if self.colorbar is not None:
-            self.viewerWidget.scene.removeItem(self.colorbar)
+        if self._colorBar is not None:
+            self.viewerWidget.scene.removeItem(self._colorBar)
             
-            self.colorbar = None
+            self._colorBar = None
         
         self.viewerWidget.clear()
-        
-    def setColorMap(self, value):
-        if isinstance(value, str):
-            self.colorMap = colormaps.get(value, None)
-            #self.colorMap = colormaps.cm.get_cmap(value)
-            #self.colorMap = colormaps.get(value, None)
-            
-        elif isinstance(value, colormaps.colors.Colormap):
-            self.colorMap = value
-                
-        else:
-            return
-        
-        self.displayFrame()
         
         
     def showScaleBars(self, origin=None, length=None, calibrated_length=None, pen=None, units=None):
@@ -4486,6 +4624,85 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         self._scaleBarLength_ = length
         self._scaleBarOrigin_ = origin
+        
+    def addCursors(self, **kwargs):
+        """Programmatically add a set of cursors
+        
+        Var-keyword parameters:
+        =======================
+        Mapping of cursor name (str) to a dict with fields:
+        "type": str (valid PlanarGraphicsType name)
+        "pos": tuple (x,y) of coordinates
+        
+        Example:
+        
+        addCursors(**dict(map(lambda k: ("Cursor%i"%k, {"type":"vertical", "pos": (50 + 50 * k, 0)}), range(2))))
+        
+        """
+        if self.viewerWidget.scene.rootImage is None:
+            return 
+        
+        k = 0
+        
+        for name, type_pos in kwargs.items():
+            ctype = type_pos.get("type", None)
+            cpos = type_pos.get("pos", None)
+            
+            if isinstance(ctype, str):
+                cursor_type_names = filter(lambda x: x.endswith("_cursor"), pgui.PlanarGraphicsType.names())
+                sub_match = list(filter(lambda x: ctype in x, cursor_type_names))
+                if ctype in cursor_type_names:
+                    ctype = pgui.PlanarGraphicsType["ctype"]
+                    
+                elif len(sub_match):
+                    ctype = pgui.PlanarGraphicsType[sub_match[0]]
+                    
+                else:
+                    continue # no known cursor type
+                
+            elif isinstance(ctype, pgui.PlanarGraphicsType):
+                if not ctype.is_primitive() or not ctype.name.endswith("_cursor"):
+                    continue
+                
+            else:
+                continue
+                    
+            if not isinstance(cpos, (tuple, list)) or len(cpos) != 2 or not all((isinstance(v, numbers.Number) for v in cpos)):
+                continue
+            
+            if ctype == pgui.PlanarGraphicsType.vertical_cursor:
+                factory = pgui.VerticalCursor
+                
+            elif ctype == pgui.PlanarGraphicsType.horizontal_cursor:
+                factory = pgui.HorizontalCursor
+                
+            elif ctype == pgui.PlanarGraphicsType.crosshair_cursor:
+                factory = pgui.CrosshairCursor
+                
+            elif ctype == pgui.PlanarGraphicsType.point_cursor:
+                factory = pgui.PointCursor
+                
+            else:
+                continue
+            
+            obj = factory(cpos[0], cpos[1],
+                          self.viewerWidget.scene.sceneRect().width(),
+                          self.viewerWidget.scene.sceneRect().height(),
+                          self.viewerWidget.__cursorWindow__, 
+                          self.viewerWidget.__cursorWindow__,
+                          self.viewerWidget.__cursorRadius__,
+                          name=name,
+                          frameindex=[],
+                          currentFrame = self.currentFrame,
+                          )
+            
+            self.addPlanarGraphics(obj, showLabel=True, labelShowsPosition=True)
+            # NOTE: 2021-09-16 12:11:54
+            # these two are needed to that we can move the thing with the mouse
+            # FIXME this should not happen
+            obj.x = cpos[0]
+            obj.y = cpos[1]
+            
         
     def addPlanarGraphics(self, item:pgui.PlanarGraphics, movable:bool = True, 
                           editable:bool = True, showLabel:bool = True, 

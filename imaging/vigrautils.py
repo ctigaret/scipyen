@@ -1,35 +1,97 @@
+import typing
 import vigra
 import numpy as np
 import quantities as pq
 from .axiscalibration import AxisCalibration
+from imaging import axisutils
 
-def getFrameLayout(img, userFrameAxis=None):
+#def defaultFrameAxis(x:vigra.VigraArray) -> str:
+    #"""A 'frame axis' is the axis along which array slices are viewed as 'frames'.
+    #It's just semantics...
+    
+    #Parameters:
+    #----------
+    #x: vigra.VigraArray
+    
+    #Returns:
+    #-------
+    #A str: the key of the 'frame' axis. 
+    
+    #Example 1: For a 3D VigraArray with no channel axis, but where the third 
+    #(i.e. highest-order) axis is a time axis, array slices along this axis are 
+    #considered 'frames' each with data from a particular time instance. 
+    #Similarly, if the higher-order axis is a space axis, the slices along it are
+    #considered 'frames' each with data at a particular space coordinate along 
+    #this axis (as in the case of a confocal image 'stack').
+    
+    #Example 2: For a 4D VigraArray with one channel axis, the channel axis is 
+    #TYPICALLY the one with the highest order, but this is NOT specially enforced
+    #in VIGRA.
+    
+    #If the channel axis IS the axis with the highest order, then the frame axis
+    #is taken to be the next highest order axis. For an array with axistags
+    #(x, y, z(t), c), the axis corresponding to 'z' (or to 't') is considered the
+    #frame axis.
+    
+    #A default frame axis cannot be set for ambiguous situations where the 
+    #VigraArray has:
+    
+    #* 4D without a channel axis 
+    
+    #* 5D (4D and one channel axis)
+    
+    #By default, VigraArray's do not support higher dimensions.
+    
+    #"""
+    ## NOTE: 2021-03-08 13:39:10
+    ## channelIndex is a vigra array property: this is the index of the channel 
+    ## axis (if it exists) or array's ndim otherwise (which therefore indicates
+    ## that a channel axis is NOT defined / DOES NOT exist).
+    ##
+    ## Here, a 'channel' is in VIGRA's sense.
+    #chindex = x.channelIndex
+    
+    #if chindex == x.ndim:
+        ## NOTE: 2021-09-25 23:11:44
+        ## no channel axis; in this case, we take the axis with the highest order
+        ## as the 'frame axis'
+        #return x.axistags[-1].key
+    
+def getFrameLayout(img:vigra.VigraArray, 
+                   userFrameAxis:typing.Optional[typing.Union[str, vigra.AxisInfo, int, 
+                                                              typing.Sequence[typing.Union[str, vigra.AxisInfo, int]]]]=None) -> typing.Tuple[int, typing.Optional[typing.Union[vigra.AxisInfo, typing.List[vigra.AxisInfo]]], vigra.AxisInfo, vigra.AxisInfo, vigra.AxisInfo]:
     """Parses a vigra array to identify a reasonable axis defining "frames".
     
     A frame is a 2D array or array view.
     
     Parameters:
     ===========
-    img: a VigraArray
+    img: VigraArray
+    userFrameAxis: str, int, AxisInfo, or tuple/list of any of these
     
     Returns:
     ========
-    A tuple (nFrames:int, frameAxisInfo:vigra.AxisInfo, widthAxisInfo:vigra.AxisInfo, heightAxisInfo:vigra.AxisInfo)
-    where:
+    A tuple with the following elements:
      
     nFrames:int = the number of putative frames along the "frame" axis
+    
+    All the others are vigra.AxisInfo objects, None, or tuple of vigra.AxisInfo
      
     frameAxisInfo:vigra.AxisInfo = the AxisInfo along which the array will can
-        be "sliced" into frames to be duisplayed individually
-        NOTE: this may be None, a vigra.AxisInfo or a sequence of 
-        vigra.AxisInfo objects for arrays with more than 3 dimensions (to enable
-        iteration across nested frames)
+        be "sliced" into frames to be displayed individually
+        
+        NOTE: this may be None, a vigra.AxisInfo or a sequence of vigra.AxisInfo 
+        objects for arrays with more than 3 dimensions (to enable iteration across
+        'nested' frames)
      
     widthAxisInfo:vigra.AxisInfo = the axis for the image "width" : the first 
         non-channel axis (which is also the innermost non-channel axis given by 
         img.innerNonChannelIndex property)
         
-    heightAxisInfo:vigra.AxisInfo = the axis of the image "height" : the 2nd dimension (second non-channel axis)
+    heightAxisInfo:vigra.AxisInfo = the axis of the image "height" : the 2nd 
+        dimension (second non-channel axis)
+        
+    channelAxisInfo:vigra.AxisInfo = the channel axis
      
      NOTE the last two values need not be along the first and second axis, as this
      depends on which axis is the channel axis (if it exists); by default, in vigra 
@@ -41,7 +103,8 @@ def getFrameLayout(img, userFrameAxis=None):
     
     A "frame" is a 2D slice view of a VigraArray. Arrays can be sliced along 
     any axis, including a channel axis. This function attempts to "guess"
-    a reasonable axis along which the array can be sliced into 2D frames.
+    a reasonable axis along which the array can be sliced into meaningful 2D 
+    frames.
     
     NOTE: 2018-09-14 23:14:38
     give up on "separateChannels" thing -- useless; for arrays with > 4 dimensions
@@ -58,13 +121,10 @@ def getFrameLayout(img, userFrameAxis=None):
     if img.ndim == 0:
         raise TypeError("Expecting a VigraArray with at least 1 dimension")
     
-    #if img.axistags.axisTypeCount(vigra.AxisType.NonChannel) < 2:
-        #raise TypeError("Expecting at least two non-channel axes; got %d instead" % (img.axistags.axisTypeCount(vigra.AxisType.NonChannel)))
-    
     #bring userFrameAxis to a common denominator: an AxisInfo object, or None
     if isinstance(userFrameAxis, (vigra.AxisInfo, str)):
         if userFrameAxis not in img.axistags:
-            # CAUTION equality testing for AxisInfo objects ONLY  takes into
+            # CAUTION equality testing for AxisInfo objects ONLY takes into
             # account the axis typeFlags and key
             raise ValueError("Axis %s not found in image" % userFrameAxis.key)
         
@@ -97,9 +157,6 @@ def getFrameLayout(img, userFrameAxis=None):
         warnings.warn("Invalid user frame axes specification; will set it to None", RuntimeWarning)
         userFrameAxis = None
         
-    #if isinstance(userFrameAxis, vigra.AxisInfo) and userFrameAxis.typeFlags & vigra.AxisType.Channels:
-        #raise TypeError("Cannot use a Channels axis as frame axis")
-    
     xIndex = img.axistags.index("x")
     yIndex = img.axistags.index("y")
     zIndex = img.axistags.index("z")

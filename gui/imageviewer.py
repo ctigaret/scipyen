@@ -3297,15 +3297,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     # private methods
     ####
     
-    def _parseVigraArrayData_(self, img):
+    def _parseVigraArrayData_(self, img:vigra.VigraArray):
         """ Extract information about image axes to figure out how to display it.
         
         For now ImageViewer only accepts images with up to three dimensions.
         
         NOTE:
-        1) a 3D image MAY be represented as a 4D vigra array with a channel axis
+        1) a 3D 'image' (or 'volume') MAY be represented as a 4D vigra array 
+            with a channel axis
         
-        2) a 2D image MAY be prepresented as a 3D vigra array with a channel axis
+        2) a 2D image MAY be represented as a 3D vigra array with a channel axis
         
         img is a vigra.VigraArray object
         
@@ -3340,7 +3341,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         try:
             # there may be a previous image stored here
-            if self._data_ is not None and len(self.cursors) > 0: # parse width/height of previos image if any, to check against existing cursors
+            if self._data_ is not None and len(self.dataCursors) > 0: # parse width/height of previos image if any, to check against existing cursors
                 #if self._data_.width != img.width or self._data_.height != img.height:
                 if self._data_.shape[self._data_.axistags.index(self.widthAxisInfo.key)] != img.shape[img.axistags.index(widthAxisInfo.key)] or \
                     self._data_.shape[self._data_.axistags.index(self.heightAxisInfo.key)] != img.shape[img.axistags.index(heightAxisInfo.key)]:

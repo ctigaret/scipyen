@@ -1731,6 +1731,37 @@ class ScanData(object):
         volume      = 2
         
     apiversion = (0,3)
+    
+    _data_components_ = ("scene", "scans", "ephys", 
+                         "scansProfiles", "sceneProfiles", 
+                         "scansBlock", "sceneBlock",
+                         "triggerProtocols")
+    
+    def _get_data_component_(self, component):
+        """
+        Parameters:
+        ==========
+        component: str, one of: 
+            "electrophysiology" "ephys", "scansProfiles", "sceneProfiles", 
+            "scansBlock", "sceneBlock", "scans", "scene"
+        """
+        if component in ("electrophysiology", "ephys"):
+            component = ephys
+            
+        if component not in self._data_components_:
+            raise ValueError(f"Unknown data component: {component}")
+        
+        data = getattr(self, component, None)
+        
+        if data is None:
+            return
+        
+    def _get_image_frame_axis_(self, component):
+        """
+        Parameters:
+        ==========
+        component: str, one of: "scans", "scene"
+        """
         
     def __init__(self, scene: (vigra.VigraArray, tuple, list, type(None)) = None, 
                  scans: (vigra.VigraArray, tuple, list, type(None)) = None, 
@@ -2665,14 +2696,18 @@ class ScanData(object):
                 
                 if sceneFrameAxis is None: # find out a reasonable frame axis; avoid channel axis
                     # NOTE: 2021-03-08 13:39:10
-                    # channelIndex is a vigra array property
+                    # channelIndex is a vigra array property: this is the index 
+                    # of the channel axis (if it exists) or array's ndim otherwise
+                    # (this indicatd a channel axis does NOT exist)
                     chindex = scene.channelIndex 
                     
-                    if chindex == scene.ndim: # no explicit channel axis
+                    if chindex == scene.ndim: # no explicit channel axis in the array's axistags
+                        # since a frame axis has NOT been specified in the call
+                        # parameters, we take the LAST axis as the frame axis
                         self._scene_frames_       = scene.shape[-1]
                         self._scene_frame_axis_   = scene.axistags[-1].key
                         
-                    else: # some explicit channel axis
+                    else: # an explicit channel axis exists in the array's axistags
                         # accommodate unusual axes layouts
                         if chindex < scene.ndim-1: # channel axis somewhere below the highest dimension
                             self._scene_frames_ = scene.shape[chindex+1] # take frames along the axis on the next highest dimension
@@ -10017,7 +10052,7 @@ class ScanData(object):
         self._processed_ = value
     
     @property
-    def scene(self):
+    def scene(self) -> list:
         """Direct access to the scene data.
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
@@ -10074,7 +10109,7 @@ class ScanData(object):
     
     @property
     def sceneFrames(self):
-        """Read-only; 
+        """Read-only. Alias to nSceneFrames
         
         Can only be changed indirectly, by either:
         1) changing the sceneFrameAxis
@@ -10083,10 +10118,7 @@ class ScanData(object):
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
         """
-        if len(self._scene_) == 0:
-            return 0
-        
-        return self._scene_frames_
+        return self.nSceneFrames
     
     @property
     def sceneChannels(self):
@@ -10134,7 +10166,6 @@ class ScanData(object):
         multi-channel VigraArray
         
         """
-        
         if len(self.scene) == 0:
             return
         
@@ -10164,8 +10195,8 @@ class ScanData(object):
             raise ValueError("Expecting a str list with as many elements as channels (%d); got %d elements instead" % (self.sceneChannels, len(value)))
         
     @property
-    def scans(self):
-        """Direct access to the linescan data.
+    def scans(self) -> list:
+        """Access to the linescan data.
         
         Although this property is read-only, the linescan data can be altered, because
         it is just a reference to a VigraArray!
@@ -10176,13 +10207,80 @@ class ScanData(object):
         """
         return self._scans_
     
+    def nFrames(self, component):
+        """Returns the number of image frames(1) or data sweeps(2)
+        
+        NOTE:
+        1) For the scene and scans
+        2) For electrophysiology and 1D-data _derived_ from the scene and scans.
+        The latter contains data computed along one of the axes of an image frame,
+        such as pixel intensity along a line, etc.
+        Parameters:
+        ==========
+        component: str, one of: 
+            "electrophysiology" "ephys", "scansProfiles", "sceneProfiles", 
+            "scansBlock", "sceneBlock", "scans", "scene"
+        """
+        
+        data = self._get_data_component_(component)
+        
+        if isinstance(data, list) and all(isinstance(v, VigraArray) for v in data):
+            return 
+    
     @property
-    def nScanFrames(self):
-        return self._scans_frames_
+    def nEphysSweeps(self):
+        if isinstance(self.ephys, neo.Block) and not neoutils.is_empty(self.ephys, ignore=(TriggerEvent, neo.Event, neo.Epoch)):
+            return len(self.ephys.segments)
+        
+        return 0
+    
+    @property
+    def nScansDataSweeps(self):
+        if isinstance(self.scansBlock, neo.Block) and not neoutils.is_empty(self.scansBlock, ignore=(TriggerEvent, neo.Event, neo.Epoch)):
+            return len(self.scansBlock.segments)
+        
+        return 0
+    
+    @property
+    def nSceneDataSweeps(self):
+        if isinstance(self.sceneBlock, neo.Block) and not neoutils.is_empty(self.sceneBlock, ignore=(TriggerEvent, neo.Event, neo.Epoch)):
+            return len(self.sceneBlock.segments)
+        
+        return 0
+    
+        
+        
+    
+    @property
+    def nImageFrames(self, data_component:str="scans"):
+        if data_component.lower().strip()=="scans":
+            return self.nScansFrames
+        
+        else:
+            return self.nSceneFrames
+    
+    @property
+    def nScansFrames(self):
+        # NOTE: 2021-09-25 15:27:14
+        # self.scans is ALWAYS a list!
+        # For multichannel images, scans can have ONE multi-channel VigraArray, OR
+        # several single-channel VigraArrays !!!
+        if len(self.scans):
+            return self.scans[0].shape[self.scans[0].axistags.index(self._scans_frame_axis_)]
+        
+        return 0
+        #return self._scans_frames_
     
     @property
     def nSceneFrames(self):
-        return self._scene_frames_
+        # NOTE: 2021-09-25 15:27:24
+        # self.scene is ALWAYS a list!
+        # For multichannel images, scene can have ONE multi-channel VigraArray, OR
+        # several single-channel VigraArrays !!!
+        if len(self.scene):
+            return self.scene[0].shape[self.scene[0].axistags.index(self._scene_frame_axis_)]
+        #return self._scene_frames_
+        return 0
     
     @property
     def scansFrameAxis(self):
@@ -10213,25 +10311,21 @@ class ScanData(object):
         if not isinstance(value, str):
             raise TypeError("Expecting a str; got %s instead" % type(value).__name__)
         
-        if len(self.scans) == 1:
-            if value not in self.scans.axistags:
-                raise ValueError("Axis %s not found in scans." % value)
-            
-            self._scans_frame_axis_ = value
-            self._scans_frames_ = self.scans.shape[self.scans.axistags.index(value)]
-            
-        else:
-            if value not in self.scans[0].axistags:
-                raise ValueError("Axis % not found in scans." % value)
-            
-            self._scans_frame_axis_ = value
-            self._scans_frames_ = self.scans[0].shape[self.scans[0].axistags.index(value)]
-            
+        # NOTE: 2021-09-25 15:20:41
+        # self.scans is ALWAYS a list!
+        # For multichannel images, scans can have ONE multi-channel VigraArray, OR
+        # several single-channel VigraArrays !!!
+        if value not in self.scans[0].axistags:
+            raise ValueError("Axis %s not found in scans." % value)
+        
+        self._scans_frame_axis_ = value
+        self._scans_frames_ = self.scans[0].shape[self.scans[0].axistags.index(value)]
+        
     @property
     def scansFrameAxisIndex(self):
         """Read-only.
         
-        It an only be omodified implicitly by changing the scansFrameAxis property
+        It can only be modified implicitly by changing the scansFrameAxis property
         
         This property is None when scansFrameAxis is None or there is no scans data.
         
@@ -10251,7 +10345,7 @@ class ScanData(object):
     
     @property
     def scansFrames(self):
-        """Read-only.
+        """Read-only. Aslias to nScansFrames
         
         Can only be modifier indirectly by either:
         1) changing selfFrameAxis
@@ -10261,10 +10355,7 @@ class ScanData(object):
         multi-channel VigraArray
         
         """
-        if len(self._scans_) == 0:
-            return 0
-        
-        return self._scans_frames_
+        return self.nScansFrames
 
     @property
     def scansChannels(self):

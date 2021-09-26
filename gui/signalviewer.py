@@ -134,7 +134,7 @@ from iolib import pictio as pio
 #### END pict.iolib modules
 
 #### BEGIN pict.core modules
-#from core import datatypes as dt
+import core.signalprocessing as sgp
 from core import (xmlutils, strutils, neoevent, neoepoch, neoutils, )
 from core.neoutils import (get_non_empty_spike_trains,get_non_empty_events,
                            get_segments_in_channel_index, 
@@ -149,10 +149,10 @@ from core.datatypes import (arraySlice, isColumnVector, isVector, normalized_ind
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.triggerprotocols import TriggerProtocol
-#from core.utilities import (unique, get_nested_value, set_nested_value,)
 from core.workspacefunctions import validate_varname
 from core.scipyen_config import markConfigurable
 from core.traitcontainers import DataBag
+
 
 from imaging.vigrautils import vigraKernel1D_to_ndarray
 
@@ -2325,13 +2325,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return crsId
     
     def get_axis_xData_precision(self, axis):
-        pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
+        #pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
+        pXData = (i.xData[~np.isnan(i.xData)] for i in axis.items if sgp.nansize(i.xData) > 1)
         
-        if len(pdis):
-            precisions = [int(abs(np.round(np.log10(np.diff(p.xData).mean())))) for p in pdis]
+        precisions = [int(abs(np.round(np.log10((np.diff(x)).mean())))) for x in pXData]
+        if len(precisions):
             return min(precisions)
             
-        return 3
+        return SignalCursor.default_precision
         
 
     @pyqtSlot((QtCore.QPoint))
