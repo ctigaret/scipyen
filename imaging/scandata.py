@@ -1,4 +1,4 @@
-import enum, collections, numbers, configparser, itertools, inspect, 
+import enum, collections, numbers, configparser, itertools, inspect
 import types, typing
 from traitlets import Bunch
 import numpy as np
@@ -80,13 +80,6 @@ class FrameLookup(object):
         """
         if self._ckeckargs_(args):
             self._map_ = dict(*args)
-            
-        if len(args):
-            if len(args) == 1:
-                if 
-            if all(self._checkargs_(v) for v in args):
-                self._map_ = dict(*args)
-        self._map_ = dict(*args, **kwargs)
         
         
     
