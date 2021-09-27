@@ -50,24 +50,7 @@ DEFAULTS["Channels"]["Bleed"]["Ref2Ind"] = 0.
 DEFAULTS["Channels"]["Bleed"]["Ind2Ref"] = 0.
 
 class FrameLookup(object):
-    def _checkargs_(self, *args):
-        if len(args) == 1:
-            if inspect.isgenerator(args[0]):
-                return all((self._checkargs_(*args[0])))
-            if isinstance(args[0], (tuple, list)):
-                if len(args[0]) == 2:
-                    if isinstance(args[0][0], int) and args[0][0]>=0 and isinstance(args[0][1], dict) and all((k in ("scans", "scene", "ephys") and isinstance(v, int) and v >= 0 for k,v in args[0][1].items())):
-                        return True
-                    return self._checkargs_(*args[0])
-                else:
-                    return self._checkargs_(*args[0])
-                
-            elif isinstance(args[0], dict):
-                return all((isinstance(k, int) and k >= 0 and isinstance(v, dict) and all((kk in ("scene", "scans", "ephys") and isinstance(vv, int) and vv >=0 for kk,vv in v.items()))) for k,v in args[0].items())
-                                
-
-        else:
-            return all((self._ckeckargs_(a) for a in args))
+    # virtual_frame_index: dict{"scene":int, "scans":int, "ephys":int}
             
     def __init__(self, *args):
         """
@@ -76,11 +59,37 @@ class FrameLookup(object):
             data_component: str, one of 'scans','scene','ephys'
             data_frame_index: int >= 0
             
-        **
-        """
-        if self._ckeckargs_(args):
-            self._map_ = dict(*args)
         
+        """
+        if len(args) == 1:
+            if isinstance(args[0], dict):
+                self._map_ = dict(args[0])
+            elif isinstance(args[0], (map, tuple, list, collections.deque)) or inspect.isgenerator(args[0]):
+                self._map_ = dict(*args[0])
+            else:
+                raise TypeError(f"I don't know what to do with {args}")
+        else:
+            self._map_ = dict(args)
+        
+        if not all(isinstance(k, int) for k in self._map_.keys()):
+            raise TypeError("FrameLookup can have only int keys")
+        
+        if any(k < 0 for k in self._map_keys()):
+            raise ValueError("A FrameLookup object cannot have negative keys")
+        
+        if not all(isinstance(v, dict) for v in self._map_.values()):
+            raise TypeError("In a FrameLookup, int keys must be mapped to dict objects")
+        
+        if not all(itertools.chain(*((k in ("scene", "scans", "ephys") for k in v.keys()) for v in self._map_values())))
+            raise TypeError("All keys in the mapping values must be one of 'scene', 'scans', 'ephys'")
+        
+        if not all(itertools.chain(*((isinstance(v, int) and d >= 0 for v in d.keys()) for d in self._map_values())))
+            raise TypeError("All the mapped frames must be int values >= 0")
+        
+        print("self._map_:", self._map_)
+        
+        def __getitem__(self, key:int):
+            return self._map_[key]
         
     
         
