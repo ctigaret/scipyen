@@ -30,7 +30,12 @@ import numpy as np
 import pandas as pd
 #import xarray as xa
 import h5py
-import vigra
+has_vigra=False
+try:
+    import vigra
+    has_vigra=True
+except:
+    pass
 import neo
 import confuse # for programmatic read/write of non-gui settings
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -48,10 +53,9 @@ from core.prog import (ContextExecutor, safeWrapper, check_neo_patch,
 
 from core.workspacefunctions import (user_workspace, assignin, debug_scipyen,
                                      get_symbol_in_namespace,)
-
-from imaging import (axisutils, axiscalibration, scandata, )
-
-from imaging.axisutils import *
+if has_vigra:
+    from imaging import (axisutils, axiscalibration, scandata, )
+    from imaging.axisutils import *
 
 #import datatypes
 #### END pict.core modules
@@ -93,21 +97,22 @@ except Exception as e:
 
 # NOTE: 2016-04-01 10:58:32
 # let's have this done once and for all
-__vigra_formats__ = vigra.impex.listExtensions()
 __ephys_formats__ = ["abf"]
 __generic_formats__ = ["pkl", "h5", "csv"]
 __tabular_formats__ = ["xls", "xlsx", "xlsm", "xlsb", "odf", "ods", "odt", "csv", "tsv" ]
-
-#SUPPORTED_IMAGE_TYPES = __vigra_formats__.split() + [i for i in bioformats.READABLE_FORMATS if i not in __vigra_formats__]
-SUPPORTED_IMAGE_TYPES = __vigra_formats__.split() # + [i for i in bioformats.READABLE_FORMATS if i not in __vigra_formats__]
-#del(i)
-SUPPORTED_IMAGE_TYPES.sort()
 
 SUPPORTED_EPHYS_FILES = __ephys_formats__
 SUPPORTED_EPHYS_FILES.sort()
 
 SUPPORTED_GENERIC_FILES = __generic_formats__
 SUPPORTED_GENERIC_FILES.sort()
+
+if has_vigra:
+    __vigra_formats__ = vigra.impex.listExtensions()
+    #SUPPORTED_IMAGE_TYPES = __vigra_formats__.split() + [i for i in bioformats.READABLE_FORMATS if i not in __vigra_formats__]
+    SUPPORTED_IMAGE_TYPES = __vigra_formats__.split() # + [i for i in bioformats.READABLE_FORMATS if i not in __vigra_formats__]
+    #del(i)
+    SUPPORTED_IMAGE_TYPES.sort()
 
 # NOTE: 2017-06-29 14:36:20
 # move file handling from ScipyenWindow here
@@ -123,12 +128,11 @@ user_mime_types_file = os.path.join(os.path.expanduser("~"), ".mime.types")
 if os.path.isfile(user_mime_types_file):
     mimetypes_knownfiles.append(user_mime_types_file)
 
-
 mimetypes.init(mimetypes_knownfiles)
-
-for ext in SUPPORTED_IMAGE_TYPES:
-    if mimetypes.guess_type("_."+ext)[0] is None:
-        mimetypes.add_type("image/"+ext, "."+ext)
+if has_vigra:
+    for ext in SUPPORTED_IMAGE_TYPES:
+        if mimetypes.guess_type("_."+ext)[0] is None:
+            mimetypes.add_type("image/"+ext, "."+ext)
         
 # NOTE: 2019-04-21 18:16:01
 # manual, old & cumbersome way
@@ -427,7 +431,7 @@ def __ndArray2csv__(data, writer):
         
     
 # NOTE: 2017-09-21 16:34:21
-# BioFormats dumped mid 2017 because there are nor good python ports to it
+# BioFormats dumped mid 2017 because there are no good python ports to it
 # (it uses javabridge which is suboptimal)
 def loadImageFile(fileName:str, asVolume:bool=False, axisspec:[collections.OrderedDict, None]=None) -> ([vigra.VigraArray, np.ndarray],):
     ''' Reads pixel data from an image file

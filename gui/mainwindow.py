@@ -125,8 +125,14 @@ plt.ion()
 import quantities as pq
 import xarray as xa
 import h5py
-import vigra
-#import vigra.pyqt
+has_vigra=False
+try:
+    import vigra
+    #import vagra # simulate lack of vigra
+    has_vigra=True
+except ImportError:
+    pass
+
 import neo
 #### END numerics & data visualization
 
@@ -223,7 +229,8 @@ from iolib import pictio as pio
 
 #### BEGIN scipyen gui modules
 from . import dictviewer as dv
-from . import imageviewer as iv
+if has_vigra:
+    from . import imageviewer as iv
 from . import matrixviewer as matview
 from . import signalviewer as sv
 from . import tableeditor as te
@@ -259,13 +266,14 @@ from systems import *
 #### END scipyen systems modules
 
 #### BEGIN scipyen imaging modules
-from imaging import (imageprocessing as imgp, imgsim,)
-from imaging.axiscalibration import (AxisCalibration,)
-from imaging.scandata import (AnalysisUnit, ScanData,)
+if has_vigra:
+    from imaging import (imageprocessing as imgp, imgsim,)
+    from imaging.axiscalibration import (AxisCalibration,)
+    from imaging.scandata import (AnalysisUnit, ScanData,)
 
-import imaging.CaTanalysis as CaTanalysis 
-if CaTanalysis.LSCaTWindow not in gui_viewers:
-    gui_viewers += [CaTanalysis.LSCaTWindow]
+    import imaging.CaTanalysis as CaTanalysis 
+    if CaTanalysis.LSCaTWindow not in gui_viewers:
+        gui_viewers += [CaTanalysis.LSCaTWindow]
 #### END scipyen imaging modules
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -1695,7 +1703,12 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # and, if not, then remove
         # finally, inject self into relevant modules:
         #for m in (ltp, ivramp, membrane, epsignal, CaTanalysis, pgui, sigp, imgp, crvf, plots):
-        for m in (ltp, ivramp, membrane, CaTanalysis, pgui, sigp, imgp, crvf, plots):
+        if has_vigra:
+            self_aware_modules = (ltp, ivramp, membrane, CaTanalysis, pgui, sigp, imgp, crvf, plots)
+        else:
+            self_aware_modules = (ltp, ivramp, membrane, pgui, sigp, crvf, plots)
+            
+        for m in self_aware_modules:
             m.__dict__["mainWindow"] = self
             m.__dict__["workspace"] = self.workspace
             

@@ -5,7 +5,7 @@
 
 # Running scipyan in Spyder 3
 
-At the moment, scypian can be run in spyder3 as a separate process.
+At the moment, scypien can be run in spyder3 as a separate process.
 
 This is equivalent to running pict.py from the scypian directory, in a shell: it simply
 starts a separate python3 process, with its own PyQt5 event loop, embedded
@@ -34,7 +34,7 @@ syntax highlighting (one could use Kate for this).
     
 2. Open the project (if project already created) by 
             selecting its location, e.g.:
-> /home/cezar/scypian
+> /home/cezar/scypien
         
 3. Open pict.py in spyder editor
         

@@ -80,10 +80,10 @@ class FrameLookup(object):
         if not all(isinstance(v, dict) for v in self._map_.values()):
             raise TypeError("In a FrameLookup, int keys must be mapped to dict objects")
         
-        if not all(itertools.chain(*((k in ("scene", "scans", "ephys") for k in v.keys()) for v in self._map_values())))
+        if not all(itertools.chain(*((k in ("scene", "scans", "ephys") for k in v.keys()) for v in self._map_values()))):
             raise TypeError("All keys in the mapping values must be one of 'scene', 'scans', 'ephys'")
         
-        if not all(itertools.chain(*((isinstance(v, int) and d >= 0 for v in d.keys()) for d in self._map_values())))
+        if not all(itertools.chain(*((isinstance(v, int) and d >= 0 for v in d.keys()) for d in self._map_values()))):
             raise TypeError("All the mapped frames must be int values >= 0")
         
         print("self._map_:", self._map_)
