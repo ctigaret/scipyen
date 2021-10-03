@@ -3075,31 +3075,37 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #print("slot_variableItemNameChanged old", originalVarName, "new", newVarName)
             
         if len(newVarName.strip()) == 0: # no change, really; prevent accidental deletion
-            newVarName = originalVarName
             self.workspaceModel.itemChanged.disconnect(self.slot_variableItemNameChanged)
-            item.setText(newVarName)
+            item.setText(originalVarName)
             self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
             return
         
         if newVarName != originalVarName:
+            if originalVarName in self.workspace:
+                data = self.workspace.pop(originalVarName)
+                self.workspace[newVarName] = data
+                self.workspaceModel.update()
+                
             # NOTE: 2017-09-22 21:57:23
             # check newVarName for sanity
-            newVarNameOK = validate_varname(newVarName, self.workspace)
+            # FIXME 2021-10-03 22:21:36 
             
-            if newVarNameOK != newVarName: # also update the item's text
-                self.workspaceModel.itemChanged.disconnect(self.slot_variableItemNameChanged)
-                item.setText(newVarNameOK)
-                self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
+            #newVarNameOK = validate_varname(newVarName, self.workspace)
+            
+            #if newVarNameOK != newVarName: # also update the item's text
+                #self.workspaceModel.itemChanged.disconnect(self.slot_variableItemNameChanged)
+                #item.setText(newVarNameOK)
+                #self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
                 
-            data = self.workspace.pop(originalVarName, None)
+            #data = self.workspace.pop(originalVarName, None)
             
-            #print("slot_variableItemNameChanged old", originalVarName, "new", newVarName, "new2", newVarNameOK)
+            ##print("slot_variableItemNameChanged old", originalVarName, "new", newVarName, "new2", newVarNameOK)
             
-            if data is None:
-                return
+            #if data is None:
+                #return
             
-            self.workspace[newVarNameOK] = data
-            self.workspaceModel.update()
+            #self.workspace[newVarNameOK] = data
+            #self.workspaceModel.update()
                 
     @pyqtSlot()
     @safeWrapper

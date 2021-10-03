@@ -2165,18 +2165,22 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
     objtype = type(obj)
     typename = objtype.__name__
-    
+    ttip = typename
     
     wspace_name = "Namespace: %s" % namespace
-    if isinstance(obj, str):
-        ttip = obj
-    elif isinstance(obj, (tuple, list)):
-        ttip = "%s" % (obj,)
-    else:
-        try:
-            ttip = "%s" % obj
-        except:
-            ttip = typename
+    
+    # NOTE: 2021-10-03 21:07:45
+    # this consumes too much of resources (time & memory) and is unnecessary
+    # use the short version above
+    #if isinstance(obj, str):
+        #ttip = obj
+    #elif isinstance(obj, (tuple, list)):
+        #ttip = "%s" % (obj,)
+    #else:
+        #try:
+            #ttip = "%s" % obj
+        #except:
+            #ttip = typename
     
     result["Name"] = {"display": "%s" % objname, "tooltip":"\n".join([ttip, wspace_name])}
     

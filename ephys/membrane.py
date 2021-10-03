@@ -5187,6 +5187,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         #__train_analysis_loop__(segments, ret, apIEI, apFrequency, nAPs,
                                 #apThr, apLatency, **kwargs)
         for k, segment in enumerate(segments):
+            #print("segment %d" %k)
             step_result, vstep = analyse_AP_step_injection(segment, **kwargs)
             
             if Iinj is not None:
@@ -7426,7 +7427,7 @@ def analyse_AP_step_injection(segment,
         # time of the end of last AP is time of start of last AP + last AP duration at Vonset
         
         #print("analyse_AP_step_injection for Iinj %g: ap_train[-1]: %g, AP_durations_V_onset[-1]: %g, ap_train[0]: %g" % (Iinj, ap_train[-1], ap_train.annotations["AP_durations_V_onset"][-1], ap_train[0]))
-        mean_ap_freq  = (len(ap_train) / (ap_train[-1] + ap_train[0])).rescale(pq.Hz)
+        mean_ap_freq  = ( len(ap_train) / ( ap_train[-1] - ap_train[0] ) ).rescale(pq.Hz)
         # why do I sometimes get np.nan here ?
         # because you need to also provide a tail in case the last AP is right on the end of the Vm signal!
         ap_intvl = np.diff(ap_train.magnitude, axis=0) * vm.times.units
@@ -7440,6 +7441,8 @@ def analyse_AP_step_injection(segment,
     else:
         mean_ap_freq = 0. * pq.Hz
         ap_intvl = np.array([np.nan]) * vm.times.units
+        
+    #print("mean_ap_freq", mean_ap_freq)
         
     result["Inter_AP_intervals"] = ap_intvl
     

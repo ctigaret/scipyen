@@ -461,11 +461,15 @@ class DataViewer(ScipyenViewer):
     
     view_action_name = "Object"
     
+    #def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
+                 #pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
+                 #win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
+                 #*args, **kwargs) -> None:
     def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
-                 win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
+                 ID:(int, type(None)) = None,  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
                  *args, **kwargs) -> None:
-        super().__init__(data=data, parent=parent, pWin=pWin, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs)
+        super().__init__(data=data, parent=parent, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs)
+        #super().__init__(data=data, parent=parent, pWin=pWin, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs)
         
     def _configureUI_(self):
         self.treeWidget = InteractiveTreeWidget(parent = self)
@@ -979,7 +983,9 @@ class DataViewer(ScipyenViewer):
             namePrompt.setText(names[0])
             
             if dlg.exec() == QtWidgets.QDialog.Accepted:
-                newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
+                newVarName = namePrompt.text()
+                # FIXME 2021-10-03 22:17:29 this is really buggy!
+                #newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
                 
                 self._scipyenWindow_.assignToWorkspace(newVarName, objects[0], from_console=False)
                 
