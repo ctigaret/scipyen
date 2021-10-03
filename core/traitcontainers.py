@@ -19,7 +19,7 @@ from pprint import pformat
 from traitlets.utils.bunch import Bunch
 
 from .traitutils import (traitlets, dynamic_trait, trait_from_type, transform_link,
-                         is_trait, HasTraits, TraitType, TraitsObserver, 
+                         HasTraits, TraitType, TraitsObserver, 
                          ContainerTraitsObserver, EventHandler,Int, Bool, All,
                          observe)
 
