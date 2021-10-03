@@ -12,7 +12,7 @@ from neo.core.baseneo import BaseNeo, _check_annotations
 #from neo.rawio.baserawio import (BaseRawIO, _signal_channel_dtype, _unit_channel_dtype,
                         #_event_channel_dtype)
 
-from core.axonrawio_patch import AxonRawIO_v1
+#from core.axonrawio_patch import AxonRawIO_v1
 from core.neoevent import (_new_Event_v1, _new_Event_v2,)
 from core.neoepoch import _new_Epoch_v1
 
@@ -243,8 +243,14 @@ def _new_IrregularlySampledSignal_v1(cls, times, signal, units=None, time_units=
 
 # FIXME 2020-11-18 23:47:38
 # I don't think patching _new_event is necessary
-patches = {"neo.io.axonio.AxonRawIO": AxonRawIO_v1,
-           "neo.core.analogsignal._new_AnalogSignalArray": _new_AnalogSignalArray_v2,
+#patches = {"neo.io.axonio.AxonRawIO": AxonRawIO_v1,
+           #"neo.core.analogsignal._new_AnalogSignalArray": _new_AnalogSignalArray_v2,
+           #"neo.core.irregularlysampledsignal._new_IrregularlySampledSignal": _new_IrregularlySampledSignal_v1,
+           #"neo.core.spiketrain._new_spiketrain": _new_spiketrain_v1,
+           #"neo.core.epoch._new_epoch": _new_Epoch_v1,
+           #"neo.core.event._new_event": _new_Event_v2}
+           
+patches = {"neo.core.analogsignal._new_AnalogSignalArray": _new_AnalogSignalArray_v2,
            "neo.core.irregularlysampledsignal._new_IrregularlySampledSignal": _new_IrregularlySampledSignal_v1,
            "neo.core.spiketrain._new_spiketrain": _new_spiketrain_v1,
            "neo.core.epoch._new_epoch": _new_Epoch_v1,
