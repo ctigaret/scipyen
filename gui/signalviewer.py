@@ -137,10 +137,14 @@ from iolib import pictio as pio
 import core.signalprocessing as sgp
 from core import (xmlutils, strutils, neoevent, neoepoch, neoutils, )
 from core.neoutils import (get_non_empty_spike_trains,get_non_empty_events,
-                           get_segments_in_channel_index, 
                            normalized_signal_index,
                            check_ephys_data, check_ephys_data_collection,
                            )
+#from core.neoutils import (get_non_empty_spike_trains,get_non_empty_events,
+                           #get_segments_in_channel_index, 
+                           #normalized_signal_index,
+                           #check_ephys_data, check_ephys_data_collection,
+                           #)
 
 from core.prog import safeWrapper
 from core.datatypes import (arraySlice, isColumnVector, isVector, normalized_index, normalized_axis_index, 
@@ -461,8 +465,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         # index into neo.ChannelIndex objects (if any)
         # ATTENTION: 2019-11-21 21:42:29
+        # ATTENTION 2021-10-03 12:54:13
+        # neo.ChanelIndex is deprecated in 0.9.0 and out in 0.10.0
         # NOT to be confused with signal data channels, see NOTE: 2019-11-21 21:40:38
-        self.channelIndex = None
+        #self.channelIndex = None
         
         # if given, specifies which regularly sampled signals to plot; it may be
         # overrridden by self.channelIndex when self.channelIndex is a neo.ChannelIndex
@@ -3647,6 +3653,21 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             for ax_dict in item.axes.values():
                 ax_dict["item"].setStyle(tickFont=value)
                 
+    #@safeWrapper
+    #def _parse_data_(self, 
+                     #x, 
+                     #y,
+                     #frameIndex,
+                     #frameAxis,
+                     #signalChannelAxis,
+                     #signalIndex,
+                     #signalChannelIndex,
+                     #irregularSignalIndex,
+                     #irregularSignalChannelAxis,
+                     #irregularSignalChannelIndex,
+                     #separateSignalChannels,
+                     #channelIndex,
+                     #unitIndex):
     @safeWrapper
     def _parse_data_(self, 
                      x, 
@@ -3659,9 +3680,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                      irregularSignalIndex,
                      irregularSignalChannelAxis,
                      irregularSignalChannelIndex,
-                     separateSignalChannels,
-                     channelIndex,
-                     unitIndex):
+                     separateSignalChannels):
         """Sets up the data model, essentially -- "interprets" the data 
         structure sich that plotting of different types of objects containing
         numeric data sequences is made possible.
@@ -3729,35 +3748,37 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # belong to self.y then the viewer should only plot those segments
             # that contain signals linked to the specified channel
             
-            # ATTENTION do the same at _plotSegment_() stage
-            if isinstance(channelIndex, neo.ChannelIndex) and channelIndex in self.y.channel_indexes:
-                # NOTE: 2019-11-24 21:48:37
-                # select segments & signals by neo channel index, but
-                # reject this channel index if it does not belong to y
-                # which is a neo.Block.
+            ## ATTENTION do the same at _plotSegment_() stage
+            #if isinstance(channelIndex, neo.ChannelIndex) and channelIndex in self.y.channel_indexes:
+                ## NOTE: 2019-11-24 21:48:37
+                ## select segments & signals by neo channel index, but
+                ## reject this channel index if it does not belong to y
+                ## which is a neo.Block.
                 
-                # select segments containing signals linked with this channel
-                # index, AND belong to self.y !
-                channel_segments = [s for s in get_segments_in_channel_index(channelIndex) if s.block is self.y]
+                ## select segments containing signals linked with this channel
+                ## index, AND belong to self.y !
+                #channel_segments = [s for s in get_segments_in_channel_index(channelIndex) if s.block is self.y]
                 
-                if len(channel_segments):
-                    self.frameIndex = [self.y.segments.index(s) for s in channel_segments]
-                    self._number_of_frames_ = len(self.frameIndex)
-                    self.channelIndex = channelIndex
+                #if len(channel_segments):
+                    #self.frameIndex = [self.y.segments.index(s) for s in channel_segments]
+                    #self._number_of_frames_ = len(self.frameIndex)
+                    #self.channelIndex = channelIndex
                     
-                else:
-                    # no success: this channel index has nothing to do with self.y
-                    warnings.warn("Channel index %s has no signals in this %s and will be ignored" % (self.channelIndex, type(self.y).__name__), RuntimeWarning)
+                #else:
+                    ## no success: this channel index has nothing to do with self.y
+                    #warnings.warn("Channel index %s has no signals in this %s and will be ignored" % (self.channelIndex, type(self.y).__name__), RuntimeWarning)
                     
-                    self.channelIndex = None
+                    #self.channelIndex = None
                     
-            elif channelIndex is not None:
-                raise TypeError("channelIndex expected to be a neo.ChannelIndex or None; got %s instead" % type(channelIndex).__name__)
+            #elif channelIndex is not None:
+                #raise TypeError("channelIndex expected to be a neo.ChannelIndex or None; got %s instead" % type(channelIndex).__name__)
                     
-            if self.channelIndex is None: # the above failed
-                self.frameIndex = normalized_index(self._data_frames_, frameIndex)
-                self._number_of_frames_ = len(self.frameIndex)
-                self.channelIndex = None
+            self.frameIndex = normalized_index(self._data_frames_, frameIndex)
+            self._number_of_frames_ = len(self.frameIndex)
+            #if self.channelIndex is None: # the above failed
+                #self.frameIndex = normalized_index(self._data_frames_, frameIndex)
+                #self._number_of_frames_ = len(self.frameIndex)
+                #self.channelIndex = None
             
             #### BEGIN NOTE: 2019-11-21 23:09:52 
             # TODO/FIXME handle self.plot_start and self.plot_start
@@ -3787,7 +3808,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.irregularSignalChannelIndex = None
             self.separateSignalChannels = False
             
-            self.channelIndex = channelIndex
+            #self.channelIndex = channelIndex
 
         elif isinstance(y, neo.core.ChannelIndex):
             # TODO
@@ -4193,6 +4214,28 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             raise TypeError("Plotting is not implemented for %s data types" % type(self.y).__name__)
 
+    #@safeWrapper
+    #def _set_data_(self,
+                   #x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
+                   #y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
+                   #doc_title:(str, type(None)) = None, 
+                   #frameAxis:(int, str, vigra.AxisInfo, type(None)) = None,
+                   #signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None,
+                   #frameIndex:(int, tuple, list, range, slice, type(None)) = None, 
+                   #signalIndex:(str, int, tuple, list, range, slice, type(None)) = None,
+                   #signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None,
+                   #irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, 
+                   #irregularSignalChannelAxis:(int, type(None)) = None,
+                   #irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, 
+                   #separateSignalChannels:bool = False, 
+                   #interval:(tuple, list, neo.Epoch, type(None)) = None,
+                   #unitIndex:object = None,
+                   #channelIndex:object = None,
+                   #plotStyle:str = "plot",
+                   #get_focus:bool = True,
+                   #showFrame:int = None,
+                   #*args, **kwargs):
+    
     @safeWrapper
     def _set_data_(self,
                    x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
@@ -4208,8 +4251,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                    irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, 
                    separateSignalChannels:bool = False, 
                    interval:(tuple, list, neo.Epoch, type(None)) = None,
-                   unitIndex:object = None,
-                   channelIndex:object = None,
                    plotStyle:str = "plot",
                    get_focus:bool = True,
                    showFrame:int = None,
@@ -4256,9 +4297,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                               irregularSignalIndex=irregularSignalIndex,
                               irregularSignalChannelAxis=irregularSignalChannelAxis,
                               irregularSignalChannelIndex=irregularSignalChannelIndex,
-                              separateSignalChannels=separateSignalChannels,
-                              channelIndex=channelIndex,
-                              unitIndex=unitIndex)
+                              separateSignalChannels=separateSignalChannels)
+            
+            #self._parse_data_(x=x, y=y, frameIndex=frameIndex, frameAxis=frameAxis,
+                              #signalIndex=signalIndex, signalChannelAxis=signalChannelAxis,
+                              #signalChannelIndex=signalChannelIndex,
+                              #irregularSignalIndex=irregularSignalIndex,
+                              #irregularSignalChannelAxis=irregularSignalChannelAxis,
+                              #irregularSignalChannelIndex=irregularSignalChannelIndex,
+                              #separateSignalChannels=separateSignalChannels,
+                              #channelIndex=channelIndex,
+                              #unitIndex=unitIndex)
             
             self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self.y))
                         
@@ -4298,6 +4347,27 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         except Exception as e:
             traceback.print_exc()
             
+    #@safeWrapper
+    #def setData(self,  
+                #x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
+                #y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
+                #doc_title:(str, type(None)) = None, 
+                #frameAxis:(int, str, vigra.AxisInfo, type(None)) = None,
+                #signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None,
+                #frameIndex:(int, tuple, list, range, slice, type(None)) = None, 
+                #signalIndex:(str, int, tuple, list, range, slice, type(None)) = None,
+                #signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None,
+                #irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, 
+                #irregularSignalChannelAxis:(int, type(None)) = None,
+                #irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, 
+                #separateSignalChannels:bool = False, 
+                #interval:(tuple, list, neo.Epoch, type(None)) = None,
+                #unitIndex:object = None,
+                #channelIndex:object = None,
+                #plotStyle:str = "plot",
+                #get_focus:bool = True,
+                #showFrame = None,
+                #*args, **kwargs):
     @safeWrapper
     def setData(self,  
                 x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
@@ -4313,8 +4383,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, 
                 separateSignalChannels:bool = False, 
                 interval:(tuple, list, neo.Epoch, type(None)) = None,
-                unitIndex:object = None,
-                channelIndex:object = None,
                 plotStyle:str = "plot",
                 get_focus:bool = True,
                 showFrame = None,
@@ -4527,9 +4595,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         irregularSignalChannelAxis=irregularSignalChannelAxis,
                         irregularSignalChannelIndex=irregularSignalChannelIndex,
                         separateSignalChannels=separateSignalChannels,
-                        interval=interval, unitIndex=unitIndex,channelIndex=channelIndex,
-                        plotstyle=plotStyle, get_focus=get_focus, showFrame=showFrame,
-                        *args, **kwargs)
+                        interval=interval, plotstyle=plotStyle, get_focus=get_focus,
+                        showFrame=showFrame,  *args, **kwargs)
+            
+        #super().setData(x,y,doc_title=doc_title,frameAxis=frameAxis,frameIndex=frameIndex,
+                        #signalChannelAxis=signalChannelAxis,signalIndex=signalIndex,
+                        #signalChannelIndex=signalChannelIndex, 
+                        #irregularSignalIndex=irregularSignalIndex,
+                        #irregularSignalChannelAxis=irregularSignalChannelAxis,
+                        #irregularSignalChannelIndex=irregularSignalChannelIndex,
+                        #separateSignalChannels=separateSignalChannels,
+                        #interval=interval, unitIndex=unitIndex,channelIndex=channelIndex,
+                        #plotstyle=plotStyle, get_focus=get_focus, showFrame=showFrame,
+                        #*args, **kwargs)
             
 
 
@@ -4957,7 +5035,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if isinstance(self.y, neo.core.Block):
                 # NOTE: 2019-11-24 22:31:26
                 # select a segment then delegate to _plotSegment_()
-                # Segment selection is based on self.frameIndex, or on self.channelIndex
+                # Segment selection is based on self.frameIndex, or on self.channelIndex # NOTE 2021-10-03 12:59:10 ChannelIndex is no more
                 if len(self.y.segments) == 0:
                     return
                 
@@ -5403,22 +5481,28 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         # NOTE: 2019-11-24 23:21:13#
         # 1) Select which signals to display
-        if isinstance(self.channelIndex, neo.ChannelIndex):
-            # _set_data_() has already checked that this segment has signals 
-            # linked in self.channelIndex
-            # therefore at this stage, _plotSegment_() receives a segment that 
-            # contains signals linked this channelIndex;
-            # all we have to do is select those signals in the received segment
-            # that are linked to this channelIndex
-            analog = [s for s in seg.analogsignals if s in self.channelIndex.analogsignals]
-            irregs = [s for s in seg.irregularlysampledsignals if s in channelIndex.irregularlysampledsignals]
+        # NOTE: 2021-10-03 12:55:21 ChannelIndex is OUT
+        #if isinstance(self.channelIndex, neo.ChannelIndex):
+            ## _set_data_() has already checked that this segment has signals 
+            ## linked in self.channelIndex
+            ## therefore at this stage, _plotSegment_() receives a segment that 
+            ## contains signals linked this channelIndex;
+            ## all we have to do is select those signals in the received segment
+            ## that are linked to this channelIndex
+            #analog = [s for s in seg.analogsignals if s in self.channelIndex.analogsignals]
+            #irregs = [s for s in seg.irregularlysampledsignals if s in channelIndex.irregularlysampledsignals]
             
-        else:
-            self.signalIndex = normalized_signal_index(seg, self.signalIndex, ctype = neo.AnalogSignal)
-            self.irregularSignalIndex = normalized_signal_index(seg, self.irregularSignalIndex, ctype = neo.IrregularlySampledSignal)
-            analog = [seg.analogsignals[k] for k in self.signalIndex]
-            irregs = [seg.irregularlysampledsignals[k] for k in self.irregularSignalIndex]
+        #else:
+            #self.signalIndex = normalized_signal_index(seg, self.signalIndex, ctype = neo.AnalogSignal)
+            #self.irregularSignalIndex = normalized_signal_index(seg, self.irregularSignalIndex, ctype = neo.IrregularlySampledSignal)
+            #analog = [seg.analogsignals[k] for k in self.signalIndex]
+            #irregs = [seg.irregularlysampledsignals[k] for k in self.irregularSignalIndex]
         
+        self.signalIndex = normalized_signal_index(seg, self.signalIndex, ctype = neo.AnalogSignal)
+        self.irregularSignalIndex = normalized_signal_index(seg, self.irregularSignalIndex, ctype = neo.IrregularlySampledSignal)
+        analog = [seg.analogsignals[k] for k in self.signalIndex]
+        irregs = [seg.irregularlysampledsignals[k] for k in self.irregularSignalIndex]
+    
         # this updates the available choices in the comboboxes
         # any previous selection is kept, if still available
         self._setup_signal_choosers_(analog = analog, irregular = irregs) 

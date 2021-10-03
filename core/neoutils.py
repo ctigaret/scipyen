@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 """ Various utilities for handling objects and data structures in the neo package.
+
+FIXME/TODO:: 2021-10-03 12:37:31 
+Unit and ChannelIndex are deprecated in neo
+Everything in here MUST reflect that!
+0.9.0 and removed in neo 0.10.0
 NOTE: 2020-10-07 09:45:08
 Code split and redistributed in core.neoutils, ephys.ephys and core.triggerprotocols
 
@@ -35,7 +40,7 @@ get_index_of_named_signal
 get_non_empty_epochs
 get_non_empty_events
 get_non_empty_spike_trains
-get_segments_in_channel_index
+get_segments_in_channel_index -> removed 2021-10-03 12:52:25
 get_signal_names_indices
 get_time_slice
 inverse_lookup
@@ -100,6 +105,7 @@ IV. Generic indexing for the neo framework (provisional)
     
     Below, child_collection_name is specific for the type of neo object that
     if looked up _for_
+    
     
     
     NOTATION:
@@ -516,7 +522,8 @@ ephys_data = (neo.Block, neo.Segment, neo.AnalogSignal, neo.IrregularlySampledSi
 
 ancillary_neo_data = (neo.ImageSequence, neo.Event, neo.Epoch)
 
-ephys_data_collection = (neo.Block, neo.Segment, neo.Unit)
+ephys_data_collection = (neo.Block, neo.Segment)#, neo.Unit)
+#ephys_data_collection = (neo.Block, neo.Segment, neo.Unit)
 
 type_to_container_member_name = {
     neo.Segment: {
@@ -534,12 +541,7 @@ type_to_container_member_name = {
         neo.CircularRegionOfInterest: "regionofinterest",
         neo.PolygonRegionOfInterest: "regionsofinterest",
         neo.Segment: "segments",
-        neo.ChannelIndex: "channel_indexes",
         neo.Group: "groups",
-        neo.Unit: "list_units",
-        },
-    neo.Unit: {
-        neo.SpikeTrain: "spiketrains",
         },
     neo.Group: {
         neo.Segment: "segments",
@@ -553,6 +555,42 @@ type_to_container_member_name = {
         neo.ImageSequence: "imagesequences",
         },
     }
+
+#type_to_container_member_name = {
+    #neo.Segment: {
+        #DataSignal: "analogsignals",
+        #IrregularlySampledDataSignal: "irregularlysampledsignals",
+        #neo.AnalogSignal: "analogsignals",
+        #neo.IrregularlySampledSignal: "irregularlysampledsignals",
+        #neo.SpikeTrain: "spiketrains",
+        #neo.Event: "events",
+        #neo.Epoch: "epochs",
+        #neo.ImageSequence: "imagesequences",
+        #},
+    #neo.Block: {
+        #neo.RectangularRegionOfInterest: "regionsofinterest",
+        #neo.CircularRegionOfInterest: "regionofinterest",
+        #neo.PolygonRegionOfInterest: "regionsofinterest",
+        #neo.Segment: "segments",
+        #neo.ChannelIndex: "channel_indexes",
+        #neo.Group: "groups",
+        #neo.Unit: "list_units",
+        #},
+    #neo.Unit: {
+        #neo.SpikeTrain: "spiketrains",
+        #},
+    #neo.Group: {
+        #neo.Segment: "segments",
+        #DataSignal: "analogsignals",
+        #IrregularlySampledDataSignal: "irregularlysampledsignals",
+        #neo.AnalogSignal: "analogsignals",
+        #neo.IrregularlySampledSignal: "irregularlysampledsignals",
+        #neo.SpikeTrain: "spiketrains",
+        #neo.Event: "events",
+        #neo.Epoch: "epochs",
+        #neo.ImageSequence: "imagesequences",
+        #},
+    #}
 
 
 if __debug__:
@@ -1149,7 +1187,7 @@ def normalized_signal_index(src: neo.core.container.Container,
     Parameters:
     ----------
     
-    src: neo.Segment, neo.ChannelIndex, or neo.Unit.
+    src: neo container
     
     index: int, str, tuple, list, range, or slice; any valid form of indexing
         including by the value of the signal's "name " attribute.
@@ -1178,25 +1216,36 @@ def normalized_signal_index(src: neo.core.container.Container,
     
     data_len = None
     
-    if not isinstance(src, (neo.Segment, neo.ChannelIndex, neo.Unit)):
-        raise TypeError("Expecting a neo.Segment or neo.ChannelIndex; got %s instead" % type(src).__name__)
+    if not isinstance(src, neo.Segment):
+        raise TypeError("Expecting a neo.Segment; got %s instead" % type(src).__name__)
+    #if not isinstance(src, (neo.Segment, neo.ChannelIndex, neo.Unit)):
+        #raise TypeError("Expecting a neo.Segment or neo.ChannelIndex; got %s instead" % type(src).__name__)
     
     #### BEGIN figure out what signal collection we're after
     if ctype in (neo.AnalogSignal, DataSignal):
-        if not isinstance(src, (neo.Segment, neo.ChannelIndex)):
+        if not isinstance(src, neo.Segment):
             raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
+        
+        #if not isinstance(src, (neo.Segment, neo.ChannelIndex)):
+            #raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
         
         signal_collection = src.analogsignals
         
     elif ctype in (neo.IrregularlySampledSignal, IrregularlySampledDataSignal):
-        if not isinstance(src, (neo.Segment, neo.ChannelIndex)):
+        if not isinstance(src, neo.Segment):
             raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
+        
+        #if not isinstance(src, (neo.Segment, neo.ChannelIndex)):
+            #raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
         
         signal_collection = src.irregularlysampledsignals
         
     elif ctype is neo.SpikeTrain:
-        if not isinstance(src, (neo.Segment, neo.Unit)):
+        if not isinstance(src, neo.Segment):
             raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
+        
+        #if not isinstance(src, (neo.Segment, neo.Unit)):
+            #raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
         
         signal_collection = src.spiketrains
         
@@ -1238,11 +1287,11 @@ def normalized_signal_index(src: neo.core.container.Container,
             
             data_len = len(signal_collection)
             
-    elif ctype is neo.Unit:
-        if not isinstance(src, neo.ChannelIndex):
-            raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
+    #elif ctype is neo.Unit:
+        #if not isinstance(src, neo.ChannelIndex):
+            #raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
         
-        signal_collection = src.units
+        #signal_collection = src.units
         
     else:
         raise TypeError("Cannot handle %s" % ctype.__name__)
@@ -1288,28 +1337,28 @@ def normalized_signal_index(src: neo.core.container.Container,
     else:
         raise TypeError("Invalid indexing: %s" % index)
     
-def get_segments_in_channel_index(channelIndex:neo.ChannelIndex) -> tuple:
-    """Query the segments linked to the channel index.
+#def get_segments_in_channel_index(channelIndex:neo.ChannelIndex) -> tuple:
+    #"""Query the segments linked to the channel index.
     
-    Parameters:
-    ----------
-    channelIndex: neo.ChannelIndex
+    #Parameters:
+    #----------
+    #channelIndex: neo.ChannelIndex
     
-    Returns:
-    -------
-    a tuple of segments that contain the signals linkes to this channel index
+    #Returns:
+    #-------
+    #a tuple of segments that contain the signals linkes to this channel index
 
-    NOTE: the segments may or may not belong to the same Block; this can be 
-    queried by testing the identity of segment.block attribute
+    #NOTE: the segments may or may not belong to the same Block; this can be 
+    #queried by testing the identity of segment.block attribute
     
-    """
-    if not isinstance(channelIndex, neo.ChannelIndex):
-        raise TypeError("Expecting a neo.ChannelIndex; got %s instead" % type(channelIndex).__name__)
+    #"""
+    #if not isinstance(channelIndex, neo.ChannelIndex):
+        #raise TypeError("Expecting a neo.ChannelIndex; got %s instead" % type(channelIndex).__name__)
     
-    # use generator expression
-    genex = (x.segment for x in channelIndex.analogsignals + channelIndex.irregularlysampledsignals if isinstance(x.segment, neo.Segment))
+    ## use generator expression
+    #genex = (x.segment for x in channelIndex.analogsignals + channelIndex.irregularlysampledsignals if isinstance(x.segment, neo.Segment))
     
-    return tuple(set(genex))
+    #return tuple(set(genex))
     
 #@safeWrapper
 def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
@@ -2562,7 +2611,8 @@ def concatenate_blocks2(*args, **kwargs):
             
     return ret
 
-def neo_copy(src: typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Unit]) -> typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Unit]:
+#def neo_copy(src: typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Unit]) -> typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Unit]:
+def neo_copy(src: typing.Union[neo.Block, neo.Segment]) -> typing.Union[neo.Block, neo.Segment]:
     """Copies a neo.Block or a neo.Segment
     
     CAUTION: neo data objects' copy() function creates shallow copies
@@ -2597,29 +2647,29 @@ def neo_copy(src: typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Uni
         
         # NOTE: 2020-03-13 18:33:19
         # original channel: {"copy": copied channel, "units": {original unit: copied unit}}
-        channels = dict() 
+        #channels = dict() 
         
-        for c in src.channel_indexes:
-            c_ = neo.ChannelIndex(index=c.index, name=c.name, 
-                                  channel_ids=c.channel_ids,
-                                  channel_names=c.channel_names,
-                                  description=c.description,
-                                  file_origin=c.file_origin,
-                                  coordinates=c.coordinates,
-                                  **c.annotations)
+        #for c in src.channel_indexes:
+            #c_ = neo.ChannelIndex(index=c.index, name=c.name, 
+                                  #channel_ids=c.channel_ids,
+                                  #channel_names=c.channel_names,
+                                  #description=c.description,
+                                  #file_origin=c.file_origin,
+                                  #coordinates=c.coordinates,
+                                  #**c.annotations)
             
-            c_.block = ret
+            #c_.block = ret
             
-            channels[c] = {"copy": c_, "units": dict()}
+            #channels[c] = {"copy": c_, "units": dict()}
             
-            for u_ in c.units:
-                u_ = neo.Unit(name=u.name, description=u.description,
-                              fle_origin=u.file_origin,
-                              **u.annotations)
-                u_.channel_index = u.c_
-                c_.units.append(u_)
+            #for u_ in c.units:
+                #u_ = neo.Unit(name=u.name, description=u.description,
+                              #fle_origin=u.file_origin,
+                              #**u.annotations)
+                #u_.channel_index = u.c_
+                #c_.units.append(u_)
                 
-                channels[c]["units"][u] = u_
+                #channels[c]["units"][u] = u_
                 
         for s in src.segments:
             s_ = neo.Segment(name=s.name, description=s.description,
@@ -2632,21 +2682,21 @@ def neo_copy(src: typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Uni
             for asig in s.analogsignals:
                 asig_ = asig.copy()
                 
-                for c in channels:
-                    #if asig in c.analogsignals:
-                    if any([np.all(asig==sig) for sig in c.analogsignals]):
-                        asig_.channel_index = channels[c]
-                        channels[c]["copy"].analogsignals.append(asig_)
+                #for c in channels:
+                    ##if asig in c.analogsignals:
+                    #if any([np.all(asig==sig) for sig in c.analogsignals]):
+                        #asig_.channel_index = channels[c]
+                        #channels[c]["copy"].analogsignals.append(asig_)
                 
                 s_.analogsignals.append(asig_)
                 
             for st in s.spiketrains:
                 st_ = st.copy()
                 
-                for c in channels:
-                    if len(c["units"]):
-                        if st.unit in c["units"]:
-                            st_.unit = c["units"][u]
+                #for c in channels:
+                    #if len(c["units"]):
+                        #if st.unit in c["units"]:
+                            #st_.unit = c["units"][u]
                 
                 s_.spiketrains.append(st_)
                     
@@ -2690,25 +2740,25 @@ def neo_copy(src: typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Uni
         
         ret.create_many_to_one_relationship()
         
-    elif isinstance(src, neo.ChannelIndex):
-        # NOTE: 2020-03-14 00:42:29
-        # bare-bones copy; the analogsignals and units are NOT copied
-        # the respective links must be restored manually
-        ret = neo.ChannelIndex(index=src.index, name=src.name, 
-                               channel_ids=src.channel_ids,
-                               channel_names=src.channel_names,
-                               description=src.description,
-                               file_origin=src.file_origin,
-                               coordinates=src.coordinates,
-                               **src.annotations)
+    #elif isinstance(src, neo.ChannelIndex):
+        ## NOTE: 2020-03-14 00:42:29
+        ## bare-bones copy; the analogsignals and units are NOT copied
+        ## the respective links must be restored manually
+        #ret = neo.ChannelIndex(index=src.index, name=src.name, 
+                               #channel_ids=src.channel_ids,
+                               #channel_names=src.channel_names,
+                               #description=src.description,
+                               #file_origin=src.file_origin,
+                               #coordinates=src.coordinates,
+                               #**src.annotations)
         
-    elif isinstance(src, neo.Unit):
-        # NOTE: 2020-03-14 00:55:16
-        # bare-bones copy; the spiketrains and channel_index are NOT copied
-        # the respective links must be restored manually
-        ret = neo.Unit(name=src.name, description=src.description,
-                       file_origin=src.file_origin,
-                       **src.annotations)
+    #elif isinstance(src, neo.Unit):
+        ## NOTE: 2020-03-14 00:55:16
+        ## bare-bones copy; the spiketrains and channel_index are NOT copied
+        ## the respective links must be restored manually
+        #ret = neo.Unit(name=src.name, description=src.description,
+                       #file_origin=src.file_origin,
+                       #**src.annotations)
         
     elif isinstance(src, neo.Epoch) or "Epoch" in type(src).__name__:
         ret = neo.Epoch(times=src.times, durations=src.durations, units=src.units,
