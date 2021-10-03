@@ -11,10 +11,11 @@ from types import new_class
 from collections import deque
 from functools import (partial, partialmethod)
 
+import six
+
 import traitlets
 
-from traitlets import (six,
-    HasTraits, MetaHasTraits, TraitType, All, Any, Bool, CBool, Bytes, CBytes, 
+from traitlets import (HasTraits, MetaHasTraits, TraitType, All, Any, Bool, CBool, Bytes, CBytes, 
     Dict, Enum, Set, Int, CInt, Long, CLong, Integer, Float, CFloat, 
     Complex, CComplex, Unicode, CUnicode, CRegExp, TraitError, Union, Undefined, 
     Type, This, Instance, TCPAddress, List, Tuple, UseEnum, ObjectName, 
