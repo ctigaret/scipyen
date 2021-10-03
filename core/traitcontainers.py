@@ -18,10 +18,13 @@ from pprint import pformat
                        #is_trait, observe,TraitError,)
 from traitlets.utils.bunch import Bunch
 
+#from .traitutils import (traitlets, dynamic_trait, trait_from_type, transform_link,
+                         #HasTraits, TraitType, TraitsObserver, 
+                         #ContainerTraitsObserver, EventHandler,Int, Bool, All,
+                         #observe)
 from .traitutils import (traitlets, dynamic_trait, trait_from_type, transform_link,
                          HasTraits, TraitType, TraitsObserver, 
-                         ContainerTraitsObserver, EventHandler,Int, Bool, All,
-                         observe)
+                         ContainerTraitsObserver, Int, Bool, All, observe)
 
 from .prog import safeWrapper
 from .strutils import str2symbol

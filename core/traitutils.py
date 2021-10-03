@@ -21,8 +21,10 @@ from traitlets import (HasTraits, MetaHasTraits, TraitType, All, Any, Bool, CBoo
     Type, This, Instance, TCPAddress, List, Tuple, UseEnum, ObjectName, 
     DottedObjectName, CRegExp, ForwardDeclaredType, ForwardDeclaredInstance, 
     link, directional_link, validate, observe, default,
-    observe_compat, BaseDescriptor, HasDescriptors, EventHandler,
+    observe_compat, BaseDescriptor, HasDescriptors,
     )
+#, EventHandler,
+    #)
 
 try:
     from traitlets import (class_of, repr_type, add_article,)
