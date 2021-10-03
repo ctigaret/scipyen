@@ -8,6 +8,12 @@ import faulthandler
 import sys, os, atexit, re, inspect, gc, io, traceback
 import cProfile
 
+if sys.platform == "win32" and sys.version_info.minor >= 8:
+    import win32api
+    vigraimpex_mod = "vigraimpex"
+    path_to_vigraimpex = win32.GetModuleFileName(win32api.LoadLibrary(vigraimpex_mod))
+    os.add_dll_directory(os.path.dirname(path_to_vigraimpex))
+    
 #import warnings
 #### END core python modules
 
@@ -23,11 +29,6 @@ from core import scipyen_config
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-if sys.platform == "win32" and sys.version_info.minor >= 8:
-    import win32api
-    vigraimpex_mod = "vigraimpex"
-    path_to_vigraimpex = win32.GetModuleFileName(win32api.LoadLibrary(vigraimpex_mod))
-    os.add_dll_directory(os.path.dirname(path_to_vigraimpex))
 
 # NOTE: 2021-01-10 13:19:20
 # the same Configuration object holds/merges both the user options and the 
