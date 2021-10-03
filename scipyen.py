@@ -13,6 +13,13 @@ if sys.platform == "win32" and sys.version_info.minor >= 8:
     vigraimpex_mod = "vigraimpex"
     path_to_vigraimpex = win32api.GetModuleFileName(win32api.LoadLibrary(vigraimpex_mod))
     os.add_dll_directory(os.path.dirname(path_to_vigraimpex))
+    lib_environ = os.environ.get("LIB", "")
+    if len(lib_environ.strip()):
+        libdirs = lib_environ.split(os.pathsep)
+        for d in libdirs:
+            if len(d.strip()):
+                os.add_dll_directory(d)
+        
     
 #import warnings
 #### END core python modules
