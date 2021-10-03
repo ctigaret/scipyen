@@ -152,9 +152,9 @@ def _new_AnalogSignalArray_v2(cls, signal, units=None, dtype=None, copy=True, t_
     
     if annotations is None:
         annotations = dict()
-    elif isinstance(annotations, neo.ChannelIndex):
-        channel_index = annotations
-        annotations =dict()
+    #elif isinstance(annotations, neo.ChannelIndex):
+        #channel_index = annotations
+        #annotations =dict()
         
         
     #if array_annotations is None:

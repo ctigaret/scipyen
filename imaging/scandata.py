@@ -2078,10 +2078,6 @@ class ScanData(object):
         # Semantically links analogsignals across the segments in the _scans_block_
         # to a defined "structure"
         # 
-        # A neo.ChannelIndex corresponds semantically to an imaged structure 
-        # (e.g., "spine", "dendrite" "neuron", etc) from which the analogsignals 
-        # were derived. See neo.ChannelIndex.
-        #
         # _scene_block_ : similar role as _scans_block_; -- ?
         #
         #

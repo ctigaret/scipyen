@@ -500,7 +500,7 @@ class DataViewer(ScipyenViewer):
     def _set_data_(self, data:object, *args, **kwargs):
         """
         Display new data
-        # TODO 2019-09-14 10:16:03:
+        # TODO 2019-09-14 10:16:03: NOTE: 2021-10-03 13:10:00 SCRAP THAT
         # expand this to other hierarchical containers including those in
         # the neo package (neo.Block, neo.Segment, neo.Unit, etc) and in the
         # datatypes module (ScanData)

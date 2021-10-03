@@ -1021,10 +1021,10 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
                 channel_units = [pq.dimensionless for c in channel_names]
                 
             
-            chndx = neo.ChannelIndex(index=np.arange(len(channel_names)),
-                                        channel_ids = range(len(channel_names)),
-                                        channel_names = channel_names,
-                                        name = "Channels")
+            #chndx = neo.ChannelIndex(index=np.arange(len(channel_names)),
+                                        #channel_ids = range(len(channel_names)),
+                                        #channel_names = channel_names,
+                                        #name = "Channels")
 
             # try to guess if this is a regularly sampled signal
             dtime = np.ediff1d(time_vector)
@@ -1052,8 +1052,8 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
                                                         name = name) \
                         for k, name in enumerate(channel_names)]
                 
-            for k, sig in enumerate(signals):
-                sig.channel_index = chndx[k]
+            #for k, sig in enumerate(signals):
+                #sig.channel_index = chndx[k]
                     
         else: # no "Time" column
             # we assume all data columns are analog signals, sampled at 1 Hz
@@ -1062,10 +1062,10 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
             t_start = 0 * time_units
             sampling_period = 1 * pq.s
             
-            chndx = neo.ChannelIndex(index = np.arange(len(data_col_names)),
-                                        channel_ids = range(len(data_col_names)),
-                                        channel_names = data_col_names,
-                                        name = "Channels")
+            #chndx = neo.ChannelIndex(index = np.arange(len(data_col_names)),
+                                        #channel_ids = range(len(data_col_names)),
+                                        #channel_names = data_col_names,
+                                        #name = "Channels")
             
             if len(data_units):
                 signals = [neo.AnalogSignal(data[name],
@@ -1083,8 +1083,8 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
                                         name = name) \
                         for name in data_col_names]
                 
-            for k, sig in enumerate(signals):
-                sig.channel_index = chndx[k]
+            #for k, sig in enumerate(signals):
+                #sig.channel_index = chndx[k]
                 
                 
     else:
@@ -1094,10 +1094,10 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
         t_start = 0 * time_units
         sampling_period = 1 * pq.s
         
-        chndx = neo.ChannelIndex(index = np.arange(len(data_col_names)),
-                                    channel_ids = range(len(data_col_names)),
-                                    channel_names = data_col_names,
-                                    name = "Channels")
+        #chndx = neo.ChannelIndex(index = np.arange(len(data_col_names)),
+                                    #channel_ids = range(len(data_col_names)),
+                                    #channel_names = data_col_names,
+                                    #name = "Channels")
         
         if len(data_units):
             signals = [neo.AnalogSignal(data[:,k],
@@ -1115,8 +1115,8 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
                                         name = data_col_names[k]) \
                     for k in range(data.shape[1])]
             
-        for k, sig in enumerate(signals):
-            sig.channel_index = chndx[k]
+        #for k, sig in enumerate(signals):
+            #sig.channel_index = chndx[k]
             
             
     segment = neo.Segment()
@@ -1128,7 +1128,7 @@ def loadAxonTextFile(fileName:str) -> neo.Block:
     result = neo.Block(name=os.path.basename(fileName),
                        file_origin = fileName)
     
-    result.channel_indexes.append(chndx)
+    #result.channel_indexes.append(chndx)
     
     result.segments.append(segment)
     

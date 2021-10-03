@@ -4513,7 +4513,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             b) that the interval falls within the domain of all signals in the 
                 data
         
-        channelIndex: neo.ChannelIndex object, or None (default) - used to select
+        channelIndex: DEPRECATED neo.ChannelIndex object, or None (default) - used to select
             which data channel to plot (NOT to be confused with signal channels)
         
         plotStyle: str, default is "plot" -- keyword reserved for development

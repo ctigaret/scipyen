@@ -184,15 +184,15 @@ def adapt_args_kw(x, args, kw, allow_none):
         if "axistags" not in kw:
             kw["axistags"] = None # calls VigraArray.defaultAxistags or uses x.axistags if they exist
             
-    elif isinstance(x, neo.ChannelIndex):
-        if len(args) == 0:
-            args = (x.index, )
+    #elif isinstance(x, neo.ChannelIndex):
+        #if len(args) == 0:
+            #args = (x.index, )
             
-        #for attr in x._all_attrs:
-        for attr in x._necessary_attrs:
-            if attr[0] != "index":
-                if attr[0] not in kw:
-                    kw[attr[0]] = getattr(x, attr[0])
+        ##for attr in x._all_attrs:
+        #for attr in x._necessary_attrs:
+            #if attr[0] != "index":
+                #if attr[0] not in kw:
+                    #kw[attr[0]] = getattr(x, attr[0])
         
     elif isinstance(x, (neo.AnalogSignal, datasignal.DataSignal)):
         if len(args) == 0:
@@ -258,9 +258,13 @@ def adapt_args_kw(x, args, kw, allow_none):
                 if attr[0] not in kw:
                     kw[attr[0]] = getattr(x, attr[0], None)
         
-    elif isinstance(x, (neo.Segment, neo.Block, neo.Unit)):
+    elif isinstance(x, (neo.Segment, neo.Block)):
         if len(args) == 0:
             args = (x, )
+        
+    #elif isinstance(x, (neo.Segment, neo.Block, neo.Unit)):
+        #if len(args) == 0:
+            #args = (x, )
         
     elif isinstance(x, (neo.Epoch, neo.Event)):
         #for attr in x._all_attrs:
@@ -1002,14 +1006,14 @@ def trait_from_type(x, *args, **kwargs):
                 if "axistags" not in kw:
                     kw["axistags"] = None # calls VigraArray.defaultAxistags or uses x.axistags if they exist
                     
-            elif isinstance(x, neo.ChannelIndex):
-                if len(args) == 0:
-                    args = (x.index, )
+            #elif isinstance(x, neo.ChannelIndex):
+                #if len(args) == 0:
+                    #args = (x.index, )
                     
-                for attr in x._all_attrs:
-                    if attr[0] != "index":
-                        if attr[0] not in kw:
-                            kw[attr[0]] = getattr(x, attr[0])
+                #for attr in x._all_attrs:
+                    #if attr[0] != "index":
+                        #if attr[0] not in kw:
+                            #kw[attr[0]] = getattr(x, attr[0])
                         
             elif isinstance(x, (neo.AnalogSignal, datasignal.DataSignal)):
                 if len(args) == 0:
@@ -1047,9 +1051,13 @@ def trait_from_type(x, *args, **kwargs):
                         if attr[0] not in kw:
                             kw[attr[0]] = getattr(x, attr[0])
                 
-            elif isinstance(x, (neo.Block, neo.Segment, neo.Unit)):
+            elif isinstance(x, (neo.Block, neo.Segment)):
                 if len(args) == 0:
                     args = (x, )
+                    
+            #elif isinstance(x, (neo.Block, neo.Segment, neo.Unit)):
+                #if len(args) == 0:
+                    #args = (x, )
                     
             elif isinstance(x, (neo.Epoch, neo.Event)):
                 for attr in x._all_attrs:

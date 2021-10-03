@@ -1199,8 +1199,9 @@ def normalized_signal_index(src: neo.core.container.Container,
         
         Defaults is neo.AnalogSignal.
         
-        NOTE: 
-        ChannelIndex objects contains analog & irregularly sampled signals and units.
+        
+        
+        WARNING: AS OF 2021-10-03 13:08:37 ChannelIndex and Unit are OUT 
         
         Segment objects contain analog & irregularly sampled signals, events,
             epochs, spike trains, channel indexes, and image sequences.
@@ -2061,7 +2062,7 @@ def concatenate_blocks(*args, **kwargs):
                 from 0.8.0 onwards)
                 
                 
-    channel:    int, index  of the neo.ChannelIndex
+    channel:    int, index  of the neo.ChannelIndex DEPRECATED
                     
                     
     Returns:
@@ -2355,7 +2356,7 @@ def concatenate_blocks2(*args, **kwargs):
                 from 0.8.0 onwards)
                 
                 
-    channel:    int, index  of the neo.ChannelIndex
+    channel:    int, index  of the neo.ChannelIndex DEPRECATED
                     
                     
     Returns:
