@@ -572,15 +572,18 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     else:
                         return QtCore.QVariant()
                     
-            elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
+            #elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
+            elif isinstance(self._modelData_, neo.core.basesignal.BaseSignal):
                 if orientation == QtCore.Qt.Horizontal: # horizontal (columns) header
                     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
                         if section == 0:
                             if isinstance(self._modelData_, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
                                 domain_name = getattr(self._modelData_,"domain_name", None)
                                 domain = getattr(self._modelData_, "domain", None)
-                                if domain_name is not None and domain is not None:
-                                    return QtCore.QVariant("%s (%s)" % (self._modelData_.domain_name, self._modelData_.domain.dimensionality))
+                                if isinstance(domain_name, str) and isinstance(domain, pq.Quantity):
+                                    dname = f"{domain_name} ({domain.dimensionality})" if len(domain_name.strip()) else "Sample index"
+                                    return QtCore.QVariant(dname)
+                                    #return QtCore.QVariant("%s (%s)" % (self._modelData_.domain_name, self._modelData_.domain.dimensionality))
                                 else:
                                     return QtCore.QVariant("Sample")
                                                        

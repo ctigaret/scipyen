@@ -1,4 +1,4 @@
-PREAMBLE:
+PREAMBLE: This is for Windows 10
 =========
 I. LOCATION OF SOURCE CODE, BUILDS & INSTALLED LIBRARIES
 
@@ -85,7 +85,7 @@ Configure to install each library in in ROOT (see I.3 above).
 
 IV. Prerequisites (ancillary software):
 --------------------------------------
-Visudal Studio community editon 2019 and visual studio code;
+Visual Studio community editon 2019 and visual studio code;
 git, gh and github desktop
 7zip
 cmake - no need

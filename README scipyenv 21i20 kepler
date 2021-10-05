@@ -1,3 +1,22 @@
+Last modified 2021-10-05 18:18:50
+
+To build on a Python build from sources (e.g. 3.9.7) -> installed in 
+/usr/local
+
+see src/Building python
+
+activate the environment
+
+NOTE you need to build boost_1_77_0 form sources
+
+On Linux :
+    ./booststrap.sh --prefix=$VIRTUAL_ENV --with-python=/usr/local/bin/python3.9 --with-python-root=/usr/local
+    ./b2 --prefix=$VIRTUAL_ENV --with-python=/usr/local/bin/python3.9 --with-python-root=/usr/local
+
+
+
+
+
 Last modified 2021-09-20 10:07:27
 
 
@@ -302,8 +321,9 @@ NOTE: 2021-01-14 09:02:07 Variations for individual software libraries:
   # Replace
   # QT_INSTALL_PLUGINS with $VIRTUAL_ENV/lib/qt5/plugins/
   # QT_INSTALL_DATA with $VIRTUAL_ENV/share/qt5
+  
   #NOTE: 2021-09-20 11:08:31 the line below seems to be working at configuration stage
-  python configure.py --qmake=`which qmake-qt5` --designer-plugindir=$VIRTUAL_ENV/lib/qt5/plugins/designer --qml-plugindir=$VIRTUAL_ENV/lib/qt5/plugins/PyQt5 --qsci-api-destdir=$VIRTUAL_ENV/share/qt5
+  python configure.py --confirm-license --qmake=`which qmake-qt5` --designer-plugindir=$VIRTUAL_ENV/lib/qt5/plugins/designer --qml-plugindir=$VIRTUAL_ENV/lib/qt5/plugins/PyQt5 --qsci-api-destdir=$VIRTUAL_ENV/share/qt5 --no-python-dbus
   
   python dbus bindings are skipped because they tend to be installed in a system directory
   
@@ -360,7 +380,7 @@ NOTE: 2021-01-14 09:02:07 Variations for individual software libraries:
   option, then you may want to pass the '-I' options to pip install command for
   those packages that are already installed systemwide
 
-e.g. pip install -I numpy
+e.g. pip install -I numpy NOTE: omit -I
     This may flag further needed dependencies, that will have to be installed
     in the environment.
     
@@ -556,6 +576,7 @@ e.g. pip install -I numpy
     
   5.3 Create out-of-source build for vigra
   ........................................
+  NOTE if inside virtual environment - get out of it!
     5.3.1
     cd ..
     mkdir ~/scipyenv/src/vigra-build (if not already there, see NOTE: 2021-01-14 09:02:07)

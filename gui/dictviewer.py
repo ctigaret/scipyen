@@ -20,6 +20,7 @@ from pyqtgraph import (DataTreeWidget, TableWidget, )
 #from pyqtgraph.widgets.TableWidget import _defersort
 
 import neo
+import quantities as pq
 import numpy as np
 import pandas as pd
 #### END 3rd party modules
@@ -303,9 +304,33 @@ class InteractiveTreeWidget(DataTreeWidget):
             widget.setMaximumHeight(200)
             widget.readOnly=True
             
-            #widget = QtGui.QPlainTextEdit(asUnicode(data))
+            #widget = QtWidgets.QPlainTextEdit(asUnicode(data))
+            ##widget = QtGui.QPlainTextEdit(asUnicode(data))
             #widget.setMaximumHeight(200)
             #widget.setReadOnly(True)
+        elif isinstance(data, neo.core.dataobject.DataObject):
+            desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+            if data.size == 1:
+                widget = QtWidgets.QLabel(asUnicode(data))
+            else:
+                widget = TableEditorWidget(parent=self)
+                signalBlocker = QtCore.QSignalBlocker(widget.tableView)
+                widget.tableView.model().setModelData(data)
+                widget.setMaximumHeight(200)
+                widget.readOnly=True
+                
+            
+        elif isinstance(data, pq.Quantity):
+            desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
+            if data.size == 1:
+                widget = QtWidgets.QLabel(asUnicode(data))
+            else:
+                widget = TableEditorWidget(parent=self)
+                signalBlocker = QtCore.QSignalBlocker(widget.tableView)
+                widget.tableView.model().setModelData(data)
+                widget.setMaximumHeight(200)
+                widget.readOnly=True
+                
             
         elif isinstance(data, np.ndarray):
             desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
@@ -322,7 +347,7 @@ class InteractiveTreeWidget(DataTreeWidget):
             
         elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
             frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
-            widget = QtGui.QPlainTextEdit(asUnicode('\n'.join(frames)))
+            widget = QtWidgets.QPlainTextEdit(asUnicode('\n'.join(frames)))
             widget.setMaximumHeight(200)
             widget.setReadOnly(True)
             
