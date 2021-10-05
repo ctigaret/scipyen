@@ -546,7 +546,7 @@ e.g. pip install -I numpy NOTE: omit -I
   to verify.
   ............................................................................
   
-    cmake, cmake-gui
+    cmake, cmake-gui NOTE: needs cmake3 which on opensuse15.2 comes as cmake3 but as cmake on leap15.3
     zlib
     tiff
     jpeg
