@@ -397,45 +397,43 @@ e.g. pip install -I numpy NOTE: omit -I
     xxhash (optional, not used currently)
     distributed
     blosc
-    numpy
-    matplotlib      (pyparsing, cycler, kiwisolver, Pillow, python_dateutil, six)
-    scipy
-    sympy           (mpmath)
-    cmocean         (for nice colormaps)
-    cmasher         (ditto; brings colorspacious, e13tools, )
-    viscm           matplotlib module to visualize colormaps (pip install viscm)
-    scikit-learn    (joblib, threadpoolctl)
-    scikit-image    (imageio, networkx, decorator, pywavelets, tifffile)
-    seaborn         (pandas, pillow, cycler, python-dateutil, pyparsing, six)
-    bohek           (for jupyterlab plotting from neuron; also install tornado, typing_extension)
+    * numpy
+    * matplotlib      (pyparsing, cycler, kiwisolver, Pillow, python_dateutil, six)
+    * scipy
+    * sympy           (mpmath)
+    * cmocean         (for nice colormaps)
+    * cmasher         (ditto; brings colorspacious, e13tools, )
+    * viscm           matplotlib module to visualize colormaps (pip install viscm)
+    * scikit-learn    (joblib, threadpoolctl)
+    * scikit-image    (imageio, networkx, decorator, pywavelets, tifffile)
+    * seaborn         (pandas, pillow, cycler, python-dateutil, pyparsing, six)
+    * bohek           (for jupyterlab plotting from neuron; also install tornado, typing_extension)
     
-    quantities
-    pandas          (pytz)
-    nixio
-    neo
-    pyqtgraph
-    statsmodels     (patsy)
-    pingouin        (urllib3, idna, chardet, certifi, requests, littleutils, 
+    * pandas          (pytz)
+    * nixio
+    * neo             (quantities)
+    * pyqtgraph
+    * statsmodels     (patsy)
+    * pingouin        (urllib3, idna, chardet, certifi, requests, littleutils, 
                      tabulate, pandas_flavor, outdated, xarray)
-    pywavelets      (installed by scikit-learn)
-    researchpy
-    h5py            required for vigra
-    nose            required for vigra                            
-    sphinx          required for vigra    
+    * researchpy
+    * h5py           
+    * nose            required for vigra                            
+    * sphinx          required for vigra    
                     also installs:
                     (sphinxcontrib-serializinghtml, sphinxcontrib-qthelp, 
                     sphinxcontrib-jsmath, sphinxcontrib-htmlhelp, sphinxcontrib-devhelp, 
                     sphinxcontrib-applehelp, snowballstemmer, imagesize, docutils, 
                     babel, alabaster)
-    qimage2ndarray
-    imreg_dft                               
+    * qimage2ndarray
+    * imreg_dft                               
     xarray      
-    pyxdg
-    python-magic    Python interface to the libmagic file type identification library
+    * pyxdg
+    * python-magic    Python interface to the libmagic file type identification library
     nested_lookup
     dpath
 
-    jupyter         (zipp, typing-extensions, ipython-genutils, traitlets,
+    * jupyter         (zipp, typing-extensions, ipython-genutils, traitlets,
                     pyrsistent, importlib-metadata, attrs, wcwidth, tornado, pyzmq,
                     ptyprocess, parso, jupyter-core, jsonschema, webencodings, pygments,
                     pycparser, prompt-toolkit, pickleshare, pexpect, nest-asyncio, 
@@ -456,7 +454,7 @@ e.g. pip install -I numpy NOTE: omit -I
             https://github.com/ipython/ipython/issues/12740
             https://github.com/ipython/ipython/issues/12821
                 
-    jupyter_qtconsole_colorschemes
+    * jupyter_qtconsole_colorschemes
     
     NOTE: Scipyen does not aim to replicate the functionality in the jupyter 
         interfaces available - some people may find it easy(er) to work with 
@@ -469,22 +467,22 @@ e.g. pip install -I numpy NOTE: omit -I
         in neuron package (for plotting outside of neuron's own gui)
         
     ipyparallel
-    jupyter_cms     (woosh)
-    jupyterlab      (immutables, contextvars, sniffio, dataclasses, anyio, jupyter-server,
+    * jupyter_cms     (woosh)
+    * jupyterlab      (immutables, contextvars, sniffio, dataclasses, anyio, jupyter-server,
                      json5, nbclassic, jupyterlab-server, )
     
-    jupyterlab_templates
+    * jupyterlab_templates
     
-    jupyterthemes   for theming the jupyter notebook
+    * jupyterthemes   for theming the jupyter notebook
     
-    nodejs - requires installation of a more recent Node.js version (>- 12.0.0)
+    * nodejs - requires installation of a more recent Node.js version (>- 12.0.0)
         in the local environment
         
     
     *** Install Python libraries for storing configuration options unrelated to the GUI:
         NOTE: this is still experimental - testing various configuration libraries
     
-    confuse     (pyyaml)
+    * confuse     (pyyaml)
         
         not used, not installed:
             config (pip install config) -- 
@@ -501,9 +499,9 @@ e.g. pip install -I numpy NOTE: omit -I
                 * again, saving configuration to files from within the program not straightforward
                 
     Optional jupyter kernels:
-    octave_kernel   (metakernal)
-    gnuplot_kernel
-    matlab_kernel   (wurlitzer)
+    * octave_kernel   (metakernal)
+    * gnuplot_kernel
+    * matlab_kernel   (wurlitzer)
     
     Other modules - functionality complementary to NEURON:
         pyneuroml reader
@@ -511,7 +509,8 @@ e.g. pip install -I numpy NOTE: omit -I
         neurom - SWC reader
         pylmeasure
 
-    # install jupyterlab extensions for bokeh
+    # install jupyterlab extensions for bokeh - note hey will fail as they require pyqtlite which
+    # is notuet available for python3.9
     jupyter labextension install @jupyter-widgets/jupyterlab-manager
     jupyter labextension install @bokeh/jupyter_bokeh - error current version of jupyterlab not supported
     ValueError: The extension "@bokeh/jupyter_bokeh" does not yet support the current version of JupyterLab.
@@ -612,7 +611,7 @@ e.g. pip install -I numpy NOTE: omit -I
         python3-cython (installed system-wide; on OpenSUSE this is 'python3-Cython')
         mpich
         
-    6.2 clone git repository (in src)
+    6.2 clone git repository (in src): gh repo clone neuronsimulator/nrn
     
     cd ~/scipyenv-src
     mkdir ~/scipyenv/src/nrn-build (if not present, see NOTE: 2021-01-14 09:02:07)
