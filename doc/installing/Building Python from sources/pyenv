@@ -148,7 +148,7 @@ if ! [ -z "${VIRTUAL_ENV+_}" ]; then
     sys_ps1=${ndx_array[1]}
     PS1="(`basename ${VIRTUAL_ENV}` $PYENV) $sys_ps1"
     
-    LD_LIBRARY_PATH=$VIRTUAL_ENV/lib
+    LD_LIBRARY_PATH=$VIRTUAL_ENV/lib:$VIRTUAL_ENV/lib64:$LD_LIBRARY_PATH
     export LD_LIBRARY_PATH
     export PYTHONHOME # you NEED this to find platform independent libraries !!!
 #     export PYTHONHOME=${VIRTUAL_ENV}

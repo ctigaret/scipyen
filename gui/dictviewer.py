@@ -305,7 +305,7 @@ class InteractiveTreeWidget(DataTreeWidget):
             widget.readOnly=True
             
             #widget = QtWidgets.QPlainTextEdit(asUnicode(data))
-            ##widget = QtGui.QPlainTextEdit(asUnicode(data))
+            ##widget = QtWidgets.QPlainTextEdit(asUnicode(data))
             #widget.setMaximumHeight(200)
             #widget.setReadOnly(True)
         elif isinstance(data, neo.core.dataobject.DataObject):
@@ -360,7 +360,7 @@ class InteractiveTreeWidget(DataTreeWidget):
         from pyqtgraph.python2_3 import asUnicode
         
         # NOTE: 2021-07-24 13:15:38
-        # throughout this function 'node' is a QtGui.QTreeWidgetItem
+        # throughout this function 'node' is a QtWidgets.QTreeWidgetItem
         # the root node is named after the symbol of the nested data structure
         # shown by DataViewer, or by _docTitle_, hence it is always a str
         #
@@ -400,7 +400,7 @@ class InteractiveTreeWidget(DataTreeWidget):
         if hideRoot:
             node = parent
         else:
-            node = QtGui.QTreeWidgetItem([name, "", ""])
+            node = QtWidgets.QTreeWidgetItem([name, "", ""])
             parent.addChild(node)
         
         # record the path to the node so it can be retrieved later
@@ -427,14 +427,14 @@ class InteractiveTreeWidget(DataTreeWidget):
         if len(desc) > 100:
             desc = desc[:97] + '...'
             if widget is None:
-                widget = QtGui.QPlainTextEdit(asUnicode(data))
+                widget = QtWidgets.QPlainTextEdit(asUnicode(data))
                 widget.setMaximumHeight(200)
                 widget.setReadOnly(True)
         
         # Add widget to new subnode
         if widget is not None:
             self.widgets.append(widget)
-            subnode = QtGui.QTreeWidgetItem(["", "", ""])
+            subnode = QtWidgets.QTreeWidgetItem(["", "", ""])
             node.addChild(subnode)
             self.setItemWidget(subnode, 0, widget)
             self.setFirstItemColumnSpanned(subnode, True)

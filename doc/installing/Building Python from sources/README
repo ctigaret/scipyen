@@ -32,11 +32,14 @@ CORRESPONDING devel PACKAGES:
     libnsl, 
     openssl (>= 1.1.1)
     tk
+    sqlite3
 
 
 The cd into the chosen Python source tree (e.g. ~/src/Python-3.10.0) and run
-./configure --enable-optimizations --with-lto --enable-shared
+(in a Unix shell)
+./configure --enable-optimizations --with-lto --enable-shared --enable-loadable-sqlite-extensions > config_output 2>&1
 # NOTE: VIGRA required shared python library !!!
+# NOTE: IPython requires the sqlite3 module
 make
 # run as superuser (su, or via sudo):
 make altinstall

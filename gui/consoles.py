@@ -13,7 +13,7 @@ NEURON Gui.
 
 As things stand (2020-07-10 15:29:33) quitting the NEURON Gui crashes the 
 (I)python kernel under which the NEURON Gui has been launched. This also brings 
-down Scioyen app, if the kernel is happens to be the in-process ipython kernel,
+down Scipyen app, if the kernel is happens to be the in-process ipython kernel,
 or Scipyen's own python kernel (e.g. if NEURON Gui was started from code inside
 the Scipyen event loop)
 
@@ -37,7 +37,7 @@ across kill - restart cycles.
 import os
 import signal
 import json
-import sys, typing, traceback, itertools
+import sys, typing, traceback, itertools, subprocess
 from functools import partial, partialmethod
 from collections import OrderedDict
 from warnings import warn
@@ -50,9 +50,10 @@ from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
 from traitlets.config.application import boolean_flag
 from traitlets.config.application import catch_config_error
 from traitlets import (
-    Dict, Unicode, CBool, Any, Bunch,
+    Dict, Unicode, CBool, Any, Bunch, HasTraits, Instance, Int,
 )
 from ipykernel.inprocess.ipkernel import InProcessKernel
+from ipykernel.inprocess.socket import DummySocket
 from jupyter_core.paths import jupyter_runtime_dir
 from jupyter_core.application import JupyterApp, base_flags, base_aliases
 
@@ -62,6 +63,12 @@ from jupyter_client.consoleapp import (
         JupyterConsoleApp, app_aliases, app_flags,
     )
 
+from tornado import ioloop
+from tornado.queues import Queue
+
+import zmq
+
+import sip
 
 from pygments import styles as pstyles
 
@@ -149,6 +156,50 @@ def get_available_syntax_styles():
 
 #current_syntax_styles = get_available_syntax_styles()
 
+#class ScipyenDummySocket(DummySocket):
+    #""" A dummy socket implementing (part of) the zmq.Socket interface. """
+
+    #def getsockopt(self, *args, **kwargs):
+        #pass
+        ##return subprocess.DEVNULL
+    
+class ScipyenInProcessKernel(InProcessKernel):
+    """Workaround the following exception when using InProcessKernel (see below).
+    
+    It turns out that all we need is to set evbentloop to None so that tornado
+    "stays put".
+
+    (NOTE: This DOES NOT crash the kernel):
+    ERROR:tornado.application:Exception in callback 
+    functools.partial(<bound method Kernel.enter_eventloop of <ipykernel.inprocess.ipkernel.InProcessKernel object at 0x7f0b6abe5730>>)
+    
+  Traceback (most recent call last):
+  File "/home/cezar/scipyenv39/lib64/python3.9/site-packages/tornado/ioloop.py", line 741, in _run_callback
+    ret = callback()
+  File "/home/cezar/scipyenv39/lib/python3.9/site-packages/ipykernel/kernelbase.py", line 419, in enter_eventloop
+    schedule_next()
+  File "/home/cezar/scipyenv39/lib/python3.9/site-packages/ipykernel/kernelbase.py", line 416, in schedule_next
+    self.io_loop.call_later(0.001, advance_eventloop)
+AttributeError: 'InProcessKernel' object has no attribute 'io_loop'
+    """
+    eventloop = None
+    
+    def __init__(self, **traits):
+        super().__init__(**traits)
+    
+class ScipyenInProcessKernelManager(QtInProcessKernelManager):
+    """Starts our own custom InProcessKernel (ScipyenInProcessKernel)
+    
+    Workaround for a bug (?) in InProcessKernel API.
+    
+    See ScipyenInProcessKernel docstring.
+    
+    """
+    client_class = 'qtconsole.inprocess.QtInProcessKernelClient'
+    
+    def start_kernel(self, **kwds):
+        self.kernel = ScipyenInProcessKernel(parent=self, session=self.session)
+
 class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     """
     """
@@ -156,11 +207,10 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         super(RichJupyterWidget, self).__init__(*args, **kw)
         self._console_pygment = ""
         self._console_colors = ""
-        #self.qsettings = QtCore.QSettings()
         self.available_colors = ("nocolor", "linux", "lightbg")
         self.scrollbar_positions = Bunch({QtCore.Qt.LeftToRight: "right",
                                            QtCore.Qt.RightToLeft: "left"})
-        ScipyenConfigurable.__init__(self, **kw)
+        ScipyenConfigurable.__init__(self)
         
     @property
     def scrollBarPosition(self):
@@ -2790,23 +2840,15 @@ class ScipyenConsoleWidget(ConsoleWidget):
 
         # NOTE 2020-07-07 12:32:40
         # ALWAYS uses the in-proces Qt kernel manager
-        self.kernel_manager = QtInProcessKernelManager() # what if gui is NOT Qt?
-            
+        # NOTE 2021-10-06 13:52:58
+        # Use a customized InProcessKernel, see
+        # ScipyenInProcessKernelManager and ScipyenInProcessKernel
+        # for details
+        self.kernel_manager = ScipyenInProcessKernelManager() # what if gui is NOT Qt?
         self.kernel_manager.start_kernel()
         self.kernel_manager.kernel.eventloop = None
         self.ipkernel = self.kernel_manager.kernel
         self.ipkernel.gui = "qt"
-        # NOTE: 2021-09-21 14:22:58
-        # see https://github.com/ipython/ipykernel/issues/319
-        # comment by sdh4
-        # https://github.com/ipython/ipykernel/issues/319#issuecomment-661951992
-        #if not hasattr(self.kernel_manager.kernel, "io_loop"):
-            ##print("try and fix io_loop")
-            #import ipykernel.kernelbase
-            #ipykernel.kernelbase.Kernel.start(self.kernel_manager.kernel)
-            #def _bogus_advance_event_loop(kernel):
-                #pass
-            
         
         ## NOTE: 2016-03-20 14:37:37
         ## this must be set BEFORE start_channels is called
@@ -2821,7 +2863,6 @@ class ScipyenConsoleWidget(ConsoleWidget):
         
         self.kernel_client = self.kernel_manager.client()
         self.kernel_client.start_channels()
-        #super(InProcessKernel, self.kernel_manager.kernel).start()
         
         # NOTE: 2019-08-07 16:34:58
         # enforce qt5 backend for matplotlib

@@ -117,7 +117,7 @@ NOTE 2021-01-12 10:13:03 Separate builds
 ------------------------------------------
 The source directories DO NOT need to be located inside the directory of the
 virtual python environment; they can be placed in a source repository separate
-from the environment itself, e.g. ~/scipyenv/src or ~/scipyenv-src.
+from the environment itself, e.g. $VIRTUAL_ENV/src or $VIRTUAL_ENV-src.
 
 However, both the build and installation processes MUST be run from a shell
 with the virtual python environment activated (see points 1.2 and 1.3, below).
@@ -356,7 +356,7 @@ NOTE: 2021-01-14 09:02:07 Variations for individual software libraries:
   --> node-v15.6.0.tar.gz
   
   
-  cd ~/scipyenv-src
+  cd $VIRTUAL_ENV-src
   tar xzf node-v15.6.0.tar.gz
   cd node-v15.6.0
   
@@ -567,54 +567,69 @@ e.g. pip install -I numpy NOTE: omit -I
     
   5.2 Clone vigra repo (while in src, with the virtual environment activated):
   ...........................................................................
-    cd ~/scipyenv-src
+    cd $VIRTUAL_ENV-src
     
     git clone https://github.com/ukoethe/vigra.git
     
-    (--> creates ~/scipyenv-src/vigra)
+    (--> creates $VIRTUAL_ENV-src/vigra)
     
   5.3 Create out-of-source build for vigra
   ........................................
   NOTE if inside virtual environment - get out of it!
     5.3.1
     cd ..
-    mkdir ~/scipyenv/src/vigra-build (if not already there, see NOTE: 2021-01-14 09:02:07)
-    cd ~/scipyenv/src/vigra-build
+    mkdir $VIRTUAL_ENV/src/vigra-build (if not already there, see NOTE: 2021-01-14 09:02:07)
+    cd $VIRTUAL_ENV/src/vigra-build
     
     5.3.2 generate Makefile
     cmake-gui ~/scypienv-src/vigra (run cmake-gui --help for options)
         At first run click "configure" then as cmake variables are set or edited
         as below, press "configure" again
-        Inside the CMake gui set the following variables as follows:
+        
+        In cmake-gui:
+            * search for configuration variables containing the string 'INSTALL'
+            (without quotes) and adjust them to point to the real path of your
+            $VIRTUAL_ENV e.g., set the following variables as follows:
             CMAKE_INSTALL_PREFIX (-DCMAKE_INSTALL_PREFIX=) /home/user/scipyenv
-            LIB_SUFFIX (-DLIB_SUFFIX=) 64
-                    
-            - also select in the "WITH" group: 
-                boost-thread, boost-graph, openexr, vigranumpy, valgrind
-    
-            - in the GUI, press configure until all options are satisfied (i.e.,
-            i.e. they are NOT highlighted anymore) - check the environment variables 
-            mentioned above - remember to press "configure" again
             
-            - finally press "Generate" and quit cmake-gui
+            * set LIB_SUFFIX (-DLIB_SUFFIX=) 64
+                    
+            * in the "WITH" group, make sure the following ar echecked (i.e. True): 
+            boost-thread, boost-graph, openexr, vigranumpy, valgrind
+    
+            * press configure until all options are satisfied (i.e. nothing is
+            highlighted in red anymore) - NOTE: this is a recursive process
+            
+            * finally, press "Generate" and quit cmake-gui
                 
     5.3.3. Build vigra and install
     make
-    make doc
-    make install (--> installs in scipyenv/doc/vigra and scipyenv/doc/vigranumpy)
+    patch vigra-build/vigranumpy/docsrc/conf.py on line 25: 
+        change from:
+                except TypeError, e:
+        to:
+                except TypeError as e:
+        (NOTE: this corrects deprecated syntax)
+        
+    make doc 
+    make install (--> installs in $VIRTUAL_ENV/doc/vigra and $VIRTUAL_ENV/doc/vigranumpy)
     
     cd ..
     
     6. Install (download/clone, make and install) NEURON
     ---------------------------------------------------------------
     6.1 prerequisites: 
-        python3-cython (installed system-wide; on OpenSUSE this is 'python3-Cython')
+        * python3-cython (installed system-wide; e.g. 'python3-Cython' on OpenSuSE)
+        NOTE: if you are using a Python version built from sources then you MUST
+        use a virtual environment with THAT SPECIFIC python version, AND install
+        cython package INSIDE IT.
+        
         mpich
         
     6.2 clone git repository (in src): gh repo clone neuronsimulator/nrn
     
-    cd ~/scipyenv-src
-    mkdir ~/scipyenv/src/nrn-build (if not present, see NOTE: 2021-01-14 09:02:07)
+    cd $VIRTUAL_ENV-src
+    mkdir $VIRTUAL_ENV/src/nrn-build (if not present, see NOTE: 2021-01-14 09:02:07)
     
     git clone https://github.com/neuronsimulator/nrn 
     (=> creates ~/scipeynv-src/nrn)
@@ -623,15 +638,15 @@ e.g. pip install -I numpy NOTE: omit -I
     
     cd ~/scipyen/src/nrn-build
      NOTE: requires libXcomposite development packages
-    cmake-gui ..~/scipyenv-src/nrn
+    cmake-gui ..$VIRTUAL_ENV-src/nrn
         "Configure" will also pull iv, coreneuron
-        CMAKE_INSTALL_PREFIX (-DCMAKE_INSTALL_PREFIX=) ~/scipyenv
+        CMAKE_INSTALL_PREFIX (-DCMAKE_INSTALL_PREFIX=) $VIRTUAL_ENV
         NRN_ENABLE_CORENEURON=true
         NRN_ENABLE_INTERVIEWS=true
         NRN_ENABLE_MECH_DLL_STYLE=true
         NRN_ENABLE_MODULE_INSTALL=true
         NRN_ENABLE_INTERNAL_READLINE=false
-        NRN_MODULE_INSTALL --prefix= --home=/home/cezar/scipyenv
+        NRN_MODULE_INSTALL --prefix= --home=$VIRTUAL_ENV
         NRN_ENABLE_MPI=true
         NRN_ENABLE_MPI_DYNAMIC=false
         NRN_ENABLE_PYTHON=true (default python3 fallback to python2)
@@ -640,6 +655,11 @@ e.g. pip install -I numpy NOTE: omit -I
         NRN_ENABLE_SHARED=true
         NRN_ENABLE_TESTS=false
         NRN_ENABLE_THREADS=true
+        LIB_INSTALL_DIR=$VIRTUAL_ENV/lib64
+        
+        In cmake-gui, search for configuration variables containing the string
+        'INSTALL' (without quotes) and adjust them to point to the real path of
+        $VIRTUAL_ENV
         
     6.4 Build neuron, then install
     make
@@ -648,23 +668,23 @@ e.g. pip install -I numpy NOTE: omit -I
     properly install neuron python modules inside the site-packages corresponding
     to the environment's python version
     
-    cd ~/scipyenv/src/nrn-build/src/nrnpython
+    cd $VIRTUAL_ENV/src/nrn-build/src/nrnpython
     
     python setup.py install 
     (to install nrnpython in site-packages)
     
-    Build neuron documentation locally and install locally (see ~/scipyenv-src/nrn/docs/README.md)
+    Build neuron documentation locally and install locally (see $VIRTUAL_ENV-src/nrn/docs/README.md)
     
-    cd ~/scipyenv-src/nrn
+    cd $VIRTUAL_ENV-src/nrn
     pip3 install -r docs/docs_requirements.txt
         --> installs required python packages (e.g.commonmark, sphinx-rtd-theme, 
         recommonmark, plotly, etc) inside the virtual environment
     
-    cd ~/scipyenv/src/nrn-build
+    cd $VIRTUAL_ENV/src/nrn-build
     make docs
     
     Optionally, copy/move (or, better make a symbolic link) 
-    ~/scipyenv/src/nrn/docs/_build to ~/scipyenv/doc/neuron
+    $VIRTUAL_ENV/src/nrn/docs/_build to $VIRTUAL_ENV/doc/neuron
     
     
     7. Clone scipyenv (for now use the dev branch)
@@ -703,20 +723,17 @@ e.g. pip install -I numpy NOTE: omit -I
         Finally, for development work:
             git checkout dev; make sure to git pull every time
             
-    8. Link the nrnipython script (in scipyen/nrnipython):
-        cd ~/scipyenv/bin
-        ln -s ../scipyen/scipyen
+    8. link the scypien bash script (executable)
+        cd $VIRTUAL_ENV/bin
+        ln -s ../scipyen/scipyen scipyen
+        ln -s ../scipyen/noteboook.sh notebook
+        ln -s ../scipyen/jupyterlab.sh jupyterlab
+        ln -s ../scipyen/set_browser.sh set_browser
+        
+    9. ONLY IF USING NEURON:
         ln -s ../scipyen/nrnipython/nrnipython nrnipython
         ln -s ../scipyen/nrnipython/nrnipython nrnpython
         ln -s ../scipyen/nrnipython/nrnipython nrnpy
-        
-        (the last two are just aliases of the first)
-        
-    9 link the scypien bash script (executable)
-        cd ~/scipyenv/bin
-        ln -s ../scipyen/scipyen scipyen
-        ln -s ../scipyen/noteboook.sh notebook
-        ln -s ../scipyen/jupyterlab.sh jopyterlab
     
     10. Other software (optional)
     ----------------------------
