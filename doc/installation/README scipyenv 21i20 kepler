@@ -646,7 +646,7 @@ e.g. pip install -I numpy NOTE: omit -I
         NRN_ENABLE_MECH_DLL_STYLE=true
         NRN_ENABLE_MODULE_INSTALL=true
         NRN_ENABLE_INTERNAL_READLINE=false
-        NRN_MODULE_INSTALL --prefix= --home=$VIRTUAL_ENV
+        NRN_MODULE_INSTALL_OPTIONS --prefix= --home=$VIRTUAL_ENV
         NRN_ENABLE_MPI=true
         NRN_ENABLE_MPI_DYNAMIC=false
         NRN_ENABLE_PYTHON=true (default python3 fallback to python2)
@@ -656,6 +656,7 @@ e.g. pip install -I numpy NOTE: omit -I
         NRN_ENABLE_TESTS=false
         NRN_ENABLE_THREADS=true
         LIB_INSTALL_DIR=$VIRTUAL_ENV/lib64
+        IV_ENABLE_SHARED=true
         
         In cmake-gui, search for configuration variables containing the string
         'INSTALL' (without quotes) and adjust them to point to the real path of
