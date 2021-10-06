@@ -7319,7 +7319,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         exclude_failures = not self.includeFailuresCheckBox.isChecked()
         test_component = self.selectFailureTestComponentComboBox.currentText()
         
-        if exclude_failures and test_component is "index":
+        if exclude_failures and test_component == "index":
             testComponentIndexText = self.testEPSCaTComponentInputLineEdit.text()
             
             if len(testComponentIndexText.strip()) == 0:
@@ -7419,7 +7419,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         excludeFailures = not self.includeFailuresCheckBox.isChecked()
         testComponent = self.selectFailureTestComponentComboBox.currentText()
         
-        if excludeFailures and testComponent is "index":
+        if excludeFailures and testComponent == "index":
             testComponentIndexText = self.testEPSCaTComponentInputLineEdit.text()
             
             if len(testComponentIndexText.strip()) == 0:
@@ -7507,7 +7507,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         excludeFailures = not self.includeFailuresCheckBox.isChecked()
         testComponent = self.selectFailureTestComponentComboBox.currentText()
         
-        if excludeFailures and testComponent is "index":
+        if excludeFailures and testComponent == "index":
             testComponentIndexText = self.testEPSCaTComponentInputLineEdit.text()
             
             if len(testComponentIndexText.strip()) == 0:
@@ -8647,7 +8647,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         #print("newname")
         
         if len(newname.strip()) == 0:
-            if len(self._data_.cell) and self._data_.cell is not "NA":
+            if len(self._data_.cell) and self._data_.cell != "NA":
                 srcID = self._data_.cell.split(".")
                 
                 if len(srcID) == 0:
@@ -8739,7 +8739,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         self.cellLineEdit.setText(self._data_.cell)
         #self.cellLineEdit.editingFinished.connect(self.slot_gui_changed_cell_name, type = QtCore.Qt.QueuedConnection)
         
-        if self._data_.sourceID is"NA" and self._data_.cell is not "NA":
+        if self._data_.sourceID == "NA" and self._data_.cell != "NA":
             srcID = self._data_.cell.split(".")
             
             if len(srcID) == 0:
@@ -12962,7 +12962,7 @@ def addAge(data, value):
         raise TypeError("Expecting a pandas.DataFrame; got %s instead" % type(data).__name__)
     
         if isinstance(value, str):
-            if value.strip().lower() is not "na":
+            if value.strip().lower() != "na":
                 raise ValueError("When a str, age must be 'NA'; got %s instead" % age)
             
             age = "NA"

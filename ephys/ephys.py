@@ -2798,7 +2798,7 @@ def parse_step_waveform_signal(sig, method="state_levels", **kwargs):
     # 1) get transition times from injected current
     # use filtered signal, if available
     
-    if method is "state_levels":
+    if method == "state_levels":
         levels = kwargs.pop("levels", 0.5)
         adcres = kwargs.pop("adcres", 15)
         adcrange = kwargs.pop("adcrange", 10)

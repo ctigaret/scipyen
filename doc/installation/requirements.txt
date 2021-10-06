@@ -1,0 +1,14 @@
+numpy
+scipy
+sympy
+matplotlib
+viscm
+researchpy
+scikit-learn
+scikit-image
+cmocean
+cmasher
+seaborn
+nixio
+neo
+pandas

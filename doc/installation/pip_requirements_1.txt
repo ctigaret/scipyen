@@ -1,0 +1,20 @@
+# AFTER installing PyQt5, see pip_requirements_0.txt
+jupyter
+jupyter_qtconsole_colorschemes
+matplotlib
+viscm
+scipy
+sympy
+pandas
+pyqtgraph
+nixio
+neo
+h5py
+qimage2ndarray
+imreg-dft
+seaborn
+statsmodels
+pyxdg
+python-magic
+cmocean
+cmasher
