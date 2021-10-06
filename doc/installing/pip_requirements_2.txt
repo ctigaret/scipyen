@@ -1,0 +1,4 @@
+# if you plan to use NEURON
+cython
+pyneuroml       # optional
+pylmeasure      # optional
