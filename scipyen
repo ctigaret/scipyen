@@ -5,7 +5,8 @@ scipyendir=`dirname $realscript`
 scipyenvdir=`dirname $scipyendir`
 
 if [ -z $VIRTUAL_ENV ]; then
-    source $scipyenvdir/bin/activate
+#     source $scipyenvdir/bin/activate
+    echo "You must run this script while in a virtual python environment"
 fi
 
 if [ -z $BROWSER ]; then
@@ -15,7 +16,7 @@ if [ -z $BROWSER ]; then
 fi
 
 # NOTE: 2021-02-04 18:00:07
-# On linux, prevent KDE or other DEs theming from overriding the resources 
+# On linux, override KDE or other DEs theming from overriding the resources 
 # (colors etc) in the InterViews GUI
 xrdb -merge $scipyendir/neuron_python/app-defaults/nrniv
 
