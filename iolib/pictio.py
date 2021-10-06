@@ -1954,7 +1954,7 @@ def getMimeAndFileType(fileName):
     # NOTE: 2021-04-12 11:31:29
     # this is in case the actual file type and mime type are not registered
     # with either the global or the user mime data base(s)
-    if mime_type in ["application/executable", None] or file_type is "data":
+    if mime_type in ["application/executable", None] or file_type == "data":
         _mime_type, encoding = mimetypes.guess_type(fileName)
         if _mime_type is not None:
             # NOTE: 2021-04-12 11:31:24

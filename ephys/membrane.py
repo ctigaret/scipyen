@@ -1919,7 +1919,7 @@ def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,
     if len(segments_ap_reports):
         report = pd.concat(segments_ap_reports, ignore_index=True, sort=False)
         
-        if report.Record.dtype.name is not "category":
+        if report.Record.dtype.name != "category":
             report.Record = report.Record.astype("category")
             
         grouping = "AP"
@@ -2174,7 +2174,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,
     elif isinstance(signal.name, str) and len(signal.name.strip()):
         recordname = signal.name
         
-    elif (protocol_name is "NA" or protocol_name is None) and \
+    elif (protocol_name == "NA" or protocol_name is None) and \
         (isinstance(triggers, (TriggerProtocol, TriggerEvent)) and isinstance(triggers.name, str) and len(triggers.name.strip())):
         recordname.append(triggers.name)
         
@@ -3914,12 +3914,12 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
                 # there are two alternative workarounds:
                 # (a) extrapolate a straight line from the point on half-max and 
                 #   find its intercept with the Vm onset value
-                if decay_intercept_approx.strip().lower() is "linear":
+                if decay_intercept_approx.strip().lower() == "linear":
                     if isinstance(decay_ref, str):
-                        if decay_ref is "hm":
+                        if decay_ref == "hm":
                             decay_onset_Vm_x = (ap_Vm_onset_values.magnitude[k] - vm_at_half_max.magnitude[k]) / hm_decay_slope + hm_decay_x
                             
-                        elif decay_ref is "qm":
+                        elif decay_ref == "qm":
                             decay_onset_Vm_x = (ap_Vm_onset_values.magnitude[k] - vm_at_quart_max.magnitude[k]) / qm_decay_slope + qm_decay_x
                             
                         else:
@@ -4238,7 +4238,7 @@ def ap_duration_at_Vm(ap, value, **kwargs): #decay_ref, decay_intercept_approx="
     rise_time, rise_value, rise_slope, decay_time, decay_value, decay_slope = ap_waveform_roots(ap, value, interpolate=interpolate)
     
     if decay_time is np.nan:
-        if decay_intercept_approx.strip().lower() is "linear":
+        if decay_intercept_approx.strip().lower() == "linear":
             ref_rise_time, ref_rise_value, ref_rise_slope, ref_decay_time, ref_decay_value, ref_decay_slope = ap_waveform_roots(ap, decay_ref, interpolate=interpolate)
             
             decay_time = (value - ref_decay_value)/ref_decay_slope + ref_decay_time
@@ -7754,7 +7754,7 @@ def get_ap_analysis_param(rdict, param_name, step_index, waveform_index = 0):
     
     # ensure that if Waveform is requested and is not found, then return None
     # instead of np.nan
-    if param_name is "Waveform":
+    if param_name == "Waveform":
         ret = None
         
     else:
@@ -7776,10 +7776,10 @@ def get_ap_analysis_param(rdict, param_name, step_index, waveform_index = 0):
         else:
             segdict = rdict
             
-        if param_name is "Vm_signal" and "Vm_signal" in segdict:
+        if param_name == "Vm_signal" and "Vm_signal" in segdict:
             return segdict["Vm_signal"]
         
-        if param_name is "AP_train":
+        if param_name == "AP_train":
             if "AP_analysis" in segdict:
                 return segdict["AP_analysis"]["AP_train"]
             
@@ -7863,10 +7863,10 @@ def get_ap_analysis_param(rdict, param_name, step_index, waveform_index = 0):
                 if isinstance(ret, float):
                     ret = np.array([ret])
                 
-            elif param_name is "time_units":
+            elif param_name == "time_units":
                 ret = segdict["Duration_at_half_max"].units
                 
-            elif param_name is "data_units":
+            elif param_name == "data_units":
                 ret = segdict["Vm_amplitude"].units
                 
             else:
