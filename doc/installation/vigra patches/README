@@ -1,0 +1,36 @@
+Below are some patches to be applied to the files in the vigra source and
+build trees (respectively, directories 'vigra' and 'vigra-build'), with
+their justification.
+
+Simply make a backup copy of the target files, then overwrite the originals
+with the corresponding files (directory tree structure reproduced here on purpose).
+
+Alternatively, you could generate 'diff' files to use with 'patch'.
+
+Required to build docs on Python 3.9:
+    vigra/vigranumpy/docsrc/conf.py.in                # patch BEFORE make
+    vigra-build/vigranumpy/docsrc/conf.py.in, conf.py # patch BEFORE make doc
+    
+vigra/vigranumpy/lib/__init__.py # correct syntax for Python 3.9 (no more warnings)
+
+For building under VisualStudio2019:
+    vigra/src/impex/hdf5impex.cxx               # to conform with the more recent 
+                                                # HDF5 API (v.1.12.1, but possibly
+                                                # also >= 1.11), namely, 
+                                                # H5Oget_info_by_name
+                                                # (declared in H5Opublic.h)
+                                                # expects five parameters (with
+                                                # the fourth being unsigned int), 
+                                                # not four (in 1.10.7 the four-
+                                                # parameter version was flagged
+                                                # for deprecation)
+                                                
+    vigra/vigranumpy/src/core/segmentation.cxx  # VS2019 seemingly cannot infer
+                                                # from the context whether 
+                                                # MultiArrayView.begin() and
+                                                # MultiArrayView.end() return a
+                                                # MultiArrayView.const_iterator 
+                                                # or MultiarrayView.iterator; it
+                                                # treats it as const_iterator type
+                                                # so fails to compile
+                                                

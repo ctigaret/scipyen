@@ -675,10 +675,10 @@ e.g. pip install -I numpy NOTE: omit -I
     python setup.py install 
     (to install nrnpython in site-packages)
     
+    Optional:
     Build neuron documentation locally and install locally (see $VIRTUAL_ENV-src/nrn/docs/README.md)
     
-    cd $VIRTUAL_ENV-src/nrn
-    pip3 install -r docs/docs_requirements.txt
+    pip3 install -r $VIRTUAL_ENV/src/nrn/docs/docs_requirements.txt
         --> installs required python packages (e.g.commonmark, sphinx-rtd-theme, 
         recommonmark, plotly, etc) inside the virtual environment
     

@@ -24,7 +24,7 @@ libjpeg                 # VIGRA                     (1)
 libpng                  # VIGRA                     (1)
 libtiff                 # VIGRA                     (1)
 boost_1_77_0            # VIGRA                     (3) build SHARED libraries!
-HDF5                    # VIGRA                     (1)
+HDF5                    # VIGRA                     (1) but also possibly (3)
 OpenEXR                 # VIGRA                     (1)
 mpich                   # NEURON                    (1)
 VIGRA                   # imaging in scipyen        (2,3)
