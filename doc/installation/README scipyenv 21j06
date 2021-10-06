@@ -605,6 +605,7 @@ e.g. pip install -I numpy NOTE: omit -I
     5.3.3. Build vigra and install
     make
     patch vigra-build/vigranumpy/docsrc/conf.py on line 25: 
+        (or , better, vigra/vigranumpy/docsrc/conf.py.in on line 25)
         change from:
                 except TypeError, e:
         to:

@@ -1,4 +1,7 @@
 # if you plan to use NEURON
 cython
+bokeh
+pytest
+# also see nrn/docs/docs_requirements.txt
 pyneuroml       # optional
 pylmeasure      # optional
