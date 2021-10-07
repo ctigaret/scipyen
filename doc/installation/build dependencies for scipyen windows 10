@@ -133,6 +133,8 @@ open the \src\zlib-1.2.11 directory as "Folder" in VisualStudio 2019
 
 Modify environment variables (in Windows Settings, search "environment", select
 "Modify Environment variables for your account"):
+(NOTE: 2021-10-07 16:13:05 these are now taken care of by the scipyact*.bat scripts, 
+when ROOT is %VIRTUAL_ENV% of scipyenv)
 Add ROOT\bin to PATH
 Create INCLUDE=ROOT\include
 Create LIB=ROOT\lib
