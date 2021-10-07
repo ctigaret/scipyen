@@ -64,7 +64,10 @@ VIRTUAL PYTHON ENVIRONMENT ACTIVATION SCRIPTS:
 
 1. Create a Scripts directory in your Windows home directory (%USERPROFILE%)
 
-2. Add the %USERPROFILE%\Scripts to your %PATH% PERMANENTLY
+2. Add to your %PATH% PERMANENTLY:
+
+	%USERPROFILE%\Scripts
+	
 
 (use Windows settings, search for "environment", select 
 "Edit environment variables for your account" -> in the new dialog edit %PATH% ->
@@ -72,12 +75,14 @@ VIRTUAL PYTHON ENVIRONMENT ACTIVATION SCRIPTS:
 
 * restart the command prompt
 
-3. copy scipyact.bat, vs64.bat and scipyact_vs64.bat to %USERPROFILE%\Scripts
+3. Copy scipyen_startup.py to <where your environment is>\Scripts
+
+4. copy scipyact.bat, vs64.bat and scipyact_vs64.bat to %USERPROFILE%\Scripts
 
 (NOTE: you can name these scripts whatever you like, just make note of what each
 does; in the following, I will use the above names by convention)
 
-4. Scripts usage:
+4.1. Scripts usage:
     scipyact.bat => activates the virtual python environment <- USE THIS FOR REGULAR
         USE OF Scipyen, inside the virtual python environment
         
@@ -88,7 +93,6 @@ does; in the following, I will use the above names by convention)
         dependencies INSIDE the virtual python environment (RECOMMENDED)
         
     
-
 
 
 
