@@ -7,11 +7,13 @@ see src/Building python
 
 activate the environment
 
-NOTE you need to build boost_1_77_0 form sources
+NOTE you need to build boost_1_77_0 from sources
+
+di that from within virtual oython environment (e.g., scipyenv) activaed (see below)
 
 On Linux :
     ./booststrap.sh --prefix=$VIRTUAL_ENV --with-python=/usr/local/bin/python3.9 --with-python-root=/usr/local
-    ./b2 --prefix=$VIRTUAL_ENV --with-python=/usr/local/bin/python3.9 --with-python-root=/usr/local
+    ./b2 --prefix=$VIRTUAL_ENV
 
 
 
@@ -349,7 +351,7 @@ NOTE: 2021-01-14 09:02:07 Variations for individual software libraries:
   
   3. Build and install Node.js in the local virtual environment
   -----------------------------------------------------------------------
-  (required to use bokeh with jupyterlab)
+  (required to use bokeh with NEURON and jupyterlab)
   
   3.1 Download Node.js source code archive from https://nodejs.org/en/download/current/
   
