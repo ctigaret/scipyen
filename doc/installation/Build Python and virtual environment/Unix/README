@@ -42,14 +42,19 @@ etc., on others) search for and install, TOGETHER WITH THEIR CORRESPONDING
     tk
     sqlite3
 
+Exrtact the Python source code archive (e.g., Python-3.9.7.tar.xz) into your
+chosen place (e.g., ~/src)
 
-The cd into the chosen Python source tree (e.g. ~/src/Python-3.10.0) and run
+The cd into the chosen Python source tree (e.g. ~/src/Python-3.9.7) and run
 (in a Unix shell)
+
 ./configure --enable-optimizations --with-lto --enable-shared --enable-loadable-sqlite-extensions > config_output 2>&1
 # NOTE: VIGRA requires shared python library !!!
 # NOTE: IPython requires the sqlite3 module
+
 make
-# run as superuser (su, or via sudo):
+
+# run as superuser (either call su, or via sudo):
 
 make altinstall # NOTE: DO NOT CALL make install !!!! (this will overwrite your
                 #   ditribution's pytnhon executable)

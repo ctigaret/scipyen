@@ -1,109 +1,307 @@
-Last modified 2021-10-05 18:18:50
-
-To build on a Python build from sources (e.g. 3.9.7) -> installed in 
-/usr/local
-
-see src/Building python
-
-activate the environment
-
-NOTE you need to build boost_1_77_0 from sources
-
-di that from within virtual oython environment (e.g., scipyenv) activaed (see below)
-
-On Linux :
-    ./booststrap.sh --prefix=$VIRTUAL_ENV --with-python=/usr/local/bin/python3.9 --with-python-root=/usr/local
-    ./b2 --prefix=$VIRTUAL_ENV
-
-
-
-
-
-Last modified 2021-09-20 10:07:27
-
-
-On Kepler:
-    For the latest ipython/jupyter create a virtualenv using python >= 3.7!!!
-    
-    Meanwhile, for python < 3.7 there are some oustanding issue:
-        
-        1) with jedi:
-        
-            must install
-            
-            pip install jedi==0.17.2
-            
-        2) with inprocess kernel: the following issue raises exceptions (printed
-        on stderr) but does NOT seem to affect the functionality of the external 
-        console
-        
-tornado.application - ERROR - Exception in callback functools.partial(<bound 
-method Kernel.enter_eventloop of <ipykernel.inprocess.ipkernel.InProcessKernel 
-object at 0x7fe018246d30>>) Traceback (most recent call last): File 
-"/home/cezar/scipyenv/lib/python3.6/site-packages/tornado/ioloop.py", line 741, 
-in _run_callback ret = callback() File 
-"/home/cezar/scipyenv/lib/python3.6/site-packages/ipykernel/kernelbase.py", line 
-324, in enter_eventloop schedule_next() File 
-"/home/cezar/scipyenv/lib/python3.6/site-packages/ipykernel/kernelbase.py", line 
-321, in schedule_next self.io_loop.call_later(1, advance_eventloop) 
-AttributeError: 'InProcessKernel' object has no attribute 'io_loop'
-            
-        Furthermore the issue only appears when the external console is initialized
-        for the FIRST time.
-        
-        Interestingly, the external console DOES NOT use an inprocess kernel. It
-        is the ScipyenConsoleWidget that does!
-            
-        The immediate reason is that the inprocess kernels don't have an 'io_loop' 
-        attribute anymore.
-        
-        The NOTE: 2021-09-21 14:22:58 in ScipyenConsoleWidget has a possible
-        workaround. However, while this helps the code to get through the 
-        io_loop.call_later(), it exposes the subsidiary issue that the 
-        'shell_streams' attribute of an inprocess kernel is always empty, causing:
-                
-tornado.application - ERROR - Exception in callback functools.partial(<function 
-Kernel.enter_eventloop.<locals>.advance_eventloop at 0x7f276842b7b8>) Traceback 
-(most recent call last): File 
-"/home/cezar/scipyenv/lib/python3.6/site-packages/tornado/ioloop.py", line 741, 
-in _run_callback ret = callback() File 
-"/home/cezar/scipyenv/lib/python3.6/site-packages/ipykernel/kernelbase.py", line 
-307, in advance_eventloop eventloop(self) File 
-"/home/cezar/scipyenv/lib/python3.6/site-packages/ipykernel/eventloops.py", line 
-130, in loop_qt5 return loop_qt4(kernel) File 
-"/home/cezar/scipyenv/lib/python3.6/site-packages/ipykernel/eventloops.py", line 
-121, in loop_qt4 _notify_stream_qt(kernel, kernel.shell_streams[0]) IndexError: 
-list index out of range
-            
-    I cannot find a workaround yet, for this subsidiary issue.
-    
-    On questions is why launching the external console triggers the above code
-    inside the inprocess kernel of the internal (Scipyen) console?
-        
-    
-        
-    To (re)create a virtualenv with a more recent python3:
-        
+Last modified 2021-06-07 14:47:34
 
 ================================================================================
-
 This file describes how to install scipyen and its dependencies in a virtual
 environment (python3), independent of the system or local (i.e. "user") python
 site packages.
 
-The advantage of a virtual environment include the possibility of installing
-build software directly in this environment (without administrator privileges,
-and without interfering with system-wide or account-wide software).
+Applies to: GNU/Linux platforms
+
+The advantage of a virtual environment include the possibility of installing and
+building software directly in this environment, without the need for administrator
+(superuser) privileges, and without interfering with system-wide or account-wide 
+software.
+
+The only exception is building Python diretly from sources which may require
+admin privileges.
 
 This means the software can be uninstalled re-built, etc, without worrying about
 the local account or system-wide interference.
 
-Requires ~ 1 GiB in home directory (including source trees, see below)
+Steps:
+================================================================================
+0. Clone the Scipyen git repo somewhere convenient (e.g. in $HOME)
+================================================================================
 
-Prerequisites:
---------------
-a. For creating the virtual environment:
-python3, python3-virtualenv, python3-virtualenvwrapper (optional) toml, setuptools, pip3, wheel
+    REQUIRES:
+        git software (system-wide installation) including gitk and git-gui
+        github cli (for Linux, also for Windows; other platforms may use github 
+                    desktop app, you mileage mau vary)
+    (for various distributions see https://github.com/cli/cli/blob/trunk/docs/install_linux.md)
+    
+        openSUSE/SUSE Linux (zypper)
+            Install:
+
+            sudo zypper addrepo https://cli.github.com/packages/rpm/gh-cli.repo
+            sudo zypper ref
+            sudo zypper install gh
+            
+        To use gh you need to authenticate with github (if not already done)
+        gh auth login ==> select GitHub.com, then when prompted enter username
+            and password (you will have to create a free github account )
+            
+Clone scipyen
+        gh repo clone ctigaret/scipyen
+        
+        Then cd into scipyen and verify local repo is uptodate with the relevant
+        branches:
+            git checkout master
+            git pull
+            git checkout work
+            git pull
+            git checkout dev
+            git pull
+================================================================================
+
+From now on, ALWAYS make sure you are on the dev branch (this also contains the 
+doc/installation directory with pip requirements, etc). You may wish to run at
+regular intervals:
+    
+    git checkout dev
+    git pull
+
+In the following we assume that scipyen has been cloned in $HOME/scipyen
+
+================================================================================
+1. INSTALL THE FOLLOWING PACKAGES AS PER YOUR DISTRIBUTION:
+================================================================================
+(* indicates you need to also install their corresponding devel packages; where
+ appriopriate, a minimal version is specified):
+    
+Qt5 (*)
+cmake3,     # NOTE this and the one blow are required ot configure vigra & neuron
+cmake3-full, (includes cmake-gui) 
+zlib (*)
+hdf5 (*)
+openexr (*)
+openssl >= 1.11 (*)
+fftw3 (*) (optionally with MPI bindings)
+mpich (*)
+tiff (*)
+jpeg (*)
+png (*)
+sqlite3 (*)
+libXcomposite (*) (for NEURON)
+valgrind (optional)
+
+================================================================================
+2. BUILD PYTHON (if unhappy with what the distribution offers)
+
+NOTE: This is RECOMMENDED if the distribution is behind the latest Python by 
+(quite) a few minor versions.
+
+For example, OpenSuSE Leap 15.3 installs Python-3.6.12; here, we use Python 
+3.9.7 where there have been some significant changes, and because the latest neo 
+package don't support python < 3.7
+================================================================================
+
+To build on a Python build from sources (e.g. 3.9.7) see the file:
+
+    Build Python and virtual environmentUnix/README
+
+From here on we assume it will be installed in /usr/local.
+
+
+================================================================================
+3. CREATE A PYTHON VIRTUAL ENVIRONMENT
+================================================================================
+
+see Building python and virtual environments/Unix/README for details
+
+
+================================================================================
+4. ACTIVATE THE PYTHON VIRTUAL ENVIRONMENT AND BUILD DEPENDENCIES
+================================================================================
+
+NOTE: for convenience, the source trees can be located inside the virtual 
+environment's directory, e.g. ~/scipyenv/src (assuming the virtual environment is
+in ~/scipyenv).
+
+NOTE: From here on we assume all source trees are in $VIRTUAL_ENV/src  and
+we operate inside the activated virtual environment in the $VIRTUAL_ENV/src directory
+
+--------------------------------------------------------------------------------
+4.1 BUILD AND INSTALL BOOST LIBRARIES boost_1_77_0.tar.b2
+--------------------------------------------------------------------------------
+On Linux :
+    ./booststrap.sh --prefix=$VIRTUAL_ENV --with-python=/usr/local/bin/python3.9 --with-python-root=/usr/local
+    ./b2 --prefix=$VIRTUAL_ENV
+
+--------------------------------------------------------------------------------
+4.2 INSTALL PIP REQUIREMENTS STAGE 0
+--------------------------------------------------------------------------------
+call pip install -r doc/installation/pip_requirements_0.txt
+
+NOTE: this prepares for bulding the other C++ libs
+
+--------------------------------------------------------------------------------
+4.3 BUILD AND INSTALL NODEJS node-v15.6.0.tar.gz
+--------------------------------------------------------------------------------
+  (required to use bokeh with NEURON and jupyterlab)
+  
+  cd into the extracted source tree then run:
+      
+      ./configure --prefix=$VIRTUAL_ENV
+      make -j4
+      make doc
+      make install
+
+--------------------------------------------------------------------------------
+4.4 BUILD AND INSTALL sip-5.51, PyQt5-5.15.3, PyQt5_sip-12.8.1 IN THIS ORDER
+--------------------------------------------------------------------------------
+For each of these, cd into their source tree and run:
+
+..............
+4.4.1 sip:
+..............
+    python setup.py build
+    python setup.py install
+    
+..............
+4.4.2 PyQt5:
+..............
+    python configure.py --confirm-license --qmake=`which qmake-qt5` --designer-plugindir=$VIRTUAL_ENV/lib/qt5/plugins/designer --qml-plugindir=$VIRTUAL_ENV/lib/qt5/plugins/PyQt5 --qsci-api-destdir=$VIRTUAL_ENV/share/qt5 --no-python-dbus
+    make 
+    make install
+
+    pip list (should indicate PyQt5, sip)
+................................
+4.4.3 PyQt5.sip extension module:
+................................
+    python setup.py build
+    python setup.py install
+
+    pip show PyQt5-sip <-- verifies that PyQt5 sip module is installed
+    
+--------------------------------------------------------------------------------
+4.5 BUILD AND INSTALL VIGRA
+--------------------------------------------------------------------------------
+git clone https://github.com/ukoethe/vigra.git
+
+....................................
+4.5.1 create out-of-source build tree
+....................................
+
+mkdir vigra-build && cd vigra-build
+
+....................................
+4.5.2 configure the build
+....................................
+
+cmake-gui ../vigra
+
+        At first run click "configure" then as cmake variables are set or edited
+        as below, press "configure" again
+        
+        In cmake-gui:
+            * search for configuration variables containing the string 'INSTALL'
+            (without quotes) and adjust them to point to the real path of your
+            $VIRTUAL_ENV e.g., set the following variables as follows:
+            CMAKE_INSTALL_PREFIX (-DCMAKE_INSTALL_PREFIX=) /home/user/scipyenv
+            
+            * set LIB_SUFFIX (-DLIB_SUFFIX=) 64 (optional; both lib and lib64 are added to LD_LIBRARY_PATH by the pyenv script)
+                    
+            * in the "WITH" group, make sure the following ar echecked (i.e. True): 
+            boost-thread, boost-graph, openexr, vigranumpy, valgrind
+    
+            * press configure until all options are satisfied (i.e. nothing is
+            highlighted in red anymore) - NOTE: this is a recursive process
+            
+            * finally, press "Generate" and quit cmake-gui
+                
+....................................
+4.5.3 make & install
+....................................
+    make
+    
+    !!! NOTE !!!
+    patch vigra-build/vigranumpy/docsrc/conf.py on line 25: 
+        (or , better, vigra/vigranumpy/docsrc/conf.py.in on line 25)
+        change from:
+                except TypeError, e:
+        to:
+                except TypeError as e:
+        (NOTE: this corrects deprecated syntax)
+        
+    make doc 
+    make install (--> installs in $VIRTUAL_ENV/doc/vigra and $VIRTUAL_ENV/doc/vigranumpy)
+    
+-------------------------------------------------------------------------------
+4.6. INSTALL pip requirements 1 & 2
+-------------------------------------------------------------------------------
+pip install -r ~/scipyen/doc/installation/pip_requirements_1.txt
+pip install -r ~/scipyen/doc/installation/pip_requirements_2.txt
+
+-------------------------------------------------------------------------------
+4.7 BUILD AND INSTALL NEURON
+-------------------------------------------------------------------------------
+git clone https://github.com/neuronsimulator/nrn
+mkdir nrn-build && cd nrn-build
+cmake-gui ../nrn
+"Configure" will also pull iv, coreneuron
+        CMAKE_INSTALL_PREFIX (-DCMAKE_INSTALL_PREFIX=) $VIRTUAL_ENV
+        NRN_ENABLE_CORENEURON=true
+        NRN_ENABLE_INTERVIEWS=true
+        NRN_ENABLE_MECH_DLL_STYLE=true
+        NRN_ENABLE_MODULE_INSTALL=true
+        NRN_ENABLE_INTERNAL_READLINE=false
+        NRN_MODULE_INSTALL_OPTIONS --prefix= --home=$VIRTUAL_ENV
+        NRN_ENABLE_MPI=true
+        NRN_ENABLE_MPI_DYNAMIC=false
+        NRN_ENABLE_PYTHON=true (default python3 fallback to python2)
+        NRN_ENABLE_PYTHON_DYNAMIC=false
+        NRN_ENABLE_RX3D=true
+        NRN_ENABLE_SHARED=true
+        NRN_ENABLE_TESTS=false
+        NRN_ENABLE_THREADS=true
+        LIB_INSTALL_DIR=$VIRTUAL_ENV/lib64
+        IV_ENABLE_SHARED=true
+make 
+make install
+
+    NOTE: Run the following in order to properly install neuron python modules 
+    inside the site-packages corresponding  to the environment's python version
+    
+cd $VIRTUAL_ENV/src/nrn-build/src/nrnpython
+    
+python setup.py install 
+    (to install nrnpython in site-packages)
+    
+    NOTE: Optional: Build neuron documentation locally and install locally 
+        (see $VIRTUAL_ENV-src/nrn/docs/README.md)
+    
+pip3 install -r $VIRTUAL_ENV/src/nrn/docs/docs_requirements.txt
+    
+    (installs required python packages (e.g.commonmark, sphinx-rtd-theme, 
+        recommonmark, plotly, etc) inside the virtual environment)
+    
+cd $VIRTUAL_ENV/src/nrn-build
+make docs (NOTE this may fail --> no problems !)
+    
+    Optionally, copy/move (or, better make a symbolic link) 
+    $VIRTUAL_ENV/src/nrn/docs/_build to $VIRTUAL_ENV/doc/neuron
+    
+
+-------------------------------------------------------------------------------
+4.8 INSTALL LAST PIP REQUIREMENTS
+-------------------------------------------------------------------------------
+pip install -r ~/scipyen/doc/installation/pip_requirements_3.txt
+================================================================================
+5. Make final script links while still in the active python ivrtual environment
+================================================================================
+
+cd ~/scipyen
+./make_script_links.sh
+
+================================================================================
+                                
+                                !!! DONE !!!
+                                
+================================================================================
+
+
+VVV Obsolete - TO MOVE TO stash files
+
 
 b. The following software must be built inside the virtual environment (see
     NOTE 2021-01-12 10:13:03 Separate builds, below):
@@ -156,57 +354,6 @@ NOTE: 2021-01-14 09:02:07 Variations for individual software libraries:
         These do not seem to support out-of-source builds. They must be unpacked
         in the src directory and built INSIDE the resulting subdirectory.
 
-  1. Create Python 3 virtual environment
-  ======================================
-  
-  1.1 Prerequisites and shell command:
-  ------------------------------------
-  
-  shell command (assumes the python3, and NOT the python2 version of virtualenv
-                 is installed on the system):
-      
-  #virtualenv --system-site-packages scipyenv
-  
-  NOTE: 2021-09-20 10:30:23 Do NOT use system packages
-  virtualenv --p python3 scipyenv #(do NOT use system packages)
-  
-  # make relocatable WARNING only avaliable for legacy <20.0 versions of virtualenv
-  virtualenv --relocatable scipyenv
-  
-  # for more recent virtualenv versions (>= 20.0):
-      pip install --user virtualenv-make-relocatable
-      
-  # then
-    virtualenv-make-relocatable scipyenv
-  
-  
-  1.2 Activate the virtual environment --  everything below MUST be run under
-  the activated virtual python environment
-  ------------------------------------------------------------------------------
-  cd scipyenv
-  source bin/activate
-  
-  1.3 (Optional) make an activation command alias:
-  -------------------------------------------------
-      
-      in ~/.bashrc enter the following line:
-          
-          alias scipyact='source $HOME/scipyenv/bin/activate'
-          
-    Then, to activate the scipyenv environment just type 'scipyact' command
-    in the shell.
-    
-  The active environment will be indicated by its name in parantheses before the
-  normal shell prompt, e.g.:
-      
-      (scipyenv) user@Host:~>
-  
-  NOTE: While the scipyen environment is active, it can be deactivated with the 
-  'deactivate' shell command
-  
-  1.4 Create directories for source code
-  --------------------------------------
-  
   As per NOTE 2021-01-12 10:13:03 Separate builds and 
   NOTE: 2021-01-14 09:02:07 Variations for individual software libraries, the
   directory tree used in this README is as follows:
@@ -653,7 +800,7 @@ e.g. pip install -I numpy NOTE: omit -I
         NRN_ENABLE_MPI=true
         NRN_ENABLE_MPI_DYNAMIC=false
         NRN_ENABLE_PYTHON=true (default python3 fallback to python2)
-        NRN_ENABLE_PYTHON_DYNAMIC=false
+        NRN_ENABLE_PYTHON_DYNAMIC=true
         NRN_ENABLE_RX3D=true
         NRN_ENABLE_SHARED=true
         NRN_ENABLE_TESTS=false
