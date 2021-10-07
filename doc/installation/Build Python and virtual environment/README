@@ -57,8 +57,11 @@ make altinstall # NOTE: DO NOT CALL make install !!!! (this will overwrite your
                 # NOTE: you could try to install Python locally somewhere under 
                 # your own $HOME tree
 
-ldconfig # <-- required to update the records for the shared python library
-
+ldconfig        # NOTE: required to update the records for the shared python library
+                # NOTE: this MUST be run as superuser (administrator) which is
+                # why it is a BAD IDEA to instal Pyton anywhere in your $HOME
+                # tree
+                
 ATTENTION: DO NOT RUN 'make install' (it will overwrite/overshadow the 
 distribution's own python executable and mess everything up)
 
@@ -75,6 +78,41 @@ an OS ugrade.
 
 If you decide to install Python in a non-standard place (e.g. ~/Python-3.9.7)
 you MUST add this directory to your PATH (edit ~/.bashrc)
+
+To run Scipyen YOU NEED TO MAKE AND ACTIVATE THE PYTHON ENVIRONMENT USING THE 
+BUILT PYTHON.
+
+================================================================================
+VIRTUAL PYTHON ENVIRONMENT ACTIVATION SCRIPTS:
+================================================================================
+
+NOTE: These have been created with the assumption that the build was configured 
+    using the default value for the '--prefix' option (which sets the FINAL 
+    location of Python after installation). By default, this is '/usr/local'
+    
+    Should you decide to ./configure with a specific --prefix value (e.g. 
+    ./configure --prefix=$HOME/Python-x.x.x) then you should modify the contents
+    of these scripts accordingly.
+    
+    It is a BadIdea(TM) to install Pythnon DIRECTLY in $HOME (it will populate
+    it with a lot of stuff, and may even overwrite scripts and binaries in your
+    $HOME/bin).
+    
+    HOWEVER: Because you have to call ldconfig (as superuser) after make install,
+    is is a BadIdea NOT to install Python in the default location (/usr/local)
+
+Copy the pyenv bash script to your $HOME/bin directory
+
+You MUST NOT make this executable.
+
+In your ~/.bashrc file (located in your HOME directory; this is hidden in 
+your file manager unless you set it to display hidden files) add the following
+line:
+
+alias usepy='source $HOME/bin/pyenv'
+
+This script IS REQUIRED to set up environment variables telling the Python 
+interpreter where its extensions & platform dependent libraries are.
 
 ================================================================================
 CREATE A VIRTUAL PYTHON ENVIRONMENT
@@ -115,33 +153,7 @@ Do the following:
     
     5. Proceed with the installation of virtual environment activation scripts
     
-================================================================================
-VIRTUAL PYTHON ENVIRONMENT ACTIVATION SCRIPTS:
-================================================================================
 
-These have been created with the assumption that the build was configured using 
-the default value for the '--prefix' option (which sets the FINAL location of 
-Python after installation) which is /usr/local
-    
-Should you decide to ./configure with a specific --prefix value (e.g. 
-./configure --prefix=$HOME) then you should modify the contents of these scripts
-accordingly.
-
-Copy pyenv script to your $HOME/bin directory
-
-You MUST NOT make this executable.
-
-In your ~/.bashrc file (located in your HOME directory; this is hidden in 
-your file manager unless you set it to display hidden files) add the following
-line:
-
-alias usepy='source $HOME/bin/pyenv'
-
-This script IS REQUIRED to set up environment variables telling the Python 
-interpreter where its extensions & platform dependent libraries are.
-
-To run Scipyen YOU NEED TO MAKE AND ACTIVATE THE PYTHON ENVIRONMENT USING THE 
-BUILT PYTHON.
 
 Therefore, in your ~/.bashrc also create an alias to source the activation
 script of the nbewly created Python environment AND set up the use of the built

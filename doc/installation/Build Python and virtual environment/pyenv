@@ -180,7 +180,7 @@ if [ -x $HOME/.local/bin/virtualenv ]; then
         alias virtualenv=$new_virtualenv
     fi
     
-elif [-x $new_virtualenv ] ; then
+elif [ -x $new_virtualenv ] ; then
     alias virtualenv=$new_virtualenv
     
 fi
