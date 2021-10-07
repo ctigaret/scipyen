@@ -722,7 +722,7 @@ e.g. pip install -I numpy NOTE: omit -I
             git checkout work
             git pull
             
-        Finally, for development work:
+        Finally, for development work, switch to the dev branch:
             git checkout dev; make sure to git pull every time
             
     8. link the scypien bash script (executable)
