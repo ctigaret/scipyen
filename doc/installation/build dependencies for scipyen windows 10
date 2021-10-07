@@ -8,6 +8,7 @@ We follow the following convention:
 drive (i.e. NOT mapped network drive or anything else)
 
 On this machine, the ROOT is E:\
+NOTE it can also be the virtual environment directory
 
 It goes without saying that you need read/write acess to that. Failing that,
 you MAY choose the ROOT to be a directory where you have read/write access.
@@ -17,24 +18,29 @@ SPECIAL CHARACTERS (e.g accented characters, etc).
 
 3) The ROOT itself has the following subdirectories:
     ROOT\src        - contains the source trees, including cloned git repositories
+                    NOTE this must be created manually
+                    
     ROOT\bin        - installations will place built *.exe and *.dll here
     ROOT\lib        - installations will place built *.lib files here
     ROOT\include    - installations will place header files (e.g., *.h, *.hxx, *.hpp) here
     ROOT\share      - installations will place other auxiliary files here
+    
+    Optional (these can be places somwhere else more convenient):
     ROOT\downloads  - contains downloaded installers for ancillary software (see
                       below) and archives of source trees NOT available from
                       git/gitlab (e.g., boost_1_77_0.7z, etc.)
 
-    You will have to create the "src" and "downloads" directorie manually;
-    the others ("bin", "lib", "include", "share") will be created during the
+    The directories ("bin", "lib", "include", "share") will be created during the
     installation after building.
 
     AFTER BUILDING AND INSTALLING THE FIRST LIBRARY BELOW (zlib) edit the
-    environment variables for your account to:
+    environment variables for your account (Using windows settings) to:
 
     add ROOT\bin to PATH
     create INCLUDE=e:\include
     create LIB=e:\lib
+    
+    NOTE that these can also be set dynamically from within the scipact*.bat scripts
 
     The "downloads" directory contains software installers for required software
     as well as zip archives for source code trees that cannot be obtained from
