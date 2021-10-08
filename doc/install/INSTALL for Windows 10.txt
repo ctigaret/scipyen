@@ -114,20 +114,80 @@ NOTE: Below, changes to PATH are to be made permanent using Windows Settings ->
 search "envir" -> select "Edit environment variables for your account"
 --------------------------------------------------------------------------------
 Visual Studio 2019 Community Edition    <- vs_community__2067806454.1615472217.exe
+                                            launch the installer make sure it is
+                                            uptodate
+
+                                            from "Workloads" select to install:
+                                                Azure development
+                                                Desktop development with C++
+                                                .NET desktop development
+
+                                            from "Installation details" expand
+                                            "Desktop development with C++" and in
+                                            the "Optional" group select (or make
+                                            sure they are selected):
+                                                MSVC v142 - VS 2019 C++x64/x86 built toolkit
+                                                Windows 10 SDK (10.0.18362.0)
+
+
 Git                                     <- Git-2.33.0.2-64-bit.exe
+
 GitDesktop                              <- GitHubDesktopSetup-x64.exe
+
 gh                                      <- gh_2.0.0_windows_amd64.msi
-cmake-3.21.3-windows-x86_64             <- cmake-3.21.3-windows-x86_64.zip
+
 kate                                    <- kate-21.08.1-1422-windows-msvc2019_64-cl.exe (VERY GOOD text editor)
+
 doxygen                                 <- doxygen-1.9.2-setup.exe
 
 7z2103-x64.exe                          <- to expand *.7z archives
-depends22_x64.zip                       <- for debugging (optional) - 
-                                            unpack an place in ROOT\bin
-WinDiff.zip
-NSIS, WiX
-nasm-2.15.05-installer-x64.exe          <- run as administrator
+
+nasm-2.15.05-installer-x64.exe          <- https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/nasm-2.15.05-installer-x64.exe
+                                            run as administrator;
+                                            manually add c:\Programs Files\NASM to %PATH%
+
 strawberry-perl-5.32.1.1-64bit.msi      <- add C:\Strawberry\perl\bin to PATH
+                                            (only if necessary; the installer
+                                             should have done that)
+rubyinstaller-devkit-3.0.2-1-x64.exe
+
+node-v14.18.0-x64.exe                   <- from https://nodejs.org/en/download/
+
+MPICH
+    dowload from https://www.microsoft.com/en-us/download/confirmation.aspx?id=57467
+    msmpisetup.exe <- run this first
+    msmpisdk.msi
+
+    If you choose to install these, then edit
+    scipyact.bat, vs64.bat and scipyact_vs64.bat
+    to append:
+    C:\Program Files (x86)\Microsoft SDKs\MPI\Include to %INCLUDE%
+    C:\Program Files (x86)\Microsoft SDKs\MPI\Lib to %LIB% and %LIBPATH%
+    C:\Program Files\Microsoft MPI\Bin to %PATH%
+
+    NOTE, however, that I did not yet figure out why boost build did
+    not detect MPI parallel and icu libraries...
+
+
+NOTE: ALternative to building openssl (see below) is to install Win64 open SSL
+(non-light version)
+Get it from here: Win32/Win64 OpenSSL Installer for Windows - Shining Light Productions (slproweb.com)
+Grab the 140Mb installer (either *.exe or *.msi) for Win64 OpenSSL v3.0.0 – this is the non-light installer.
+
+NSIS, WiX
+
+------------------------------------------------
+# local installation (into %VIRTUAL_ENV%):
+------------------------------------------------
+cmake-3.21.3-windows-x86_64             <- cmake-3.21.3-windows-x86_64.zip
+                                            unpack and move subdirs into %VIRTUAL_ENV% (bin, and so forth)
+
+depends22_x64.zip                       <- for debugging (optional) -
+                                            unpack an place in ROOT\bin
+
+WinDiff.zip                             <- unpack an place in ROOT\bin
+
+jom_1_1_3.zip                           <- unpack and copy *.bat, *.exe, *.xml to %VIRTUAL_ENV%\bin
 
 
 ================================================================================
@@ -154,6 +214,9 @@ All will be built from the comand prompt, with:
 
 CAUTION: Sometimes visual Studio does not bring up a GUI but jumps directly
 to the editor, in order to change CMake settings for build configurations.
+
+Make sure VS2019 is THE ONLY VS installed!
+
 
 In these cases: 
     2.3.1) duplicate the "windows-default" preset to create a new one, named
@@ -187,9 +250,9 @@ for x64 platform (or "address model").
         
 
 
-
+Build in order:
 --------------------------------------------------------------------------------
-1. build zlib
+1. zlib
 --------------------------------------------------------------------------------
 
 
@@ -204,6 +267,34 @@ NOTE: this is a CMake project
 launch Visual Studio 2019:
     devenv
 
+open the solution zlib-1.2.11\contrib\vstudio\vc14\zlibvc.sln
+    retarget the solution
+    select Release and x64
+    In solution explorer select xlibvc -> right click for Properties -> change:
+     Configuration Properties
+        General:
+            Target Name:    zlib
+
+        Linker:
+            General:
+                Output File:    $(OutDir)zlib.dll
+            Debugging:
+                Generate Program Database file:     $(OutDir)zlib.pdb
+                Map file Name:                      $(OutDir)zlib.map
+            Advanced:
+                Import Library:                     $(OutDir)zlib.lib
+
+    build solution
+    from zlib-1.2.11\contrib\vstudio\vc14\x64\ZlibDllrelease copy:
+        zlib.dll to  %VIRTUAL_ENV%\bin\
+        zlib.lib, zlib.exp to  %VIRTUAL_ENV%\lib\
+
+    from zlib-1.2.11 copy:
+        zlib.h, zconf.h to %VIRTUAL_ENV%\include\
+        zlib.3 to %VIRTUAL_ENV%\man\man3\
+        README,FAQ, zlib.3.pdf, doc\*.* to %VIRTUAL_ENV%\doc\zlib\
+
+ALTERNATIVELY:
 open the %VIRTUAL_ENV%\src\zlib-1.2.11 directory as "Folder" in VisualStudio 2019
     create x64-Release configuration, build type: RelWithDebInfo
     save and refresh CMake cache
@@ -217,8 +308,9 @@ open the %VIRTUAL_ENV%\src\zlib-1.2.11 directory as "Folder" in VisualStudio 201
     close project
     close Visual Studio
 
+
 --------------------------------------------------------------------------------
-2. build libpng
+2. libpng
 --------------------------------------------------------------------------------
 
 download lpng1637.zip
@@ -226,10 +318,12 @@ download lpng1637.zip
 from https://sourceforge.net/projects/libpng/files/libpng16/1.6.37/lpng1637.zip/download?use_mirror=jztkft
 
 extract to %VIRTUAL_ENV%\src => %VIRTUAL_ENV%\src\lpng1637
+copy %VIRTUAL_ENV%\src\lpng1637\scripts\pnglibconf.h.prebuilt
+to   %VIRTUAL_ENV%\src\lpng1637\pnglibconf.h
 
 to build: launch visual studio 2019
     devenv
-    
+
     then "open project or solution" -> choose:
     %VIRTUAL_ENV%\src\lpng1637\projects\vstudio\vstudio.sln
 
@@ -244,16 +338,16 @@ open configuration manager,
 
     in Active solution configurations select Release
 
-    in the Build check ONLY libpng (we will use the zlib built as above)
+    in the Build check ONLY libpng or at least UNCKECK zlib
+    (we will use the zlib built as above).
 
-    copy src\lpng1637\scripts\pnglibconf.h.prebuilt to src\lpng1637\pnglibconf.h
 
     open properties for libpng (sub)project -> right click -> properties
         -> Configuration properties:
             -> VC++ directories:
                 -> Include directories -> add %VIRTUAL_ENV%\\include
                 -> External include directories -> add v\include
-                -> Libray directories -> add %VIRTUAL_ENV%\\lib;%VIRTUAL_ENV%\\bin
+                -> Libray directories -> add %VIRTUAL_ENV%\\lib;%VIRTUAL_ENV%\\lib64;%VIRTUAL_ENV%\\bin
             -> C/C++:
                 -> General:
                     -> Additional include directories -> add %VIRTUAL_ENV%\\src\lpng1637;%VIRTUAL_ENV%\\include
@@ -261,7 +355,7 @@ open configuration manager,
 
             -> Linker:
                 -> General:
-                    -> Additional librarr directories -> add %VIRTUAL_ENV%\\lib
+                    -> Additional library directories -> add %VIRTUAL_ENV%\\lib;%VIRTUAL_ENV%\\lib64
 
     Build menu -> build solution (Ctrl+Shift+B)
     the built files are in
@@ -273,12 +367,12 @@ open configuration manager,
     also copy all include files (*.h) from %VIRTUAL_ENV%\src\lpng1637 to %VIRTUAL_ENV%\include
 
 --------------------------------------------------------------------------------
-3. build jpeg9d (optional, see jpeg-turbo, below)
+3. jpeg9d (optional, see jpeg-turbo, below)
 --------------------------------------------------------------------------------
 Skip this
 
 --------------------------------------------------------------------------------
-4. build jpeg-turbo => supplied both jpeg AND jpeg-turbo
+4. jpeg-turbo => supplies both jpeg AND jpeg-turbo
 --------------------------------------------------------------------------------
 cd %VIRTUAL_ENV%\src
 
@@ -307,7 +401,7 @@ configuration x64-Release:
         WITH_TURBOJPEG (true)
 
 --------------------------------------------------------------------------------
-5. build libtiff
+5. libtiff
 --------------------------------------------------------------------------------
 
     git clone https://gitlab.com/libtiff/libtiff.git
@@ -339,68 +433,8 @@ tiff2pdf -o cramps.pdf cramps.tif
 tiff2bw jello.tif jello_bw.tif
 
 also you may run tiffinfo on all tif files in this directory
-
 --------------------------------------------------------------------------------
-6. build Imath (NOTE this is "eye-math" not "ell-math" !)
---------------------------------------------------------------------------------
-
-get it from https://github.com/AcademySoftwareFoundation/Imath
-
-clone git repo:
-gh repo clone AcademySoftwareFoundation/Imath
-or 
-git clone https://github.com/AcademySoftwareFoundation/Imath.git
-
-devenv 
-
-open "folder" in VS2019; as above make x64 release configuration, select %VIRTUAL_ENV%
-for install directory (is possible, else install manually from the 
-out/install/release tree).
-
-Build all
-Install Imath
-
---------------------------------------------------------------------------------
-7. openEXR
---------------------------------------------------------------------------------
-get it from https://github.com/AcademySoftwareFoundation/openexr
-cd to %VIRTUAL_ENV%\src and clone git repo :
-    
-gh repo clone AcademySoftwareFoundation/openexr
-or
-https://github.com/AcademySoftwareFoundation/openexr.git
-
-open Visual Studio -> open folder -> %VIRTUAL_ENV%\src\openexr
-create x64 release
-Imath should be recognized
-build & install
-
---------------------------------------------------------------------------------
-8. HDF5
---------------------------------------------------------------------------------
-get the CMake version of the source tree :
-from https://www.hdfgroup.org/downloads/hdf5/source-code/
-download CMake-hdf5-1.12.1.zip
-extract
-copy build-VS2019-64-Hermes.bat from downloads to
-%VIRTUAL_ENV%\\src\CMake-hdf5-1.12.1
-
-Open command prompt, run vs64
-
-cd to %VIRTUAL_ENV%\\src\CMake-hdf5-1.12.1 and execute build-VS2019-64-Hermes
-
-don't worry about test 1726 - H5DUMP-tfloatsattrs (Failed) message
-(see here https://forum.hdfgroup.org/t/h5dump-test-failed/8762/2)
-to install, extract the newly created zip file
-%VIRTUAL_ENV%\\src\CMake-hdf5-1.12.1\build\HDF5-1.12.1-win64.zip and copy the contents of
-the subdirectories to their corresponding directories in %VIRTUAL_ENV%\
-(e.g. from bin\*.* to %VIRTUAL_ENV%\bin, etc)
-NOTE: DO NOT copy zconf.h obe the one already present in %VIRTUAL_ENV%\include
-(they are identical, and the latter has been provided by zlib, see above)
-
-
---------------------------------------------------------------------------------
-9. fftw3
+6. install fftw3
 --------------------------------------------------------------------------------
 
 download fftw-3.3.5-dll64.zip from http://www.fftw.org/install/windows.html
@@ -421,7 +455,45 @@ then copy:
     *.h files (actually fftw3.h) to %VIRTUAL_ENV%\\include
 
 --------------------------------------------------------------------------------
-10. ICU
+7. Imath (NOTE this is "eye-math" not "ell-math" !)
+--------------------------------------------------------------------------------
+
+get it from https://github.com/AcademySoftwareFoundation/Imath
+
+clone git repo:
+gh repo clone AcademySoftwareFoundation/Imath
+or
+git clone https://github.com/AcademySoftwareFoundation/Imath.git
+
+devenv
+
+open "folder" in VS2019; as above make x64 release configuration, select %VIRTUAL_ENV%
+for install directory (is possible, else install manually from the
+out/install/release tree).
+
+Build all
+Install Imath
+
+--------------------------------------------------------------------------------
+8. openssl
+--------------------------------------------------------------------------------
+git clone https://github.com/winlibs/openssl.git
+or
+gh repo clone winlibs/openssl
+
+follow the instructions at
+https://github.com/openssl/openssl/blob/master/NOTES-WINDOWS.md#native-builds-using-visual-c++
+
+In a nutshell:
+
+    cd openssl
+    perl Configure VC-WIN64A --prefix=%VIRTUAL_ENV% --openssldir=%VIRTUAL_ENV%
+    nmake
+    nmake tests
+    nmake install
+
+--------------------------------------------------------------------------------
+9. ICU
 --------------------------------------------------------------------------------
 gh repo clone unicode-org/icu
 or
@@ -431,33 +503,57 @@ devenv
     open solution  %VIRTUAL_ENV%\src\icu\icu4c\source\allinone\allinone.sln
     project -> retarget solution
     choose Release x64;
-    open configuration, deselect *_UWP from build column
+    open configuration manager, deselect all *_UWP from build column
     build solution
 
-copy 
+copy
     %VIRTUAL_ENV%\src\icu\icu4c\bin64\*.* to %VIRTUAL_ENV%\bin
     %VIRTUAL_ENV%\src\icu\icu4c\include\*.* to %VIRTUAL_ENV%\include
     %VIRTUAL_ENV%\src\icu\icu4c\lib64\*.* to %VIRTUAL_ENV%\lib64
 
 --------------------------------------------------------------------------------
-11. MPICH
+10. openEXR
 --------------------------------------------------------------------------------
-gh repo clone microsoft/Microsoft-MPI
-or 
-git clone https://github.com/microsoft/Microsoft-MPI.git
+get it from https://github.com/AcademySoftwareFoundation/openexr
+cd to %VIRTUAL_ENV%\src and clone git repo :
 
-devenv
-    open solution %VIRTUAL_ENV%\src\Microsoft-MPI\src\msmpi.sln
-    retarget solution
---------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------
-12. openssl 
---------------------------------------------------------------------------------
-git clone https://github.com/winlibs/openssl.git
+gh repo clone AcademySoftwareFoundation/openexr
 or
-gh repo clone winlibs/openssl
+git clone https://github.com/AcademySoftwareFoundation/openexr.git
 
+open Visual Studio -> open folder -> %VIRTUAL_ENV%\src\openexr
+create x64 release
+Imath should be recognized
+build all
+install openexr
+
+--------------------------------------------------------------------------------
+11. HDF5
+--------------------------------------------------------------------------------
+get the CMake version of the source tree :
+from https://www.hdfgroup.org/downloads/hdf5/source-code/
+download CMake-hdf5-1.12.1.zip
+extract
+copy build-VS2019-64-virtualenv.bat from downloads to
+%VIRTUAL_ENV%\\src\CMake-hdf5-1.12.1\
+(edit INSTALLDIR=%VIRTUAL_ENV%)
+
+Open command prompt, run vs64
+
+cd to %VIRTUAL_ENV%\\src\CMake-hdf5-1.12.1 and execute build-VS2019-64-vitrtualenv
+
+don't worry about test 1726 - H5DUMP-tfloatsattrs (Failed) message
+(see here https://forum.hdfgroup.org/t/h5dump-test-failed/8762/2)
+
+to install, extract the newly created zip file:
+
+%VIRTUAL_ENV%\\src\CMake-hdf5-1.12.1\build\HDF5-1.12.1-win64.zip
+
+then copy the contents of the subdirectories to their corresponding directories
+in %VIRTUAL_ENV%\
+(e.g. from bin\*.* to %VIRTUAL_ENV%\bin, etc)
+NOTE: DO NOT copy zconf.h ! we use the one already present in %VIRTUAL_ENV%\include
+(they are identical, and the latter has been provided by zlib, see above)
 
 --------------------------------------------------------------------------------
 12.Install Boost libraries:
@@ -466,85 +562,392 @@ gh repo clone winlibs/openssl
 from https://www.boost.org/doc/libs/1_77_0/more/getting_started/windows.html#get-boost
 download boost_1_77_0.7z
 extract to %VIRTUAL_ENV%\\src\ => will create %VIRTUAL_ENV%\\src\boost_1_77_0
-Create the b2 Boost.Build program
+
+........................................
+12.1 Create the b2 Boost.Build program
+........................................
+
 cd boost_1_77_0\tools\build
 bootstrap
 .\b2 --prefix=%VIRTUAL_ENV%\\Boost.Build toolset=msvc install
 
 (e.g., .\b2 --prefix=E:\Boost.Build\bin)
 
-App %VIRTUAL_ENV%\\Boost.Build\bin to PATH
+........................................
+12.2 Build & install boost
+........................................
 
-Restart the x64 command prompt
+cd %VIRTUAL_ENV%\src\boost_1_77_0
 
-go to %VIRTUAL_ENV%\\src\boost_1_77_0
-
-run (NOTE: make sure to replace root with the full real path; as per PREAMBLE 2
-spaces in the ROOT path should be avoided; where this is impossible, then all
+run (NOTE: make sure to replace root with the full real path; as per PREAMBLE,
+     NO spaces in the ROOT path are allowed; where this is impossible, then all
 paths below should be enclosed in double-quotes):
+
+NOTE: always use the same toolset setting!
 
 (skip this ) %VIRTUAL_ENV%\Boost.Build\bin\b2 toolset=msvc threading=multi address-model=64 variant=release link=shared -prefix=%VIRTUAL_ENV% --build-type=complete msvc stage
 %VIRTUAL_ENV%\Boost.Build\bin\b2 toolset=msvc threading=multi address-model=64 variant=release link=shared --prefix=%VIRTUAL_ENV% --build-type=complete msvc install
 
 When prefix is a drive this will install:
-    * boost headers (*.hpp) in ROOT\include\boost_1_77_0\boost
+    * boost headers (*.hpp) in %VIRTUAL_ENV%\include\boost_1_77_0\boost
         => add this to the INCLUDE environment variable
 
-    * the *.dll and *.lib files in ROOT\lib
-As per Getting Started page, create, build and run:
+    * the *.dll and *.lib files in %VIRTUAL_ENV%\lib
+
+Test as per Getting Started page, create, build and run:
 1) header-only program in VS2019 (see heading 4 Build a simple program using boost)
 2)
 
------------------------------
-Install jom
------------------------------
-extract jon_1_1_3.zip -> copy *.bat, *.exe, *.xml to %VIRTUAL_ENV%\bin
 
-
-11. Build and install Qt5
-=========================
+--------------------------------------------------------------------------------
+13. Build and install Qt5
+--------------------------------------------------------------------------------
 Dependencies:
     openssl <- perl, nasm
     icu
------------------------------
-11.1 install Perl
-------------------------------
-Use:
-https://strawberryperl.com/download/5.32.1.1/strawberry-perl-5.32.1.1-64bit.msi
------------------------------
-11.1 install nasm
-------------------------------
-Use:
-https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/nasm-2.15.05-installer-x64.exe
------------------------------
-11.1 Build and install openssl-
-------------------------------
-cd ROOT\src
-git clone https://github.com/openssl/openssl.git
------------------------------
-11.2 Build and install icu
------------------------------
------------------------------
-11.3 build and install Qt5
------------------------------
-cd ROOT\src
+    Clang <- This is optional (only required to build qdoc documentation) and is
+                skipped here –
+            For online Qt documentation go to https://doc.qt.io/qt-5/
+
+............................
+13.1 Clone the Qt5 repo
+............................
+
+cd %VIRTUAL_ENV%\src
 git clone git://code.qt.io/qt/qt5.git
 cd Qt5
 git checkout 5.12
+perl init-repository --module-subset=default,-qtwebengine
+
+............................
+13.2 Configure the build
+............................
+
+<path-where-scipyen-repo-is>\doc\install\qt5vars.bat
+
+cd ..
+
+mkdir qt5-build && cd qt5-build
+
+..\\qt5\configure --prefix=%VIRTUAL_ENV% -opensource -confirm-license -nomake examples -nomake tests -mp -opengl es2 –qt-zlib –qt-libjpeg –qt-libpng –qt-freetype –qt-pcre –qt-harfbuzz -no-feature-location-labs-plugin
+
+#################################################################################
+BELOW is the configuration output on Bruker machine
+#################################################################################
+
+(x64 scipyenv) E:\scipyenv\src\qt5-build>..\\qt5\configure --prefix=%VIRTUAL_ENV% -opensource -confirm-license -nomake examples -nomake tests -mp -opengl es2 -qt-zlib -qt-libjpeg -qt-libpng -qt-freetype -qt-pcre -qt-harfbuzz -no-feature-location-labs-plugin
++ cd qtbase
++ E:\scipyenv\src\qt5\qtbase\configure.bat -top-level --prefix=E:\scipyenv -opensource -confirm-license -nomake examples -nomake tests -mp -opengl es2 -qt-zlib -qt-libjpeg -qt-libpng -qt-freetype -qt-pcre -qt-harfbuzz -no-feature-location-labs-plugin
+Running syncqt ...
+<srcbase> = E:/scipyenv/src/qt5/qtbase
+<bldbase> = E:/scipyenv/src/qt5-build/qtbase
+<outbase> = E:/scipyenv/src/qt5-build/qtbase
+Bootstrapping qmake ...
+
+jom 1.1.3 - empower your cores
 
 
-12 Install python packages
-===========================
-a) Install in the virtual environment
----------------------------------------
-install (using pip):
-sphinx, nose, PyQt5 (this will pull sip, PyQt5 and PyQt5-sip), numpy, scipy,
-sympy, jupyter, jupyter-qtconsole-colorschemes, matplotlib, jupyterlab,
-pyqtgraph, seaborn, statsmodels, scikit-learn, scikit-image, confuse,
-python-magic, pyxdg, neo, qimage2ndarray, pywavelets, imreg-dft, nixio, h5py
-pingouin, cmasher, cmocean, researchpy
+This is the Qt Open Source Edition.
 
-Check that PyQt5 works:
+You have already accepted the terms of the Open Source license.
+
+Running configuration tests...
+Done running configuration tests.
+
+Configure summary:
+
+Build type: win32-msvc (x86_64, CPU features: sse sse2)
+Compiler: msvc 192930136
+Configuration: sse2 aesni sse3 ssse3 sse4_1 sse4_2 avx avx2 avx512f avx512bw avx512cd avx512dq avx512er avx512ifma avx512pf avx512vbmi avx512vl compile_examples f16c largefile msvc_mp precompile_header rdrnd shani x86SimdAlways shared debug_and_release release debug build_all c++11 c++14 c++1z concurrent dbus no-pkg-config release_tools stl
+Build options:
+  Mode ................................... debug and release; default link: debug; optimized tools
+  Optimize release build for size ........ no
+  Building shared libraries .............. yes
+  Using C standard ....................... C89
+  Using C++ standard ..................... C++1z
+  Using gold linker ...................... no
+  Using precompiled headers .............. yes
+  Using LTCG ............................. no
+  Target compiler supports:
+    SSE .................................. SSE2 SSE3 SSSE3 SSE4.1 SSE4.2
+    AVX .................................. AVX AVX2
+    AVX512 ............................... F ER CD PF DQ BW VL IFMA VBMI
+    Other x86 ............................ AES F16C RDRAND SHA
+  Build parts ............................ libs tools
+  App store compliance ................... no
+Qt modules and options:
+  Qt Concurrent .......................... yes
+  Qt D-Bus ............................... yes
+  Qt D-Bus directly linked to libdbus .... no
+  Qt Gui ................................. yes
+  Qt Network ............................. yes
+  Qt Sql ................................. yes
+  Qt Testlib ............................. yes
+  Qt Widgets ............................. yes
+  Qt Xml ................................. yes
+Support enabled for:
+  Using pkg-config ....................... no
+  udev ................................... no
+  Using system zlib ...................... no
+Qt Core:
+  DoubleConversion ....................... yes
+    Using system DoubleConversion ........ no
+  GLib ................................... no
+  iconv .................................. no
+  ICU .................................... no
+  Tracing backend ........................ <none>
+  Logging backends:
+    journald ............................. no
+    syslog ............................... no
+    slog2 ................................ no
+  Using system PCRE2 ..................... no
+Qt Network:
+  getifaddrs() ........................... no
+  IPv6 ifname ............................ no
+  libproxy ............................... no
+  OpenSSL ................................ yes
+    Qt directly linked to OpenSSL ........ no
+  OpenSSL 1.1 ............................ yes
+  DTLS ................................... yes
+  SCTP ................................... no
+  Use system proxies ..................... yes
+Qt Gui:
+  Accessibility .......................... yes
+  FreeType ............................... yes
+    Using system FreeType ................ no
+  HarfBuzz ............................... yes
+    Using system HarfBuzz ................ no
+  Fontconfig ............................. no
+  Image formats:
+    GIF .................................. yes
+    ICO .................................. yes
+    JPEG ................................. yes
+      Using system libjpeg ............... no
+    PNG .................................. yes
+      Using system libpng ................ no
+  EGL .................................... yes
+  OpenVG ................................. no
+  OpenGL:
+    ANGLE ................................ yes
+    Combined ANGLE Library ............... no
+    Desktop OpenGL ....................... no
+    Dynamic OpenGL ....................... no
+    OpenGL ES 2.0 ........................ yes
+    OpenGL ES 3.0 ........................ no
+    OpenGL ES 3.1 ........................ no
+    OpenGL ES 3.2 ........................ no
+  Vulkan ................................. no
+  Session Management ..................... yes
+Features used by QPA backends:
+  evdev .................................. no
+  libinput ............................... no
+  INTEGRITY HID .......................... no
+  mtdev .................................. no
+  tslib .................................. no
+  xkbcommon .............................. no
+  X11 specific:
+    XLib ................................. no
+    XCB Xlib ............................. no
+    EGL on X11 ........................... no
+QPA backends:
+  DirectFB ............................... no
+  EGLFS .................................. no
+  LinuxFB ................................ no
+  VNC .................................... no
+  Mir client ............................. no
+  Windows:
+    Direct 2D ............................ yes
+    DirectWrite .......................... yes
+    DirectWrite 2 ........................ yes
+Qt Sql:
+  SQL item models ........................ yes
+Qt Widgets:
+  GTK+ ................................... no
+  Styles ................................. Fusion Windows WindowsVista
+Qt PrintSupport:
+  CUPS ................................... no
+Qt Sql Drivers:
+  DB2 (IBM) .............................. no
+  InterBase .............................. no
+  MySql .................................. no
+  OCI (Oracle) ........................... no
+  ODBC ................................... yes
+  PostgreSQL ............................. no
+  SQLite2 ................................ no
+  SQLite ................................. yes
+    Using system provided SQLite ......... no
+  TDS (Sybase) ........................... no
+Qt Testlib:
+  Tester for item models ................. yes
+Qt SerialBus:
+  Socket CAN ............................. no
+  Socket CAN FD .......................... no
+Further Image Formats:
+  JasPer ................................. no
+  MNG .................................... no
+  TIFF ................................... yes
+    Using system libtiff ................. yes
+  WEBP ................................... yes
+    Using system libwebp ................. no
+Qt QML:
+  QML network support .................... yes
+  QML debugging and profiling support .... yes
+  QML sequence object .................... yes
+  QML list model ......................... yes
+  QML XML http request ................... yes
+  QML Locale ............................. yes
+  QML delegate model ..................... yes
+Qt Quick:
+  Direct3D 12 ............................ yes
+  AnimatedImage item ..................... yes
+  Canvas item ............................ yes
+  Support for Qt Quick Designer .......... yes
+  Flipable item .......................... yes
+  GridView item .......................... yes
+  ListView item .......................... yes
+  TableView item ......................... yes
+  Path support ........................... yes
+  PathView item .......................... yes
+  Positioner items ....................... yes
+  Repeater item .......................... yes
+  ShaderEffect item ...................... yes
+  Sprite item ............................ yes
+Qt Scxml:
+  ECMAScript data model for QtScxml ...... yes
+Qt Gamepad:
+  SDL2 ................................... no
+Qt 3D:
+  Assimp ................................. yes
+  System Assimp .......................... no
+  Output Qt3D Job traces ................. no
+  Output Qt3D GL traces .................. no
+  Use SSE2 instructions .................. yes
+  Use AVX2 instructions .................. no
+  Aspects:
+    Render aspect ........................ yes
+    Input aspect ......................... yes
+    Logic aspect ......................... yes
+    Animation aspect ..................... yes
+    Extras aspect ........................ yes
+Qt 3D Renderers:
+  OpenGL Renderer ........................ yes
+Qt 3D GeometryLoaders:
+  Autodesk FBX ........................... no
+Qt Wayland Client ........................ no
+Qt Wayland Compositor .................... no
+Qt Bluetooth:
+  BlueZ .................................. no
+  BlueZ Low Energy ....................... no
+  Linux Crypto API ....................... no
+  WinRT Bluetooth API (desktop & UWP) .... yes
+Qt Sensors:
+  sensorfw ............................... no
+Qt Quick Controls 2:
+  Styles ................................. Default Fusion Imagine Material Universal
+Qt Quick Templates 2:
+  Hover support .......................... yes
+  Multi-touch support .................... yes
+Qt Positioning:
+  Gypsy GPS Daemon ....................... no
+  WinRT Geolocation API .................. yes
+Qt Location:
+  Qt.labs.location experimental QML plugin . no
+  Geoservice plugins:
+    OpenStreetMap ........................ yes
+    HERE ................................. yes
+    Esri ................................. yes
+    Mapbox ............................... yes
+    MapboxGL ............................. no
+    Itemsoverlay ......................... yes
+QtXmlPatterns:
+  XML schema support ..................... yes
+Qt Multimedia:
+  ALSA ................................... no
+  GStreamer 1.0 .......................... no
+  GStreamer 0.10 ......................... no
+  Video for Linux ........................ no
+  OpenAL ................................. no
+  PulseAudio ............................. no
+  Resource Policy (libresourceqt5) ....... no
+  Windows Audio Services ................. yes
+  DirectShow ............................. yes
+  Windows Media Foundation ............... yes
+  Media player backend ................... DirectShow
+Qt Tools:
+  QDoc ................................... no
+
+Note: No wayland-egl support detected. Cross-toolkit compatibility disabled.
+
+WARNING: QDoc will not be compiled, probably because libclang could not be located. This means that you cannot build the Qt documentation.
+
+Either ensure that llvm-config is in your PATH environment variable, or set LLVM_INSTALL_DIR to the location of your llvm installation.
+On Linux systems, you may be able to install libclang by installing the libclang-dev or libclang-devel package, depending on your distribution.
+On macOS, you can use Homebrew's llvm package.
+On Windows, you must set LLVM_INSTALL_DIR to the installation path.
+
+Qt is now configured for building. Just run 'jom'.
+Once everything is built, you must run 'jom install'.
+Qt will be installed into 'E:\scipyenv'.
+
+Prior to reconfiguration, make sure you remove any leftovers from
+the previous build.
+################################################################################
+
+............................
+13.3 Build Qt5
+............................
+
+jom /J 8
+
+............................
+13.3 Install Qt5
+............................
+
+jom install
+
+===============================================================================
+14 Install pip requirements stage 0
+===============================================================================
+
+cd %VIRTUAL_ENV%
+
+pip install -r <path-where-scipyen-repo-is>\doc\install\pip_requirements_0.txt
+
+===============================================================================
+15 Build & install sip, pyqt5, pyqt5-sip
+===============================================================================
+
+Restart the command prompt, run scipyact_vs64, cd to %VIRTUAL_ENV%\src
+
+From scipyen-dependencies\Unix,
+extract the tar.gz archives (see below which) using 7zip in %VIRTUAL_ENV%\src
+
+..............
+15.1 sip: sip-5.5.1.dev2011271026.tar.gz
+..............
+    python setup.py build
+    python setup.py install
+
+..............
+15.2 PyQt5: PyQt5-5.15.3.dev2012141313.tar.gz
+..............
+    python configure.py --confirm-license --designer-plugindir=%VIRTUAL_ENV%\lib\plugins\designer --qml-plugindir=%VIRTUAL_ENV%\lib\plugins\PyQt5 --qsci-api-destdir=%VIRTUAL_ENV%\share\qt5 --no-python-dbus --disable QtNfc
+    jom
+    nmake install
+
+    pip list (should indicate PyQt5, sip)
+
+................................
+15.3 PyQt5.sip extension module: PyQt5_sip-12.8.1.tar.gz
+................................
+    python setup.py build
+    python setup.py install
+
+    pip show PyQt5-sip <-- verifies that PyQt5 sip module is installed
+
+-------------------------------------------------------------------------------
+15.4 Check PyQt5
+-------------------------------------------------------------------------------
 start python then run:
 import sys
 from PyQt5 import QtWidgets
@@ -554,9 +957,15 @@ win.show()
 
 close the window then exit()
 
+===============================================================================
+16 Install pip requirements stage 1
+===============================================================================
+cd %VIRTUAL_ENV%
+
+pip install -r <path-where-scipyen-repo-is>\doc\install\pip_requirements_1.txt
+
 Check that jupyter qtconsole works:
 jupyter qtconsole
-
 
 Check that matplotlib works in qtconsole:
 %matlplotlib
@@ -565,15 +974,16 @@ import matplotlib.pyplot as plt
 plt.figure()
 exit
 
-Check that matplotlib also works in python
-(run the last three lines above; the %matplotlib is a jupyter-specific macro!)
+Check that matplotlib also works in python using Qt5Agg
+(run the last three lines above at regular python prompt;
+ the %matplotlib is a jupyter-specific macro!)
 in addition you have to call plt.show() to display the figure , when in plain
 python.
 
-b) Install the above outside the virtual environment
 
-13 Build VIGRA
-==============
+================================================================================
+17 Build VIGRA
+================================================================================
 
 cd to ROOT\src
 clone the vigra repo:
@@ -598,17 +1008,17 @@ Build using VisualStudio2019
 ---------------------------------------
 
 NOTE: if you use the virtual environment then call VS2019 from the command prompt
-AFTER calling scipyact (ie. with the environment activated)
+AFTER calling scipyact (ie. with the environment activated): devenv
 
 Otherwise you may launch vs2019 as usual.
 
-Open "folder" ROOT\src\vigra
+Open "folder" %VIRTUAL_ENV%\src\vigra
 
 create x64-Release configuration
 
 you may have to:
-1) point to the python libray - choose
-    ROOT\lib\boost_python39-vc142-mt-x64-1_77.lib
+1) point to the python libray - choose lib not dll !
+    %VIRTIUAL_ENV%\lib\boost_python39-vc142-mt-x64-1_77.lib
 
 build
 
@@ -632,6 +1042,72 @@ os.add_dll_directory("e:/lib") # <-- replace here where vigraimpex.lib and vigra
 Add the following line to your scipyact.bat script:
 SET PYTHONSTARTUP=%USERPROFILE%\Scripts\scipyen_startup.py
 
+No need to build documentation -> see it online at
+http://ukoethe.github.io/vigra/doc-release/vigra/index.html
+
+================================================================================
+18 Install the rest of the pip requirements
+================================================================================
+cd %VIRTUAL_ENV%
+
+pip install -r <path-where-scipyen-repo-is>\doc\install\pip_requirements_2.txt
+pip install -r <path-where-scipyen-repo-is>\doc\install\pip_requirements_3.txt
 
 
+================================================================================
+19 Build and install NEURON
+================================================================================
+first install bison & flex
+
+
+git clone https://github.com/neuronsimulator/nrn
+devenv
+
+"Configure" will also pull iv, coreneuron
+        CMAKE_INSTALL_PREFIX (-DCMAKE_INSTALL_PREFIX=) $VIRTUAL_ENV
+        NRN_ENABLE_CORENEURON=true
+        NRN_ENABLE_INTERVIEWS=true
+        NRN_ENABLE_MECH_DLL_STYLE=true
+        NRN_ENABLE_MODULE_INSTALL=true
+        NRN_ENABLE_INTERNAL_READLINE=false
+        NRN_MODULE_INSTALL_OPTIONS --prefix= --home=$VIRTUAL_ENV
+        NRN_ENABLE_MPI=true
+        NRN_ENABLE_MPI_DYNAMIC=false
+        NRN_ENABLE_PYTHON=true (default python3 fallback to python2)
+        NRN_ENABLE_PYTHON_DYNAMIC=false
+        NRN_ENABLE_RX3D=true
+        NRN_ENABLE_SHARED=true
+        NRN_ENABLE_TESTS=false
+        NRN_ENABLE_THREADS=true
+        LIB_INSTALL_DIR=$VIRTUAL_ENV/lib64
+        IV_ENABLE_SHARED=true
+nmake
+nmake install
+
+    NOTE: Run the following in order to properly install neuron python modules
+    inside the site-packages corresponding  to the environment's python version
+
+cd $VIRTUAL_ENV/src/nrn-build/src/nrnpython
+
+python setup.py install
+    (to install nrnpython in site-packages)
+
+    NOTE: Optional: Build neuron documentation locally and install locally
+        (see $VIRTUAL_ENV/src/nrn/docs/README.md)
+
+pip3 install -r $VIRTUAL_ENV/src/nrn/docs/docs_requirements.txt
+
+    (installs required python packages (e.g.commonmark, sphinx-rtd-theme,
+        recommonmark, plotly, etc) inside the virtual environment)
+
+cd $VIRTUAL_ENV/src/nrn-build
+make docs (NOTE this may fail --> no problems !)
+
+    Optionally, copy/move (or, better make a symbolic link)
+    $VIRTUAL_ENV/src/nrn/docs/_build to $VIRTUAL_ENV/doc/neuron
+
+
+================================================================================
+20 copy scipyen scripts to your %VIRTUAL_ENV\bin
+================================================================================
 
