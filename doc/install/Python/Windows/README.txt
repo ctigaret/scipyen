@@ -87,7 +87,7 @@ as VIRTUAL_ENV:
 
 3.3. Copy scipyen_startup.py to %VIRTUAL_ENV%\Scripts
 
-3.4. copy scipyact.bat, vs64.bat and scipyact_vs64.bat to %USERPROFILE%\Scripts
+3.4. edit and copy scipyact.bat, vs64.bat and scipyact_vs64.bat to %USERPROFILE%\Scripts
 
 (NOTE: you can name these scripts whatever you like, just make note of what each
 does; in the following, I will use the above names by convention)
