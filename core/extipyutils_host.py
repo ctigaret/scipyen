@@ -17,6 +17,7 @@ if sys.platform == 'win32':
     scipyenvlib     = os.path.join(scipyenvdir,"lib")
     scipyenvlib64   = os.path.join(scipyenvdir,"lib64")
 
+
     if os.path.isdir(scipyenvbin):
         os.add_dll_directory(scipyenvbin)
     else:
@@ -30,7 +31,13 @@ if sys.platform == 'win32':
     else:
         print(f"{scipyenvlib64} directory not found; functionality will be limited")
 
-    del scipyenvbin, scipyenvlib, scipyenvlib64
+    vigranumpyextdir = os.path.join(scipyenvdir, "lib", "site-packages", "vigra")
+
+    if os.path.isdir(vigranumpyextdir):
+        sys.path.append(vigranumpyextdir)
+
+
+    del scipyenvbin, scipyenvlib, scipyenvlib64, vigranumpyextdir
 
 
 from contextlib import (contextmanager,
