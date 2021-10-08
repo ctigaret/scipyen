@@ -9,6 +9,10 @@ cmake-3.21.3-windows-x86_64             <- cmake-3.21.3-windows-x86_64.zip
 kate                                    <- kate-21.08.1-1422-windows-msvc2019_64-cl.exe (VERY GOOD text editor)
 doxygen                                 <- doxygen-1.9.2-setup.exe
 
+7z2103-x64.exe                          <- to expand *.7z archives
+depends22_x64.zip                       <- for debugging (optional)
+WinDiff.zip
+NSIS, WiX
 ================================================================================
 ACTIVATE THE ENVIRONMENT WITH THE scipyact SCRIPT
 ================================================================================

@@ -25,15 +25,8 @@
 #     OTHER DEALINGS IN THE SOFTWARE.                                   
 ###############################################################################
 
-NOTE: This is for creating a Python virtual environment under Windows, used for
-running Scipyen
-
-Grab the installer from Python.org (for now, use Python 3.9.7), install "for everyone" and make
-sure to activate "Disable limit on PATH" or whatever the option is to this effect.
-
-================================================================================
-CREATE A VIRTUAL PYTHON ENVIRONMENT
-================================================================================
+NOTE: These instructions are for creating a Python virtual environment under Windows
+for running Scipyen.
 
 You MUST create a virtual python environment specific for the version of Python
 you are planning to use, for the following reasons:
@@ -44,53 +37,74 @@ you are planning to use, for the following reasons:
     the version-specifc 'pip' tool will not interfere (or worse, ovderwrite)
     system-wide packages
 
-After installing Python (e.g., 3.9.7, see above) run from a (regular) command prompt:
+================================================================================
+1. INSTALL PYTHON - below, the Python stack from Python.org will be used
+================================================================================
+Grab the installer from Python.org (for now, use Python 3.9.7), run it and
+choose to install "for everyone"; make sure to activate "Disable limit on PATH" 
+or whatever the option is to this effect.
+
+================================================================================
+2. CREATE A VIRTUAL PYTHON ENVIRONMENT
+================================================================================
+
+After installing Python (e.g., 3.9.7, see above) in a (regular) command prompt
+run:
 
 pip install virtualenv
 
 Then:
 
-1) cd into a dfrive:\directory_path WITHOUT SPACES IN THE PATH NAME 
+1) cd into a drive:\directory_path WITHOUT SPACES IN THE PATH NAME 
 
 2) run virtualenv <your_preferred_environment_name> e.g.:
     
     virtualenv scipyen
     
-3) Proceed to install the virtual python environment activation scripts
+NOTE: This will create the environment's ROOT directory that will be referred to
+as VIRTUAL_ENV:
 
+    drive:\directory_path\scipyenv
+    
+(e.g., e:\users\user\scipyenv )
+    
 ================================================================================
-VIRTUAL PYTHON ENVIRONMENT ACTIVATION SCRIPTS:
+3. VIRTUAL PYTHON ENVIRONMENT ACTIVATION SCRIPTS:
 ================================================================================
 
-1. Create a Scripts directory in your Windows home directory (%USERPROFILE%)
+3.1. Create a Scripts directory in your Windows home directory (%USERPROFILE%)
 
-2. Add to your %PATH% PERMANENTLY:
+3.2. Add to your %PATH% PERMANENTLY:
 
 	%USERPROFILE%\Scripts
 	
 
-(use Windows settings, search for "environment", select 
+(NOTE: use Windows settings, search for "environment", select 
 "Edit environment variables for your account" -> in the new dialog edit %PATH% ->
 "add" %USERPROFILE%\Scripts)
 
 * restart the command prompt
 
-3. Copy scipyen_startup.py to <where your environment is>\Scripts
+3.3. Copy scipyen_startup.py to %VIRTUAL_ENV%\Scripts
 
-4. copy scipyact.bat, vs64.bat and scipyact_vs64.bat to %USERPROFILE%\Scripts
+3.4. copy scipyact.bat, vs64.bat and scipyact_vs64.bat to %USERPROFILE%\Scripts
 
 (NOTE: you can name these scripts whatever you like, just make note of what each
 does; in the following, I will use the above names by convention)
 
-4.1. Scripts usage:
-    scipyact.bat => activates the virtual python environment <- USE THIS FOR REGULAR
-        USE OF Scipyen, inside the virtual python environment
+3.4.1. Scripts usage:
+    scipyact.bat => activates the virtual python environment 
+                    USE THIS FOR REGULAR USE OF Scipyen, inside the virtual 
+                    python environment
         
-    vs64.bat => activates Visual Studio 2019 development environment <- use this
-        for building software INDEPENDENT OF the virtual python environment
+    vs64.bat => activates Visual Studio 2019 development environment 
+                use for building software INDEPENDENTlLY OF the virtual python 
+                environment
         
-    scipyact_vs64.bat => activates BOTH <- use THIS for building Scipyen's
-        dependencies INSIDE the virtual python environment (RECOMMENDED)
+    scipyact_vs64.bat => activates BOTH the python virtual environment AND the
+                         Visual Studio 2019 development environment
+                         use for building Scipyen's dependencies INSIDE the 
+                         virtual python environment (RECOMMENDED)
         
     
 
