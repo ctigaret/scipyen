@@ -18,3 +18,4 @@ pyxdg
 python-magic
 cmocean
 cmasher
+nibabel

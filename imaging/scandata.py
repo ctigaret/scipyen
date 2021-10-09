@@ -10241,7 +10241,18 @@ class ScanData(object):
         # For multichannel images, scans can have ONE multi-channel VigraArray, OR
         # several single-channel VigraArrays !!!
         if len(self.scans):
-            return self.scans[0].shape[self.scans[0].axistags.index(self.scansFrameAxis)]
+            #return self.scans[0].shape[self.scans[0].axistags.index(self.scansFrameAxis)]
+            if isinstance(self.scansFrameAxis, int):
+                return self.scans[0].shape(self.scansFrameAxis)
+            else:
+                key = None
+                if isinstance(self.scansFrameAxis, vigra.AxisInfo):
+                    key = self.scansFrameAxis.key
+                elif isinstance(self.scansFrameAxis, str):
+                    key = self.scansFrameAxis
+                    
+                if key is not None:
+                    return self.scans[0].shape[self.scans[0].axistags.index(key)]
         
         return 0
     
@@ -10252,7 +10263,19 @@ class ScanData(object):
         # For multichannel images, scene can have ONE multi-channel VigraArray, OR
         # several single-channel VigraArrays !!!
         if len(self.scene):
-            return self.scene[0].shape[self.scene[0].axistags.index(self.sceneFrameAxis)]
+            #return self.scene[0].shape[self.scene[0].axistags.index(self.sceneFrameAxis)]
+            if isinstance(self.sceneFrameAxis, int):
+                return self.scans[0].shape(self.sceneFrameAxis)
+            else:
+                key = None
+                if isinstance(self.sceneFrameAxis, vigra.AxisInfo):
+                    key = self.sceneFrameAxis.key
+                elif isinstance(self.sceneFrameAxis, str):
+                    key = self.sceneFrameAxis
+                    
+                if key is not None:
+                    return self.scans[0].shape[self.scans[0].axistags.index(key)]
+        
         return 0
     
     @property

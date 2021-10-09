@@ -147,7 +147,11 @@ class XmlSyntaxHighlighter(QtGui.QSyntaxHighlighter):
             else:
                 break
             
-
+def getChildren(element):
+    """Compensate for the loss of xlm.etree.Element.getchildren() in Python 3.9.7
+    """
+    chiter = element.iter()
+    return (c for c in next(chiter))
 
 def attributesToDict(node):
     """Returns a dictionary with the attributes names/values
@@ -569,7 +573,7 @@ def dictToXMLDocument(data, name=None, maxElements = 10):
         finally:
             del(cframe)
             
-    if name is None or name  is "":
+    if name is None or isinstance(name, str) and len(name.strip()) == 0:
         name = "root"
         
         

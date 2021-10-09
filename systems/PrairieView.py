@@ -2247,8 +2247,9 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         # later delete actions on these objects will throw exceptions)
         #
         # see also scipyen gui.mainwindow.ScipyenWindow.slot_importPrairieView()
-        super(WorkspaceGuiMixin, self).__init__(parent=parent, **kwargs)
-        super().__init__(parent=parent, **kwargs)
+        super(__QDialog__, self).__init__(parent)
+        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
+        #super(WorkspaceGuiMixin, self).__init__(parent, **kwargs)
         
         self._scandata_ = None # the outcome: a ScanData object
         
@@ -2370,8 +2371,13 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         self.editTriggerProtocolsToolButton.clicked.connect(self._slot_editTriggerProtocols)
         self.buildScandataToolButton.clicked.connect(self.slot_generateScanData)
         
-        self.ephysPreview = sv.SignalViewer(pWin = self._scipyenWindow_, 
+        # NOTE: 2021-10-09 23:55:03
+        # belowl self._scipyenWindow_ is inherited from WorkspaceGuiMixin (initialized)
+        self.ephysPreview = sv.SignalViewer(parent = self._scipyenWindow_, 
                                             win_title = "Trigger Events Detection")
+        
+        #self.ephysPreview = sv.SignalViewer(pWin = self._scipyenWindow_, 
+                                            #win_title = "Trigger Events Detection")
         
         #### BEGIN - use TriggerDetectDialog instead of local code
         #self.eventDetectionDialog = qd.QuickDialog(self, "Detect Trigger Events")

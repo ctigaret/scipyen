@@ -2332,7 +2332,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     def get_axis_xData_precision(self, axis):
         #pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
-        pXData = (i.xData[~np.isnan(i.xData)] for i in axis.items if sgp.nansize(i.xData) > 1)
+        pXData = (i.xData[~np.isnan(i.xData)] for i in axis.items if isinstance(i, pg.PlotDataItem) and sgp.nansize(i.xData) > 1)
         
         precisions = [int(abs(np.round(np.log10((np.diff(x)).mean())))) for x in pXData]
         if len(precisions):
@@ -6111,7 +6111,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     x_ = x.squeeze()
                     
-                if any(y_nan_ndx):
+                #if any(y_nan_ndx): # np.bool_ not iterable in numpy 1.21.2
+                if np.any(y_nan_ndx):
                     yy = y_[~y_nan_ndx]
                     xx = x_[~y_nan_ndx]
                     

@@ -1378,19 +1378,24 @@ def savePickleFile(val, fileName, protocol=None):
     
 def saveNixIOFile(val, fileName):
     (name,extn) = os.path.splitext(fileName)
-    if len(extn)==0 or extn != ".h5":
-        fileName += ".h5"
+    if len(extn)==0 or extn != ".nix":
+        fileName += ".nix"
+    #if len(extn)==0 or extn != ".h5":
+        #fileName += ".h5"
         
-    nixio = neo.NixIO(fileName=fileName)
+    nixio = neo.NixIO(fileName)
+    #nixio = neo.NixIO(fileName=fileName)
     nixio.write(val)
     
     nixio.close()
     
 def loadNixIOFile(fileName):
     if os.path.isfile(fileName):
-        nixio = neo.NixIO(fileName=fileName)
-        ret = nixio.read()
+        nixio = neo.NixIO(fileName)
+        ret = nixio.read() # always retirns a list of neo.Block objects
         nixio.close()
+        if len(ret) == 1:
+            return ret[0] # just return a block
         return ret
     else:
         raise OSError("File Not Found)")

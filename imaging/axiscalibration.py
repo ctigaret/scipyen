@@ -4,6 +4,7 @@ import numpy as np
 import quantities as pq
 
 from core import datatypes, xmlutils
+from core.xmlutils import getChildren
 from core.datatypes import (arbitrary_unit, pixel_unit,
                             channel_unit,
                             space_frequency_unit,
@@ -1730,7 +1731,10 @@ class AxisCalibration(object):
             
             result = dict()
             
-            children = element.getchildren()
+            # NOTE: 2021-10-09 23:58:58
+            # xml.etree.ElementTree.Element.getchildren() is absent in Python 3.9.7
+            #children = element.getchildren()
+            children = getChildren(element)
             #if len(children) != 3:
                 #raise ValueError("Expecting an XML element with three children; got %s instead" % len(children))
             
@@ -1899,7 +1903,11 @@ class AxisCalibration(object):
                 if main_calibration_element.tag != "axis_calibration":
                     raise ValueError("Wrong element tag; was expecting 'axis_calibration', instead got %s" % element.tag)
                 
-                element_children = main_calibration_element.getchildren()
+                # see NOTE: 2021-10-09 23:58:58
+                # xml.etree.ElementTree.Element.getchildren() is absent in Python 3.9.7
+                #element_children = main_calibration_element.getchildren()
+                # NOTE: replaced with the following:
+                element_children = getChildren(main_calibration_element) # getChildren defined in xmlutils
                 
                 for child_element in element_children:
                     # these can be <childrenX> tags (X is a 0-based index) or a <name> tag
@@ -1999,7 +2007,9 @@ class AxisCalibration(object):
                 if name_element.tag != "name":
                     raise ValueError("Wrong element tag: expecting 'name', got %s instead" % name_element.tag)
                 
-                for child_element in name_element.getchildren():
+                #NOTE: see NOTE: 2021-10-09 23:58:58
+                #for child_element in name_element.getchildren():
+                for child_element in getChildren(name_element):
                     if child_element.tag.startswith("channel"):
                         # check for a name element then add it if not already in result
                         cx = child_element.tag.split("channel")

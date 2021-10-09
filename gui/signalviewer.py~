@@ -2332,7 +2332,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     def get_axis_xData_precision(self, axis):
         #pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
-        pXData = (i.xData[~np.isnan(i.xData)] for i in axis.items if sgp.nansize(i.xData) > 1)
+        pXData = (i.xData[~np.isnan(i.xData)] for i in axis.items if isinstance(i, pg.PlotDataItem) and sgp.nansize(i.xData) > 1)
         
         precisions = [int(abs(np.round(np.log10((np.diff(x)).mean())))) for x in pXData]
         if len(precisions):
@@ -4513,7 +4513,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             b) that the interval falls within the domain of all signals in the 
                 data
         
-        channelIndex: neo.ChannelIndex object, or None (default) - used to select
+        channelIndex: DEPRECATED neo.ChannelIndex object, or None (default) - used to select
             which data channel to plot (NOT to be confused with signal channels)
         
         plotStyle: str, default is "plot" -- keyword reserved for development

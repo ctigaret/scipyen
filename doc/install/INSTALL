@@ -1,4 +1,9 @@
-Last modified 2021-06-07 14:47:34
+Last modified / change log:
+
+2021-10-09 18:15:17
+
+    
+2021-06-07 14:47:34
 
 ================================================================================
 This file describes how to install scipyen and its dependencies in a virtual
@@ -25,6 +30,11 @@ Steps:
 
     REQUIRES:
         git software (system-wide installation) including gitk and git-gui
+            NOTE: get this using your OS distribution's software management - it
+            is basic enough to be able to install it in this way; otherwise you
+            may have to build & install it from sources
+            
+        Optional:    
         github cli (for Linux, also for Windows; other platforms may use github 
                     desktop app, you mileage mau vary)
 (for various distributions see https://github.com/cli/cli/blob/trunk/docs/install_linux.md)
@@ -40,43 +50,47 @@ Steps:
         gh auth login ==> select GitHub.com, then when prompted enter username
             and password (you will have to create a free github account )
             
-Clone scipyen
-        gh repo clone ctigaret/scipyen
+    Clone scipyen
+            gh repo clone ctigaret/scipyen
+        
+        OR:
+        
+            git clone https://github.com/ctigaret/scipyen.git
         
         Then cd into scipyen and verify local repo is uptodate with the relevant
         branches:
+            
             git checkout master
             git pull
             git checkout work
             git pull
             git checkout dev
             git pull
-================================================================================
 
 From now on, ALWAYS make sure you are on the dev branch (this also contains the 
 doc/installation directory with pip requirements, etc). You may wish to run at
 regular intervals:
     
-    git checkout dev
-    git pull
-
+            git checkout dev
+            git pull
+            
 In the following we assume that scipyen has been cloned in $HOME/scipyen and all
 relative paths in this document are RELATIVE to $HOME/scipyen/
 
 ================================================================================
-1. INSTALL THE FOLLOWING PACKAGES AS PER YOUR DISTRIBUTION:
+1. INSTALL THE FOLLOWING PACKAGES AS PER YOUR OS DISTRIBUTION:
 ================================================================================
-(* indicates you need to also install their corresponding devel packages; where
- appriopriate, a minimal version is specified):
+(* indicates you also need to install their corresponding devel packages; where
+ appropriate, a minimal version is specified):
     
 Qt5 (*)
-cmake3,     # NOTE this and the one blow are required ot configure vigra & neuron
-cmake3-full, (includes cmake-gui) 
+cmake3,     # NOTE this and the one below are required to configure vigra & neuron
+cmake3-full # (includes cmake-gui) 
 zlib (*)
 hdf5 (*)
 openexr (*)
 openssl >= 1.11 (*)
-fftw3 (*) (optionally with MPI bindings)
+fftw3 (*) (optionally and recomended with MPI bindings)
 mpich (*)
 tiff (*)
 jpeg (*)
@@ -87,25 +101,35 @@ valgrind (optional)
 
 ================================================================================
 2. BUILD PYTHON (if unhappy with what the distribution offers)
+================================================================================
 
 NOTE: This is RECOMMENDED if the distribution is behind the latest Python by 
 (quite) a few minor versions.
 
 For example, OpenSuSE Leap 15.3 installs Python-3.6.12; here, we use Python 
 3.9.7 where there have been some significant changes, and because the latest neo 
-package don't support python < 3.7
-================================================================================
+package doesn't support python < 3.7
 
-To build on a Python build from sources (e.g. 3.9.7) see the file:
+
+To build Python from sources (e.g. 3.9.7) see the file:
 
     $HOME/scipyen/doc/install/Python/Unix/README
+    
+NOTE: To avoid overshadowing/overwriting your system's python3 executable, 
+ALWAYS execute 'make altinstall' AND NOT 'make install' after building.
 
-From here on we assume it will be installed in /usr/local.
+'make altinstall' needs to be called as superuser (su then password, or sudo)
 
-Run the $HOME/scipyen/make_script_links.sh once - this will create a symbolic link
-from $HOME/scipyen/doc/install/Python/Unix/pyenv to $HOME/pyenv
+Also you MUST call ldconfig (again, as superuser).
 
+From here on we assume Python-3.9.7 was built then installed in /usr/local.
+
+Run the $HOME/scipyen/make_script_links.sh once - this will create a symbolic 
+link from $HOME/scipyen/doc/install/Python/Unix/pyenv to $HOME/pyenv
 (see $HOME/scipyen/doc/install/Python/Unix/README for details)
+
+NOTE: If you relocate the 'scipyen' directory you have to recreate these links.
+Have a look inside make_script_links.sh shell script to see what it does.
 
 ================================================================================
 3. CREATE A PYTHON VIRTUAL ENVIRONMENT
@@ -122,17 +146,20 @@ reflects the use of Python-3.9)
 4. ACTIVATE THE PYTHON VIRTUAL ENVIRONMENT AND BUILD DEPENDENCIES
 ================================================================================
 
-NOTE: for convenience, the source trees will be placed inside the virtual 
-environment's directory, e.g. $HOME/scipyenv39/src (assuming the virtual environment is
-in $HOME/scipyenv39).
-
 Once the virtual environment has been activated, a new environment variable 
 VIRTUAL_ENV becomes available, pointing to the location of the environment's
 directory (e.g., $HOME/scipyenv39) so we will use VIRTUAL_ENV through to the
-end of this document.
+end of this document, when referring to the environment's directory.
+
+NOTE: For convenience, the source trees will be placed in a directory 'src'
+inside the virtual environment's directory, i.e., $HOME/scipyenv39/src 
+(assuming the virtual environment is in $HOME/scipyenv39, see above).
+
+NOTE that this is NOT necessary - you can have the src located somewhere else, 
+e.g. on a larger 'data' partition, but AVOID networked partitions.
 
 NOTE: From here on we assume all source trees are in $VIRTUAL_ENV/src  and
-we operate inside the activated virtual environment in the $VIRTUAL_ENV/src directory
+we operate from an activated virtual environment, in the $VIRTUAL_ENV/src directory
 
 --------------------------------------------------------------------------------
 4.1 BUILD AND INSTALL BOOST LIBRARIES boost_1_77_0.tar.b2
