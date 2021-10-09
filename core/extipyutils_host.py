@@ -35,6 +35,7 @@ if sys.platform == 'win32':
 
     if os.path.isdir(vigranumpyextdir):
         sys.path.append(vigranumpyextdir)
+        os.add_dll_directory(vigranumpyextdir)
 
 
     del scipyenvbin, scipyenvlib, scipyenvlib64, vigranumpyextdir

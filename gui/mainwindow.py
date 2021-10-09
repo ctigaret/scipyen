@@ -3855,7 +3855,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_goToHomeDir(self):
-        self.slot_changeDirectory(os.environ['HOME'])
+        if sys.platform == "win32":
+            self.slot_changeDirectory(os.environ['USERPROFILE'])
+        else:
+            self.slot_changeDirectory(os.environ['HOME'])
         
     @pyqtSlot()
     @safeWrapper
