@@ -54,8 +54,6 @@ from core.utilities import gethash, safe_identity_test
 #        if inspect.isclass(klass) and issubclass(traitlets.Instance):
 #            print(klass)
 
-
-
 #from prog import safeWrapper
 #from core.traitcontainers import DataBag # doesn't work because of recursion
 
@@ -103,7 +101,9 @@ def enhanced_traitlet_set(instance, obj, value):
     
     try:
         old_value = obj._trait_values[instance.name]
+        
     except KeyError:
+        #print(f"{instance.name} not found")
         old_value = instance.default_value
         
 
@@ -309,6 +309,11 @@ def adapt_args_kw(x, args, kw, allow_none):
 def dynamic_trait(x, *args, **kwargs):
     """Generates a trait type for object x.
     
+    Parameters:
+    ===========
+    
+    x = an object; 
+    
     The trait type is derived from a traitlets.TraitType subclass according to 
     type(x) after lookup in the TRAITSMAP dict in this module.
     
@@ -352,10 +357,13 @@ def dynamic_trait(x, *args, **kwargs):
     
     """
     allow_none = kwargs.pop("allow_none", False)
-    content_traits = kwargs.pop("content_traits", True)
-    content_allow_none = kwargs.pop("content_allow_none", allow_none)
     force_trait = kwargs.pop("force_trait", None)
     set_function = kwargs.pop("set_function", None)
+    content_traits = kwargs.pop("content_traits", True) # used in the recursive dynamic_trait call
+    # FIXME: 2021-10-10 16:43:29
+    # the following are never used !!!
+    content_allow_none = kwargs.pop("content_allow_none", allow_none)
+    klass = kwargs.pop("klass", None)
     
     # NOTE: 2021-08-20 11:44:00 A reminder:
     # isinstance(x, sometype) returns True when sometype is in type(x).__mro__
@@ -381,54 +389,45 @@ def dynamic_trait(x, *args, **kwargs):
     
     kw = kwargs
     
-    #traitclass = TRAITSMAP.get(myclass, Instance)
-    
-    if isclass(force_trait) and issubclass(force_trait, traitlets.TraitType):
-        traitclass = (force_trait, )
-    else:
-        # NOTE: 2021-08-20 12:22:12 For a finer granularity
-        traitclass = TRAITSMAP.get(myclass, (None, ))
-    
-    #print("traitclass", traitclass)
-
-    if traitclass[0] is None:
-        highest_below_object = [s for s in reversed(getmro(type(x)))][1] # all Python types inherit from object
-        traitclass = TRAITSMAP.get(highest_below_object, (Any,))
-        #traitclass = TRAITSMAP.get(highest_below_object, (Instance,))
+    if myclass.__name__ == "DataBag":
+        from .databagtrait import DataBagTrait
         
-    #print("traitclass", traitclass)
-    
-    if not isfunction(set_function) or len(signature(set_function).parameters) != 3:
-        set_function = enhanced_traitlet_set
-
-    exec_body_fn = partial(_dynatrtyp_exec_body_, setfn=set_function)
-    
-    new_klass = new_class("%s_Dyn" % traitclass[0].__name__, bases = traitclass, 
-                          exec_body = exec_body_fn)
-    
-    new_args, new_kw = adapt_args_kw(x, args, kw, allow_none)
-    
-    #print("new_args", new_args)
-    #print("new_kw", new_kw)
-    
-    if traitclass[0] is Instance:
-        return new_klass(klass = myclass, args = args, kw = kw, allow_none = allow_none)
-    
-    if issubclass(new_klass, Dict):
-        if content_traits:
-            # NOTE: 2021-08-21 09:54:18 FIXME
-            # ATTENTION Line below produces infinite recursion when the underlying dict
-            # contains a reference to itself
-            #traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=content_traits)) for k,v in x.items())
-            # NOTE: 2021-08-21 09:54:46 FIXED
-            # do NOT use content_traits for dict values when these are of dict type
-            traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=False)) for k,v in x.items())
-        else:
-            traits = None
-            
-        return new_klass(default_value = x, traits=traits, allow_none = allow_none)
-    
+        traitclass = (DataBagTrait, )
+        
     else:
+        if isclass(force_trait) and issubclass(force_trait, traitlets.TraitType):
+            traitclass = (force_trait, )
+            
+            
+        else:
+            # NOTE: 2021-08-20 12:22:12 For a finer granularity
+            traitclass = TRAITSMAP.get(myclass, (None, ))
+            
+        if traitclass[0] is None:
+            # NOTE: 2021-10-10 17:10:02
+            # when 'x' is a DataBag, the line below always returns 'dict'
+            highest_below_object = [s for s in reversed(getmro(myclass))][1] # all Python types inherit from object
+            traitclass = TRAITSMAP.get(highest_below_object, (Any,))
+            
+        if not isfunction(set_function) or len(signature(set_function).parameters) != 3:
+            set_function = enhanced_traitlet_set
+
+        exec_body_fn = partial(_dynatrtyp_exec_body_, setfn=set_function)
+        
+        new_klass = new_class("%s_Dyn" % traitclass[0].__name__, 
+                            bases = traitclass, 
+                            exec_body = exec_body_fn)
+        
+        new_args, new_kw = adapt_args_kw(x, args, kw, allow_none)
+        
+        if traitclass[0] is Instance:
+            return new_klass(klass = myclass, args = args, kw = kw, allow_none = allow_none)
+        
+        if issubclass(new_klass, Dict) and content_traits:
+            traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=False if v is x else True)) for k,v in x.items())
+            # NOTE: New API for traitlets >= 5.0: 'traits' is deprecated in favour of 'per_key_traits'
+            return new_klass(default_value = x, per_key_traits = traits, allow_none = allow_none)
+        
         return new_klass(default_value = x, allow_none = allow_none)
     
 class TraitSetMixin(object):

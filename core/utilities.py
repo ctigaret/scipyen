@@ -243,7 +243,7 @@ def hashiterable(x:typing.Iterable[typing.Any]) -> Number:
 
 @safeWrapper
 def gethash(x:typing.Any) -> Number:
-    """Calculates a hash-like figure for objects including non-hashable
+    """Calculates a hash-like figure for objects (including of non-hashable types)
     To be used for object comparisons.
     
     Not suitable for secure code.

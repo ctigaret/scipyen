@@ -942,7 +942,7 @@ class PlanarGraphics():
         =========================
         *args: either:
             1) sequence of planar descriptors specific to the PlanarGraphics 
-                subclass type, but WITHOUT z_frame (which is specified via 
+                subclass type, but WITHOUT the z_frame (which is specified via 
                 the 'frameindex' parameter)
                 
                 The expected order is as specified in the _planar_descriptors_
@@ -1387,7 +1387,7 @@ class PlanarGraphics():
     def __getattr__(self, name):
         if name in self.__class__._planar_descriptors_:
             state = self.getState()
-            if isinstance(state, DataBag):
+            if isinstance(state, (DataBag, dict)):
                 return state[name]
         
         else:
@@ -5158,8 +5158,12 @@ class Move(PlanarGraphics):
                  linked_objects=dict()):
         """Parameters: move to point coordinates (x,y)
         """
-        super().__init__(*args, name=name, frameindex=frameindex, currentframe=currentframe,
-                         graphicstype=PlanarGraphicsType.point, closed=closed,
+        super().__init__(*args, 
+                         name=name, 
+                         frameindex=frameindex, 
+                         currentframe=currentframe,
+                         graphicstype=PlanarGraphicsType.point, 
+                         closed=closed,
                          linked_objects=linked_objects)
         
     def controlPoints(self, frame=None):
@@ -6023,9 +6027,11 @@ class Path(PlanarGraphics):
         for p in args:
             self._objects_.append(p.copy())
             
-        #for p in self:
-            #print(p)
-
+        obj = self._objects_[0]
+        # make sure the Path starts with a Move
+        if not isinstance(obj, Move):
+            self._objects_.insert(0, Move(obj.x, obj.y, frameindex=frameindex, currentframe=currentframe))
+            
     def __init__(self, *args, name:typing.Optional[str]="path", frameindex=[], currentframe:int=0, 
                  graphicstype=None, closed=False,
                  linked_objects = dict(), position = (0,0)):
@@ -6035,27 +6041,32 @@ class Path(PlanarGraphics):
         Parameters:
         -----------
         
-        *args: tuple of parameters; 
+        *args; 
             When this is empty, the Path will be initalized without elements.
             
-            When args have just one element, this can be:
+            1. When args have just one element, this can be:
             
-            1. a Path - in which case this function behaved like a copy constructor
+            1.1. a Path - in which case this function behaved like a copy constructor
             
-            2. a PlanarGraphics other than a Path - the Path will be initialized 
+            1.2. a PlanarGraphics other than a Path - the Path will be initialized 
             with this element. If the PlanarGraphics is NOT a Move element, a
             Move element will be prepended to the Path, with the coordinates, 
             frame index and current frame as specified by the named parameters
             (see below)
             
-            3. a sequence (tuple or list) of numeric values used to construct
+            1.3. a sequence (tuple or list) of numeric values used to construct
             PlanarGraphics objects.
                 Currently, only Move and Line objects are supported by this syntax.
                 
-            4. a sequence (tuple or list) of PlanarGraphics objects (these can
+            1.4. a sequence (tuple or list) of PlanarGraphics objects (these can
             be Path objects themselves)
             
+            2. When args is a sequence of parameters, these can be:
+
+            2.1 A sequence of sequences of numeric values, each used to construct
+            a PlanarGraphics object component of this path
             
+            2.2 A sequence of PlanarGraphics objects (including another Path)
             
         
         
@@ -6092,14 +6103,16 @@ class Path(PlanarGraphics):
         else:
             self._ID_ = self.__class__.__name__
         
+        # NOTE: 2021-10-10 11:25:20
+        # init super with no args
         PlanarGraphics.__init__(self, (), name=name, frameindex=frameindex, currentframe=currentframe, 
                                 graphicstype=graphicstype, closed=closed,
                                 linked_objects = linked_objects)
         
         if len(args):
             #print("Path.__init__ *args", args, " %d elements" % len(args))
-            if len(args) == 1: # construct Path from one argument in *args
-                if isinstance(args[0], Path): # copy constructor
+            if len(args) == 1: # construct Path from one argument in *args, which may be:
+                if isinstance(args[0], Path): # a Path => copy constructor
                     # NOTE: 2021-04-26 11:52:53
                     # there should be no need to chack that Path starts with a 
                     # Move - this should have been taken care of when the original
@@ -6124,6 +6137,7 @@ class Path(PlanarGraphics):
                     # x and y given by the tuple elements in the 'position'
                     # parameter (itself being by default, 0,0)
                     self._objects_.append(args[0].copy())
+                    
                     if not isinstance(self._objects_[0], Move):
                         self._objects_.insert(0, Move(position[0], position[1],
                                                       frameindex=frameindex, 
@@ -6143,58 +6157,24 @@ class Path(PlanarGraphics):
                     else:
                         self._planar_graphics_type_ = PlanarGraphicsType.path
                         
-                elif isinstance(args[0], (tuple, list)) and len(args[0]): # construct from one packed iterable
+                elif isinstance(args[0], (tuple, list)) and len(args[0]): 
+                    # the sole parameter is a sequence: this can be case 1.3 or
+                    # case 1.4 (although Path behaves like a list of PlanarGraphics,
+                    # it is dealt with above, as a copy constructor)
                     # NOTE: clauses for c'tor based on an iterable passed as sole
                     # arguments -- two subclauses:
                     if all([isinstance(p, PlanarGraphics) for p in args[0]]):
+                        # NOTE: case 1.4
                         self.__init_from_planar_graphics_(*args[0])
                         
-                        #for k, p in enumerate(args[0]):
-                            #self._objects_.append(p.copy())
-                            
-                        ## NOTE: 2018-01-20 09:56:56
-                        ## make sure Path begins with a Move 
-                        #if not isinstance(self._objects_[0], Move):
-                            #self._objects_.insert(0, Move(position[0], position[1], 
-                                                          #frameindex=frameindex, 
-                                                          #currentframe=currentframe))
-                            
-                        #if all([isinstance(e, (Move, Line)) for e in self._objects_]):
-                            #if len(self._objects_) == 2:
-                                #self._planar_graphics_type_ = PlanarGraphicsType.line
-                            
-                            #else:
-                                #if self._closed_:
-                                    #self._planar_graphics_type_ = PlanarGraphicsType.polygon
-                                
-                                #else:
-                                    #self._planar_graphics_type_ = PlanarGraphicsType.polyline
-                            
-                        #else:
-                            #self._planar_graphics_type_ = PlanarGraphicsType.path
-                            
-                            
-                        #if len(self._objects_):
-                            ## NOTE: 2021-04-26 12:30:51
-                            ## the position is NOT necessarly given by the (x,y) coordinates
-                            ## of the first element in Path!
-                            #x = min([e.x for e in self._objects_ if isinstance(e, PlanarGraphics)])
-                            #y = min([e.y for e in self._objects_ if isinstance(e, PlanarGraphics)])
-
-                            #self._position_ = (x,y)
-                            
-                        #else:
-                            #self._position_ = (0,0)
-                            
                     elif all([isinstance(c, (tuple, list)) and len(c) == 2 for c in args[0]]):
-                        # NOTE: clause for c'tor of path from iterable of coordinate tuples
+                        # NOTE: case 1.3 iterable of coordinate tuples
                         # e.g. as stored in image XML metadata, etc => Move (, Line) *
                         
                         self._objects_.append(Move(args[0][0], args[0][1], frameindex=frameindex, currentframe=currentframe))
                         
-                        if len(args[0]) > 1:
-                            for a in args[1:]:
-                                self._objects_.append(Line(a[0], a[1], frameindex=frameindex, currentframe=currentframe))
+                        for a in args[1:]:
+                            self._objects_.append(Line(a[0], a[1], frameindex=frameindex, currentframe=currentframe))
                                 
                         x = min([o.x for o in self if o is not None])
                         y = min([o.y for o in self if o is not None])

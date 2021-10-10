@@ -394,7 +394,7 @@ class XMLViewer(ScipyenViewer):
         
     def __init__(self, data: (xml.etree.ElementTree.Element, xml.dom.minidom.Document, QtXml.QDomNode, QtXml.QDomDocument, str, type(None)) = None, 
                  parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
+                 ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
                  processNameSpaces=True, *args, **kwargs) -> None:
         ''' Constructor for XMLViewer
@@ -407,7 +407,7 @@ class XMLViewer(ScipyenViewer):
                             is a string and indicates to the underlying DOM document whether to
                             process namespaces (True) or not (False)
         '''
-        super().__init__(data=data, parent=parent, pWin=pWin, ID = ID, win_title=win_title, doc_title=doc_title, *args, **kwargs)
+        super().__init__(data=data, parent=parent, ID = ID, win_title=win_title, doc_title=doc_title, *args, **kwargs)
 
         self.processNS = processNameSpaces
         

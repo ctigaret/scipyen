@@ -370,7 +370,7 @@ class PVSystemConfiguration(object):
             self.__attributes__ = DataBag(xmlutils.attributesToDict(node))
             
         else:
-            self.__attributes__ = DataBag(dict())
+            self.__attributes__ = DataBag()
         
         lasers = node.getElementsByTagName("Laser")
         
@@ -411,13 +411,6 @@ class PVSystemConfiguration(object):
         
         return DataBag(ret)
     
-    #def laser(self, index):
-        #return self.lasers[index]
-
-    #@property
-    #def numLasers(self):
-        #return len(self.lasers)
-        
     def __repr__(self):
         return self.__str__()
     
@@ -2042,8 +2035,6 @@ class PVScan(object):
     def metadata(self):
         """Returns metadata associated with this PVSCan
         """
-        
-        #metadata = dict()
         metadata = DataBag(mutable_types=True, allow_none=True)
         metadata["configuration"] = self.configuration.as_dict()
         metadata["file_path"] = self.filepath
@@ -2072,7 +2063,8 @@ class PVScan(object):
             
         metadata["type"] = self.__class__.__name__
         
-        return DataBag(metadata)
+        return metadata
+        #return DataBag(metadata)
     
     def mergeChannels(self, filepath=None):
         """Coerce reading the files as a multiband image.

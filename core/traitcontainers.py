@@ -18,11 +18,7 @@ from pprint import pformat
                        #is_trait, observe,TraitError,)
 from traitlets.utils.bunch import Bunch
 
-#from .traitutils import (traitlets, dynamic_trait, trait_from_type, transform_link,
-                         #HasTraits, TraitType, TraitsObserver, 
-                         #ContainerTraitsObserver, EventHandler,Int, Bool, All,
-                         #observe)
-from .traitutils import (traitlets, dynamic_trait, trait_from_type, transform_link,
+from .traitutils import (traitlets, dynamic_trait, transform_link,
                          HasTraits, TraitType, TraitsObserver, 
                          ContainerTraitsObserver, Int, Bool, All, observe)
 
@@ -43,59 +39,16 @@ class DataBagTraitsObserver(HasTraits):
                               (HasTraits, ), 
                               {"remove_traits":self.remove_traits})
         
-        #self.__class__ = type(self.__class__.__name__,
-                              #(HasTraits, ), 
-                              #{"changed":self.changed, "remove_traits":self.remove_traits})
-        
         self.add_traits(**keep_traits)
         
-    #def __setstate__(self, state):
-        #super().__setstate__(state)
-        ###print("DataBagTraitsObserver.__setstate__", state)
+class DataBagTrait(Dict):
+    # forward declaration; for actual defintion, see further down DataBag
+    pass
         
-        ### ATTENTION: 2020-10-30 14:27:36
-        ### the following completely messes up DataBagTraitsObserver when unpickled
-        ###self.__dict__ = state.copy()
-        
-        ### ATTENTION: 2020-10-30 14:27:58
-        ### therefore we UPDATE values in self._trait_values, rather than self__dict__
-        
-        ### event handlers are reassigned to self
-        ##cls = self.__class__
-        ###print("DataBagTraitsObserver.__setstate__: cls", cls)
-        ##for key in dir(cls):
-            ### Some descriptors raise AttributeError like zope.interface's
-            ### __provides__ attributes even though they exist.  This causes
-            ### AttributeErrors even though they are listed in dir(cls).
-            ###print("DataBagTraitsObserver.__setstate__: key", key)
-            ##try:
-                ##value = getattr(cls, key)
-            ##except AttributeError:
-                ##pass
-            ##else:
-                ##if isinstance(value, EventHandler):
-                    ###print("DataBagTraitsObserver.__setstate__ value is a ", type(value))
-                    ##value.instance_init(self)
-
-    #def __getstate__(self):
-        #return super().__getstate__()
-    
-    #@observe(All)
-    #def changed(self, change):
-        #"""for illustration purposes
-        #WARNING the corresponding ObserveHandler will be removed upon calling
-        #self.unobserve() or self.unobserve_all()
-        #"""
-        ### NOTE: 2020-07-05 18:01:01 that's what you can to with these
-        ##print("self.changed: change['type']:\n",change["type"], "\n")
-        ##print("self.changed: change['owner']:\n",change["owner"], "\n")
-        ##print("self.changed: change['name']:\n",change["name"], "\n")
-        ##print("self.changed: change['old']:\n",change["old"], "\n")
-        ##print("self.changed: change['new']:\n",change["new"], "\n")
-        #return
 
 class DataBag(Bunch):
     """Dictionary with semantics for direct attribute reference and attribute change observer.
+    
     NOTE 2020-07-04 17:48:10
     The implementation is based on traitlets.utils.bunch.Bunch
     ("Yet another implementation of bunch - attribute-access of items on a dict"
@@ -119,9 +72,16 @@ class DataBag(Bunch):
     items()
     __str__()
     __len__()
-
-    TODO upgrade to defaultdict!
     
+    NOTE: 2021-10-10 17:00:26
+    Acquired traitlets.HasTraits functionality through composition, via the
+    'observer' property which inherits from traitlets.HasTraits.
+    
+    The following DataBag instance methods are exposed from traitlets.HasTraits:
+    
+    traits()
+    trait_values()
+
     TODO 2020-07-04 23:44:59
     customize observer handlers
     customize link & directional link
@@ -192,7 +152,7 @@ class DataBag(Bunch):
     
     @staticmethod
     def _make_hidden(**kwargs):
-        ret = Bunch([(name, kwargs.pop(name, False)) for name in DataBag.hidden_traits])
+        ret = Bunch([(name, kwargs.pop(name, False)) for name in list(DataBag.hidden_traits) + ["mutable_types"]])
         ret.length = 0
         ret.allow_none = True
         ret.use_mutable = True
@@ -226,6 +186,8 @@ class DataBag(Bunch):
             When True, allows a new value type to be assigned to an EXISTING
             attribute.
             
+        mutable_types: alias for use_mutable (for backward compatibility)
+            
         allow_none: bool, default False
             When True, a trait value can be None
             
@@ -244,12 +206,11 @@ class DataBag(Bunch):
         use_casting takes precedence over mutable_types.
             
         """
+        self.__observer__ = DataBagTraitsObserver()
         self.__hidden__ = DataBag._make_hidden(**kwargs)
-        
-        dd = dict(*args, **kwargs)
-        
+
         for name in self.__hidden__.keys():
-            dd.pop(name, None)
+            kwargs.pop(name, None)
         
         if self.use_casting:
             self.use_mutable = False
@@ -257,37 +218,54 @@ class DataBag(Bunch):
         elif self.use_mutable:
             self.use_casting = False
             
-        self.__observer__ = DataBagTraitsObserver(**dd)
+        if len(args)==1 and isinstance(args[0], dict):
+            dd = args[0]
+        else:
+            dd = kwargs
+            
+        print(type(dd))
         
-        super().__init__(*args, **kwargs)
+        print("dd", dd)
+            
+        traits = dict(map(lambda x: (x[0], self._light_trait_(x[1])), dd.items()))
         
-        if self in dd.keys():
-            raise ValueError("One cannot set onself as a trait key!")
-        
-        #dtrait = partial(dynamic_trait, allow_none=self.__hidden__.allow_none) 
-        
-        # NOTE: 2021-09-14 13:00:51 exclude dictionaries (force them to behave as Any)
-        # because of the long processing times
-        
-        trdict = dict(map(lambda x: (x[0], self._light_trait_(x[1])), dd.items()))
-        
-        #trdict = dict(map(lambda x: (x[0], dtrait(x[1]) if (x[1] is not self or not isinstance(x[1], dict)) else dtrait(x[1], force_trait=traitlets.Any)), dd.items()))
-        #trdict = dict(map(lambda x: (x[0], dtrait(x[1]) if (x[1] is not self and not isinstance(x[1], DataBag)) else dtrait(x[1], force_trait=traitlets.Any)), dd.items()))
-        
-        self.__hidden__.length = len(trdict)
+        self.__hidden__.length = len(traits)
 
-        self.__observer__.add_traits(**trdict)
+        self.__observer__.add_traits(**traits)
+        
+        # FIXME:L 2021-10-10 15:59:37
+        # Why is this needed (because it really is required, otherwise this
+        # DataBag shows no contents)
+        for k,v in dd.items():
+            object.__setattr__(self.__observer__, k, v)
+            
+        super().__init__(**dd)
+        #super().__init__(*args, **kwargs)
         
     def _light_trait_(self, obj):
-        if obj is self or isinstance(obj, dict):
-            dtrait = partial(dynamic_trait, allow_none=self.__hidden__.allow_none, content_traits=False,force_trait=traitlets.Any)
-        else:
-            dtrait = partial(dynamic_trait, allow_none=self.__hidden__.allow_none, content_traits=True)
-            
-        return dtrait(obj, force_trait=traitlets.Any)
+        # NOTE: 2021-09-14 13:00:51 
+        # Might have to force dictionaries to behave as Any
+        # because of the long processing times
         
-        #else:
-            #return trait_factory(obj)
+        if obj is self:
+            dtrait = partial(dynamic_trait, 
+                             allow_none=self.__hidden__.allow_none, 
+                             content_traits=False,
+                             force_trait=traitlets.Any)
+            
+        #elif isinstance(obj, DataBag):
+            #dtrait = DataBagTrait
+            
+        #elif isinstance(obj, dict):
+            #dtrait = partial(dynamic_trait, 
+                             #allow_none=self.__hidden__.allow_none, 
+                             #content_traits=False)
+        else:
+            dtrait = partial(dynamic_trait, 
+                             allow_none=self.__hidden__.allow_none, 
+                             content_traits=True)
+            
+        return dtrait(obj)#, force_trait=traitlets.Any)
         
     def __setitem__(self, key, val):
         """Implements indexed (subscript) assignment: obj[key] = val
@@ -341,6 +319,7 @@ class DataBag(Bunch):
 
         try:
             hid = object.__getattribute__(self, "__hidden__")
+            
         except:
             hid = DataBag._make_hidden()
             object.__setattr__(self, "__hidden__", hid)
@@ -386,14 +365,7 @@ class DataBag(Bunch):
         else:
             # add a new trait
             if key not in ("__observer__", "__hidden__") and key not in self.__hidden__.keys():
-                #dtrait = partial(dynamic_trait, allow_none=self.__hidden__.allow_none)
                 trdict = {key: self._light_trait_(val)}
-                #if val is self or isinstance(val, DataBag):
-                    ##trdict = {key: dynamic_trait(val, allow_none = self.allow_none, content_traits=False, force_trait=traitlets.Any)}
-                    ##trdict = {key: traitlets.Any(val, allow_none = True)}
-                #else:
-                    #trdict = {key: dynamic_trait(val, allow_none = self.allow_none, content_traits=True)}
-                #trdict = {key:trait_from_type(val, allow_none = self.allow_none, content_traits=True)}
                 obs.add_traits(**trdict)
                 object.__setattr__(obs, key, val)
                 object.__getattribute__(self, "__hidden__").length = len(trdict)
@@ -409,13 +381,13 @@ class DataBag(Bunch):
     def __str__(self):
         #return pformat(self)
         obs = object.__getattribute__(self, "__observer__")
-        d = dict(map(lambda x: (x[0], x[1] if x[1] is not self else "<Recursion on %s with id=%d>" % (self.__class__.__name__, id(self)) ), obs._trait_values.items()))
+        d = dict(map(lambda x: (x[0], x[1] if x[1] is not self else "<Reference to %s object with id=%d>" % (self.__class__.__name__, id(self)) ), obs._trait_values.items()))
         return pformat(d)
     
     def __repr__(self):
         #return "%s:\n%s" % (self.__class__, pformat(self))
         obs = object.__getattribute__(self, "__observer__")
-        d = dict(map(lambda x: (x[0], x[1] if x[1] is not self else "<Recursion on %s with id=%d>" % (self.__class__.__name__, id(self)) ), obs._trait_values.items()))
+        d = dict(map(lambda x: (x[0], x[1] if x[1] is not self else "<Reference to %s object with id=%d>" % (self.__class__.__name__, id(self)) ), obs._trait_values.items()))
         return pformat(d)
     
     def __getitem__(self, key):
@@ -424,6 +396,8 @@ class DataBag(Bunch):
         try:
             obs = object.__getattribute__(self, "__observer__")
             return getattr(obs, key)
+        except AttributeError:
+            return object.__getattribute__(self, key)
         except:
             raise
     
@@ -534,7 +508,8 @@ class DataBag(Bunch):
         return self.__observer__
     
     def as_dict(self):
-        """Dictionary view
+        """Dictionary view - DEPRECATED; use self.trait_values()
+        
         """
         return self._trait_values
         #return dict((k,v) for k,v in self.items())
@@ -888,6 +863,7 @@ class DataBag(Bunch):
         else:
             raise TypeError("'source' expected to be a DataBag or HasTraits; got %s instead" % type(source).__name__)
         
+        
 def generic_change_handler(c, show:str="all"):
     if isinstance(show, str):
         if len(show.strip()) == 0:
@@ -899,14 +875,14 @@ def generic_change_handler(c, show:str="all"):
     else:
         show = "all"
         
-    print("generic_change_handler for debugging")
+    herald="#debug generic_change_handler"
         
     if show == "all":
-        print("type:",  c.type)
-        print("owner:", c.owner)
-        print("name:",  c.name)
-        print("old:",   c.old)
-        print("new:",   c.new)
+        print(f"{herald} type:",  c.type)
+        print(f"{herald} owner:", c.owner)
+        print(f"{herald} name:",  c.name)
+        print(f"{herald} old:",   c.old)
+        print(f"{herald} new:",   c.new)
         
     else:
-        print(show, c[show])
+        print(f"{herald} {show}", c[show])
