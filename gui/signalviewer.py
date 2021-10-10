@@ -6111,8 +6111,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     x_ = x.squeeze()
                     
-                #if any(y_nan_ndx): # np.bool_ not iterable in numpy 1.21.2
-                if np.any(y_nan_ndx):
+                #if np.any(y_nan_ndx):
+                if any(y_nan_ndx): # np.bool_ not iterable in numpy 1.21.2
                     yy = y_[~y_nan_ndx]
                     xx = x_[~y_nan_ndx]
                     
