@@ -2,7 +2,7 @@ from traitlets.utils.bunch import Bunch
 
 from .traitutils import (traitlets, dynamic_trait, transform_link,
                          HasTraits, TraitType, TraitsObserver, 
-                         ContainerTraitsObserver, Int, Bool, All, Dict, observe)
+                         ContainerTraitsObserver, Int, Bool, All, Dict, Undefined, observe)
 
 from .traitcontainers import DataBag
 

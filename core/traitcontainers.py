@@ -41,11 +41,6 @@ class DataBagTraitsObserver(HasTraits):
         
         self.add_traits(**keep_traits)
         
-class DataBagTrait(Dict):
-    # forward declaration; for actual defintion, see further down DataBag
-    pass
-        
-
 class DataBag(Bunch):
     """Dictionary with semantics for direct attribute reference and attribute change observer.
     
