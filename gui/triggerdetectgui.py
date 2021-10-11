@@ -106,34 +106,6 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
         self._update_channel_ranges_()
         self._update_time_ranges_()
         
-        #self.presynChannelSpinBox.valueChanged.connect(self.slot_paramValueChangedGui)
-        #self.postsynChannelSpinBox.valueChanged.connect(self.slot_paramValueChangedGui)
-        #self.photoChannelSpinBox.valueChanged.connect(self.slot_paramValueChangedGui)
-        #self.imagingChannelSpinBox.valueChanged.connect(self.slot_paramValueChangedGui)
-        
-        #self.presynStartDoubleSpinBox.valueChanged.connect(self.slot_paramValueChangedGui)
-        #self.presynStopDoubleSpinBox.valueChanged.connect(self.slot_paramValueChangedGui)
-        #self.postsynStartDoubleSpinBox.valueChanged.connect(self.slot_paramValueChangedGui)
-        #self.postsynStopDoubleSpinBox.valueChanged.connect(self.slot_paramValueChangedGui)
-        #self.photoStartDoubleSpinBox.valueChanged.connect(self.slot_paramValueChangedGui)
-        #self.photoStopDoubleSpinBox.valueChanged.connect(self.slot_paramValueChangedGui)
-        #self.imagingStartDoubleSpinBox.valueChanged.connect(self.slot_paramValueChangedGui)
-        #self.imagingStopDoubleSpinBox.valueChanged.connect(self.slot_paramValueChangedGui)
-        
-        #self.presynChannelSpinBox.valueChanged.connect(self.slot_channelValueChanged)
-        #self.postsynChannelSpinBox.valueChanged.connect(self.slot_channelValueChanged)
-        #self.photoChannelSpinBox.valueChanged.connect(self.slot_channelValueChanged)
-        #self.imagingChannelSpinBox.valueChanged.connect(self.slot_channelValueChanged)
-        
-        #self.presynStartDoubleSpinBox.valueChanged.connect(self.slot_timeValueChanged)
-        #self.presynStopDoubleSpinBox.valueChanged.connect(self.slot_timeValueChanged)
-        #self.postsynStartDoubleSpinBox.valueChanged.connect(self.slot_timeValueChanged)
-        #self.postsynStopDoubleSpinBox.valueChanged.connect(self.slot_timeValueChanged)
-        #self.photoStartDoubleSpinBox.valueChanged.connect(self.slot_timeValueChanged)
-        #self.photoStopDoubleSpinBox.valueChanged.connect(self.slot_timeValueChanged)
-        #self.imagingStartDoubleSpinBox.valueChanged.connect(self.slot_timeValueChanged)
-        #self.imagingStopDoubleSpinBox.valueChanged.connect(self.slot_timeValueChanged)
-        
     def setValues(self, target, src=None):
         """Populates the fields for the trigger event type corresponding to target
         """

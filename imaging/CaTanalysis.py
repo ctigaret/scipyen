@@ -10122,7 +10122,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             
             return len(data.segments)
             
-        elif isinstance(data, list) and all((isinstance(v, VigraArray) for v in data)):
+        elif isinstance(data, list) and all((isinstance(v, vigra.VigraArray) for v in data)):
             if section == "scene":
                 return self._data_.nSceneFrames
             
@@ -12325,10 +12325,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             # NOTE: 2019-11-14 23:15:07 retain untouched channels
             result = [vigra.VigraArray(source[0].shape, init = True, value = 0, axistags = source[0].axistags)]
 
-            #new_shape = list(source[0].shape)
-            #new_shape[source[0].channelIndex] = len(process_channel_ndx)
-            #result = [vigra.VigraArray(new_shape, init = True, value = 0, axistags = source[0].axistags)]
-            
             # NOTE: 2019-10-12 14:51:54
             # does the actual processing of image frames in source
             for frame_index in range(source_frames):
@@ -12353,18 +12349,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                     
             source_chn_cal = AxisCalibration(source[0].axistags["c"])
             source_chn_cal.calibrateAxis(result[0].axistags["c"])
-            #result_chn_cal = AxisCalibration(result[0].axistags["c"])
-            #for chn_ndx, chn_name in zip(process_channel_ndx, process_channel_names):
-                #result_chn_cal.setChannelCalibration(chn_ndx, name=chn_name, 
-                                                     #units=source_chn_cal.getUnits("c", channel=chn_ndx), 
-                                                     #origin=source_chn_cal.getOrigin("c", channel=chn_ndx),
-                                                     #resolution=source_chn_cal.getResolution("c", channel=chn_ndx))
-                
-            #result_chn_cal.calibrateAxis(result[0].axistags["c"])
-                    
-            # overwrite pixel data in target with pixel values from the result
-            #target[:] = result
-            #target_chnames[:] = [name for name in axisName(target[0].axistags["c"])[0]]
             
         else: # case when source data is a sequence of (single-channel) VigraArray objects
             if len(source) != len(source_chnames):

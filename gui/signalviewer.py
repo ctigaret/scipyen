@@ -3810,16 +3810,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             #self.channelIndex = channelIndex
 
-        elif isinstance(y, neo.core.ChannelIndex):
-            # TODO
-            raise NotImplementedError("Plotting neo.core.ChannelIndex object is not yet implemented") 
-            #NOTE: 2017-04-08 22:21:21 I need to think carefully about this
-            # a ChannelIndex:
-            # 1) groups all analog signals inside a block accross segments, OR
-            # 2) indexes a SUBSET of the channels within an analogsignal, OR
-            # 3) contains neo.core.Unit objects
-            #self.frameIndex = range(1)
-            #self._plotEpochs_(clear=True)
+        #elif isinstance(y, neo.core.ChannelIndex):
+            ## NOTE: ChannelIndex is OUT in neo >= 0.10.0
+            #raise NotImplementedError("Plotting neo.core.ChannelIndex object is not yet implemented") 
+            ##NOTE: 2017-04-08 22:21:21 I need to think carefully about this
+            ## a ChannelIndex:
+            ## 1) groups all analog signals inside a block accross segments, OR
+            ## 2) indexes a SUBSET of the channels within an analogsignal, OR
+            ## 3) contains neo.core.Unit objects
+            ##self.frameIndex = range(1)
+            ##self._plotEpochs_(clear=True)
         
         elif isinstance(y, (neo.core.AnalogSignal, DataSignal)):
             self.y = y
@@ -5466,9 +5466,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @safeWrapper
     def _plotSegment_(self, seg, *args, **kwargs):
         """Plots a neo.Segment.
-        Plots the signals (optionally the selected ones), and any epochs, events and
-        spike trains associated woth the segment.
+        Plots the signals (optionally the selected ones) present in a segment, 
+        and the associated epochs, events, and spike trains.
         """
+        # NOTE: 2021-10-03 12:55:21 ChannelIndex is OUT
         
         # NOTE: 2021-01-02 11:54:50
         # allow custom plot title - handy e.g., for plotting segments from across
@@ -5481,23 +5482,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         # NOTE: 2019-11-24 23:21:13#
         # 1) Select which signals to display
-        # NOTE: 2021-10-03 12:55:21 ChannelIndex is OUT
-        #if isinstance(self.channelIndex, neo.ChannelIndex):
-            ## _set_data_() has already checked that this segment has signals 
-            ## linked in self.channelIndex
-            ## therefore at this stage, _plotSegment_() receives a segment that 
-            ## contains signals linked this channelIndex;
-            ## all we have to do is select those signals in the received segment
-            ## that are linked to this channelIndex
-            #analog = [s for s in seg.analogsignals if s in self.channelIndex.analogsignals]
-            #irregs = [s for s in seg.irregularlysampledsignals if s in channelIndex.irregularlysampledsignals]
-            
-        #else:
-            #self.signalIndex = normalized_signal_index(seg, self.signalIndex, ctype = neo.AnalogSignal)
-            #self.irregularSignalIndex = normalized_signal_index(seg, self.irregularSignalIndex, ctype = neo.IrregularlySampledSignal)
-            #analog = [seg.analogsignals[k] for k in self.signalIndex]
-            #irregs = [seg.irregularlysampledsignals[k] for k in self.irregularSignalIndex]
-        
         self.signalIndex = normalized_signal_index(seg, self.signalIndex, ctype = neo.AnalogSignal)
         self.irregularSignalIndex = normalized_signal_index(seg, self.irregularSignalIndex, ctype = neo.IrregularlySampledSignal)
         analog = [seg.analogsignals[k] for k in self.signalIndex]
@@ -5774,7 +5758,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         #### BEGIN plot events
         if isinstance(events, (tuple, list)) and len(events):
-            # plot all event arrais in this segment stacked in a single axis
+            # plot all event arrays in this segment stacked in a single axis
             #print("_plotSegment_ events", kAx)
             event_axis = self.signalsLayout.getItem(kAx, 0)
             
@@ -6008,7 +5992,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             symbolcolorcycle:(cycle, type(None))=None,
                             #overlay:bool = False,
                             *args, **kwargs):
-        """ does the actual plotting of signals
+        """ The workhorse that does the actual plotting of signals
         
         name is required for internal management of plot data items
         
@@ -6021,6 +6005,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         # NOTE: 2019-04-06 09:37:51 
         # there are issues with SVG export of curves containing np.nan
+        
+        x = np.atleast_1d(x)
+        y = np.atleast_1d(y)
         
         if x.shape[0] != y.shape[0]:
             raise ValueError("x and y have different sizes on their first axes")
@@ -6066,7 +6053,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             kwargs["name"]=name
             
         if y.ndim == 1:
-            y_nan_ndx = np.isnan(y)
+            y_nan_ndx = np/atleast_1d(np.isnan(y))
             
             if any(y_nan_ndx):
                 yy = y[~y_nan_ndx]
@@ -6102,14 +6089,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     plotItem.removeItem(item)
             
             for k in range(y.shape[1]):
-                y_ = y[:,k].squeeze()
+                y_ = np.atleast_1d(y[:,k].squeeze())
                 y_nan_ndx = np.isnan(y_)
                 
                 if x.ndim == 2 and x.shape[1] == y.shape[1]:
-                    x_ = x[:,k].squeeze()
+                    x_ = np.atleast_1d(x[:,k].squeeze())
                     
                 else:
-                    x_ = x.squeeze()
+                    x_ = np.atleast_1d(x.squeeze())
                     
                 #if np.any(y_nan_ndx):
                 if any(y_nan_ndx): # np.bool_ not iterable in numpy 1.21.2
