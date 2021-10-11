@@ -155,9 +155,6 @@ import quantities as pq
 import neo
 
 import vigra
-#import vigra.pyqt
-#import vigra.pyqt.quickdialog as quickdialog
-
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -197,7 +194,7 @@ import gui.textviewer as tv
 import gui.tableeditor as te
 import gui.matrixviewer as matview
 import gui.pictgui as pgui
-import gui.quickdialog as quickdialog
+import gui.quickdialog as qd
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import (ScipyenViewer, ScipyenFrameViewer)
 from gui.workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
@@ -5083,300 +5080,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         pvimp.finished[int].connect(self._slot_prairieViewImportGuiDone)
         pvimp.open()
         
-        ##targetDir = self._scipyenWindow_.recentDirectories[0]
-        ##targetDir = self._scipyenWindow_.currentDirMerlin
-        
-        #targetDir = os.getcwd()
-        
-        #lsdata = None
-
-        ## 1) choose PrairieView xml file:
-        #pvXMLfileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
-                                                                 #caption="Open PrairieView file", 
-                                                                 #filter="XML Files (*.xml)",
-                                                                 #directory=targetDir)
-        
-        #if len(pvXMLfileName) == 0:
-            #return
-        
-        #tempDataVarName = os.path.splitext(os.path.basename(pvXMLfileName))[0]
-        
-        #lsdata_varname = strutils.str2symbol(tempDataVarName)
-        
-        #try:
-            #pvScan = PrairieView.PVScan(pio.loadXMLFile(pvXMLfileName))
-            #lsdata = pvScan.scandata()
-            
-        #except Exception as e:
-            #s = io.StringIO()
-            #sei = sys.exc_info()
-            #traceback.print_exc()
-            #traceback.print_exception(file=s, *sei)
-            #msgbox = QtWidgets.QMessageBox()
-            #msgbox.setSizeGripEnabled(True)
-            #msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-            ##msgbox.setWindowTitle(sei[0].__class__.__name__)
-            #msgbox.setWindowTitle(type(e).__name__)
-            #msgbox.setText(sei[0].__class__.__name__)
-            #msgbox.setDetailedText(s.getvalue())
-            #msgbox.exec()
-            #return
-            
-        
-        ## 2) choose epscats options pickle file or rely on "factory" default
-        
-        #epscatOptionsFileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
-                                                                         #caption="Open EPSCaT Options file for %s" % tempDataVarName, 
-                                                                         #filter="Pickle Files (*.pkl)",
-                                                                         #directory=targetDir)
-        
-        #if len(epscatOptionsFileName) == 0:
-            #epscatoptions = scanDataOptions()
-            
-        #else:
-            #try:
-                #epscatoptions = pio.loadPickleFile(epscatOptionsFileName)
-                
-                ## NOTE: 2018-06-20 09:13:58
-                ## this will ensure we have these options in as well (epscat)
-                ## this is so that the parameters for event detection are stored in the 
-                ## ScanData analysisOptions as well
-                #if "TriggerEventDetection" not in epscatoptions:
-                    #defaultoptions = scanDataOptions()
-                    #epscatoptions["TriggerEventDetection"] = defaultoptions["TriggerEventDetection"]
-                    
-            #except Exception as e:
-                #s = io.StringIO()
-                #sei = sys.exc_info()
-                #traceback.print_exception(file=s, *sei)
-                #msgbox = QtWidgets.QMessageBox()
-                #msgbox.setSizeGripEnabled(True)
-                #msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-                #msgbox.setWindowTitle(type(e).__name__)
-                ##msgbox.setWindowTitle(sei[0].__class__.__name__)
-                #msgbox.setText(sei[0].__class__.__name__)
-                #msgbox.setDetailedText(s.getvalue())
-                #msgbox.exec()
-                #return
-            
-        ## 3) choose electrophysiology files
-        
-        ## these can be (possibly, multiple) abf files (each with a segment)
-        ## or a single pickle file
-        
-        ## when a single abf file, it should have as many segments as frames 
-        ## but this is not checked
-        
-        ## when multiple abf files, they should all have one segment (sweep) each and 
-        ## there should be as many single-sweep abf files as frames in data
-        
-        ## again this is not checked
-        
-        ## trigger events will be detected automatically after prompting the user for 
-        ## arguments
-        
-        ## when a pickle file, it should have a single neo.Block with as many sweeps
-        ## as frames in data, optionally with trigger events already defined
-        
-        ## the user is expected to select at least one abf or pickle file
-        
-        ##ephysFilesFilter = ";;".join(["All file types (*.*)", "Pickle files (*.pkl)", "Axon files (*.abf)"])
-        #ephysFilesFilter = ";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)"])
-        
-        #ephysFileNames, _ = QtWidgets.QFileDialog.getOpenFileNames(self, 
-                                                               #caption="Open electrophysiology files for %s" % tempDataVarName,
-                                                               #filter = ephysFilesFilter,
-                                                               #directory=targetDir)
-        #blocks = list()
-        
-        #ephysData = None
-        
-        ## 1) read ephys files, try to generate a neo.Block
-        ## if that fails, carry on to construct lsdata w/o ephys
-        #try:
-            #if len(ephysFileNames) > 0:
-                ##if all([mimetypes.guess_type(f)[0] == "application/axon-data" for f in ephysFileNames]):
-                #if all(["application/axon" in mimetypes.guess_type(f)[0] for f in ephysFileNames]):
-                    #blocks = [pio.loadAxonFile(f) for f in ephysFileNames]
-                    
-                #else:
-                    #blocks = [pio.loadPickleFile(f) for f in ephysFileNames]
-                    
-            #if len(blocks) > 0:
-                #if all([isinstance(b, neo.Block) for b in blocks]):
-                    #ephysData = neoutils.concatenate_blocks(*blocks)
-                    ##ephysData = ephys.concatenate_blocks(*blocks)
-                    
-                #elif all([isinstance(b, neo.Segment) for b in blocks]):
-                    #ephysData = neo.Block()
-                    #ephysData.segments[:] = blocks[:]
-                    
-                #else:
-                    #QtWidgets.QMessageBox.critical("Electrophysiology files must contain neo.Blocks or individual neo.Segments")
-                    ##return
-                        
-        #except Exception as e:
-            #traceback.print_exc()
-            #s = io.StringIO()
-            #sei = sys.exc_info()
-            #traceback.print_exc()
-            #traceback.print_exception(file=s, *sei)
-            #msgbox = QtWidgets.QMessageBox()
-            #msgbox.setSizeGripEnabled(True)
-            #msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-            #msgbox.setWindowTitle(type(e).__name__)
-            ##msgbox.setWindowTitle(sei[0].__class__.__name__)
-            #msgbox.setText(sei[0].__class__.__name__)
-            #msgbox.setDetailedText(s.getvalue())
-            #msgbox.exec()
-            ##return
-        
-        #if lsdata is None:
-            #return
-        
-        #if isinstance(ephysData, neo.Block):
-            ## 2020-09-06 21:51:30
-            ## preview electrophysiology data to help in settings the trigger protocols
-            #ephys_preview = sv.SignalViewer(pWin = self._scipyenWindow_)
-            #ephys_preview.plot(ephysData)
-            
-            ## ephys constructed, now check if has as many segments as there are
-            ## frames in lsdata;
-            ## adjust segments if necessary
-            #if len(ephysData.segments) > lsdata.nScansFrames:
-                #msgbox_btn = QtWidgets.QMessageBox.question(self, "Importing electrophysiology into %s" % tempDataVarName,
-                                                #"Block data has more segments (%d) that linescan frames (%d).\n Do you wish to discard surplus segments?" % (len(ephysData.segments), lsdata.nScansFrames))
-
-
-                #if msgbox_btn in (QtWidgets.QMessageBox.Yes,  QtWidgets.QMessageBox.Ok):
-                    #for k in range(len(ephysData.segments), lsdata.nScansFrames):
-                        #ephysData.segments = ephysData.segments[0:lsdata.nScansFrames]
-                        
-            #elif len(ephysData.segments) < lsdata.nScansFrames:
-                #msgbox_btn = QtWidgets.QMessageBox.question(self, "Importing electrophysiology into %s" % tempDataVarName,
-                                                #"Block data has fewer segments (%d) that linescan frames (%d).\n Do you wish to append empty segments to electrophysiology?" % (len(ephysData.segments), lsdata.nScansFrames))
-
-                #if msgbox_btn in (QtWidgets.QMessageBox.Yes,  QtWidgets.QMessageBox.Ok):
-                    #for k in range(len(ephysData.segments), lsdata.nScansFrames):
-                        #ephysData.segments.append(neo.Segment())
-
-            ## now go ahead and try to "guess" trigger events based on the user's dialog
-            ## (by detecting trigger waveforms in specific time intervals on specific signals)
-            ## if that fails or is bypassed, just accept the ephys data as is
-            ## and continue to construct lsdata without trigger protocols
-            #try:
-                #dlg = quickdialog.QuickDialog(self, "Data name and trigger protocols for %s:" % tempDataVarName)
-                
-                ##dlg.setModal(False) # NOTE: 2020-11-29 17:10:53 exec() will force it to modal
-                #dlg.setSizeGripEnabled(True)
-                
-                #namePrompt = quickdialog.StringInput(dlg, "Data name:")
-                
-                #namePrompt.variable.setClearButtonEnabled(True)
-                #namePrompt.variable.redoAvailable=True
-                #namePrompt.variable.undoAvailable=True
-                
-                #namePrompt.setText(lsdata_varname)
-                
-                #ephysNamePrompt = quickdialog.StringInput(dlg, "Electrophysiology name:")
-                
-                #ephysNamePrompt.variable.setClearButtonEnabled(True)
-                #ephysNamePrompt.variable.redoAvailable=True
-                #ephysNamePrompt.variable.undoAvailable=True
-                
-                #ephysNamePrompt.setText(os.path.splitext(os.path.basename(ephysFileNames[0]))[0])
-                
-                
-                #tp, _  = parse_trigger_protocols(ephysData) # this may be an empty list
-        
-                #if len(tp) == 0:
-                    ## will call dlg.exec() from within self._trigger_events_detection_gui_
-                    #ephysStart = ephysData.segments[0].analogsignals[0].t_start.magnitude.flatten()[0]
-                    #ephysEnd   = ephysData.segments[0].analogsignals[0].t_stop.magnitude.flatten()[0]
-                    ## ask to parse trigger protocols from emphys; does NOT need any signals
-                    ## only returns arguments for trigger event detection, below
-                    #OK, trig_dlg_result = self._trigger_events_detection_gui_(epscatoptions,
-                                                                                #ephysStart, ephysEnd,
-                                                                                #dlg=dlg)
-                    
-                    #if OK: # if not OK, do create lsdata w/o ephys !
-                        #presyn = trig_dlg_result[0]
-                        #postsyn = trig_dlg_result[1]
-                        #photo = trig_dlg_result[2]
-                        #imaging = trig_dlg_result[3]
-                        #epscatoptions = trig_dlg_result[4]
-                    
-                        #tp = auto_detect_trigger_protocols(ephysData, 
-                                                    #presynaptic=presyn, 
-                                                    #postsynaptic=postsyn,
-                                                    #photostimulation=photo,
-                                                    #imaging=imaging,
-                                                    #clear=True)
-                        
-                        #ephys_preview.plot(ephysData)
-                        
-                        #lsdata.electrophysiology = neoutils.neo_copy(ephysData)
-                        #lsdata.electrophysiology.name = ephysNamePrompt.text()
-                
-                #else: # we still need to call dlg.exec()
-                    #if dlg.exec() == QtWidgets.QDialog.Accepted: # if rejected, do create lsdata w/o ephys
-                        #lsdata.electrophysiology = neoutils.neo_copy(ephysData) # just accept ephys data
-                        #lsdata.electrophysiology.name = ephysNamePrompt.text()
-                        
-                #if isinstance(tp, (tuple, list)) and len(tp) and len(lsdata.electrophysiology.segments):
-                    #lsdata.triggerProtocols = tp # will "adopt" protocols and embed events in the ephys, scans & scene block
-                    
-                #lsdata.analysisOptions = epscatoptions
-                
-                #lsdata_varname = namePrompt.text()
-                #lsdata.name = namePrompt.text()
-                
-                #ephys_preview.setVisible(False)
-                
-            #except Exception as e:
-                #traceback.print_exc()
-                #s = io.StringIO()
-                #sei = sys.exc_info()
-                #traceback.print_exception(file=s, *sei)
-                #msgbox = QtWidgets.QMessageBox()
-                #msgbox.setSizeGripEnabled(True)
-                #msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-                #msgbox.setWindowTitle(type(e).__name__)
-                ##msgbox.setWindowTitle(sei[0].__class__.__name__)
-                #msgbox.setText(sei[0].__class__.__name__)
-                #msgbox.setDetailedText(s.getvalue())
-                #msgbox.exec()
-                #ephys_preview.setVisible(False)
-                ##return
-
-        #else: # do still ask for a custom data name
-            #dlg = quickdialog.QuickDialog(self, "Data name for %s:" % tempDataVarName)
-            
-            #namePrompt = quickdialog.StringInput(dlg, "Data name:")
-            
-            #namePrompt.variable.setClearButtonEnabled(True)
-            #namePrompt.variable.redoAvailable=True
-            #namePrompt.variable.undoAvailable=True
-            
-            #namePrompt.setText(lsdata_varname)
-            
-            #if dlg.exec() == QtWidgets.QDialog.Accepted: # if rejected, this IS the last chance to cancel
-                #lsdata_varname = namePrompt.text()
-                #lsdata.name = lsdata_varname
-                
-            #else:
-                #return
-            
-
-        #var_name = strutils.str2symbol(lsdata_varname)
-        #self._scipyenWindow_.assignToWorkspace(var_name, lsdata)
-        
-        #self.setData(lsdata, var_name)
-        ##self._parsedata_(lsdata, lsdata_varname)
-        
-            
-        #self.statusBar().showMessage("Done!")
-        
     def _analyzeFrames_(self, frames, progressSignal=None, setMaxSignal=None, **kwargs):
         if self._data_ is None:
             return
@@ -5435,19 +5138,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             errMsgDlg.setWindowTitle(obj[0])
             errMsgDlg.showMessage(obj[2])
             
-            #msgbox = QtWidgets.QMessageBox()
-            #msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-            #msgbox.setSizeGripEnabled(True)
-            #msgbox.setWindowTitle(obj[0])
-            #msgbox.setText(obj[1])
-            #msgbox.setDetailedText(obj[2])
-            #msgbox.exec()
-            
         elif isinstance(obj, ScanData):
             
-            dlg = quickdialog.QuickDialog(self, "Store concatenated LSData as:")
+            dlg = qd.QuickDialog(self, "Store concatenated LSData as:")
             
-            namePrompt = quickdialog.StringInput(dlg, "Data name:")
+            namePrompt = qd.StringInput(dlg, "Data name:")
             
             namePrompt.variable.setClearButtonEnabled(True)
             namePrompt.variable.redoAvailable=True
@@ -5803,11 +5498,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                     
         try:
             if isinstance(ephysData, neo.Block) and len(ephysData.segments):
-                dlg = quickdialog.QuickDialog(self, "Data parameters:")
+                dlg = qd.QuickDialog(self, "Data parameters:")
                 ephysStart = ephysData.segments[0].analogsignals[0].t_start.magnitude.flatten()[0]
                 ephysEnd   = ephysData.segments[0].analogsignals[0].t_stop.magnitude.flatten()[0]
                 
-                ephysNamePrompt = quickdialog.StringInput(dlg, "Electrophysiology name:")
+                ephysNamePrompt = qd.StringInput(dlg, "Electrophysiology name:")
                 
                 ephysNamePrompt.variable.setClearButtonEnabled(True)
                 ephysNamePrompt.variable.redoAvailable=True
@@ -5873,7 +5568,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         if self._data_ is None:
             return 
         
-        dlg = quickdialog.QuickDialog(self, "Reorder electrophysiology segments")
+        dlg = qd.QuickDialog(self, "Reorder electrophysiology segments")
         infotxt = "\n".join(["Enter comma-separated KEY>VALUE pairs, where:\n",
                    "KEY = CURRENT index for the segment\n",
                    "VALUE = NEW position of the segment at current index KEY\n",
@@ -5887,7 +5582,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         dlg.addLabel(infotxt)
         dlg.addLabel("CAUTION! Make sure there are no duplicates/clashes !")
         
-        indexPrompt = quickdialog.StringInput(dlg, "New order")
+        indexPrompt = qd.StringInput(dlg, "New order")
         indexPrompt.variable.setClearButtonEnabled(True)
         indexPrompt.variable.redoAvailable=True
         indexPrompt.variable.undoAvailable=True
@@ -6107,11 +5802,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
 
         try:
             if isinstance(ephysData, neo.Block) and len(ephysData.segments):
-                dlg = quickdialog.QuickDialog(self, "Data parameters:")
+                dlg = qd.QuickDialog(self, "Data parameters:")
                 ephysStart = ephysData.segments[0].analogsignals[0].t_start.magnitude.flatten()[0]
                 ephysEnd   = ephysData.segments[0].analogsignals[0].t_stop.magnitude.flatten()[0]
                 
-                ephysNamePrompt = quickdialog.StringInput(dlg, "Electrophysiology name:")
+                ephysNamePrompt = qd.StringInput(dlg, "Electrophysiology name:")
                 
                 ephysNamePrompt.variable.setClearButtonEnabled(True)
                 ephysNamePrompt.variable.redoAvailable=True
@@ -6856,8 +6551,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         if self._data_ is None:
             return
         
-        dlg = quickdialog.QuickDialog(self, "Remove frames")
-        frames_index_prompt = quickdialog.StringInput(dlg, "Frame inidices")
+        dlg = qd.QuickDialog(self, "Remove frames")
+        frames_index_prompt = qd.StringInput(dlg, "Frame inidices")
         frames_index_prompt.varibale.setToolTip("Specify the indices of frames to be removed as a comma-separated sequence of integers between 0 (inclusive) and %d (exclusive)" % self._data_.scansFrames)
         frames_index_prompt.variable.setClearButtonEnabled(True)
         frames_index_prompt.variable.redoAvailable = True
@@ -7713,9 +7408,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             
             newVarName = validate_varname(var_name, self._scipyenWindow_.workspace)
             
-            dlg = quickdialog.QuickDialog(self, "Export collated results")
+            dlg = qd.QuickDialog(self, "Export collated results")
 
-            namePrompt = quickdialog.StringInput(dlg, "Variable name:")
+            namePrompt = qd.StringInput(dlg, "Variable name:")
             
             namePrompt.variable.setClearButtonEnabled(True)
             namePrompt.variable.redoAvailable=True
@@ -7723,7 +7418,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             
             namePrompt.setText(newVarName)
             
-            exportCsvPrompt = quickdialog.CheckBox(dlg, "Write to CSV file")
+            exportCsvPrompt = qd.CheckBox(dlg, "Write to CSV file")
             
             exportCsvPrompt.setChecked(False)
             
@@ -7945,10 +7640,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         var_name = strutils.str2symbol(result.name)
         
         if var_name in self._scipyenWindow_.workspace.keys():
-            dlg = quickdialog.QuickDialog(self, "Assign to workspace")
+            dlg = qd.QuickDialog(self, "Assign to workspace")
             dlg.addWidget(QtWidgets.QLabel("A variable named %s already exists" % var_name, parent=dlg))
             dlg.addWidget(QtWidgets.QLabel("You may wish to rename it below", parent=dlg))
-            namePrompt = quickdialog.StringInput(dlg, "New name:")
+            namePrompt = qd.StringInput(dlg, "New name:")
             namePrompt.setText(var_name)
             namePrompt.setToolTip("Enter new name to prevent overwriting in the workspace")
             
@@ -8245,24 +7940,24 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             unit._descriptors_.mutable_types=True
             data_wide = False
         
-        dlg = quickdialog.QuickDialog(self, "Edit analysis unit descriptors")
+        dlg = qd.QuickDialog(self, "Edit analysis unit descriptors")
         
         if data_wide:
-            somatic_distance_field = quickdialog.StringInput(dlg, "Distance from soma (um) (*)")
-            branch_order_field = quickdialog.StringInput(dlg, "Branch order (*)")
-            nbranches_field = quickdialog.StringInput(dlg, "Branching points (*)")
+            somatic_distance_field = qd.StringInput(dlg, "Distance from soma (um) (*)")
+            branch_order_field = qd.StringInput(dlg, "Branch order (*)")
+            nbranches_field = qd.StringInput(dlg, "Branching points (*)")
         else:
-            somatic_distance_field = quickdialog.StringInput(dlg, "Distance from soma (um)")
-            branch_order_field = quickdialog.StringInput(dlg, "Branch order")
-            nbranches_field = quickdialog.StringInput(dlg, "Branching points")
+            somatic_distance_field = qd.StringInput(dlg, "Distance from soma (um)")
+            branch_order_field = qd.StringInput(dlg, "Branch order")
+            nbranches_field = qd.StringInput(dlg, "Branching points")
             
-        ddwidth_field = quickdialog.StringInput(dlg, "Dendrite width (um)")
-        ddlength_field = quickdialog.StringInput(dlg, "Dendrite length (um)")
-        splength_field = quickdialog.StringInput(dlg, "Spine length (um)")
-        spwidth_field = quickdialog.StringInput(dlg, "Spine width (um)")
+        ddwidth_field = qd.StringInput(dlg, "Dendrite width (um)")
+        ddlength_field = qd.StringInput(dlg, "Dendrite length (um)")
+        splength_field = qd.StringInput(dlg, "Spine length (um)")
+        spwidth_field = qd.StringInput(dlg, "Spine width (um)")
         
         if data_wide:
-            propagate_check = quickdialog.CheckBox(dlg, "(*) Propagate to nested units")
+            propagate_check = qd.CheckBox(dlg, "(*) Propagate to nested units")
             propagate_check.setChecked(True)
         else:
             propagate_check = None
@@ -9640,8 +9335,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             
         newVarName = validate_varname(bname, self._scipyenWindow_.workspace)
         
-        dlg = quickdialog.QuickDialog(self, "Export data copy to workspace")
-        namePrompt = quickdialog.StringInput(dlg, "Export data as:")
+        dlg = qd.QuickDialog(self, "Export data copy to workspace")
+        namePrompt = qd.StringInput(dlg, "Export data as:")
         
         namePrompt.variable.setClearButtonEnabled(True)
         namePrompt.variable.redoAvailable=True
@@ -9884,36 +9579,55 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_loadWorkspaceScanData(self):
-        from core.workspacefunctions import getvarsbytype
-
-        scandata_name_vars = getvarsbytype(ScanData, ws = self._scipyenWindow_.workspace)
         
-        #print("scandata_name_vars", scandata_name_vars)
-        
-        if len(scandata_name_vars) == 0:
-            return
-        
-        #name_list = sorted([name for name in scandata_name_vars.keys() if self._check_for_linescan_data_(scandata_name_vars[name])])
-        name_list = sorted([name for name in scandata_name_vars.keys()])# if self._check_for_linescan_data_(scandata_name_vars[name])])
-        
-        if self._data_ is not None and self._data_.name in name_list:
-            pre_selected = self._data_.name
+        if isinstance(self._data_, ScanData) and len(self._data_.name.strip()):
+            preSel = self._data_.name
             
         else:
-            pre_selected = None
+            preSel = None
+        
+        lsdata_vars = self.importWorkspaceData(title="Load ScanData Object",
+                                          single=True,
+                                          preSelected=preSel,
+                                          with_varName=True)
+        
+        if len(lsdata_vars) == 0:
+            return
+        
+        ldata_varname, lsdata = lsdata_vars[0]
+        
+        self.setData(newdata = lsdata, doc_title = lsdata_varname)
+        
+        #from core.workspacefunctions import getvarsbytype
+
+        #scandata_name_vars = getvarsbytype(ScanData, ws = self._scipyenWindow_.workspace)
+        
+        ##print("scandata_name_vars", scandata_name_vars)
+        
+        #if len(scandata_name_vars) == 0:
+            #return
+        
+        ##name_list = sorted([name for name in scandata_name_vars.keys() if self._check_for_linescan_data_(scandata_name_vars[name])])
+        #name_list = sorted([name for name in scandata_name_vars.keys()])# if self._check_for_linescan_data_(scandata_name_vars[name])])
+        
+        #if self._data_ is not None and self._data_.name in name_list:
+            #pre_selected = self._data_.name
             
-        #print("name_list", name_list)
-        
-        choiceDialog = pgui.ItemsListDialog(parent=self, title="Load ScanData Object", 
-                                            itemsList = name_list, preSelected = pre_selected)
-        
-        ans = choiceDialog.exec()
-        
-        if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
-            lsdata = scandata_name_vars[choiceDialog.selectedItemsText[0]]
-            lsdata_varname = choiceDialog.selectedItems[0]
+        #else:
+            #pre_selected = None
             
-            self.setData(newdata=lsdata, doc_title=lsdata_varname)
+        ##print("name_list", name_list)
+        
+        #choiceDialog = pgui.ItemsListDialog(parent=self, title="Load ScanData Object", 
+                                            #itemsList = name_list, preSelected = pre_selected)
+        
+        #ans = choiceDialog.exec()
+        
+        #if ans == QtWidgets.QDialog.Accepted and len(choiceDialog.selectedItemsText):
+            #lsdata = scandata_name_vars[choiceDialog.selectedItemsText[0]]
+            #lsdata_varname = choiceDialog.selectedItems[0]
+            
+            #self.setData(newdata=lsdata, doc_title=lsdata_varname)
                 
     @pyqtSlot()
     @safeWrapper
@@ -10481,25 +10195,25 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             if not isinstance(title, str) or len(title.strip()) == 0:
                 title = "Detect triggers"
                 
-            dlg = quickdialog.QuickDialog(self, title)
+            dlg = qd.QuickDialog(self, title)
         
         dlg.addLabel("Event triggers detection")
         
-        triggersGroup = quickdialog.HDialogGroup(dlg)
+        triggersGroup = qd.HDialogGroup(dlg)
         
-        presynGroup = quickdialog.VDialogGroup(triggersGroup)
+        presynGroup = qd.VDialogGroup(triggersGroup)
         
-        presynDetect = quickdialog.CheckBox(presynGroup, "Presynaptic")
+        presynDetect = qd.CheckBox(presynGroup, "Presynaptic")
         presynDetect.setToolTip("Detect presynaptic triggers")
 
                     
-        presynTriggerChannel = quickdialog.IntegerInput(presynGroup, "Channel:")
+        presynTriggerChannel = qd.IntegerInput(presynGroup, "Channel:")
         presynTriggerChannel.variable.setClearButtonEnabled(True)
         presynTriggerChannel.variable.redoAvailable = True
         presynTriggerChannel.variable.undoAvailable = True
         presynTriggerChannel.setToolTip("Channel with the signal for presynaptic trigger")
         
-        presynEventNamePrompt = quickdialog.StringInput(presynGroup, "Name:")
+        presynEventNamePrompt = qd.StringInput(presynGroup, "Name:")
         presynEventNamePrompt.variable.setClearButtonEnabled(True)
         presynEventNamePrompt.variable.redoAvailable=True
         presynEventNamePrompt.variable.undoAvailable=True
@@ -10507,14 +10221,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
 
         
-        presynEventStartTimePrompt = quickdialog.FloatInput(presynGroup,"Start (s):")
+        presynEventStartTimePrompt = qd.FloatInput(presynGroup,"Start (s):")
         presynEventStartTimePrompt.variable.setClearButtonEnabled(True)
         presynEventStartTimePrompt.variable.redoAvailable=True
         presynEventStartTimePrompt.variable.undoAvailable=True
         presynEventStartTimePrompt.variable.setToolTip("Beginning of interval to look for trigger pulse (s)")
         
         
-        presynEventStopTimePrompt = quickdialog.FloatInput(presynGroup,"Stop  (s):")
+        presynEventStopTimePrompt = qd.FloatInput(presynGroup,"Stop  (s):")
         presynEventStopTimePrompt.variable.setClearButtonEnabled(True)
         presynEventStopTimePrompt.variable.redoAvailable=True
         presynEventStopTimePrompt.variable.undoAvailable=True
@@ -10532,34 +10246,34 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         presynEventStartTimePrompt.setValue("%f" % presynaptic_trigger_begin)
         presynEventStopTimePrompt.setValue("%f" % presynaptic_trigger_end)
         
-        postsynGroup = quickdialog.VDialogGroup(triggersGroup)
+        postsynGroup = qd.VDialogGroup(triggersGroup)
         
-        postsynDetect = quickdialog.CheckBox(postsynGroup, "Postsynaptic")
+        postsynDetect = qd.CheckBox(postsynGroup, "Postsynaptic")
         postsynDetect.setToolTip("Detect postsynaptic triggers")
         
         
-        postsynTriggerChannel = quickdialog.IntegerInput(postsynGroup, "Channel:")
+        postsynTriggerChannel = qd.IntegerInput(postsynGroup, "Channel:")
         postsynTriggerChannel.variable.setClearButtonEnabled(True)
         postsynTriggerChannel.variable.redoAvailable = True
         postsynTriggerChannel.variable.undoAvailable = True
         postsynTriggerChannel.setToolTip("Channel with the signal for postsynaptic trigger")
         
             
-        postsynEventNamePrompt = quickdialog.StringInput(postsynGroup, "Name:")
+        postsynEventNamePrompt = qd.StringInput(postsynGroup, "Name:")
         postsynEventNamePrompt.variable.setClearButtonEnabled(True)
         postsynEventNamePrompt.variable.redoAvailable=True
         postsynEventNamePrompt.variable.undoAvailable=True
         postsynEventNamePrompt.variable.setToolTip("Name")
         
         
-        postsynEventStartTimePrompt = quickdialog.FloatInput(postsynGroup,"Start (s):")
+        postsynEventStartTimePrompt = qd.FloatInput(postsynGroup,"Start (s):")
         postsynEventStartTimePrompt.variable.setClearButtonEnabled(True)
         postsynEventStartTimePrompt.variable.redoAvailable=True
         postsynEventStartTimePrompt.variable.undoAvailable=True
         postsynEventStartTimePrompt.variable.setToolTip("Beginning of interval to look for trigger pulse (s)")
         
         
-        postsynEventStopTimePrompt = quickdialog.FloatInput(postsynGroup,"Stop  (s):")
+        postsynEventStopTimePrompt = qd.FloatInput(postsynGroup,"Stop  (s):")
         postsynEventStopTimePrompt.variable.setClearButtonEnabled(True)
         postsynEventStopTimePrompt.variable.redoAvailable=True
         postsynEventStopTimePrompt.variable.undoAvailable=True
@@ -10577,32 +10291,32 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         postsynEventStartTimePrompt.setValue("%f" % postsynaptic_trigger_begin)
         postsynEventStopTimePrompt.setValue("%f" % postsynaptic_trigger_end)
 
-        photostimGroup = quickdialog.VDialogGroup(triggersGroup)
+        photostimGroup = qd.VDialogGroup(triggersGroup)
         
-        photostimDetect = quickdialog.CheckBox(photostimGroup, "Photostimulation")
+        photostimDetect = qd.CheckBox(photostimGroup, "Photostimulation")
         photostimDetect.setToolTip("Detect photostimulation triggers")
 
         
-        photostimTriggerChannel = quickdialog.IntegerInput(photostimGroup, "Channel:")
+        photostimTriggerChannel = qd.IntegerInput(photostimGroup, "Channel:")
         photostimTriggerChannel.variable.setClearButtonEnabled(True)
         photostimTriggerChannel.variable.redoAvailable = True
         photostimTriggerChannel.variable.undoAvailable = True
         photostimTriggerChannel.setToolTip("Channel with the signal for photostimulation trigger")
         
         
-        photostimEventNamePrompt = quickdialog.StringInput(photostimGroup, "Name:")
+        photostimEventNamePrompt = qd.StringInput(photostimGroup, "Name:")
         photostimEventNamePrompt.variable.setClearButtonEnabled(True)
         photostimEventNamePrompt.variable.redoAvailable=True
         photostimEventNamePrompt.variable.undoAvailable=True
         photostimEventNamePrompt.variable.setToolTip("Name")
         
-        photostimEventStartTimePrompt = quickdialog.FloatInput(photostimGroup,"Start (s):")
+        photostimEventStartTimePrompt = qd.FloatInput(photostimGroup,"Start (s):")
         photostimEventStartTimePrompt.variable.setClearButtonEnabled(True)
         photostimEventStartTimePrompt.variable.redoAvailable=True
         photostimEventStartTimePrompt.variable.undoAvailable=True
         photostimEventStartTimePrompt.variable.setToolTip("Beginning of interval to look for trigger pulse (s)")
         
-        photostimEventStopTimePrompt = quickdialog.FloatInput(photostimGroup,"Stop  (s):")
+        photostimEventStopTimePrompt = qd.FloatInput(photostimGroup,"Stop  (s):")
         photostimEventStopTimePrompt.variable.setClearButtonEnabled(True)
         photostimEventStopTimePrompt.variable.redoAvailable=True
         photostimEventStopTimePrompt.variable.undoAvailable=True
@@ -10620,32 +10334,32 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
               #"begin", photostimulation_trigger_begin,
               #"end", photostimulation_trigger_end)
         
-        imagingGroup = quickdialog.VDialogGroup(triggersGroup)
+        imagingGroup = qd.VDialogGroup(triggersGroup)
         
-        imagingDetect = quickdialog.CheckBox(imagingGroup, "Imaging frame trigger")
+        imagingDetect = qd.CheckBox(imagingGroup, "Imaging frame trigger")
         imagingDetect.setToolTip("Detect imaging frame trigger")
 
         
-        imagingTriggerChannel = quickdialog.IntegerInput(imagingGroup, "Channel:")
+        imagingTriggerChannel = qd.IntegerInput(imagingGroup, "Channel:")
         imagingTriggerChannel.variable.setClearButtonEnabled(True)
         imagingTriggerChannel.variable.redoAvailable = True
         imagingTriggerChannel.variable.undoAvailable = True
         imagingTriggerChannel.setToolTip("Channel with the signal for imaging frame trigger")
 
-        imagingEventNamePrompt = quickdialog.StringInput(imagingGroup, "Name:")
+        imagingEventNamePrompt = qd.StringInput(imagingGroup, "Name:")
         imagingEventNamePrompt.variable.setClearButtonEnabled(True)
         imagingEventNamePrompt.variable.redoAvailable=True
         imagingEventNamePrompt.variable.undoAvailable=True
         imagingEventNamePrompt.variable.setToolTip("Name")
         
-        imagingEventStartTimePrompt = quickdialog.FloatInput(imagingGroup,"Start (s):")
+        imagingEventStartTimePrompt = qd.FloatInput(imagingGroup,"Start (s):")
         imagingEventStartTimePrompt.variable.setClearButtonEnabled(True)
         imagingEventStartTimePrompt.variable.redoAvailable=True
         imagingEventStartTimePrompt.variable.undoAvailable=True
         imagingEventStartTimePrompt.variable.setToolTip("Beginning of interval to look for trigger pulse (s)")
         
         
-        imagingEventStopTimePrompt = quickdialog.FloatInput(imagingGroup,"Stop  (s):")
+        imagingEventStopTimePrompt = qd.FloatInput(imagingGroup,"Stop  (s):")
         imagingEventStopTimePrompt.variable.setClearButtonEnabled(True)
         imagingEventStopTimePrompt.variable.redoAvailable=True
         imagingEventStopTimePrompt.variable.undoAvailable=True
@@ -11613,7 +11327,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         """Parses metainformation and then actually assigns the data to the _data_ attribute
         """
         if isinstance(newdata, ScanData):
-            newdata._upgrade_API_()
+            #newdata._upgrade_API_()
             #print("LSCaTWindow _parsedata_ %s" % newdata.name)
             default_options = scanDataOptions()
             

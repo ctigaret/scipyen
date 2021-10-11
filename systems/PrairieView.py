@@ -2467,35 +2467,6 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             else:
                 self.triggerProtocolFileNameLineEdit.setText("")
             
-    ## NOTE: 2021-04-11 14:12:46
-    ## not needed anymore: event detection is delegated to the eventDetectionDialog
-    #def _detect_trigger_events_(self):
-        ##print("PrairieViewImporter._detect_trigger_events_")
-        #signalblockers = [QtCore.QSignalBlocker(w) for w in (self.triggerProtocolFileNameLineEdit,)]
-        #self.cachedProtocols[:] = self.triggerProtocols[:]
-        
-        #presyn  = self.eventDetectionDialog.presyn
-        #postsyn = self.eventDetectionDialog.postsyn
-        #photo   = self.eventDetectionDialog.photo
-        #imaging = self.eventDetectionDialog.imaging
-        
-        #tp = auto_detect_trigger_protocols(self._ephys_,
-                                           #presynaptic = presyn,
-                                           #postsynaptic = postsyn,
-                                           #photostimulation = photo,
-                                           #imaging = imaging,
-                                           #clear = self.clearEvents)
-        
-        
-        #if len(tp):
-            #self.triggerProtocols[:] = tp[:]
-            #self.cachedProtocolFileName = self.triggerProtocolFileNameLineEdit.text()
-            #self.triggerProtocolFileNameLineEdit.setText("<detected>")
-            
-        #else:
-            #self.triggerProtocols[:] = self.cachedProtocols[:]
-            #self.triggerProtocolFileNameLineEdit.setText(self.cachedProtocolFileName)
-            
     @pyqtSlot()
     def _slot_undoTriggers(self):
         if self._ephys_ is None:
@@ -2553,7 +2524,6 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self._scandata_ = None # because we need to rebuild the scanData
             if self.loadPVScan(self.pvScanFileName):
                 self.pvScanFileNameLineEdit.setText(self.pvScanFileName)
-                
             else:
                 self.pvScanFileNameLineEdit.clear()
                 self.pvScanFileName = ""
@@ -2652,7 +2622,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
     @safeWrapper
     def _slot_setDataName(self):
         self.dataName = self.dataNameLineEdit.text()
-        if len(self.dataName):
+        if len(self.dataName.strip()):
             self.scanDataVarName = strutils.str2symbol(self.dataName)
         
     @pyqtSlot()
@@ -2831,9 +2801,11 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             tempDataVarName = os.path.splitext(os.path.basename(fileName))[0]
             self.scanDataVarName = strutils.str2symbol(tempDataVarName)
             
-            if len(self.dataName) == 0:
-                self.dataName = self.scanDataVarName
-                self.dataNameLineEdit.setText(self.dataName)
+            #print("PrairieViewImporter.loadPVScan dataName", self.dataName)
+            
+            if len(self.dataName.strip()) == 0:
+                #self.dataName = self.scanDataVarName
+                self.dataNameLineEdit.setText(self.scanDataVarName)
                 
             if fileName != self.pvScanFileName:
                 signalblockers = [QtCore.QSignalBlocker(w) for w in (self.pvScanFileNameLineEdit, self.dataNameLineEdit)]

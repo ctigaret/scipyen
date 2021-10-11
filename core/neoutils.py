@@ -1041,7 +1041,6 @@ def is_empty(x:typing.Union[neo.core.container.Container, neo.core.dataobject.Da
             raise TypeError("'ignore' expected to be a type, a sequence of types;, or None got %s" % ignore)
         
     if isinstance(x, neo.core.container.Container):
-        #return sum((len(x.container_children_recur), *(len(c) for c in x.data_children_recur))) == 0
         if ignore is None:
             container_children = x.container_children_recur
             data_children = x.data_children_recur
@@ -1050,10 +1049,7 @@ def is_empty(x:typing.Union[neo.core.container.Container, neo.core.dataobject.Da
             container_children = tuple(c for c in x.container_children_recur if not isinstance(c, tuple(ignore)))
             data_children = tuple(c for c in x.data_children_recur if not isinstance(c, tuple(ignore)))
             
-        #print(ignore)
-        #print([type(c) for c in data_children])
         ret = len(container_children) > 0 and len(data_children) > 0
-        #print(ret)
             
         if ret:
             ret &= sum((len(c) for c in data_children))> 0

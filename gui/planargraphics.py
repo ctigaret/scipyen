@@ -779,17 +779,9 @@ class PlanarGraphics():
                 if key in src:
                     ret[key] = src[key] 
                     
-                #else:
-                    ##warnings.warn("%s.copyConvertState: The descriptor %s was not supplied; it will be assigned a default value" % (cls.__name__, key),
-                                ##stacklevel=3)
-                    #if key == "z_frame":
-                        #ret.z_frame = None
-                    #else:
-                        #ret[key] = 0
-                        
         # now remove any extra predictors that have nothing to do with this type
         # NOTE: now we DO need to take z_frame into account
-        extra_keys = [k for k in ret if k not in cls._planar_descriptors_]
+        extra_keys = [k for k in ret if k not in list(cls._planar_descriptors_) + ["z_frame"]]
         
         for key in extra_keys:
             ret.__delitem__(key)
@@ -1073,6 +1065,7 @@ class PlanarGraphics():
         #self._currentstate_ = self.defaultState()
         
         #### BEGIN check and set graphicstype
+        
         # NOTE: 2021-05-03 09:02:59
         # normally this should be set by the subclass attribute _planar_graphics_type_
         # however, it needs to be specified for Cursor objects - poor design...
@@ -1137,8 +1130,6 @@ class PlanarGraphics():
         # NOTE: 2018-01-12 16:18:37
         # Path is itself a list of PlanarGraphics, each with their own common state
         # and framestates; these need to be kept in sync.
-        
-        #print(args)
         
         # ### BEGIN constructor code
         

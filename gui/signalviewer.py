@@ -119,11 +119,6 @@ from matplotlib.backends.backend_qt5agg import (FigureCanvasQTAgg as FigureCanva
 import neo
 
 import vigra
-#import vigra.pyqt # for quickdialog -- to phase out
-#import vigra.pyqt.quickdialog as quickdialog
-#import vigra.pyqt.quickdialog as quickdialog
-#import vigra.pyqt.quickdialog as quickdialog
-#import VigraQt; -- we can do away without it; some classes used by vigra.pyqt
 
 from traitlets import Bunch
 
@@ -1165,6 +1160,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionDetect_Triggers.setEnabled(False)
         
     # ### END private methods
+    
+    def closeEvent(self, evt):
+        """Override ScipyenViewer.closeEvent.
+        Attempt to deal with situations where C/C++ objects are deleted before 
+        their wrappers in pyqtgraph
+        """
+        
+        pgmembers = inspect.getmembers(self, lambda x: isinstance(x, (pg.GraphicsItem, pg.GraphicsView)))
+        
+        super().closeEvent(evt)
 
     def addCursors(self, cursorType="c", *where, **kwargs):
         """Manually adds a set of cursors to the selected axes in the SignalViewer window.
@@ -3653,21 +3658,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             for ax_dict in item.axes.values():
                 ax_dict["item"].setStyle(tickFont=value)
                 
-    #@safeWrapper
-    #def _parse_data_(self, 
-                     #x, 
-                     #y,
-                     #frameIndex,
-                     #frameAxis,
-                     #signalChannelAxis,
-                     #signalIndex,
-                     #signalChannelIndex,
-                     #irregularSignalIndex,
-                     #irregularSignalChannelAxis,
-                     #irregularSignalChannelIndex,
-                     #separateSignalChannels,
-                     #channelIndex,
-                     #unitIndex):
     @safeWrapper
     def _parse_data_(self, 
                      x, 
@@ -4214,28 +4204,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             raise TypeError("Plotting is not implemented for %s data types" % type(self.y).__name__)
 
-    #@safeWrapper
-    #def _set_data_(self,
-                   #x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
-                   #y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
-                   #doc_title:(str, type(None)) = None, 
-                   #frameAxis:(int, str, vigra.AxisInfo, type(None)) = None,
-                   #signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None,
-                   #frameIndex:(int, tuple, list, range, slice, type(None)) = None, 
-                   #signalIndex:(str, int, tuple, list, range, slice, type(None)) = None,
-                   #signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None,
-                   #irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, 
-                   #irregularSignalChannelAxis:(int, type(None)) = None,
-                   #irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, 
-                   #separateSignalChannels:bool = False, 
-                   #interval:(tuple, list, neo.Epoch, type(None)) = None,
-                   #unitIndex:object = None,
-                   #channelIndex:object = None,
-                   #plotStyle:str = "plot",
-                   #get_focus:bool = True,
-                   #showFrame:int = None,
-                   #*args, **kwargs):
-    
     @safeWrapper
     def _set_data_(self,
                    x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
@@ -4347,27 +4315,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         except Exception as e:
             traceback.print_exc()
             
-    #@safeWrapper
-    #def setData(self,  
-                #x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
-                #y:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None,
-                #doc_title:(str, type(None)) = None, 
-                #frameAxis:(int, str, vigra.AxisInfo, type(None)) = None,
-                #signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None,
-                #frameIndex:(int, tuple, list, range, slice, type(None)) = None, 
-                #signalIndex:(str, int, tuple, list, range, slice, type(None)) = None,
-                #signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None,
-                #irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, 
-                #irregularSignalChannelAxis:(int, type(None)) = None,
-                #irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, 
-                #separateSignalChannels:bool = False, 
-                #interval:(tuple, list, neo.Epoch, type(None)) = None,
-                #unitIndex:object = None,
-                #channelIndex:object = None,
-                #plotStyle:str = "plot",
-                #get_focus:bool = True,
-                #showFrame = None,
-                #*args, **kwargs):
     @safeWrapper
     def setData(self,  
                 x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 

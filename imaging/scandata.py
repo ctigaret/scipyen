@@ -31,7 +31,7 @@ from core.triggerprotocols import (TriggerProtocol,
                                    parse_trigger_protocols,
                                    remove_trigger_protocol,)
 
-from core.neoutils import (clear_events, get_index_of_named_signal, neo_copy,)
+from core.neoutils import (clear_events, get_index_of_named_signal, neo_copy, is_empty,)
 from ephys.ephys import (average_segments, )
 
 from imaging.vigrautils import getFrameLayout
@@ -2345,9 +2345,6 @@ class ScanData(object):
         import gui.pictgui as pgui
         
         def _upgrade_attribute_(old_name, new_name, attr_type, default):
-            #print("self._upgrade_API_._upgrade_attribute_()", old_name, new_name, attr_type, default, ")")
-            
-            
             if hasattr(self, new_name):
                 value = getattr(self, new_name)
                 if isinstance(value, attr_type):
@@ -2382,16 +2379,7 @@ class ScanData(object):
         def _remove_attribute_(name):
             if hasattr(self, name):
                 delattr(self, name)
-        
-        #if hasattr(self, "apiversion") and isinstance(self.apiversion, tuple) and len(self.apiversion)>=2 and all(isinstance(v, numbers.Number) for v in self.apiversion):
-            #vernum = self.apiversion[0] + self.apiversion[1]/10
-            
-            #class_vernum = ScanData.apiversion[0] + ScanData.apiversion[1]/10
-            
-            #print("ScanData._upgrade_API_", vernum, class_vernum)
-            #if vernum >= class_vernum:
-                #return
-            
+
         _upgrade_attribute_("__metadata__", "_metadata_", DataBag, DataBag(mutable_types=True, allow_none=True))
         _upgrade_attribute_("__name__", "_name_", str, "ScanData")
         _upgrade_attribute_("__modified__", "_modified_", bool, False)
@@ -6589,21 +6577,6 @@ class ScanData(object):
         # assign the electrophysiology to the result
         result._electrophysiology_.segments[:] = protocol_ephys_segments
         
-        # NOTE: 2018-06-17 16:23:54
-        # add the trigger protocols:
-        #if len(result._electrophysiology_.segments):
-            #for p in protocol_list:
-                #embed_trigger_protocol(p, result._electrophysiology_)
-            
-        # NOTE: 2018-06-17 16:24:30
-        # adopt trigger protocols - do I still need this ?
-        #result.parseElectrophysiologyTriggerProtocols() # does nothing if ephys is empty
-            
-        # END electrophysiology data
-        
-        # BEGIN assign analysis unit data to result
-        # NOTE: 2018-06-17 16:24:43
-        # finally set up the analysis units in the returned data
         ret_unit = result.analysisUnit() # the AnalysisUnit of the entire result ScanData object
         
         # assign cell and field attributes 
@@ -7563,17 +7536,20 @@ class ScanData(object):
                 #print("ScanData.adoptTriggerProtocols:", p.name)
                 rev_p = p.reverseAcquisition(copy=True)
                 
-                embed_trigger_protocol(p, 
-                                                self._electrophysiology_,
-                                                clearTriggers=True)
-                
-                embed_trigger_protocol(rev_p, 
-                                                self._scans_block_,
-                                                clearTriggers=True)
-                
-                embed_trigger_protocol(rev_p, 
-                                                self._scene_block_,
-                                                clearTriggers=True)
+                if not is_empty(self._electrophysiology_):
+                    embed_trigger_protocol(p, 
+                                            self._electrophysiology_,
+                                            clearTriggers=True)
+                    
+                if not is_empty(self._scans_block_):
+                    embed_trigger_protocol(rev_p, 
+                                            self._scans_block_,
+                                            clearTriggers=True)
+                    
+                if not is_empty(self._scene_block_):
+                    embed_trigger_protocol(rev_p, 
+                                            self._scene_block_,
+                                            clearTriggers=True)
                 
         else:
             if isinstance(src, neo.Block):
@@ -7604,36 +7580,42 @@ class ScanData(object):
                     
                     if imaging_source: # adopting protocol from a scans or scene block
                         # store ref to reversed acquisition of original
-                        embed_trigger_protocol(reversedProtocol,
-                                                        self._electrophysiology_,
-                                                        clearTriggers=True)
+                        if not is_empty(self._electrophysiology_):
+                            embed_trigger_protocol(reversedProtocol,
+                                                            self._electrophysiology_,
+                                                            clearTriggers=True)
                         
                         # store copy of original
-                        embed_trigger_protocol(protocol,
-                                                        self._scans_block_,
-                                                        clearTriggers=True)
-                        
-                        embed_trigger_protocol(protocol,
-                                                        self._scene_block_,
-                                                        clearTriggers=True)
+                        if not is_empty(self._scans_block_):
+                            embed_trigger_protocol(protocol,
+                                                    self._scans_block_,
+                                                    clearTriggers=True)
+                            
+                        if not is_empty(self._scene_block_):
+                            embed_trigger_protocol(protocol,
+                                                    self._scene_block_,
+                                                    clearTriggers=True)
                         
                         self._trigger_protocols_.append(reversedProtocol)
                         
                     else: # adopting protocol from an ephys block
                         # store ref to original
-                        embed_trigger_protocol(protocol,
-                                                        self._electrophysiology_,
-                                                        clearTriggers=True)
-                        
-                        # store ref to reverse acquisition copy of origiinal
-                        embed_trigger_protocol(reversedProtocol,
-                                                        self._scans_block_,
-                                                        clearTriggers=True)
+                        if not is_empty(self._electrophysiology_):
+                            embed_trigger_protocol(protocol,
+                                                    self._electrophysiology_,
+                                                    clearTriggers=True)
                         
                         # store ref to reverse acquisition copy of original
-                        embed_trigger_protocol(reversedProtocol,
-                                                        self._scene_block_,
-                                                        clearTriggers=True)
+                        if not is_empty(self._scans_block_):
+                            embed_trigger_protocol(reversedProtocol,
+                                                    self._scans_block_,
+                                                    clearTriggers=True)
+                    
+                        # store ref to reverse acquisition copy of original
+                        if not is_empty(self._scene_block_):
+                            embed_trigger_protocol(reversedProtocol,
+                                                    self._scene_block_,
+                                                    clearTriggers=True)
                         
                 
                         self._trigger_protocols_.append(protocol)
@@ -7671,6 +7653,15 @@ class ScanData(object):
             Set it manually to True for isolated calls to this function
         
         """
+        ##### BEGIN debugging
+        #frame = inspect.currentframe()
+        #if frame is not None:
+            #frames = inspect.getouterframes(frame)
+            #print("ScanData.addTriggerProtocol: frames: ")
+            #for f in frames:
+                #print(f"\t{f.function} at line {f.lineno} in {f.filename}")
+        ##### END debugging
+        
         if not isinstance(protocol, TriggerProtocol):
             raise TypeError("Expecting a trigger protocol; got %s instead" % type(protocol).__name__)
         
@@ -7687,17 +7678,20 @@ class ScanData(object):
         # in imaging block we store COPIES of protocol events with reversed acquisition!
         rev_p = protocol.reverseAcquisition(copy=True)
         
-        embed_trigger_protocol(protocol,
-                                        self._electrophysiology_,
-                                        clearEvents=False)
+        if not is_empty(self._electrophysiology_):
+            embed_trigger_protocol(protocol,
+                                    self._electrophysiology_,
+                                    clearEvents=False)
         
-        embed_trigger_protocol(rev_p,
-                                        self._scans_block_,
-                                        clearEvents=False)
+        if not is_empty(self._scans_block_):
+            embed_trigger_protocol(rev_p,
+                                    self._scans_block_,
+                                    clearEvents=False)
         
-        embed_trigger_protocol(rev_p,
-                                        self._scene_block_,
-                                        clearEvents=False)
+        if not is_empty(self._scene_block_):
+            embed_trigger_protocol(rev_p,
+                                    self._scene_block_,
+                                    clearEvents=False)
         
         self._trigger_protocols_.append(protocol)
         
@@ -8647,20 +8641,23 @@ class ScanData(object):
             for p in self._trigger_protocols_:
                 rev_p = p.reverseAcquisition(copy=True)
                 
-                embed_trigger_protocol(p,
-                                                self._electrophysiology_,
-                                                clearTriggers=True,
-                                                clearEvents=False)
+                if not is_empty(self._electrophysiology_):
+                    embed_trigger_protocol(p,
+                                            self._electrophysiology_,
+                                            clearTriggers=True,
+                                            clearEvents=False)
                 
-                embed_trigger_protocol(rev_p,
-                                                self._scans_block_,
-                                                clearTriggers=True,
-                                                clearEvents=False)
+                if not is_empty(self._scans_block_):
+                    embed_trigger_protocol(rev_p,
+                                            self._scans_block_,
+                                            clearTriggers=True,
+                                            clearEvents=False)
                 
-                embed_trigger_protocol(rev_p,
-                                                self._scene_block_,
-                                                clearTriggers=True,
-                                                clearEvents=False)
+                if not is_empty(self._scene_block_):
+                    embed_trigger_protocol(rev_p,
+                                            self._scene_block_,
+                                            clearTriggers=True,
+                                            clearEvents=False)
                 
             del_units = list()
 
@@ -9592,28 +9589,32 @@ class ScanData(object):
                 
             if all([isinstance(v, TriggerProtocol) and len(v) > 0 for v in value]):
                 self._trigger_protocols_.clear()
+                self._trigger_protocols_[:] = sorted(value, key=lambda x: x.segmentIndices()[0])
                 
                 # do it one by one instead of simply broadcasting into the list
                 # so that events lists in self._electrophysiology_ are also updated
-                for v in value:
-                    self.addTriggerProtocol(v.copy()) # by default this will NOT sort
+                # tge following popul;ates self._trigger_protocols_
+                # NOTE: 2021-10-11 18:20:17
+                # not point in doing the same thing twice!
+                #for v in value:
+                    #self.addTriggerProtocol(v.copy()) # by default this will NOT sort
                     
-                self._trigger_protocols_.sort(key=lambda x: x.segmentIndices()[0])
+                #self._trigger_protocols_.sort(key=lambda x: x.segmentIndices()[0])
                 
                 # now embed the new protocols in the data
                 for p in self._trigger_protocols_:
                     rev_p = p.reverseAcquisition(copy=True)
                     
-                    embed_trigger_protocol(p, self._electrophysiology_,
-                                                 clearEvents=False)
+                    if not is_empty(self._electrophysiology_):
+                        embed_trigger_protocol(p, self._electrophysiology_,
+                                                    clearEvents=False)
+                    if not is_empty(self._scans_block_.segments):
+                        embed_trigger_protocol(rev_p, self._scans_block_,
+                                                    clearEvents=False)
                     
-                    embed_trigger_protocol(rev_p, self._scans_block_,
-                                                 clearEvents=False)
-                    
-                    embed_trigger_protocol(rev_p, self._scene_block_,
-                                                 clearEvents=False)
-            
-                
+                    if not is_empty(self._scene_block_):
+                        embed_trigger_protocol(rev_p, self._scene_block_,
+                                                    clearEvents=False)
                 # a reference to this data's trigger protocols
                 self._analysis_unit_.protocols[:] = self._trigger_protocols_
                 

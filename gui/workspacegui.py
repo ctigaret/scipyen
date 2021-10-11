@@ -5,11 +5,11 @@ from pprint import pprint
 from traitlets import (config, Bunch)
 #### END Configurable objects with traitlets.config
 import matplotlib as mpl
-from PyQt5 import QtCore, QtWidgets, QtGui
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
+from PyQt5 import (QtCore, QtWidgets, QtGui)
+from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty)
 #from traitlets.config import SingletonConfigurable
 from core.utilities import safeWrapper
-from core.workspacefunctions import user_workspace
+from core.workspacefunctions import (user_workspace, validate_varname,)
 from core.scipyen_config import (ScipyenConfigurable, 
                                  syncQtSettings, 
                                  markConfigurable, 
@@ -17,6 +17,7 @@ from core.scipyen_config import (ScipyenConfigurable,
                                  saveWindowSettings,
                                  confuse)
 
+import gui.quickdialog as qd
 from gui.pictgui import ItemsListDialog
 
 #ScipyenConfigurable = ScipyenConfigurable2 # NOTE remove before release
@@ -344,7 +345,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     @safeWrapper
     def importWorkspaceData(self, dataTypes:typing.Union[typing.Type[typing.Any], typing.Sequence[typing.Type[typing.Any]]],
                             title:str="Import from workspace",
-                            single:bool=True) -> list:
+                            single:bool=True, 
+                            preSelected:typing.Optional[str]=None,
+                            with_varName:bool=False) -> list:
         """Launches ItemsListDialog to import on or several workspace variables.
         
         Parameters:
@@ -366,14 +369,49 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         #selectionMode = QtWidgets.QAbstractItemView.SingleSelection if single else QtWidgets.QAbstractItemView.MultiSelection
         selectionMode = QtWidgets.QAbstractItemView.SingleSelection if single else QtWidgets.QAbstractItemView.ExtendedSelection
         
-        dialog = ItemsListDialog(parent=self, title=title, itemsList = name_list,
-                                 selectmode = selectionMode)
+        if isinstance(preSelected, str) and len(preSelected.strip()) and preSelected in name_list:
+            dialog = ItemsListDialog(parent=self, title=title, itemsList = name_list,
+                                    selectmode = selectionMode, preSelected=preSelected)
+        else:
+            dialog = ItemsListDialog(parent=self, title=title, itemsList = name_list,
+                                    selectmode = selectionMode)
         
         ans = dialog.exec()
         
         if ans == QtWidgets.QDialog.Accepted:
-            return [self._scipyenWindow_.workspace[i] for i in dialog.selectedItemsText]
+            if with_varName:
+                return [(i, self._scipyenWindow_.workspace[i]) for i in dialog.selectedItemsText]
+            else:
+                return [self._scipyenWindow_.workspace[i] for i in dialog.selectedItemsText]
             
         return list()
+    
+    @safeWrapper
+    def exportDataToWorkspace(self, 
+                              data:typing.Any,
+                              var_name:str, 
+                              title:str="Export data to workspace"):
+            
+        newVarName = validate_varname(var_name)
+        
+        dlg = qd.QuickDialog(self, title)
+        namePrompt = qd.StringInput(dlg, "Export data as:")
+        
+        namePrompt.variable.setClearButtonEnabled(True)
+        namePrompt.variable.redoAvailable=True
+        namePrompt.variable.undoAvailable=True
+        
+        namePrompt.setText(newVarName)
+        
+        if dlg.exec() == QtWidgets.QDialog.Accepted:
+            newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
+            
+            self._scipyenWindow_.assignToWorkspace(newVarName, self._data_)
+            
+            self._data_.modified=False
+            self.displayFrame()
+            
+            self.statusBar().showMessage("Done!")
+        
             
         
