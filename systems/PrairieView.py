@@ -2365,14 +2365,21 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         
         # NOTE: 2021-10-09 23:55:03
         # belowl self._scipyenWindow_ is inherited from WorkspaceGuiMixin (initialized)
-        self.ephysPreview = sv.SignalViewer(parent = self._scipyenWindow_, 
-                                            win_title = "Trigger Events Detection")
+        self.ephysPreview = sv.SignalViewer(win_title = "Trigger Events Detection")
+        
+        #self.ephysPreview = sv.SignalViewer(parent = self._scipyenWindow_, 
+                                            #win_title = "Trigger Events Detection")
+        
+        #self.ephysPreview = sv.SignalViewer(parent = self, 
+                                            #win_title = "Trigger Events Detection")
         
         # NOTE: 2021-03-21 11:35:59 just a "place holder" here; the actual dialog 
         # created in _slot_startTriggerEventDetectionGui()
         self.eventDetectionDialog = None # when a TriggerDetectDialog, this caches the detection options & events
         
-        self.protocolEditorDialog = ProtocolEditorDialog(parent=self, title = "Edit Trigger Protocols")
+        #self.protocolEditorDialog = ProtocolEditorDialog(parent=self, title = "Edit Trigger Protocols")
+        #self.protocolEditorDialog = ProtocolEditorDialog(parent=self._scipyenWindow_, title = "Edit Trigger Protocols")
+        self.protocolEditorDialog = ProtocolEditorDialog(title = "Edit Trigger Protocols")
         
         # the ProtocolEditorDialog works on a reference to the list of 
         # TriggerProtocols stored in here.
@@ -2431,8 +2438,12 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             if self.eventDetectionDialog is None:
                 self.eventDetectionDialog = TriggerDetectDialog(ephysdata=self._ephys_,
                                                                 clearEvents=True,
-                                                                ephysViewer = self.ephysPreview,
-                                                                parent=self)
+                                                                ephysViewer = self.ephysPreview)#,
+                                                                #parent=self._scipyenWindow_)
+                #self.eventDetectionDialog = TriggerDetectDialog(ephysdata=self._ephys_,
+                                                                #clearEvents=True,
+                                                                #ephysViewer = self.ephysPreview,
+                                                                #parent=self)
                 self.eventDetectionDialog.finished.connect(self._slot_stopTriggerEventDetectionGui)
             
             #self.ephysPreview.plot(self._ephys_) # done in TriggerDetectDialog c'tor

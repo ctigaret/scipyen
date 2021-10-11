@@ -22,13 +22,22 @@ class DataBagTrait(Instance):
     
     """
     _value_trait = None
-    _key_trait = None   # not sure I really need this one
+    # FIXME 2021-10-11 23:14:13
+    # there's something wrong going on here: 
+    # the line below at some point calls traitlets.TraitType._validate(self, obj, value)
+    # which then raises AttributeError: 'str' object has no attribute '_cross_validation_lock'
+    # on line 613, once it goes past value=self.validate(obj, value) on line 612
+    # not sure why obj in that context resolves to a str - it is a gremlin somewhere?
+    #
+    #_key_trait = Unicode   
+    
+    # NOTE: 2021-10-11 23:16:31
+    # for now, disable the key_trait
+    _key_trait = None
     klass=DataBag
     
     def __init__(self, value_trait=None, per_key_traits=None, default_value=Undefined,
                  **kwargs):
-    #def __init__(self, value_trait=None, per_key_traits=None, key_trait=None, default_value=Undefined,
-                 #**kwargs):
         """Avoid casting DataBag to dict
         """
         # handle deprecated keywords
@@ -131,9 +140,10 @@ class DataBagTrait(Instance):
         validated = {}
         for key in value:
             v = value[key]
+            #print(f"DataBag.validate_elements, obj: {obj}, value: {value}, key {key}:, v: {v}")
             if key_trait:
                 try:
-                    key = key_trait._validate(obj, key)
+                    key = key_trait._validate(obj, key, v)
                 except TraitError as error:
                     self.element_error(obj, key, key_trait, 'Keys')
             active_value_trait = per_key_override.get(key, value_trait)

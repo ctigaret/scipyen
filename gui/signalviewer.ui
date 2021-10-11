@@ -119,6 +119,9 @@
         <property name="whatsThis">
          <string>Current frame number</string>
         </property>
+        <property name="buttonSymbols">
+         <enum>QAbstractSpinBox::UpDownArrows</enum>
+        </property>
         <property name="keyboardTracking">
          <bool>false</bool>
         </property>

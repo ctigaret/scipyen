@@ -468,12 +468,21 @@ class DataBag(Bunch):
     def __getstate__(self):
         """Returns the state of this object's observer wrapped in a dict
         """
-        obs = object.__getattribute__(self, "__observer__", None)
-        if obs is None:
-            d = {"__observer--": {"_trait_notifiers":{}, "_trait_validators":{}}}
-        else:
+        # NOTE: Python 3.9 way
+        if hasattr(self , "__observer__"): 
+            obs = object.__getattribute__(self, "__observer__")
             state = obs.__getstate__()
             d = {"__observer__": state}
+        
+        else:
+            d = {"__observer__": {"_trait_notifiers":{}, "_trait_validators":{}}}
+            
+        #obs = object.__getattribute__(self, "__observer__", None)
+        #if obs is None:
+            #d = {"__observer--": {"_trait_notifiers":{}, "_trait_validators":{}}}
+        #else:
+            #state = obs.__getstate__()
+            #d = {"__observer__": state}
         return d
     
     def __setstate__(self, state:dict):

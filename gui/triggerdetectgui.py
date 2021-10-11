@@ -550,7 +550,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         super().exec()
         
     def closeEvent(self, evt):
-        """for when the dialog is closed fomr the window's close button
+        """for when the dialog is closed from the window's close button
         """
         print("closeEvent owns viewer", self._owns_viewer_)
         if self._ephysViewer_.isVisible():
@@ -562,7 +562,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         # NOTE: 2021-04-16 11:30:35
         # unbind the SignalViewer reference from this symbol, otherwise the garbage
         # collector will try to double-delete C++ objects (in pyqtgraph)
-        self._ephysViewer_ = None
+        #self._ephysViewer_ = None
         
         super().closeEvent(evt)
         
@@ -607,7 +607,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         # NOTE: 2021-04-16 11:30:35
         # unbind the SignalViewer reference from this symbol, otherwise the garbage
         # collector will try to double-delete C++ objects (in pyqtgraph)
-        self._ephysViewer_ = None
+        #self._ephysViewer_ = None
             
         super().done(value)
         
