@@ -4,7 +4,7 @@
 
 import enum
 from enum import (EnumMeta, Enum, IntEnum, )
-import contextlib
+import contextlib, traceback
 
 from inspect import (getmro, isclass, isfunction, signature,)
 from types import new_class
@@ -356,6 +356,8 @@ def dynamic_trait(x, *args, **kwargs):
         For details see traitlets.TraitType.set()
     
     """
+    from .traitcontainers import DataBag
+    from .databagtrait import DataBagTrait
     allow_none = kwargs.pop("allow_none", False)
     force_trait = kwargs.pop("force_trait", None)
     set_function = kwargs.pop("set_function", None)
@@ -363,7 +365,7 @@ def dynamic_trait(x, *args, **kwargs):
     # FIXME: 2021-10-10 16:43:29
     # the following are never used !!!
     content_allow_none = kwargs.pop("content_allow_none", allow_none)
-    klass = kwargs.pop("klass", None)
+    #klass = kwargs.pop("klass", None)
     
     # NOTE: 2021-08-20 11:44:00 A reminder:
     # isinstance(x, sometype) returns True when sometype is in type(x).__mro__
@@ -381,7 +383,7 @@ def dynamic_trait(x, *args, **kwargs):
     
     myclass = x.__class__
     
-    #print("myclass", myclass)
+    #print("dynamic_trait: myclass", myclass)
     
     arg = [x] + [a for a in args]
     
@@ -389,46 +391,44 @@ def dynamic_trait(x, *args, **kwargs):
     
     kw = kwargs
     
-    if myclass.__name__ == "DataBag":
-        from .databagtrait import DataBagTrait
+    if myclass is DataBag:
+        traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=False if v is x else True)) for k,v in x.items())
+        return DataBagTrait(default_value=x, per_key_traits = traits, allow_none = allow_none)
+    
+    if isclass(force_trait) and issubclass(force_trait, traitlets.TraitType):
+        traitclass = (force_trait, )
         
-        traitclass = (DataBagTrait, )
         
     else:
-        if isclass(force_trait) and issubclass(force_trait, traitlets.TraitType):
-            traitclass = (force_trait, )
-            
-            
-        else:
-            # NOTE: 2021-08-20 12:22:12 For a finer granularity
-            traitclass = TRAITSMAP.get(myclass, (None, ))
-            
-        if traitclass[0] is None:
-            # NOTE: 2021-10-10 17:10:02
-            # when 'x' is a DataBag, the line below always returns 'dict'
-            highest_below_object = [s for s in reversed(getmro(myclass))][1] # all Python types inherit from object
-            traitclass = TRAITSMAP.get(highest_below_object, (Any,))
-            
-        if not isfunction(set_function) or len(signature(set_function).parameters) != 3:
-            set_function = enhanced_traitlet_set
+        # NOTE: 2021-08-20 12:22:12 For a finer granularity
+        traitclass = TRAITSMAP.get(myclass, (None, ))
+        
+    if traitclass[0] is None:
+        # NOTE: 2021-10-10 17:10:02
+        # when 'x' is a DataBag, the line below always returns 'dict'
+        highest_below_object = [s for s in reversed(getmro(myclass))][1] # all Python types inherit from object
+        traitclass = TRAITSMAP.get(highest_below_object, (Any,))
+        
+    if not isfunction(set_function) or len(signature(set_function).parameters) != 3:
+        set_function = enhanced_traitlet_set
 
-        exec_body_fn = partial(_dynatrtyp_exec_body_, setfn=set_function)
-        
-        new_klass = new_class("%s_Dyn" % traitclass[0].__name__, 
-                            bases = traitclass, 
-                            exec_body = exec_body_fn)
-        
-        new_args, new_kw = adapt_args_kw(x, args, kw, allow_none)
-        
-        if traitclass[0] is Instance:
-            return new_klass(klass = myclass, args = args, kw = kw, allow_none = allow_none)
-        
-        if issubclass(new_klass, Dict) and content_traits:
-            traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=False if v is x else True)) for k,v in x.items())
-            # NOTE: New API for traitlets >= 5.0: 'traits' is deprecated in favour of 'per_key_traits'
-            return new_klass(default_value = x, per_key_traits = traits, allow_none = allow_none)
-        
-        return new_klass(default_value = x, allow_none = allow_none)
+    exec_body_fn = partial(_dynatrtyp_exec_body_, setfn=set_function)
+    
+    new_klass = new_class("%s_Dyn" % traitclass[0].__name__, 
+                        bases = traitclass, 
+                        exec_body = exec_body_fn)
+    
+    new_args, new_kw = adapt_args_kw(x, args, kw, allow_none)
+    
+    if traitclass[0] is Instance:
+        return new_klass(klass = myclass, args = args, kw = kw, allow_none = allow_none)
+    
+    if issubclass(new_klass, Dict) and content_traits:
+        traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=False if v is x else True)) for k,v in x.items())
+        # NOTE: New API for traitlets >= 5.0: 'traits' is deprecated in favour of 'per_key_traits'
+        return new_klass(default_value = x, per_key_traits = traits, allow_none = allow_none)
+    
+    return new_klass(default_value = x, allow_none = allow_none)
     
 class TraitSetMixin(object):
     def __init__(self):

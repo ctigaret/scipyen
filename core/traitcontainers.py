@@ -218,11 +218,13 @@ class DataBag(Bunch):
         else:
             dd = kwargs
             
-        print(type(dd))
+        #print(type(dd))
         
-        print("dd", dd)
+        #print("dd", dd)
             
         traits = dict(map(lambda x: (x[0], self._light_trait_(x[1])), dd.items()))
+        
+        #print("DataBag.__init__: traits", traits)
         
         self.__hidden__.length = len(traits)
 
@@ -417,6 +419,16 @@ class DataBag(Bunch):
         except:
             raise #KeyError("%s" % key)
         
+    def __iter__(self):
+        """Restricted membership test ('in' keyword).
+        Overloads super().__iter__(self) to restrict membership test for trait
+        values.
+        """
+        return (k for k in self.trait_values())
+    
+    def __iter_full__(self):
+        return super().__iter__(self)
+        
     def __hash__(self):
         return sum((hash(v) for v in self.items()))
         
@@ -439,14 +451,19 @@ class DataBag(Bunch):
         except:
             raise #KeyError("%s" % key)
         
-    def __contains__(self, key):
-        """Implements membership test ("in" keyword)
-        """
-        try:
-            obs = object.__getattribute__(self, "__observer__")
-            return obs.has_trait(key)
-        except:
-            raise
+    #def __contains__(self, key):
+        #"""Implements membership test ("in" keyword).
+        
+    
+        #"""
+        # NOTE: 2021-10-11 12:08:05 
+        # This doesn't work because the base type dict has __iter__(), and 'in'
+        # keyword goes for it first
+        #try:
+            #obs = object.__getattribute__(self, "__observer__")
+            #return obs.has_trait(key)
+        #except:
+            #raise
         
     def __getstate__(self):
         """Returns the state of this object's observer wrapped in a dict
