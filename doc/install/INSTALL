@@ -106,6 +106,14 @@ valgrind (optional)
 NOTE: This is RECOMMENDED if the distribution is behind the latest Python by 
 (quite) a few minor versions.
 
+NOTE: If you choose to build python then the folloing python packages must also
+be built locally (from inside the activated virtual python environment, see below):
+    sip
+    PyQt5
+    PyQt5_sip
+    tables
+    
+
 For example, OpenSuSE Leap 15.3 installs Python-3.6.12; here, we use Python 
 3.9.7 where there have been some significant changes, and because the latest neo 
 package doesn't support python < 3.7
@@ -272,6 +280,24 @@ cmake-gui ../vigra
 -------------------------------------------------------------------------------
 pip install -r $HOME/scipyen/doc/installation/pip_requirements_1.txt
 pip install -r $HOME/scipyen/doc/installation/pip_requirements_2.txt
+
+-------------------------------------------------------------------------------
+4.6b. BUILD AND INSTALL PyhTables (tables)
+-------------------------------------------------------------------------------
+
+gh repo clone PyTables/PyTables
+cd PyTables
+python setup.py build
+python setup.py install
+
+Check that importing tables doesn't crash the interpreter:
+    
+    python
+    
+    >>> import tables
+    >>>
+    
+
 
 -------------------------------------------------------------------------------
 4.7 BUILD AND INSTALL NEURON

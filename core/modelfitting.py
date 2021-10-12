@@ -122,11 +122,9 @@ class ModelExpression(object):
 
             
         return name
-        
-    
 
 class FitModelMeta(type):
-    """Metaclass that generates properties for the model parameters.
+    """:Metaclass: that generates properties for the model parameters.
     Each model parameter gets three read/write properties named after the 
     parameter's name or suffixed with '_lb' or '_ub', respectively, for the
     initial value, lower and upper bound values.

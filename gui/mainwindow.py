@@ -4228,8 +4228,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def slot_addCommandFindToHistory(self):
         cmdTxt = self.commandFinderComboBox.lineEdit().text()
-        if len(cmdTxt) > 0 and cmdTxt not in self.commandHistoryFinderList:
-            self.commandHistoryFinderList.appendleft(cmdTxt)
+        if len(cmdTxt) > 0 and cmdTxt not in self._commandHistoryFinderList:
+            self._commandHistoryFinderList.appendleft(cmdTxt)
             self.lastCommandFind = cmdTxt
     
     
@@ -4238,8 +4238,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_removeItemFromCommandFinderHistory(self):
         currentNdx = self.commandFinderComboBox.currentIndex()
         cmdTxt = self.commandFinderComboBox.itemText(currentNdx)
-        if cmdTxt in self.commandHistoryFinderList:
-            self.commandHistoryFinderList.remove(cmdTxt)
+        if cmdTxt in self._commandHistoryFinderList:
+            self._commandHistoryFinderList.remove(cmdTxt)
             
         self.commandFinderComboBox.removeItem(currentNdx)
         self.commandFinderComboBox.lineEdit().setClearButtonEnabled(True)

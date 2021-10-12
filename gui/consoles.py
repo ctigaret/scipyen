@@ -203,6 +203,7 @@ class ScipyenInProcessKernelManager(QtInProcessKernelManager):
 class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     """
     """
+    # NOTE: This is , ultimately, a qtconsole.frontend_widget.FrontentWidget
     def __init__(self, *args, **kw):
         super(RichJupyterWidget, self).__init__(*args, **kw)
         self._console_pygment = ""

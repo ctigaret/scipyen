@@ -1378,7 +1378,7 @@ def savePickleFile(val, fileName, protocol=None):
     
 def saveNixIOFile(val, fileName):
     (name,extn) = os.path.splitext(fileName)
-    if len(extn)==0 or extn != ".nix":
+    if len(extn)==0 or extn not in neo.NixIO.extensions:
         fileName += ".nix"
     #if len(extn)==0 or extn != ".h5":
         #fileName += ".h5"

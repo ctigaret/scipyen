@@ -10,7 +10,7 @@ import vigra
 from core import (prog, traitcontainers, strutils, neoutils, models,)
 from core.prog import safeWrapper
 from core.traitcontainers import DataBag
-from core.datatypes import (UnitTypes,Genotypes, arbitrary_unit, pixel_unit, 
+from core.datatypes import (UnitTypes, Genotypes, arbitrary_unit, pixel_unit, 
                             channel_unit,
                             space_frequency_unit,
                             angle_frequency_unit,
@@ -50,6 +50,8 @@ DEFAULTS["Channels"]["Bleed"]["Ref2Ind"] = 0.
 DEFAULTS["Channels"]["Bleed"]["Ind2Ref"] = 0.
 
 class FrameLookup(object):
+    """Heuristic for frame synchronization between scans, scene and ephys data.
+    """
     # virtual_frame_index: dict{"scene":int, "scans":int, "ephys":int}
             
     def __init__(self, *args):

@@ -598,6 +598,7 @@ if __debug__:
 
     __debug_count__ = 0
     
+    
 def get_member_collections(container:typing.Union[type, neo.core.container.Container],
                            membertype:typing.Union[type, tuple, list]) -> list:
     if isinstance(container, type):
@@ -867,11 +868,13 @@ def normalized_segment_index(src: neo.Block,
     else:
         raise TypeError("Invalid indexing: %s" % index)
     
-def neo_child_property_name(type_or_obj):
-    """Provisional.
-    As of neo 0.8.0 this only works for neo.Unit, in neo.Block
-    """    
-    return "list_%s" % neo_child_container_name(type_or_obj)
+#def neo_child_property_name(type_or_obj):
+    #"""Provisional.OBSOLETE
+    #As of neo 0.8.0 this only works for neo.Unit, in neo.Block
+    #"""    
+    #return "list_%s" % neo_child_container_name(type_or_obj)
+
+
         
 def neo_child_container_name(type_or_obj):
     """Provisional: name of member collection.
@@ -900,31 +903,6 @@ def neo_child_container_name(type_or_obj):
             return neo.baseneo._container_name(type(type_or_obj).__name__)
             
         
-def neo_child_reference_name(type_or_obj):
-    """Provisional: name of attribute name ot reference instance of type_or_obj
-    """
-    
-    if inspect.isclass(type_or_obj):
-        if neo.regionofinterest.RegionOfInterest in inspect.getmro(type_or_obj):
-            return "regionofinterest"
-        
-        else:
-            return neo.baseneo._reference_name(type_or_obj.__name__)
-        
-    elif isinstance(type_or_obj, str):
-        if s in dir(neo.regionofinterest):
-            return "regionofinterest"
-        
-        else:
-            return neo.baseneo._reference_name(type_or_obj)
-        
-    else:
-        if isinstance(type_or_obj, neo.regionofinterest.RegionOfInterest):
-            return "regionofinterest"
-        
-        else:
-            return neo.baseneo._reference_name(type(type_or_obj).__name__)
-        
 def __get_container_collection_attribute__(container, attrname,
                                            container_index=None,
                                            multiple=True):
@@ -943,16 +921,50 @@ def __container_lookup__(container: neo.container.Container,
                          multiple:bool = True, 
                          return_objects:bool = False,
                          **kwargs) -> dict:
-    """ Cases 2 & 4       
+    """
+    Lookup and optioooinally return children of specified contained_type 
+    inside a neo.container.Container.
+    
+    What we want:
+    
+    given a neo.Block b, we want to know the index of analog signals with 
+    specific names and extract them.
+    
+    We may specify the signal index as a tuple of ints
+    
+    Since the neo API is a moving goal post thisis rewritten as of 
+    2021-10-12 17:30:30 and the module docstring is outdated & obsolete.
+    
+    Basically DO NOT rely on ANY class or instance attrobutes that start with '_'
+    in the neo hierarchy!!!
+    
+    Cases 2 & 4       
     """
     # 1) check if the container's type is among the contained_type._parent_objects
     
     if isinstance(container, neo.container.Container):
         pfun0 = partial(normalized_index, index=index_obj, multiple=multiple)
         
-        member_collection_names = [neo_child_container_name(contained_type), neo_child_property_name(contained_type)]
+        collection_name = neo_child_container_name(contained_type)
+        #member_collection_names = [neo_child_container_name(contained_type), neo_child_property_name(contained_type)]
         
-        member_collections = [getattr(container, cname, None) for cname in member_collection_names]
+        collection = getattr(container, collection_name, None)
+        
+        if collection is not None:
+            t = pfun0(collection)
+            if len(t):
+                if return_objects:
+                    ret = {collection_name: t)}
+                else:
+                    ret = {collection_name: [collection[t_] for t in t]}
+                    
+            else:
+                return dict()
+            
+        
+    
+        
+        #member_collections = [getattr(container, cname, None) for cname in member_collection_names]
             
         ret = dict((cname, t) for cname, t in zip(member_collection_names, map(pfun0, member_collections)) if len(t) > 0)
         
@@ -960,7 +972,8 @@ def __container_lookup__(container: neo.container.Container,
             # might by indirectly contained
             # this is where additional index objects for collection of data that may be in kwargs should be applied
             
-            direct_containers = contained_type._single_parent_objects
+            direct_containers = contained_type._parent_containers
+            #direct_containers = contained_type._single_parent_objects # removed in neo 0.10.0
             
             child_container_names = [neo_child_container_name(c) for c in direct_containers]
             
@@ -977,6 +990,7 @@ def __container_lookup__(container: neo.container.Container,
             ret = dict((cname, d) for cname, d in zip(child_container_names, map(pfun, child_container_collections)) if len(d) > 0)
 
     else:
+        raise TypeError(f"Expecting a neo.Container; got {type(container).__name__} instead.")
         ret = dict()
         
     return ret
@@ -1073,6 +1087,39 @@ def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[n
                return_objects:bool = False) -> typing.Union[dict, tuple]:
     """Provisional - work in progress
     
+    We have: 
+        a neo.container.Container object
+        a name (str) or sequence of names of child container or data objects
+        possibly contained in the container object
+        
+    We want:
+        a dict returing the (possibly) nested index of the child object inside
+        the container
+        
+    e.g.:
+    
+    We have:
+        Block with three segments and name 'block':
+            segment 0 with name 's0' and
+                3 analogsignals: 
+                    'sig1', 'sig2', 'sig3'
+                2 irregularlysampledsignals:
+                    'sig2', 'sig4'
+                    
+            segment 1 with name 's1'
+                with 2 analogsignals:
+                    'sig1', 'sig3'
+                    
+                    
+        We look for analog signals named 'sig1'
+        
+    We should get back:
+        {"block": 'block'}
+        
+        
+        
+    
+    
     Positional parameters:
     ----------------------
     src: neo.core.container.Container or a sequence of Container objects
@@ -1117,7 +1164,7 @@ def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[n
         return __container_lookup__(src, index, ctype, multiple=True, return_objects=return_objects)
     
 def neo_index(src: typing.Union[neo.container.Container, typing.Sequence],
-                    ndx: typing.Union[typing.Mapping, typing.Sequence]) -> tuple:
+                    ndx: typing.Union[typing.Mapping, typing.Sequence, str]) -> tuple:
     """Provisional. Applies dictionary ndx created by neo_lookup.
     """
     if __debug__:
@@ -2046,7 +2093,7 @@ def concatenate_blocks(*args, **kwargs):
                 will be retained in the concatenated data. These include
                 neo.AnalogSignal and datatypes.DataSignal
                 
-                This index can be (see neo_index_lookup):
+                This index can be (see neo_index):
                 int, str (signal name), sequence of int or str, a range, a
                 slice, or a numpy array of int or booleans.
                     
@@ -2057,9 +2104,10 @@ def concatenate_blocks(*args, **kwargs):
     image:      as analog, for neo.ImageSequence objects (for neo version
                 from 0.8.0 onwards)
                 
-                
-    channel:    int, index  of the neo.ChannelIndex DEPRECATED
+    rename_segments:bool, optional (default True) - segments are renamed to the
+        generic format f"segment_{k}" with 0<= k < len(ret.segments)
                     
+    channel:    int, index  of the neo.ChannelIndex DEPRECATED
                     
     Returns:
     -------
@@ -2070,7 +2118,7 @@ def concatenate_blocks(*args, **kwargs):
     
     Example:
     
-    block = concatenate_blocks(getvars("data_name_prefix*"), segment_index=0)
+    block = concatenate_blocks2(getvars("data_name_prefix*"), segment_index=0)
     
     will concatenate the first segment (segment_index = 0) from all neo.Block 
     variables having names beginning with 'data_name_prefix' in the user 
@@ -2113,28 +2161,40 @@ def concatenate_blocks(*args, **kwargs):
     image_index = kwargs.get("image", None)
     channel_index = kwargs.get("channel", None)
     
+    rename_segments = kwargs.get("rename_segments", True)
+    
      # the returned data:
     ret = neo.core.Block(name=name, description=description, file_origin=file_origin,
                          file_datetime=file_datetime, rec_datetime=rec_datetime, 
                          **annotations)
     
     if isinstance(args, neo.core.Block):
+        if isinstance(args.name, str) and len(args.name.strip()):
+            original_block_name = f" f Block {args.name}"
+        else:
+            original_block_name = ""
+            
         if segment_index is None:
             for (l,seg) in enumerate(args.segments):
+                if isinstance(seg.name, str) and len(seg.name.strip()):
+                    original_segment_name = f" ({seg.name})"
+                else:
+                    original_segment_name = ""
+                    
+                segment_origin_str = f"{original_segment_name}{original_block_name}"
+                seg_name = seg.name if isinstance(seg.name, str) and len(seg.name.strip()) else f"Segment {l}{original_block_name}"
+                
                 if analog_index is None:
-                    #seg_ = copy(seg)
                     seg_ = neo_copy(seg)
-                    seg_.name = "%s_%s" % (args.name, seg.name)
-                    seg_.annotate(origin=args.file_origin, original_segment=segment_index)
-                    ret.segments.append(seg_)
                     
                 else:
                     # NOTE: 2020-03-13 08:48:10 
                     # we do NOT copy; instead we create a new segment, that we
                     # then populate with selected signals
-                    seg_ = neo.Segment(rec_datetime = seg.rec_datetime, name="%s_%s" % (args.name, seg.name))
+                    seg_ = neo.Segment(rec_datetime = seg.rec_datetime)
                     seg_.merge_annotations(seg)
-                    seg_.annotate(origin=args.file_origin, original_segment=segment_index)
+                    
+                    analog_index = neo_index(seg, analog_index, )
                     
                     if isinstance(analog_index, str):
                         seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, analog_index)].copy())
@@ -2155,7 +2215,9 @@ def concatenate_blocks(*args, **kwargs):
                     else:
                         raise TypeError("analog_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(analog_index).__name__)
                         
-                    ret.segments.append(seg_)
+                seg_.name = seg_name
+                seg_.annotate(origin=args.file_origin, original_segment=segment_origin_str)
+                ret.segments.append(seg_)
         else:
             if segment_index < len(args.segments):
                 # NOTE: 2020-03-13 08:51:32
@@ -2164,19 +2226,23 @@ def concatenate_blocks(*args, **kwargs):
                 # a) copy it, if all signals are to be retained
                 # b) create a new segment populated only with the selected signals
                 seg = args.segments[segment_index] # a reference
+                if isinstance(seg.name, str) and len(seg.name.strip()):
+                    original_segment_name = f" ({seg.name})"
+                else:
+                    original_segment_name = ""
+                    
+                segment_origin_str = f"{original_segment_name}{original_block_name}"
+                    
+                seg_name = seg.name if isinstance(seg.name, str) and len(seg.name.strip()) else f"Segment {segment_index}"
                 
                 if analog_index is None:
                     seg_ = copy(seg)
-                    seg_.name = "%s_%s" % (args.name, seg.name)
-                    seg_.annotate(origin=args.file_origin, original_segment=segment_index)
-                    ret.segments.append(seg_) # copy of original seg
                     
                 else:
-                    seg_ = neo.Segment(rec_datetime = seg.rec_datetime, name="%s_%s" % (args.name, seg.name)) # new seg
+                    seg_ = neo.Segment(rec_datetime = seg.rec_datetime) # new seg
                     seg_.merge_annotations(seg)
-                    seg_.annotate(origin=args.file_origin, original_segment=segment_index)
                     
-                    analog_index = neo_index_lookup(seg, analog_index, )
+                    analog_index = neo_index(seg, analog_index, )
                     
                     if isinstance(analog_index, str):
                         seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, analog_index)].copy())
@@ -2196,22 +2262,36 @@ def concatenate_blocks(*args, **kwargs):
                             
                     else:
                         raise TypeError("analog_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(analog_index).__name__)
-                        
-                    ret.segments.append(seg_)
-        
+                
+                seg_.name = seg_name
+                seg_.annotate(origin=args.file_origin, original_segment=segment_origin_str)
+                ret.segments.append(seg_) # copy of original seg
+                    
     elif isinstance(args,(tuple, list)):
         for (k,arg) in enumerate(args):
             if isinstance(arg, neo.core.Block):
+                if isinstance(arg.name, str) and len(arg.name.strip()):
+                    original_block_name = f" of Block {arg.name}"
+                else:
+                    original_block_name = ""
+                    
                 if segment_index is None:
                     for (l,seg) in enumerate(arg.segments):
-                        if analog_index is None:
-                            ret.segments.append(seg)
-                            ret.segments[-1].annotate(origin=arg.file_origin, original_segment=segment_index)
+                        if isinstance(seg.name, str) and len(seg.name.strip()):
+                            original_segment_name = f" ({seg.name})"
+                        else:
+                            original_segment_name = ""
                             
+                        segment_origin_str = f"{original_segment_name}{original_block_name}"
+                            
+                        seg_name = seg.name if isinstance(seg.name, str) and len(seg.name.strip()) else f"Segment {l}{original_block_name}"
+                        
+                        if analog_index is None:
+                            seg_ = neo_copy(seg)
                         else:
                             seg_ = neo.Segment(rec_datetime = seg.rec_datetime)
-                            seg_.annotate(origin=arg.file_origin, original_segment=segment_index)
-                            
+                            seg_.merge_annotations(seg)
+                            # select signal indices
                             if isinstance(analog_index, str):
                                 seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, analog_index)].copy())
                                 
@@ -2230,22 +2310,29 @@ def concatenate_blocks(*args, **kwargs):
                                     
                             else:
                                 raise TypeError("analog_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(analog_index).__name__)
-                                
-                            ret.segments.append(seg_)
-        
                             
+                        seg_.name = seg_name
+                        seg_.annotate(origin=arg.file_origin, original_segment=f"Segment {l}{segment_origin_str}")
+                        ret.segments.append(seg_)
+        
                 else:
                     if segment_index < len(arg.segments):
-                        if analog_index is None:
-                            ret.segments.append(arg.segments[segment_index])
-                            ret.segments[-1].annotate(origin=arg.file_origin, original_segment=segment_index)
-                            
+                        seg = arg.segments[segment_index]
+                        
+                        if isinstance(seg.name, str) and len(seg.name.strip()):
+                            original_segment_name = f" ({seg.name})"
                         else:
-                            seg = arg.segments[segment_index]
+                            original_segment_name = ""
                             
+                        segment_origin_str = f"{original_segment_name}{original_block_name}"
+                            
+                        seg_name = seg.name if isinstance(seg.name, str) and len(seg.name.strip()) else f"Segment {segment_index}{original_block_name}"
+                        
+                        if analog_index is None:
+                            seg_ = neo_copy(seg)
+                        else:
                             seg_ = neo.Segment(rec_datetime = seg.rec_datetime)
-                            seg_.annotate(origin=arg.file_origin, original_segment=segment_index)
-                            
+                            seg_.merge_annotations(seg)
                             if isinstance(analog_index, str):
                                 seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, analog_index)].copy())
                                 
@@ -2265,15 +2352,21 @@ def concatenate_blocks(*args, **kwargs):
                             else:
                                 raise TypeError("analog_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(analog_index).__name__)
                                 
-                            ret.segments.append(seg_)
+                        seg_.name = seg_name
+                        seg_.annotate(origin=arg.file_origin, original_segment=f"Segment {segment_index}{segment_origin_str}")
+                        ret.segments.append(seg_)
         
             elif isinstance(arg, neo.core.Segment):
+                if isinstance(arg.name, str) and len(arg.name.strip()):
+                    seg_name = arg.name
+                else:
+                    seg_name = f"Segment {k}"
+                    
                 if analog_index is None:
-                    ret.segments.append(arg)
+                    seg_ = copy(arg)
                     
                 else:
                     seg_ = neo.Segment(rec_datetime = arg.rec_datetime)
-                    seg_.annotate(origin=arg.file_origin, original_segment=segment_index)
                     
                     if isinstance(analog_index, str):
                         seg_.analogsignals.append(arg.analogsignals[get_index_of_named_signal(arg, analog_index)].copy())
@@ -2294,11 +2387,16 @@ def concatenate_blocks(*args, **kwargs):
                     else:
                         raise TypeError("analog_index parameter expected to be None, a str, int or a sequence of these types; got %s instead" % type(analog_index).__name__)
                         
-                    ret.segments.append(seg_)
-        
+                seg_.name = seg_name
+                seg_.annotate(origin=arg.file_origin, original_segment=seg_name)
+                ret.segments.append(seg_)
                     
     else:
         raise TypeError("Expecting a neo.Block or a sequence of neo.Block objects, got %s instead" % type(args).__name__)
+            
+    if rename_segments:
+        for k, s in enumerate(ret.segments):
+            s.name = f"segment_{k}"
             
     return ret
 
@@ -2340,7 +2438,7 @@ def concatenate_blocks2(*args, **kwargs):
                 will be retained in the concatenated data. These include
                 neo.AnalogSignal and datatypes.DataSignal
                 
-                This index can be (see neo_index_lookup):
+                This index can be (see neo_index):
                 int, str (signal name), sequence of int or str, a range, a
                 slice, or a numpy array of int or booleans.
                     
@@ -2608,7 +2706,6 @@ def concatenate_blocks2(*args, **kwargs):
             
     return ret
 
-#def neo_copy(src: typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Unit]) -> typing.Union[neo.Block, neo.Segment, neo.ChannelIndex, neo.Unit]:
 def neo_copy(src: typing.Union[neo.Block, neo.Segment]) -> typing.Union[neo.Block, neo.Segment]:
     """Copies a neo.Block or a neo.Segment
     
@@ -2729,8 +2826,8 @@ def neo_copy(src: typing.Union[neo.Block, neo.Segment]) -> typing.Union[neo.Bloc
         ret.analogsignals += [s.copy() for s in src.analogsignals]
         
         ret.irregularlysampledsignals += [s.copy() for s in src.irregularlysampledsignals]
-
-        ret.spiketrains += [s.copy() for s in src.spiketrains]
+        
+        ret.spiketrains.extend([s.copy() for s in src.spiketrains])
         
         ret.events += [neo_copy(e) for e in src.events]
         ret.epochs += [neo_copy(e) for e in src.epochs]
