@@ -142,7 +142,9 @@ from core.neoutils import (get_non_empty_spike_trains,get_non_empty_events,
                            #)
 
 from core.prog import safeWrapper
-from core.datatypes import (arraySlice, isColumnVector, isVector, normalized_index, normalized_axis_index, 
+from core.datatypes import (arraySlice, isColumnVector, isVector, )
+
+from core.utilities import (normalized_index, normalized_axis_index, 
                             normalized_sample_index,)
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)

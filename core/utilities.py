@@ -2457,7 +2457,7 @@ def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True) -> typi
 def index_of(seq, obj, key=None):
     """Find the index of obj in the object sequence seq.
     
-    Objetc finding can be based on the object's identity (by default) or by the 
+    Object finding can be based on the object's identity (by default) or by the 
     value of a specific object attribute.
     
     For the latter case, 'key' must be a function - typically, a lambda function, 
@@ -2520,6 +2520,9 @@ def make_file_filter_string(extList, genericName):
     individualFilterStrings = ';;'.join([fileFilterString, individualImageTypeFilters])
     
     return (fileFilterString, individualFilterStrings)
+
+def is_dotted_name(s):
+    return isinstance(s, str) and '.' in s
 
 
 def counter_suffix(x, strings, sep="_"):
@@ -2826,12 +2829,15 @@ def gen_unique(seq, key=None):
         yield from (x for x in seq if key not in seen and not seen.add(key))
 
 
-def __name_lookup__(container: typing.Sequence, name:str, 
-                    multiple: bool = True) -> typing.Union[tuple, int]:
+def name_lookup(container: typing.Sequence, name:str, 
+                multiple: bool = True) -> typing.Union[tuple, int]:
+    """Get indices of container elements with attribute 'name' of given value(s).
+    """
+    
     names = [getattr(x, "name") for x in container if (hasattr(x, "name") and isinstance(x.name, str) and len(x.name.strip())>0)]
     
     if len(names) == 0 or name not in names:
-        warnings.warn("No element with 'name' == '%s' was found in the sequence" % name)
+        warnings.warn(f"No element with 'name' {name} was found in the sequence")
         return None
     
     if multiple:
@@ -2843,4 +2849,224 @@ def __name_lookup__(container: typing.Sequence, name:str,
         return ret
         
     return names.index(name)
+
+def normalized_index(data: typing.Optional[typing.Union[typing.Sequence, int]],
+                     index: typing.Optional[typing.Union[str, int, tuple, list, np.ndarray, range, slice]] = None,
+                     multiple:bool = True,
+                     flat:bool = True) -> typing.Union[range, tuple]:
+    """Transform various indexing objects to a range or iterable of int indices.
+    
+    Also checks the validity of the index for an iterable of data_len samples.
+    
+    Parameters:
+    -----------
+    data: sequence, or int; 
+        When a sequence, the indexing object the index will be verified against
+            the sequence length.
+        
+        When an int, data is the length of a putative sequence
+        
+    
+    index: int, tuple, list, np.ndarray, range, slice, None (default).
+        When not None, it is the index to be normalized
+    
+        CAUTION: negative integral indices are valid and perform the reverse 
+            indexing (going "backwards" in the iterable).
+            
+    multiple:bool, optional, default is False:
+        When False, the function behaves like in the standard Python way, where
+        the 'index' method of list and tuple objects returns the first index of 
+        value.
+        When several container elements have a 'name' attribute with the same
+        value all their indices will be returned. This is contrary to the 
+        standard behavour of the 'index' method of Python lists and tuples
+        where the index of the first element that satisfies the criterio is 
+        returned.
+        
+    flat: bool, optional, default is False
+        
+    
+    Returns:
+    --------
+    ret - an iterable index (range or list of integer indices) that can be
+        used with list comprehension
+    
+    """
+    
+    if data is None:
+        return tuple()
+    
+    elif isinstance(data, int):
+        data_len = data
+        data = None
+        
+    elif isinstance(data, (tuple, list, deque)):
+        data_len = len(data)
+    
+    if not isinstance(data, (int, tuple, list)):
+        raise TypeError("Expecting an int or a sequence (tuple, or list) or None; got %s instead" % type(data).__name__)
+    
+    data_len = data if isinstance(data, int) else len(data)
+    
+    if index is None:
+        return range(data_len)
+    
+    elif isinstance(index, int):
+        # NOTE: 2020-03-12 22:40:31
+        # negative values ARE supported: they simply go backwards from the end of
+        # the sequence
+        if index >= data_len:
+            raise ValueError("Index %s is invalid for %d elements" % (index, len(data)))
+        
+        if flat:
+            return index
+        
+        return tuple([index]) # -> (index,)
+    
+    elif isinstance(index, str):
+        if not isinstance(data, (tuple, list)):
+            raise TypeError("Name lookup requires a sequence")
+        
+        ret = name_lookup(data, index, multiple=multiple)
+        
+        if isinstance(ret, numbers.Number):
+            return tuple([ret])
+        
+        elif isinstance(ret, (tuple, list)):
+            if len(ret) > 1:
+                return tuple(ret)
+            
+            else:
+                return tuple([ret[0]])
+            
+        else:
+            return tuple()
+            
+    elif isinstance(index, (tuple,  list)):
+        if not all([isinstance(v, (int, str)) for v in index]):
+            raise TypeError("Index sequence %s is expected to contain int only" % index)
+        
+        if any([isinstance(v, str) for v in index]):
+            if not isinstance(data, (tuple, list)):
+                raise TypeError("Name lookup requires a sequence")
+            
+            return tuple([v if isinstance(v, int) and v < data_len else name_lookup(data, v, multiple=multiple) for v in index])
+            
+        else:
+            if not all([v < data_len for v in index]):
+                raise ValueError("Index sequence %s contains invalid values for %d elements" % (index, data_len))
+            
+            return tuple(index) # -> index as a tuple
+    
+    elif isinstance(index, range):
+        if index.start < 0 or index.stop < 0:
+            warnings.warn("Range %s will produce reverse indexing" % index)
+            
+        if max(index) >= data_len:
+            raise ValueError("Index %s out of range for %d elements" % (index, data_len))
+        
+        return index # -> index IS a range
+    
+    elif isinstance(index, slice):
+        if index.start < 0 or index.stop < 0:
+            warnings.warn("Index %s will produce reverse indexing or an empty indexing list" % index)
+            
+        if max(index) >= data_len:
+            raise ValueError("Index %s out of range for %d elements" % (index, data_len))
+        
+        ndx = index.indices(data_len)
+        
+        if len(ndx) == 0:
+            raise ValueError("Indexing %s results in an empty indexing list" % index)
+        
+        if any(ndx) >= data_len:
+            raise ValueError("Slice %s generates out of range indices (%s) for %d elements" % (index, ndx, data_len))
+        
+        if any(ndx) < 0:
+            warnings.warn("Index %s will produce reverse indexing" % index)
+            
+        return ndx # -> ndx IS a tuple
+    
+    elif isinstance(index, np.ndarray):
+        if not isVector(index):
+            raise TypeError("Indexing array must be a vector; instead its shape is %s" % index.shape)
+            
+        if index.dtype.kind == "i": # index is an array of int
+            return tuple([k for k in index])
+        
+        elif index.dtype.kind == "b": # index is an array of bool
+            if len(index) != data_len:
+                raise TypeError("Boolean indexing vector must have the same length as the iterable against it will be normalized (%d); got %d instead" % (data_len, len(index)))
+            
+            return tuple([k for k in range(data_len) if index[k]])
+            
+    else:
+        raise TypeError("Unsupported data type for index: %s" % type(index).__name__)
+    
+def normalized_sample_index(data:np.ndarray, 
+                            axis: typing.Union[int, str, vigra.AxisInfo], 
+                            index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None) -> typing.Union[range, list]:
+    """Calls normalized_index on a specific array axis.
+    Also checks index validity along a numpy array axis.
+    
+    Parameters:
+    ----------
+    data: numpy.ndarray or a derivative (e.g. neo.AnalogSgnal, vigra.VigraArray)
+    
+    axis: int, str, vigra.AxisInfo. The array axis along which the index is normalized.
+    
+    index: int, tuple, list, np.ndarray, range, slice, None (default).
+        When not None, it is the index to be normalized.
+        
+        CAUTION: negative integral indices are valid and perform the indexing 
+        "backwards" in an array.
+    
+    Returns:
+    --------
+    ret - an iterable (range or list) of integer indices
+    
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Expecting a numpy array or a derivative; got %s instead" % type(data).__name__)
+    
+    if not isinstance(axis, (int, str, vigra.AxisInfo)):
+        raise TypeError("Axis expected to be an int, a str or a vigra.AxisInfo; got %s instead" % type(axis).__name__)
+    
+    axis = normalized_axis_index(data, axis)
+    
+    data_len = data.shape[axis]
+    
+    try:
+        return normalized_index(data_len, index)
+    
+    except Exception as exc:
+        raise RuntimeError("For data axis %d with size %d:" % (axis, data_len)) from exc
+
+def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)) -> int:
+    """Returns an integer index for a specific array axis
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Expecting a numpy array or a derivative; got %s instead" % type(data).__name__)
+    
+    if not isinstance(axis, (int, str, vigra.AxisInfo)):
+        raise TypeError("Axis expected to be an int, a str or a vigra.AxisInfo; got %s instead" % type(axis).__name__)
+    
+    if isinstance(axis, (str, vigra.AxisInfo)):
+        # NOTE: 2019-11-22 12:39:30
+        # for VigraArray only, normalize axis index from str or AxisInfo to int
+        if not isinstance(data, vigra.VigraArray):
+            raise TypeError("Generic numpy arrays do not support axis index as strings or AxisInfo objects")
+        
+        if isinstance(axis, str):
+            axis = data.axitags.index(axis)
+            
+        elif isinstance(axis, vigra.AxisInfo):
+            axis = data.axistags.index(axis.key)
+            
+    # NOTE: 2019-11-22 12:39:17
+    # by now, axis is an int
+    if axis < 0 or axis > data.shape[axis]:
+        raise ValueError
+    
+    return axis
 

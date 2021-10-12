@@ -213,7 +213,6 @@ import pyqtgraph as pg
 #### BEGIN pict.core modules
 #from . import plots
 from core.prog import safeWrapper
-from core.datatypes import  normalized_index
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.triggerevent import (TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import TriggerProtocol
@@ -223,6 +222,7 @@ from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities
 from core import neoutils
+from core.utilities import normalized_index
 from core.neoutils import get_index_of_named_signal
 
 

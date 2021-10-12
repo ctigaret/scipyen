@@ -499,8 +499,7 @@ import pyqtgraph as pg
 #### BEGIN pict.core modules
 #from . import plots
 from .prog import safeWrapper
-from .datatypes import (normalized_index, units_convertible, check_time_units, 
-                        is_string, 
+from .datatypes import (units_convertible, check_time_units, is_string, 
                         RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
 
 from .datasignal import (DataSignal, IrregularlySampledDataSignal,)
@@ -509,7 +508,7 @@ from .triggerevent import (TriggerEvent, TriggerEventType,)
 from . import workspacefunctions
 from . import signalprocessing as sigp
 from . import utilities
-
+from core.utilities import (normalized_index, name_lookup, )
 
 #from .patchneo import neo
 
@@ -952,7 +951,7 @@ def __container_lookup__(container: neo.container.Container,
         
         if collection is None:
             container_children = container.container_children
-            ret = dict((type(c).__name, list() for c in container_children))
+            ret = dict((type(c).__name, list()) for c in container_children)
             
             
             
@@ -1157,10 +1156,10 @@ def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[n
         the "name" attribute equals the value in index (python's default)
         
         This parameters is passed to, and control the bbehaviour of, the 
-        datatypes.normalized_index(...) function.
+        utilities.normalized_index(...) function.
         
     See also:
-        datatypes.normalized_index
+        utilities.normalized_index
         
     """
     if isinstance(src, (tuple, list)):

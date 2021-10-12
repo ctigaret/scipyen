@@ -8,7 +8,7 @@ Decorators, context managers, and helper functions & classes for programming
 from pprint import pprint
 
 import enum, io, os, re, itertools, sys, time, traceback, types, typing
-import importlib, inspect, pathlib, warnings
+import importlib, inspect, pathlib, warnings, operator, functools
 from functools import singledispatch, update_wrapper, wraps
 from contextlib import (contextmanager, ContextDecorator,)
 
@@ -218,14 +218,14 @@ def filterfalse_type(iterable:typing.Iterable, klass:typing.Type) -> typing.Iter
     """
     return filter(lambda x: not isinstance(x, klass), iterable)
 
-def filter_attr(iterable:typing.Iterable, **kwargs):
+def filter_attr(iterable:typing.Iterable, op=operator.and_, **kwargs):
     """Alternative version of filter_attribute.
     
     Fails silently.
     
     Var-keyword parameters:
     =======================
-    attr_name:str ->  predicate:function or value (any). 
+    Mapping of attr_name (str) ->  predicate (function or value). 
         When the attr_name is mapped to a function, this is expected to be a
         unary predicate of the form f(x) -> bool, with the value compared against
         the attr, being hardcoded within.
@@ -237,10 +237,92 @@ def filter_attr(iterable:typing.Iterable, **kwargs):
         comparison function that takes into account the array shape, etc.
         
         WARNING The python's stock operator.eq DOES NOT WORK with numpy arrays!
+    
+    Example 1.:
+    ===========
+    
+    Let 'ephysdata' a neo.Segment where ephysdata.analogsignals contains a
+    neo.AnalogSignal with the 'name' attribute being 'Im_prim2'.
+    
+    We can directly retrieve the named analog signal from its container 
+    (the ephysdata.analosignals list).
+    
+    The expression:
+    
+    [s for s in prog.filter_attr(ephysdata.analogsignals, name = 'Im_prim2')]
+    
+    will return a list with ALL the analog signals named 'Im_prim2' (if found in 
+    ephysdata.analogsignals).
+    
+    Example 2.:
+    ===========
+    
+    Return all analogsignals with name 'Im_prim2' and with units with 
+    dimensionality of picoampere
+    
+    [s for s in prog.filter_attr(ephysdata.analogsignals, name = 'Im_prim2', units = pq.pA)]
+    
+    Example 3.:
+    ===========
+    
+    Return all analogsignals with name 'Im_prim2' and with units with 
+    dimensionality of picoampere
+    
+    NOTE the use of multiple predicates as an 'unpacked' mapping, useful when
+    we are interested in the value of a dotted attribute name (i.e., the value of 
+    the attribute's attribute, in this case the value of the 'dimensionality'
+    attribute of the 'units' attribute of the signal)
+    
+    [s for s in prog.filter_attr(ephysdata.analogsignals, **{'name' : 'Im_prim2', 'units.dimensionality' : pq.pA.dimensionality})]
+    
     """
     #pprint(kwargs)
-    return itertools.chain.from_iterable((filter(lambda x: f(getattr(x, n, None)) if inspect.isfunction(f) else f == getattr(x, n, None),
-                                                 iterable) for n,f in kwargs.items()))
+    from core.utilities import is_dotted_name
+    
+    #op = kwargs.pop('operator', operator.and_)
+    
+    def _check_dotted_attr_(x, attrname):
+        if not is_dotted_name(attrname):
+            return False
+        
+        obj = x
+        
+        for name in attrname.split('.'):
+            obj = getattr(obj, name, None)
+            if obj is None:
+                return False
+            
+        return True
+    
+    def _tf_(x, key, f):
+        """
+        x: the element where attribute check takes place
+        key: name of the attribute; can be a dotted attribute name
+        f: predicate: function or value; when value, the comparison is made by
+            way of operator.eq
+        """
+        return (f(operator.attrgetter(key)(x)) if _check_dotted_attr_(x,key) else (getattr(x, key, None))) if inspect.isfunction(f) else operator.attrgetter(key)(x) == f if _check_dotted_attr_(x, key) else f == getattr(x, key, None)
+    
+    return filter(lambda x: functools.reduce(op, (_tf_(x, k, f) for k,f in kwargs.items())), iterable)
+    
+    #if len(kwargs) > 1:
+        #do something like:
+            #d = {'name':'Im_prim2', 'units':lambda x: x.dimensionality == pq.mV.dimensionality}
+            #fd = [f(getattr(s, x, None)) if inspect.isfunction(f) else f==getattr(s, x, None) for x, f in d.items()]
+            #where s is a signal
+            #then:
+                #ret = operator.and_(*fd)
+            #or:
+                #ret = operator_or_(*fd)
+                
+        #or, better still: # NOTE: 2021-10-13 00:08:36 distilled in the above 
+            #d1 = {'name':'Im_prim2', 'units.dimensionality': pq.mA.dimensionality}
+            
+            #fd1 = [f(getattr(s, x, None)) if inspect.isfunction(f) else operator.attrgetter(x)(s) == f if is_dotted_name(x) else f==getattr(s, x, None) for x, f in d1.items()]
+                
+    
+    #return itertools.chain.from_iterable((filter(lambda x: f(getattr(x, n, None)) if inspect.isfunction(f) else f == getattr(x, n, None),
+                                                 #iterable) for n,f in kwargs.items()))
 
 def filterfalse_attr(iterable:typing.Iterable, **kwargs):
     return itertools.chain.from_iterable((filter(lambda x: not f(getattr(x, n, None)) if inspect.isfunction(f) else f != getattr(x, n, None),
@@ -268,6 +350,24 @@ def filter_attribute(iterable:typing.Iterable,attribute:str, value:typing.Any,
     silentfail:bool Optional, default is True.
         When True, yield None if 'attribute' is not found in elements of 'iterable';
         otherwise, raise AttributeError
+        
+    Example:
+    ========
+    
+    Let 'ephysdata' a neo.Segment where ephysdata.analogsignals contains a
+    neo.AnalogSignal with the 'name' attribute being 'Im_prim2'.
+    
+    We can directly retrieve the named analog signal from its container 
+    (the ephysdata.analosignals list).
+    
+    The expression:
+    
+    [s for s in prog.filter_attribute(ephysdata.analogsignals, 'name', 'Im_prim2')]
+    
+    will return a list with ALL the analog signals named 'Im_prim2' (if found in 
+    ephysdata.analogsignals).
+    
+    
         
     """
     return filter(lambda x: predicate(getattr(x, attribute, None) if silentfail else getattr(x, attribute),
