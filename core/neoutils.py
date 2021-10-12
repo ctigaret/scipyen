@@ -922,7 +922,7 @@ def __container_lookup__(container: neo.container.Container,
                          return_objects:bool = False,
                          **kwargs) -> dict:
     """
-    Lookup and optioooinally return children of specified contained_type 
+    Lookup and optioinally return children of specified contained_type 
     inside a neo.container.Container.
     
     What we want:
@@ -932,7 +932,7 @@ def __container_lookup__(container: neo.container.Container,
     
     We may specify the signal index as a tuple of ints
     
-    Since the neo API is a moving goal post thisis rewritten as of 
+    Since the neo API is a moving goal post this is rewritten as of 
     2021-10-12 17:30:30 and the module docstring is outdated & obsolete.
     
     Basically DO NOT rely on ANY class or instance attrobutes that start with '_'
@@ -950,11 +950,19 @@ def __container_lookup__(container: neo.container.Container,
         
         collection = getattr(container, collection_name, None)
         
+        if collection is None:
+            container_children = container.container_children
+            ret = dict((type(c).__name, list() for c in container_children))
+            
+            
+            
+            
+        
         if collection is not None:
             t = pfun0(collection)
             if len(t):
                 if return_objects:
-                    ret = {collection_name: t)}
+                    ret = {collection_name: t}
                 else:
                     ret = {collection_name: [collection[t_] for t in t]}
                     
@@ -988,13 +996,11 @@ def __container_lookup__(container: neo.container.Container,
                                     return_objects = return_objects)
             
             ret = dict((cname, d) for cname, d in zip(child_container_names, map(pfun, child_container_collections)) if len(d) > 0)
+            
+        return ret
 
-    else:
-        raise TypeError(f"Expecting a neo.Container; got {type(container).__name__} instead.")
-        ret = dict()
+    raise TypeError(f"Expecting a neo.Container; got {type(container).__name__} instead.")
         
-    return ret
-
 def __collection_lookup__(seq: typing.Sequence, 
                           index_obj: typing.Union[str, int, tuple, list, np.ndarray, range, slice],
                           contained_type: neo.baseneo.BaseNeo,
@@ -1151,10 +1157,10 @@ def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[n
         the "name" attribute equals the value in index (python's default)
         
         This parameters is passed to, and control the bbehaviour of, the 
-        utilities.normalized_index(...) function.
+        datatypes.normalized_index(...) function.
         
     See also:
-        utilities.normalized_index
+        datatypes.normalized_index
         
     """
     if isinstance(src, (tuple, list)):
@@ -1262,16 +1268,11 @@ def normalized_signal_index(src: neo.core.container.Container,
     
     if not isinstance(src, neo.Segment):
         raise TypeError("Expecting a neo.Segment; got %s instead" % type(src).__name__)
-    #if not isinstance(src, (neo.Segment, neo.ChannelIndex, neo.Unit)):
-        #raise TypeError("Expecting a neo.Segment or neo.ChannelIndex; got %s instead" % type(src).__name__)
     
     #### BEGIN figure out what signal collection we're after
     if ctype in (neo.AnalogSignal, DataSignal):
         if not isinstance(src, neo.Segment):
             raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
-        
-        #if not isinstance(src, (neo.Segment, neo.ChannelIndex)):
-            #raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
         
         signal_collection = src.analogsignals
         
@@ -1279,17 +1280,11 @@ def normalized_signal_index(src: neo.core.container.Container,
         if not isinstance(src, neo.Segment):
             raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
         
-        #if not isinstance(src, (neo.Segment, neo.ChannelIndex)):
-            #raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
-        
         signal_collection = src.irregularlysampledsignals
         
     elif ctype is neo.SpikeTrain:
         if not isinstance(src, neo.Segment):
             raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
-        
-        #if not isinstance(src, (neo.Segment, neo.Unit)):
-            #raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
         
         signal_collection = src.spiketrains
         
@@ -1331,12 +1326,6 @@ def normalized_signal_index(src: neo.core.container.Container,
             
             data_len = len(signal_collection)
             
-    #elif ctype is neo.Unit:
-        #if not isinstance(src, neo.ChannelIndex):
-            #raise TypeError("%s does not contain %s" % (type(src).__name__, ctype.__name__))
-        
-        #signal_collection = src.units
-        
     else:
         raise TypeError("Cannot handle %s" % ctype.__name__)
     

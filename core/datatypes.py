@@ -483,7 +483,7 @@ def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)) -> i
 def normalized_index(data: typing.Optional[typing.Union[typing.Sequence, int]],
                      index: typing.Optional[typing.Union[str, int, tuple, list, np.ndarray, range, slice]] = None,
                      multiple:bool = True) -> typing.Union[range, tuple]:
-    """Returns a generic indexing in the form of an iterable of indices.
+    """Transform various indexing mechanisms to a generic iterable of int indices.
     
     Also checks the validity of the index for an iterable of data_len samples.
     
