@@ -177,7 +177,9 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
 def deprecation(msg):
     warnings.warn(msg, DeprecationWarning, stacklevel=2)
     
-def iter_attribute(iterable:typing.Iterable, attribute:str, silentfail:bool=True)-> typing.Iterator:
+def iter_attribute(iterable:typing.Iterable, 
+                   attribute:str, 
+                   silentfail:bool=True)-> typing.Generator:
     """Iterator accessing the specified attribute of the elements in 'iterable'.
     Elements lacking the specified attribute yield None, unless 'silentfail' is 
     False.
@@ -191,6 +193,11 @@ def iter_attribute(iterable:typing.Iterable, attribute:str, silentfail:bool=True
     silentfail:bool, optional (default is True)
         When True, elements that lack the attribute yield None; otherwise, an
         AttributeError is raised when such an element is found in 'iterable'.
+        
+    Returns:
+    ========
+    Generator expression
+    
     """
     if silentfail:
         return (getattr(item, attribute, None) for item in iterable)
@@ -218,17 +225,64 @@ def filterfalse_type(iterable:typing.Iterable, klass:typing.Type) -> typing.Iter
     """
     return filter(lambda x: not isinstance(x, klass), iterable)
 
-def filter_attr(iterable:typing.Iterable, op=operator.and_, **kwargs):
-    """Alternative version of filter_attribute.
+def filter_attr(iterable:typing.Iterable, 
+                op:typing.Callable[[typing.Any, typing.Any], bool] = operator.and_, 
+                indices:bool = False, 
+                indices_only:bool = False, 
+                exclude:bool = False,
+                **kwargs)-> typing.Iterator:
+    """Filter an iterable using predicates applied to attributes of its elements.
     
-    Fails silently.
+    This is an enhanced version of filter_attribute. Furthermore, it fails
+    silently if no element of the iterable satisfies the predicate(s).
     
-    Var-keyword parameters:
-    =======================
+    Parameters:
+    ==========
+    iterable: an iterable
+    
+    op: builtin, or user-defined binary predicate function or method.
+        Optional, default is operator.and_
+        
+        This must have the form: f(x,y) -> bool and is used to collapse the
+        resutls from several predicates in kwargs into one boolean value.
+    
+    indices:bool, optional (default is False)
+        When False (default), returns an iterator through the elements of the
+            iterable that satisfy the predicate(s) in kwargs (see below)
+            
+        When True, also gives access to the indices, inside the iterable, of the 
+            elements that satisfy the predicates in kwargs. Depending on the 
+            'indices_only' flag (see below), this can be:
+                
+                * an iterator through tuples (index, element) when index_only is
+                    False (the default)
+                
+                * an iterator through int indices, when indices_only is True.
+                
+        NOTE: ALL the indices of the found elements will be returned. 
+            This behaviour is distinct from that of Python's list.index()
+            method, which returns the index of the FIRST element found.
+            
+    indices_only:bool, optional (default is False)
+        When True, returns an iterator through the indices of the elements that
+            satisy the predicate(s)
+            
+        When False (default) returns an iterator through the tuples 
+            (index, element) for the elements that satisfy the predicate(s)
+            
+        NOTE: Setting the 'indices_only' flag to True, automatically sets 'indices'
+        to True as well (this will save some typing).
+        
+    exclude:bool, ooptioinal (default is False)
+        When True, the function NEGATES the evaluation of the predicates.
+    
+    Var-keyword parameters (kwargs):
+    ================================
+    
     Mapping of attr_name (str) ->  predicate (function or value). 
         When the attr_name is mapped to a function, this is expected to be a
-        unary predicate of the form f(x) -> bool, with the value compared against
-        the attr, being hardcoded within.
+        unary predicate of the form f(x) -> bool, where the comparison value for
+        the attribute is hardcoded.
         
         When attr_name is mapped to any other type, the predicate will be the
         stock python's identity operator (operator.eq).
@@ -238,48 +292,85 @@ def filter_attr(iterable:typing.Iterable, op=operator.and_, **kwargs):
         
         WARNING The python's stock operator.eq DOES NOT WORK with numpy arrays!
     
+    Returns:
+    ========
+    None; the function is a generator (yields an iterator).
+    
+    NOTE: When no predicates are specified (i.e. **kwargs resolves to an empty
+    mapping) then, the behaviour is as detailed in the table below:
+    
+    'exclude'   'indices'   'indices_only'      Function yields:
+    ============================================================================
+        True                                        Nothing
+
+        False   True        True                    Unfiltered index iterator
+        
+                True        False                   Unfiltered iterator (index, element)
+
+        False   False       False                   Unfiltered element iterator
+        
     Example 1.:
     ===========
     
     Let 'ephysdata' a neo.Segment where ephysdata.analogsignals contains a
     neo.AnalogSignal with the 'name' attribute being 'Im_prim2'.
     
-    We can directly retrieve the named analog signal from its container 
-    (the ephysdata.analosignals list).
+    The named analog signal is obtained using an unary predicate that compares 
+    the signal's 'name' attribute to a str. The unary predicate function 
+    lambda x: x== 'Im_prim2' is passed as the keyword 'name'.
     
     The expression:
     
-    [s for s in prog.filter_attr(ephysdata.analogsignals, name = 'Im_prim2')]
+    [s for s in prog.filter_attr(ephysdata.analogsignals, name = lambda x: x=='Im_prim2')]
     
-    will return a list with ALL the analog signals named 'Im_prim2' (if found in 
+    constructs a list with ALL the analog signals named 'Im_prim2' (if found in 
     ephysdata.analogsignals).
     
     Example 2.:
     ===========
+    Accomplishes the same as Example 1 but the name 'attribute' is compared 
+    directly.
     
-    Return all analogsignals with name 'Im_prim2' and with units with 
-    dimensionality of picoampere
-    
-    [s for s in prog.filter_attr(ephysdata.analogsignals, name = 'Im_prim2', units = pq.pA)]
+    [s for s in prog.filter_attr(ephysdata.analogsignals, name = 'Im_prim2')]
     
     Example 3.:
     ===========
     
-    Return all analogsignals with name 'Im_prim2' and with units with 
-    dimensionality of picoampere
+    Return all analog signals with name 'Im_prim2' AND with units of picoampere
     
-    NOTE the use of multiple predicates as an 'unpacked' mapping, useful when
-    we are interested in the value of a dotted attribute name (i.e., the value of 
-    the attribute's attribute, in this case the value of the 'dimensionality'
-    attribute of the 'units' attribute of the signal)
+    [s for s in prog.filter_attr(ephysdata.analogsignals, name = 'Im_prim2', units = pq.pA)]
+    
+    Example 4.: 
+    ===========
+    Accomplishes the same thing as Example 2 but illustrates the use of an
+    attribute's attribute.
+    
+    NOTE The use of multiple predicates as an 'unpacked' mapping ( **{...} ), 
+    useful when we are using the value of a dotted attribute name (i.e., the 
+    value of the attribute's attribute) as one of the predicate.
+    
+    In this case the attribute's attribute is units.dimensionality. 
+    
+    Since keyword literals cannot be dotted strings, we pass a dict that we 
+    build and 'unpack' 'on the fly'.
     
     [s for s in prog.filter_attr(ephysdata.analogsignals, **{'name' : 'Im_prim2', 'units.dimensionality' : pq.pA.dimensionality})]
     
     """
-    #pprint(kwargs)
     from core.utilities import is_dotted_name
     
-    #op = kwargs.pop('operator', operator.and_)
+    
+    if indices_only is True:
+        indices = True
+        
+    if not isinstance(op, (types.FunctionType, types.LambdaType, types.BuiltinFunctionType, types.MethodType)):
+        raise TypeError(f"'op' expected to be a function, buitlin, lambda or method; got {op} instead")
+    
+    #if not inspect.isbuiltin(op) and not inspect.isfunction(op):
+        #raise TypeError(f"'op' parameter ({op}) expected to be a function or builtin; got {type(op).__name__} instead")
+    
+    if len(inspect.getfullargspec(op).args) != 2:
+        raise TypeError(f"'op' parameter expected to be a binary function, i.e., with call syntax op(a,b)")
     
     def _check_dotted_attr_(x, attrname):
         if not is_dotted_name(attrname):
@@ -301,38 +392,54 @@ def filter_attr(iterable:typing.Iterable, op=operator.and_, **kwargs):
         f: predicate: function or value; when value, the comparison is made by
             way of operator.eq
         """
-        return (f(operator.attrgetter(key)(x)) if _check_dotted_attr_(x,key) else (getattr(x, key, None))) if inspect.isfunction(f) else operator.attrgetter(key)(x) == f if _check_dotted_attr_(x, key) else f == getattr(x, key, None)
-    
-    return filter(lambda x: functools.reduce(op, (_tf_(x, k, f) for k,f in kwargs.items())), iterable)
-    
-    #if len(kwargs) > 1:
-        #do something like:
-            #d = {'name':'Im_prim2', 'units':lambda x: x.dimensionality == pq.mV.dimensionality}
-            #fd = [f(getattr(s, x, None)) if inspect.isfunction(f) else f==getattr(s, x, None) for x, f in d.items()]
-            #where s is a signal
-            #then:
-                #ret = operator.and_(*fd)
-            #or:
-                #ret = operator_or_(*fd)
-                
-        #or, better still: # NOTE: 2021-10-13 00:08:36 distilled in the above 
-            #d1 = {'name':'Im_prim2', 'units.dimensionality': pq.mA.dimensionality}
+        if exclude:
+            return (not f(operator.attrgetter(key)(x)) if _check_dotted_attr_(x,key) else not f(getattr(x, key, None))) if inspect.isfunction(f) else not operator.attrgetter(key)(x) == f if _check_dotted_attr_(x, key) else f != getattr(x, key, None)
+        else:
+            return (f(operator.attrgetter(key)(x)) if _check_dotted_attr_(x,key) else f(getattr(x, key, None))) if inspect.isfunction(f) else operator.attrgetter(key)(x) == f if _check_dotted_attr_(x, key) else f == getattr(x, key, None)
+        
+    if len(kwargs) == 0:
+        if exclude is True:
+            yield
+        else:
+            if not indices:
+                yield from iterable
+            else:
+                if indices_only:
+                    yield from range(len(list(iterable)))
+                else:
+                    yield from enumerate(iterable)
             
-            #fd1 = [f(getattr(s, x, None)) if inspect.isfunction(f) else operator.attrgetter(x)(s) == f if is_dotted_name(x) else f==getattr(s, x, None) for x, f in d1.items()]
-                
+    else:
+        if indices:
+            if indices_only:
+                yield from (i[0] for i in filter(lambda x: functools.reduce(op, (_tf_(x[1], k, f) for k,f in kwargs.items())), enumerate(iterable)))
+                #return (i[0] for i in filter(lambda x: functools.reduce(op, (_tf_(x[1], k, f) for k,f in kwargs.items())), enumerate(iterable)))
+            else:
+                yield from filter(lambda x: functools.reduce(op, (_tf_(x[1], k, f) for k,f in kwargs.items())), enumerate(iterable))
+                #return filter(lambda x: functools.reduce(op, (_tf_(x[1], k, f) for k,f in kwargs.items())), enumerate(iterable))
+        else:
+            yield from filter(lambda x: functools.reduce(op, (_tf_(x, k, f) for k,f in kwargs.items())), iterable)
+        #return filter(lambda x: functools.reduce(op, (_tf_(x, k, f) for k,f in kwargs.items())), iterable)
     
-    #return itertools.chain.from_iterable((filter(lambda x: f(getattr(x, n, None)) if inspect.isfunction(f) else f == getattr(x, n, None),
+def filterfalse_attr(iterable:typing.Iterable, **kwargs)-> typing.Iterator:
+    """'Negative' form of filter_attr.
+    
+    Calls filter_attr with 'exclude' set to True.
+    
+    """
+    kwargs.pop("exclude", True)
+    
+    return filter_attr(iterable, exclude=True, **kwargs)
+    
+    #return itertools.chain.from_iterable((filter(lambda x: not f(getattr(x, n, None)) if inspect.isfunction(f) else f != getattr(x, n, None),
                                                  #iterable) for n,f in kwargs.items()))
-
-def filterfalse_attr(iterable:typing.Iterable, **kwargs):
-    return itertools.chain.from_iterable((filter(lambda x: not f(getattr(x, n, None)) if inspect.isfunction(f) else f != getattr(x, n, None),
-                                                 iterable) for n,f in kwargs.items()))
 
     
 def filter_attribute(iterable:typing.Iterable,attribute:str, value:typing.Any, 
                      predicate:typing.Callable[...,bool]=lambda x,y: x==y,
                      silentfail:bool=True) -> typing.Iterator:
     """Iterates elements in 'iterable' for which 'attribute' satisfies 'predicate'.
+    DEPRECATED
     
     Positional parameters:
     ======================
@@ -367,9 +474,8 @@ def filter_attribute(iterable:typing.Iterable,attribute:str, value:typing.Any,
     will return a list with ALL the analog signals named 'Im_prim2' (if found in 
     ephysdata.analogsignals).
     
-    
-        
     """
+    deprecation("Use prog.filter_attr")
     return filter(lambda x: predicate(getattr(x, attribute, None) if silentfail else getattr(x, attribute),
                                       value),
                   iterable)
@@ -378,6 +484,7 @@ def filterfalse_attribute(iterable:typing.Iterable, attribute:str, value:typing.
                      predicate:typing.Callable[...,bool]=lambda x,y: x==y,
                      silentfail:bool=True) -> typing.Iterator:
     """The negated version of filter_attribute.
+    DEPRECATED
     Iterates elements in 'iterable' for which 'attribute' does NOT satisfy 'predicate'.
     Positional parameters:
     ======================
@@ -401,6 +508,7 @@ def filterfalse_attribute(iterable:typing.Iterable, attribute:str, value:typing.
         otherwise, raise AttributeError
         
     """
+    deprecation("Use prog.filterfalse_attr")
     return filter(lambda x: not predicate(getattr(x, attribute, None) if silentfail else getattr(x, attribute),
                                           value), iterable)
     
@@ -412,7 +520,7 @@ def deprecated(f, *args, **kwargs):
     @wraps(f)
     def wrapper(*args, **kwargs):
         try:
-            warnings.warn("%s is deprecated" % f)
+            deprecation("%s is deprecated" % f)
             return f(*args, **kwargs)
         
         except Exception as e:

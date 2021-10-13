@@ -30,7 +30,7 @@ except:
     from operator import eq
 
 
-from .prog import safeWrapper
+from .prog import safeWrapper, deprecation
 
 from .strutils import get_int_sfx
 
@@ -2443,7 +2443,9 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
 def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True) -> typing.Union[tuple, int]:
     """Alternative to list.index(), such that a missing value returns None
-    of raising an Exception
+    of raising an Exception.
+    DEPRECATED
+    Use prog.filter_attr
     """
     if b in a:
         if multiple:
@@ -2523,6 +2525,9 @@ def make_file_filter_string(extList, genericName):
 
 def is_dotted_name(s):
     return isinstance(s, str) and '.' in s
+
+def elements_types(s):
+    return gen_unique(map(lambda x: type(x).__name__, s))
 
 
 def counter_suffix(x, strings, sep="_"):
@@ -2902,11 +2907,9 @@ def normalized_index(data: typing.Optional[typing.Union[typing.Sequence, int]],
         
     elif isinstance(data, (tuple, list, deque)):
         data_len = len(data)
-    
-    if not isinstance(data, (int, tuple, list)):
-        raise TypeError("Expecting an int or a sequence (tuple, or list) or None; got %s instead" % type(data).__name__)
-    
-    data_len = data if isinstance(data, int) else len(data)
+        
+    else:
+        raise TypeError("Expecting an int or a sequence (tuple, list, deque) or None; got %s instead" % type(data).__name__)
     
     if index is None:
         return range(data_len)

@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
 """ Various utilities for handling objects and data structures in the neo package.
-
 FIXME/TODO:: 2021-10-03 12:37:31 
 Unit and ChannelIndex are deprecated in neo
 Everything in here MUST reflect that!
@@ -482,7 +480,9 @@ IV. Generic indexing for the neo framework (provisional)
 
 """
 #### BEGIN core python modules
-import traceback, datetime, collections, numbers, inspect, warnings, typing
+import traceback, datetime, numbers, inspect, warnings, typing, types
+from collections import deque
+import operator
 from itertools import chain, filterfalse
 from functools import partial
 from enum import (Enum, IntEnum,)
@@ -498,7 +498,11 @@ import pyqtgraph as pg
 
 #### BEGIN pict.core modules
 #from . import plots
-from .prog import safeWrapper
+from .prog import (safeWrapper, deprecation, 
+                   filter_attr, filterfalse_attr,
+                   filter_type, filterfalse_type,
+                   iter_attribute)
+
 from .datatypes import (units_convertible, check_time_units, is_string, 
                         RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
 
@@ -508,7 +512,7 @@ from .triggerevent import (TriggerEvent, TriggerEventType,)
 from . import workspacefunctions
 from . import signalprocessing as sigp
 from . import utilities
-from core.utilities import (normalized_index, name_lookup, )
+from core.utilities import (normalized_index, name_lookup, elements_types)
 
 #from .patchneo import neo
 
@@ -524,6 +528,8 @@ ancillary_neo_data = (neo.ImageSequence, neo.Event, neo.Epoch)
 ephys_data_collection = (neo.Block, neo.Segment)#, neo.Unit)
 #ephys_data_collection = (neo.Block, neo.Segment, neo.Unit)
 
+# NOTE: 2021-10-13 12:44:51
+# the below is on its way out!
 type_to_container_member_name = {
     neo.Segment: {
         DataSignal: "analogsignals",
@@ -921,7 +927,7 @@ def __container_lookup__(container: neo.container.Container,
                          return_objects:bool = False,
                          **kwargs) -> dict:
     """
-    Lookup and optioinally return children of specified contained_type 
+    Lookup and optionally return children of specified contained_type 
     inside a neo.container.Container.
     
     What we want:
@@ -1084,89 +1090,205 @@ def is_empty(x:typing.Union[neo.core.container.Container, neo.core.dataobject.Da
     
     else:
         raise TypeError("Expecting a neo Container, DataObject or a sequence of these; got %s instead" % type(x).__name__)
+    
+
         
 def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]],
-               index: typing.Union[int, str, range, slice, typing.Sequence],
-               ctype: type = neo.AnalogSignal,
-               multiple: bool = True,
-               return_objects:bool = False) -> typing.Union[dict, tuple]:
-    """Provisional - work in progress
+               data_obj_type: typing.Union[typing.Sequence[type], type] = neo.AnalogSignal,
+               op = operator.and_, 
+               indices:bool = False, 
+               indices_only:bool = False,
+               exclude: bool = False,
+               **kwargs):
+    """Enhanced filtering of child data objects inside neo containers.
     
-    We have: 
-        a neo.container.Container object
-        a name (str) or sequence of names of child container or data objects
-        possibly contained in the container object
-        
-    We want:
-        a dict returing the (possibly) nested index of the child object inside
-        the container
-        
-    e.g.:
+    Looks up data objects by type and any combination of data object attributes
+    inside a neo.container, recursively.
     
-    We have:
-        Block with three segments and name 'block':
-            segment 0 with name 's0' and
-                3 analogsignals: 
-                    'sig1', 'sig2', 'sig3'
-                2 irregularlysampledsignals:
-                    'sig2', 'sig4'
-                    
-            segment 1 with name 's1'
-                with 2 analogsignals:
-                    'sig1', 'sig3'
-                    
-                    
-        We look for analog signals named 'sig1'
-        
-    We should get back:
-        {"block": 'block'}
-        
-        
-        
+    For a flat iterator, consider using the filter method of a neo.core.container.Container
+    and the filterdata function in the neo.core.container module.
     
+    Returns a nested dictionary where the leaves are lists of child data objects,
+    their indices in the corresponding data object collection, or tuples 
+    (index, child data object).
     
-    Positional parameters:
-    ----------------------
-    src: neo.core.container.Container or a sequence of Container objects
-        (neo.core.container.Container is the ancestor of all container objects 
-        in the neo package)
-        
-    index: int, str, range, slice, or sequence of int or str.
-        CAUTION: The sequence can contain a mixture of int and str.
-        
-        When index is a string, the function looks up objects by the value of 
-        their "name" attribute - all data objects in the neo package except for 
-        neo.regionofinterest.RegionOfInterest. 
-        
-        WARNING This name lookup assumes that all data object children have 
-            unique values for their "name" attribute.
-            
-        If this is not the case, the behaviour of the function depends on the
-            value of the "multiple" parameter (see below).
-        
-    ctype: type, default is neo.AnalogSignal; the type of the contained object
+    Below a 'sequence' denotes a collections.deque, list, or tuple.
     
-    multiple: bool, default is True; controls the behaviour when looking up
-        objects by their "name" attribute.
+    Parameters:
+    ==========
+    
+    src: neo container (e.g, Block, Segment, Group) or sequence (collections.deque,
+        list or tuple) of neo containers
         
-        When True, the function will return  the index of all objects for which
-        the "name" attribute equals the value in index.
-        
-        When False, the function returns the index of the first object for which
-        the "name" attribute equals the value in index (python's default)
-        
-        This parameters is passed to, and control the bbehaviour of, the 
-        utilities.normalized_index(...) function.
-        
-    See also:
-        utilities.normalized_index
-        
+    data_obj_type: type or sequence of type
+    
     """
-    if isinstance(src, (tuple, list)):
-        return tuple([__container_lookup__(s, index, ctype, multiple=True, return_objects=return_objects) for s in src])
-    
+
+    if isinstance(data_obj_type, type):
+        data_obj_type = (data_obj_type, )
+            
+    if isinstance(data_obj_type, (tuple, list, deque)) and all((isinstance(d, type) and neo.core.dataobject.DataObject in inspect.getmro(d)) for d in data_obj_type):
+        collection_names = tuple(map(neo.core.baseneo._container_name, (d.__name__ for d in data_obj_type)))
     else:
-        return __container_lookup__(src, index, ctype, multiple=True, return_objects=return_objects)
+        raise ValueError(f"'data_obj_type' expected to be a descendant of neo.core.dataobject.DataObject, or a sequence (deque, list, tuple) of such types; got {data_obj_type.__name__} instead")
+        
+    if isinstance(src, neo.core.container.Container):
+        containers = [src]
+        
+    elif isinstance(src, (tuple, list, deque)) and all(isinstance(s, neo.core.container.Container) for s in src):
+        containers = src
+        
+    else:
+        raise TypeError("'src' expected to be a descendant of neo.core.container.Container, or a sequence (deque, list, tuple) of such")
+    
+    #def _collection_lookup_(coll, coll_name, op, indices, indices_only,exclude,flat, **kwargs):
+        #if flat:
+            #return filter_attr(coll, op=op, indices=indices, indices_only=indices_only, 
+                                #exclude=exclude, **kwargs)
+        #else:
+            #return {coll_name: tuple([i for i in filter_attr(coll, op=op, 
+                                                             #indices=indices, 
+                                                             #indices_only=indices_only, 
+                                                             #exclude=exclude, 
+                                                             #**kwargs)])}
+        
+    #def _container_lookup_(container, coll_name):
+        #return _collection
+        
+    
+    container_names = tuple(map(lambda x: neo.core.baseneo._container_name(type(x).__name__), containers))
+    
+    #rr = dict((container_names[k], {k:dict((collection_name, tuple([i for i in filter_attr(collection, 
+                                                                             #op=op, 
+                                                                             #indices=indices, 
+                                                                             #indices_only=indices_only, 
+                                                                             #exclude=exclude, 
+                                                                             #**kwargs)])))}) for k, container in enumerate(containers))
+    
+    ret = dict()
+    
+    # ### BEGIN blueprint code - it actually works - do not delete !!!
+    for k, container in enumerate(containers):
+        container_name = container_names[k]
+        
+        cdict = dict()
+        
+        for l, collection_name in enumerate(collection_names):
+            collection = getattr(container, collection_name, None)
+            if collection is not None:
+                cdict.update({collection_name: tuple([i for i in filter_attr(collection, 
+                                                                             op=op, 
+                                                                             indices=indices, 
+                                                                             indices_only=indices_only, 
+                                                                             exclude=exclude, 
+                                                                             **kwargs)])})
+                
+            else:
+                for child_container_name in container._child_containers:
+                    ccdict  = neo_lookup(getattr(container, child_container_name),
+                                         data_obj_type=data_obj_type,
+                                         op=op,
+                                         indices=indices,
+                                         indices_only=indices_only,
+                                         exclude=exclude,
+                                         **kwargs)
+                    
+                    if isinstance(ccdict, dict):
+                        cdict.update(ccdict)
+                        
+        if len(cdict):
+            if container_name in ret:
+                ret[container_name].update({k:cdict})
+            else:
+                ret[container_name] = {k:cdict}
+    
+    if len(ret):
+        return ret
+                
+    # ### END blueprint code - it actually works!
+    
+#def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]],
+               #index: typing.Union[int, str, range, slice, typing.Sequence],
+               #ctype: type = neo.AnalogSignal,
+               #multiple: bool = True,
+               #return_objects:bool = False) -> typing.Union[dict, tuple]:
+    #"""Provisional - work in progress
+    
+    #We have: 
+        #a neo.container.Container object
+        #a name (str) or sequence of names of child container or data objects
+        #possibly contained in the container object
+        
+    #We want:
+        #a dict returing the (possibly) nested index of the child object inside
+        #the container
+        
+    #e.g.:
+    
+    #We have:
+        #Block with three segments and name 'block':
+            #segment 0 with name 's0' and
+                #3 analogsignals: 
+                    #'sig1', 'sig2', 'sig3'
+                #2 irregularlysampledsignals:
+                    #'sig2', 'sig4'
+                    
+            #segment 1 with name 's1'
+                #with 2 analogsignals:
+                    #'sig1', 'sig3'
+                    
+                    
+        #We look for analog signals named 'sig1'
+        
+    #We should get back:
+        #{"block": 'block'}
+        
+        
+        
+    
+    
+    #Positional parameters:
+    #----------------------
+    #src: neo.core.container.Container or a sequence of Container objects
+        #(neo.core.container.Container is the ancestor of all container objects 
+        #in the neo package)
+        
+    #index: int, str, range, slice, or sequence of int or str.
+        #CAUTION: The sequence can contain a mixture of int and str.
+        
+        #When index is a string, the function looks up objects by the value of 
+        #their "name" attribute - all data objects in the neo package except for 
+        #neo.regionofinterest.RegionOfInterest. 
+        
+        #WARNING This name lookup assumes that all data object children have 
+            #unique values for their "name" attribute.
+            
+        #If this is not the case, the behaviour of the function depends on the
+            #value of the "multiple" parameter (see below).
+        
+    #ctype: type, default is neo.AnalogSignal; the type of the contained object
+    
+    #multiple: bool, default is True; controls the behaviour when looking up
+        #objects by their "name" attribute.
+        
+        #When True, the function will return  the index of all objects for which
+        #the "name" attribute equals the value in index.
+        
+        #When False, the function returns the index of the first object for which
+        #the "name" attribute equals the value in index (python's default)
+        
+        #This parameters is passed to, and control the bbehaviour of, the 
+        #utilities.normalized_index(...) function.
+        
+    #See also:
+        #utilities.normalized_index
+        
+    #"""
+    #if isinstance(src, (tuple, list)):
+        #return tuple([__container_lookup__(s, index, ctype, multiple=True, return_objects=return_objects) for s in src])
+    
+    #else:
+        #return __container_lookup__(src, index, ctype, multiple=True, return_objects=return_objects)
     
 def neo_index(src: typing.Union[neo.container.Container, typing.Sequence],
                     ndx: typing.Union[typing.Mapping, typing.Sequence, str]) -> tuple:
@@ -1478,11 +1600,7 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
             data = src
         
         if isinstance(names, str):
-            # NOTE: 2017-12-14 00:54:06
-            # I don't think this is really necessary because DataSignal objects
-            # can be very well contained in the analogsignals list of a segment
-            # alongside neo.AnalogSignal objects ( guess ... TODO check this)
-            
+            ret = [k for k in filter_attr(getattr(j,signal_collection), name = names)]
             if silent:
                 return [utilities.silentindex([i.name for i in getattr(j, signal_collection)], names, multiple=False) for j in data]
             
