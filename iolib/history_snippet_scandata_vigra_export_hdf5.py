@@ -75,3 +75,11 @@ store.put("df", df, format="table")
 
 store.close()
 
+#######
+## 2021-10-14 18:28:08
+neo_nixio_file = neo.NixIO("test_neo_nixio_file.nix")
+nix_file = neo_nixio_file.nix_file
+nix_file._h5file # this is a HDF5 file; can one add vigra writeHDF5 to it?
+
+
+
