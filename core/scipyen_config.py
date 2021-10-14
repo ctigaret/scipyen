@@ -988,6 +988,7 @@ class ScipyenConfigurable(object):
     #qsettings = QtCore.QSettings("Scipyen", "Scipyen")
     _scipyen_settings_  = scipyen_config
     _user_settings_src_ = scipyen_user_config_source
+    _user_settings_file_ = _user_settings_src_.filename
     
     def __init__(self, configTag:typing.Optional[str]=None):
         #super().__init__()
