@@ -1485,6 +1485,8 @@ def write_config(config:typing.Optional[confuse.Configuration]=scipyen_config,
         if ext != ".yaml":
             filename = ".".join([fn, "yaml"])
             
+    #print(f"scipyen_config.write_config: filename {filename}")
+            
     if isinstance(config, confuse.Configuration): # Configuration and LazyConfig
         out = config.dump(full=full, redact=redact)
         
