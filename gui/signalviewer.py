@@ -866,16 +866,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         elif isinstance(analog, np.ndarray):
             self.selectSignalComboBox.clear()
             self.selectIrregularSignalComboBox.clear()
-            # TODO (maybe) manage individual signals from the array
-            #if analog.size > 0:
-                #if analog.ndim == 1:
-                    #sig_names = "Analog signal"
-                    
-                #elif analog.ndim  == 2:
-                    #if self.frameAxis is None:
-            
+
         else:
-            #print(type(analog))
             current_ndx = self.selectSignalComboBox.currentIndex()
             current_txt = self.selectSignalComboBox.currentText()
             

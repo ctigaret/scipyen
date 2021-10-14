@@ -1324,9 +1324,6 @@ def auto_define_trigger_events(src, event_type, analog_index,
                         if isinstance(event, TriggerEvent):
                             embed_trigger_event(event, s, clear=clear)
                             
-                        #else:
-                            #warnings.warn("No trigger event was detected in signal %d" % sndx)
-                        
                     else:
                         raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (ndx, len(s.analogsignals)))
 
@@ -1349,8 +1346,6 @@ def auto_define_trigger_events(src, event_type, analog_index,
                         
                     if isinstance(event, TriggerEvent):
                         embed_trigger_event(event, s, clear=clear)
-                    #else:
-                        #warnings.warn("No trigger event detected in signal %d, in segment %d" % (analog_index, ks))
                     
                 else:
                     raise ValueError("Invalid signal index %d for a segment with %d analogsignals" % (analog_index, len(s.analogsignals)))

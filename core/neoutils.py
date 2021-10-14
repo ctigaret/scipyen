@@ -879,8 +879,6 @@ def normalized_segment_index(src: neo.Block,
     #"""    
     #return "list_%s" % neo_child_container_name(type_or_obj)
 
-
-        
 def neo_child_container_name(type_or_obj):
     """Provisional: name of member collection.
     Returns a valid child container name; doesn't tell is a container actually
@@ -1093,7 +1091,7 @@ def is_empty(x:typing.Union[neo.core.container.Container, neo.core.dataobject.Da
     
 
         
-def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]],
+def neo_lookup(*args: typing.Union[neo.core.container.Container, typing.Sequence[neo.core.container.Container]],
                data_obj_type: typing.Union[typing.Sequence[type], type] = neo.AnalogSignal,
                op = operator.and_, 
                indices:bool = False, 
@@ -1103,10 +1101,18 @@ def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[n
     """Enhanced filtering of child data objects inside neo containers.
     
     Looks up data objects by type and any combination of data object attributes
-    inside a neo.container, recursively.
+    inside a neo container (i.e., Block, Segment, or a sequence of these), 
+    recursively.
     
-    For a flat iterator, consider using the filter method of a neo.core.container.Container
-    and the filterdata function in the neo.core.container module.
+    CAUTION: Use neo_lookup ONLY for this purpose.
+    
+    To select signals directly from a regular Python sequence, use prog.filter_attr()
+    (poissibly in combination with prog.filter_type()).
+    
+    For a flat iterator for neo data objects, and when their indices inside the 
+    container or sequence are irrelevant, use the
+    neo.core.container.Container.filter() method or the 
+    neo.core.container.filterdata() function.
     
     Returns a nested dictionary where the leaves are lists of child data objects,
     their indices in the corresponding data object collection, or tuples 
@@ -1227,7 +1233,7 @@ def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[n
         } 
     }
     
-    I.e., analog signals named "Im_prim2" were found at index 2 in the 
+    Here, analog signals named "Im_prim2" were found at index 2 in the 
     'analogsignals' list attributes of segments 0, 1, and 2, in the first (and
     only) block in the argument list.
     
@@ -1239,11 +1245,14 @@ def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[n
     this function keeps track of the original container where the data object 
     was found.
     
-    The only caveat is that the index can become out of sync with the data source
-    if the contents of the data source (i.e. of the block/segment/analogsignals list)
-    have changed. As long as the STRUCTURE of the data source stays the same, 
-    the final indices can be updated atomically.
+    CAVEATS:
+    ========
+    1. The index can become out of sync with the data source if the contents of 
+    the data source (i.e. of the block/segment/analogsignals list)
+    have changed. 
     
+    2. When a sequence, src can only contain a mixture of neo container objects
+    (i.e., Block and Segment) OR it can be a sequence of neo data objects
 
     NOTE:
     =====
@@ -1296,6 +1305,17 @@ def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[n
         raise ValueError(f"'data_obj_type' expected to be a descendant of neo.core.dataobject.DataObject, or a sequence (deque, list, tuple) of such types; got {data_obj_type.__name__} instead")
     
     #print("signal_collection_names", signal_collection_names)
+    
+    # NOTE: 2021-10-14 09:05:28
+    # *args introduced so that we can feed a comma-separated list of neo objects
+    if len(args)==0:
+        return {}
+    
+    if len(args) == 1:
+        src = args[0]
+        
+    else:
+        src = args
         
     if isinstance(src, neo.core.container.Container):
         containers = [src]
@@ -1305,17 +1325,19 @@ def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[n
             containers = src
             
         elif all(isinstance(s, neo.core.dataobject.DataObject) for s in src):
-            ret = dict()
-            
-            for i in filter_attr(src, op=op, indices=True, indices_only=False,
-                                 exclude=exclude, **kwargs):
-                cont_name = neo.core.baseneo._container_name(type(i[1]).__name__)
-                if cont_name in ret:
-                    ret[cont_name] = ret[cont_name] + (i[0], )
-                else:
-                    ret[cont_name] = (i[0],)
-                    
-            return ret
+            # a colleciton of possibly mixed signals - just return a 'vanilla'
+            # dict
+            if all(type(s) == type(src[0]) for s in src):
+                # if all data obejcts have the same type return a 'mock' 
+                # named container list
+                key = neo.core.container._container_name(type(src[0]).__name__)
+            else:
+                #
+                key = "signals"
+                
+            return {key: tuple([i for i in filter_attr(src, op=op, indices=indices,
+                                                             indices_only=indices_only,
+                                                             exclude=exclude, **kwargs)])}
     else:
         raise TypeError("'src' expected to be a descendant of neo.core.container.Container, or a sequence (deque, list, tuple) of such, or of data objects")
     
@@ -1370,12 +1392,54 @@ def neo_lookup(src: typing.Union[neo.core.container.Container, typing.Sequence[n
                 
     # ### END blueprint code - it actually works!
     
-def neo_apply_index(src: typing.Union[neo.container.Container, typing.Sequence],
-                    ndx: typing.Union[typing.Mapping, typing.Sequence, str]) -> tuple:
+#def neo_lookup2(*args:
+               #data_obj_type: typing.Union[typing.Sequence[type], type] = neo.AnalogSignal,
+               #op = operator.and_, 
+               #indices:bool = False, 
+               #indices_only:bool = False,
+               #exclude: bool = False,
+               #**kwargs):
+    
+    #if len(args) == 0:
+        #return {}
+
+    #if isinstance(data_obj_type, type):
+        #data_obj_type = (data_obj_type, )
+            
+    #if isinstance(data_obj_type, (tuple, list, deque)) and all((isinstance(d, type) and neo.core.dataobject.DataObject in inspect.getmro(d)) for d in data_obj_type):
+        #signal_collection_names = tuple(map(neo.core.baseneo._container_name, (d.__name__ for d in data_obj_type)))
+    #else:
+        #raise ValueError(f"'data_obj_type' expected to be a descendant of neo.core.dataobject.DataObject, or a sequence (deque, list, tuple) of such types; got {data_obj_type.__name__} instead")
+    
+    #ret = dict()
+    
+    ## NOTE: 
+    ## 'container_list_name' = name of attribute that is a list of containers
+    ##   e.g., 'segments' (most typically) but also 'groups'
+    ##   we also allow fictitous ones:
+    ##   'blocks' to index in a collection of 
+    ## 'object_list_name' = name of attribute that is a list of data object
+    
+    #for arg in args:
+        #if isinstance(arg, neo.core.container.Container):
+            #container_name = neo.core.container._container_name(type(arg).__name__)
+            
+            ## get the indexing dict for container arg
+            
+            #if container_name in ret:
+                
+            
+            
+        
+    
+    #if len(src) == 1:
+        #src = src[0]
+        
+            
+def neo_use_lookup_index(*args: typing.Union[neo.container.Container, typing.Sequence],
+                    ndx: dict) -> tuple:
     """Access data objects using an indexing dictionary returned by neo_lookup.
     neo_lookup must have been called with indices_onlt set to True.
-    
-    For generality, more regular indices can also be applied.
     
     """
     if __debug__:
@@ -1384,7 +1448,36 @@ def neo_apply_index(src: typing.Union[neo.container.Container, typing.Sequence],
         
         __debug_indent__ = "   " * (__debug_count__ -1)
         
+    if not isinstance(ndx, dict):
+        raise TypeError(f"'ndx' expected to be a dict; got {type(ndx).__name__} instead")
+        
+    if len(args) == 0:
+        return
+    
+    if len(args) == 1:
+        src = args[0]
+        
+    else:
+        src = args
+        
     ret = list()
+    
+    if isinstance(src, neo.core.container.Container):
+        src = [src]
+        
+    elif not (isinstance(src, (tuple, list, deque)) and all(isinstance(s, neo.core.baseneo.BaseNeo) for s in src)):
+        raise TypeError("'src' expected ot be a neo container or a sequence of neo objects")
+    
+    for kdata, data in enumerate(src):
+        data_container_name = neo.core.baseneo._container_name(type(data).__name__)
+        
+        if data_container_name in ndx.keys():
+            data_subindex = ndx[data_container_name]
+            if isinstance(data_subindex, dict) and all(isinstance(k, int) for k in data_subindex):
+                dsub = data_subindex[kdata]
+                
+                    
+                
     
     if isinstance(src, (tuple, list)): # NOTE: 2020-03-23 23:41:16 sequence of containers or data objects
         if isinstance(ndx, (tuple, list, deque, range)) and all([isinstance(k, int) for k in ndx]): # sequence of ints
@@ -1396,7 +1489,7 @@ def neo_apply_index(src: typing.Union[neo.container.Container, typing.Sequence],
         elif isinstance(ndx, dict):
             for key, index in ndx.items():
                 if isinstance(key, int):
-                    ret_ = neo_apply_index(src[key], index)
+                    ret_ = neo_use_lookup_index(src[key], index)
                     ret += [v for v in ret_ if all([not is_same_as(v, v_) for v_ in ret])]
                               
                 else:
@@ -1408,16 +1501,18 @@ def neo_apply_index(src: typing.Union[neo.container.Container, typing.Sequence],
     elif isinstance(src, neo.container.Container): # typical entry point
         if isinstance(ndx, dict):
             src_container_name = neo.core.baseneo._container_name(type(src).__name__)
-            if src_container_name in ndx:
-                subindex = ndx[src_container_name][0]
-                if 
+            if src_container_name in ndx.keys():# and all (isinstance(k, int) for k in ndx[src_container_name].keys()):
+                subindex = ndx[src_container_name]
+                #if all(isinstance(k, int) for k in subindex.keys()): # {...}{0:}, {1:}, etc;
+                    #for k in 
+                #if 
                 for subcontainer_name , subcontainer_ndx in subindex.items():
                     # does subcontainer_name refer to a collection of neo containers or neo data objects?
                     subcontainer_or_collection = getattr(src, subcontainer_name, None)
-                    if subcontainer_or_collection is not None:
-                        if isinstance(subcontainer_ndx, dict):
-                            # 
-                            for subcontainer_k,  in subcontainer_ndx
+                    #if subcontainer_or_collection is not None:
+                        #if isinstance(subcontainer_ndx, dict):
+                            ## 
+                            #for subcontainer_k,  in subcontainer_ndx
                         
                     
                     ret.extend(getattr(src, ))
@@ -1429,7 +1524,7 @@ def neo_apply_index(src: typing.Union[neo.container.Container, typing.Sequence],
                         raise AttributeError("%s is an invalid attribute of %s" % (key, type(src).__name__))
                     
                     if isinstance(index, (dict, tuple, list)):
-                        ret += [v for v in neo_apply_index(collection, index) if v not in ret] # enters at NOTE: 2020-03-23 23:41:16 
+                        ret += [v for v in neo_use_lookup_index(collection, index) if v not in ret] # enters at NOTE: 2020-03-23 23:41:16 
                         
                     else:
                         raise KeyError("Unexpected indexing structure type %s for %s object" % (type(index).__name__, type(collection).__name__))
@@ -1719,8 +1814,6 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
         
         if isinstance(names, str):
             if silent:
-                #ret = utilities.silentindex([i.name for i in objectList], names, multiple=False)
-                #print("ret", ret)
                 return utilities.silentindex([i.name for i in objectList], names, multiple=False)
             
             return [i.name for i in objectList].index(names)
@@ -2297,7 +2390,7 @@ def concatenate_blocks(*args, **kwargs):
                 will be retained in the concatenated data. These include
                 neo.AnalogSignal and datatypes.DataSignal
                 
-                This index can be (see neo_apply_index):
+                This index can be (see neo_use_lookup_index):
                 int, str (signal name), sequence of int or str, a range, a
                 slice, or a numpy array of int or booleans.
                     
@@ -2398,7 +2491,7 @@ def concatenate_blocks(*args, **kwargs):
                     seg_ = neo.Segment(rec_datetime = seg.rec_datetime)
                     seg_.merge_annotations(seg)
                     
-                    analog_index = neo_apply_index(seg, analog_index, )
+                    analog_index = neo_use_lookup_index(seg, analog_index, )
                     
                     if isinstance(analog_index, str):
                         seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, analog_index)].copy())
@@ -2446,7 +2539,7 @@ def concatenate_blocks(*args, **kwargs):
                     seg_ = neo.Segment(rec_datetime = seg.rec_datetime) # new seg
                     seg_.merge_annotations(seg)
                     
-                    analog_index = neo_apply_index(seg, analog_index, )
+                    analog_index = neo_use_lookup_index(seg, analog_index, )
                     
                     if isinstance(analog_index, str):
                         seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, analog_index)].copy())
@@ -2642,7 +2735,7 @@ def concatenate_blocks2(*args, **kwargs):
                 will be retained in the concatenated data. These include
                 neo.AnalogSignal and datatypes.DataSignal
                 
-                This index can be (see neo_apply_index):
+                This index can be (see neo_use_lookup_index):
                 int, str (signal name), sequence of int or str, a range, a
                 slice, or a numpy array of int or booleans.
                     
@@ -2736,7 +2829,7 @@ def concatenate_blocks2(*args, **kwargs):
                     
                     seg_.annotate(origin=args.file_origin, original_segment=segment_index)
                     
-                    signal_index = neo_apply_index(seg, analog_index)
+                    signal_index = neo_use_lookup_index(seg, analog_index)
                     
                     sig_ = seg.analogsignals[signal_index]
                     
@@ -2780,7 +2873,7 @@ def concatenate_blocks2(*args, **kwargs):
                     seg_.merge_annotations(seg)
                     seg_.annotate(origin=args.file_origin, original_segment=segment_index)
                     
-                    analog_index = neo_apply_index(seg, analog_index, )
+                    analog_index = neo_use_lookup_index(seg, analog_index, )
                     
                     if isinstance(analog_index, str):
                         seg_.analogsignals.append(seg.analogsignals[get_index_of_named_signal(seg, analog_index)].copy())
@@ -3548,7 +3641,7 @@ def check_ephys_data_collection(x:typing.Any, mix:bool=False):
     
     if isinstance(x, (tuple, list)):
         if mix:
-            return all([isinstace(x_, ephys_data_collection) for x_ in x])
+            return all([isinstance(x_, ephys_data_collection) for x_ in x])
             
         else:
             return any([all([isinstance(x_, e_type) for x_ in x]) for e_type in ephys_data_collection])
