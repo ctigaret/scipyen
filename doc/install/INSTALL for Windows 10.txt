@@ -607,7 +607,7 @@ Test as per Getting Started page, create, build and run:
 
 
 --------------------------------------------------------------------------------
-13. Build and install Qt5
+13. Build and install Qt5 - this is optional - you may instead install PyQt5 directly using pip
 --------------------------------------------------------------------------------
 Dependencies:
     openssl <- perl, nasm
@@ -921,7 +921,9 @@ cd %VIRTUAL_ENV%
 pip install -r <path-where-scipyen-repo-is>\doc\install\pip_requirements_0.txt
 
 ===============================================================================
-15 Build & install sip, pyqt5, pyqt5-sip
+15 Build & install sip, pyqt5, pyqt5-sip - ONLY if using Qt built from sources!
+
+Skip if PyQt5 was installed via pip!
 ===============================================================================
 
 Restart the command prompt, run scipyact_vs64, cd to %VIRTUAL_ENV%\src

@@ -17,7 +17,7 @@ if sys.platform == "win32" and sys.version_info.minor >= 8:
     if len(lib_environ.strip()):
         libdirs = lib_environ.split(os.pathsep)
         for d in libdirs:
-            if len(d.strip()):
+            if len(d.strip()) and  os.path.isdir(d):
                 os.add_dll_directory(d)
         
     
