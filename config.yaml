@@ -1,6 +1,6 @@
 SignalViewer:
+    VerticalCursorColor: g
     CursorsShowValue: yes
-    VerticalCursorColor: lightskyblue
     LinkedVerticalCursorColor: violet
     CursorHoverColor: tomato
 Fconf:

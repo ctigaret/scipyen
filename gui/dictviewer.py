@@ -205,7 +205,7 @@ class InteractiveTreeWidget(DataTreeWidget):
         """
         from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
         from pyqtgraph.pgcollections import OrderedDict
-        from pyqtgraph.python2_3 import asUnicode
+        #from pyqtgraph.python2_3 import asUnicode
         from core.datatypes import is_namedtuple
         
 
@@ -311,7 +311,8 @@ class InteractiveTreeWidget(DataTreeWidget):
         elif isinstance(data, neo.core.dataobject.DataObject):
             desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
             if data.size == 1:
-                widget = QtWidgets.QLabel(asUnicode(data))
+                widget = QtWidgets.QLabel(str(data))
+                #widget = QtWidgets.QLabel(asUnicode(data))
             else:
                 widget = TableEditorWidget(parent=self)
                 signalBlocker = QtCore.QSignalBlocker(widget.tableView)
@@ -323,7 +324,8 @@ class InteractiveTreeWidget(DataTreeWidget):
         elif isinstance(data, pq.Quantity):
             desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
             if data.size == 1:
-                widget = QtWidgets.QLabel(asUnicode(data))
+                widget = QtWidgets.QLabel(str(data))
+                #widget = QtWidgets.QLabel(asUnicode(data))
             else:
                 widget = TableEditorWidget(parent=self)
                 signalBlocker = QtCore.QSignalBlocker(widget.tableView)
@@ -347,17 +349,19 @@ class InteractiveTreeWidget(DataTreeWidget):
             
         elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
             frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
-            widget = QtWidgets.QPlainTextEdit(asUnicode('\n'.join(frames)))
+            widget = QtWidgets.QPlainTextEdit(str('\n'.join(frames)))
+            #widget = QtWidgets.QPlainTextEdit(asUnicode('\n'.join(frames)))
             widget.setMaximumHeight(200)
             widget.setReadOnly(True)
             
         else:
-            desc = asUnicode(data)
+            desc = str(data)
+            #desc = asUnicode(data)
         
         return typeStr, desc, childs, widget, typeTip
     
     def buildTree(self, data, parent, name="", nameTip = "", hideRoot=False, path=()):
-        from pyqtgraph.python2_3 import asUnicode
+        #from pyqtgraph.python2_3 import asUnicode
         
         # NOTE: 2021-07-24 13:15:38
         # throughout this function 'node' is a QtWidgets.QTreeWidgetItem
@@ -427,7 +431,8 @@ class InteractiveTreeWidget(DataTreeWidget):
         if len(desc) > 100:
             desc = desc[:97] + '...'
             if widget is None:
-                widget = QtWidgets.QPlainTextEdit(asUnicode(data))
+                widget = QtWidgets.QPlainTextEdit(str(data))
+                #widget = QtWidgets.QPlainTextEdit(asUnicode(data))
                 widget.setMaximumHeight(200)
                 widget.setReadOnly(True)
         
@@ -443,14 +448,17 @@ class InteractiveTreeWidget(DataTreeWidget):
         for key, data in childs.items():
             if isinstance(key, type):
                 keyrepr = key.__name__
-                keytip = asUnicode(key)
+                keytip = str(key)
+                #keytip = asUnicode(key)
                 
             elif type(key).__name__ == "instance":
                 keyrepr = key.__class__.__name__
-                keytip = asUnicode(key)
+                keytip = str(key)
+                #keytip = asUnicode(key)
                 
             else:
-                keyrepr = asUnicode(key)
+                keyrepr = str(key)
+                #keyrepr = asUnicode(key)
                 keytip = type(key).__name__
                 
             keyTypeTip = "key / index type: %s" % keytip

@@ -8,6 +8,8 @@ import faulthandler
 import sys, os, atexit, re, inspect, gc, io, traceback
 import cProfile
 
+has_breeze_resources_for_win32 = False
+
 if sys.platform == "win32" and sys.version_info.minor >= 8:
     import win32api
     vigraimpex_mod = "vigraimpex"
@@ -19,6 +21,13 @@ if sys.platform == "win32" and sys.version_info.minor >= 8:
         for d in libdirs:
             if len(d.strip()) and  os.path.isdir(d):
                 os.add_dll_directory(d)
+                
+    try:
+        import breeze_resources
+        has_breeze_resources_for_win32 = True
+    except:
+        has_breeze_resources_for_win32 = False
+
         
     
 #import warnings
@@ -97,6 +106,13 @@ def main():
         # BEGIN 
         # 1. create the pyqt5 app
         app = QtWidgets.QApplication(sys.argv)
+        
+        if has_breeze_resources_for_win32:
+            file = QtCore.QFile(":/dark/stylesheet.qss")
+            file.open(QtCore.QFile.ReadOnly | QtCore.QFile.Text)
+            stream = QtCore.QTextStream(file)
+            app.setStyleSheet(stream.readAll())
+            
         
         # NOTE: 2021-08-17 10:05:20
         # explore the possibility to customize look and feel
