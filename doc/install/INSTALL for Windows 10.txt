@@ -197,6 +197,13 @@ See scipyen\doc\install\Python\Windows\README.txt
 
 * When the environment is activated, ROOT is VIRTUAL_ENV
 
+NOTE: the vitual environemnt is NOT relocatable !!!
+
+By consequence, the virtual environment folder (with all the libraries built
+inside it) CANNOT be copied on another path on the machine, or on other machine
+(unless, of coure the structure of the path leading to it is idential to the
+ one on the machine the virtual enviornemnt was built on)
+
 ================================================================================
 2. BUILD AND INSTALL DEPENDENCIES
 ================================================================================

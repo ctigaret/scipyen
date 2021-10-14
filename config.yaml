@@ -1,8 +1,8 @@
 SignalViewer:
-    CursorHoverColor: tomato
-    LinkedVerticalCursorColor: violet
-    VerticalCursorColor: lightskyblue
     CursorsShowValue: yes
+    VerticalCursorColor: lightskyblue
+    LinkedVerticalCursorColor: violet
+    CursorHoverColor: tomato
 Fconf:
     name: np.linalg.norm
     args: []
