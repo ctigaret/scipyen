@@ -25,6 +25,119 @@ independently from pictio.
     
 """
 
+# NOTE: 2021-10-15 10:43:03
+# 
+# Low-level h5py API:
+# modules:
+#   h5      -> configuration
+#   h5a     -> attribute
+#   h5ac    -> cache configuration
+#   h5d     -> dataset
+#   h5ds    -> dimension scale
+#   h5f     -> file
+#   h5fd    -> file driver
+#   h5g     -> group
+#   h5i     -> identifier
+#   h5l     -> linkproxy
+#   h5o     -> H5O (object)
+#   h5p     -> property list
+#   h5pl    -> plugins
+#   h5r     -> object and region references
+#   h5s     -> data space
+#   h5t     -> data type
+#   h5z     -> filter
+#   
+# vigra.impex supports read/write from/to a group, as well as a hdf5 file !
+#   operates DIRECTLY at the h5py API level - GOOD!
+#
+# neo.NixIO -> operates on actual file system files only (unlike h5py where a file 
+# is also a group!)
+#
+#   it is a layer upon nixpy ('nix' module) which is a layer over h5py
+# 
+#   IMHO, that is BAD
+#
+# =============================================================================
+# neo.NixIO:
+# =============================================================================
+#
+# init expects a file system file name
+#
+#   initializes a nix.File (see below) as the 'nix_file' attribute
+#
+#
+# =============================================================================
+# nixpy (nix) File object
+# =============================================================================
+# uses h5py low-level API to generate groups
+#
+# init, broadly, requires a physical file (checked with os.path.exists(...))
+#   this is used to create a h5py.File - which also behaves like a group - assigned
+#   to the nix.File attribute _h5file:
+#
+#       _h5file: is a h5py File object
+#           is private, there is no guarantee it won't change in the future
+#
+#   1) create h5py file ID; the file ID is generating by either
+#       create or open (depending on whether the physcial file exists or not)
+#
+#   1.a) If physical file does no exist yet => create:
+#       create a file ID object: fid = h5py.h5f.create(path, flags=h5mode, ...)
+#       
+#       fapl is always h5py.h5p.FILE_ACCESS
+#       fcpl is a h5py.h5p.PropFCID (file creation property list)
+#           with set_link_creation_order (h5py.h5p.CRT_ORDER_TRACKED | h5py.h5p.CRT_ORDER_INDEXED)
+#
+#   1.b) If physical file DOES exist: => open:
+#       create file ID object: h5py.h5f.open(path)
+#       use fapl as above
+#
+#   2) create _h5file: h5py.File(fid)
+#
+#   3) wrap the _h5file root ('/') group into a nix.H5Group object
+#       'H5Group(parent, name, create=False)' -> when create is True or name 
+#               exists in parent  this simply assigns the HDF5 group to the 
+#               'group' attribute of the H5Group object
+#
+#       if file existing:
+#           _root = H5Group(_h5file, '/') 
+#       else:
+#           _root = H5Group(_h5file, '/', create=True)
+#
+#       in either case above, the h5py.File's '/' group will be assigned to the
+#       'group' attribute of _root
+#
+#       'create' trigger the creation of a HDF5 Group through a scheme similar to
+#       that used for _h5file: create group ID then create h5py Group:
+#           gpcl = group create property list with link creation order set to 
+#           (h5py.h5p.CRT_ORDER_TRACKED | h5py.h5p.CRT_ORDER_INDEXED)
+#
+#           gid = h5py.h5g.create(parent's id, name, gpcl)
+#           group = h5py.Group(gid)
+#           
+#
+#       in either case, alias _root to _h5group
+#
+#   4) Also create two more groups - children of _root: _data and _metadata
+#   4.1) uses _root.create_group -> generates nix.H5Group ad a child, AFTER it
+#       ensures that _root is assigned to the 'group' attribute of the H5Group
+#       (more generally, parent.create_group ensures this)
+#
+#   5) Adorn h5py File _directly_ with attributes (_h5file.attrs):
+#       "created_at", "updated_at"
+#
+#        These are nix.util.time_to_str(nix.util.now_int())
+#
+#   6) set compression attribute (of the nix.File object)
+#
+#   7) Finally, set _blocks and _sections attrbutes of the nix.File object
+#       uninitialized
+#
+#   nix.File.blocks: is a nix.Container: wraps a h5py Group used as a container 
+#   for other groups
+#
+#  nep.NixIO taps into _blocks and _sections
+
 import numpy as np
 import quantities as pq
 import neo
