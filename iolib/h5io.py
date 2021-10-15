@@ -20,8 +20,31 @@ independently from pictio.
     str                         
     
     
+    Possible strategies: 
+    A) embed a VigraArray as HDF5 in a nix.File accessed via
+    neo.NixIO:
     
+    1) create a neo.NixIO file -> a physical file in the file system
+    2) access the nix_file inside the neo_nixio file object
+    3) access the _h5file of the nix_file
+    4) create a group inside the _h5file using h5py API:
     
+    4.1) this is a HDF5 Group, NOT a nix H5Group!
+    
+    4.2) we can create it using the strategy in nix i.e., via low-level h5py api
+        e.g. h5g.create() a groupid, to enable group creation with order tracked
+        and order indexed flags - see h5p api - followed by instatiation of the
+        h5py.Group(groupid)
+        
+    5) use the newly-created group as a filenameOrGoup parameter to vigra.writeHDF5()
+    
+    CAUTION: a nix.File cannot be used as context manager (i.e. one cannot
+    use the idiom with nix.File(...) as nixfile: ...)
+    But the neo.NixIO can be used as context manager:
+    with neo.NixIO(...) as neo_nixio_file: ...
+        (the underlying HDF5 file object is open in the neo.NixIO c'tor)
+    
+    see history_snipper_scandata_vigra_export_hdf5.py
     
 """
 
@@ -136,7 +159,23 @@ independently from pictio.
 #   nix.File.blocks: is a nix.Container: wraps a h5py Group used as a container 
 #   for other groups
 #
-#  nep.NixIO taps into _blocks and _sections
+# --------------------------------------------
+#  neo.NixIO taps into _blocks and _sections
+# --------------------------------------------
+#
+# NixIO.write_block:
+#   convert neo Block to NIX Block then write to NIX file
+#
+#   looks for a NIX block with same nix_name, in nix_file.blocks
+#       if found then clean out previous nix_name block
+#           delete nix_file.block[nix_name]
+#           delete nix_file.sections[nix_name]
+#
+#       nixblock = nix_file.create_block(...)
+#       nixblock is a nix Block, inherits from nix.Entity
+
+
+
 
 import numpy as np
 import quantities as pq

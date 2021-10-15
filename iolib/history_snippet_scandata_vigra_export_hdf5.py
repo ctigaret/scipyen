@@ -20,6 +20,20 @@ import h5py
 import neo
 import nixio as nix 
 
+newAxisInfo = vigra.AxisInfo(key="t1", typeFlags=vigra.AxisType.Time, 
+                                                       resolution=1, 
+                                                       description=defaultAxisTypeName(axisTypeFlags["t"]))
+newAxisCal = AxisCalibration(newAxisInfo,
+                                                       units=pq.s,
+                                                       origin=0,
+                                                       resolution=1,
+                                                       axisname=defaultAxisTypeName(newAxisInfo))
+ch1 = imgp.concatenateImages(*[imgp.insertAxis(img, newAxisInfo, 2) for img in (base_000_Cycle00001_CurrentSettings_Ch1_000001, base_000_Cycle00002_CurrentSettings_Ch1_000001, base_000_Cycle00003_CurrentSettings_Ch1_000001)], axis=newAxisInfo)
+
+
+ephysdata = neoutils.concatenate_blocks(base_0000, base_0001, base_0002)
+
+
 # writing strings:
 with h5py.File("test.hdf5", "a") as f:
     f["test_string"] = b
@@ -54,7 +68,6 @@ with h5y.File("scans.h5", "a") as f:
     
 
 # writing neo data: <- caveats
-ephysdata = neoutils.concatenate_blocks(base_0000, base_0001, base_0002)
 with h5y.File("ephys_data.h5", "a") as f:
     with tempfile.TemporaryFile() as tmpfile:
         with neo.NixIO(tempfile) as nixfile:
@@ -82,6 +95,48 @@ store.close()
 neo_nixio_file = neo.NixIO("test_neo_nixio_file.nix")
 nix_file = neo_nixio_file.nix_file
 nix_file._h5file # this is a HDF5 file; can one add vigra writeHDF5 to it?
+
+
+###########
+## 2021-10-15 22:09:47
+newAxisInfo = vigra.AxisInfo(key="t1", typeFlags=vigra.AxisType.Time, 
+                                                       resolution=1, 
+                                                       description=defaultAxisTypeName(axisTypeFlags["t"]))
+newAxisCal = AxisCalibration(newAxisInfo,
+                                                       units=pq.s,
+                                                       origin=0,
+                                                       resolution=1,
+                                                       axisname=defaultAxisTypeName(newAxisInfo))
+ch1 = imgp.concatenateImages(*[imgp.insertAxis(img, newAxisInfo, 2) for img in (base_000_Cycle00001_CurrentSettings_Ch1_000001, base_000_Cycle00002_CurrentSettings_Ch1_000001, base_000_Cycle00003_CurrentSettings_Ch1_000001)], axis=newAxisInfo)
+
+ephysdata = neoutils.concatenate_blocks(base_0000, base_0001, base_0002)
+
+neo_nixio_file = neo.NixIO("data_test_ephys_vigra.h5")
+neo_nixio_file.write_block(ephysdata)
+
+h5file = neo_nixio_file.nix_file._h5file
+
+name = f"{ch1.__class__.__name__}.{uuid.uuid4().hex}"
+
+gcpl=h5py.h5p.create(h5py.h5p.GROUP_CREATE)
+
+gcpl.set_link_creation_order(h5py.h5p.CRT_ORDER_TRACKED | h5py.h5p.CRT_ORDER_INDEXED)
+
+gid = h5py.h5g.create(h5file.id, name.encode("utf-8"), gcpl=gcpl)
+
+
+vigra_group = h5py.Group(gid)
+
+vigra.writeHDF5(ch1, vigra_group, "Ch1")
+
+neo_nixio_file.nix_file._root.open_group(name)
+
+neo_nixio_file.close() # => saves BOTH the ephysdata block AND VigraArray inside
+                       # the same nix hdf5 file
+                       
+# NOTE: the neo_nixio_file does NOT need to save any ephysdata
+
+
 
 
 
