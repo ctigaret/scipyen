@@ -30,6 +30,8 @@ with h5py.File("test.hdf5", "a") as f:
 
 
 
+
+
 # writing vigra arrays
 f = h5py.File("scans_000.h5", "a")
 scans_list = f.create_group("scans")
