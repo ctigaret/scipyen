@@ -5,14 +5,52 @@
 `h5py` supports numeric datasets almost transparently (for strings, see 
 `https://docs.h5py.org/en/latest/strings.html` and below)
 
+## Keep to the `first principles` laid out in HDF5 specification (h5py)
+### What we want is just to store data persistently and INSENSITIVE to possible API changes in 3rd party libraries (such as neo :-(  )
+
++ Write "codecs" to convert between basic python types to HDF and back
++ For collections, focus on:
+    + lists, tuple, deque, dict <-> HDF5 groups
+        + use attributes to identify Python class
+        
+    + entirely numeric sequences (including numpy arrays but EXCLUDING VigraArray
+    and Quantities (pq module)) -> as numeric datasets
+    + investigate numpy array attributes 
+    + conversions to/from numpy dtypes
+        
++ User-defined classes:
+    + HDF5 Group
+        + attributes:
+            + "class" = qualified class name (i.e., package.module.class)
+    + children (HDF5 Groups):
+        + class_attributes: HDF5 Group
+            + each a HDF5 Dataset with optional attributes
+        + instance_attributes: HDF5 Group
+            + each a HDF5 Dataset with optional attributes
+    
+**NOTE** might require changes in the data class designs (ScanData, AnalysisUnit,
+PlanarGraphics) but must have sufficiently flexible heuristic to read/write neo 
+data types and our own (e.g. DataSignal, TriggerEvent, etc)
+
+## PyTables: the underlying engine for pandas <-> HDF5
+Too complex and yet limited:
++ geared towards pandas API (one can perform many of the pandas operations on
+pytables "files")
++ like nix (see below) relies on existing physical files which precludes easy
+ways to directly 'inject' data in HDF5 groups
+
+
 
 ## `neo.NixIO` write operations - relies on `nix` (`nixpy`): 
 Too complex and yet limited:
-+ no (easy) support for multidimensional arrays
++ `nix` API unnecessarily convoluted to adapt (a limited set of) data structures to the underlying HDF5 data sets
++ no (easy) support for:
+    + multidimensional arrays
+    + nested Python containers / collections (e.g., dict elements of an iterable,
+iterable values in a dict, and so on...)
 + requires direct access to a physical file (limitation of `nix`):
     + the underlying HDF5 h5py.File object, although accessible, is a private attribute of `nix.File`
     + this encumbers the opportunity for using a h5py.File as a h5py.Group (which vigra.impex does successfully)
-    + `nix` API unnecessarily convoluted to adapt (a limited set of) data structures to the underlying HDF5 data sets
 + writing a VigraArray (with its own bells and whistles) possible, e.g. by using a tempfile, **BUT** no easy way to read it back using `neo.NixIO`/`nix` API
 
 
