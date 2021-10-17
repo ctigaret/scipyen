@@ -36,7 +36,7 @@ independently from pictio.
         and order indexed flags - see h5p api - followed by instatiation of the
         h5py.Group(groupid)
         
-    5) use the newly-created group as a filenameOrGoup parameter to vigra.writeHDF5()
+    5) use the newly-created group as a filenameOrGroup parameter to vigra.writeHDF5()
     
     CAUTION: a nix.File cannot be used as context manager (i.e. one cannot
     use the idiom with nix.File(...) as nixfile: ...)
@@ -177,12 +177,15 @@ independently from pictio.
 
 
 
+import tempfile
 import numpy as np
+import h5py
+import nixio as nix 
+import vigra
+import pandas as pd
 import quantities as pq
 import neo
-import pandas as pd
-import vigra
-import h5py
+
 from core.prog import safeWrapper
 from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
@@ -207,4 +210,140 @@ from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse,
                          PlanarGraphics, Rect, Text, VerticalCursor,)
 
 
+def readHDF5_VigraArray(filenameOrGroup, pathInFile, order=None):
+    '''Read an array from an HDF5 file.
+    
+    Modified version of vigra.impex.readHDF5() for the new h5py API:
+    A DataSet object does NOT have a "value" attribute in h5py v3.4.0
+    
+    'filenameOrGroup' can contain a filename or a group object
+    referring to an already open HDF5 file. 'pathInFile' is the name
+    of the dataset to be read, including intermediate groups. If the
+    first argument is a group object, the path is relative to this
+    group, otherwise it is relative to the file's root group.
 
+    If the dataset has an attribute 'axistags', the returned array
+    will have type :class:`~vigra.VigraArray` and will be transposed
+    into the given 'order' ('vigra.VigraArray.defaultOrder'
+    will be used if no order is given).  Otherwise, the returned
+    array is a plain 'numpy.ndarray'. In this case, order='F' will
+    return the array transposed into Fortran order.
+
+    Requirements: the 'h5py' module must be installed.
+    '''
+    #import h5py
+    if isinstance(filenameOrGroup, h5py.Group):
+        file = None
+        group = filenameOrGroup
+    else:
+        file = h5py.File(filenameOrGroup, 'r')
+        group = file['/']
+    try:
+        dataset = group[pathInFile]
+        if not isinstance(dataset, h5py.Dataset):
+            raise IOError("readHDF5(): '%s' is not a dataset" % pathInFile)
+        if hasattr(dataset, "value"):
+            # NOTE: keep this for older h5py API
+            data = dataset.value # <- offending line (cezar.tigaret@gmail.com)
+        else:
+            # NOTE: 2021-10-17 09:38:13
+            # the following returns a numpy array, see:
+            # https://docs.h5py.org/en/latest/high/dataset.html#reading-writing-data
+            data = dataset[()] 
+            
+        axistags = dataset.attrs.get('axistags', None)
+        if axistags is not None:
+            data = data.view(arraytypes.VigraArray)
+            data.axistags = arraytypes.AxisTags.fromJSON(axistags)
+            if order is None:
+                order = arraytypes.VigraArray.defaultOrder
+            data = data.transposeToOrder(order)
+        else:
+            if order == 'F':
+                data = data.transpose()
+            elif order not in [None, 'C', 'A']:
+                raise IOError("readHDF5(): unsupported order '%s'" % order)
+    finally:
+        # NOTE: 2021-10-17 09:42:50 Original code
+        # This only closes 'file' when filenameOrGroup if a HDF5 File object
+        # otherwise does nothing
+        if file is not None:
+            file.close()
+    return data
+
+def readHDF5_str(filenameOrGroup, pathInFile):
+    if isinstance(filenameOrGroup, h5py.Group):
+        file = None
+        group = filenameOrGroup
+    else:
+        file = h5py.File(filenameOrGroup, 'r')
+        group = file['/']
+        
+    try:
+        dataset = group[pathInFile]
+        if not isinstance(dataset, h5py.Dataset):
+            raise IOError("readHDF5(): '%s' is not a dataset" % pathInFile)
+        
+        encoding = group.attrs.get("encoding", "utf-8")
+
+        data = dataset[()]
+        
+        if isinstance(data, bytes):
+            data = data.decode(encoding)
+            
+    finally:
+        if file is not None:
+            file.close()
+            
+    return data
+
+def writeHDF5_NeoBlock(data, filenameOrGroup, pathInFile):
+    if not isinstance(data, neo.Block):
+        raise TypeError(f"Expecting a neo.Block; got {type(data).__name__} instead")
+    
+    if isinstance(filenameOrGroup, h5py.Group):
+        file = None
+        group = filenameOrGroup
+    else:
+        file = h5py.File(filenameOrGroup, 'r')
+        group = file['/']
+    try:
+        levels = pathInFile.split('/')
+        for groupname in levels[:-1]:
+            if groupname == '':
+                continue
+            g = group.get(groupname, default=None)
+            if g is None:
+                group = group.create_group(groupname)
+            elif not isinstance(g, h5py.Group):
+                raise IOError("writeHDF5(): invalid path '%s'" % pathInFile)
+            else:
+                group = g
+        #dataset = group.get(levels[-1], default=None)
+        #if dataset is not None:
+            #if isinstance(dataset, h5py.Dataset):
+                #del group[levels[-1]]
+            #else:
+                #raise IOError("writeHDF5(): cannot replace '%s' because it is not a dataset" % pathInFile)
+        
+        group.attrs.set("python_class")
+
+        try:
+            with tempfile.TemporaryFile() as tmpfile:
+                with neo.NixIO(tmpfile) as neonixfile:
+                    neonixfile.write_block(data)
+                    
+                    
+            
+        #try:
+            #data = data.transposeToNumpyOrder()
+        #except:
+            #pass
+        #dataset = group.create_dataset(levels[-1], data=data, compression=compression, chunks=chunks)
+        #if hasattr(data, 'axistags'):
+            #dataset.attrs['axistags'] = data.axistags.toJSON()
+    finally:
+        if file is not None:
+            file.close()
+
+    

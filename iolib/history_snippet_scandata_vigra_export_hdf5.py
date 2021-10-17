@@ -14,6 +14,8 @@ snippet of commands as example for exporting scandata bits to hdf5
     
     
     Signed-off-by: Cezar M. Tigaret <cezar.tigaret@gmail.com>
+    
+    See STRATEGY further down
 """
 import tempfile
 import h5py
@@ -43,7 +45,8 @@ with h5py.File("test.hdf5", "a") as f:
     f["/string_group/test_string"] = b
 
 
-
+# reading strings:
+# a = test_hdf5["/string_group/test_string"][()].decode("utf-8")
 
 
 # writing vigra arrays
@@ -57,6 +60,8 @@ base_000.scansChannelNames
     
 # NOTE: vigra.impex writes directly into a HDF5 file (which is also a HDF5 group
 # therefore it can be included in a "real" HDF5 file )
+# when first parameter to writeHDF5 is a HDF5 Group, the HDF5 file to which it
+# belogns (and was opened beforehand) is left OPEN!
 for k, channel_name in enumerate(base_000.scansChannelNames):
     vigra.impex.writeHDF5(base_000.scans[k], f, f"/scans/{channel_name}")
 f.close()
@@ -69,9 +74,7 @@ with h5y.File("scans.h5", "a") as f:
         
 # reading vigra arrays -> there is a problem that vigra.impex.readHDF5 expects a 
 # 'value' attribute to HDF5 datasets - which raises AtributeError with h5py 3.4.0
-# (I guess this happens because vigraimpex and vigranumpy were compiled against 
-# hdf5 1.10.7 ?)
-    
+#
 
 # writing neo data: <- caveats
 with h5y.File("ephys_data.h5", "a") as f:
@@ -148,8 +151,17 @@ neo_nixio_file.close() # => saves BOTH the ephysdata block AND VigraArray inside
 
 # 2. reading back:
 # the neo.NixIO api disregards the vigra_group
+# this can be read with h5io.readHDF5Vigra (because it conform to the more 
+# recent h5py Dataset API)
 
 
+# ==============================================================================
+#
+# STRATEGY
+# 
+# ==============================================================================
 
-
+# h5py support numeric datasets almost transparently (for strings, see 
+# https://docs.h5py.org/en/latest/strings.html
+# ane below)
 

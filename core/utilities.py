@@ -2406,7 +2406,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz    = str(obj.nbytes)
             memsztip = "memory size (bytes): "
             
-            if isinstance(obj, vigra.VigraArray):
+            if isinstance(obj, vigra.VigraArray) and hasattr(obj, "axistags"):
                 axes    = repr(obj.axistags)
                 axestip = "axes: "
                 
