@@ -177,7 +177,7 @@ independently from pictio.
 
 
 
-import tempfile
+import os, sys, tempfile
 import numpy as np
 import h5py
 import nixio as nix 
@@ -297,15 +297,21 @@ def readHDF5_str(filenameOrGroup, pathInFile):
             
     return data
 
-def writeHDF5_NeoBlock(data, filenameOrGroup, pathInFile):
+def writeHDF5_NeoBlock(data, filenameOrGroup, pathInFile, use_temp_file=True):
     if not isinstance(data, neo.Block):
         raise TypeError(f"Expecting a neo.Block; got {type(data).__name__} instead")
+    
+    if not isinstance(data.name, str) or len(data.name.strip()) == 0:
+        data_name = ".".join([data.__class__.__module__, data.__class__.__name__])
+        
+    else:
+        data_name = data.name
     
     if isinstance(filenameOrGroup, h5py.Group):
         file = None
         group = filenameOrGroup
     else:
-        file = h5py.File(filenameOrGroup, 'r')
+        file = h5py.File(filenameOrGroup, 'a')
         group = file['/']
     try:
         levels = pathInFile.split('/')
@@ -326,22 +332,22 @@ def writeHDF5_NeoBlock(data, filenameOrGroup, pathInFile):
             #else:
                 #raise IOError("writeHDF5(): cannot replace '%s' because it is not a dataset" % pathInFile)
         
-        group.attrs.set("python_class")
-
-        try:
-            with tempfile.TemporaryFile() as tmpfile:
-                with neo.NixIO(tmpfile) as neonixfile:
-                    neonixfile.write_block(data)
-                    
-                    
+        # NOTE: in the future, check use_temp_file:
+        # if use_temp_file:
+        # else:
+        # write stuff directly through nix (if low-level nix api allows it)
+        with tempfile.TemporaryFile() as tmpfile:
+            with neo.NixIO(tmpfile) as neonixfile:
+                neonixfile.write_block(data)
+                if data_name in group:
+                    del group[data_name]
+                neonixfile.nix_file._h5file.copy(neonixfile.nix_file._h5file['/'], group, name=data_name,
+                                                    expand_soft=True, expand_external=True,
+                                                    expand_refs=True)
+                group[data_name].attrs["python_class"] = ".".join([data.__class__.__module__, data.__class__.__name__])
+                
+        os.remove(str(tmpfile))
             
-        #try:
-            #data = data.transposeToNumpyOrder()
-        #except:
-            #pass
-        #dataset = group.create_dataset(levels[-1], data=data, compression=compression, chunks=chunks)
-        #if hasattr(data, 'axistags'):
-            #dataset.attrs['axistags'] = data.axistags.toJSON()
     finally:
         if file is not None:
             file.close()

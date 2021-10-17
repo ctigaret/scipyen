@@ -142,7 +142,7 @@ vigra_group = h5py.Group(gid)
 
 vigra.writeHDF5(ch1, vigra_group, "Ch1")
 
-neo_nixio_file.nix_file._root.open_group(name)
+neo_nixio_file.nix_file._root.open_group(name) # this writes the ch1 group to the nix_file
 
 neo_nixio_file.close() # => saves BOTH the ephysdata block AND VigraArray inside
                        # the same nix hdf5 file
@@ -163,5 +163,11 @@ neo_nixio_file.close() # => saves BOTH the ephysdata block AND VigraArray inside
 
 # h5py support numeric datasets almost transparently (for strings, see 
 # https://docs.h5py.org/en/latest/strings.html
-# ane below)
+# and below)
+
+
+neo.NixIO write operations:
+    
+write_blocks => 
+    
 
