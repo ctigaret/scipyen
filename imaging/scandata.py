@@ -439,8 +439,8 @@ class AnalysisUnit(object):
             
         NOTE: by definition, AnalysisUnits are defined in, and associated with,
             the "scans" image data set of a ScanData object. However, by setting
-            scene to True, AnalysisUnit object will be forecuflly associated with
-            scene data, rather than scans data.
+            scene to True, AnalysisUnit object will be associated with scene,
+            rather than scans, data.
                     
     Additional parameters (e.g. geometric descriptors) are given by the var-named
     parameters **kwargs of the constructor.
@@ -10002,6 +10002,9 @@ class ScanData(object):
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
         """
+        # NOTE: 2021-10-16 14:51:27
+        # this is ALWAYS a viga.AxisInfo!
+        
         return self._scene_frame_axis_
     
     @sceneFrameAxis.setter
@@ -10035,7 +10038,7 @@ class ScanData(object):
         """
         if self.sceneFrameAxis is not None:
             if len(self.scene):
-                return self.scene[0].axistags.index(self.sceneFrameAxis)
+                return self.scene[0].axistags.index(self.sceneFrameAxis.key)
     
     @property
     def sceneFrames(self):
@@ -10288,12 +10291,11 @@ class ScanData(object):
         multi-channel VigraArray
         
         """
+        # NOTE: 2021-10-16 14:51:27
+        # this is ALWAYS a viga.AxisInfo!
+        
         return self._scans_frame_axis_
         
-        #FIXME/TODO adapt to a new scenario where all scene image data is a single
-        #multi-channel VigraArray
-        
-    
     @scansFrameAxis.setter
     def scansFrameAxis(self, value):
         """Setting this value will also update the scansFrames
@@ -10331,8 +10333,7 @@ class ScanData(object):
         """
         if self.scansFrameAxis is not None:
             if len(self._scans_):
-                return self._scans_[0].axistags.index(self.scansFrameAxis)
-            
+                return self._scans_[0].axistags.index(self.scansFrameAxis.key)
             else:
                 return 0
             

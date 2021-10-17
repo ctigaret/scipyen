@@ -82,6 +82,8 @@ relative paths in this document are RELATIVE to $HOME/scipyen/
 ================================================================================
 (* indicates you also need to install their corresponding devel packages; where
  appropriate, a minimal version is specified):
+These will be installed system-wide hence will be available regardless of 
+whether you are in an activate python virtual environment or not.
     
 Qt5 (*)
 cmake3,     # NOTE this and the one below are required to configure vigra & neuron
@@ -138,6 +140,13 @@ link from $HOME/scipyen/doc/install/Python/Unix/pyenv to $HOME/pyenv
 
 NOTE: If you relocate the 'scipyen' directory you have to recreate these links.
 Have a look inside make_script_links.sh shell script to see what it does.
+
+================================================================================
+2.a IF YOU HAVE BUILT YOUR OWN PYTHON STACK
+================================================================================
+
+If you plan to use pytables AND you are using your own built Pyton stack, then
+you MUST build pytables yourself - see 4.6b, below.
 
 ================================================================================
 3. CREATE A PYTHON VIRTUAL ENVIRONMENT
@@ -284,7 +293,9 @@ pip install -r $HOME/scipyen/doc/installation/pip_requirements_2.txt
 -------------------------------------------------------------------------------
 4.6b. BUILD AND INSTALL PyhTables (tables)
 -------------------------------------------------------------------------------
+This is REQUIRED if you are using a built Python stack (see above)
 
+NOTE: PyTables are avaiulbale as 'tables'; to use you must 'import tables'
 gh repo clone PyTables/PyTables
 cd PyTables
 python setup.py build
@@ -297,8 +308,6 @@ Check that importing tables doesn't crash the interpreter:
     >>> import tables
     >>>
     
-
-
 -------------------------------------------------------------------------------
 4.7 BUILD AND INSTALL NEURON
 -------------------------------------------------------------------------------

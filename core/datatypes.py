@@ -410,6 +410,9 @@ def is_hashable(x):
             return False
         
 
+def is_dotted_name(s):
+    return isinstance(s, str) and '.' in s
+
 def is_namedtuple(x):
     return isinstance(x, tuple) and all([hasattr(x, a) for a in ("_asdict", "_fields", "_make", "_replace", "_source")])
     

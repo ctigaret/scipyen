@@ -1392,7 +1392,7 @@ def saveNixIOFile(val, fileName):
 def loadNixIOFile(fileName):
     if os.path.isfile(fileName):
         nixio = neo.NixIO(fileName)
-        ret = nixio.read() # always retirns a list of neo.Block objects
+        ret = nixio.read() # always returns a list of neo.Block objects
         nixio.close()
         if len(ret) == 1:
             return ret[0] # just return a block

@@ -2523,9 +2523,6 @@ def make_file_filter_string(extList, genericName):
     
     return (fileFilterString, individualFilterStrings)
 
-def is_dotted_name(s):
-    return isinstance(s, str) and '.' in s
-
 def elements_types(s):
     return gen_unique(map(lambda x: type(x).__name__, s))
 

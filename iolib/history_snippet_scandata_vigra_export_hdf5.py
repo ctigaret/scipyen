@@ -65,6 +65,12 @@ f.close()
 with h5y.File("scans.h5", "a") as f:
     for k, channel_name in enumerate(base_000.scansChannelNames):
         vigra.impex.writeHDF5(base_000.scans[k], f, f"/scans/{channel_name}")
+        
+        
+# reading vigra arrays -> there is a problem that vigra.impex.readHDF5 expects a 
+# 'value' attribute to HDF5 datasets - which raises AtributeError with h5py 3.4.0
+# (I guess this happens because vigraimpex and vigranumpy were compiled against 
+# hdf5 1.10.7 ?)
     
 
 # writing neo data: <- caveats
@@ -98,7 +104,9 @@ nix_file._h5file # this is a HDF5 file; can one add vigra writeHDF5 to it?
 
 
 ###########
-## 2021-10-15 22:09:47
+## 2021-10-15 22:09:47 
+# combine a neo block and a VigraArray in a HDF5 file through nix (nixpy)
+# 1. writing:
 newAxisInfo = vigra.AxisInfo(key="t1", typeFlags=vigra.AxisType.Time, 
                                                        resolution=1, 
                                                        description=defaultAxisTypeName(axisTypeFlags["t"]))
@@ -113,6 +121,8 @@ ephysdata = neoutils.concatenate_blocks(base_0000, base_0001, base_0002)
 
 neo_nixio_file = neo.NixIO("data_test_ephys_vigra.h5")
 neo_nixio_file.write_block(ephysdata)
+
+
 
 h5file = neo_nixio_file.nix_file._h5file
 
@@ -134,7 +144,10 @@ neo_nixio_file.nix_file._root.open_group(name)
 neo_nixio_file.close() # => saves BOTH the ephysdata block AND VigraArray inside
                        # the same nix hdf5 file
                        
-# NOTE: the neo_nixio_file does NOT need to save any ephysdata
+# NOTE: the neo_nixio_file does NOT need to contain/save any ephysdata
+
+# 2. reading back:
+# the neo.NixIO api disregards the vigra_group
 
 
 

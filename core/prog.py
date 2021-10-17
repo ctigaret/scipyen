@@ -357,7 +357,7 @@ def filter_attr(iterable:typing.Iterable,
     [s for s in prog.filter_attr(ephysdata.analogsignals, **{'name' : 'Im_prim2', 'units.dimensionality' : pq.pA.dimensionality})]
     
     """
-    from core.utilities import is_dotted_name
+    from core.datatypes import is_dotted_name
     
     
     if indices_only is True:

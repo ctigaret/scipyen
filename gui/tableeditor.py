@@ -281,8 +281,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             if not isinstance(data, (pd.Series, pd.DataFrame, np.ndarray, type(None))):
                 raise TypeError("%s data is not yet supported" % type(data).__name__)
             
-            if isinstance(data, np.ndarray) and data.ndim > 2:
-                raise TypeError("cannot support numpy array data with more than two dimensions")
+            #if isinstance(data, np.ndarray) and data.ndim > 2:
+                #raise TypeError("cannot support numpy array data with more than two dimensions")
             
             self.beginResetModel()
             
@@ -325,12 +325,17 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelData_ = data
                 
             elif isinstance(data, np.ndarray):
-                self._modelData_ = data
-                if data.ndim:
-                    self._modelRows_ = data.shape[0]
+                if data.ndim > 2:
+                    self._modelData_ = np.squeeze(data).reshape((data.shape[0], np.prod(data.shape[1:])))
+                else:
+                    self._modelData_ = data
                     
-                    if data.ndim > 1:
-                        self._modelColumns_ = data.shape[1]
+                if self._modelData_.ndim:
+                        
+                    self._modelRows_ = self._modelData_.shape[0]
+                    
+                    if self._modelData_.ndim > 1:
+                        self._modelColumns_ = self._modelData_.shape[1]
                         
                     else:
                         self._modelColumns_ = 1
