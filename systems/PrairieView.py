@@ -2438,12 +2438,8 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             if self.eventDetectionDialog is None:
                 self.eventDetectionDialog = TriggerDetectDialog(ephysdata=self._ephys_,
                                                                 clearEvents=True,
-                                                                ephysViewer = self.ephysPreview)#,
+                                                                ephysViewer = self.ephysPreview)
                                                                 #parent=self._scipyenWindow_)
-                #self.eventDetectionDialog = TriggerDetectDialog(ephysdata=self._ephys_,
-                                                                #clearEvents=True,
-                                                                #ephysViewer = self.ephysPreview,
-                                                                #parent=self)
                 self.eventDetectionDialog.finished.connect(self._slot_stopTriggerEventDetectionGui)
             
             #self.ephysPreview.plot(self._ephys_) # done in TriggerDetectDialog c'tor

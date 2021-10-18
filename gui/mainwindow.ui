@@ -145,7 +145,7 @@
    <attribute name="dockWidgetArea">
     <number>8</number>
    </attribute>
-   <widget class="QWidget" name="dockWidgetWorkspace_Contents">
+   <widget class="QWidget" name="dockWidgetWorkspaceContents">
     <layout class="QVBoxLayout" name="verticalLayout_3">
      <item>
       <widget class="QTableView" name="workspaceView">
@@ -245,7 +245,7 @@ NOTE: you can click anywhere in the row to select</string>
     </layout>
    </widget>
   </widget>
-  <widget class="QDockWidget" name="dockWidget_History">
+  <widget class="QDockWidget" name="dockWidgetHistory">
    <property name="sizePolicy">
     <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
      <horstretch>0</horstretch>
@@ -261,7 +261,7 @@ NOTE: you can click anywhere in the row to select</string>
    <attribute name="dockWidgetArea">
     <number>8</number>
    </attribute>
-   <widget class="QWidget" name="dockWidgetHistory_Contents">
+   <widget class="QWidget" name="dockWidgetHistoryContents">
     <layout class="QVBoxLayout" name="verticalLayout_4">
      <item>
       <widget class="QTreeWidget" name="historyTreeWidget">
@@ -359,7 +359,7 @@ NOTE: you can click anywhere in the row to select</string>
     </layout>
    </widget>
   </widget>
-  <widget class="QDockWidget" name="FileSystemBrowser">
+  <widget class="QDockWidget" name="dockWidgetFileSystem">
    <property name="sizePolicy">
     <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
      <horstretch>0</horstretch>
@@ -375,7 +375,7 @@ NOTE: you can click anywhere in the row to select</string>
    <attribute name="dockWidgetArea">
     <number>8</number>
    </attribute>
-   <widget class="QWidget" name="dockWidgetContents">
+   <widget class="QWidget" name="dockWidgetFileSystemContents">
     <layout class="QVBoxLayout" name="verticalLayout_5">
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout">

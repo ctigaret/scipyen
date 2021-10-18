@@ -227,6 +227,8 @@ custom_unit_symbols[Gohm.symbol] = Gohm
 
 # TODO some other useful units TODO
 
+
+
 def isVector(x):
     """Returns True if x is a numpy array encapsulating a vector.
     
@@ -296,7 +298,8 @@ def is_uniform_sequence(s):
     return ret
 
 def sequence_element_type(s):
-    return 
+    from utilities import unique
+    return unique((type(e) for e in s))
     
     
 def arraySlice(data:np.ndarray, slicing:(dict, type(None))):
@@ -647,13 +650,6 @@ class UnitsStringValidator(QtGui.QValidator):
 class TypeEnum(IntEnum):
     """Common ancestor for enum types used in Scipyen
     """
-    #@classmethod
-    #def __repr__(cls):
-        #return  "%s:\n" % cls.__name__ + "\t\n".join(["%s = %d" % (t.name, t.value) for t in cls])
-    #@staticmethod
-    #def __repr__():
-        #return super().__repr__() + ", ".join(["%s = %d" % (t.name, t.value) for t in cls])
-    
     @classmethod
     def names(cls):
         """Iterate through the names in TypeEnum enumeration.

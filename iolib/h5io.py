@@ -246,7 +246,7 @@ def get_file_and_group(filenameOrGroup:typing.Union[str, h5py.Group],
     if isinstance(pathInFile, str) and len(pathInFile.strip()):
         levels = pathInFile.split('/')
         
-        from groupname in levels[:-1]:
+        for groupname in levels[:-1]:
             if len(groupanme.strip()) == 0:
                 continue
             
@@ -313,18 +313,39 @@ def mapping2hdf(x:collections.abc.Mapping,
     file, group = get_file_and_group(filenameOrGroup, pathInFile)
     
     for key in x.__iter__():
+        if isinstance(key, str):
+            childname = key
+            attr_key_type = "str"
+        else:
+            childname=str(key)
+            attr_key_type = type(key)
+            
         value = x.__getitem__(key, None)
         
-        if isinstance(value, collections.abc.Mapping):
-            if isinstance(key, str):
-                groupname = key
-            else:
-                groupname = str(key)
-                
-            mapping2hdf(value, group, groupname)
+        value_type = type(value)
+        
+        #if isinstance(value, collections.abc.Mapping):
+        if issubclass(value_type, collections.abc.Mapping):
+            mapping2hdf(value, group, childname)
             
-        elif isinstance(value, collections.abc.Sequence):
+        #elif isinstance(value, collections.abc.Sequence):
+        elif issubclass(value_type, collections.abc.Sequence)
             if is_uniform_sequence(value):
+                element_type = type(value[0])
+                if element_type in (bool, bytes, complex, float, int, str):
+                    dtype = np.dtype(element_type)
+                    
+                    group.create_dataset(childname, data=value, dtype=dtype)
+                    
+            else:
+                pass
+                
+        elif value_type in (bool, bytes, complex, float, int, str):
+            dtype = np.dtype(value_type)
+            group.create_dataset(childname, data=value, dtype=dtype)
+            
+            
+                
                 
             
     

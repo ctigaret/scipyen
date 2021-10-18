@@ -1620,10 +1620,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         # NOTE: WARNING 2021-09-16 14:32:03
         # this must be called AFTER all class and instance attributes used in the 
-        # configurables mechanism have been defined
-        # Any such attribute defined further below will NOT be found by the 
-        # mechanism (e.g. syncQtSettings)
+        # configurables mechanism have been defined, and BEFORE self._configureUI_()
+        # This is so that GUI widgets members of the ScipyenWindow instance have
+        # been themselves initialized
         self.setupUi(self)
+        
         WorkspaceGuiMixin.__init__(self, parent=self)#, settings=settings)
         self.scriptsManager = ScriptManager(parent=self)
         self.scriptsManager.signal_executeScript[str].connect(self._slot_runPythonScriptFromManager)
@@ -1663,13 +1664,21 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         # NOTE: 2021-01-06 17:22:45
         # a lot of things happen up to here which depend on an initialized bare-bones
-        # UI; hence setupui must be called early (where it is right now), and
-        # _configureUI_ must be called NOW
+        # UI; hence setupUi must be called early (where it is right now), and
+        # _configureUI_ must be called NOW; this will initialize additional UI
+        # elements and signal-slot connections NOT defined in the *.ui file
         self._configureUI_()
         
-        # NOTE: 2021-08-17 12:35:47
-        # loads window settings, not Scipyen non-gui settings !
+        # With all UI and their signal-slot connections in place we can now
+        # apply stored settings, including the 'state' of the ScipyenWindow object
+        #  (a QMainWindow instance)
+        #
         self.loadSettings()
+        
+        
+        
+        self.activeDockWidget = self.dockWidgetWorkspace
+        
         
         # NOTE: 2021-08-17 12:36:49 TODO custom icon ?
         # see also NOTE: 2021-08-17 10:06:24 in scipyen.py
@@ -2417,9 +2426,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.console.execute("console_info()")
         
     @pyqtSlot()
-    def slot_refreshWorkspaceView(self):
-        self.workspaceModel.update()
-        #self.workspaceModel.update(from_console=False, force=True)
+    def slot_refreshView(self):
+        if self.activeDockWidget is self.dockWidgetFileSystem:
+            self._updateFileSystemView_(self.currentDir)
+        elif self.activeDockWidget is self.dockWidgetHistory:
+            if self.console is not None and self.ipkernel.shell.execution_count > self.executionCount: # only update history if something has indeed been executed
+                self.executionCount = self.ipkernel.shell.execution_count
+                self._updateHistoryView_(self.executionCount-1, self.console.consoleWidget.history_tail(1)[0])
+        else:
+            self.workspaceModel.update()
     
     # NOTE: 2016-03-26 17:07:17
     # as a workaround for the problem in NOTE: 2016-03-26 17:01:32
@@ -2482,8 +2497,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         if mustUpdateSessionID:
             self.currentSessionID = self.historyAccessor.get_last_session_id()
-
-
 
     # NOTE: 2016-03-25 09:43:58
     # inspired from stock IPython/core/magic/namespaces.py
@@ -3271,6 +3284,18 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.workspaceModel.update()
         
+    @pyqtSlot(bool)
+    @safeWrapper
+    def slot_dockWidgetVisibilityChanged(self, val):
+        if val is True:
+            self.activeDockWidget=self.sender()
+        
+        
+    @pyqtSlot(QtWidgets.QDockWidget)
+    @safeWrapper
+    def slot_dockWidgetActivated(self, w):
+        self.activeDockWidget = w
+        
     @pyqtSlot()
     @safeWrapper
     def slot_copyWorkspaceSelection(self):
@@ -3735,8 +3760,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.scriptsAction.setMenu(self.menuScripts)
         self.applicationsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("homerun"), "Applications")
         self.applicationsAction.setMenu(self.applicationsMenu)
-        self.refreshWorkspaceAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh Workspace")
-        self.refreshWorkspaceAction.triggered.connect(self.slot_refreshWorkspaceView)
+        self.refreshViewAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh Active View")
+        self.refreshViewAction.triggered.connect(self.slot_refreshView)
         
         tbactions = (self.newViewersAction, self.consolesAction, self.scriptsAction, self.applicationsAction)
         tw = (w for w in itertools.chain(*(a.associatedWidgets() for a in tbactions)) if w is not self.toolBar)
@@ -3749,6 +3774,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #self.actionNewViewer = self.menuViewer.addAction("New...")
         #self.actionNewViewer.triggered.connect(self.slot_newViewer)
         #### END do not delete: action for presenting a list of viewer types to choose from
+        
+        #### BEGIN Dock widgets management - it is good to know which one is on top
+        self.dockWidgetWorkspace.visibilityChanged[bool].connect(self.slot_dockWidgetVisibilityChanged)
         
         #### BEGIN file system view,  navigation widgets & actions
         self.fileSystemTreeView.setModel(self.fileSystemModel)
@@ -4428,19 +4456,28 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 
             self._setRecentDirectory_(targetDir)
             
-            self.fileSystemModel.setRootPath(targetDir)
-            self.fileSystemTreeView.scrollTo(self.fileSystemModel.index(targetDir))
-            self.fileSystemTreeView.setRootIndex(self.fileSystemModel.index(targetDir))
-            self.fileSystemTreeView.sortByColumn(0, QtCore.Qt.AscendingOrder)
+            self._updateFileSystemView_(targetDir)
+            
+            #self.fileSystemModel.setRootPath(targetDir)
+            #self.fileSystemTreeView.scrollTo(self.fileSystemModel.index(targetDir))
+            #self.fileSystemTreeView.setRootIndex(self.fileSystemModel.index(targetDir))
+            #self.fileSystemTreeView.sortByColumn(0, QtCore.Qt.AscendingOrder)
 
-            # NOTE 2017-07-04 15:59:38
-            # for this to work one has to set horizontalScrollBarPolicy
-            # to ScrollBarAlwaysOff (e.g in QtDesigner)
-            self._resizeFileColumn_()
             self.currentDir = targetDir
             self.currentDirLabel.setText(targetDir)
             mpl.rcParams["savefig.directory"] = targetDir
             self.setWindowTitle("Scipyen %s" % targetDir)
+            
+    def _updateFileSystemView_(self, targetDir):
+        self.fileSystemModel.setRootPath(targetDir)
+        self.fileSystemTreeView.scrollTo(self.fileSystemModel.index(targetDir))
+        self.fileSystemTreeView.setRootIndex(self.fileSystemModel.index(targetDir))
+        self.fileSystemTreeView.sortByColumn(0, QtCore.Qt.AscendingOrder)
+        # NOTE 2017-07-04 15:59:38
+        # for this to work one has to set horizontalScrollBarPolicy
+        # to ScrollBarAlwaysOff (e.g in QtDesigner)
+        self._resizeFileColumn_()
+        
             
     @safeWrapper
     def _setRecentDirectory_(self, newDir):

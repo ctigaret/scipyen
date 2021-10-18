@@ -2675,6 +2675,7 @@ class ScanData(object):
         """
         TODO
         """
+        warnings.warn("DEPRECATED", DeprecationWarning, stacklevel=2)
         if data is None:
             self._scene_ = None
             

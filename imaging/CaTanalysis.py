@@ -5076,8 +5076,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
     def slot_importPrairieView(self):
         import mimetypes, io
         from systems import PrairieView
-        #pvimp = PrairieView.PrairieViewImporter(parent=self) # see NOTE: 2021-04-18 12:25:11 in gui.mainwindow
-        pvimp = PrairieView.PrairieViewImporter(parent=self._scipyenWindow_) # see NOTE: 2021-04-18 12:25:11 in gui.mainwindow
+        pvimp = PrairieView.PrairieViewImporter(parent=self) # see NOTE: 2021-04-18 12:25:11 in gui.mainwindow
+        #pvimp = PrairieView.PrairieViewImporter(parent=self._scipyenWindow_) # see NOTE: 2021-04-18 12:25:11 in gui.mainwindow
         pvimp.finished[int].connect(self._slot_prairieViewImportGuiDone)
         pvimp.open()
         
