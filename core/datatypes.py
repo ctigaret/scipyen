@@ -287,6 +287,17 @@ def isRowVector(x):
     else:
         return False
     
+def is_uniform_sequence(s):
+    ret = isinstance(s, collections.abc.Sequence) 
+
+    if ret:
+        ret &= all(isinstance(v, type(s[0])) for v in s[1:])
+
+    return ret
+
+def sequence_element_type(s):
+    return 
+    
     
 def arraySlice(data:np.ndarray, slicing:(dict, type(None))):
     """Dynamic slicing of nD arrays and introducing new axis in the array.
@@ -917,73 +928,3 @@ class TypeEnum(IntEnum):
         return self.strand(self.name, name)
         
         
-#class PictArray(vigra.VigraArray):
-    #"""DO NOT USE -- inheritance from VigraArray is broken
-    #Extends vigra.VigraArray with axes calibration concept.
-    #Does NOT replicate VigraArray static methods!!!
-    
-    #To calibrate an axis (or an individual channel in a Channels axis)
-    #call one of the setXXX() methods of its "axiscalibration" property.
-    
-    #FIXME: after calling VigraArray methods such as bindAxis, the PictArray
-    #will lose its __axiscalibration__ attribute
-    
-    #"""
-    
-    #def __new__(cls, obj, dtype=np.float32, order=None, init=True, value=None, axistags=None):
-        ##print("__new__ Cls:", cls)
-        ##print("__new__ type(args[0]):", type(obj))
-        
-        ##ret = vigra.VigraArray(obj, dtype=dtype, order=order, init=init, value=value, axistags=axistags)
-        
-        ##ret.__class__.__name__ = "PictArray"
-        
-        ## NOTE: 2018-09-11 15:48:12
-        ## this doesn't work because internally (at C++ level)0 this expects cls to be VigraArray
-        ## 
-        #ret = super(PictArray, cls).__new__(cls, obj, dtype=dtype, order=order, init=init, value=value, axistags=axistags)
-        
-        ##print("__new__ type(ret)", type(ret))
-        
-        #return ret
-
-    #def __init__(self, *args, **kwargs):
-        ##print("__init__ type(self)", type(self))
-        ##print("__init__ args", args)
-        #if not hasattr(self, "__axiscalibration__"):
-            #self.__axiscalibration__ = AxisCalibration(self)
-            #for ax in self.axistags:
-                #self.__axiscalibration__.calibrateAxis(ax)
-            
-
-    #def __array_finalize__(self, obj):
-        #super(PictArray, self).__array_finalize__(obj)
-        
-        ##print("__array_finalize__", type(obj))
-        
-        #if not hasattr(self, "__axiscalibration__"):
-            #self.__axiscalibration__ = AxisCalibration(obj)
-        #else:
-            #self.__axiscalibration__.synchronize()
-        ##if isinstance(obj, vigra.VigraArray):
-        
-    #@property
-    #def axiscalibration(self):
-        #if not hasattr(self, "__axiscalibration__"):
-            #self.__axiscalibration__ = AxisCalibration(self)
-
-        #return self.__axiscalibration__
-    
-    #@axiscalibration.setter
-    #def axiscalibration(self, value):
-        #if not isinstance(value, AxisCalibration):
-            #raise TypeError("Expectign an AxisCalibration object; got %s instead" % type(value).__name__)
-        
-        #if any([key not in self.axistags for key in value.keys()]):
-            #raise ValueError("AxisCalibration axis %s does not exist in this PictArray object" % key)
-        
-        #self.__axiscalibration__ = value
-        
-        #for ax in self.axistags:
-            #self.__axiscalibration__.calibrateAxis(ax)
-            

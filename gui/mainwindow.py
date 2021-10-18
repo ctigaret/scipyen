@@ -124,7 +124,14 @@ plt.ion()
 #### END matplotlib modules
 import quantities as pq
 import xarray as xa
-import h5py
+
+has_hdf5=False
+try:
+    import h5py
+    has_hdf5=True
+except ImporError as e:
+    pass
+
 has_vigra=False
 try:
     import vigra
@@ -2374,6 +2381,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
             self.ipkernel.shell.run_cell(impcmd)
             
+            if has_hdf5:
+                self.ipkernel.shell.run_cell("h5py.enable_ipython_completer()")
+            
             # hide the variables added to the workspace so far (e.g., ipkernel,
             # console, shell, and imported modules) so that they don't show in 
             # the workspace browser (the tree view in the User variables pane)
@@ -2389,7 +2399,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.console.setWindowTitle(u'Scipyen Console')
 
         self.console.show()
-        self.console.consoleWidget.set_pygment(self.console.consoleWidget._console_pygment) # must be applied on visible console!
+        # NOTE: 2021-10-18 11:28:25
+        # The following must be called when console has bocome visible!
+        self.console.consoleWidget.set_pygment(self.console.consoleWidget._console_pygment) 
         
     # NOTE: 2016-03-20 21:18:32
     # to run code inside the console and use the console as stdout, 

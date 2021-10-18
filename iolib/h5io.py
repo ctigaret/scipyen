@@ -177,7 +177,7 @@ independently from pictio.
 
 
 
-import os, sys, tempfile
+import os, sys, tempfile, types, typing, collections, inspect, functools, itertools
 import numpy as np
 import h5py
 import nixio as nix 
@@ -189,7 +189,10 @@ import neo
 from core.prog import safeWrapper
 from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
-from core.datatypes import (TypeEnum,UnitTypes, Genotypes, arbitrary_unit, pixel_unit, 
+from core.datatypes import (TypeEnum,UnitTypes, Genotypes, 
+                            is_uniform_sequence,
+                            arbitrary_unit, 
+                            pixel_unit, 
                             channel_unit,
                             space_frequency_unit,
                             angle_frequency_unit,
@@ -209,18 +212,146 @@ from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse,
                          HorizontalCursor, Line, Move, Quad, Path, 
                          PlanarGraphics, Rect, Text, VerticalCursor,)
 
+# NOTE: 2021-10-18 12:08:18 in all functions below:
+# filenameOrGroup is either:
+#   a str, the file name of a target HDF5 file (possible, relative to cwd)
+#
+#       In this case, the functions will work on the root group ('/') of the 
+#       HDF5 filename.
+#
+#   a h5py.Group object
+#
+# pathInFile is a str: the name of the h5py.Dataset.
+#
+#   This can be a HDF5 'path' (from the root '/' to, and including, the data set
+#       name) or just the data set name (in which case the data set will be
+#       relative to the filenameOrGroup)
+#   
+#   for reading functions, the named data set must already exist in the group
+#   (for data sets deeply nested, the intermediary groups must also be present)
+#   
 
-def readHDF5_VigraArray(filenameOrGroup, pathInFile, order=None):
+def get_file_and_group(filenameOrGroup:typing.Union[str, h5py.Group],
+                       pathInFile:typing.Optional[str] = None) -> typing.Tuple[typing.Optional[h5py.File], h5py.Group]:
+    """Common tool for coherent syntax of h5io read/write functions.
+    From vigra.impex.readHDF5/writeHDF5, (c) U.Koethe
+    """
+    if isinstance(filenameOrGroup, h5py.Group):
+        file = None
+        group = filenameOrGroup
+    else:
+        file = h5py.File(filenameOrGroup, 'r')
+        group = file['/']
+        
+    if isinstance(pathInFile, str) and len(pathInFile.strip()):
+        levels = pathInFile.split('/')
+        
+        from groupname in levels[:-1]:
+            if len(groupanme.strip()) == 0:
+                continue
+            
+            g = group.get(groupname, default=None)
+            
+            if g is None:
+                group = group.create_group(groupname)
+                
+            elif not isinstance(g, h5py.Group):
+                raise IOError(f"Invalid path: {pathInFile}")
+            
+            else:
+                group = g
+
+    return file, group
+
+def parse_data(data):
+    attrs = dict()
+    
+    type_str = type(data).__name__
+    
+    module_name = type(data).__module__
+    
+    if type_str == "instance":
+        type_str = data.__class__.__name__
+        module_name = data.__class__.__module__
+        
+    elif type_str == "type":
+        type_str = data.__name__
+        module_name = data.__module__
+        
+    #elif type_str == "namedtuple":
+        
+    attrs["type_str"] = type_str
+    attrs["module_name"] = module_name
+    
+    
+    
+def parse_func(f):
+    sig = inspect.signature(f)
+    
+    def __identify__(x):
+        if x is None:
+            return str(x)
+        
+        elif isinstance(x, type):
+            return x.__name__
+        
+        else:
+            return {"type": type(x).__name__, "value": x}
+        
+    
+    return dict((p_name, {"kind":p.kind.name, 
+                              "default": __identify__(p.default),
+                              "annotation": __identify__(p.annotation),
+                              }) for p_name, p in sig.parameters.items())
+
+def mapping2hdf(x:collections.abc.Mapping, 
+                filenameOrGroup:typing.Union[str, h5py.Group], 
+                pathInFile:typing.Optional[str]=None) -> None:
+    if not isinstance(x, collections.abc.Mapping):
+        raise TypeError(f"Expecting a mapping; got {type(x).__name__} instead")
+    
+    file, group = get_file_and_group(filenameOrGroup, pathInFile)
+    
+    for key in x.__iter__():
+        value = x.__getitem__(key, None)
+        
+        if isinstance(value, collections.abc.Mapping):
+            if isinstance(key, str):
+                groupname = key
+            else:
+                groupname = str(key)
+                
+            mapping2hdf(value, group, groupname)
+            
+        elif isinstance(value, collections.abc.Sequence):
+            if is_uniform_sequence(value):
+                
+            
+    
+
+def build_HDF5_tree(data, parent, name=""):
+    pass
+
+def readHDF5_VigraArray(filenameOrGroup:typing.Union[str, h5py.Group], 
+                        pathInFile:str, 
+                        order:typing.Optional[str]=None):
     '''Read an array from an HDF5 file.
     
     Modified version of vigra.impex.readHDF5() for the new h5py API:
     A DataSet object does NOT have a "value" attribute in h5py v3.4.0
     
-    'filenameOrGroup' can contain a filename or a group object
-    referring to an already open HDF5 file. 'pathInFile' is the name
-    of the dataset to be read, including intermediate groups. If the
-    first argument is a group object, the path is relative to this
-    group, otherwise it is relative to the file's root group.
+    Parameters:
+    ===========
+    
+    'filenameOrGroup' : str or h5py.Group
+        When a str, it contains a filename
+        When a hy5py.Group this is a group object referring to an already open 
+        HDF5 file, or present in an already open HDF5 file
+        
+    'pathInFile' : str is the name of the dataset to be read, including 
+    intermediate groups (when a HDF5 'path' - like string). If 'filenameOrGroup'
+    is a group object, the path is relative to this group, otherwise it is 
+    relative to the file's root group.
 
     If the dataset has an attribute 'axistags', the returned array
     will have type :class:`~vigra.VigraArray` and will be transposed
@@ -232,12 +363,8 @@ def readHDF5_VigraArray(filenameOrGroup, pathInFile, order=None):
     Requirements: the 'h5py' module must be installed.
     '''
     #import h5py
-    if isinstance(filenameOrGroup, h5py.Group):
-        file = None
-        group = filenameOrGroup
-    else:
-        file = h5py.File(filenameOrGroup, 'r')
-        group = file['/']
+    file, group = get_file_and_group(filenameOrGroup)
+        
     try:
         dataset = group[pathInFile]
         if not isinstance(dataset, h5py.Dataset):
@@ -272,12 +399,7 @@ def readHDF5_VigraArray(filenameOrGroup, pathInFile, order=None):
     return data
 
 def readHDF5_str(filenameOrGroup, pathInFile):
-    if isinstance(filenameOrGroup, h5py.Group):
-        file = None
-        group = filenameOrGroup
-    else:
-        file = h5py.File(filenameOrGroup, 'r')
-        group = file['/']
+    file, group = get_file_and_group(filenameOrGroup)
         
     try:
         dataset = group[pathInFile]
@@ -306,13 +428,9 @@ def writeHDF5_NeoBlock(data, filenameOrGroup, pathInFile, use_temp_file=True):
         
     else:
         data_name = data.name
+        
+    file, group = get_file_and_group(filenameOrGroup)
     
-    if isinstance(filenameOrGroup, h5py.Group):
-        file = None
-        group = filenameOrGroup
-    else:
-        file = h5py.File(filenameOrGroup, 'a')
-        group = file['/']
     try:
         levels = pathInFile.split('/')
         for groupname in levels[:-1]:
@@ -325,12 +443,6 @@ def writeHDF5_NeoBlock(data, filenameOrGroup, pathInFile, use_temp_file=True):
                 raise IOError("writeHDF5(): invalid path '%s'" % pathInFile)
             else:
                 group = g
-        #dataset = group.get(levels[-1], default=None)
-        #if dataset is not None:
-            #if isinstance(dataset, h5py.Dataset):
-                #del group[levels[-1]]
-            #else:
-                #raise IOError("writeHDF5(): cannot replace '%s' because it is not a dataset" % pathInFile)
         
         # NOTE: in the future, check use_temp_file:
         # if use_temp_file:
@@ -352,4 +464,12 @@ def writeHDF5_NeoBlock(data, filenameOrGroup, pathInFile, use_temp_file=True):
         if file is not None:
             file.close()
 
+    
+def write_dict(data, filenameOrGroup, pathInFile):
+    if not isinstance(data, dict):
+        raise TypeError(f"Expecting a dict; got {type(data).__name__} instead")
+    
+    pass
+    
+    
     

@@ -73,7 +73,7 @@ TRAITSMAP = {           # use casting versions
     str:        (Unicode,),
     #str:        (CUnicode,),
     list:       (List,),
-    deque:      (List,),
+    #deque:      (List,),
     set:        (Set,),
     frozenset:  (Set,),
     tuple:      (Tuple,),
@@ -357,7 +357,7 @@ def dynamic_trait(x, *args, **kwargs):
     
     """
     from .traitcontainers import DataBag
-    from .databagtrait import DataBagTrait
+    from .scipyen_traitlets import (DataBagTrait, DequeTrait,)
     allow_none = kwargs.pop("allow_none", False)
     force_trait = kwargs.pop("force_trait", None)
     set_function = kwargs.pop("set_function", None)
@@ -395,9 +395,11 @@ def dynamic_trait(x, *args, **kwargs):
         traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=False if v is x else True)) for k,v in x.items())
         return DataBagTrait(default_value=x, per_key_traits = traits, allow_none = allow_none)
     
+    elif myclass is deque:
+        return DequeTrait(default_value=x)
+    
     if isclass(force_trait) and issubclass(force_trait, traitlets.TraitType):
         traitclass = (force_trait, )
-        
         
     else:
         # NOTE: 2021-08-20 12:22:12 For a finer granularity

@@ -43,6 +43,7 @@ from core.triggerprotocols import (TriggerEvent, TriggerEventType,)
 
 import core.datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
+from core.datatypes import arraySlice
 
 #### END pict.core modules
 
@@ -145,7 +146,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         #self._displayedColumns = 0
         self._displayedRows_ = 0
         
-        self._viewers_ = list()
+        #self._viewers_ = list()
         
         self.setModelData(data)
         
@@ -216,19 +217,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     def rowCount(self, parentIndex=QtCore.QModelIndex()):
         #print("TabularDataModel rowCount")
         return self._modelRows_
-        #return self._displayedRows_
-    
-        #if parentIndex.isValid():
-            #return 0
-            
-        #if self._modelData_ is None:
-            #return 0
-        
-        #if isinstance(self._modelData_, (pd.DataFrame, pd.Series, np.ndarray)):
-            #return self._modelData_.shape[0]
-        
-        #else:
-            #return 0 #  NOTE: 2018-11-10 11:26:48 TODO nested lists ?!?
         
     def columnCount(self, parentIndex=QtCore.QModelIndex()):
         #print("TabularDataModel columnCount")
@@ -365,9 +353,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         except Exception as e:
             traceback.print_exc()
         
-    @property
-    def views(self):
-        return self._viewers_
+    #@property
+    #def views(self):
+        #return self._viewers_
             
     #def appendView()
     
@@ -851,15 +839,23 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     
     view_action_name = "Table"
     
-    def __init__(self, model:typing.Optional[QtCore.QAbstractTableModel]=None, 
-                 parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
+    #def __init__(self, model:typing.Optional[QtCore.QAbstractTableModel]=None, 
+                 #parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
+    def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
         super().__init__(parent=parent)
         
-        if model is None:
-            self._dataModel_ = TabularDataModel(parent=self)
+        self._dataModel_ = TabularDataModel(parent=self)
+        
+        # NOTE: 2021-10-18 09:32:45
+        # ### BEGIN keep this  - you may re-enable the possibility to use custom tabular
+        # data models
+        
+        #if model is None:
+            #self._dataModel_ = TabularDataModel(parent=self)
             
-        else:
-            self._dataModel_ = model
+        #else:
+            #self._dataModel_ = model
+        # ### END keep this ...
         
         self._configureUI_()
         
@@ -870,7 +866,79 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         # QtWidgets.QAbstractItemView.AnyKeyPressed
         self._defaultEditTriggers_ = self.tableView.editTriggers()
         
+        self._data_ = None
+        
+        self._slicingAxis_ = None
+        
+        self._currentSlice_ = 0
+        
+    def setData(self, data:(pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
+                       neo.AnalogSignal, neo.IrregularlySampledSignal,
+                       neo.Epoch, neo.Event, neo.SpikeTrain,
+                       DataSignal, IrregularlySampledDataSignal,
+                       TriggerEvent, TriggerProtocol,
+                       np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D), *args, **kwargs):
+        
+        self._data_ = data
+        
+        if isinstance(data, np.ndarray):
+            if data.ndim > 2:
+                self._slicingAxis_ = kwargs.get("sliceaxis", None)
+                if not isinstance(self._slicingAxis_, int) or self._slicingAxis_ < 0 or self._slicingAxis_ >= data.ndim:
+                    self._slicingAxis_ = 2
+                    
+                if data.ndim > 3:
+                    new_shape = list(data.shape[0:self._slicingAxis_]) + [np.prod(data.shape[self._slicingAxis_:])]
+                    self._data_ = np.squeeze(data).reshape(tuple(new_shape))
+                    
+                self._currentSlice_ = 0
+                self._dataModel_.setModelData(self._data_[arraySlice(self._data_, {self._slicingAxis_:self._currentSlice_})])
+                
+                self.prevSliceToolbutton.setEnabled(True)
+                self.nextSliceToolButton.setEnabled(True)
+                return
+        
+        self.prevSliceToolbutton.setEnabled(False)
+        self.nextSliceToolButton.setEnabled(False)
+        self._dataModel_.setModelData(self._data_)
+        
+    @pyqtSlot()
+    def _slot_prevSlice(self):
+        if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
+            if self.currentSlice > 0:
+                self.currentSlice = self.currentSlice - 1
+        
+    @pyqtSlot()
+    def _slot_nextSlice(self):
+        if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
+            if self.currentSlice <= self._data_.shape[self._slicingAxis_] -1 :
+                self.currentSlice = self.currentSlice + 1
+        
+    @property
+    def currentSlice(self):
+        return self._currentSlice_
     
+    @currentSlice.setter
+    def currentSlice(self, val):
+        if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
+            if isinstance(val, int):
+                if val >=0 and val < self._data_.ndim:
+                    self._currentSlice_ = val
+                    if self._currentSlice_ == 0:
+                        self.prevSliceToolbutton.setEnabled(False)
+                        self.nextSliceToolButton.setEnabled(True)
+                        
+                    elif self._currentSlice_ >= self._data_.shape[self._slicingAxis_] - 1:
+                        self.prevSliceToolbutton.setEnabled(True)
+                        self.nextSliceToolButton.setEnabled(False)
+                        
+                    else:
+                        self.prevSliceToolbutton.setEnabled(True)
+                        self.nextSliceToolButton.setEnabled(True)
+                        
+                    self._dataModel_.setModelData(self._data_[arraySlice(self._data_, {self._slicingAxis_:self._currentSlice_})])
+                        
+                        
     @property
     def model(self):
         return self.tableView.model()
@@ -935,6 +1003,11 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
 
         self.resizeColumnsToolButton.clicked.connect(self.slot_resizeAllColumnsToContents)
         self.resizeRowsToolButton.clicked.connect(self.slot_resizeAllRowsToContents)
+        
+        self.prevSliceToolbutton.setEnabled(False)
+        self.prevSliceToolbutton.clicked.connect(self._slot_prevSlice)
+        self.nextSliceToolButton.setEnabled(False)
+        self.nextSliceToolButton.clicked.connect(self._slot_nextSlice)
         
     @pyqtSlot()
     def slot_resizeAllColumnsToContents(self):
@@ -1272,9 +1345,14 @@ class TableEditor(ScipyenViewer):#, Ui_TableEditor):
         
         #self.tableView.setSortingEnabled(False)
 
-        self._dataModel_ = TabularDataModel(parent=self)
+        self.tableWidget = TableEditorWidget(parent=self)
+        self._dataModel_ = self.tableWidget._dataModel_
         
-        self.tableWidget = TableEditorWidget(model = self._dataModel_, parent=self)
+        # NOTE: see NOTE: 2021-10-18 09:32:45
+        #self._dataModel_ = TabularDataModel(parent=self)
+        
+        #self.tableWidget = TableEditorWidget(model = self._dataModel_, parent=self)
+        
         self.setCentralWidget(self.tableWidget)
         self.tableView = self.tableWidget.tableView
         
@@ -1343,9 +1421,9 @@ class TableEditor(ScipyenViewer):#, Ui_TableEditor):
         if type(data) not in self.supported_types or not any([t in type(data).mro() for t in self.supported_types]):
             raise TypeError("%s cannot handle data type %s" % (type(self).__name__, type(data).__name__))
         
-        if isinstance(data, np.ndarray):
-            if data.ndim > 2:
-                raise ValueError("Numpy arrays with more than two dimensions are not supported")
+        #if isinstance(data, np.ndarray):
+            #if data.ndim > 2:
+                #raise ValueError("Numpy arrays with more than two dimensions are not supported")
             
         self._data_ = data
         
@@ -1364,7 +1442,9 @@ class TableEditor(ScipyenViewer):#, Ui_TableEditor):
         
         signalBlocker = QtCore.QSignalBlocker(self.tableView)
         
-        self._dataModel_.setModelData(self._data_)
+        self.tableWidget.setData(self._data_)
+        
+        #self._dataModel_.setModelData(self._data_)
     
     @pyqtSlot()
     @safeWrapper

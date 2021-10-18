@@ -15,6 +15,7 @@ from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
                      )
 from functools import (partial, partialmethod,)
 from itertools import chain
+import collections
 from collections import deque, OrderedDict
 from numbers import Number
 import numpy as np
@@ -2773,6 +2774,9 @@ def unique(seq, key=None):
     See also gen_unique for a generator version.
     
     """
+    if not isinstance(seq, collections.abc.Sequence):
+        raise TypeError(f"Expecting a Sequence; got {type(seq).__name__} instead")
+
     if isinstance(seq, tuple):
         return tuple((item for item in gen_unique(seq)))
     
@@ -2819,7 +2823,7 @@ def gen_unique(seq, key=None):
     unique for a function version
     
     """
-    if not isinstance(seq, (tuple, list, range)):
+    if not isinstance(seq, (tuple, list, range, deque)):
         raise TypeError("expecting an iterable sequence (i.e., a tuple, a list, or a range); got %sinstead" % type(seq).__name__)
     
     seen = set()

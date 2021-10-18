@@ -202,6 +202,9 @@ class InteractiveTreeWidget(DataTreeWidget):
         NOTE: 2020-10-11 13:48:51
         override superclass parse to use ScipyenTableWidget instead
         
+        NOTE: 2021-10-18 14:03:13
+        ScipyenTableWidget DEPRECATED in favour of tableeditor.TableEditorWidget
+        
         """
         from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
         from pyqtgraph.pgcollections import OrderedDict
@@ -292,7 +295,8 @@ class InteractiveTreeWidget(DataTreeWidget):
             #widget = table
             widget = TableEditorWidget(parent=self)
             signalBlocker = QtCore.QSignalBlocker(widget.tableView)
-            widget.tableView.model().setModelData(data)
+            widget.setData(data)
+            #widget.tableView.model().setModelData(data)
             widget.setMaximumHeight(200)
             widget.readOnly=True
             
@@ -338,7 +342,8 @@ class InteractiveTreeWidget(DataTreeWidget):
             desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
             widget = TableEditorWidget(parent=self)
             signalBlocker = QtCore.QSignalBlocker(widget.tableView)
-            widget.tableView.model().setModelData(data)
+            widget.setData(data)
+            #widget.tableView.model().setModelData(data)
             widget.setMaximumHeight(200)
             widget.readOnly=True
             

@@ -27,10 +27,19 @@
             + each a HDF5 Dataset with optional attributes
         + instance_attributes: HDF5 Group
             + each a HDF5 Dataset with optional attributes
+            
+    + neo and pandas: use library functions, respectively, from nix and pytables
+    
+    
     
 **NOTE** might require changes in the data class designs (ScanData, AnalysisUnit,
 PlanarGraphics) but must have sufficiently flexible heuristic to read/write neo 
 data types and our own (e.g. DataSignal, TriggerEvent, etc)
+
+### Possible (ugly) hack:
+Use `tempfile` module to open a `nix` file using `neo.NixIO` 
++ for writing neo data (i.e. `neo.Block`)
++ for reading, one needs to copy the `neo`/`nix` data structure to the temporary file then read these using `neo`/`nix` framework
 
 ## PyTables: the underlying engine for pandas <-> HDF5
 Too complex and yet limited:

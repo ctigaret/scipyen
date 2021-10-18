@@ -72,21 +72,33 @@ from core.traitcontainers import DataBag
 #from contextlib import contextmanager
 #print(sys.path)
 
-__module_path__ = os.path.abspath(os.path.dirname(__file__))
+__module_path__ = os.path.abspath(os.path.dirname(__file__)) # this should be ending in "/core"
 
 __scipyen_path__ =  os.path.dirname(__module_path__)
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 __virtual_env_dir__ = os.environ.get("VIRTUAL_ENV", None)
+
 if isinstance(__virtual_env_dir__, str) and len(__virtual_env_dir__.strip()):
     __virtual_site_packages__ = os.path.join(__virtual_env_dir__, "lib", "python%i.%i" % sys.version_info[0:2], "site-packages")
     
 else:
     __virtual_site_packages__ = None
+    
+# initialization script for ALL external IPython consoles
+# private: call indirectly via init_commands!
+_ext_ipython_initialization_file = os.path.join(__module_path__, "extipy_init.py")
+_ext_ipython_initialization_cmd = " ".join(["get_ipython().run_cell(", "'run -i -n", _ext_ipython_initialization_file, "')"])
 
+#print("_ext_ipython_initialization_cmd", _ext_ipython_initialization_cmd)
+
+# initialization script for NEURON in external ipython process
+# only called when launching a NEURON external console
+# expected to be passed as 'code' parameter to tab with frontend factories in 
+# ExternalIPython / ExternalConsolewindow!
 nrn_ipython_initialization_file = os.path.join(os.path.dirname(__module_path__),"neuron_python", "nrn_ipython.py")
-nrn_ipython_initialization_cmd = "".join(["run -i -n ", nrn_ipython_initialization_file, " 'gui'"])
+nrn_ipython_initialization_cmd = " ".join(["run -i -n", nrn_ipython_initialization_file, " 'gui'"])
 
 # NOTE: 2021-01-14 12:12:11
 # the last two lines in the init_commands make these two modules available for 
@@ -102,6 +114,9 @@ init_commands = [
 if __virtual_site_packages__:
     init_commands.append("".join(["sys.path.insert(2, '", __virtual_site_packages__, "')"]))
 
+if os.path.isfile(_ext_ipython_initialization_file):
+    init_commands.append(_ext_ipython_initialization_cmd)
+    
 init_commands.extend(
     [
     "import signal, pickle, json, csv",
@@ -122,7 +137,7 @@ init_commands.extend(
     "".join(["sys.path.insert(2, '", __scipyen_path__, "')"]),
     "from core import extipyutils_host as hostutils",
     ])
-
+    
 #init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, importlib",
                  #"import traceback, keyword, inspect, itertools, functools, collections",
                  #"import signal, pickle, json, csv",

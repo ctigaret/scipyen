@@ -60,6 +60,32 @@
       </widget>
      </item>
      <item>
+      <widget class="QToolButton" name="prevSliceToolbutton">
+       <property name="toolTip">
+        <string>Previous slice</string>
+       </property>
+       <property name="text">
+        <string>Prev.</string>
+       </property>
+       <property name="icon">
+        <iconset theme="go-previous"/>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="nextSliceToolButton">
+       <property name="toolTip">
+        <string>Next slice</string>
+       </property>
+       <property name="text">
+        <string>Next</string>
+       </property>
+       <property name="icon">
+        <iconset theme="go-next"/>
+       </property>
+      </widget>
+     </item>
+     <item>
       <spacer name="horizontalSpacer">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
