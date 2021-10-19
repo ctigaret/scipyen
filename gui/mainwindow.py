@@ -1691,7 +1691,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: 2017-07-04 16:28:52
         # do not delete: this is the first code where self.cwd is defined & initiated!
         self.cwd = os.getcwd()
-        #self.slot_updateCwd()
         
         # NOTE: 2016-03-20 14:49:05
         # we also need to quit the app when Pict main window is closed
@@ -2428,7 +2427,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     def slot_refreshView(self):
         if self.activeDockWidget is self.dockWidgetFileSystem:
-            self._updateFileSystemView_(self.currentDir)
+            #self.slot_updateCwd()
+            self._updateFileSystemView_(self.currentDir, False)
         elif self.activeDockWidget is self.dockWidgetHistory:
             if self.console is not None and self.ipkernel.shell.execution_count > self.executionCount: # only update history if something has indeed been executed
                 self.executionCount = self.ipkernel.shell.execution_count
@@ -2458,12 +2458,14 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # This is because workspaceModel doesn't "know" anything about workspaceView.
         self.workspaceModel.update() # emits WorkspaceModel.modelContentsChanged
         
+    @pyqtSlot()
     def slot_updateCwd(self):
         if self.cwd != os.getcwd():
             self.cwd = os.getcwd()
             self._setRecentDirectory_(self.cwd)
-            self.fileSystemTreeView.scrollTo(self.fileSystemModel.index(self.cwd))
-            self.fileSystemTreeView.setCurrentIndex(self.fileSystemModel.index(self.cwd))
+            self._updateFileSystemView_(self.cwd, False)
+            #self.fileSystemTreeView.scrollTo(self.fileSystemModel.index(self.cwd))
+            #self.fileSystemTreeView.setCurrentIndex(self.fileSystemModel.index(self.cwd))
             self._resizeFileColumn_()
             self._refreshRecentDirsComboBox_()
             
@@ -4456,7 +4458,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 
             self._setRecentDirectory_(targetDir)
             
-            self._updateFileSystemView_(targetDir)
+            self._updateFileSystemView_(targetDir, True)
             
             #self.fileSystemModel.setRootPath(targetDir)
             #self.fileSystemTreeView.scrollTo(self.fileSystemModel.index(targetDir))
@@ -4468,10 +4470,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             mpl.rcParams["savefig.directory"] = targetDir
             self.setWindowTitle("Scipyen %s" % targetDir)
             
-    def _updateFileSystemView_(self, targetDir):
+    def _updateFileSystemView_(self, targetDir, cd=True):
         self.fileSystemModel.setRootPath(targetDir)
         self.fileSystemTreeView.scrollTo(self.fileSystemModel.index(targetDir))
-        self.fileSystemTreeView.setRootIndex(self.fileSystemModel.index(targetDir))
+        if cd:
+            self.fileSystemTreeView.setRootIndex(self.fileSystemModel.index(targetDir))
+        else:
+            self.fileSystemTreeView.setCurrentIndex(self.fileSystemModel.index(targetDir))
         self.fileSystemTreeView.sortByColumn(0, QtCore.Qt.AscendingOrder)
         # NOTE 2017-07-04 15:59:38
         # for this to work one has to set horizontalScrollBarPolicy

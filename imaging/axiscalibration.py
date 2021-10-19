@@ -1,4 +1,5 @@
-import numbers, traceback
+import numbers, traceback, typing
+import h5py
 import vigra 
 import numpy as np
 import quantities as pq
@@ -15,11 +16,14 @@ from core.datatypes import (arbitrary_unit, pixel_unit,
 
 from core.utilities import reverse_mapping_lookup
 
+from core.traitcontainers import DataBag
+
 from .axisutils import (axisTypeFlags, 
                         defaultAxisTypeName, 
                         defaultAxisTypeSymbol, 
                         defaultAxisTypeUnits,
                         axisTypeFromString,
+                        axisTypeLiteral,
                         )
 
 
@@ -27,34 +31,76 @@ class AxisCalibration(object):
     """Axis calibration.
     
     An axis calibration is uniquely determined by the axis type and the
-    attributes "name", "units", "origin", and "resolution", for each axis contained
-    in a VigraArray axistag property.
+    attributes 'name', 'units', 'origin', and 'resolution', for each axis in the
+    VigraArray 'axistags' property.
     
-    In addition, Channel axes contain a set of name, units, origin & resolution
-    parameters for each channel.
+    In addition, for each channel in a Channel axis there is a set of 
+    'name', 'units', 'origin' & 'resolution' parameters. This set is mapped to
+    the channel index along the Channel axis.
     
     The main function of the AxisCalibration objects is to associate physical
     units (and names) to a vigra array axis in a persistent way.
     
-    Ways to use:
+    Quick reminder on vigra.AxisTags, vigra.AxisInfo, and vigra.AxisType objects:
+    ----------------------------------------------------------------------------
     
-    1) Preferred way: construct an AxisCalibration on a vigra.VigraArray or a
+    AxisTags: describes the axis properties AND ordering in a VigraArray
+        * constructed from a sequence of AxisInfo objects
+        * minimal iterable interface 
+            e.g. let data.axistags an AxisTags object:
+            
+            `(a for a in data.axistags)` iterates through the AxisInfo objects in 
+                the AxisTags object)
+            
+            `data.axistags[k]` with `k` an `int` OR a `str`
+                when `k` is an `int` AND `0 <= k < len(data.axistags)` or `0 <= k < data.ndim`
+                    returns the k_th AxisInfo object
+                    
+                when `k` is a `str` AND is a KEY of an AxisInfo objects contained
+                in the `data.axistags`
+                    returns the AxisInfo object with `key == k`
+                    
+            `data.axistags.index(k)`
+                where `k` is a `str`:
+                    returns the `int` index of the AxisInfo with `key == k`
+                    
+                if an AxisInfo object with `key == k` is NOT found, returns 
+                `data.ndim`
+            
+    AxisInfo: describes a SINGLE axis.
+        Relevant attributes (dot access):
+        
+        `key`: `str` - values are from the standard set prescribed by vigranumpy,
+            and enhanced by Scipyen in `imaging.axisutils.axisTypeflags`
+        
+        `resolution`: `float`
+        `description`: `str`
+        
+        Read-only:
+        `typeFlags`: vigra.AxisType
+        
+    AxisType: enum type encoding the type of the axis described by an AxisInfo.
+        
+    
+    Usage:
+    
+    1) Preferred way: 
+    ------------------
+    Construct an AxisCalibration using a vigra.VigraArray or a
     vigra.AxisTags object.
     
-    The AxisCalibration will keep a reference to the VigraArray axistags property
-    or to the AxisTags object passed to the constructor.
+    When the AxisCalibration object is constructed in this way it will keep a 
+    reference to the VigraArray 'axistags' property or to the AxisTags object 
+    passed to the constructor.
     
-    In both cases, the calibration generates default values which can then by
-    atomically modified by calling one of the setXXX methods, as explained below.
-    
-    For axisInfo object that contain in their "description" property an XML-formatted
-    string (see the documentation for calibrationString()), the calibration
-    data is parsed from that string.
+    The newly-created AxisCalibration object generates default values which can 
+    then by atomically modified by calling one of the setXXX methods, 
+    as explained below.
     
     The units, origin and resolution of an axis (or an individual channel in a 
     Channels axis) are set by the setUnits, setOrigin, setResolution methods.
     
-    These methods require an axis "key" string or axisInfo object to specify
+    These methods require an axis "key" string or AxisInfo object to specify
     the axis for which the calibration is being modified. For Channel axes, 
     these methods also require the index of the channel for which the calibration
     is being modified.
@@ -69,25 +115,34 @@ class AxisCalibration(object):
     For convenience, methods to add or remove axes are provided. HOWEVER this risks
     breaking the axes bookkeeping by the vigra.VigraArray to which the axes belong.
     
-    2) construct an AxisCalibration based on a vigra.AxisInfo object. 
+    2) Construct an AxisCalibration using a vigra.AxisInfo object. 
+    ---------------------------------------------------------------
     The units, origin, resolution and axisname can be passed as constructor 
     parameters, or assigned later. The axiskey and axistype parameters, 
     if passed to the constructor, will be ignored, their values being supplied 
     by the AxisInfo.
     
-    An "independent" AxisTags object will be constructed for this AxisCalirbation 
-    instance -- CAUTION: this will be uncoupled from any VigraArray and thus
-    won;t be of much use outside the AxisCalibration object.
+    When the AxisCalibration object is contructued using a vigra.AxisInfo object
+    it looks for an XML-formatted string inside the AxisInfo object's 
+    'description' property and the calibration data will be parsed from that 
+    string (see the documentation for AxisCalibration.calibrationString() method).
     
-    3) construct an "anonymous" AxisCalibration passing the axiskey, axistype, 
-    units, origin, resolution and axisname for a yet undefined axis.
+    An "independent" AxisTags object will be constructed for this AxisCalibration 
+    instance -- CAUTION: this will be uncoupled from any VigraArray and thus
+    won't be of much use outside the AxisCalibration object.
+    
+    3) Construct an "anonymous" AxisCalibration
+    --------------------------------------------
+    This is achieved by passing the 'axiskey', 'axistype', 'units', 'origin', 
+    'resolution' and 'axisname' parameters for a yet undefined axis.
+    
     An "independent" AxisTags object will be constructed (see case 2, above) 
-    containing a single AxisInfo object. Bothe the AxisTags and its single 
+    containing a single AxisInfo object. Both the the AxisTags and its single 
     AxisInfo object will be uncoupled from any VigraArrays.
     
     Such AxisCalibration objects can be used as a "vehicle" to calibrate actual
     AxisInfo objects embedded in another VigraArray, provided they are compatible
-    (and their key is found inside the calibration data)
+    (and their key is found inside the calibration data).
     
     In all cases, for Channels axes only, the name, units, origin and resolution
     are accessed and set to the specified channel index (0-based integer).
@@ -110,8 +165,8 @@ class AxisCalibration(object):
         ================
         
         data = None (default), a vigra.AxisTags object (typically asociated with 
-                a vigra.VigraArray), a vigra.AxisInfo object, or a vigra.VigraArray
-                object.
+                a vigra.VigraArray object), a vigra.AxisInfo object, 
+                or a vigra.VigraArray object.
                 
         axistype = None (default) or a vigra.AxisType enum flag (or a combination thereof);
                 only used when axis is None, or a str (axiskey)
@@ -165,7 +220,8 @@ class AxisCalibration(object):
         # NOTE: 2018-08-01 08:55:15
         # except for "units", all other values in this dictionary are PODs, 
         # not python quantities !!!
-        self._calibration_ = dict()
+        self._calibration_ = DataBag(allow_none=True)
+        #self._calibration_ = dict()
         
         # FIXME: 2018-08-27 09:40:10
         # do we realy need the axiskey?
@@ -202,16 +258,7 @@ class AxisCalibration(object):
             
             self._initialize_calibration_with_axis_(data)
             
-            
-            #print("AxisCalibration from axisinfo with atomic data")
-            #print(self._calibration_[data.key])
-            #print("atomic data:")
-            #print("units", units)
-            #print("origin", origin)
-            #print("resolution", resolution)
-            #print("axisname", axisname)
-            #print("channel", channel)
-            #print("channelname", channelname)
+            print("self._calibration_", self._calibration_)
             
             # NOTE: 2018-09-11 17:26:37
             # allow setting up atomic elements when constructing from a single AxisInfo object
@@ -222,8 +269,6 @@ class AxisCalibration(object):
                                                                     resolution=resolution,
                                                                     channel=channel,
                                                                     channelname=channelname)
-            
-            #print( "_axiscal", _axiscal)
             
             self._calibration_[data.key].update(_axiscal)
                             
@@ -303,7 +348,7 @@ class AxisCalibration(object):
             self._calibration_[_axiscal["axiskey"]] = _axiscal
             
             ## NOTE: 2018-08-28 10:10:35
-            ## figure out units/origin/r`esolution
+            ## figure out units/origin/resolution
             
         assert [ax.key in self._calibration_.keys() for ax in self._axistags_], "Mismatch between axistags keys and the keys in the calibration dictionary"
         
@@ -312,6 +357,18 @@ class AxisCalibration(object):
         # the axis calibrations in data generated with old API
         for ax in self._axistags_:
             self._axistags_[ax.key] = self.calibrateAxis(ax)
+            
+    def __iter__(self):
+        yield from (k for k in self._calibration_.keys() if k in self._axistags_)
+        
+    def __contains__(self, item):
+        return item in self._calibration_.keys()
+    
+    def __getitem__(self, key):
+        if key not in self:
+            raise KeyError(f"Axis key {key} not found")
+        
+        return self._calibration_[key]
             
     def _adapt_channel_index_spec_(self, axiskey, channel):
         if axiskey not in self._calibration_.keys():
@@ -331,7 +388,7 @@ class AxisCalibration(object):
             
         return channel
     
-    def _generate_atomic_calibration_dict_(self, initial_axis_cal = dict(),
+    def _generate_atomic_calibration_dict_(self, initial_axis_cal = None,
                                              axistype = None,
                                              axisname = None,
                                              units = None, origin = None, resolution = None, 
@@ -344,9 +401,19 @@ class AxisCalibration(object):
         This is to allow overriding atomic calibration elements when an axistags 
         or axisinfo or vigra array (with axistags) was passed to c'tor
         """
-        result = initial_axis_cal
+        if initial_axis_cal is None:
+            result = DataBag(allow_none = True)
+            
+        elif isinstance(initial_axis_cal, dict):
+            result = DataBag(initial_axis_cal, allow_none=True)
+            
+        elif not isinstance(initial_axis_cal, DataBag):
+            raise TypeError(f"'initial_axis_cal' expected to be a DataBag, dict, or None; for {type(initial_axis_cal).__name__} instead")
         
-        #print(result)
+        else:
+            result = initial_axis_cal
+            
+        print("result", result)
         
         user_units = None
         
@@ -467,6 +534,9 @@ class AxisCalibration(object):
         
         # 4) set up axis type, name, and key
         # 
+        if axistype is None:
+            axistype = result.get("axistype", None)
+            
         if isinstance(axistype, str): 
             # NOTE: 2018-08-27 23:56:50
             # axistype supplied as a string; this can be:
@@ -475,7 +545,7 @@ class AxisCalibration(object):
             #
             # we fall back on UnknownAxisType
             
-            if axistype in axisTypeFlags: # check is axistype is supplied as an axis info key string
+            if axistype in axisTypeFlags: # check if axistype is supplied as an axis info key string
                 axiskey = axistype
                 axistype = axisTypeFlags[axiskey]
                 
@@ -502,11 +572,15 @@ class AxisCalibration(object):
                 axiskey = "?"
                 
         else:
-            if "axistype" not in result.keys():
-                raise TypeError("axistype must be given as a str or a vigra.AxisType enumeration flag, or an int (combination of flags) when missing from the initial calibration dictionary; got %s instead" % type(axistype).__name__)
+            axiskey = "?"
+            #axistype = result.get("axistype", None)
+            #print("result.axistype", axistype)
+            #print("result keys", [k for k in result.keys()])
+            #print("result trait values", [k for k in result.trait_values()])
+            #if "axistype" not in result.keys():
+                #raise TypeError("axistype must be given as a str or a vigra.AxisType enumeration flag, or an int (combination of flags) when missing from the initial calibration dictionary; got %s instead" % type(axistype).__name__)
             
-            else:
-                axiskey = None
+            #else:
                 
         # 5) set up any channel calibration nested dicts
         
@@ -706,7 +780,8 @@ class AxisCalibration(object):
         self.apiversion = (0, 2)
             
     def _initialize_calibration_with_axis_(self, axinfo):
-        self._calibration_[axinfo.key] = dict()
+        self._calibration_[axinfo.key] = DataBag(allow_none=True)
+        #self._calibration_[axinfo.key] = dict()
         
         cal = AxisCalibration.parseDescriptionString(axinfo.description)
         
@@ -732,16 +807,16 @@ class AxisCalibration(object):
         self._calibration_[axinfo.key]["resolution"]  = cal.get("resolution", 1.0)
         
         if axinfo.isChannel():
-            # see NOTE: 2018-08-25 21:35:54
-            channel_indices = [channel_ndx for channel_ndx in cal.keys() \
-                                if isinstance(channel_ndx, int) and isinstance(cal[channel_ndx], dict)]
+            channel_indices = [channel_ndx for channel_ndx in cal.keys() if isinstance(cal[channel_ndx], DataBag)]
+            #channel_indices = [channel_ndx for channel_ndx in cal.keys() \
+                                #if isinstance(channel_ndx, int) and isinstance(cal[channel_ndx], DataBag)]
             
             #print("AxisCalibration._initialize_calibration_with_axis_(AxisInfo) channel_indices:", channel_indices)
             
             if len(channel_indices):
                 for channel_ndx in channel_indices:
                     # see NOTE: 2018-08-27 11:51:04
-                    self._calibration_[axinfo.key][channel_ndx] = dict()
+                    self._calibration_[axinfo.key][channel_ndx] = DataBag(allow_none=True)()
                     self._calibration_[axinfo.key][channel_ndx]["name"] = cal[channel_ndx].get("name", None)
                     self._calibration_[axinfo.key][channel_ndx]["units"] = cal[channel_ndx].get("units", arbitrary_unit)
                     self._calibration_[axinfo.key][channel_ndx]["origin"] = cal[channel_ndx].get("origin", 0.0)
@@ -754,11 +829,11 @@ class AxisCalibration(object):
                         self._calibration_[axinfo.key]["resolution"] = self._calibration_[axinfo.key][channel_indices[0]]["resolution"]
                     
             else:
-                self._calibration_[axinfo.key][0] = dict()
-                self._calibration_[axinfo.key][0]["name"]        = None # string or None
-                self._calibration_[axinfo.key][0]["units"]       = arbitrary_unit # python UnitQuantity or None
-                self._calibration_[axinfo.key][0]["origin"]      = 0.0 # number or None
-                self._calibration_[axinfo.key][0]["resolution"]  = 1.0 # number or None
+                self._calibration_[axinfo.key]["0"] = DataBag(allow_none=True)
+                self._calibration_[axinfo.key]["0"]["name"]        = None # string or None
+                self._calibration_[axinfo.key]["0"]["units"]       = arbitrary_unit # python UnitQuantity or None
+                self._calibration_[axinfo.key]["0"]["origin"]      = 0.0 # number or None
+                self._calibration_[axinfo.key]["0"]["resolution"]  = 1.0 # number or None
                         
     def is_same_as(self, other, key, channel = 0, ignore=None, 
                    rtol = relative_tolerance, 
@@ -896,7 +971,7 @@ class AxisCalibration(object):
                 if result:
                     for chIndex in range(len(self.channelIndices(key))):
                         if not ignoreUnits:
-                            channel_units_compatible = self.getUnits(key, self.channelIndices(key)[chIndex]) == other.getUnits(key, other.channelIndices(key)[chIndex])
+                            channel_units_compatible = self.getUnits(key, self.channelIndices(key)[str(chIndex)]) == other.getUnits(key, other.channelIndices(key)[str(chIndex)])
                             #print(channel_units_compatible)
                             if not channel_units_compatible:
                                 self_dim = pq.quantity.validate_dimensionality(self.getUnits(key, self.channelIndices(key)[chIndex]))
@@ -1396,18 +1471,19 @@ class AxisCalibration(object):
     def axiskeys(self):
         """A list of axiskeys
         """
-        keys = [key for key in self._calibration_]
+        yield from (k for k in self)
+        #keys = [key for key in self._calibration_]
         
-        if any([k not in self._axistags_ for k in keys]):
-            raise RuntimeError("Mismatch between the axistags keys and calibration keys")
+        #if any([k not in self._axistags_ for k in keys]):
+            #raise RuntimeError("Mismatch between the axistags keys and calibration keys")
         
-        return keys
+        #return keys
     
     @property
     def keys(self):
         """Aalias to self.axiskeys
         """
-        return self.axiskeys
+        yield from self.axiskeys
     
     @property
     def axistags(self):
@@ -1475,6 +1551,28 @@ class AxisCalibration(object):
         # parse calibration string from axisInfo, it if exists
         self._initialize_calibration_with_axis_(axInfo)
         
+    def writeHDF5(self, filenameOrGroup:typing.Union[str, h5py.Group],
+                  pathInFile:typing.Optional[str] = "axis_calibrations",
+                  mode:typing.Optional[str]="a"):
+        from iolib.h5io import get_file_group_child
+        
+        file, group, childname = get_file_group_child(filenameOrGroup, pathInFile, mode)
+        
+        axcalgroup = group.create_group(childname)
+        
+        for k in self:
+            caldict = self[k]
+            
+            axcal_dataset = axcalgroup.create_dataset(caldict.axiskey, data=[caldict.origin, caldict.resolution])
+            axcal_dataset.attrs["axis_type"] = axisTypeLiteral(caldict["axistype"])
+            
+            
+            
+            
+        
+        
+        
+        
     def removeAxis(self, axis):
         """Removes the axis and its associated calibration data
         
@@ -1507,25 +1605,28 @@ class AxisCalibration(object):
         del(self._axistags_[key])
         
     def synchronize(self):
-        """Synchronizes the calibration data with the axistags instance contained within this AxisCalibration object.
+        """Synchronizes the axis calibration data.
         
-        This should be called after any VigraArray methods that change the
-        axes layout (e.g. inserting a singleton axis, or removing an axis, e.g.
-        creating a lesser dimension view, etc) and therefore modify the axistags
-        reference contained in this object.
+        Updates the AxisCalibration values using the axistags instance contained
+        within this AxisCalibration object.
         
-        The axistags take priority: 
+        This should be called after calling any VigraArray methods that change 
+        the axes layout (inserting or removing an axis, e.g. by creating a lesser
+        dimension view, etc). Such methods modify the axistags reference contained
+        in this object.
         
-        * if, as a result of Vigra library functions,
-        the axistags have GAINED a new axis, this will get default calibration
-        values that can be modified atomically by calling one of the setXXX()
-        methods of the AxisCalibration object/
+        The axistags take priority in the following cases: 
         
-        NOTE: a Channels axis will get calibration data for channel 0; calibration
-        data for more channel can be added manually, by calling 
-        setChannelCalibration()
+        1) if, as a result of Vigra library functions, the axistags have GAINED 
+        a new axis, this new axis will get default calibration values which can 
+        be later modified individually, by calling one of the setXXX() methods
+        of the AxisCalibration object.
         
-        * if the axistags have LOST an axis, its calibration data will be removed
+            NOTE: a Channels axis will get calibration data for channel 0; 
+            calibration data for more channels can be added manually, by calling 
+            setChannelCalibration().
+        
+        2) if the axistags have LOST an axis, its calibration data will be removed
         
         """
         new_axes = [axInfo for axInfo in self._axistags_ if axInfo.key not in self._calibration_.keys()]
@@ -1540,11 +1641,17 @@ class AxisCalibration(object):
             self._calibration_.pop(key, None)
                 
     def calibrationString(self, key):
-        """Generates an axis calibration string for axis with specified key (and channel for a Channels axis)
+        """Generates an axis calibration string.
+        
+        Generates an axis calibration string to be included in the AxisInfo 
+        'description' property for the axis with specified key (and channel index,
+        for a Channels axis)
 
         Returns an xml string with one of the following formats, depending on axis type:
         
-        1) non-channels axis:
+        1) For a non-channels axis:
+        ----------------------------
+        
         <axis_calibration>
             <axistype>int</axistype>
             <axiskey>str</axiskey>
@@ -1554,7 +1661,9 @@ class AxisCalibration(object):
             <resolution>float</resolution>
         </axis_calibration>
         
-        2) channel axis:
+        2) for a channel axis:
+        ----------------------------
+        
         <axis_calibration>
             <axistype>int</axistype>
             <axiskey>str</axiskey>
@@ -1583,20 +1692,9 @@ class AxisCalibration(object):
         
         strlist += xmlutils.composeStringListForXMLElement("axiskey", self._calibration_[key]["axiskey"])
         
-        #strlist.append("<axiskey>")
-        #strlist.append("%s" % self._calibration_[key]["axiskey"])
-        #strlist.append("</axiskey>")
-        
         strlist += xmlutils.composeStringListForXMLElement("axisname", self._calibration_[key]["axisname"])
         
-        #strlist.append("<axisname>")
-        #strlist.append("%s" % self._calibration_[key]["axisname"])
-        #strlist.append("</axisname>")
-        
         strlist += xmlutils.composeStringListForXMLElement("axistype", "%s" % self._calibration_[key]["axistype"])
-        #strlist.append("<axistype>")
-        #strlist.append("%s" % self._calibration_[key]["axistype"])
-        #strlist.append("</axistype>")
         
         if self._calibration_[key]["axistype"] & vigra.AxisType.Channels:
             channel_indices = [ch_key for ch_key in self._calibration_[key].keys() if isinstance(ch_key, int)]
@@ -2399,13 +2497,14 @@ class AxisCalibration(object):
             raise TypeError("Expecting a Python Quantity or UnitQuantity; got %s instead" % type(value).__name__)
         
     def calibrateAxes(self):
-        """Attachches a calibration string to all axes registered with this object
+        """Attaches a calibration string to all axes registered with this object.
         """
         for ax in self._axistags_:
             self.calibrateAxis(ax)
         
     def calibrateAxis(self, axInfo):
         """Attaches a dimensional calibration to an AxisInfo object.
+        
         Calibration is inserted as an xml-formatted string.
         (see AxisCalibration.calibrationString())
         
@@ -2425,8 +2524,8 @@ class AxisCalibration(object):
         Returns:
         ========
         
-        A reference to the axInfo with modified description string containing calibration
-        information.
+        A reference to the axInfo with modified description string containing 
+        calibration information.
         
         What this function does:
         ========================

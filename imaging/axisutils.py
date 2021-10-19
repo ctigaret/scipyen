@@ -62,27 +62,6 @@ __all_axis_tag_keys__ = tuple(list(__specific_axis_tag_keys__) + ["?", "l"])
 
 """Maps vigra.AxisInfo keys (str, lower case) to vigra.AxisType flags
 """
-#axisTypeFlags = collections.defaultdict(lambda: vigra.AxisType.UnknownAxisType)
-#axisTypeFlags["a"]  = vigra.AxisType.Angle
-#axisTypeFlags["c"]  = vigra.AxisType.Channels
-#axisTypeFlags["e"]  = vigra.AxisType.Edge
-#axisTypeFlags["f"]  = vigra.AxisType.Frequency
-#axisTypeFlags["t"]  = vigra.AxisType.Time
-#axisTypeFlags["x"]  = vigra.AxisType.Space
-#axisTypeFlags["y"]  = vigra.AxisType.Space
-#axisTypeFlags["z"]  = vigra.AxisType.Space
-#axisTypeFlags["n"]  = vigra.AxisType.Space
-#axisTypeFlags["fa"] = vigra.AxisType.Frequency | vigra.AxisType.Angle
-#axisTypeFlags["fe"] = vigra.AxisType.Frequency | vigra.AxisType.Edge
-#axisTypeFlags["ft"] = vigra.AxisType.Frequency | vigra.AxisType.Time
-#axisTypeFlags["fx"] = vigra.AxisType.Frequency | vigra.AxisType.Space
-#axisTypeFlags["fy"] = vigra.AxisType.Frequency | vigra.AxisType.Space
-#axisTypeFlags["fz"] = vigra.AxisType.Frequency | vigra.AxisType.Space
-#axisTypeFlags["fn"] = vigra.AxisType.Frequency | vigra.AxisType.Space
-#axisTypeFlags["?"]  = vigra.AxisType.UnknownAxisType
-#axisTypeFlags["s"]  = vigra.AxisType.NonChannel
-#axisTypeFlags["l"]  = vigra.AxisType.AllAxes
-
 axisTypeFlags = Bunch({
     "a": vigra.AxisType.Angle,
     "c": vigra.AxisType.Channels,
@@ -685,6 +664,35 @@ def axisTypeFromString(s):
     else:
         return vigra.AxisType.UnknownAxisType
     
+def axisTypeLiteral(axisinfo):
+    if isinstance(axisinfo, vigra.AxisInfo):
+        typeflags = axisinfo.typeFlags
+        typeint = typeflags.numerator
+        
+    elif isinstance(axisinfo, vigra.AxisType):
+        typeflags = axisinfo
+        typeint = typeflags.numerator
+        
+    elif isinstance(axisinfo, int):
+        typeint = axisinfo
+        
+    else:
+        raise TypeError(f"Expecting a vigra.AxisType or vigra.AxisInfo; got {type(axisinfo).__name__} instead")
+    
+    if typeflags in vigra.AxisType.values:
+        return vigra.AxisType.values[typeflags].name
+    
+    else:
+        if typeflags.numerator > vigra.AxisType.Frequency:
+            rmd = typeflags - vigra.AxisType.Frequency
+            if rmd in vigra.AxisType.values:
+                return "|".join(["Frequency", vigra.AxisType[rmd].name])
+            
+            else:
+                raise ValueError(f"Cannot resolve {typeflags} axis type")
+        
+        else:
+            raise ValueError(f"Cannot resolve {typeflags} axis type")
 
 def defaultAxisTypeName(axisinfo):
     """Generates a default string description for the vigra.AxisInfo parameter.

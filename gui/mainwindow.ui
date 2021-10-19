@@ -400,26 +400,6 @@ NOTE: you can click anywhere in the row to select</string>
         </widget>
        </item>
        <item>
-        <widget class="QToolButton" name="dirUpBtn">
-         <property name="toolTip">
-          <string>Go to parent directory</string>
-         </property>
-         <property name="text">
-          <string>Parent directory</string>
-         </property>
-         <property name="icon">
-          <iconset theme="go-up">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-         <property name="autoRaise">
-          <bool>true</bool>
-         </property>
-         <property name="arrowType">
-          <enum>Qt::UpArrow</enum>
-         </property>
-        </widget>
-       </item>
-       <item>
         <widget class="QToolButton" name="dirBackBtn">
          <property name="toolTip">
           <string>Go back</string>
@@ -456,6 +436,26 @@ NOTE: you can click anywhere in the row to select</string>
          </property>
          <property name="arrowType">
           <enum>Qt::RightArrow</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="dirUpBtn">
+         <property name="toolTip">
+          <string>Go to parent directory</string>
+         </property>
+         <property name="text">
+          <string>Parent directory</string>
+         </property>
+         <property name="icon">
+          <iconset theme="go-up">
+           <normaloff>.</normaloff>.</iconset>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+         <property name="arrowType">
+          <enum>Qt::UpArrow</enum>
          </property>
         </widget>
        </item>

@@ -648,18 +648,6 @@ class DataBag(Bunch):
         """
         obs = object.__getattribute__(self, "__observer__")
         return obs._trait_values.keys()
-        #try:
-            #if not hasattr(self, "__observer__"):
-                #return tuple()
-            #obs = object.__getattribute__(self, "__observer__")
-            #return obs._trait_values.keys()
-            ## TODO find a way to return this as a dict_view (mapping proxy)
-            ## it should be OK for now
-            ##yield from (k for k in obs._trait_values.keys())
-        #except:
-            #traceback.print_exc()
-            #return tuple()
-            ##yield
     
     def values(self):
         """Generates a values 'view'

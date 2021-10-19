@@ -289,6 +289,34 @@ def isRowVector(x):
     else:
         return False
     
+def generic_data_attrs(data):
+    attrs = dict()
+    
+    type_name = type(data).__name__
+    
+    if type_name == "instance":
+        type_name = data.__class__.__name__
+        module_name = data.__class__.__module__
+        
+    elif type_name == "type":
+        type_name = data.__name__
+        module_name = data.__module__
+        
+    else:
+        module_name = type(data).__module__
+    
+    #elif type_name == "namedtuple":
+        
+    attrs["type_name"] = type_name
+    attrs["module_name"] = module_name
+    attrs["python_class"] = ".".join([module_name, type_name])
+    
+    return attrs
+    
+def qualtypename(x):
+    attrs = generic_data_attrs(x)
+    return attrs["python_class"]
+    
 def is_uniform_sequence(s):
     ret = isinstance(s, collections.abc.Sequence) 
 
