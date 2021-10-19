@@ -468,9 +468,12 @@ def is_string(array):
     return np.asarray(array).dtype.kind in NUMPY_STRING_KINDS
 
 def is_numeric_string(array):
-    """Determines of the argumen is a string array that can be parsed as numeric.
+    """Determines if the argument is a string array that can be parsed as numeric.
     """
-    return is_string(array) and not np.isnan(np.genfromtxt(value)).any()
+    if isinstance(array, str):
+        array = [array]
+        
+    return is_string(array) and not np.isnan(np.genfromtxt(array)).any()
         
 
 def is_numeric(array):
@@ -592,10 +595,10 @@ def check_time_units(value):
     
     return value._reference.dimensionality == ref.dimensionality
     
-def conversion_factor(x, y):
+def conversion_factor(x:pq.Quantity, y:pq.Quantity):
     """Calculates the conversion factor from y units to x units.
     """
-    if not isinstance(x, (pq.Quantity, pq.UnitQuantity)):
+    if not isinstance(x, pq.Quantity):
         raise TypeError("x expected to be a python Quantity; got %s instead" % type(x).__name__)
     
     if not isinstance(y, (pq.UnitQuantity, pq.Quantity)):

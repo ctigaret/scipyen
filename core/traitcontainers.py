@@ -218,13 +218,7 @@ class DataBag(Bunch):
         else:
             dd = kwargs
             
-        #print(type(dd))
-        
-        #print("dd", dd)
-            
         traits = dict(map(lambda x: (x[0], self._light_trait_(x[1])), dd.items()))
-        
-        #print("DataBag.__init__: traits", traits)
         
         self.__hidden__.length = len(traits)
 
@@ -237,7 +231,6 @@ class DataBag(Bunch):
             object.__setattr__(self.__observer__, k, v)
             
         super().__init__(**dd)
-        #super().__init__(*args, **kwargs)
         
     def _light_trait_(self, obj):
         # NOTE: 2021-09-14 13:00:51 
@@ -250,13 +243,6 @@ class DataBag(Bunch):
                              content_traits=False,
                              force_trait=traitlets.Any)
             
-        #elif isinstance(obj, DataBag):
-            #dtrait = DataBagTrait
-            
-        #elif isinstance(obj, dict):
-            #dtrait = partial(dynamic_trait, 
-                             #allow_none=self.__hidden__.allow_none, 
-                             #content_traits=False)
         else:
             dtrait = partial(dynamic_trait, 
                              allow_none=self.__hidden__.allow_none, 
@@ -302,7 +288,7 @@ class DataBag(Bunch):
         # too complex for this purpose.
         
         if not isinstance(key, str):
-            raise TypeError("Expecting a string key; got %s instead" % type(key).__name__)
+            raise TypeError("Expecting a str key; got %s instead" % type(key).__name__)
         
         try:
             obs = object.__getattribute__(self, "__observer__") # bypass usual API
