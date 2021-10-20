@@ -13,21 +13,28 @@ utilities to enhance axis and axistags handling
 
 #### BEGIN core python modules
 from __future__ import print_function
-import collections
-import typing
+import collections, operator, typing
 from traitlets import Bunch
+from functools import reduce
 #### END core python modules
 
 #### BEGIN 3rd party modules
 import numpy as np
 import vigra
-import quantities as pq
 #import signalviewer as sv
 #import javabridge
 #import bioformats
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
+import quantities as pq
+from core.utilities import (reverse_mapping_lookup, unique,)
+
+from core.datatypes import (space_frequency_unit, 
+                            angle_frequency_unit, 
+                            channel_unit, 
+                            arbitrary_unit,
+                            pixel_unit)
 #from . import datatypes
 #### END pict.core modules
 
@@ -61,465 +68,68 @@ __specific_axis_tag_keys__ = tuple(list(__standard_axis_tag_keys__)  + ["a", "f"
 __all_axis_tag_keys__ = tuple(list(__specific_axis_tag_keys__) + ["?", "l"])
 
 """Maps vigra.AxisInfo keys (str, lower case) to vigra.AxisType flags
+On its way to DEPRECATION
 """
-axisTypeFlags = Bunch({
+axisTypeKeys = Bunch({
     "a": vigra.AxisType.Angle,
     "c": vigra.AxisType.Channels,
     "e": vigra.AxisType.Edge,
     "f": vigra.AxisType.Frequency,
     "t": vigra.AxisType.Time,
+    "s": vigra.AxisType.Space,
     "x": vigra.AxisType.Space,
     "y": vigra.AxisType.Space,
     "z": vigra.AxisType.Space,
-    "n": vigra.AxisType.Space,
     "fa": vigra.AxisType.Frequency | vigra.AxisType.Angle,
     "fe": vigra.AxisType.Frequency | vigra.AxisType.Edge,
     "ft": vigra.AxisType.Frequency | vigra.AxisType.Time,
+    "fs": vigra.AxisType.Frequency | vigra.AxisType.Space,
     "fx": vigra.AxisType.Frequency | vigra.AxisType.Space,
     "fy": vigra.AxisType.Frequency | vigra.AxisType.Space,
     "fz": vigra.AxisType.Frequency | vigra.AxisType.Space,
-    "fn": vigra.AxisType.Frequency | vigra.AxisType.Space,
     "?": vigra.AxisType.UnknownAxisType,
-    "s": vigra.AxisType.NonChannel,
+    "n": vigra.AxisType.NonChannel,
     "l": vigra.AxisType.AllAxes,
     }
     )
 
+primitive_axis_type_units = {
+    vigra.AxisType.UnknownAxisType: pixel_unit,
+    vigra.AxisType.Channels: channel_unit,
+    vigra.AxisType.Space: pq.m,
+    vigra.AxisType.Edge: pq.dimensionless,
+    vigra.AxisType.Angle: pq.radian,
+    vigra.AxisType.Time: pq.s,
+    vigra.AxisType.Frequency: pq.Hz,
+    vigra.AxisType.NonChannel: pixel_unit,
+    vigra.AxisType.AllAxes: pixel_unit,
+    }
 
-def makeAxisSpec(tags, dims=None, **tagsizemap):
-    '''
-    Factory function
-        Creates an axis specification object (AxisSpec) that 
-        specifies the axis tags and its size. The (key, value) pairs in this object
-        specify the sizes of the axes in a VigraArray, identified by character tags.
-        
-        See also vigranumpy documentation for the use of axis tags. Here, the 'tags'
-        are only character symbols used to generate proper AxisTag objects associated 
-        with vigra arrays.
-        
-        Parameters:
-        
-        tags:   A sequence (tuple or list) of valid single character axis tags,
-                or a vigra.VigraArray object, or a collections.OrderedDict object,
-                or None.
-                
-                When a sequence, valid elements are: "x", "y", "z", "c", and "t".
-        
-        dims:   None (default) or a sequence (tuple or list).
-        
-                Simply refers to the size (in samples) of each axis. NOTE: do 
-                not confuse with any quantities associated with the axis (e.g. 
-                space or time resolution, or physical dimension associated with 
-                a particular channel).
-        
-                Can be None only iff 'tags' is a vigra.VigraArray object or a
-                collections.OrderedDict object.
-                
-                When a sequence, elements of 'dims' can be scalar integral values, 
-                single character axis tags, None, or a mixture these, representing 
-                the values of the size for each of the axistags given in 'tags'. 
-                
-                A numeric element specifies the dimenson of the axis with the tag
-                at the same index and this element, in the tags sequence.
-                
-                When an element is a valid tag character, it indicates that the 
-                size of the axis with the specified tag is taken to be the size 
-                of the axis with that tag in some pre-existing data (assuming that
-                such pre-existing data contains an axis with that tag).
-                
-                In addition, 'dims' may contain at most one None element which 
-                indicates that the size of the corresponding axis will have to
-                be calculated given the total number of samples in the data and 
-                the sizes of all the other axes.
-                
-                Valid values for 'dims' elements when it is a sequence are: 
-                any integer > 0, x, y, z, c, t, and None
-                
-        tagsizemap: Key-Value pairs (up to five) with the axis tag (key) and size,
-                used as an alternative to specifying axis tags and dimensions when
-                tags and dims are both None.
-                
-        AxisSpecs objects where at least some of the values are strings, on where
-        one of the values is None are so-called "incomplete" or "undetermined":
-        they specify tags for axes for which the size has not been yet determined.
-        
-        This situation arises when the axis size is not known for all axes, when
-        the object is created, but the unknown sizes can be determined at a later 
-        time (see Examples (2) - (4), below).
-        
-        Example:
-        
-        # (1) calls AxisSpecs(tags, dims)
-        
-        axs = AxisSpec(('x','y','z','c'), (256,256,1,2))
-        
-        OrderedDict([('x', 256), ('y', 256), ('z', 1), ('c', 2)])
-        
-        (2) 
-        
-        axs = AxisSpec(('x','y','z','c'),('x','y','z',2))
-        
-        OrderedDict([('x', 'x'), ('y', 'y'), ('z', 'z'), ('c', 2)])
-        
-        here, the sizes of the 'x', 'y', and 'z' axes are taken from pre-existing data
-        
-        (3) assume one has loaded a vigra array from an image file
-        
-        data
-        
-        --> VigraArray(shape=(256, 1500, 2, 1), axistags=x y z c, dtype=float32, data=...)
-        
-        but the axistags are wrong; they should have been x y c z (i.e. the image is NOT 
-        a stack of TWO FRAMES, but a single frame with TWO CHANNELS)
-        
-        
-        axs = AxisSpec(('x','y','z','c'),('x','y',1,2))
-        
-        generates
-        
-        OrderedDict([('x', 'x'), ('y', 'y'), ('z', 1), ('c', 2)])
-        
-        which can be applied to the data by calling 'applyAxisSpec(data, axs)'
-        
-        (4)
-        
-        vigra array is loaded from multi-image tiff file as a stack:
-        
-        stackdata
-        -->VigraArray(shape=(256, 256, 172, 1), axistags=x y z c, dtype=float32, data=...)
-        
-        in fact, the data is a Z-stack with two channels; to correct this use
-        
-        axs = AxisSpec(('x','y','z','c'),('x','y',None,2))
-        
-        
-    '''
-    if tags is not None:
-        if dims is None:
-            if isinstance(tags, vigra.VigraArray):
-                dims = tags.shape
-                mytags = tags.axistags.keys()
-            elif isinstance(tags, collections.OrderedDict):
-                dims = tags.values()
-                mytags = tags.keys()
-            else:
-                raise TypeError("The dims argument can be None only if tags is a vigra.VigraArray or a collections.OrderedDict object")
+reversedAxisTypes = list(reversed(sorted(((k,v) for k,v in vigra.AxisType.values.items()), key = lambda x: x[0])))
 
-        elif type(dims) is tuple or type(dims) is list:
+def get_axis_type_flags_int(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int]) -> int:
+    """Use for the uniform treatment of argument which is AxisInfo, AxisType or int
+    """
+    if isinstance(axisinfo, vigra.AxisInfo):
+        #typeflags = axisinfo.typeFlags
+        typeint = typeflags.numerator
         
-            if type(tags) is not tuple and type(tags) is not list:
-                raise TypeError('When both arguments are given, they must be either tuples or lists')
-            
-            if len(tags) > 5 or len(dims) > 5:
-                raise ValueError('Both tags and dims must have at most five elements')
-            
-            if len(tags) != len(dims):
-                raise ValueError('Both tags and dims must have the same number of elements')
-            
-            # check the tags argumment
-            
-            for k1 in tags:
-                if type(k1) is not str or k1 not in __allowed_axis_tag_keys__:
-                    raise ValueError('Incorrect axis tag key. Acceptable keys are %s' % __allowed_axis_tag_keys__)
-                
-            # check dims
-            
-            for v in dims:
-                if type(v) is str:
-                    if not v in __allowed_axis_tag_keys__:
-                        raise ValueError('Axis size specification "%s" is not allowed. Allowed values are %s' % (v, __allowed_axis_tag_keys__))
-                    else:
-                        pass
-                elif v is None or type(v) is int:
-                    pass
-                else:
-                    raise TypeError('Unexpected value type (%s) in second argument' % type(v))
-                
-            testNone = np.where(np.equal(dims, None))[0]
-            
-            if len(testNone) > 1:
-                raise ValueError('Second argument can contain at most one element which is None')
-            
-            mytags = tags
-            
+    elif isinstance(axisinfo, vigra.AxisType):
+        #typeflags = axisinfo
+        typeint = typeflags.numerator
+        
+    elif isinstance(axisinfo, int):
+        #typeflags = None
+        typeint = axisinfo
+        
     else:
-        
-        if len(tagsizemap) == 0:
-            raise SyntaxError("Keyword parameters are required when positional parameters are both None")
-        
-        elif len(tagsizemap) > 5:
-            raise ValueError("Too many keyword parameters (maximum of 5)")
-        
-        mytags = tagsizemap.keys()
-        dims   = tagsizemap.values()
-        
-        for k in tags:
-            if type(k) is not str or k not in __allowed_axis_tag_keys__:
-                raise ValueError('Incorrect axis tag key. Acceptable keys are %s' % __allowed_axis_tag_keys__)
-            
-        for k in dims:
-            if type(v) is str:
-                if not v in __allowed_axis_tag_keys__:
-                    raise ValueError('Axis size specification "%s" is not allowed. Allowed values are %s' % (v, __allowed_axis_tag_keys__))
-                else:
-                    pass
-            elif v is None or type(v) is int:
-                pass
-            else:
-                raise TypeError('Unexpected value type (%s) in second argument' % type(v))
-            
-        testNone = np.where(np.equal(dims, None))[0]
-        
-        if len(testNone) > 1:
-            raise ValueError('Second argument can contain at most one element which is None')
-            
-        
-    return None # for now
+        raise TypeError(f"Expecting a vigra.AxisType or vigra.AxisInfo; got {type(axisinfo).__name__} instead")
 
-def verifyAxisSpecs(newSpecs, oldSpecs):
-    '''
-    DEPRECATED
-    
-    Verifies axis specs in newSpecs for consistency given old axis specs in oldSpecs:
-    
-    * checks syntax for axis tag/dimension specifications
-    
-    * assigns axis sizes where necessary (e.g. where axis tag size in newSpecs are specified using
-    an axis tag character or none)
-    
-    * and verifies that the newSpecs does not change the number or samples in data, 
-      just its shape (and possibly, axis tags)
-        
-    Parameters:
-    
-    newSpecs:   collections.OrderedDict with axis tags/size specification (see makeAxisSpec)
-    
-    oldSpec:    collections.OrderedDict with axis tags/size specification taken from 
-                pre-existing data
-                
-    Returns:
-    
-    newSpecs (for convenience)
-        
-    newSpecs are passed by reference, it being a dictionary, so any modifications
-    will be seen from the caller of the function immediately, without a need to 
-    assign the returned result to a new variable (which will only be a new reference
-    to the original newSpecs, now modified by this function)
-    
-    If that is not what is intended, then pass a _DEEP_ copy to the function as in:
-    
-    newVal = verifyAxisSpecs(initialVal.copy(), testSpecs)
-    
-    '''
-    if type(newSpecs) is not collections.OrderedDict:
-        raise ValueError('First argument must be a collections.OrderedDict')
-    
-    if type(oldSpecs) is not collections.OrderedDict:
-        raise ValueError('Second argument must be a collections.OrderedDict')
-    
-    if len(newSpecs) > 5 or len(oldSpecs) > 5:
-        raise ValueError('Axis specs must have at most five elements')
-    
-            
-    nSamples = np.prod(oldSpecs.values())
-    
-    for k1, k2 in zip(newSpecs.iterkeys(), oldSpecs.iterkeys()):
-        if k1 not in 'xyczt' or k2 not in 'xyzct':
-            raise ValueError('Incorrect axis specification key. Acceptable keys are "x", "y", "z", "c", "t"')
-        
-        if type(newSpecs[k1]) is str:
-            if newSpecs[k1] in oldSpecs.keys():
-                newSpecs[k1] = oldSpecs[newSpecs[k1]]
-            else:
-                raise ValueError("Value of axis spec in newSpecs not found in oldSpecs")
-            
-        elif type(newSpecs[k1]) is int or newSpecs[k1] is None:
-            pass
-        
-        else:
-            raise ValueError('Axis specification value must be a character, an int or None')
-        
-    noneAxis = np.where(np.equal(newSpecs.values(), None))[0]
-    
-    if len(noneAxis) > 1:
-        raise ValueError("At most one axis dimension may be None ")
-    
-    elif len(noneAxis) == 1:
-        okAxis = np.where(np.not_equal(newSpecs.values(), None))[0]
-        okValues = np.asarray(newSpecs.values())[okAxis]
-        newSpecs[newSpecs.keys()[noneAxis]] = nSamples / np.prod(okValues)
-        
-    if np.prod(newSpecs.values()) != nSamples:
-        raise ValueError("New axis specification should not change the number of samples in the data")
-    
-    return newSpecs # 2016-03-15 14:05:43 for convenience
+    return typeint
 
-def tagKeysAsString(val):
-    '''
-    DEPRECATED
-    Convenience function that collapses the axis tag keys in axis specification 
-    dictionary 'val' into a string ('str') that can be used to specify axistags 
-    for a VigraArray.
-    
-    Parameters: 
-    
-    val:        collections.OrderedDict with tag/size pairs (see makeAxisSpec)
-    
-    Returns
-    
-    A str object with the axis tag characters specified in 'val'
-    
-    '''
-    if type(val) is not collections.OrderedDict:
-        raise ValueError ('collections.OrderedDict expected')
-    
-    ret = str()
-    
-    for k in val.keys():
-        ret += k
-        
-    return ret
 
-def makeAxisSpec_old(tags, dims):
-    '''
-    DEPRECATED
-    Creates an axis specification object (collections.OrderedDict) that 
-    specifies the axis tags and its size. The (key, value) pairs in this object
-    specify the sizes of the axes in a VigraArray, identified by character tags.
-    
-    See also vigranumpy documentation for the use of axis tags. Here, the 'tags'
-    are only character symbols used to generate proper AxisTag objects associated 
-    with vigra arrays.
-    
-    Parameters:
-    
-    tags:   A sequence of single character axis tags (see vigranumpy documentation)
-            
-            Valid keys are: x, y, z, c, t
-    
-    dims:   A sequence of scalar integral values, or of single character axis tags, 
-            or a mixture of both, representing the values of the size for each of the 
-            axistags given in 'tags'. 
-            
-            When given as character, it indicates that the size of the axis with 
-            the corresponding tag is taken from the size of the axis with that tag
-            in pre-existing data (assuming that ore-esiting data contains an axis 
-            with that tag).
-            
-            In addition, dims may contain at most one None element which 
-            symbolizes that the size of the axis with the corresponding tag will 
-            be calculated given the total number of samples in the data and the sizes
-            of all the other axes.
-            
-            Valid values are: any integer > 0, x, y, z, c, t, and None
-    
-    Example:
-    
-    (1)
-    
-    axs = makeAxisSpec(('x','y','z','c'), (256,256,1,2))
-    
-    OrderedDict([('x', 256), ('y', 256), ('z', 1), ('c', 2)])
-    
-    (2) 
-    
-    axs = makeAxisSpec(('x','y','z','c'),('x','y','z',2))
-    
-    OrderedDict([('x', 'x'), ('y', 'y'), ('z', 'z'), ('c', 2)])
-    
-    here, the sizes of the 'x', 'y', and 'z' axes are taken from pre-existing data
-    
-    (3) assume one has loaded a vigra array from an image file
-    
-    data
-    
-    --> VigraArray(shape=(256, 1500, 2, 1), axistags=x y z c, dtype=float32, data=...)
-    
-    but the axistags are wrong; they should have been x y c z (i.e. the image is NOT 
-    a stack of TWO FRAMES, but a single frame with TWO CHANNELS)
-    
-    
-    axs = pio.makeAxisSpec(('x','y','z','c'),('x','y',1,2))
-    
-    generates
-    
-    OrderedDict([('x', 'x'), ('y', 'y'), ('z', 1), ('c', 2)])
-    
-    which can be applied to the data by calling 'applyAxisSpec(data, axs)'
-    
-    (4)
-    
-    vigra array is loaded from multi-image tiff file as a stack:
-    
-    stackdata
-    -->VigraArray(shape=(256, 256, 172, 1), axistags=x y z c, dtype=float32, data=...)
-    
-    in fact, the data is a Z-stack with two channels; to correct this:
-    
-    axs = makeAxisSpec(('x','y','z','c'),('x','y',None,2))
-    
-    
-    See also applyAxisSpec
-    
-    '''
-    if len(tags) != len(dims):
-        raise ValueError('Both tags and dims must  have same number of elements')
-    
-    ret = collections.OrderedDict(zip(tags, dims))
-    
-    return ret
-
-def applyAxisSpec(data, axisspec):
-    '''
-    DEPRECATED
-    Apply axis specification (see makeAxisSpec) to the vigra array in data.
-    This may result in a reshape of data.
-    
-    Parameters:
-    
-    data:       vigra.VigraArray
-    
-    axisspecs:  collections.OrderedDict (see makeAxisSpec_old)
-    
-    Returns
-    
-    A reference to data (with new axistags and possibly a new shape)
-    
-    NOTE: 
-    
-    Both data and axisspecs are passed by reference, therefore capturing the return
-    value is a variable is not needed (it will in fact be just another reference to data).
-    
-    If that is not what is intended, then pass a _DEEP_ copy of data to this function:
-    
-    applyAxisSpec(data.copy(), axisspec)
-    
-    As a side effect, the second argument ('axisspec') might also be modified 
-    (see verifyAxisSpecs). Again, is that is not what was intended, also pass a _DEEP_
-    copy of it:
-    
-    applyAxisSpec(data.copy(), axisspec.copy())
-    
-    See also makeAxisSpec
-    
-    '''
-    if not isinstance(data, vigra.VigraArray):
-        raise ValueError('data must be a vigra array')
-    
-    if not isinstance(axisspec, collections.OrderedDict):
-        raise ValueError('axisspec must be a collections.OrderedDict')
-    
-    dataAxisspec = collections.OrderedDict(zip(data.axistags.keys(), data.shape))
-    
-    verifyAxisSpecs(axisspec, dataAxisspec)
-                
-    data.shape = axisspec.values()
-    data.axistags = vigra.VigraArray.defaultAxistags(tagKeysAsString(axisspec))
-    
-    return data # 2016-03-15 14:01:08 for convenience
-
-def defaultAxisTypeUnits(axisinfo):
-    """Returns a default Quantity based on the axisinfo parameter.
+def axisTypeUnits(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int]) -> pq.Quantity:
+    """Returns a default Python Quantity based on the axisinfo parameter.
     
     Positional parameters:
     ======================
@@ -535,172 +145,219 @@ def defaultAxisTypeUnits(axisinfo):
     For unknown axis types, returns pixel_unit
     
     """
-    if isinstance(axisinfo, vigra.AxisInfo):
-        if axisinfo.typeFlags == vigra.AxisType.Channels.numerator:
-            return pq.dimensionless
-        
-        elif axisinfo.typeFlags == vigra.AxisType.Space.numerator:
-            return pq.m
-        
-        elif axisinfo.typeFlags == vigra.AxisType.Angle.numerator:
-            return pq.radian
-        
-        elif axisinfo.typeFlags == vigra.AxisType.Time.numerator:
-            return pq.s
-        
-        elif axisinfo.typeFlags == vigra.AxisType.Frequency.numerator:
-            return pq.Hz
-        
-        elif axisinfo.typeFlags == vigra.AxisType.Frequency | vigra.AxisType.Space:
-            return space_frequency_unit
-        
-        elif axisinfo.typeFlags == vigra.AxisType.Frequency | vigra.AxisType.Time:
-            return pq.Hz
-        
-        elif axisinfo.typeFlags == vigra.AxisType.Frequency | vigra.AxisType.Angle:
-            return angle_frequency_unit
-        
-        elif axisinfo.typeFlags == vigra.AxisType.Edge.numerator:
-            return pq.dimensionless
-        
-        elif axisinfo.typeFlags == vigra.AxisType.UnknownAxisType.numerator:
-            return pixel_unit
-        
-        elif axisinfo.typeFlags == vigra.AxisType.NonChannel.numerator:
-            return pixel_unit
-        
-        elif axisinfo.typeFlags == vigra.AxisType.AllAxes.numerator:
-            return pixel_unit
-        
-        else:
-            return pixel_unit
     
-    elif isinstance(axisinfo, (vigra.AxisType, int)):
-        if axisinfo == vigra.AxisType.Channels.numerator:
-            return pq.dimensionless
-        
-        elif axisinfo == vigra.AxisType.Space.numerator:
-            return pq.m
-        
-        elif axisinfo == vigra.AxisType.Angle.numerator:
-            return pq.radian
-        
-        elif axisinfo == vigra.AxisType.Time.numerator:
-            return pq.s
-        
-        elif axisinfo == vigra.AxisType.Frequency.numerator:
-            return pq.Hz
-        
-        elif axisinfo == vigra.AxisType.Frequency | vigra.AxisType.Space:
-            return space_frequency_unit
-        
-        elif axisinfo == vigra.AxisType.Frequency | vigra.AxisType.Time:
-            return pq.Hz
-        
-        elif axisinfo == vigra.AxisType.Frequency | vigra.AxisType.Angle:
-            return angle_frequency_unit
-        
-        elif axisinfo == vigra.AxisType.Edge.numerator:
-            return pq.dimensionless
-        
-        elif axisinfo == vigra.AxisType.UnknownAxisType.numerator:
-            return pixel_unit
-        
-        elif axisinfo == vigra.AxisType.NonChannel.numerator:
-            return pixel_unit
-        
-        elif axisinfo == vigra.AxisType.AllAxes.numerator:
-            return pixel_unit
-        
-        else:
-            return pixel_unit
-        
-    else:
-        raise TypeError("AxisInfo object expected; instead got a %s" % type(axisinfo).__name__)
+    typeint = get_axis_type_flags_int(axisinfo)
     
-def axisTypeFromString(s):
-    """Inverse lookup of axis type flags from descriptive string or axis info key.
-    Performs the reverse of defaultAxisTypeName and the reverse mapping of axisTypeFlags.
-    """
-    if s.lower() in ("channel", "channels", "c"):
-        return vigra.AxisType.Channels
+    if typeint in vigra.AxisType.values:
+        return primitive_axis_type_units[typeint]
     
-    elif s.lower() in ("width","height", "depth", "space", "spatial", "distance",  "x", "y", "z", "n"):
-        return vigra.AxisType.Space
+    typenames = axisTypeStrings(typeint)
     
-    elif s.lower() in ("angular range", "angular", "angle", "a"):
-        return vigra.AxisType.Angle
-    
-    elif s.lower() in ("time", "temporal", "duration", "t"):
-        return vigra.AxisType.Time
-    
-    elif s.lower() in ("frequency", "frequency range", "f"):
-        return vigra.AxisType.Frequency
-    
-    elif s.lower() in ("spatial frequency range", "spatial frequency", "spatial sampling", "fx", "fy", "fz", "fn"):
-        return vigra.AxisType.Frequency | vigra.AxisType.Space
-    
-    elif s.lower() in ("temporal frequency range", "temporal frequency", "temporal sampling", "ft"):
-        return vigra.AxisType.Frequency | vigra.AxisType.Time
-    
-    elif s.lower() in ("angular frequency range", "angular frequency", "angular sampling", "fa"):
-        return vigra.AxisType.Frequency | vigra.AxisType.Angle
-    
-    elif s.lower() in ("fe"):
-        return vigra.AxisType.Frequency | vigra.AxisType.Edge
-    
-    elif s.lower() in ("edge", "e"):
-        return vigra.AxisType.Edge
-    
-    elif s.lower() in ("unknownaxistype", "unknown axis type", "unknown type", "unknown", "size", "?"):
-        return vigra.AxisType.UnknownAxisType
-    
-    elif s.lower() in ("nonchannel", "non channel", "s"):
-        return vigra.AxisType.NonChannel
-    
-    elif s.lower() in ("allaxes", "all axes", "l"):
-        return vigra.AxisType.AllAxes
-    
-    else:
-        return vigra.AxisType.UnknownAxisType
-    
-def axisTypeLiteral(axisinfo):
-    if isinstance(axisinfo, vigra.AxisInfo):
-        typeflags = axisinfo.typeFlags
-        typeint = typeflags.numerator
-        
-    elif isinstance(axisinfo, vigra.AxisType):
-        typeflags = axisinfo
-        typeint = typeflags.numerator
-        
-    elif isinstance(axisinfo, int):
-        typeint = axisinfo
-        
-    else:
-        raise TypeError(f"Expecting a vigra.AxisType or vigra.AxisInfo; got {type(axisinfo).__name__} instead")
-    
-    if typeflags in vigra.AxisType.values:
-        return vigra.AxisType.values[typeflags].name
-    
-    else:
-        if typeflags.numerator > vigra.AxisType.Frequency:
-            rmd = typeflags - vigra.AxisType.Frequency
-            if rmd in vigra.AxisType.values:
-                return "|".join(["Frequency", vigra.AxisType[rmd].name])
+    if len(typenames):
+        if len(typenames) > 1:
+            if "Frequency" in typenames:
+                if len(typenames) > 2:
+                    ## certainly NOT a meaningful combination
+                    return pq.dimensionless
+                
+                if "Time" in typenames:
+                    return pq.Hz
+                
+                if "Space" in typenames:
+                    return 1/pq.m
+                
+                if "Angle" in typenames:
+                    return 1/pq.radian
+                
+                return pq.Hz
             
-            else:
-                raise ValueError(f"Cannot resolve {typeflags} axis type")
+            # combinations of axis type flags that do not include frequency are
+            # not meaningful
+            return pixel_unit
+        
+        # almost surely we never land here
+        return primitive_axis_type_units(typenames[0])
+    
+    return pq.dimensionless
+    
+def axisTypeFromString(s:str) -> vigra.AxisType:
+    """Inverse lookup of axis type flags from descriptive string or axis info key.
+    Performs the reverse of axisTypeName and the reverse mapping of axisTypeKeys.
+    """
+    try:
+        return evalAxisTypeExpression(s)
+    
+    except AttributeError:
+        # deal with some humanly meaningful strings
+        if s.lower() in ("channel", "channels", "c"):
+            return vigra.AxisType.Channels
+        
+        elif s.lower() in ("width","height", "depth", "space", "spatial", "distance", "s", "x", "y", "z"):
+            return vigra.AxisType.Space
+        
+        elif s.lower() in ("angular range", "angular", "angle", "a"):
+            return vigra.AxisType.Angle
+        
+        elif s.lower() in ("time", "temporal", "duration", "t"):
+            return vigra.AxisType.Time
+        
+        elif s.lower() in ("frequency", "frequency range", "f"):
+            return vigra.AxisType.Frequency
+        
+        elif s.lower() in ("spatial frequency range", "spatial frequency", "spatial sampling", 
+                           "fs", "fx", "fy", "fz", 
+                           "sf", "xf", "yf", "xf"):
+            return vigra.AxisType.Frequency | vigra.AxisType.Space
+        
+        elif s.lower() in ("temporal frequency range", "temporal frequency", "temporal sampling", "ft", "tf"):
+            return vigra.AxisType.Frequency | vigra.AxisType.Time
+        
+        elif s.lower() in ("angular frequency range", "angular frequency", "angular sampling", "fa", "af"):
+            return vigra.AxisType.Frequency | vigra.AxisType.Angle
+        
+        elif s.lower() in ("fe", "ef"):
+            return vigra.AxisType.Frequency | vigra.AxisType.Edge
+        
+        elif s.lower() in ("edge", "e"):
+            return vigra.AxisType.Edge
+        
+        elif s.lower() in ("unknownaxistype", "unknown axis type", "unknown type", "unknown", "size", "?", "u", "uk", "ut"):
+            return vigra.AxisType.UnknownAxisType
+        
+        elif s.lower() in ("nonchannel", "non channel", "n", "nc"):
+            return vigra.AxisType.NonChannel
+        
+        elif s.lower() in ("allaxes", "all axes", "l", "aa"):
+            return vigra.AxisType.AllAxes
         
         else:
-            raise ValueError(f"Cannot resolve {typeflags} axis type")
-
-def defaultAxisTypeName(axisinfo):
-    """Generates a default string description for the vigra.AxisInfo parameter.
+            # deal with less meaningful strings on the assumption that these are
+            # concatenated symbols - this assumption may be wrong but then I can't
+            # anticipate everything!
+            # use with CAUTION - you have been WARNED
+            typestr = unique(s.lower())
+            types = list()
+            if "a" in typestr:
+                types.append(vigra.AxisType.Angle)
+                
+            if "c" in typestr:
+                types.append(vigra.AxisType.Channels)
+                
+            if "e" in typestr:
+                types.append(vigra.AxisType.Edge)
+                
+            if "f" in typestr:
+                types.append(vigra.AxisType.Frequency)
+                
+            if "t" in typestr:
+                types.append(vigra.AxisType.Time)
+                
+            if any(s_ in typestr for s_ in ("s", "x", "y", "z")):
+                types.append(vigra.AxisType.Space)
+                
+            if any(s_ in typestr for s_ in ("?", "u")):
+                vigra.AxisType.UnknownAxisType
+                
+            if "l" in typestr:
+                return vigra.AxisType.AllAxes
+                
+            if "n" in typestr:
+                return vigra.AxisType.NonChannel
+                
+            if len(types):
+                return reduce(operator.or_, types)
+                
+            return vigra.AxisType.UnknownAxisType
+    
+def axisTypeStrings(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int],
+                    as_expr:bool=False) -> typing.Union[typing.List[str], str]:
+    """Returns string representations of AxisType flags.
+    
+    When as_expr:bool is False (default):
+    
+        For primitive type flags, returns a list of one string (e.g. ['Space'], 
+        ['Time'], etc.)
+        
+        For type flags computed by OR-ed primitive type flags, the list contains the
+        names primitive flags (e.g. ['Frequency', 'Space'], or ['Frequency', 'Time'],
+        etc.)
+        
+    When as_expr is True, returns a string where the strings otherwise returned 
+        in a list are separated by '|'
+        
+    WARNING: Although numerically possible, not all combinations of primitive
+    AxisType flags is meaningful!
+    
+    For example, let:
+    
+    in:  v = vigra.AxisType.Frequency | vigra.AxisType.Edge | vigra.AxisType.Space
+    
+    in:  v
+    out: 50
+    
+    in:  s = axisTypeStrings(v)
+    out: ['Edge' 'Frequency' 'Space']
+    
+    in:  s = axisTypeStrings(v, as_expr = True)
+    
+    in:  s
+    out: 'Edge|Frequency|Space'
+    
+    The expression in `s` can be `eval`-ed with evalAxisTypeExpression:
+    
+    in:  evalAxisTypeExpression(s)
+    out: 50
+    
+    in:  v == evalAxisTypeExpression(s)
+    out: True
+    
+    """
+    typeint = get_axis_type_flags_int(axisinfo)
+    
+    names = list()
+    
+    if typeint in vigra.AxisType.values:
+        return [vigra.AxisType.values[typeint].name]
+    
+    else:
+        highestLess = np.argwhere(np.asarray([k[0] for k in reversedAxisTypes]) < typeint)
+        
+        if len(highestLess)  == 0:
+            return names
+            #raise ValueError(f"Invalid axisinfo {axisinfo}")
+            
+        axIntType = reversedAxisTypes[int(highestLess[0])]
+        
+        names.append(axIntType[1].name)
+        
+        names.extend(axisTypeStrings(typeint - axIntType[0]))
+        
+        return names
+        
+def evalAxisTypeExpression(x:str) -> typing.Union[vigra.AxisType, int]:
+    """Evaluates a string representation  of vigra.AxisType type flags.
+    
+    Parameters:
+    ==========
+    
+    x:str a vigra.AxisType name or a string containing several vigra.AxisType
+    names separated by '|' e.g. 'Frequency|Space' (all are case-sensitive)
+    
+    WARNING: Although numerically possible, not all combinations of primitive
+    AxisType flags is meaningful!
+    
+    """
+    return eval("|".join([f"vigra.AxisType.{s}" for s in x.split("|")]))
+    
+def axisTypeName(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int]) -> str:
+    """Generates an axis name based on the axis info or axis type flag.
+    
+    Do NOT confuse with axisTypeStrings().
     
     Positional parameters:
     ======================
     
-    axisinfo: a vigra.AxisInfo object, or a viga.AxisType object, or a valid integer
+    axisinfo: a vigra.AxisInfo object, or a viga.AxisType object, or an int
         resulted from bitwise OR between vigra.AxisType objects.
     
     Returns:
@@ -712,105 +369,32 @@ def defaultAxisTypeName(axisinfo):
     uses the "key" symbol in the axisinfo to provide a more specific string 
     (e.g.,"Width", or "Height", for space axis with keys "x" or "y", respectively).
     
-    Note that "n" stads for the nth space axis, meaning really anything in the 
-    space domain. In this case the function will return "Space".
-    
     """
-    if isinstance(axisinfo, vigra.AxisInfo):
-        if axisinfo.typeFlags == vigra.AxisType.Channels.numerator:
-            return "Channels"
-        
-        elif axisinfo.typeFlags == vigra.AxisType.Space.numerator:
-            if axisinfo.key == "x":
-                return "Width"
-            elif axisinfo.key == "y":
-                return "Height"
-            elif axisinfo.key == "z":
-                return "Depth"
-            else:
-                return "Space"
-            
-        elif axisinfo.typeFlags == vigra.AxisType.Angle.numerator:
-            return "Angular Range"
-        
-        elif axisinfo.typeFlags == vigra.AxisType.Time.numerator:
-            return "Duration"
-        
-        elif axisinfo.typeFlags == vigra.AxisType.Frequency.numerator:
-            return "Frequency Range"
-        
-        elif axisinfo.typeFlags == vigra.AxisType.Frequency | vigra.AxisType.Space:
-            return "Spatial Frequency Range"
-        
-        elif axisinfo.typeFlags == vigra.AxisType.Frequency | vigra.AxisType.Time:
-            return "Temporal Frequency Range"
-        
-        elif axisinfo.typeFlags == vigra.AxisType.Frequency | vigra.AxisType.Angle:
-            return "Angular Frequency Range"
-        
-        elif axisinfo.typeFlags == vigra.AxisType.Edge.numerator:
-            return "Edge"
-        
-        elif axisinfo.typeFlags == vigra.AxisType.UnknownAxisType.numerator:
-            return "Unknown"
-        
-        elif axisinfo.typeFlags == vigra.AxisType.NonChannel.numerator:
-            return "NonChannel"
-        
-        elif axisinfo.typeFlags == vigra.AxisType.AllAxes.numerator:
-            return "AllAxes"
-        
-        else:
-            return "Size"
-        
-    elif isinstance(axisinfo, vigra.AxisType):
-        # NOTE: 2018-05-01 21:46:14
-        # code below works even if axisinfo is an int!
-        if axisinfo == vigra.AxisType.Channels.numerator:
-            return "Channels"
-        
-        elif axisinfo == vigra.AxisType.Space.numerator:
-            return "Space"
-        
-        elif axisinfo == vigra.AxisType.Angle.numerator:
-            return "Angular Range"
-        
-        elif axisinfo == vigra.AxisType.Time.numerator:
-            return "Duration"
-        
-        elif axisinfo == vigra.AxisType.Frequency.numerator:
-            return "Frequency Range"
-        
-        elif axisinfo == vigra.AxisType.Frequency | vigra.AxisType.Space:
-            return "Spatial Frequency Range"
-        
-        elif axisinfo == vigra.AxisType.Frequency | vigra.AxisType.Time:
-            return "Temporal Frequency Range"
-        
-        elif axisinfo == vigra.AxisType.Frequency | vigra.AxisType.Angle:
-            return "Angular Frequency Range"
-        
-        elif axisinfo == vigra.AxisType.Edge.numerator:
-            return "Edge"
-        
-        elif axisinfo == vigra.AxisType.UnknownAxisType.numerator:
-            return "Size"
-        
-        elif axisinfo == vigra.AxisType.NonChannel.numerator:
-            return "Size"
-        
-        elif axisinfo == vigra.AxisType.AllAxes.numerator:
-            return "Size"
-        
-        else:
-            return "Size"
-        
-        
-    else:
-        raise TypeError("vigra.AxisInfo or vigra.AxisType object expected; instead got a %s" % type(axisinfo).__name__)
-        
     
-def defaultAxisTypeSymbol(axisinfo):
+    typeint = get_axis_type_flags_int(axisinfo)
+    
+    if typeint in vigra.AxisType.values:
+        if isinstance(axisinfo, vigra.AxisInfo):
+            infokey = axisinfo.key
+        else:
+            infokey = axisTypeSymbol(typeint)
+
+        if isinstance(infokey, str):
+            if "x" in infokey:
+                return "Width"
+            if "y" in infokey:
+                return "Height"
+            if "z" in infokey:
+                return "Depth"
+            
+            return vigra.AxisType.values[typeint].name
+        
+        return vigra.AxisType.values[typeint].name
+        
+    return " ".join(reversed(axisTypeStrings(typeint)))
+        
+def axisTypeSymbol(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int],
+                          upper:bool = True) -> str:
     """Maps vigra.AxisInfo object to a default string symbol (or "key").
     
     Positional parameters:
@@ -818,62 +402,32 @@ def defaultAxisTypeSymbol(axisinfo):
     
     axisinfo: a vigra.AxisInfo object.
     
+    Keyword parameters:
+    ===================
+    
+    upper:bool Optional, default is True: return upper case symbol.
+    
     Returns:
     ========
     
     A string key corresponding to the type flags in axisinfo object (in upper case).
     """
-    if not isinstance(axisinfo, vigra.AxisInfo):
-        raise TypeError("AxisInfo object expected; instead got a %s" % type(axisinfo).__name__)
-
-    if axisinfo.typeFlags == vigra.AxisType.Channels.numerator:
-        return "C"
-    
-    elif axisinfo.typeFlags == vigra.AxisType.Space.numerator:
-        if axisinfo.key == "x":
-            return "X"
+    if isinstance(axisinfo, vigra.AxisInfo):
+        if axisinfo.key not in ("?", "n", "l"): # force cheking these types
+            return axisinfo.key
         
-        elif axisinfo.key == "y":
-            return "Y"
         
-        elif axisinfo.key == "z":
-            return "Z"
-        
-        else:
-            return "S"
-        
-    elif axisinfo.typeFlags == vigra.AxisType.Angle.numerator:
-        return "A"
+    typeint = get_axis_type_flags_int(axisinfo)
     
-    elif axisinfo.typeFlags == vigra.AxisType.Time.numerator:
-        return "T"
-    
-    elif axisinfo.typeFlags == vigra.AxisType.Frequency.numerator:
-        return "F"
-    
-    elif axisinfo.typeFlags == vigra.AxisType.Frequency | vigra.AxisType.Space:
-        return "SF"
-    
-    elif axisinfo.typeFlags == vigra.AxisType.Frequency | vigra.AxisType.Time:
-        return "TF"
-    
-    elif axisinfo.typeFlags == vigra.AxisType.Frequency | vigra.AxisType.Angle:
-        return "AF"
-    
-    elif axisinfo.typeFlags == vigra.AxisType.Edge.numerator:
-        return "E"
-    
-    elif axisinfo.typeFlags == vigra.AxisType.UnknownAxisType.numerator:
-        return "?"
-    
-    elif axisinfo.typeFlags == vigra.AxisType.NonChannel.numerator:
-        return "?"
-    
-    elif axisinfo.typeFlags == vigra.AxisType.AllAxes.numerator:
-        return "?"
+    if typeint in vigra.AxisType.values:
+        n = vigra.AxisType.values[typeint].name[0]
     
     else:
-        return "?"
+        names = ['?' if s =="UnknownAxisType" else 'l' if s == "AllAxes" else s[0].lower() for s in reversed(axesTypeLiteral(typeint))]
+        n = "".join(names)
+        
+    return n.upper() if upper else n
+    
     
 def hasChannelAxis(data):
     if isinstance(data, vigra.VigraArray):
@@ -985,6 +539,7 @@ def getNonChannelDimensions(img):
         
 def _getTypeFlag_(value):
     """Needed because there is faulty translation of AxisType data structure between python & C++
+    TODO/FIXME Revisit this DEPRECATED
     """
     if not isinstance(value, int):
         raise TypeError("Expecting an int")

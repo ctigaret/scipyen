@@ -472,7 +472,7 @@ def specifyAxisTags(image, newtags, newshape=None, in_place=False):
             raise ValueError("Cannot specify more than 5 axis tags")
             
         if all([isinstance(tag, str) for tag in newtags]):
-            tagslist = [vigra.AxisInfo(s, axisTypeFlags[s]) for s in newtags]
+            tagslist = [vigra.AxisInfo(s, axisTypeFromString[s]) for s in newtags]
             newTags = vigra.AxisTags(*tagslist)
             
         elif all([isinstance(tag, vigra.AxisInfo)]):
@@ -499,7 +499,7 @@ def specifyAxisTags(image, newtags, newshape=None, in_place=False):
             if c not in __all_axis_tag_keys__:
                 raise ValueError("Invalid AxisInfo key: %s" % c)
             
-        tagslist = [vigra.AxisInfo(c, axisTypeFlags[c]) for c in a]
+        tagslist = [vigra.AxisInfo(c, axisTypeFromString[c]) for c in a]
         newTags = vigra.AxisTags(*tagslist)
         
     else:

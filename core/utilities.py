@@ -2823,8 +2823,8 @@ def gen_unique(seq, key=None):
     unique for a function version
     
     """
-    if not isinstance(seq, (tuple, list, range, deque)):
-        raise TypeError("expecting an iterable sequence (i.e., a tuple, a list, or a range); got %sinstead" % type(seq).__name__)
+    if not isinstance(seq, (tuple, list, range, deque, str)):
+        raise TypeError("expecting an iterable sequence (i.e., a tuple, a list, or a range); got %s instead" % type(seq).__name__)
     
     seen = set()
     

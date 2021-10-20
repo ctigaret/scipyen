@@ -90,7 +90,7 @@ from core.traitcontainers import DataBag
 from core.scipyen_config import markConfigurable
 
 from imaging import (axisutils, axiscalibration, vigrautils as vu,)
-from imaging.axisutils import (axisTypeFlags, defaultAxisTypeName, 
+from imaging.axisutils import (axisTypeKeys, defaultAxisTypeName, 
                                defaultAxisTypeSymbol, defaultAxisTypeUnits,)
 #from core import neo
 #from core import metaclass_solver

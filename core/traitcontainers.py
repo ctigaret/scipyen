@@ -145,9 +145,13 @@ class DataBag(Bunch):
             
     hidden_traits = ("length", "use_mutable", "use_casting", "allow_none","verbose")
     
-    @staticmethod
-    def _make_hidden(**kwargs):
-        ret = Bunch([(name, kwargs.pop(name, False)) for name in list(DataBag.hidden_traits) + ["mutable_types"]])
+    #@staticmethod
+    @classmethod
+    def _make_hidden(cls, **kwargs):
+        if not issubclass(cls, DataBag):
+            raise TypeError(f"Expecting a DataBag or a type derived from DataBag; got {cls.__name__} instead")
+        ret = Bunch([(name, kwargs.pop(name, False)) for name in list(cls.hidden_traits) + ["mutable_types"]])
+        #ret = Bunch([(name, kwargs.pop(name, False)) for name in list(DataBag.hidden_traits) + ["mutable_types"]])
         ret.length = 0
         ret.allow_none = True
         ret.use_mutable = True
@@ -202,7 +206,9 @@ class DataBag(Bunch):
             
         """
         self.__observer__ = DataBagTraitsObserver()
-        self.__hidden__ = DataBag._make_hidden(**kwargs)
+        # NOTE: so that derived types can use their OWN hidden_traits 
+        self.__hidden__ = self.__class__._make_hidden(**kwargs)
+        #self.__hidden__ = DataBag._make_hidden(**kwargs)
 
         for name in self.__hidden__.keys():
             kwargs.pop(name, None)

@@ -90,8 +90,10 @@ from core.traitcontainers import DataBag
 from core.scipyen_config import markConfigurable
 
 from imaging import (axisutils, axiscalibration, vigrautils as vu,)
-from imaging.axisutils import (axisTypeFlags, defaultAxisTypeName, 
-                               defaultAxisTypeSymbol, defaultAxisTypeUnits,)
+from imaging.axisutils import (axisTypeFromString,
+                               axisTypeName, 
+                               axisTypeSymbol, 
+                               axisTypeUnits,)
 #from core import neo
 #from core import metaclass_solver
 #### END scipyen core modules
@@ -306,9 +308,9 @@ class AxesCalibrationDialog(QDialog, Ui_AxisCalibrationDialog):
         self.axisIndexSpinBox.setValue(self.selectedAxisIndex)
         
         if self.arrayshape is None:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, defaultAxisTypeName(self.axistags[self.selectedAxisIndex])))
+            self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex])))
         else:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, defaultAxisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
+            self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
             
         self.unitsLineEdit.setClearButtonEnabled(True)
         
@@ -361,9 +363,9 @@ class AxesCalibrationDialog(QDialog, Ui_AxisCalibrationDialog):
         self.description    = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
 
         if self.arrayshape is None:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, defaultAxisTypeName(self.axistags[self.selectedAxisIndex])))
+            self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex])))
         else:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, defaultAxisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
+            self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
             
         self.unitsLineEdit.setText(self.units.__str__().split()[1])
         self.originSpinBox.setValue(self.origin)
@@ -3573,8 +3575,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     strutils.quantity2str(vu.getCalibratedAxisSize(self._data_, self.heightAxisInfo.key)))
     
             shapeTxt = "%s x %s: %d x %d %s" % \
-                (defaultAxisTypeName(self.widthAxisInfo), \
-                    defaultAxisTypeName(self.heightAxisInfo), \
+                (axisTypeName(self.widthAxisInfo), \
+                    axisTypeName(self.heightAxisInfo), \
                     w, h, cals)
             
             self.slot_displayColorBar(self.displayColorBarAction.isChecked())
@@ -4016,8 +4018,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     scx = "%.2f %s" % (cx.magnitude, cx.units.dimensionality.string)
                     scy = "%.2f %s" % (cy.magnitude, cy.units.dimensionality.string)
                     
-                    sx = img.axistags[viewWidthAxisIndex].key #dt.defaultAxisTypeSymbol(self._currentFrameData_.axistags[0])
-                    sy = img.axistags[viewHeightAxisIndex].key #dt.defaultAxisTypeSymbol(self._currentFrameData_.axistags[1])
+                    sx = img.axistags[viewWidthAxisIndex].key 
+                    sy = img.axistags[viewHeightAxisIndex].key
                     
                     if img.ndim > 2: # this is possible only when there is a channel axis!
                         if img.channels > 1:
@@ -4142,7 +4144,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                         
                             cz = axiscalibration.AxisCalibration(self.frameAxisInfo).getCalibratedAxisCoordinate(self._current_frame_index_, self.frameAxisInfo)
                         
-                            sz = self.frameAxisInfo.key #dt.defaultAxisTypeSymbol(self.frameAxisInfo)
+                            sz = self.frameAxisInfo.key
                         
                             c_list.append(", Z: %d (%s: %s)>" % (self._current_frame_index_, sz, cz))
                             

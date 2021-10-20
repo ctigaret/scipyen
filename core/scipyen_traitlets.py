@@ -349,17 +349,29 @@ class DequeTrait(Instance):
             new_value = self._validate(obj, [value])
         else:
             new_value = self._validate(obj, value)
+            
+        # NOTE: 82021-10-20 09:13:51
+        # to also flag addition of this trait:
+        # when DataBag is empty, its hashed value will be 0 thus not different 
+        # from the default; therefore when and old_value of this trait does not
+        # exist we should be notifying the observer
+        silent = True 
         
         try:
             old_value = obj._trait_values[self.name]
         except KeyError:
+            silent=False    # this will be the first time the observed sees us
+                            # therefore forcibly notify it
             old_value = self.default_value
             
         obj._trait_values[self.name] = new_value
         
         try:
             new_hash = gethash(new_value)
-            silent = (new_hash == self.hashed)
+            if silent:
+                # so far silent is True when the observed knows about us
+                # check it we changed and notify
+                silent = (new_hash == self.hashed)
             
             if not silent:
                 self.hashed = new_hash
@@ -367,6 +379,8 @@ class DequeTrait(Instance):
         except:
             traceback.print_exc()
             silent = False
+            
+        #print(f"silent {silent}")
                 
         if silent is not True:
             obj._notify_trait(self.name, old_value, new_value)

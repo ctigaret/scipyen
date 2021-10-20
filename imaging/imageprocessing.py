@@ -20,7 +20,10 @@ import neo
 #### BEGIN pict.core modules
 from core import (tiwt, datatypes as dt, strutils, curvefitting as crvf,)
 
-from imaging.axisutils import (axisTypeFlags, defaultAxisTypeName)
+from imaging.axisutils import (axisTypeFromString,
+                               axisTypeName, 
+                               axisTypeSymbol,
+                               axisTypeUnits)
 
 #from .patchneo import neo
 #### END pict.core modules
@@ -480,7 +483,7 @@ def resampleImageAxis(image, new_res, axis=0, p=1000, window=None):
     
     #newCal = AxisCalibration(ret.axistags[axisindex],
                                 #units = units, origin = origin, resolution = resolution, 
-                                #axisname = dt.defaultAxisTypeName(ret.axistags[axisindex]),
+                                #axisname = dt.axisTypeName(ret.axistags[axisindex]),
                                 #axistype = ret.axistags[axisindex].typeFlags)
     
     #print("newCal", image_cal)
@@ -1049,9 +1052,9 @@ def insertAxis(img, axinfo, axdim):
         raise TypeError("Expecting 'img' as a VigraArray; got %s instead" % type(img).__name__)
     
     if isinstance(axinfo, str):
-        axinfo = vigra.AxisInfo(key=axinfo, typeFlags = axisTypeFlags[axinfo], 
+        axinfo = vigra.AxisInfo(key=axinfo, typeFlags = axisTypeFromString(axinfo), 
                                 resolution = 1.0, 
-                                description = dt.defaultAxisTypeName(axisTypeFlags[axinfo]))
+                                description = axisTypeName(axinfo))
         
     elif not isinstance(axinfo, vigra.AxisInfo):
         raise TypeError("Expecting 'axinfo' as an AxisInfo object or a str; got %s instead" % type(axinfo).__name__)
@@ -1201,9 +1204,9 @@ def imageIndexTuple(img, slicing=None, newAxis=None, newAxisDim=None):
         
         if isinstance(newAxis, str):
             newAxis = vigra.AxisInfo(key=newAxis, 
-                                     typeFlags=axisTypeFlags[newAxis],
+                                     typeFlags=axisTypeFromString(newAxis),
                                      resolution=1.0,
-                                     description=dt.defaultAxisTypeName(axisTypeFlags[newAxis]))
+                                     description=axisTypeName(newAxis))
             
         elif not isinstance(newAxis, vigra.AxisInfo):
             raise TypeError("newAxis parameter expected to be a vigra.AxisInfo object, or a vigra.AxisInfo key string, or None")
@@ -1517,9 +1520,9 @@ Arrays are concatenated in two ways, explained here by examples:
             
             catAxisNdx = min_dims
             
-            newaxis = vigra.AxisInfo(key = catAxis, typeFlags = axisTypeFlags[catAxis],
+            newaxis = vigra.AxisInfo(key = catAxis, typeFlags = axisTypeFromString(catAxis),
                                      resolution=1.0,
-                                     description = defaultAxisTypeName(axisTypeFlags[catAxis]))
+                                     description = axisTypeFromString(catAxis))
             for img in images:
                 new_images.append(insertAxis(img, newaxis, catAxisNdx))
                 
