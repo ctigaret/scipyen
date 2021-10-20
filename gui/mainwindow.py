@@ -275,7 +275,20 @@ from systems import *
 #### BEGIN scipyen imaging modules
 if has_vigra:
     from imaging import (imageprocessing as imgp, imgsim,)
-    from imaging.axiscalibration import (AxisCalibration,)
+    from imaging import axisutils
+    from imaging.axisutils import (axisTypeFromString, 
+                                   axisTypeName,
+                                   axisTypeStrings,
+                                   axisTypeSymbol, 
+                                   axisTypeUnits,
+                                   dimEnum,
+                                   dimIter,
+                                   evalAxisTypeExpression,
+                                   get_axis_type_flags_int,
+                                   getNonChannelDimensions,
+                                   hasChannelAxis,
+                                   )
+    from imaging.axiscalibration import (AxesCalibration,)
     from imaging.scandata import (AnalysisUnit, ScanData,)
 
     import imaging.CaTanalysis as CaTanalysis 

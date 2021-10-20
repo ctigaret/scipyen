@@ -269,7 +269,7 @@ def synthetic_EPSCaT_linescan(field_width, duration,
     addChannelAxis: boolean (default True) adds a singleton channel axis as the last axis
     
     returnCalibration: boolean, default False:
-                When True, also returns the datatypes.AxisCalibration object for the axistags
+                When True, also returns the datatypes.AxesCalibration object for the axistags
                 if the result
                 
     twoChannels : boolean (default is False)
@@ -289,7 +289,7 @@ def synthetic_EPSCaT_linescan(field_width, duration,
     When returnCalibration is True, returns a tuple:
     
         (image, axiscalibration) where image is as above, and axiscalibration is a
-        datatypes.AxisCalibration object for the image axes (axistags property). 
+        datatypes.AxesCalibration object for the image axes (axistags property). 
         
         NOTE that in any case the image axistags will contain a calibration data in 
         their decsription properties
@@ -339,7 +339,7 @@ def synthetic_EPSCaT_linescan(field_width, duration,
     if addChannelAxis and result.channelIndex == linescan.ndim:
         linescan = linescan.insertChannelAxis()
     
-    axiscal = dt.AxisCalibration(result)
+    axiscal = dt.AxesCalibration(result)
     axiscal.setUnits(space_units, "x")
     axiscal.setResolution(spatial_resolution, "x")
     axiscal.setUnits(time_units, "t")

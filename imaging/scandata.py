@@ -35,7 +35,7 @@ from core.neoutils import (clear_events, get_index_of_named_signal, neo_copy, is
 from ephys.ephys import (average_segments, )
 
 from imaging.vigrautils import getFrameLayout
-from imaging.axiscalibration import AxisCalibration
+from imaging.axiscalibration import AxesCalibration
 from imaging.imageprocessing import concatenateImages
 from gui import pictgui as pgui
 from gui.pictgui import PlanarGraphics
@@ -2436,12 +2436,12 @@ class ScanData(object):
                 self._scan_region_scans_profiles_ = neo.Block(name="Scan region scans profiles")
                 #self._scan_region_scans_profiles_.segments = [neo.Segment(name="frame_%d" %k, index = k) for k in range(self._scans_frames_)]
                 
-        _upgrade_attribute_("__scans_axis_calibrations__", "_scans_axis_calibrations_", list, [AxisCalibration(img) for img in self._scans_])
+        _upgrade_attribute_("__scans_axis_calibrations__", "_scans_axis_calibrations_", list, [AxesCalibration(img) for img in self._scans_])
         
         for axcal in self._scans_axis_calibrations_:
             axcal._upgrade_API_()
             
-        _upgrade_attribute_("__scene_axis_calibrations__", "_scene_axis_calibrations_", list, [AxisCalibration(img) for img in self._scene_])
+        _upgrade_attribute_("__scene_axis_calibrations__", "_scene_axis_calibrations_", list, [AxesCalibration(img) for img in self._scene_])
         
         for axcal in self._scene_axis_calibrations_:
             axcal._upgrade_API_()
@@ -2682,7 +2682,7 @@ class ScanData(object):
         elif isinstance(data, vigra.VigraArray):
             (nFrames, frameAxisInfo, widthAxisInfo, heightAxisInfo) = getFrameLayout(data, userFrameAxis = sceneFrameAxis)
             self._scene_ = data
-            self._scene_axis_calibrations_ = [AxisCalibration(data)]
+            self._scene_axis_calibrations_ = [AxesCalibration(data)]
             
             if sceneFrameAxis is None:
                 chindex = data.channelIndex
@@ -2717,7 +2717,7 @@ class ScanData(object):
                 
                 #print("ScanData._parse_image_arrays_() parsing scene VigraArray")
                 
-                self._scene_axis_calibrations_ = [AxisCalibration(scene)]
+                self._scene_axis_calibrations_ = [AxesCalibration(scene)]
                 
                 # NOTE: 2017-11-12 15:45:19
                 # find out frame numbers
@@ -2750,7 +2750,7 @@ class ScanData(object):
                 
                 self._scene_ = scene
             
-                self._scene_axis_calibrations_ = [AxisCalibration(s) for s in scene]
+                self._scene_axis_calibrations_ = [AxesCalibration(s) for s in scene]
                 
                 nframes, frame_axis, width_axis, height_axis = getFrameLayout(scene[0], sceneFrameAxis)
                 
@@ -2782,7 +2782,7 @@ class ScanData(object):
                 
                 self._scans_ = [scans]
                 
-                self._scans_axis_calibrations_ = [AxisCalibration(scans)]
+                self._scans_axis_calibrations_ = [AxesCalibration(scans)]
                 
                 nframes, frame_axis, width_axis, height_axis = getFrameLayout(scans, scansFrameAxis)
                 
@@ -2808,7 +2808,7 @@ class ScanData(object):
                 
                 self._scans_ = scans
                 
-                self._scans_axis_calibrations_ = [AxisCalibration(s) for s in scans]
+                self._scans_axis_calibrations_ = [AxesCalibration(s) for s in scans]
                     
                 nframes, frame_axis, width_axis, height_axis = getFrameLayout(scans[0], scansFrameAxis)
                 self._scans_frame_axis_ = frame_axis
@@ -3198,8 +3198,8 @@ class ScanData(object):
                 img0 = img.copy()
                 img1 = tgt[k].copy()
                 
-                img0_axis_cals = AxisCalibration(img0)
-                img1_axis_cals = AxisCalibration(img1)
+                img0_axis_cals = AxesCalibration(img0)
+                img1_axis_cals = AxesCalibration(img1)
                 
                 if img0_axis_cals.getDimensionlessResolution("x") != img1_axis_cals.getDimensionlessResolution("x"):
                     img1 = resampleImage(img1, img0, axis = "x")
@@ -3800,14 +3800,14 @@ class ScanData(object):
             #result = [vigra.VigraArray(img, init=True, value=0, axistags = img.axistags) for img in source]
 
             #for k in process_channel_ndx:
-                #chn_cal = AxisCalibration(result[k].axistags["c"])
+                #chn_cal = AxesCalibration(result[k].axistags["c"])
                 #chn_cal.setChannelName(0, process_channel_names[k])
                 #chn_cal.calibrateAxis(result[k].axistags["c"])
             
             ##for k in process_channel_ndx:
                 ##result[k] = 
                 ##result.append(vigra.VigraArray(source[k], init=True, value=0, axistags = source[k].axistags))
-                ##chn_cal = AxisCalibration(result[k].axistags["c"])
+                ##chn_cal = AxesCalibration(result[k].axistags["c"])
                 ##chn_cal.setChannelName(0, process_channel_names[k])
                 ###chn_cal.setChannelName(result[k].axistags["c"], 0, process_channel_names[k])
                 ###chn_cal.setChannelNames(k, process_channel_names[k])
@@ -3828,24 +3828,24 @@ class ScanData(object):
             #target[:] = result[:]
             #target_chnames[:] = process_channel_names
         
-        #self.updateAxisCalibrations()
+        #self.updateAxesCalibrations()
         
         #self._processed_ = True
         
-    def updateAxisCalibrations(self):
+    def updateAxesCalibrations(self):
         """Call this to keep axis calibration in sync with the image array data.
         """
         if isinstance(self.scene, vigra.VigraArray):
-            self._scene_axis_calibrations_ = [AxisCalibration(self.scene)]
+            self._scene_axis_calibrations_ = [AxesCalibration(self.scene)]
             
         elif isinstance(self.scene, (tuple, list)) and  len(self.scene) > 0:
-            self._scene_axis_calibrations_ = [AxisCalibration(img) for img in self.scene]
+            self._scene_axis_calibrations_ = [AxesCalibration(img) for img in self.scene]
             
         if isinstance(self.scans, vigra.VigraArray):
-            self._scans_axis_calibrations_ = [AxisCalibration(self.scans)]
+            self._scans_axis_calibrations_ = [AxesCalibration(self.scans)]
             
         elif isinstance(self.scans, (tuple, list)) and len(self.scans) > 0:
-            self._scans_axis_calibrations_ = [AxisCalibration(img) for img in self.scans]
+            self._scans_axis_calibrations_ = [AxesCalibration(img) for img in self.scans]
             
     #@safeWrapper
     def concatenate(self, source, strict = False, pad_value = None, scanregions=False):#, resample=False, alignment=0):#, src_slice = None, other_slice = None, axis=None):
@@ -6172,7 +6172,7 @@ class ScanData(object):
                     
                     if destScene[ks].channelIndex == destScene[ks].ndim:
                         destScene[ks].insertChannelAxis()
-                        axcal = AxisCalibration(img.axistags["c"])
+                        axcal = AxesCalibration(img.axistags["c"])
                         axcal.calibrateAxis(destScene[ks].axistags["c"])
                         
                     
@@ -6184,7 +6184,7 @@ class ScanData(object):
                         
             for ks, img in enumerate(self.scene):
                 for axistag in img.axistags:
-                    src_axiscal = AxisCalibration(axistag)
+                    src_axiscal = AxesCalibration(axistag)
                     src_axiscal.calibrateAxis(destScene[ks].axistags[axistag.key])
                         
             for kf, frame in enumerate(kprotocol_frames):
@@ -6194,7 +6194,7 @@ class ScanData(object):
                         
             for ks, img in enumerate(self.scans):
                 for axistag in img.axistags:
-                    src_axiscal = AxisCalibration(axistag)
+                    src_axiscal = AxesCalibration(axistag)
                     src_axiscal.calibrateAxis(destScans[ks].axistags[axistag.key])
                         
             #### END copy image data
@@ -6218,7 +6218,7 @@ class ScanData(object):
                     
                 for ks, img in enumerate(self.scene):
                     for axistag in img.axistags:
-                        src_axiscal = AxisCalibration(axistag)
+                        src_axiscal = AxesCalibration(axistag)
                         src_axiscal.calibrateAxis(destAveragedScene[ks].axistags[axistag.key])
                         
                 for ks in range(len(self.scene)):
@@ -6240,7 +6240,7 @@ class ScanData(object):
                     
                 for ks, img in enumerate(self.scans):
                     for axistag in img.axistags:
-                        src_axiscal = AxisCalibration(axistag)
+                        src_axiscal = AxesCalibration(axistag)
                         src_axiscal.calibrateAxis(destAveragedScans[ks].axistags[axistag.key])
                         
                 for ks in range(len(self.scans)):
@@ -8382,7 +8382,7 @@ class ScanData(object):
             ch_index = name_or_index
             
         del self._scans_[ch_index]
-        self._scans_axis_calibrations_[:] = [AxisCalibration(img) for img in self._scans_]
+        self._scans_axis_calibrations_[:] = [AxesCalibration(img) for img in self._scans_]
             
     @safeWrapper
     def removeSceneChannel(self, name_or_index):
@@ -8399,7 +8399,7 @@ class ScanData(object):
             ch_index = name_or_index
             
         del self._scene_[ch_index]
-        self._scene_axis_calibrations_[:] = [AxisCalibration(img) for img in self._scene_]
+        self._scene_axis_calibrations_[:] = [AxesCalibration(img) for img in self._scene_]
         
     def trimScans(self, interval, axis):
         """Removes image data OUTSIDE the specified interval along the specified axis .
@@ -8424,7 +8424,7 @@ class ScanData(object):
             if axis.isChannel():
                 raise ValueError("Cannot operate on channel axis %s" % axis)
         
-        slice_object = self.getScansAxisCalibration(0).getCalibratedIntervalAsSlice(interval, axis)
+        slice_object = self.getScansAxesCalibration(0).getCalibratedIntervalAsSlice(interval, axis)
         
         slicing = imageIndexTuple(self.scans[0], {axis: slice_object})
         
@@ -9082,12 +9082,12 @@ class ScanData(object):
                     
             roidict.clear()
             
-    def getSceneAxisCalibration(self, channel=0):
+    def getSceneAxesCalibration(self, channel=0):
         """
-        Gets the AxisCalibration for the specified scene channel (default 0)
+        Gets the AxesCalibration for the specified scene channel (default 0)
         
-        For multi-channel data, returns the AxisCalibration of the whole image;
-        othwerwise returns the AxisCalibration for the single-channel scene image
+        For multi-channel data, returns the AxesCalibration of the whole image;
+        othwerwise returns the AxesCalibration for the single-channel scene image
         corresponding to the given channel index
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
@@ -9121,12 +9121,12 @@ class ScanData(object):
             return self._scene_axis_calibrations_[channel]
             
         
-    def getScansAxisCalibration(self, channel=0):
+    def getScansAxesCalibration(self, channel=0):
         """
-        Gets the AxisCalibration for the specified scans channel (default 0)
+        Gets the AxesCalibration for the specified scans channel (default 0)
         
-        For multi-channel data, returns the AxisCalibration of the whole image;
-        othwerwise returns the AxisCalibration for the single-channel scans image
+        For multi-channel data, returns the AxesCalibration of the whole image;
+        othwerwise returns the AxesCalibration for the single-channel scans image
         corresponding to the given channel index
         
         FIXME/TODO adapt to a new scenario where all scans image data is a single
@@ -10083,14 +10083,14 @@ class ScanData(object):
             return list()
         
         if len(self.scene) == 1:
-            return self.getSceneAxisCalibration(0).channelNames()
-            #axcal = AxisCalibration(self.scene[0].axistags["c"])
+            return self.getSceneAxesCalibration(0).channelNames()
+            #axcal = AxesCalibration(self.scene[0].axistags["c"])
             #return axcal.channelNames(self.scene[0].axistags["c"])
         
         else:
             return [axcal.channelNames()[0] for axcal in self._scene_axis_calibrations_]
             
-            #return [AxisCalibration(s.axistags["c"]).channelNames()[0] for s in self.scene]
+            #return [AxesCalibration(s.axistags["c"]).channelNames()[0] for s in self.scene]
             #return [axisChannelName(s.axistags["c"], 0) for s in self.scene]
         
     @sceneChannelNames.setter
@@ -10109,8 +10109,8 @@ class ScanData(object):
         # check conformance to number of channels in the scene data
         if len(value) == self.sceneChannels:
             if len(self.scene) == 1:
-                axcal = self.getSceneAxisCalibration(0)
-                #axcal = AxisCalibration(self.scene[0].axistags["c"])
+                axcal = self.getSceneAxesCalibration(0)
+                #axcal = AxesCalibration(self.scene[0].axistags["c"])
                 
                 for c in range(self.sceneChannels):
                     axcal.setChannelName(c, value[c])
@@ -10119,8 +10119,8 @@ class ScanData(object):
                 
             else:
                 for k, v in enumerate(value):
-                    axcal = self.getSceneAxisCalibration(k)
-                    #axcal = AxisCalibration(self.scene[k].axistags["c"])
+                    axcal = self.getSceneAxesCalibration(k)
+                    #axcal = AxesCalibration(self.scene[k].axistags["c"])
                     axcal.setChannelName(0, v)
                     axcal.calibrateAxis(self.scene[k].axistags["c"])
                     #setAxisName(self.scene[k].axistags["c"], name=[v], index=[k])
@@ -10384,8 +10384,8 @@ class ScanData(object):
             return list()
         
         if len(self._scans_) == 1:
-            return self.getScansAxisCalibration(0).channelNames()
-            #return AxisCalibration(self.scans[0].axistags["c"]).channelNames()
+            return self.getScansAxesCalibration(0).channelNames()
+            #return AxesCalibration(self.scans[0].axistags["c"]).channelNames()
         
         else:
             if any([s.channels != 1 for s in self._scans_]):
@@ -10410,8 +10410,8 @@ class ScanData(object):
         # check conformance to number of channels in the scene data
         if len(value) == self.scansChannels:
             if len(self.scans) == 1:
-                axcal = self.getScansAxisCalibration(0)
-                #axcal = AxisCalibration(self.scans[0].axistags["c"])
+                axcal = self.getScansAxesCalibration(0)
+                #axcal = AxesCalibration(self.scans[0].axistags["c"])
                 
                 for c in range(self.scansChannels):
                     axcal.setChannelName(c, value[c])
@@ -10420,8 +10420,8 @@ class ScanData(object):
 
             else:
                 for k, v in enumerate(value):
-                    axcal = self.getScansAxisCalibration(k)
-                    #axcal = AxisCalibration(self.scans[k].axistags["c"])
+                    axcal = self.getScansAxesCalibration(k)
+                    #axcal = AxesCalibration(self.scans[k].axistags["c"])
                     axcal.setChannelName(0, v)
                     axcal.calibrateAxis(self.scans[k].axistags["c"])
                     #setAxisName(self.scans[k].axistags["c"], name=[v], index=[k])
@@ -10554,7 +10554,7 @@ def __set_valid_key_names__(obj):
                 obj[k] = strutils.str2symbol(o)
 
 def check_apiversion(data):
-    if isinstance(data, (AxisCalibration, AnalysisUnit, ScanData)):
+    if isinstance(data, (AxesCalibration, AnalysisUnit, ScanData)):
         if not hasattr(data, "apiversion"):
             return False
         

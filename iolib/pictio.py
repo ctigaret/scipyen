@@ -1352,7 +1352,7 @@ def loadPickleFile_old(fileName):
             else:
                 raise e
         
-    if type(result).__name__ in ("ScanData", "AnalysisUnit", "AxisCalibration", "PlanarGraphics"):
+    if type(result).__name__ in ("ScanData", "AnalysisUnit", "AxesCalibration", "PlanarGraphics"):
         #print("loaded", type(result))
         result._upgrade_API_()
         

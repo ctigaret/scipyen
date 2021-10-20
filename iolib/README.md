@@ -148,7 +148,7 @@ import nixio as nix
 
 newAxisInfo = vigra.AxisInfo(key="t1", typeFlags=vigra.AxisType.Time, resolution=1, description=axisTypeName(axisTypeKeys["t"]))
 
-newAxisCal = AxisCalibration(newAxisInfo, units=pq.s,origin=0, resolution=1, axisname=axisTypeName(newAxisInfo))
+newAxisCal = AxesCalibration(newAxisInfo, units=pq.s,origin=0, resolution=1, axisname=axisTypeName(newAxisInfo))
 
 ch1 = imgp.concatenateImages(*[imgp.insertAxis(img, newAxisInfo, 2) for img in (base_000_Cycle00001_CurrentSettings_Ch1_000001, base_000_Cycle00002_CurrentSettings_Ch1_000001, base_000_Cycle00003_CurrentSettings_Ch1_000001)], axis=newAxisInfo)
 
@@ -233,7 +233,7 @@ nix_file._h5file # this is a HDF5 file; can one add vigra writeHDF5 to it?
 newAxisInfo = vigra.AxisInfo(key="t1", typeFlags=vigra.AxisType.Time, 
                                                        resolution=1, 
                                                        description=axisTypeName(axisTypeKeys["t"]))
-newAxisCal = AxisCalibration(newAxisInfo,
+newAxisCal = AxesCalibration(newAxisInfo,
                                                        units=pq.s,
                                                        origin=0,
                                                        resolution=1,

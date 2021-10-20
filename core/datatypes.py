@@ -46,7 +46,7 @@ from . import xmlutils
 from . import strutils
 from .prog import safeWrapper
 
-from imaging.imageprocessing import *
+#from imaging.imageprocessing import *
 #### END pict.core.modules
 
 # CHANGELOG (most recent first)
@@ -227,9 +227,27 @@ custom_unit_symbols[Gohm.symbol] = Gohm
 
 # TODO some other useful units TODO
 
+def scalar_quantity2python(x):
+    if not isinstance(x, pq.Quantity):
+        raise TypeError(f"Expecting a Ptyhon Quantity; got {type(x).__name__} instead")
+    
+    if x.size != 1:
+        raise TypeError(f"Expecting a scalar quantity; instead, got an array with size {x.size}")
+    
+    v = x.magnitude
+    
+    if v.dtype.name.startswith("complex"):
+        return complex(v)
+    
+    if v.dtype.name.startswith("float"):
+        return float(v)
+    
+    if v.dtype.name.startswith("int"):
+        return int(v)
+    
+    raise TypeError(f"Expecting a numeric dtype; got {v.dtype} instead")
 
-
-def isVector(x):
+def is_vector(x):
     """Returns True if x is a numpy array encapsulating a vector.
     
     A vector is taken to be a numpy array with one dimension, or a numpy
@@ -249,7 +267,7 @@ def isVector(x):
     else:
         return False
         
-def isColumnVector(x):
+def is_column_vector(x):
     """Returns True if x is a numpy arrtay encapsulating a column vector.
     
     A column vector is taken to be a numpy array with one dimension or a numpy
@@ -289,34 +307,6 @@ def isRowVector(x):
     else:
         return False
     
-def generic_data_attrs(data):
-    attrs = dict()
-    
-    type_name = type(data).__name__
-    
-    if type_name == "instance":
-        type_name = data.__class__.__name__
-        module_name = data.__class__.__module__
-        
-    elif type_name == "type":
-        type_name = data.__name__
-        module_name = data.__module__
-        
-    else:
-        module_name = type(data).__module__
-    
-    #elif type_name == "namedtuple":
-        
-    attrs["type_name"] = type_name
-    attrs["module_name"] = module_name
-    attrs["python_class"] = ".".join([module_name, type_name])
-    
-    return attrs
-    
-def qualtypename(x):
-    attrs = generic_data_attrs(x)
-    return attrs["python_class"]
-    
 def is_uniform_sequence(s):
     ret = isinstance(s, collections.abc.Sequence) 
 
@@ -330,7 +320,7 @@ def sequence_element_type(s):
     return unique((type(e) for e in s))
     
     
-def arraySlice(data:np.ndarray, slicing:(dict, type(None))):
+def array_slice(data:np.ndarray, slicing:(dict, type(None))):
     """Dynamic slicing of nD arrays and introducing new axis in the array.
     """
     if not isinstance(data, np.ndarray):

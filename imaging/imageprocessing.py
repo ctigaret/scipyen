@@ -235,7 +235,7 @@ def resampleImage(target, src, axis=None, window=None):
         in the pict package.
     
     """
-    from core.axiscalibration import AxisCalibration
+    from core.axiscalibration import AxesCalibration
 
     src_axes = list()
     tgt_axes = list()
@@ -246,8 +246,8 @@ def resampleImage(target, src, axis=None, window=None):
     if not isinstance(target, vigra.VigraArray):
         raise TypeError("Second argument expected to be a vigra.VigraArray; got %s instead" % type(target)._name__)
     
-    src_axis_cals = AxisCalibration(src)
-    tgt_axis_cals = AxisCalibration(target)
+    src_axis_cals = AxesCalibration(src)
+    tgt_axis_cals = AxesCalibration(target)
         
     if isinstance(axis, str):
         if axis not in src.axistags or axis not in target.axistags:
@@ -353,7 +353,7 @@ def resampleImage(target, src, axis=None, window=None):
     else:
         for k, ax in enumerate(tgt_axes):
             new_res = src_axis_cals.getDimensionlessResolution(src_axes[k].key)
-            #print("%d: %s, new_res: %s; old_res: %s" % (k, ax.key, new_res, AxisCalibration(ax).resolution) )
+            #print("%d: %s, new_res: %s; old_res: %s" % (k, ax.key, new_res, AxesCalibration(ax).resolution) )
             
             if k == 0:
                 ret = resampleImageAxis(target, new_res, axis=ax, window=window)
@@ -399,7 +399,7 @@ def resampleImageAxis(image, new_res, axis=0, p=1000, window=None):
     
     from scipy.signal import resample_poly as resample
     from scipy.signal import get_window as get_window
-    from core.axiscalibration import AxisCalibration
+    from core.axiscalibration import AxesCalibration
     
     if not isinstance(image, vigra.VigraArray):
         raise TypeError("Expecting a vigra.VigraArray as first parameter; got %s instead" % type(image).__name__)
@@ -431,7 +431,7 @@ def resampleImageAxis(image, new_res, axis=0, p=1000, window=None):
     if axisinfo.isChannel():
         raise TypeError("Cannot resample a channel axis")
     
-    image_cal = AxisCalibration(image)
+    image_cal = AxesCalibration(image)
     
     if image_cal.getUnits(axisinfo) == pq.dimensionless:
         warnings.warn("Resampling along a dimensionless axis")
@@ -481,7 +481,7 @@ def resampleImageAxis(image, new_res, axis=0, p=1000, window=None):
     
     image_cal.setResolution(new_res, axisinfo)
     
-    #newCal = AxisCalibration(ret.axistags[axisindex],
+    #newCal = AxesCalibration(ret.axistags[axisindex],
                                 #units = units, origin = origin, resolution = resolution, 
                                 #axisname = dt.axisTypeName(ret.axistags[axisindex]),
                                 #axistype = ret.axistags[axisindex].typeFlags)
@@ -751,7 +751,7 @@ def padToLargest(array0, array1, pad=0.0):
     
     
     """
-    from core.axiscalibration import AxisCalibration
+    from core.axiscalibration import AxesCalibration
 
     if any([not isinstance(a, vigra.VigraArray) for a in (array0, array1)]):
         raise TypeError("Expecting two VigraArray objects; got %s  and %s instead" % (type(array0).__name__, type(array1).__name__))
@@ -775,8 +775,8 @@ def padToLargest(array0, array1, pad=0.0):
             if ax not in array0.axistags or array0.axistags.index(ax.key) != k:
                 raise ValueError("AxisInfo %s of array1 is either absent from array0 or it is not at the same dimension (%d) in both arrays" % (ax.key, k))
             
-            res0 = AxisCalibration(array0.axistags[k]).resolution
-            res1 = AxisCalibration(array1.axistags[k]).resolution
+            res0 = AxesCalibration(array0.axistags[k]).resolution
+            res1 = AxesCalibration(array1.axistags[k]).resolution
             
             if res0 != res1:
                 raise ValueError("%Axis %s at dimension %k has different resolutions in the arrays: %s vs %s.\n Resample first." % (ax.key, k, res0, res1))
@@ -798,8 +798,8 @@ def padToLargest(array0, array1, pad=0.0):
             if ax not in array1.axistags or array1.axistags.index(ax.key) != k:
                 raise ValueError("AxisInfo %s of array0 is either absent from array1 or it is not at the same dimension (%d) in both arrays" % (ax.key, k))
             
-            res0 = AxisCalibration(array0.axistags[k]).resolution
-            res1 = AxisCalibration(array1.axistags[k]).resolution
+            res0 = AxesCalibration(array0.axistags[k]).resolution
+            res1 = AxesCalibration(array1.axistags[k]).resolution
             
             if res0 != res1:
                 raise ValueError("Axis %s at dimension %d has different resolutions in the arrays: %s vs %s.\n Resample first." % (ax.key, k, res0, res1))
@@ -1295,7 +1295,7 @@ def concatenateImages(*images, **kwargs):
     ignore: None (default) a string ("units", "origin" or "resolution") or 
         a sequence of any of these strings (e.g. ["units", "origin", "resolution"]) 
         denoting parameters to ignore from the calibration of concatenation axis
-        (see AxisCalibration.is_same_as() for details)
+        (see AxesCalibration.is_same_as() for details)
         
     Returns:
     ========
@@ -1370,7 +1370,7 @@ Arrays are concatenated in two ways, explained here by examples:
                                          |__|
     
     """
-    from .axiscalibration import AxisCalibration
+    from .axiscalibration import AxesCalibration
 
     catAxis = 0
     
@@ -1472,13 +1472,13 @@ Arrays are concatenated in two ways, explained here by examples:
     
     axistags    = images[0].axistags
     
-    axiscals    = AxisCalibration(images[0])
+    axiscals    = AxesCalibration(images[0])
     
     #if isinstance(images[0], dt.PictArray):
         #axiscals = images[0].axiscalibration
         
     #else:
-        #axiscals    = AxisCalibration(images[0])
+        #axiscals    = AxesCalibration(images[0])
         
     first_shape = images[0].shape
 
@@ -1532,13 +1532,13 @@ Arrays are concatenated in two ways, explained here by examples:
             
             axistags = images[0].axistags
             
-            axiscals = AxisCalibration(images[0])
+            axiscals = AxesCalibration(images[0])
 
             #if isinstance(images[0], dt.PictArray):
                 #axiscals = images[0].axiscalibration
                 
             #else:
-                #axiscals = AxisCalibration(images[0])
+                #axiscals = AxesCalibration(images[0])
             
         else:
             catAxisNdx = axistags.index(catAxis)
@@ -1556,13 +1556,13 @@ Arrays are concatenated in two ways, explained here by examples:
             
             axistags = images[0].axistags
             
-            axiscals = AxisCalibration(images[0])
+            axiscals = AxesCalibration(images[0])
             
             #if isinstance(images[0], dt.PictArray):
                 #axiscals = images[0].axiscalibration
                 
             #else:
-                #axiscals = AxisCalibration(images[0])
+                #axiscals = AxesCalibration(images[0])
             
         else:
             catAxisNdx = axistags.index(catAxis.key)
@@ -1582,13 +1582,13 @@ Arrays are concatenated in two ways, explained here by examples:
         if img.axistags != axistags:
             raise ValueError("Cannot concatenate images with different AxisInfo objects")
         
-        imgaxiscals = AxisCalibration(img)
+        imgaxiscals = AxesCalibration(img)
         
         #if isinstance(img, dt.PictArray):
             #imgaxiscals = img.axiscalibration
             
         #else:
-            #imgaxiscals = AxisCalibration(img)
+            #imgaxiscals = AxesCalibration(img)
         
         for key in imgaxiscals.keys:
             if axistags[key] == catAxis:
@@ -1610,7 +1610,7 @@ Arrays are concatenated in two ways, explained here by examples:
     
     # save these for later
     axistags = result.axistags
-    axiscals = AxisCalibration(axistags)
+    axiscals = AxesCalibration(axistags)
     
     #print("concatenate images")
             
@@ -1628,7 +1628,7 @@ Arrays are concatenated in two ways, explained here by examples:
         
         ## save these for later
         #axistags = result.axistags
-        #axiscals = AxisCalibration(axistags)
+        #axiscals = AxesCalibration(axistags)
         
         ##print("concatenate images")
                 

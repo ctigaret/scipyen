@@ -142,7 +142,7 @@ from core.neoutils import (get_non_empty_spike_trains,get_non_empty_events,
                            #)
 
 from core.prog import safeWrapper
-from core.datatypes import (arraySlice, isColumnVector, isVector, )
+from core.datatypes import (array_slice, isColumnVector, isVector, )
 
 from core.utilities import (normalized_index, normalized_axis_index, 
                             normalized_sample_index,)
@@ -866,16 +866,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         elif isinstance(analog, np.ndarray):
             self.selectSignalComboBox.clear()
             self.selectIrregularSignalComboBox.clear()
-            # TODO (maybe) manage individual signals from the array
-            #if analog.size > 0:
-                #if analog.ndim == 1:
-                    #sig_names = "Analog signal"
-                    
-                #elif analog.ndim  == 2:
-                    #if self.frameAxis is None:
-            
+
         else:
-            #print(type(analog))
             current_ndx = self.selectSignalComboBox.currentIndex()
             current_txt = self.selectSignalComboBox.currentText()
             
@@ -5815,7 +5807,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self._prepareAxes_(len(self.signalChannelIndex))
                     for kchn, chNdx in enumerate(self.signalChannelIndex):
                         self._plot_numeric_data_(self.plotItem(kchn),
-                                                 x, y[arraySlice(y, {self.signalChannelAxis:chNdx})],
+                                                 x, y[array_slice(y, {self.signalChannelAxis:chNdx})],
                                                  *args, **kwargs)
                         
                 else:
@@ -5826,7 +5818,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 self._prepareAxes_(1) # one axis per frame: one channel per frame
                 self._plot_numeric_data_(self.plotItem(0), 
-                                         x, y[arraySlice(y, {self.frameAxis:self.currentFrame})],
+                                         x, y[array_slice(y, {self.frameAxis:self.currentFrame})],
                                          *args, **kwargs)
                 
         elif y.ndim == 3:
@@ -5836,13 +5828,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self._prepareAxes_(len(self.signalChannelIndex))
                 for kchn, chNdx in enumerate(self.signalChannelIndex):
                     self._plot_numeric_data_(self.plotItem(kchn),
-                                             x, y[arraySlice(y, {self.signalChannelAxis, chNdx})],
+                                             x, y[array_slice(y, {self.signalChannelAxis, chNdx})],
                                              *args, **kwargs)
                 
             else:
                 self._prepareAxes_(1)
                 self._plot_numeric_data_(self.plotItem(0), 
-                                         x, y[arraySlice(y, {self.frameAxis:self.currentFrame})],
+                                         x, y[array_slice(y, {self.frameAxis:self.currentFrame})],
                                          *args, **kwargs)
                 
                 

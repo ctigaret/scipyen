@@ -2898,6 +2898,7 @@ def normalized_index(data: typing.Optional[typing.Union[typing.Sequence, int]],
         used with list comprehension
     
     """
+    from core.datatypes import is_vector
     
     if data is None:
         return tuple()
@@ -2992,7 +2993,7 @@ def normalized_index(data: typing.Optional[typing.Union[typing.Sequence, int]],
         return ndx # -> ndx IS a tuple
     
     elif isinstance(index, np.ndarray):
-        if not isVector(index):
+        if not is_vector(index):
             raise TypeError("Indexing array must be a vector; instead its shape is %s" % index.shape)
             
         if index.dtype.kind == "i": # index is an array of int

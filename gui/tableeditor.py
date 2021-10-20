@@ -43,7 +43,7 @@ from core.triggerprotocols import (TriggerEvent, TriggerEventType,)
 
 import core.datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
-from core.datatypes import arraySlice
+from core.datatypes import array_slice
 
 #### END pict.core modules
 
@@ -892,7 +892,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                     self._data_ = np.squeeze(data).reshape(tuple(new_shape))
                     
                 self._currentSlice_ = 0
-                self._dataModel_.setModelData(self._data_[arraySlice(self._data_, {self._slicingAxis_:self._currentSlice_})])
+                self._dataModel_.setModelData(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
                 
                 self.prevSliceToolbutton.setEnabled(True)
                 self.nextSliceToolButton.setEnabled(True)
@@ -936,7 +936,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                         self.prevSliceToolbutton.setEnabled(True)
                         self.nextSliceToolButton.setEnabled(True)
                         
-                    self._dataModel_.setModelData(self._data_[arraySlice(self._data_, {self._slicingAxis_:self._currentSlice_})])
+                    self._dataModel_.setModelData(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
                         
                         
     @property

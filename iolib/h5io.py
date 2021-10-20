@@ -191,8 +191,6 @@ from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.datatypes import (TypeEnum,UnitTypes, Genotypes, 
                             is_uniform_sequence,
-                            generic_data_attrs,
-                            qualtypename,
                             arbitrary_unit, 
                             pixel_unit, 
                             channel_unit,
@@ -207,7 +205,7 @@ from core.datatypes import (TypeEnum,UnitTypes, Genotypes,
 from core.modelfitting import (FitModel, ModelExpression,)
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.triggerprotocols import TriggerProtocol
-from imaging.axiscalibration import AxisCalibration
+from imaging.axiscalibration import AxesCalibration
 from imaging.indicator import IndicatorCalibration
 from imaging.scandata import (AnalysisUnit, ScanData,)
 from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse, 
@@ -233,6 +231,30 @@ from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse,
 #   (for data sets deeply nested, the intermediary groups must also be present)
 #   
 
+def generic_data_attrs(data):
+    attrs = dict()
+    
+    type_name = type(data).__name__
+    
+    if type_name == "instance":
+        type_name = data.__class__.__name__
+        module_name = data.__class__.__module__
+        
+    elif type_name == "type":
+        type_name = data.__name__
+        module_name = data.__module__
+        
+    else:
+        module_name = type(data).__module__
+    
+    #elif type_name == "namedtuple":
+        
+    attrs["type_name"] = type_name
+    attrs["module_name"] = module_name
+    attrs["python_class"] = ".".join([module_name, type_name])
+    
+    return attrs
+    
 def get_file_group_child(filenameOrGroup:typing.Union[str, h5py.Group],
                        pathInFile:typing.Optional[str] = None, 
                        mode:typing.Optional[str]=None) -> typing.Tuple[typing.Optional[h5py.File], h5py.Group, typing.Optional[str]]:

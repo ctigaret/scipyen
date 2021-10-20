@@ -2,7 +2,7 @@ import typing
 import vigra
 import numpy as np
 import quantities as pq
-from .axiscalibration import AxisCalibration
+from .axiscalibration import AxesCalibration
 from imaging import axisutils
 
 def getFrameLayout(img:vigra.VigraArray, 
@@ -335,7 +335,7 @@ def getCalibratedAxisSize(image, axis):
     else:
         raise TypeError("axis expected to be an int, str or vigra.AxisInfo; got %s instead" % type(axis).__name__)
     
-    axcal = AxisCalibration(axisinfo)
+    axcal = AxesCalibration(axisinfo)
     
     # FIXME what to do when there are several channels?
     
@@ -347,7 +347,7 @@ def getAxisResolution(axisinfo):
     if not isinstance(axisinfo, vigra.AxisInfo):
         raise TypeError("Expecting a vigra.AxisInfo object; got %s instead" % type(axisinfo).__name__)
     
-    axcal = AxisCalibration(axisinfo)
+    axcal = AxesCalibration(axisinfo)
     
     # FIXME what to do when there are several channels?
     
@@ -361,7 +361,7 @@ def getAxisOrigin(axisinfo):
     
     # FIXME what to do when there are several channels?
     
-    axcal = AxisCalibration(axisinfo)
+    axcal = AxesCalibration(axisinfo)
     
     return axcal.getOrigin(axisinfo.key)
     

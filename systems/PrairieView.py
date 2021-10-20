@@ -55,7 +55,7 @@ from imaging.scandata import (ScanData, ScanDataOptions, scanDataOptions,)
 
 from imaging.axisutils import (axisTypeFromString, axisTypeName, 
                                axisTypeSymbol, axisTypeUnits,)
-from imaging.axiscalibration import AxisCalibration
+from imaging.axiscalibration import AxesCalibration
 
 import ephys.ephys as ephys
 
@@ -814,7 +814,7 @@ class PVFrame(object):
             # NOTE: 2018-06-03 22:15:10
             # axis_0_info is the AxisInfo object for the 1st (spatial) dimension (axis)
             axis_0_info = fdata.axistags[0]
-            axis_0_cal  = AxisCalibration(axis_0_info,
+            axis_0_cal  = AxesCalibration(axis_0_info,
                                                     units=pq.um,
                                                     origin=0.0,
                                                     resolution=self.state.attributes["micronsPerPixel_XAxis"],
@@ -835,7 +835,7 @@ class PVFrame(object):
                                              typeFlags=vigra.AxisType.Time, 
                                              resolution = self.state.attributes["scanlinePeriod"])
                 
-                axis_1_cal  = AxisCalibration(axis_1_info,
+                axis_1_cal  = AxesCalibration(axis_1_info,
                                                         units=pq.s,
                                                         origin=0.0,
                                                         resolution=self.state.attributes["scanlinePeriod"],
@@ -846,7 +846,7 @@ class PVFrame(object):
             else:
                 axis_1_info = fdata.axistags[1]
                 
-                axis_1_cal = AxisCalibration(axis_1_info,
+                axis_1_cal = AxesCalibration(axis_1_info,
                                                        units = pq.um,
                                                        origin=0.0,
                                                        resolution = self.state.attributes["micronsPerPixel_YAxis"],
@@ -866,7 +866,7 @@ class PVFrame(object):
             else:
                 axis_2_info = fdata.axistags["c"]
             
-            axis_2_cal = AxisCalibration(axis_2_info, 
+            axis_2_cal = AxesCalibration(axis_2_info, 
                                                    units = axisTypeUnits(axis_2_info),
                                                    origin=0.0,
                                                    resolution = 1.0,
@@ -900,7 +900,7 @@ class PVFrame(object):
                     sdata.insertChannelAxis() # make sure there is a channel axis
                     
                 axis_0_info = sdata.axistags[0]
-                axis_0_cal = AxisCalibration(axis_0_info,
+                axis_0_cal = AxesCalibration(axis_0_info,
                                                        units=pq.um, 
                                                        origin=0.0, 
                                                        resolution=self.state.attributes["micronsPerPixel_XAxis"],
@@ -909,7 +909,7 @@ class PVFrame(object):
                 axis_0_info = axis_0_cal.calibrateAxis(axis_0_info)
                 
                 axis_1_info = sdata.axistags[1]
-                axis_1_cal = AxisCalibration(axis_1_info,
+                axis_1_cal = AxesCalibration(axis_1_info,
                                                        units=pq.um, 
                                                        origin=0.0, 
                                                        resolution=self.state.attributes["micronsPerPixel_YAxis"],
@@ -919,7 +919,7 @@ class PVFrame(object):
                 
                 axis_2_info = sdata.axistags["c"]
                 
-                axis_2_cal = AxisCalibration(axis_2_info,
+                axis_2_cal = AxesCalibration(axis_2_info,
                                                        units=axisTypeUnits(axis_2_info), 
                                                        origin=0.0, 
                                                        resolution=1.0)
@@ -953,7 +953,7 @@ class PVFrame(object):
                 
                 merged_channel_axis_info = mergedFrameData.axistags["c"]
                 
-                merged_channel_axis_cal = AxisCalibration(merged_channel_axis_info,
+                merged_channel_axis_cal = AxesCalibration(merged_channel_axis_info,
                                                                     axisname = axisTypeName(merged_channel_axis_info))
                 
                 for channel in channels:
@@ -967,7 +967,7 @@ class PVFrame(object):
                     
                     merged_source_channel_axis_info = mergedSourceData.axistags["c"]
                     
-                    merged_source_channel_axis_cal = AxisCalibration(merged_source_channel_axis_info,
+                    merged_source_channel_axis_cal = AxesCalibration(merged_source_channel_axis_info,
                                                                                axisname = axisTypeName(merged_source_channel_axis_info))
                     
                     for channel in channels:
@@ -1266,7 +1266,7 @@ class PVSequence (object):
                                                 resolution=framePeriod, \
                                                 description=axisTypeName(axisTypeFromString["t"]))
                     
-                    newAxisCal = AxisCalibration(newAxisInfo,
+                    newAxisCal = AxesCalibration(newAxisInfo,
                                                            units=pq.s, 
                                                            origin=float(self.frames[0].attributes["absoluteTime"]), 
                                                            resolution = framePeriod,
@@ -1290,7 +1290,7 @@ class PVSequence (object):
                                                 resolution=zres, \
                                                 description=axisTypeName(axisTypeFromString["z"]))
                     
-                    newAxisCal = AxisCalibration(newAxisInfo,
+                    newAxisCal = AxesCalibration(newAxisInfo,
                                                            units=pq.um, 
                                                            origin=float(self.frames[0].state.attributes["positionCurrent_ZAxis"]), 
                                                            resolution=zres,
@@ -1386,7 +1386,7 @@ class PVSequence (object):
                                                 resolution=zres, \
                                                 description=axisTypeName(axisTypeFromString["z"]))
                     
-                    newAxisCal = AxisCalibration(newAxisInfo,
+                    newAxisCal = AxesCalibration(newAxisInfo,
                                                            units=pq.um, 
                                                            origin=float(self.frames[0].state.attributes["positionCurrent_ZAxis"]), 
                                                            resolution=zres,
@@ -1838,7 +1838,7 @@ class PVScan(object):
                                                        resolution=framePeriod, 
                                                        description=axisTypeName(axisTypeFromString["t"]))
                 
-                newAxisCal = AxisCalibration(newAxisInfo,
+                newAxisCal = AxesCalibration(newAxisInfo,
                                                        units=pq.s,
                                                        origin=float(self.sequences[0].frames[0].attributes["absoluteTime"]),
                                                        resolution=framePeriod,

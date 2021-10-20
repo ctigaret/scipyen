@@ -208,7 +208,7 @@ from . import scandata
 from .scandata import (ScanData, AnalysisUnit, check_apiversion, scanDataOptions)
 from . import axisutils
 from .axisutils import dimEnum
-from .axiscalibration import (AxisCalibration, calibration, axisChannelName,)
+from .axiscalibration import (AxesCalibration, calibration, axisChannelName,)
 #### END imaging modules
 
 #### BEGIN pict.iolib modules
@@ -1054,7 +1054,7 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
     
     # NOTE: determine the f0Range: the temporal boundaries of the F0 (on the t axis)
     #
-    cal = AxisCalibration(lsdata.scans[0].axistags["t"])
+    cal = AxesCalibration(lsdata.scans[0].axistags["t"])
     units = cal.getUnits(lsdata.scans[0].axistags["t"])
     origin = cal.getOrigin(lsdata.scans[0].axistags["t"])
     resolution = cal.getResolution(lsdata.scans[0].axistags["t"])
@@ -1681,7 +1681,7 @@ def analyseFrame(lsdata, frame, unit=None,
     else:
         reference_channel_ndx = None
 
-    cal = AxisCalibration(lsdata.scans[0].axistags["t"])
+    cal = AxesCalibration(lsdata.scans[0].axistags["t"])
     #print("analyseFrame time axis calibration:")
     #print(cal)
     
@@ -1907,7 +1907,7 @@ def computeLSCaT(roiRange, f0Range, ca_data, ref_data=None, detrend=False,
     if roiRange[0] == roiRange[1]:
         warnings.warn("ROI window range is empty: %s" % str(roiRange), RuntimeWarning)
         
-    tcal = AxisCalibration(ca_data.axistags["t"])
+    tcal = AxesCalibration(ca_data.axistags["t"])
     tunits = tcal.getUnits(ca_data.axistags["t"])
     torigin = tcal.getOrigin(ca_data.axistags["t"])
     tresolution = tcal.getResolution(ca_data.axistags["t"])
@@ -4666,7 +4666,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             #self.generateScanRegionProfiles()
             #self._display_scanline_profiles_()
             
-        #self._data_.updateAxisCalibrations()
+        #self._data_.updateAxesCalibrations()
         
         #self._data_.modified=True
         #self._data_.processed = True
@@ -4765,7 +4765,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         if self._scene_processing_idle_ and self._scans_processing_idle_:
             self.generateScanRegionProfiles()
             
-            self._data_.updateAxisCalibrations()
+            self._data_.updateAxesCalibrations()
             
             self._data_.modified=True
             self._data_.processed = True
@@ -9936,10 +9936,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             
             if len(self._data_.scene) > 1:
                 # multiple single-channel arrays
-                self.sceneviewers[k].setWindowTitle("%s %s" % ("Scene", AxisCalibration(self._data_.scene[k].axistags["c"]).channelIndicesAndNames()[0][1]))
+                self.sceneviewers[k].setWindowTitle("%s %s" % ("Scene", AxesCalibration(self._data_.scene[k].axistags["c"]).channelIndicesAndNames()[0][1]))
                 
             else: # single possibly multi-channel array
-                axcal = AxisCalibration(self._data_.scene[k].axistags["c"])
+                axcal = AxesCalibration(self._data_.scene[k].axistags["c"])
                 chnames = [s[1] for s in axcal.channelIndicesAndNames()]
                 chnames = "+",join(chnames)
                 
@@ -10511,11 +10511,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             
             if len(self._data_.scans) > 1:
                 # multiple single-channel arrays
-                self.scansviewers[k].setWindowTitle("%s %s" % ("Scan", AxisCalibration(self._data_.scans[k].axistags["c"]).channelIndicesAndNames()[0][1]))
+                self.scansviewers[k].setWindowTitle("%s %s" % ("Scan", AxesCalibration(self._data_.scans[k].axistags["c"]).channelIndicesAndNames()[0][1]))
                 
             else:
                 # single, possibly multi-channel array
-                axcal = AxisCalibration(self._data_.scans[k].axistags["c"])
+                axcal = AxesCalibration(self._data_.scans[k].axistags["c"])
                 chnames = [s[1] for s in axcal.channelIndicesAndNames()]
                 chnales = "+".join(chnames)
                 
@@ -12062,7 +12062,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 if progresSignal is not None:
                     progressSignal.emit(frame_index)
                     
-            source_chn_cal = AxisCalibration(source[0].axistags["c"])
+            source_chn_cal = AxesCalibration(source[0].axistags["c"])
             source_chn_cal.calibrateAxis(result[0].axistags["c"])
             
         else: # case when source data is a sequence of (single-channel) VigraArray objects
@@ -12097,13 +12097,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                     progressSignal.emit(frame_index)
                     
             for k in process_channel_ndx:
-                chn_cal = AxisCalibration(source[k].axistags["c"])
+                chn_cal = AxesCalibration(source[k].axistags["c"])
                 chn_cal.calibrateAxis(result[k].axistags["c"])
             
             #target[:] = result[:]
             #target_chnames[:] = process_channel_names
         
-        self._data_.updateAxisCalibrations()
+        self._data_.updateAxesCalibrations()
         
         self._processed_ = True
         
@@ -13842,7 +13842,7 @@ def blankUncageArtifactInLineScans(data, time, width, bgstart, bgend, frame=0):
         if "t" not in img.axistags:
             continue
 
-        axcal = AxisCalibration(img.axistags["t"])
+        axcal = AxesCalibration(img.axistags["t"])
         
         
         for t in time:

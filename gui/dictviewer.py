@@ -29,7 +29,7 @@ import pandas as pd
 import core.datatypes as dt
 
 import imaging.axiscalibration
-from imaging.axiscalibration import AxisCalibration
+from imaging.axiscalibration import AxesCalibration
 
 import imaging.scandata
 from imaging.scandata import (ScanData, AnalysisUnit)
@@ -492,7 +492,7 @@ class DataViewer(ScipyenViewer):
     # for the generic case, )
     supported_types = (dict, list, tuple,
                         AnalysisUnit,
-                        AxisCalibration,
+                        AxesCalibration,
                         neo.core.baseneo.BaseNeo,
                         ScanData, 
                         TriggerProtocol)

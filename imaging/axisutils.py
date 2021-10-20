@@ -9,7 +9,7 @@ utilities to enhance axis and axistags handling
 #TODO: tag character (the key) to a tuple (n_samples, quantity), where quantity 
 #TODO: is None for a non-calibrated axis
 
-# 2016-12-11 00:34:19 change to mapping from tag character (the key) to AxisCalibration (the value)
+# 2016-12-11 00:34:19 change to mapping from tag character (the key) to AxesCalibration (the value)
 
 #### BEGIN core python modules
 from __future__ import print_function
@@ -105,28 +105,39 @@ primitive_axis_type_units = {
     vigra.AxisType.AllAxes: pixel_unit,
     }
 
-reversedAxisTypes = list(reversed(sorted(((k,v) for k,v in vigra.AxisType.values.items()), key = lambda x: x[0])))
+sortedAxisTypes = sorted(((k,v) for k,v in vigra.AxisType.values.items()), key=lambda x: x[0])
 
 def get_axis_type_flags_int(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int]) -> int:
-    """Use for the uniform treatment of argument which is AxisInfo, AxisType or int
+    """Use this for the uniform treatment of argument which is AxisInfo, AxisType or int
+    
+    Also prevents 'impossible' axis type flag combinations such as 
+    UnknownAxisType | Frequency | Edge
+    
+    but does alter meaningless combinations such as 
+    Frequency | Edge, or Frequency | Space | Time
+    
     """
     if isinstance(axisinfo, vigra.AxisInfo):
-        #typeflags = axisinfo.typeFlags
-        typeint = typeflags.numerator
+        return axisinfo.typeFlags.numerator
         
-    elif isinstance(axisinfo, vigra.AxisType):
-        #typeflags = axisinfo
-        typeint = typeflags.numerator
+    if isinstance(axisinfo, vigra.AxisType):
+        return axisinfo.numerator
         
-    elif isinstance(axisinfo, int):
-        #typeflags = None
-        typeint = axisinfo
+    if isinstance(axisinfo, int):
+        if axisinfo & vigra.AxisType.UnknownAxisType:
+            return vigra.AxisType.UnknownAxisType
         
-    else:
-        raise TypeError(f"Expecting a vigra.AxisType or vigra.AxisInfo; got {type(axisinfo).__name__} instead")
-
-    return typeint
-
+        if axisinfo in (vigra.AxisType.AllAxes, vigra.AxisType.NonChannel):
+            return axisinfo
+        
+        test = list(v[1] for v in sortedAxisTypes if v[0] & axisinfo)
+        
+        if len(test) == 0:
+            return vigra.AxisType.UnknownAxisType
+        
+        return axisinfo
+        
+    raise TypeError(f"Expecting a vigra.AxisType or vigra.AxisInfo; got {type(axisinfo).__name__} instead")
 
 def axisTypeUnits(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int]) -> pq.Quantity:
     """Returns a default Python Quantity based on the axisinfo parameter.
@@ -269,7 +280,7 @@ def axisTypeFromString(s:str) -> vigra.AxisType:
                 
             return vigra.AxisType.UnknownAxisType
     
-def axisTypeStrings(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int],
+def axisTypeStrings(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int, str],
                     as_expr:bool=False) -> typing.Union[typing.List[str], str]:
     """Returns string representations of AxisType flags.
     
@@ -312,27 +323,22 @@ def axisTypeStrings(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int],
     out: True
     
     """
-    typeint = get_axis_type_flags_int(axisinfo)
     
-    names = list()
+    if isinstance(axisinfo, str):
+        typeint = axisTypeFromString(axisinfo)
+    else:
+        typeint = get_axis_type_flags_int(axisinfo)
     
     if typeint in vigra.AxisType.values:
         return [vigra.AxisType.values[typeint].name]
     
-    else:
-        highestLess = np.argwhere(np.asarray([k[0] for k in reversedAxisTypes]) < typeint)
-        
-        if len(highestLess)  == 0:
-            return names
-            #raise ValueError(f"Invalid axisinfo {axisinfo}")
-            
-        axIntType = reversedAxisTypes[int(highestLess[0])]
-        
-        names.append(axIntType[1].name)
-        
-        names.extend(axisTypeStrings(typeint - axIntType[0]))
-        
-        return names
+    if typeint & vigra.AxisType.UnknownAxisType:
+        return vigra.AxisType.UnknownAxisType
+    
+    primitives = (v[1].name for v in reversed(sortedAxisTypes) if v[0] & typeint)
+    
+    # NOTE: below, exclude AllAxes and NonChannels because they will always map
+    return "|".join(list(primitives)[2:]) if as_expr else list(primitives)[2:]
         
 def evalAxisTypeExpression(x:str) -> typing.Union[vigra.AxisType, int]:
     """Evaluates a string representation  of vigra.AxisType type flags.
@@ -349,7 +355,7 @@ def evalAxisTypeExpression(x:str) -> typing.Union[vigra.AxisType, int]:
     """
     return eval("|".join([f"vigra.AxisType.{s}" for s in x.split("|")]))
     
-def axisTypeName(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int]) -> str:
+def axisTypeName(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int, str]) -> str:
     """Generates an axis name based on the axis info or axis type flag.
     
     Do NOT confuse with axisTypeStrings().
@@ -370,8 +376,10 @@ def axisTypeName(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int]) -> 
     (e.g.,"Width", or "Height", for space axis with keys "x" or "y", respectively).
     
     """
-    
-    typeint = get_axis_type_flags_int(axisinfo)
+    if isinstance(axisinfo, str):
+        typeint =  axisTypeFromString(axisinfo)
+    else:
+        typeint = get_axis_type_flags_int(axisinfo)
     
     if typeint in vigra.AxisType.values:
         if isinstance(axisinfo, vigra.AxisInfo):
@@ -413,21 +421,26 @@ def axisTypeSymbol(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int],
     A string key corresponding to the type flags in axisinfo object (in upper case).
     """
     if isinstance(axisinfo, vigra.AxisInfo):
-        if axisinfo.key not in ("?", "n", "l"): # force cheking these types
+        if axisinfo.key not in ("?", "n", "l"): # force checking these types
             return axisinfo.key
-        
         
     typeint = get_axis_type_flags_int(axisinfo)
     
     if typeint in vigra.AxisType.values:
+        if typeint == vigra.AxisType.UnknownAxisType:
+            return '?'
+        if typeint == vigra.AxisType.NonChannel:
+            return "n"
+        if typeint == vigra.AxisType.AllAxes:
+            return "l"
+        
         n = vigra.AxisType.values[typeint].name[0]
     
     else:
-        names = ['?' if s =="UnknownAxisType" else 'l' if s == "AllAxes" else s[0].lower() for s in reversed(axesTypeLiteral(typeint))]
+        names = ['?' if s =="UnknownAxisType" else 'l' if s == "AllAxes" else "n" if s=="NonChannel" else s[0].lower() for s in reversed(axisTypeStrings(typeint))]
         n = "".join(names)
         
     return n.upper() if upper else n
-    
     
 def hasChannelAxis(data):
     if isinstance(data, vigra.VigraArray):
@@ -582,4 +595,6 @@ def _getTypeFlag_(value):
     
     else:
         return vigra.AxisType.UnknownAxisType
+    
+
         
