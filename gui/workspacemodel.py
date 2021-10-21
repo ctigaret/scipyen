@@ -56,14 +56,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     
     '''
     modelContentsChanged = pyqtSignal(name = "modelContentsChanged")
-    #windowVariableDeleted = pyqtSignal(int, name="windowVariableDeleted")
     
     def __init__(self, shell, user_ns_hidden=dict(), parent=None):
         super(WorkspaceModel, self).__init__(parent)
         
         self.shell = shell # reference to IPython InteractiveShell of the internal console
-        
-        #print("mainWindow" in self.shell.user_ns)
         
         self.cached_vars = dict()
         self.modified_vars = dict()

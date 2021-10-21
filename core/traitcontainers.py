@@ -208,7 +208,6 @@ class DataBag(Bunch):
         self.__observer__ = DataBagTraitsObserver()
         # NOTE: so that derived types can use their OWN hidden_traits 
         self.__hidden__ = self.__class__._make_hidden(**kwargs)
-        #self.__hidden__ = DataBag._make_hidden(**kwargs)
 
         for name in self.__hidden__.keys():
             kwargs.pop(name, None)
@@ -231,8 +230,7 @@ class DataBag(Bunch):
         self.__observer__.add_traits(**traits)
         
         # FIXME:L 2021-10-10 15:59:37
-        # Why is this needed (because it really is required, otherwise this
-        # DataBag shows no contents)
+        # Why is this needed: because otherwise DataBag shows no contents
         for k,v in dd.items():
             object.__setattr__(self.__observer__, k, v)
             
@@ -252,7 +250,9 @@ class DataBag(Bunch):
         else:
             dtrait = partial(dynamic_trait, 
                              allow_none=self.__hidden__.allow_none, 
-                             content_traits=True)
+                             content_traits=True,
+                             use_mutable=self.__hidden__.use_mutable,
+                             force_trait=traitlets.Any)
             
         return dtrait(obj)#, force_trait=traitlets.Any)
         
@@ -361,6 +361,67 @@ class DataBag(Bunch):
                 
             super().__setitem__(key, val)
             
+    #def __setattr__(self, key, val):
+        #"""Implements dotted assignment: obj.key = val
+        #"""
+        #if not isinstance(key, str):
+            #raise TypeError(f"Expecting a str; got {type(val).__name__} instead")
+        
+        #try:
+            #obs = object.__getattribute__(self, "__observer__")
+        #except:
+            #obs = DataBagTraitsObserver()
+            #object.__setattr__(self, "__observer__", obs)
+            
+        #try:
+            #hid = object.__getattribute__(self, "__hidden__")
+            
+        #except:
+            #hid = DataBag._make_hidden()
+            #object.__setattr__(self, "__hidden__", hid)
+            
+        #if key in hid:
+            #hid[key] = val
+            
+            #if key == "use_casting" and hid["use_casting"]:
+                #hid["use_mutable"] = False
+                
+            #if key == "use_mutable" and hid["use_mutable"]:
+                #hid["use_casting"] = False
+
+            #return
+        
+        #if obs.has_trait(key):
+            #try:
+                #old_value = object.__getattribute__(obs,key)
+                #target_type = type(old_value)
+                
+                #if type(val) != target_type:
+                    #if hid["use_casting"]:
+                        #new_val = target_type(val)
+                        #object.__setattr__(obs, key, new_val)
+                        
+                    #elif hid["use_mutable"]:
+                        #self.__coerce_trait__(obs, key, val)
+                        
+                    #else:
+                        #object.__setattr__(obs, key, val)
+                #else:
+                    #object.__setattr__(obs, key, val)
+                    
+                #super().__setitem__(key, val)
+            #except:
+                #traceback.print_exc()
+                
+        #else: #add new trait
+            #if key not in ("__observer__", "__hidden__") and key not in hid.keys():
+                #trdict = {key:self._light_trait_(val)}
+                #obs.add_traits(**trdict)
+                #object.__setattr__(obs, key, val)
+                #object.__getattribute__(self, "__hidden__").length = len(trdict)
+                
+            #super().__setitem__(key, val)
+                        
     def __len__(self):
         obs = object.__getattribute__(self, "__observer__") # bypass self.__getitem__()
         ret = len(obs.traits())
@@ -501,7 +562,8 @@ class DataBag(Bunch):
         old_trait = obs.traits()[key]
         old_type = type(object.__getattribute__(obs, key))
         
-        new_trait = dynamic_trait(val, allow_none = self.allow_none, content_traits=True)
+        #new_trait = dynamic_trait(val, allow_none = self.allow_none, content_traits=True)
+        new_trait = self._light_trait_(val)
         new_type = type(val)
         
         obs.remove_traits(**{key:old_trait})
@@ -509,7 +571,7 @@ class DataBag(Bunch):
         obs.add_traits(**{key:new_trait})
         
         object.__setattr__(obs, key, val)
-        
+            
         # NOTE 2020-07-05 16:17:27
         # signal the change of trait type
         obs._notify_trait(key, old_type, new_type)

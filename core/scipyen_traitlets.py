@@ -1,6 +1,8 @@
 import sys
 from warnings import warn, warn_explicit
 from collections import deque
+import quantities as pq
+import numpy as np
 
 from traitlets.utils.bunch import Bunch
 from traitlets.utils.descriptions import describe, class_of, add_article, repr_type
@@ -15,6 +17,157 @@ from .utilities import (gethash, safe_identity_test)
 
 # NOTE: DataBagTrait <- Instance <- ClassBasedTraitType <- TraitType <- BaseDescriptor
 
+class QuantityTrait(Instance):
+    info_text = "Trait for python quantities"
+    default_value = pq.Quantity([]) # array([], dtype=float64) * dimensionless
+    klass = pq.Quantity
+    _cast_types = (np.ndarray, )
+    _valid_defaults = (pq.Quantity,)
+    
+    def __init__(self, value_trait=None,
+                 default_value = Undefined,
+                 minlen = 0,
+                 maxlen = sys.maxsize,
+                 **kwargs):
+        self._minlen = minlen
+        self._maxlen = maxlen
+        self.hashed = 0
+    
+        trait = kwargs.pop('trait', None)
+        if trait is not None:
+            if value_trait is not None:
+                raise TypeError("Found a value for both `value_trait` and its deprecated alias `trait`.")
+            value_trait = trait
+            warn(
+                "Keyword `trait` is deprecated in traitlets 5.0, use `value_trait` instead",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            
+        if default_value is None and not kwargs.get("allow_none", False):
+            default_value = Undefined
+            
+        if default_value is Undefined and value_trait is not None:
+            if not is_trait(value_trait):
+                default_value = value_trait
+                value_trait = None
+                
+        if default_value is Undefined:
+            default_value = pq.Quantity([])
+            args = ()
+            
+        elif isinstance(default_value, self._valid_defaults):
+            args = (default_value,)
+            
+        else:
+            raise TypeError(f"default_value expected to be {None} or one of {self._valid_defaults}")
+        
+        if is_trait(value_trait):
+            self._trait = value_trait() if isinstance(value_trait, type) else value_trait
+            
+        elif trait is not None:
+            raise TypeError(f"Expecting 'value_trait to be a Trait or None; got {type(value_trait_.__name__)}")
+        
+        super().__init__(klass = self.klass, args=args, **kwargs)
+        
+    def length_error(self, obj, value):
+        e = "The '%s' trait of %s instance must be of length %i <= L <= %i, but a value of %s was specified." \
+            % (self.name, class_of(obj), self._minlen, self._maxlen, value)
+        raise TraitError(e)
+
+    def validate_elements(self, obj, value):
+        length = len(value)
+        if length < self._minlen or length > self._maxlen:
+            self.length_error(obj, value)
+
+        return super().validate_elements(obj, value)
+
+        
+    def make_dynamic_default(self):
+        return pq.Quantity(self.default_value)
+    
+    def set(self, obj, value):
+        if isinstance(value, str):
+            new_value = self._validate(obj, [value])
+        else:
+            new_value = self._validate(obj, value)
+            
+        # NOTE: 82021-10-20 09:13:51
+        # to also flag addition of this trait:
+        # when DataBag is empty, its hashed value will be 0 thus not different 
+        # from the default; therefore when and old_value of this trait does not
+        # exist we should be notifying the observer
+        silent = True 
+        
+        try:
+            old_value = obj._trait_values[self.name]
+        except KeyError:
+            silent=False    # this will be the first time the observed sees us
+                            # therefore forcibly notify it
+            old_value = self.default_value
+            
+        obj._trait_values[self.name] = new_value
+        
+        try:
+            new_hash = gethash(new_value)
+            if silent:
+                # so far silent is True when the observed knows about us
+                # check it we changed and notify
+                silent = (new_hash == self.hashed)
+            
+            if not silent:
+                self.hashed = new_hash
+                
+        except:
+            traceback.print_exc()
+            silent = False
+            
+        #print(f"silent {silent}")
+                
+        if silent is not True:
+            obj._notify_trait(self.name, old_value, new_value)
+        
+    def info(self):
+        if isinstance(self.klass, six.string_types):
+            klass = self.klass
+        else:
+            klass = self.klass.__name__
+            
+        result = "%s with dimensionality (units) of %s " % (class_of(klass), self.default_value.dimensionality)
+        
+        if self.allow_none:
+            result += ' or None'
+
+        return result
+
+    def error(self, obj, value):
+        kind = type(value)
+        if six.PY2 and kind is InstanceType:
+            msg = 'class %s' % value.__class__.__name__
+        else:
+            msg = '%s (i.e. %s)' % ( str( kind )[1:-1], repr( value ) )
+
+        if obj is not None:
+            if isinstance(value, pq.Quantity):
+                e = "The '%s' trait of %s instance must be %s, but a Quantity with dimensionality (units) of %s was specified." \
+                    % (self.name, class_of(obj),
+                    self.info(), value.dimensionality)
+                
+            else:
+                e = "The '%s' trait of %s instance must be %s, but a value of %s was specified." \
+                    % (self.name, class_of(obj),
+                    self.info(), msg)
+        else:
+            if isinstance(value, pq.Quantity):
+                e = "The '%s' trait must be %s, but a Quantity with dimensionality (units) of %s was specified." \
+                    % (self.name, self.info(), value.dimensionality)
+            else:
+                e = "The '%s' trait must be %s, but a value of %r was specified." \
+                    % (self.name, self.info(), msg)
+            
+        raise TraitError(e)
+    
+  
 class DataBagTrait(Instance):
     """Avoid slicing the DataBag type to dict.
     
@@ -40,8 +193,8 @@ class DataBagTrait(Instance):
     klass=DataBag
     
     def __init__(self, value_trait=None, per_key_traits=None, default_value=Undefined,
-                 **kwargs):
-        """Avoid casting DataBag to dict
+                 mutable_keys=True, **kwargs):
+        """Avoid back-casting DataBag to dict
         """
         # handle deprecated keywords
         trait = kwargs.pop('trait', None)
@@ -117,6 +270,8 @@ class DataBagTrait(Instance):
             #raise TypeError("`key_trait` must be a Trait or None, got %s" % repr_type(key_trait))
 
         self._per_key_traits = per_key_traits
+        
+        self.mutable_keys = mutable_keys
 
         super(DataBagTrait, self).__init__(klass=self.klass, args=args, **kwargs)
 
@@ -149,12 +304,16 @@ class DataBagTrait(Instance):
                     key = key_trait._validate(obj, key, v)
                 except TraitError as error:
                     self.element_error(obj, key, key_trait, 'Keys')
-            active_value_trait = per_key_override.get(key, value_trait)
-            if active_value_trait:
-                try:
-                    v = active_value_trait._validate(obj, v)
-                except TraitError:
-                    self.element_error(obj, v, active_value_trait, 'Values')
+                    
+            if not self.mutable_keys:
+                active_value_trait = per_key_override.get(key, value_trait)
+                #print("active_value_trait", active_value_trait)
+                if active_value_trait:
+                    try:
+                        v = active_value_trait._validate(obj, v)
+                    except TraitError:
+                        self.element_error(obj, v, active_value_trait, 'Values')
+                        
             validated[key] = v
 
         return self.klass(validated)

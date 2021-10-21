@@ -1,4 +1,4 @@
-import numbers, traceback, typing, functools, operator
+import numbers, traceback, typing, functools, operator, warnings
 import h5py
 import vigra 
 import numpy as np
@@ -14,7 +14,7 @@ from core.datatypes import (arbitrary_unit,
                             is_numeric, 
                             is_numeric_string,
                             pixel_unit,
-                            scalar_quantity2python,
+                            quantity2scalar,
                             unit_quantity_from_name_or_symbol,
                             units_convertible,
                             )
@@ -28,11 +28,336 @@ from .axisutils import (axisTypeName,
                         axisTypeUnits,
                         axisTypeFromString,
                         axisTypeStrings,
+                        axisTypeFromUnits,
                         evalAxisTypeExpression,
                         sortedAxisTypes,
+                        isValidAxisType,
+                        isSpecificAxisType,
                         )
 
-class AxisCalibrationData(DataBag):
+class CalibrationData(object):
+    """:Superclass: for Axis and Channel calibrations.
+    
+    The sole purpose of these :classes: is to offer a way to notify changes in
+    the calibration data. 
+    
+    Calibration parameters can be semantically inter-dependent, 
+    e.g. axis type <-> axis units <-> (origin, resolution) <-> axis type key. 
+    
+    To avoid circular dependencies, manualy changing one parameter does NOT 
+    automatically reassigns values to the others.
+    
+    NOTE that calibration parameters (as set up in here and derived :classes:)
+    are only checked at initialization time.
+    
+    Changing these parameters on a 'live' object does NOT automatically
+    reassign the other parameters because this can give rise to circular
+    dependencies.
+    
+    Therefore, if a parameter is changed, the others may also have to be changed 
+    manually to reflect the new calibration in a meaningful way.
+    
+    For example:
+        1) adding channels to a NonChannel axis will NOT change the type
+    of the axis to Channels.
+    
+        2) changing the type of a NonChannel axis to a Channels axis will NOT
+        add channel calibration data - this has to be added manually - and the 
+        reverse operation will NOT remove channel calibration data, if it exists.
+        
+        3) switching axis type will NOT change axis key, and vice-versa
+    
+    
+    
+    """
+    parameters = ("units", "origin", "resolution")
+    
+    @classmethod
+    def isCalibration(cls, x):
+        return isinstance(x, dict) and all(k in x for k in cls.parameters)
+        
+    def __init__(self, *args, **kwargs):
+        """
+        Specifies units, origin & resolution either as:
+        
+        a) positional parameters:
+            in this case, units, origin and resolution will be assigned ONCE, 
+            ansd subsequent values will be ignored
+            
+        b) keyword parameters:
+            can override the values assigned to units, origin and resolution in
+            *args
+            
+        Var-positional parameters (*args):
+        ==================================
+        
+        int, float, complex; assigns to origin, then resolution, in THIS order
+        
+        scalar numpy array: assigns ot origin then resolution, in THIS order
+        
+        scalar python Quantity: assigns to units, origin then resolution, in THIS
+            order
+            
+            
+        Var-keyword parameters (**kwargs)
+        =================================
+        units: python Quantity, or python qualtities.dimensionality.Dimensionality
+        
+        origin, resolution: int, float, complex, scalar numpy array or scalar 
+            python Quantity.
+            
+            When a scalar python Quantity with units convertible to those of
+            units' then it will be rescaled (if necessary) and its magnitude
+            assigned ot origin or resolution, respectively.
+            
+        """
+        
+        self._data_ = DataBag()
+        self._observer_ = None
+        
+        origin=None
+        resolution=None
+        units=None
+        
+        allow_none = kwargs.pop("allow_none", True)
+        use_mutable = kwargs.pop("use_mutable", True)
+        
+        for arg in args:
+            # only assigns to units, origin, resolution when any of these are
+            # still None and arg is of appropriate type
+            if instance(arg, (int, float, complex)):
+                if not isinstance(origin, (complex, float, int)):
+                    origin = arg
+                    
+                elif not isinstance(resolution, (complex, int, float)):
+                    resolution = arg
+                    
+            elif isinstance(arg, pq.Quantity):
+                if not isinstance(units, pq.Quantity):
+                    units = arg.units
+                    
+                elif not isinstance(origin, (complex, float, int)):
+                    # units should have been assigned by now
+                    if isinstance(units, pq.Quantity):
+                        if not units_convertible(units.units, arg.units):
+                            raise TypeError(f"'origin' units {origin.units} are incompatible with the specified units ({units})")
+                        
+                        if arg.units != units.units:
+                            arg = arg.rescale(units.units)
+                            
+                    origin = quantity2scalar(arg)
+                
+                elif not isinstance(resolution, (complex, float, int)):
+                    # units should have been assigned by now
+                    if isinstance(units, pq.Quantity):
+                        if not units_convertible(units.units, arg.units):
+                            raise TypeError(f"'origin' units {origin.units} are incompatible with the specified units ({units})")
+                        
+                        if arg.units != units.units:
+                            arg = arg.rescale(units.units)
+                        
+                    resolution = quantity2scalar(arg)
+                    
+            elif isinstance(arg, np.ndarray):
+                if origin is None:
+                    origin = quantity2scalar(arg)
+                    
+                elif resolution is None:
+                    resolution = quantity2scalar(arg)
+                    
+            elif isinstance(arg, pq.dimensionality.Dimensionality):
+                if units is None:
+                    units = [k for k in arg.simplified][0]
+                    
+        # allow orverriding units, origin, resolution through keywords
+        
+        if "units" in kwargs:
+            units_ = kwargs.pop("units", pixel_unit)
+            if not isinstance(units_, (pq.Quantity, pq.dimensionality.Dimensionality)):
+                units_ = pixel_unit
+                
+            if isinstance(units_, pq.Quantity):
+                units_ = units_.units
+                
+            if isinstance(units_, pq.dimensionality.Dimensionality):
+                units_ = [k for k in units_.simplified][0]
+            
+            units = units_
+            
+        if "origin" in kwargs:
+            origin_ = kwargs.pop("origin", 0.)
+            
+            if isinstance(origin_, np.ndarray):
+                if isinstance(units, pq.Quantity):
+                    if isinstance(origin_, pq.Quantity):
+                        if not units_convertible(origin_.units, units.units):
+                            raise TypeError("wrong units for 'origin' keyword")
+                        
+                        if origin_.units != units.units:
+                            origin_ = origin_.rescale(units.units)
+                    
+                # take this even if units not yet defined
+                origin = quantity2scalar(origin_)
+                
+            elif isinstance(origin_, (complex, int, float)):
+                origin = origin_
+                
+        if "resolution" in kwargs:
+            resolution_ = kwargs.pop("resolution", 1.)
+                
+            if isinstance(resolution_, np.ndarray):
+                if isinstance(units, pq.Quantity):
+                    if isinstance(resolution_, pq.Quantity):
+                        if not units_convertible(resolution_.units, units.units):
+                            raise TypeError("wrong units for 'resolution' keyword")
+                        
+                        if resolution_.units != units.units:
+                            resolution_ = resolution_.rescale(units.units)
+                    
+                # take this even if units not yet defined
+                resolution = quantity2scalar(resolution_)
+                
+            elif isinstance(resolution_, (complex, int, float)):
+                resolution = resolution_
+                
+        # finally, set up defaults:
+                
+        if not isinstance(units, pq.Quantity):
+            units = pixel_unit
+            
+        if not isinstance(origin, (complex, int, float)):
+            origin = 0.
+            
+        if not isinstance(resolution, (complex, int, float)):
+            resolution = 1.
+            
+        spurious = [k for k in kwargs if k not in (DataBag.hidden_traits + self.__class__.parameters)]
+        
+        #print(f"CalibrationData | {self.__class__.__name__} spurious: {spurious}")
+        
+        for k in spurious:
+            kwargs.pop(k, None)
+            
+        kwargs["allow_none"] = True
+        kwargs["use_mutable"] = True
+            
+        self._data_ = DataBag(**kwargs)
+        
+        print(f"{self.__class__.__name__} (CalibrationData)._data_{self._data_}")
+        self._data_["units"]=units
+        self._data_["origin"]=origin
+        self._data_["resolution"]=resolution
+        print(f"{self.__class__.__name__} (CalibrationData)._data_{self._data_}")
+        
+    def __repr__(self):
+        return self._data_.__repr__()
+        
+    def __str__(self):
+        return self._data_.__str__()
+        
+    @property
+    def units(self) -> pq.Quantity:
+        """Get/set the pysical units of measurement.
+        WARNING: Setting this property will adjust the properties 'origin' and
+        'resolution'. These will have to be reset manually.
+        """
+        return self._data_.units
+    
+    @units.setter
+    def units(self, u:[typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]]) -> None:
+        print(f"CalibrationData | {self.__class__.__name__}).units.setter _data_: {self._data_}")
+        if isinstance(u, pq.dimensionality.Dimensionality):
+            u = [k for k in u.simplified][0]
+        
+        if isinstance(u, pq.Quantity):
+            if not units_convertible(self._data_.units.units, u.units):
+                #forcibly change units
+                self._data_["units"] = u
+                #self._data_.units = u
+                
+            elif u.units != self._data_.units:
+                new_units = self._data_.units.rescale(u.units)
+                o = self._data_.origin * self._data_.units
+                o = o.rescale(u.units)
+                self._data_["origin"] = quantity2scalar(o)
+                #self._data_.origin = quantity2scalar(o)
+                r = self._data_.resolution * self._data_.units
+                r = r.rescale(u.units)
+                self._data_["resolution"] = quantity2scalar(r)
+                #self._data_.resolution = quantity2scalar(r)
+                self._data_["units"] = new_units
+                #self._data_.units = new_units
+                
+        print(f"CalibrationData | {self.__class__.__name__}).units.setter _data_: {self._data_}")
+        _=self._data_.trait_values() # force traits refreshing
+                
+    @property
+    def origin(self):
+        """Get/set the origin value
+        """
+        return self._data_.origin
+    
+    @origin.setter
+    def origin(self, val):
+        print(f"CalibrationData | {self.__class__.__name__}).origin.setter _data_: {self._data_}")
+        if isinstance(val, (complex, float, int)):
+            self._data_["origin"] = val
+            #self._data_.origin = val
+            
+        elif isinstance(val, pq.Quantity):
+            if not units_convertible(val.units, self.units.units):
+                raise TypeError(f"Origin units ({val.units}) incompatible with my units ({self.units.units})")
+            
+            if val.units != self.units.units:
+                val = val.rescale(self.units.units)
+                
+            self._data_["origin"] = quantity2scalar(val)
+            #self._data_.origin = quantity2scalar(val)
+            
+        elif isinstance(val, np.ndarray):
+            self._data_["origin"] = quantity2scalar(val)
+            #self._data_.origin = quantity2scalar(val)
+            
+        else:
+            raise TypeError(f"Origin expected a scalar int, float, complex, Python Quantity or numpy array; got {type(val).__name__} instead")
+            
+        print(f"CalibrationData | {self.__class__.__name__}).origin.setter _data_: {self._data_}")
+        _=self._data_.trait_values() # force traits refreshing
+        
+    @property
+    def resolution(self):
+        """Get/set the origin value
+        """
+        return self._data_.resolution
+    
+    @resolution.setter
+    def resolution(self, val):
+        print(f"CalibrationData | {self.__class__.__name__}).resolution.setter _data_: {self._data_}")
+        if isinstance(val, (complex, float, int)):
+            self._data_["resolution"] = val
+            #self._data_.resolution = val
+            
+        elif isinstance(val, pq.Quantity):
+            if not units_convertible(val.units, self.units.units):
+                raise TypeError(f"Resolution units ({val.units}) incompatible with my units ({self.units.units})")
+            
+            if val.units != self.units.units:
+                val = val.rescale(self.units.units)
+                
+            self._data_["resolution"] = quantity2scalar(val)
+            #self._data_.resolution = quantity2scalar(val)
+            
+        elif isinstance(val, np.ndarray):
+            self._data_["resolution"] = quantity2scalar(val)
+            #self._data_.resolution = quantity2scalar(val)
+            
+        else:
+            raise TypeError(f"Resolution expected a scalar int, float, complex, Python Quantity or numpy array; got {type(val).__name__} instead")
+            
+        print(f"CalibrationData | {self.__class__.__name__}).resolution.setter _data_: {self._data_}")
+        _=self._data_.trait_values() # force traits refreshing
+        
+class AxisCalibrationData(CalibrationData):
     """Atomic calibration data for an axis of a vigra.VigraArray.
     To be mapped to a vigra.AxisInfo key str in AxesCalibration, or to
     a key str with format "channel_X", in a parent AxisCalibrationData object
@@ -46,18 +371,19 @@ class AxisCalibrationData(DataBag):
     object for each of its channels.
     
     """
-    parameters = ("axistype", "axisname", "axiskey", "origin", "resolution", "units")
-    
-    hidden_traits = DataBag.hidden_traits + ("parameters", )
-    
-    @staticmethod
-    def isCalibration(x):
-        return isinstance(x, dict) and all(k in x for k in AxisCalibrationData.parameters)
+    parameters = CalibrationData.parameters + ("type", "name", "key")
     
     def __init__(self, *args, **kwargs):
         """
         Parameters:
         ===========
+        
+        Calibration parameters can be specified ONCE via var-positional parameters
+        (*args) or var-keyword parameters (**kwargs), with the latter (if given)
+        overriding the former.
+        
+        Parameters (in addition to those for CalibrationData):
+        ======================================================
         
         axistype:vigra.AxisType or int = Flags that define the type of the axis
             (theoretically any combination of primitive vigra.AxisType flags 
@@ -69,10 +395,21 @@ class AxisCalibrationData(DataBag):
         axisname: a str = Short, yet descriptive enough string
             Optional, default is determined from the axistype parameter
             
+        axisinfo: vigra.AxisInfo; optional default is None
+            When specified, it will override axistype, axiskey, axisname and,
+            if its description also contains origin  & resolution, these will
+            also be overridden.
+            
         units: a scalar Python quantities Quantity (can also be a UnitQuantity)
+        
+        origin, resolution: scalar floats, quantities, or numpy arrays of size 1
+        
+        [channel_X, ...] ChannelCalibrationData objects;
+            when given, the axis type will forcibly set to vigra.AxisType.Channels
         
         """
         allow_none = kwargs.pop("allow_none", True)
+        use_mutable = kwargs.pop("use_mutable", True)
         
         axistype = None
         axisname = None
@@ -81,79 +418,143 @@ class AxisCalibrationData(DataBag):
         origin = None
         resolution = None
         
+        # cache channel calibration data from kwargs, if any;
+        # use only if axis type is Channels;
+        # also use this to force axistype to channels when axistype not given
         
-        for args in args:
+        # clean up channel params in kwargs to ensure consistency
+        c = dict([(k,v) for k,v in kwargs .items() if k.startswith("channel")])
+        
+        channeldata = [ChannelCalibrationData(**v) for v in c.values() if ChannelCalibrationData.isCalibration(v)]
+        
+        for k in c:
+            kwargs.pop(k, None)
+            
+        print("AxisCalibrationData.__init__ *args", args)
+        
+        for arg in args:
+            # below, qwhenever we set the axistype we also set the params derived
+            # from it, if required: axisname, axiskey, units
             if isinstance(arg, str):
-                if axistype is None:
+                if not isSpecificAxisType(axistype):
                     axistype = axisTypeFromString(arg)
-                    if axisname is None:
-                        axisname = axisTypeName(axistype)
+                    
+                    if len(channeldata):
+                        axistype = vigra.AxisType.Channels
+                    
+                    if isSpecificAxisType(axistype):
+                        if not isinstance(axisname, str) or len(axisname.strip()) == 0:
+                            axisname = axisTypeName(axistype)
+                            
+                        if not isinstance(axiskey, str) or len(axiskey.strip()) == 0:
+                            axiskey = axisTypeSymbol(axistype)
+                            
+                        if not isinstance(units, pq.Quantity):
+                            units = axisTypeUnits(axistype)
                         
-                elif axisname is None:
+                elif not isinstance(axisname, str) or len(axisname.strip()) == 0:
                     axisname = arg
                     
             elif isinstance(arg, vigra.AxisType):
-                if axistype is None:
+                if not isSpecificAxisType(axistype):
                     axistype = arg
                     
-            elif isinstance(arg, int):
-                if axistype is None:
-                    if arg == vigra.AxisType.UnknownAxisType:
-                        axistype = vigra.AxisType.UnknownAxisType
-                    elif arg == vigra.AxisType.AllAxes:
-                        axistype = vigra.AxisType.AllAxes
-                    elif arg == vigra.AxisType.NonChannel:
-                        axistype = vigra.AxisType.NonChannel
-                    else:
-                        test = list(v[1] for v in sortedAxisTypes if v[0] & arg)[2:]
-                        if len(test):
-                            axistype = functools.reduce(operator.or_, test)
-                            
-                elif origin is None:
-                    origin = arg
+                    if len(channeldata):
+                        axistype = vigra.AxisType.Channels
                     
-                elif resolution is None:
-                    resolution = arg
+                    if not isinstance(axisname, str) or len(axisname.strip()) == 0:
+                        axisname = axisTypeName(axistype)
+                        
+                    if not isinstance(axiskey, str) or len(axiskey.strip()) == 0:
+                        axiskey = axisTypeSymbol(axistype)
+                    
+                    if not isinstance(units, pq.Quantity):
+                        units = axisTypeUnits(axistype)
+                    
+            elif isinstance(arg, int):
+                if not isSpecificAxisType(axistype):
+                    if isSpecificAxisType(arg): 
+                        if arg == vigra.AxisType.UnknownAxisType:
+                            axistype = vigra.AxisType.UnknownAxisType
+                        elif arg == vigra.AxisType.AllAxes:
+                            axistype = vigra.AxisType.AllAxes
+                        elif arg == vigra.AxisType.NonChannel:
+                            axistype = vigra.AxisType.NonChannel
+                        else:
+                            test = list(v[1] for v in sortedAxisTypes if v[0] & arg)[2:]
+                            if len(test):
+                                axistype = functools.reduce(operator.or_, test)
+                                
+                    if len(channeldata):
+                        axistype = vigra.AxisType.Channels
+                            
+                    if isSpecificAxisType(axistype):
+                        if not isinstance(axisname, str) or len(axisname.strip()) == 0:
+                            axisname = axisTypeName(axistype)
+                            
+                        if not isinstance(axiskey, str) or len(axiskey.strip()) == 0:
+                            axiskey = axisTypeSymbol(axistype)
+                            
+                        if not isinstance(units, pq.Quantity):
+                            units = axisTypeUnits(axistype)
+                            
+                elif not isinstance(origin, (complex, float, int)):
+                    origin = quantity2scalar(arg)
+                    
+                elif not isinstance(resolution, (complex, float, int)):
+                    resolution = quantity2scalar(arg)
                 
             elif isinstance(arg, pq.Quantity):
-                units = arg
+                if not isinstance(units, pq.Quantity):
+                    units = arg.units
+                    
+                elif not isinstance(origin, (complex, float, int)):
+                    if not units_convertible(units.units, arg.units):
+                        raise TypeError(f"'origin' units {arg.units} are incompatible with the specified units ({units})")
+                    
+                    if arg.units != units.units:
+                        arg = arg.rescale(units.units)
+                        
+                    origin = quantity2scalar(arg)
+                    
+                elif not isinstance(resolution, (complex, float, int)):
+                    if not units_convertible(units.units, arg.units):
+                        raise TypeError(f"'origin' units {arg.units} are incompatible with the specified units ({units})")
+                    
+                    if arg.units != units.units:
+                        arg = arg.rescale(units.units)
+                        
+                    resolution = quantity2scalar(arg)
+                    
+            elif isinstance(arg, np.ndarray):
+                if not isinstance(origin, (complex, float, int)):
+                    origin = quantity2scalar(arg)
+                    
+                elif not isinstance(resolution, (complex, float, int)):
+                    resolution = quantity2scalar(arg)
                 
             elif isinstance(arg, pq.dimensionality.Dimensionality):
-                units = [k for k in units.simplified][0]
+                if not isinstance(units, pq.Quantity):
+                    units = [k for k in units.simplified][0]
                 
             elif isinstance(arg, (float, complex)):
-                if origin is None:
+                if not isinstance(origin, (complex, float, int)):
                     origin = arg
-                elif resolution is None:
-                    resolution is None
+                    
+                elif not isinstance(resolution, (complex, float, int)):
+                    resolution = arg
                     
             elif isinstance(arg, vigra.AxisInfo):
                 axistype = arg.typeFlags
                 axiskey = arg.key
                 axisname = axisTypeName(axistype)
+                
                 # TODO parse description - check AxesCalibration.parse description
                 
-                
-                
-            
-        # cache channel calibration data from kwargs, if any;
-        # use only if axis type is Channels;
-        # also use this to force axistype to channels when axistype not given
-        channeldata = dict((k,v) for k,v in kwargs.items() if k.startswith("channel") and self.isCalibration(v))
+        axtype = kwargs.pop("type", None)
         
-        # clean up channel params in kwargs to ensure consistency
-        c = [k for k in kwargs if k.startswith("channel")]
-        
-        for k in c:
-            kwargs.pop(k, None)
-        
-        axtype = kwargs.pop("axistype", vigra.AxisType.UnknownAxisType)
-        
-        if axistype is None:
+        if isSpecificAxisType(axtype):
             axistype = axtype
-        
-        if axistype & vigra.AxisType.UnknownAxisType and len(channeldata):
-            axistype = vigra.AxisType.Channels
         
         if isinstance(axistype, str):
             axistype = axisTypeFromString(axistype)
@@ -161,83 +562,378 @@ class AxisCalibrationData(DataBag):
         if not isinstance(axistype, (vigra.AxisType, int)) or not any(axistype & x for x in vigra.AxisType.values):
             axistype = vigra.AxisType.UnknownAxisType
         
+        if len(channeldata):
+            axistype = vigra.AxisType.Channels
+        
         if axiskey is None:
             axiskey = axisTypeSymbol(axistype, False)
             
-        axname = kwargs.pop("axisname", axisTypeName(axistype))
+        axname = kwargs.pop("name", None)
         
-        if axisname is None:
+        if isinstance(axname, str) and len(axname.strip()):
             axisname = axname
         
         if not isinstance(axisname, str) or len(axisname.strip()) == 0:
             axisname = axisTypeName(axistype)
         
-        units_ = kwargs.pop("units", pixel_unit)
-        if units is None:
-            units = units_
+        units_ = kwargs.pop("units", None)
+        if isinstance(units_, pq.Quantity):
+            units = units_.units
         
-            if not isinstance(units, (pq.Quantity, pq.dimensionality.Dimensionality)):
-                units = axisTypeUnits(axistype)
+        if not isinstance(units, (pq.Quantity, pq.dimensionality.Dimensionality)):
+            units = axisTypeUnits(axistype)
+            
+        if isinstance(units, pq.dimensionality.Dimensionality):
+            units = [k for k in units.simplified][0]
+        
+        origin_ = kwargs.pop("origin", None)
+        
+        if isinstance(origin_, (complex, float, int)):
+            origin = quantity2scalar(origin_)
+            
+        elif isinstance(origin_, pq.Quantity):
+            if not units_convertible(origin_.units, units.units):
+                raise TypeError(f"'origin' units {origin_.units} are incompatible with the specified units ({units})")
                 
-            if isinstance(units, pq.dimensionality.Dimensionality):
-                units = [k for k in units.simplified][0]
-        
-        origin_ = kwargs.pop("origin", 0.)
-        
-        if origin is None:
-            origin = origin_
-            if isinstance(origin, pq.Quantity):
-                if len(origin) != 1:
-                    raise TypeError(f"'origin' must be a scalar; got {origin} instead")
+            if origin_.units != units.units:
+                origin_ = origin_.rescale(units)
                 
-                if not units_convertible(origin, units):
-                    raise TypeError(f"'origin' units {origin.units} are incompatible with the specified units ({units})")
-                    
-                else:
-                    if origin.units != units.units:
-                        o = origin.rescale(units).magnitude
-                    else:
-                        o = origin.magnitude
-                        
-                    origin = scalar_quantity2python(o)
-                    
-            elif not isinstance(origin, (int, float, complex)):
-                raise TypeError(f"Origin expected to be a scalar Python Quantity, int, float or complex; got {type(origin).__name__} instead")
-
-        resoln  = kwargs.pop("resolution", 1.)
-        if resolition is None:
+            origin = quantity2scalar(o)
+            
+        elif isinstance(origin_, np.ndarray):
+            origin = quantity2scalar(origin_)
+            
+        resoln  = kwargs.pop("resolution", None)
+        
+        if isinstance(resoln, (complex, int, float)):
             resolution = resoln
         
-            if isinstance(resolution, pq.Quantity):
-                if len(resolution) != 1:
-                    raise TypeError(f"'resolution' must be a scalar; got {resolution} instead")
+        elif isinstance(resoln, pq.Quantity):
+            if not units_convertible(resoln.units, units.units):
+                raise TypeError(f"'resolution' units {resolution.units} are incompatible with the specified units ({units})")
                 
-                if not units_convertible(resolution, units):
-                    raise TypeError(f"'resolution' units {resolution.units} are incompatible with the specified units ({units})")
+            if resoln.units != units.units:
+                resoln = resoln.rescale(units)
+                
+            resolution = quantity2scalar(resoln)
                     
-                else:
-                    if resolution.units != units.units:
-                        r = resolution.rescale(units).magnitude
-                    else:
-                        r = resolution.magnitude
-                        
-                    resolution = scalar_quantity2python(r)
-                        
-            elif not isinstance(resolution, (int, float, complex)):
-                raise TypeError(f"Origin expected to be a scalar Python Quantity, int, float or complex; got {type(resolution).__name__} instead")
+        elif isinstance(resoln, np.ndarray):
+            resolution = quantity2scalar(resoln)
         
         if axistype & vigra.AxisType.Channels:
             # bring back channel calibration data if necessary
-            kwargs.update(channeldata)
-
-        super().__init__(axistype=axistype,
-                         axisname=axisname,
-                         axiskey=axiskey,
-                         units=units,
+            for k, chcal in enumerate(channeldata):
+                # assign calibrations as they come;
+                # later on, use their own channelname/channelindex fields as needed
+                kwargs[f"channel_calibration_{k}"] = chcal
+                
+        if not isinstance(origin, (complex, float, int)):
+            origin = 0.
+            
+        if not isinstance(resolution, (complex, float, int)):
+            resolution = 1.
+            
+        spurious = [k for k in kwargs if k not in (DataBag.hidden_traits + self.__class__.parameters)]
+        
+        for k in spurious:
+            kwargs.pop(k, None)
+            
+        kwargs["allow_none"] = True
+        kwargs["use_mutable"] = True
+            
+        super().__init__(units=units,
                          origin=origin,
                          resolution=resolution,
-                         allow_none=allow_none, 
                          **kwargs)
+        print(f"{self.__class__.__name__}._data_{self._data_}")
+    
+        self._data_["type"] = axistype
+        self._data_["name"] = axisname
+        self._data_["key"]  = axiskey
+        print(f"{self.__class__.__name__}._data_{self._data_}")
+            
+    @property
+    def name(self):
+        """Get/set the axis name
+        """
+        return self._data_.name
+    
+    @name.setter
+    def name(self, val:str):
+        print(f"CalibrationData | {self.__class__.__name__}).name.setter _data_: {self._data_}")
+        if isinstance(val, str) and len(val.strip()):
+            self._data_["name"] = val
+            #self._data_.name = val
+            
+        print(f"CalibrationData | {self.__class__.__name__}).name.setter _data_: {self._data_}")
+        _=self._data_.trait_values() # force traits refreshing
+            
+    @property
+    def key(self):
+        """Get/set the axis type key
+        """
+        return self._data_.key
+    
+    @key.setter
+    def key(self, val:str):
+        print(f"CalibrationData | {self.__class__.__name__}).key.setter _data_: {self._data_}")
+        if isinstance(val, str) and len(val.strip()):
+            self._data_["key"] = val
+            #self._data_.key = val
+        print(f"CalibrationData | {self.__class__.__name__}).key.setter _data_: {self._data_}")
+        
+        _=self._data_.trait_values() # force traits refreshing
+            
+    @property
+    def type(self):
+        """Get/set the axis type flags
+        WARNING: Setting this property will modify the other properties:
+        'units', 'name', 'key', 'origin', and 'resolution'
+        
+        """
+        return self._data_.type
+    
+    @type.setter
+    def type(self, val:typing.Union[vigra.AxisType, int, str]):
+        print(f"CalibrationData | {self.__class__.__name__}).type.setter _data_: {self._data_}")
+        if isinstance(val, str):
+            val = axisTypeFromString(val)
+            
+        if not isSpecificAxisType(val):
+            raise TypeError(f"Incompatible axis type {val}")
+        
+        if val != self._data_.type:
+            if val == vigra.AxisType.Channels:
+                # switch to Channels: add channels
+                if len(list(self.channels)) == 0:
+                    channel = ChannelCalibrationData(channelindex = 0,
+                                                     channelname = "channel_0")
+                    
+                    self._data_[f"channel_{channel.index}"] = channel
+                    
+            else:
+                if len(list(self.channels)):
+                    # switch AWAY FROM Channels:
+                    # remove channels
+                    chcals = [k for k in self._data_ if k.startswith("channel")]
+                    
+                    print(chcals)
+                    
+                    for k in chcals:
+                        self._data_.pop(k, None)
+                        
+            self._data_["type"] = val
+            print(f"CalibrationData | {self.__class__.__name__}).type.setter _data_: {self._data_}")
+            self._data_["units"] = axisTypeUnits(val)
+            print(f"CalibrationData | {self.__class__.__name__}).type.setter->units _data_: {self._data_}")
+            self._data_["key"] = axisTypeSymbol(val)
+            print(f"CalibrationData | {self.__class__.__name__}).type.setter->key _data_: {self._data_}")
+            self._data_["name"] = axisTypeName(val)
+            print(f"CalibrationData | {self.__class__.__name__}).type.setter->name _data_: {self._data_}")
+                        
+        #self._data_.type = val
+        #self._data_.units = axisTypeUnits(val)
+        #self._data_.key = axisTypeSymbol(val)
+        #self._data_.name = axisTypeName(val)
+                        
+        print(f"CalibrationData | {self.__class__.__name__}).type.setter _data_: {self._data_}")
+        _=self._data_.trait_values() # force traits refreshing
+            
+    @property
+    def channels(self):
+        """Iterator through channel calibration data
+        """
+        yield from (v for v in self._data_.values() if isinstance(v, ChannelCalibrationData))
+        
+    @channels.setter
+    def channels(self, val:typing.Sequence):
+        _=self._data_.trait_values() # force traits refreshing
+            
+        pass
+        
+        
+class ChannelCalibrationData(CalibrationData):
+    """Encapsulates calibration data for pixel INTENSITIES in a given channel.
+    
+    Do not confuse with the calibration of a Channels axis itself.
+    
+    """
+    parameters = CalibrationData.parameters + ("name","index")
+    
+    def __init__(self, *args, **kwargs):
+        channelname = None
+        channelindex = None
+        units = None
+        origin = None
+        resolution = None
+        
+        allow_none = kwargs.pop("allow_none", True)
+        use_mutable = kwargs.pop("use_mutable", True)
+        
+        for arg in args:
+            if isinstance(arg, str) and len(arg.strip()):
+                if not isinstance(channelname, str) or len(channelname.strip()) == 0:
+                    channelname = arg
+                    
+            elif isinstance(arg, int):
+                if not isinstance(channelindex, int) or channelindex < 0:
+                    if arg >= 0:
+                        channelindex = arg
+                        
+                elif not isinstance(origin, (complex, float, int)):
+                    origin = quantity2scalar(arg)
+                    
+                elif not isinstance(resolution, (complex, float, int)):
+                    resolution = quantity2scalar(arg)
+                    
+            elif isinstance(arg, (complex, float)):
+                if not isinstance(origin, (complex, float, int)):
+                    origin = quantity2scalar(arg)
+                    
+                elif not isinstance(resolution, (complex, float, int)):
+                    reslution = quantity2scalar(arg)
+                    
+            elif isinstance(arg, pq.dimensionality.Dimensionality):
+                if not isinstance(units, pq.Quantity):
+                    units = [k for k in arg.simplified][0]
+                    
+            if isinstance(arg, pq.Quantity):
+                if not isinstance(units, pq.Quantity):
+                    units = arg.units
+                    
+                elif not isinstance(origin, (complex, float, int)):
+                    if not units_convertible(units.units, arg.units):
+                        raise TypeError(f"'origin' units {arg.units} incompatible with units {units.units}")
+                    
+                    if arg.units != units.units:
+                        arg = arg.rescale(units.units)
+                        
+                    origin = quantity2scalar(arg)
+                
+                elif not isinstance(resolution, (complex, float, int)):
+                    if not units_convertible(units.units, arg.units):
+                        raise TypeError(f"'resolution' units {arg.units} incompatible with units {units.units}")
+                    
+                    if arg.units != units.units:
+                        arg = arg.rescale(units.units)
+                        
+                    resolution = quantity2scalar(arg)
+                
+            elif isinstance(arg, np.ndarray):
+                if not isinstance(origin, (complex, float, int)):
+                    origin = quantity2scalar(arg)
+                        
+                elif not isinstance(resolution, (complex, float, int)):
+                    resolution = quantity2scalar(arg)
+                    
+        chndx = kwargs.pop("index", None)
+        
+        if isinstance(chndx, int) and chndx >= 0:
+            channelindex = chndx
+                        
+        chname = kwargs.pop("name", None)
+        
+        if isinstance(chname, str) and len(chname.strip()):
+            channelname = chname
+            
+        units_ = kwargs.pop("units",None)
+        
+        if isinstance(units_, pq.Quantity):
+            units = units_.units
+            
+        origin_ = kwargs.pop("origin", None)
+        
+        if isinstance(origin_, (complex, float, int)):
+            origin = origin_
+            
+        elif isinstance(origin_, pq.Quantity):
+            if not units_convertible(origin_.units, units.units):
+                raise TypeError(f"'origin' units {origin_.units} are incompatible with the specified units ({units})")
+                
+            if origin_.units != units.units:
+                origin_ = origin_.rescale(units)
+                
+            origin = quantity2scalar(o)
+            
+        elif isinstance(origin_, np.ndarray):
+            origin = quantity2scalar(origin_)
+            
+        resoln  = kwargs.pop("resolution", None)
+        
+        if isinstance(resoln, (complex, int, float)):
+            resolution = resoln
+        
+        elif isinstance(resoln, pq.Quantity):
+            if not units_convertible(resoln.units, units.units):
+                raise TypeError(f"'resolution' units {resolution.units} are incompatible with the specified units ({units})")
+                
+            if resoln.units != units.units:
+                resoln = resoln.rescale(units)
+                
+            resolution = quantity2scalar(resoln)
+                    
+        elif isinstance(resoln, np.ndarray):
+            resolution = quantity2scalar(resoln)
+        
+        #if axistype & vigra.AxisType.Channels:
+            ## bring back channel calibration data if necessary
+            #kwargs.update(channeldata)
+            
+        if not isinstance(channelindex, int) or channelindex < 0:
+            channelindex = 0
+            
+        if not isinstance(channelname, str) or len(channelname.strip()) == 0:
+            channelname = f"channel_{channelindex}"
+        
+        if not isinstance(units, pq.Quantity):
+            units = arbitrary_unit
+            
+        if not isinstance(origin, (complex, float, int)):
+            origin = 0.
+            
+        if not isinstance(resolution, (complex, float, int)):
+            resolution = 1.
+
+
+        spurious = [k for k in kwargs if k not in DataBag.hidden_traits]
+        
+        for k in spurious:
+            kwargs.pop(k, None)
+            
+        kwargs["allow_none"] = True
+        kwargs["use_mutable"] = True
+            
+        super().__init__(units=units,
+                         origin=origin,
+                         resolution=resolution,
+                         **kwargs)
+        
+        self._data_["index"] = channelindex
+        self._data_["name"] = chanelname
+        
+    @property
+    def name(self):
+        return self._data_.name
+    
+    @name.setter
+    def name(self, val:str):
+        if isinstance(val, str) and len(val.strip()):
+            self._data_["name"] = val
+            #self._data_.name = val
+
+        _=self._data_.trait_values() # force traits refreshing
+            
+    @property
+    def index(self):
+        return self._data_.index
+    
+    @index.setter
+    def index(self, val:int):
+        if isinstance(val, int) and val >= 0:
+            self._data_["index"] = val
+            #self._data_.index = val
+        
+        _=self._data_.trait_values() # force traits refreshing
 
 
 class AxesCalibration(object):
@@ -2032,7 +2728,8 @@ class AxesCalibration(object):
             """Looks for elements with the following tags: name, units, origin, resolution
             """
             
-            result = dict()
+            result = DataBag()
+            #result = dict()
             
             # NOTE: 2021-10-09 23:58:58
             # xml.etree.ElementTree.Element.getchildren() is absent in Python 3.9.7
@@ -2060,19 +2757,9 @@ class AxesCalibration(object):
                 unit_element = children[children_tags.index("units")]
                 u_ = unit_element.text
                 
-                #print("u_", u_)
-                
                 if len(u_) > 0:
                     u = unit_quantity_from_name_or_symbol(u_)
                     
-                    #try:
-                        #u = eval(u_, pq.__dict__)
-                        
-                    #except Exception as err:
-                        #print("".format(err))
-                        #print("Unexpected error:", sys.exc_info()[0])
-                        #warnings.warn("String %s could not be evaluated to a Python Quantity" % u_, RuntimeWarning)
-                            
             if u is None: 
                 # NOTE: default value depends on whether this is a channel axis 
                 # or not. 

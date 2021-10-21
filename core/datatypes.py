@@ -162,6 +162,7 @@ EQUAL_NAN = True
 arbitrary_unit = arbitraryUnit = ArbitraryUnit = pq.UnitQuantity('arbitrary unit', 1. * pq.dimensionless, symbol='a.u.')
 pixel_unit  = pixelUnit = PixelUnit = pixel = pq.UnitQuantity('pixel', 1. * pq.dimensionless, symbol='pixel')
 
+
 day_in_vitro = div = pq.UnitQuantity("day in vitro", 1 * pq.day, symbol = "div")
 week_in_vitro = wiv = pq.UnitQuantity("week in vitro", 1 * pq.week, symbol = "wiv")
 
@@ -227,25 +228,34 @@ custom_unit_symbols[Gohm.symbol] = Gohm
 
 # TODO some other useful units TODO
 
-def scalar_quantity2python(x):
-    if not isinstance(x, pq.Quantity):
-        raise TypeError(f"Expecting a Ptyhon Quantity; got {type(x).__name__} instead")
+def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]):
+    """
+    """
+    if isinstance(x, (complex, float, int)):
+        return x
     
-    if x.size != 1:
-        raise TypeError(f"Expecting a scalar quantity; instead, got an array with size {x.size}")
+    if isinstance(x, np.ndarray):
+        if x.size != 1:
+            raise TypeError(f"Expecting a scalar; instead, got an array with size {x.size}")
+        
+        if isinstance(x, pq.Quantity): # this is derived from numpy array
+            v = x.magnitude
+        else:
+            v = x[0]
     
-    v = x.magnitude
     
-    if v.dtype.name.startswith("complex"):
-        return complex(v)
+        if v.dtype.name.startswith("complex"):
+            return complex(v)
+        
+        if v.dtype.name.startswith("float"):
+            return float(v)
+        
+        if v.dtype.name.startswith("int"):
+            return int(v)
     
-    if v.dtype.name.startswith("float"):
-        return float(v)
+        raise TypeError(f"Expecting a numeric dtype; got {v.dtype} instead")
     
-    if v.dtype.name.startswith("int"):
-        return int(v)
-    
-    raise TypeError(f"Expecting a numeric dtype; got {v.dtype} instead")
+    raise TypeError(f"Expecting a scalar int float, complex, numpy array or Pyhon quantities.Quantity; got {type(x).__name__} instead")
 
 def is_vector(x):
     """Returns True if x is a numpy array encapsulating a vector.

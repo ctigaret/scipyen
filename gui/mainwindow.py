@@ -36,10 +36,12 @@ CHANGELOG:
 #
 # TODO breadcrumbs navigation for the file system model.
 
+# NOTE: 2021-10-21 13:24:24
+# all things imported below will be available in the user workspace
 #### BEGIN core python modules
 import faulthandler
 import sys, os, types, atexit, re, inspect, gc, sip, io, warnings, numbers
-import traceback, keyword, inspect, weakref, itertools, typing, functools
+import traceback, keyword, inspect, weakref, itertools, typing, functools, operator
 from pprint import pprint
 from copy import copy, deepcopy
 import collections
@@ -284,7 +286,7 @@ if has_vigra:
                                    dimEnum,
                                    dimIter,
                                    evalAxisTypeExpression,
-                                   get_axis_type_flags_int,
+                                   getAxisTypeFlagsInt,
                                    getNonChannelDimensions,
                                    hasChannelAxis,
                                    )

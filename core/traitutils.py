@@ -7,6 +7,8 @@ from enum import (EnumMeta, Enum, IntEnum, )
 import contextlib, traceback
 
 from inspect import (getmro, isclass, isfunction, signature,)
+import quantities as pq
+import numpy as np
 from types import new_class
 from collections import deque
 from functools import (partial, partialmethod)
@@ -357,7 +359,7 @@ def dynamic_trait(x, *args, **kwargs):
     
     """
     from .traitcontainers import DataBag
-    from .scipyen_traitlets import (DataBagTrait, DequeTrait,)
+    from .scipyen_traitlets import (DataBagTrait, DequeTrait, QuantityTrait)
     allow_none = kwargs.pop("allow_none", False)
     force_trait = kwargs.pop("force_trait", None)
     set_function = kwargs.pop("set_function", None)
@@ -365,6 +367,7 @@ def dynamic_trait(x, *args, **kwargs):
     # FIXME: 2021-10-10 16:43:29
     # the following are never used !!!
     content_allow_none = kwargs.pop("content_allow_none", allow_none)
+    use_mutable = kwargs.pop("use_mutable", False)
     #klass = kwargs.pop("klass", None)
     
     # NOTE: 2021-08-20 11:44:00 A reminder:
@@ -393,10 +396,13 @@ def dynamic_trait(x, *args, **kwargs):
     
     if issubclass(myclass, DataBag):
         traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=False if v is x else True)) for k,v in x.items())
-        return DataBagTrait(default_value=x, per_key_traits = traits, allow_none = allow_none)
+        return DataBagTrait(default_value=x, per_key_traits = traits, allow_none = allow_none, mutable_keys = use_mutable)
     
     elif issubclass(myclass, deque):
-        return DequeTrait(default_value=x)
+        return DequeTrait(default_value = x)
+    
+    elif issubclass(myclass, pq.Quantity):
+        return QuantityTrait(default_value = x)
     
     if isclass(force_trait) and issubclass(force_trait, traitlets.TraitType):
         traitclass = (force_trait, )
@@ -737,105 +743,7 @@ class ArrayTrait(Instance):
         
     def make_dynamic_default(self):
         return np.array(self.default_value)
-    
-class QuantityTrait(Instance):
-    info_text = "Trait for python quantities"
-    default_value = pq.Quantity([]) # array([], dtype=float64) * dimensionless
-    klass = pq.Quantity
-    
-    def __init__(self, args=None, kw=None, **kwargs):
-        # allow 1st argument to be the array instance
-        default_value = kwargs.pop("default_value", None)
-        self.allow_none = kwargs.pop("allow_none", False)
-        if isinstance(kw, dict) and len(kw):
-            units = kw.pop("units", pq.dimensionless)
-            
-        else:
-            kw = dict()
-            units = kwargs.pop("units", pq.dimensionless)
-        
-        if isinstance(args, np.ndarray):
-            if isinstance(args, pq.Quantity):
-                units = args.units
-                
-            self.default_value = pq.Quantity(args, units=units)
-            
-        elif isinstance(args, (tuple, list)):
-            if len(args):
-                if isinstance(args[0], np.ndarray):
-                    if isinstance(args[0], pq.Quantity):
-                        units = args[0].units
-                        self.default_value = pq.Quantity(args[0], units=units)
-                            
-                    else:
-                        self.default_value = pq.Quantity(args[0], units=units)
-                        
-                else:
-                    self.default_value = pq.Quantity(*args, units=units **kwargs)
-                    
-            else:
-                self.default_value = pq.Quantity([], units=units)
-                            
-        else:
-            self.default_value = pq.Quantity([], units=units)
-            
-        args=None
-                
-        kw["units"] = units
-        
-        super().__init__(klass = self.klass, args=args, kw=kw, 
-                         default_value=default_value, **kwargs)
-        
-    def validate(self, obj, value):
-        if isinstance(value, pq.Quantity) and units_convertible(value, self.default_value):
-            return value
-        
-        self.error(obj, value)
-        
-    def make_dynamic_default(self):
-        return pq.Quantity(self.default_value)
-    
-    def info(self):
-        if isinstance(self.klass, six.string_types):
-            klass = self.klass
-        else:
-            klass = self.klass.__name__
-            
-        result = "%s with dimensionality (units) of %s " % (class_of(klass), self.default_value.dimensionality)
-        
-        if self.allow_none:
-            result += ' or None'
-
-        return result
-
-    def error(self, obj, value):
-        kind = type(value)
-        if six.PY2 and kind is InstanceType:
-            msg = 'class %s' % value.__class__.__name__
-        else:
-            msg = '%s (i.e. %s)' % ( str( kind )[1:-1], repr( value ) )
-
-        if obj is not None:
-            if isinstance(value, pq.Quantity):
-                e = "The '%s' trait of %s instance must be %s, but a Quantity with dimensionality (units) of %s was specified." \
-                    % (self.name, class_of(obj),
-                    self.info(), value.dimensionality)
-                
-            else:
-                e = "The '%s' trait of %s instance must be %s, but a value of %s was specified." \
-                    % (self.name, class_of(obj),
-                    self.info(), msg)
-        else:
-            if isinstance(value, pq.Quantity):
-                e = "The '%s' trait must be %s, but a Quantity with dimensionality (units) of %s was specified." \
-                    % (self.name, self.info(), value.dimensionality)
-            else:
-                e = "The '%s' trait must be %s, but a value of %r was specified." \
-                    % (self.name, self.info(), msg)
-            
-        raise TraitError(e)
-    
-   
+ 
     
 def trait_from_type(x, *args, **kwargs):
     """Generates a TraitType for object x.

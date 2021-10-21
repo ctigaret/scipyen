@@ -284,7 +284,7 @@ if has_vigra:
                                    dimEnum,
                                    dimIter,
                                    evalAxisTypeExpression,
-                                   get_axis_type_flags_int,
+                                   getAxisTypeFlagsInt,
                                    getNonChannelDimensions,
                                    hasChannelAxis,
                                    )
