@@ -264,15 +264,22 @@ class CalibrationData(object):
         return self._data_.units
     
     @units.setter
-    def units(self, u:[typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]]) -> None:
-        print(f"CalibrationData | {self.__class__.__name__}).units.setter _data_: {self._data_}")
-        if isinstance(u, pq.dimensionality.Dimensionality):
-            u = [k for k in u.simplified][0]
+    def units(self, u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality, str]) -> None:
+        print(f"{self.__class__.__name__} (CalibrationData).units.setter")
         
+        old_units = self._data_["units"]
+        obs = self._data_.observer
+        print(f"initial trait values: \n{obs._trait_values}")
+        if isinstance(u, pq.dimensionality.Dimensionality):
+            new_units = [k for k in u.simplified][0]
+            
+        elif isinstance(u, str):
+            new_units = pq.unit_registry[u]
+            
         if isinstance(u, pq.Quantity):
             if not units_convertible(self._data_.units.units, u.units):
                 #forcibly change units
-                self._data_["units"] = u
+                new_units = u
                 #self._data_.units = u
                 
             elif u.units != self._data_.units:
@@ -288,7 +295,11 @@ class CalibrationData(object):
                 self._data_["units"] = new_units
                 #self._data_.units = new_units
                 
-        print(f"CalibrationData | {self.__class__.__name__}).units.setter _data_: {self._data_}")
+        else:
+            raise TypeError(f"Units expected to be a Python Quantity, Dimensionality, or str; got {type(u).__name__} instead")
+                
+        self._data_["units"] = new_units
+        print(f"final trait values: \n{obs._trait_values}")
         _=self._data_.trait_values() # force traits refreshing
                 
     @property
@@ -299,7 +310,6 @@ class CalibrationData(object):
     
     @origin.setter
     def origin(self, val):
-        print(f"CalibrationData | {self.__class__.__name__}).origin.setter _data_: {self._data_}")
         if isinstance(val, (complex, float, int)):
             self._data_["origin"] = val
             #self._data_.origin = val
@@ -321,7 +331,6 @@ class CalibrationData(object):
         else:
             raise TypeError(f"Origin expected a scalar int, float, complex, Python Quantity or numpy array; got {type(val).__name__} instead")
             
-        print(f"CalibrationData | {self.__class__.__name__}).origin.setter _data_: {self._data_}")
         _=self._data_.trait_values() # force traits refreshing
         
     @property
@@ -332,7 +341,6 @@ class CalibrationData(object):
     
     @resolution.setter
     def resolution(self, val):
-        print(f"CalibrationData | {self.__class__.__name__}).resolution.setter _data_: {self._data_}")
         if isinstance(val, (complex, float, int)):
             self._data_["resolution"] = val
             #self._data_.resolution = val
@@ -354,7 +362,6 @@ class CalibrationData(object):
         else:
             raise TypeError(f"Resolution expected a scalar int, float, complex, Python Quantity or numpy array; got {type(val).__name__} instead")
             
-        print(f"CalibrationData | {self.__class__.__name__}).resolution.setter _data_: {self._data_}")
         _=self._data_.trait_values() # force traits refreshing
         
 class AxisCalibrationData(CalibrationData):
@@ -695,7 +702,11 @@ class AxisCalibrationData(CalibrationData):
     
     @type.setter
     def type(self, val:typing.Union[vigra.AxisType, int, str]):
-        print(f"CalibrationData | {self.__class__.__name__}).type.setter _data_: {self._data_}")
+        #print(f"{self.__class__.__name__} (CalibrationData).type.setter val = {val}; initial _data_:\n{self._data_}")
+        obs = self._data_.observer
+        
+        print(f"initial trait values: \n{obs._trait_values}")
+        
         if isinstance(val, str):
             val = axisTypeFromString(val)
             
@@ -722,21 +733,34 @@ class AxisCalibrationData(CalibrationData):
                     for k in chcals:
                         self._data_.pop(k, None)
                         
+            obs = self._data_.observer
+            
+            old_val = self._data_["type"]
             self._data_["type"] = val
-            print(f"CalibrationData | {self.__class__.__name__}).type.setter _data_: {self._data_}")
-            self._data_["units"] = axisTypeUnits(val)
-            print(f"CalibrationData | {self.__class__.__name__}).type.setter->units _data_: {self._data_}")
-            self._data_["key"] = axisTypeSymbol(val)
-            print(f"CalibrationData | {self.__class__.__name__}).type.setter->key _data_: {self._data_}")
-            self._data_["name"] = axisTypeName(val)
-            print(f"CalibrationData | {self.__class__.__name__}).type.setter->name _data_: {self._data_}")
-                        
+            print(f"trait values after setting type: \n{obs._trait_values}")
+            
+            new_key = axisTypeSymbol(val)
+            old_key = self._data_["key"]
+            self._data_["key"] = new_key
+            print(f"trait values after setting key: \n{obs._trait_values}")
+            
+            new_name = axisTypeName(val)
+            old_name = self._data_["name"]
+            self._data_["name"] = new_name
+            print(f"trait values after setting name: \n{obs._trait_values}")
+                
+            new_units = axisTypeUnits(val)
+            old_units = self._data_["units"]
+            self._data_["units"] = new_units
+            print(f"trait values after setting units: \n{obs._trait_values}")
+            
+            
         #self._data_.type = val
         #self._data_.units = axisTypeUnits(val)
         #self._data_.key = axisTypeSymbol(val)
         #self._data_.name = axisTypeName(val)
                         
-        print(f"CalibrationData | {self.__class__.__name__}).type.setter _data_: {self._data_}")
+        print(f"final trait values: \n{obs._trait_values}")
         _=self._data_.trait_values() # force traits refreshing
             
     @property

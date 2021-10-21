@@ -193,7 +193,7 @@ class DataBagTrait(Instance):
     klass=DataBag
     
     def __init__(self, value_trait=None, per_key_traits=None, default_value=Undefined,
-                 mutable_keys=True, **kwargs):
+                 mutable_key_value_traits=True, **kwargs):
         """Avoid back-casting DataBag to dict
         """
         # handle deprecated keywords
@@ -271,7 +271,7 @@ class DataBagTrait(Instance):
 
         self._per_key_traits = per_key_traits
         
-        self.mutable_keys = mutable_keys
+        self.mutable_key_value_traits = mutable_key_value_traits
 
         super(DataBagTrait, self).__init__(klass=self.klass, args=args, **kwargs)
 
@@ -281,8 +281,11 @@ class DataBagTrait(Instance):
         raise TraitError(e)
 
     def validate(self, obj, value):
+        # NOTE: called by TraitType :superclass: _validate() method.
         value = super(DataBagTrait, self).validate(obj, value) # this should always return a DataBag
+        
         if isinstance(value, DataBag) and len(value):
+            # now, go ahead and validate its contents (or "elements")
             value = self.validate_elements(obj, value)
             #return value
         return value
@@ -305,7 +308,7 @@ class DataBagTrait(Instance):
                 except TraitError as error:
                     self.element_error(obj, key, key_trait, 'Keys')
                     
-            if not self.mutable_keys:
+            if not self.mutable_key_value_traits:
                 active_value_trait = per_key_override.get(key, value_trait)
                 #print("active_value_trait", active_value_trait)
                 if active_value_trait:
@@ -315,8 +318,12 @@ class DataBagTrait(Instance):
                         self.element_error(obj, v, active_value_trait, 'Values')
                         
             validated[key] = v
-
-        return self.klass(validated)
+        
+        # NOTE: 2021-10-21 21:56:00 
+        # next line effectively creates a new instance of self containing the
+        # validated values - is this why the update of a databag member of a 
+        # :class: (A) from another :class: B(A) derived from (A) is broken?
+        return self.klass(validated) 
     
     def class_init(self, cls, name):
         if isinstance(self._value_trait, TraitType):
@@ -411,8 +418,6 @@ class DataBagTrait(Instance):
         return {key: value}
     
     def set(self, obj, value):
-        new_value = self._validate(obj, value)
-        
         try:
             old_value = obj._trait_values[self.name]
             
@@ -420,7 +425,20 @@ class DataBagTrait(Instance):
             #print(f"{instance.name} not found")
             old_value = self.default_value
             
-
+        # NOTE: 2021-10-21 22:02:40# self._validate is inherited from 
+        # traitlets.TraitType.
+        #
+        # This returns value if value is None and allow_none is True;
+        #
+        # If the TraitYpe subtype has a "validate" attribute (a method) then 
+        # calls it, with the expectation it will return the value if validation
+        # was successful
+        #
+        # When mutable_key_value_traits is False, next line will throw exception if
+        # new value is a different trait from old_value
+        new_value = self._validate(obj, value) 
+        
+        
         obj._trait_values[self.name] = new_value
         
         try:

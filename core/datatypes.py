@@ -597,12 +597,14 @@ def check_time_units(value):
     
 def conversion_factor(x:pq.Quantity, y:pq.Quantity):
     """Calculates the conversion factor from y units to x units.
+    Alternative to pq.quantity.get_conversion_factor()
+    
     """
     if not isinstance(x, pq.Quantity):
         raise TypeError("x expected to be a python Quantity; got %s instead" % type(x).__name__)
     
-    if not isinstance(y, (pq.UnitQuantity, pq.Quantity)):
-        raise TypeError("y expected to be a python UnitQuantity or Quantity; got %s instead" % type(y).__name__)
+    if not isinstance(y, pq.Quantity):
+        raise TypeError("y expected to be a python Quantity; got %s instead" % type(y).__name__)
     
     if x._reference.dimensionality != y._reference.dimensionality:
         raise TypeError("x and y have incompatible units (%s and %s respectively)" % (x.units, y.units))

@@ -396,7 +396,10 @@ def dynamic_trait(x, *args, **kwargs):
     
     if issubclass(myclass, DataBag):
         traits = dict((k, dynamic_trait(v, allow_none = allow_none, content_traits=False if v is x else True)) for k,v in x.items())
-        return DataBagTrait(default_value=x, per_key_traits = traits, allow_none = allow_none, mutable_keys = use_mutable)
+        return DataBagTrait(default_value=x, 
+                            per_key_traits = traits, 
+                            allow_none = allow_none, 
+                            mutable_key_value_traits = use_mutable)
     
     elif issubclass(myclass, deque):
         return DequeTrait(default_value = x)
