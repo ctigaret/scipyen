@@ -8,7 +8,7 @@ from neo.core import basesignal
 from neo.core import container
 from neo.core.dataobject import DataObject, ArrayDict
 
-from .datatypes import name_from_unit
+from core.datatypes import name_from_unit
 
 
 def _new_DataSignal(cls, signal, units=None, dtype=None, copy=True,

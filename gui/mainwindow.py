@@ -168,6 +168,7 @@ from jupyter_client.session import Message
 
 #### BEGIN scipyen core modules
 #import core.prog as prog
+import core.quantities as cq
 from core.prog import (timefunc, timeblock, processtimefunc, processtimeblock,
                        Timer, safeWrapper, warn_with_traceback,)
 
@@ -186,6 +187,7 @@ from core import neoutils
 # also imports datetime & time; all become directly available in console, see 
 # NOTE: 2017-04-16 09:48:15 above 
 from core.datatypes import * 
+
 import core.desktoputils as desktoputils
 import core.xmlutils as xmlutils
 import core.tiwt as tiwt

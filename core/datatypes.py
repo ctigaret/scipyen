@@ -41,7 +41,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 #### END 3rd party modules
 
 #### BEGIN pict.core.modules
-
+from core import quantities as cq
 from . import xmlutils
 from . import strutils
 from .prog import safeWrapper
@@ -137,96 +137,11 @@ UnitTypes = collections.defaultdict(lambda: "NA",
                                     
 Genotypes = ["NA", "wt", "het", "hom"]
 
-sipfx = ("yotta", "zetta", "exa", "peta", "tera", 
-         "giga", "mega", "kilo", "hecto", "deca", 
-         "deci", "centi", "milli", "micro", "nano",
-         "pico", "femto", "atto", "zepto", "yotto",)
-
-SI_prefix = sipfx
-
-sisymb = ("Y", "Z", "E", "P", "T", "G", "M", "k", "h", "da",
-          "d", "c", "m", "mu", "n", "p", "f", "a", "z", "y",)
-
-SI_symbols = sisymb
-
-exps = tuple([k for k in range(24,2,-3)] + [2,1,-1,-2] + [k for k in range(-3, -37, -3)])
-exponents_of_10 = exps
-
-SI10Powers = dict([(p, dict([("exponent", e), ("symbol", s)])) for (p,e,s) in zip(sipfx, exps, sisymb)])
 
 RELATIVE_TOLERANCE = 1e-4
 ABSOLUTE_TOLERANCE = 1e-4
 EQUAL_NAN = True
 
-#NOTE: do not confuse with pq.au which is one astronomical unit !!!
-arbitrary_unit = arbitraryUnit = ArbitraryUnit = pq.UnitQuantity('arbitrary unit', 1. * pq.dimensionless, symbol='a.u.')
-pixel_unit  = pixelUnit = PixelUnit = pixel = pq.UnitQuantity('pixel', 1. * pq.dimensionless, symbol='pixel')
-
-
-day_in_vitro = div = pq.UnitQuantity("day in vitro", 1 * pq.day, symbol = "div")
-week_in_vitro = wiv = pq.UnitQuantity("week in vitro", 1 * pq.week, symbol = "wiv")
-
-postnatal_day = pnd = pq.UnitQuantity("postnatal day", 1 * pq.day, symbol = "pnd")
-postnatal_week = pnw = pq.UnitQuantity("postnatal week", 1 * pq.week, symbol = "pnw")
-postnatal_month = pnm = pq.UnitQuantity("postnatal month", 1 * pq.month, symbol = "pnm")
-
-embryonic_day = emd = pq.UnitQuantity("embryonic day", 1 * pq.day, symbol = "emd")
-embryonic_week = emw = pq.UnitQuantity("embryonic week", 1 * pq.week, symbol = "emw")
-embryonic_month = emm = pq.UnitQuantity("embryonic month", 1 * pq.month, symbol = "emm")
-
-# NOTE: 2017-07-21 16:05:38
-# a dimensionless unit for channel axis (when there are more than one channel in the data)
-# NOTE: NOT TO BE CONFUSED WITH THE UNITS OF THE DATA ITSELF!
-channel_unit = channelUnit = ChannelUnit = pq.UnitQuantity("channel", 1. * pq.dimensionless, symbol="channel")
-
-space_frequency_unit = spaceFrequencyUnit = sfu = pq.UnitQuantity('space frequency unit', 1/pq.m, symbol='1/m')
-
-# not to be confused with angular frequency which is radian/s (or Hz, if you consider radian to be dimensionless)
-# thus 1 angle frequency equal one cycle per radian -- another form of space frequency
-# where space is expressed in "angle" (e.g. visual angle)
-angle_frequency_unit = angleFrequencyUnit = afu = pq.UnitQuantity('angle frequency unit', 1/pq.rad, symbol='1/rad')
-
-custom_unit_symbols = dict()
-custom_unit_symbols[arbitrary_unit.symbol] = arbitrary_unit
-custom_unit_symbols[pixel_unit.symbol] = pixel_unit
-custom_unit_symbols[channel_unit.symbol] = channel_unit
-custom_unit_symbols[space_frequency_unit.symbol] = space_frequency_unit
-custom_unit_symbols[angle_frequency_unit.symbol] = angle_frequency_unit
-custom_unit_symbols[div.symbol] = div
-custom_unit_symbols[wiv.symbol] = wiv
-custom_unit_symbols[pnd.symbol] = pnd
-custom_unit_symbols[pnw.symbol] = pnw
-custom_unit_symbols[pnm.symbol] = pnm
-custom_unit_symbols[emd.symbol] = emd
-custom_unit_symbols[emw.symbol] = emw
-custom_unit_symbols[emm.symbol] = emm
-
-def make_scaled_unit_quantity(base_quantity, power):
-    if not isinstance(base_quantity, (pq.Quantity,pq.UnitQuantity)):
-        raise TypeError("base_quantity expected to be a UnitQuanitity or a Quantity; got %s instead" % type(base_quantity).__name__)
-    
-    if not isinstance(power, str):
-        raise TypeError("power expected to be a str; got %s instead" % type(power).__name__)
-    
-    if power not in SI10Powers.keys():
-        raise ValueError("Power %s is invalid" % power)
-    
-    name = "%s%s" % (power, base_quantity.units.dimensionality)
-    factor = pow(10, SI10Powers[power]["exponent"])
-    symbol = "%s%s" % (SI10Powers[power]["symbol"],base_quantity.units.symbol)
-    
-    return pq.UnitQuantity(name, factor * base_quantity, symbol=symbol)
-    
-# NOTE: the string argument refers to the prefix to be prepended to the original
-# unit string
-kiloohm = kohm = make_scaled_unit_quantity(pq.ohm, "kilo")
-custom_unit_symbols[kohm.symbol] = kohm
-megaohm = Mohm = make_scaled_unit_quantity(pq.ohm, "mega")
-custom_unit_symbols[Mohm.symbol] = Mohm
-gigaohm = Gohm = make_scaled_unit_quantity(pq.ohm, "giga")
-custom_unit_symbols[Gohm.symbol] = Gohm
-
-# TODO some other useful units TODO
 
 def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]):
     """
@@ -516,9 +431,11 @@ def unit_quantity_from_name_or_symbol(s):
     
     try:
         # easy way first
-        return pq.unit_registry(s)
+        return pq.unit_registry[s]
     
     except:
+        traceback.print_exc()
+        
         if s in pq.__dict__:
             ret = eval(s, pq.__dict__)
 
@@ -527,13 +444,6 @@ def unit_quantity_from_name_or_symbol(s):
             
         elif s in [u.name for u in custom_unit_symbols.values()]:
             ret = [u for u in custom_unit_symbols.values() if u.name == s]
-            
-        else:
-            frterms = s.split('/')
-            powterms = [i for i in itertools.chain.from_iterable(ft.split('**') for ft in frterms)]
-            
-            if len(powterms) > 1:
-                for 
             
         else:
             warnings.warn("Unknown unit quantity %s" % s, RuntimeWarning)

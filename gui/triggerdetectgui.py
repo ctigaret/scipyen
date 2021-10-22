@@ -12,7 +12,8 @@ import numpy as np
 import quantities as pq
 from neo import (Block, Segment,)
 
-from core.datatypes import (arbitrary_unit, check_time_units, units_convertible,
+from core.quantities import arbitrary_unit
+from core.datatypes import (check_time_units, units_convertible,
                             unit_quantity_from_name_or_symbol, UnitTypes)
 from core.traitcontainers import DataBag
 from core.triggerevent import (TriggerEvent, TriggerEventType,)

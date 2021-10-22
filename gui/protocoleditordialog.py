@@ -9,7 +9,8 @@ from PyQt5.uic import loadUiType
 import numpy as np
 import quantities as pq
 
-from core.datatypes import (arbitrary_unit, check_time_units, units_convertible,
+from core.quantities import arbitrary_unit
+from core.datatypes import (check_time_units, units_convertible,
                             unit_quantity_from_name_or_symbol, UnitTypes, )
 from core.strutils import (quantity2str, numbers2str,)
 from core.traitcontainers import DataBag

@@ -8,14 +8,17 @@ from traitlets import Bunch
 
 from core import datatypes, xmlutils
 from core.xmlutils import getChildren as getXMLChildren
-from core.datatypes import (arbitrary_unit, 
-                            space_frequency_unit,
-                            angle_frequency_unit,
-                            channel_unit,
-                            custom_unit_symbols,
+from core import quantities as cq
+from core.quantities import (arbitrary_unit, 
+                                    space_frequency_unit,
+                                    angle_frequency_unit,
+                                    channel_unit,
+                                    pixel_unit,
+                                    )
+
+from core.datatypes import (
                             is_numeric, 
                             is_numeric_string,
-                            pixel_unit,
                             quantity2scalar,
                             unit_quantity_from_name_or_symbol,
                             units_convertible,
@@ -876,7 +879,9 @@ class AxisCalibrationData(CalibrationData):
               s = "|".join(axisTypeStrings(value))
             
             elif param == "units":
-                s = value.units.dimensionality.string
+                # output the dimensionality's string property, always simplified
+                # if possible
+                s = value.units.dimensionality.simplified.string
                 
             elif param == "index":
                 s = "%d" % value
@@ -890,7 +895,7 @@ class AxisCalibrationData(CalibrationData):
             
             ss.append(f"</{param}>")
             
-            return ss
+            return "".join(ss)
 
         strlist = ["<axis_calibration>"]
         

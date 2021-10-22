@@ -30,12 +30,16 @@ import vigra
 import quantities as pq
 from core.utilities import (reverse_mapping_lookup, unique,)
 
-from core.datatypes import (space_frequency_unit, 
-                            angle_frequency_unit, 
-                            channel_unit, 
-                            arbitrary_unit,
-                            pixel_unit,
-                            units_convertible)
+from core import quantities as cq
+from core.quantities import (space_frequency_unit, 
+                                    angle_frequency_unit, 
+                                    channel_unit, 
+                                    arbitrary_unit,
+                                    pixel_unit,
+                                    )
+
+from core.datatypes import units_convertible
+
 #from . import datatypes
 #### END pict.core modules
 

@@ -10,15 +10,16 @@ import vigra
 from core import (prog, traitcontainers, strutils, neoutils, models,)
 from core.prog import safeWrapper
 from core.traitcontainers import DataBag
-from core.datatypes import (UnitTypes, Genotypes, arbitrary_unit, pixel_unit, 
-                            channel_unit,
-                            space_frequency_unit,
-                            angle_frequency_unit,
-                            custom_unit_symbols,
+from core import quantities as cq
+from core.quantities import(arbitrary_unit, pixel_unit, channel_unit,
+                                    space_frequency_unit,
+                                    angle_frequency_unit,day_in_vitro,
+                                    week_in_vitro, postnatal_day, postnatal_month,
+                                    embryonic_day, embryonic_week, embryonic_month,
+                                    )
+
+from core.datatypes import (UnitTypes, Genotypes, 
                             unit_quantity_from_name_or_symbol,
-                            day_in_vitro,
-                            week_in_vitro, postnatal_day, postnatal_month,
-                            embryonic_day, embryonic_week, embryonic_month,
                             )
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
