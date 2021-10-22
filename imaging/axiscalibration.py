@@ -458,6 +458,20 @@ class CalibrationData(object):
         
     def __str__(self):
         return pformat(self._data_)
+    
+    def __eq__(self, other):
+        ret = other.__class__ == self.__class__
+        
+        if ret:
+            ret &= all(getattr(self, p, None) == getattr(other, p, None) for p in self.__class__.parameters)
+            
+        if ret:
+            ret &= getattr(self, "nChannels", 0) == getattr(other, "nChannels", 0)
+            
+        if ret: 
+            ret &= all(c[0] == c[1] for c in zip(getattr(self, "channels"), getattr(other, "channels")))
+            
+        return ret
         
     @property
     def units(self) -> pq.Quantity:
@@ -471,24 +485,25 @@ class CalibrationData(object):
     @units.setter
     def units(self, u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality, str]) -> None:
         if isinstance(u, pq.dimensionality.Dimensionality):
-            new_units = [k for k in u.simplified][0]
+            u = pq.quantity.validate_dimensionality(u.simplified)
             
-        elif isinstance(u, str):
-            new_units = unit_quantity_from_name_or_symbol(u)
+        if isinstance(u, str):
+            u = unit_quantity_from_name_or_symbol(u)
             
-        elif isinstance(u, pq.Quantity):
-            new_units = u
-                
+        if isinstance(u, pq.Quantity):
+            udim = u.dimensionality.simplified
+            u = pq.unit_registry[udim.string]
+            
         else:
             raise TypeError(f"Units expected to be a Python Quantity, Dimensionality, or str; got {type(u).__name__} instead")
         
         if hasattr(self, "type"):
             units_for_type = axisTypeUnits(self.type)
-            axis_type_names = axisTypeStrings(self.type)
-            if not units_convertible(new_units.units, units_for_type.units):
-                warnings.warn(f"Assigning units {new_units} for a {axis_type_names} axis", RuntimeWarning, stacklevel=2)
+            if not units_convertible(u.units, units_for_type.units):
+                axis_type_names = "|".join(axisTypeStrings(self.type))
+                warnings.warn(f"Assigning units {u} for a {axis_type_names} axis", RuntimeWarning, stacklevel=2)
                 
-        self._data_.units = new_units
+        self._data_.units = u
         
     def rescale(self, u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality, str]) -> None:
         """Rescale units, origin and resolution for new units.
@@ -899,13 +914,13 @@ class AxisCalibrationData(CalibrationData):
 
         strlist = ["<axis_calibration>"]
         
-        for param in self.__class__.parameters:
+        for param in sorted(self.__class__.parameters):
             strlist.append(__gen_xml_element__(self, param))
             
         if self.type & vigra.AxisType.Channels:
             for ch in self.channels:
                 strlist.append(f"<channel_{ch[0]}>" % ch[0])
-                for p in ChannelCalibrationData.parameters:
+                for p in sorted(ChannelCalibrationData.parameters):
                     strlist.append(__gen_xml_element__(ch[1], pp))
                 strlist.append("f</channel_{ch[0]}>" % ch[0])
                 
@@ -1342,6 +1357,10 @@ class AxisCalibrationData(CalibrationData):
                 
             return value
         
+        if isinstance(cal, (str, vigra.AxisInfo)):
+            s = cal
+            cal = None
+            
         if isinstance(s, vigra.AxisInfo):
             s = s.description
             
@@ -1390,14 +1409,14 @@ class AxisCalibrationData(CalibrationData):
                             val = __eval_xml_element_text__(param, txt)
                             
                             if param == "type":
-                                if self._data_.get(param, None) is not None:
+                                if cal._data_.get(param, None) is not None:
                                     if not val & self._data_[param]:
-                                        raise ValueError(f"Cannot set current axis type {axisTypeStrings(self._data_[param])} to {axisTypeStrings(val)}")
+                                        raise ValueError(f"Cannot set current axis type {axisTypeStrings(cal._data_[param])} to {axisTypeStrings(val)}")
                                     
                             elif param =="key":
-                                if self._data_.get(param, None) is not None and self._data_.get("type", None) is not None:
-                                    axtype = self._data_["type"]
-                                    if val != self._data_[param] and val != axisTypeSymbol(axtype):
+                                if cal._data_.get(param, None) is not None and cal._data_.get("type", None) is not None:
+                                    axtype = cal._data_["type"]
+                                    if val != cal._data_[param] and val != axisTypeSymbol(axtype):
                                         warnings.warn(f"Atypical axis key supplied ({val}) for a {axisTypeStrings(axtype)} axis")
                         else:
                             setattr(cal, param, __eval_xml_element_text__(param, txt))
