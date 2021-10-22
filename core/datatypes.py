@@ -529,6 +529,13 @@ def unit_quantity_from_name_or_symbol(s):
             ret = [u for u in custom_unit_symbols.values() if u.name == s]
             
         else:
+            frterms = s.split('/')
+            powterms = [i for i in itertools.chain.from_iterable(ft.split('**') for ft in frterms)]
+            
+            if len(powterms) > 1:
+                for 
+            
+        else:
             warnings.warn("Unknown unit quantity %s" % s, RuntimeWarning)
             
             ret = pq.dimensionless

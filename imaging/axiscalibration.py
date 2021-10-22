@@ -863,30 +863,49 @@ class AxisCalibrationData(CalibrationData):
         </axis_calibration>
         
         """
+        
+        def __gen_xml_element__(obj, param):
+            value = getattr(obj._data_, param, None)
+            
+            ss = [f"<{param}>"]
+            
+            if isinstance(value, str): # ("name", "key")
+                s = value
+                
+            elif param == "type":
+              s = "|".join(axisTypeStrings(value))
+            
+            elif param == "units":
+                s = value.units.dimensionality.string
+                
+            elif param == "index":
+                s = "%d" % value
+                
+            #elif param in ("origin", "resolution", "maximum", "minimum"):
+                
+            else: # ("origin", "resolution", "maximum", "minimum")
+                s = "%f"%value
+                
+            ss.append(s)
+            
+            ss.append(f"</{param}>")
+            
+            return ss
 
         strlist = ["<axis_calibration>"]
-        strlist.append(f"<type>{axisTypeStrings(self.type)}</type>")
-        strlist.append(f"<key>{self.key}</key>")
-        strlist.append(f"<name>{self.name}</name>")
         
+        for param in self.__class__.parameters:
+            strlist.append(__gen_xml_element__(self, param))
+            
         if self.type & vigra.AxisType.Channels:
             for ch in self.channels:
-                strlist.append("<channel_%d>" % ch[0])
-                strlist.append(f"<index>{ch[1].index}</index>")
-                strlist.append(f"<name>{ch[1].name}</name>")
-                strlist.append(f"<units>{ch[1].units}</units>")
-                strlist.append(f"<minimum>{ch[1].minimum}</minimum>")
-                strlist.append(f"<maximum>{ch[1].maximum}</maximum>")
-                strlist.append(f"<resolution>{ch[1].resolution}</resolution>")
-                strlist.append("</channel_%d>" % ch[0])
+                strlist.append(f"<channel_{ch[0]}>" % ch[0])
+                for p in ChannelCalibrationData.parameters:
+                    strlist.append(__gen_xml_element__(ch[1], pp))
+                strlist.append("f</channel_{ch[0]}>" % ch[0])
                 
-        else:
-            strlist.append(f"<units>{self.units}</units>")
-            strlist.append(f"<origin>{self.origin}</origin>")
-            strlist.append(f"<resolution>{self.resolution}</resolution>")
-            
         strlist.append("</axis_calibration>")
-            
+        
         return "".join(strlist)
     
     def addChannelCalibration(self, val:ChannelCalibrationData,
@@ -1304,6 +1323,8 @@ class AxisCalibrationData(CalibrationData):
                                s:typing.Optional[typing.Union[str, vigra.AxisInfo]] = None,
                                check:bool=False) -> CalibrationData:
         """"""
+        import xml.etree.ElementTree as ET
+        
         def __eval_xml_element_text__(param, txt):
             if param == "units":
                 value = unit_quantity_from_name_or_symbol(txt)
@@ -1311,16 +1332,15 @@ class AxisCalibrationData(CalibrationData):
                 value = txt
             elif param == "type":
                 value = axisTypeFromString(txt)
-            else:
-                value == eval(txt)
+            else: # ("index", "origin", "resolution", "minimum", "maximum")
+                value = eval(txt)
                 
             return value
-            
         
         if isinstance(s, vigra.AxisInfo):
             s = s.description
             
-        elif not isinstance(s,str) or len(s.strip()) == 0:
+        if not isinstance(s,str) or len(s.strip()) == 0:
             return
         
         if not isinstance(cal, AxisCalibrationData):
@@ -1357,7 +1377,7 @@ class AxisCalibrationData(CalibrationData):
                     # ignore everything else
                     if child_element.tag.lower() in AxisCalibrationData.parameters:
                         param = child_element.tag.lower()
-                        txt = child_element.txt
+                        txt = child_element.text
                         
                         if check:
                             #NOTE: 2021-10-22 13:41:45
@@ -1375,7 +1395,7 @@ class AxisCalibrationData(CalibrationData):
                                     if val != self._data_[param] and val != axisTypeSymbol(axtype):
                                         warnings.warn(f"Atypical axis key supplied ({val}) for a {axisTypeStrings(axtype)} axis")
                         else:
-                            setattr(cal, param, _eval_xml_element_text__(param, txt))
+                            setattr(cal, param, __eval_xml_element_text__(param, txt))
                         
                                     
                     else:#if child_element.tag.lower().startswith("channel_"):
