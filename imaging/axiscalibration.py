@@ -1,8 +1,10 @@
 import numbers, traceback, typing, functools, operator, warnings
+from pprint import (pprint, pformat)
 import h5py
 import vigra 
 import numpy as np
 import quantities as pq
+from traitlets import Bunch
 
 from core import datatypes, xmlutils
 from core.xmlutils import getChildren as getXMLChildren
@@ -19,7 +21,7 @@ from core.datatypes import (arbitrary_unit,
                             units_convertible,
                             )
 
-from core.utilities import (reverse_mapping_lookup, unique,)
+from core.utilities import (reverse_mapping_lookup, unique, counter_suffix,)
 
 from core.traitcontainers import DataBag
 
@@ -74,7 +76,7 @@ class CalibrationData(object):
     
     @classmethod
     def isCalibration(cls, x):
-        return isinstance(x, dict) and all(k in x for k in cls.parameters)
+        return isinstance(x, cls) or (isinstance(x, dict) and all(k in x for k in cls.parameters))
         
     def __init__(self, *args, **kwargs):
         """
@@ -111,197 +113,395 @@ class CalibrationData(object):
             assigned ot origin or resolution, respectively.
             
         """
+        # FIXME 2021-10-22 09:48:23
+        # a DataBag here gets "sliced" in :subclasses: of CalibrationData
+        # why ???
+        #self._data_ = DataBag()
+        self._data_ = Bunch()
         
-        self._data_ = DataBag()
-        self._observer_ = None
+        for param in self.__class__.parameters:
+            self._data_[param] = None
+            
+        # allow ONE calibration-like dict or calibration data object
+        if len(args) == 1 and AxisCalibrationData.isCalibration(args[0]):
+            if isinstance(args[0], dict):
+                kwargs = args[0]
+                args.clear()
+            elif isinstance(args[0], AxisCalibrationData):
+                self._data_.update(args[0]._data_)
+                return
+            
+        # cache channel calibration data structures in kwargs to ensure consistency
+        channeldata = [(k, ChannelCalibrationData(v)) for k,v in kwargs.items() if ChannelCalibrationData.isCalibration(v)]
         
-        origin=None
-        resolution=None
-        units=None
-        
-        allow_none = kwargs.pop("allow_none", True)
-        use_mutable = kwargs.pop("use_mutable", True)
+        for c[0] in channeldata:
+            kwargs.pop(k, None)
         
         for arg in args:
-            # only assigns to units, origin, resolution when any of these are
-            # still None and arg is of appropriate type
-            if instance(arg, (int, float, complex)):
-                if not isinstance(origin, (complex, float, int)):
-                    origin = arg
-                    
-                elif not isinstance(resolution, (complex, int, float)):
-                    resolution = arg
-                    
-            elif isinstance(arg, pq.Quantity):
-                if not isinstance(units, pq.Quantity):
-                    units = arg.units
-                    
-                elif not isinstance(origin, (complex, float, int)):
-                    # units should have been assigned by now
-                    if isinstance(units, pq.Quantity):
-                        if not units_convertible(units.units, arg.units):
-                            raise TypeError(f"'origin' units {origin.units} are incompatible with the specified units ({units})")
+            # below, whenever we set the axistype we also set the params derived
+            # from it, if required: axisname, axiskey, units
+            
+            if isinstance(arg, self.__class__):
+                # copy c'tor
+                self._data_.update(arg._data_) # DONE
+                return
+            
+            if isinstance(arg, str):
+                if self.__class__ == AxisCalibrationData:
+                    if not isSpecificAxisType(self._data_.type):
+                        self._data_.type = axisTypeFromString(arg)
                         
-                        if arg.units != units.units:
-                            arg = arg.rescale(units.units)
+                        if len(channeldata):
+                            self._data_.type = vigra.AxisType.Channels
+                        
+                        if isSpecificAxisType(self._data_.type):
+                            if not isinstance(self._data_.name, str) or len(self._data_.name.strip()) == 0:
+                                self._data_.name = axisTypeName(self._data_.type)
+                                
+                            if not isinstance(self._data_.key, str) or len(self._data_.key.strip()) == 0:
+                                self._data_.key = axisTypeSymbol(self._data_.type)
+                                
+                            if not isinstance(self._data_.units, pq.Quantity):
+                                self._data_.units = axisTypeUnits(self._data_.type)
                             
-                    origin = quantity2scalar(arg)
+                    elif not isinstance(self._data_.name, str) or len(self._data_.name.strip()) == 0:
+                        self._data_.name = arg
+                        
+                if not isinstance(self._data_.units, pq.Quantity):
+                    try:
+                        self._data_.units = unit_quantity_from_name_or_symbol(arg)
+                    except:
+                        pass # let the next args deal with it
+                    
+            elif isinstance(arg, vigra.AxisType):
+                if self.__class__ == AxisCalibrationData:
+                    if not isSpecificAxisType(self._data_.type):
+                        self._data_.type = arg
+                        
+                        if len(channeldata):
+                            self._data_.type = vigra.AxisType.Channels
+                        
+                        if not isinstance(self._data_.name, str) or len(self._data_.name.strip()) == 0:
+                            self._data_.name = axisTypeName(self._data_.type)
+                            
+                        if not isinstance(self._data_.key, str) or len(self._data_.key.strip()) == 0:
+                            self._data_.key = axisTypeSymbol(self._data_.type)
+                        
+                        if not isinstance(self._data_.units, pq.Quantity):
+                            self._data_.units = axisTypeUnits(self._data_.type)
+                    
+            elif isinstance(arg, int):
+                if self.__class__ == AxisCalibrationData:
+                    if not isSpecificAxisType(self._data_.type):
+                        if isSpecificAxisType(arg): 
+                            if arg == vigra.AxisType.UnknownAxisType:
+                                self._data_.type = vigra.AxisType.UnknownAxisType
+                            elif arg == vigra.AxisType.AllAxes:
+                                self._data_.type = vigra.AxisType.AllAxes
+                            elif arg == vigra.AxisType.NonChannel:
+                                self._data_.type = vigra.AxisType.NonChannel
+                            else:
+                                test = list(v[1] for v in sortedAxisTypes if v[0] & arg)[2:]
+                                if len(test):
+                                    self._data_.type = functools.reduce(operator.or_, test)
+                                    
+                        if len(channeldata):
+                            self._data_.type = vigra.AxisType.Channels
+                                
+                        if isSpecificAxisType(self._data_.type):
+                            if not isinstance(self._data_.name, str) or len(self._data_.name.strip()) == 0:
+                                self._data_.name = axisTypeName(self._data_.type)
+                                
+                            if not isinstance(self._data_.key, str) or len(self._data_.key.strip()) == 0:
+                                self._data_.key = axisTypeSymbol(self._data_.type)
+                                
+                            if not isinstance(self._data_.units, pq.Quantity):
+                                self._data_.units = axisTypeUnits(self._data_.type)
+                                
+                if self.__class__ == ChannelCalibrationData:
+                    if not isinstance(self._data_.index, int) and arg >= 0:
+                        self._data_.index = arg
+                        
+                    elif not isinstance(self._data_.maximum, (complex, float, int)):
+                        self._data_.maximum = arg
+                            
+                if not isinstance(self._data_.origin, (complex, float, int)):
+                    self._data_.origin = quantity2scalar(arg)
+                    
+                elif not isinstance(self._data_.resolution, (complex, float, int)):
+                    self._data_.resolution = quantity2scalar(arg)
                 
-                elif not isinstance(resolution, (complex, float, int)):
-                    # units should have been assigned by now
-                    if isinstance(units, pq.Quantity):
-                        if not units_convertible(units.units, arg.units):
-                            raise TypeError(f"'origin' units {origin.units} are incompatible with the specified units ({units})")
+            elif isinstance(arg, pq.Quantity):
+                if not isinstance(self._data_.units, pq.Quantity):
+                    self._data_.units = arg.units
+                    
+                if not isinstance(self._data_.origin, (complex, float, int)):
+                    if not units_convertible(self._data_.units.units, arg.units):
+                        raise TypeError(f"'origin' units {arg.units} are incompatible with the specified units ({self._data_.units})")
+                    
+                    if arg.units != self._data_.units.units:
+                        arg = arg.rescale(self._data_.units.units)
                         
-                        if arg.units != units.units:
-                            arg = arg.rescale(units.units)
+                    self._data_.origin = quantity2scalar(arg)
+                    
+                elif not isinstance(self._data_.resolution, (complex, float, int)):
+                    if not units_convertible(self._data_.units.units, arg.units):
+                        raise TypeError(f"'origin' units {arg.units} are incompatible with the specified units ({self._data_.units})")
+                    
+                    if arg.units != self._data_.units.units:
+                        arg = arg.rescale(self._data_.units.units)
                         
-                    resolution = quantity2scalar(arg)
+                    self._data_.resolution = quantity2scalar(arg)
+                    
+                elif self.__class__ == ChannelCalibrationData:
+                    if not isinstance(self._data_.maximum, (complex, float, int)):
+                        if not units_convertible(self._data_.units.units, arg.units):
+                            raise TypeError(f"'max value' units {arg.units} are incompatible with the specified units ({self._data_.units})")
+                        
+                        if arg.units != self._data_.units.units:
+                            arg.rescale(self._data_.units.units)
+                            
+                        self._data_.maximum = quantity2scalar(arg)
                     
             elif isinstance(arg, np.ndarray):
-                if origin is None:
-                    origin = quantity2scalar(arg)
+                if not isinstance(self._data_.origin, (complex, float, int)):
+                    self._data_.origin = quantity2scalar(arg)
                     
-                elif resolution is None:
-                    resolution = quantity2scalar(arg)
+                elif not isinstance(self._data_.resolution, (complex, float, int)):
+                    self._data_.resolution = quantity2scalar(arg)
+                
+                elif self.__class__ == ChannelCalibrationData:
+                    if not isinstance(self._data_.maximum, (complex, float, int)):
+                        self._data_.maximum = quantity2scalar(arg)
                     
             elif isinstance(arg, pq.dimensionality.Dimensionality):
-                if units is None:
-                    units = [k for k in arg.simplified][0]
+                if not isinstance(self._data_.units, pq.Quantity):
+                    self._data_.units = [k for k in arg.simplified][0]
+                
+            elif isinstance(arg, (float, complex)):
+                if not isinstance(self._data_.origin, (complex, float, int)):
+                    self._data_.origin = arg
                     
-        # allow orverriding units, origin, resolution through keywords
-        
-        if "units" in kwargs:
-            units_ = kwargs.pop("units", pixel_unit)
-            if not isinstance(units_, (pq.Quantity, pq.dimensionality.Dimensionality)):
-                units_ = pixel_unit
-                
-            if isinstance(units_, pq.Quantity):
-                units_ = units_.units
-                
-            if isinstance(units_, pq.dimensionality.Dimensionality):
-                units_ = [k for k in units_.simplified][0]
-            
-            units = units_
-            
-        if "origin" in kwargs:
-            origin_ = kwargs.pop("origin", 0.)
-            
-            if isinstance(origin_, np.ndarray):
-                if isinstance(units, pq.Quantity):
-                    if isinstance(origin_, pq.Quantity):
-                        if not units_convertible(origin_.units, units.units):
-                            raise TypeError("wrong units for 'origin' keyword")
+                elif not isinstance(self._data_.resolution, (complex, float, int)):
+                    self._data_.resolution = arg
+                    
+                elif self.__class__ == ChannelCalibrationData:
+                    if not isinstance(self._data_.maximum, (complex, float, int)):
+                        self._data_.maximum = arg
                         
-                        if origin_.units != units.units:
-                            origin_ = origin_.rescale(units.units)
+            elif arg == np.nan:
+                if not isinstance(self._data_.origin, (complex, float, int)) and self._data_.origin != np.nan:
+                    self._data_.origin = arg
                     
-                # take this even if units not yet defined
-                origin = quantity2scalar(origin_)
-                
-            elif isinstance(origin_, (complex, int, float)):
-                origin = origin_
-                
-        if "resolution" in kwargs:
-            resolution_ = kwargs.pop("resolution", 1.)
-                
-            if isinstance(resolution_, np.ndarray):
-                if isinstance(units, pq.Quantity):
-                    if isinstance(resolution_, pq.Quantity):
-                        if not units_convertible(resolution_.units, units.units):
-                            raise TypeError("wrong units for 'resolution' keyword")
+                elif not isinstance(self._data_.resolution, (complex, float, int)) and self._data_.origin != np.nan:
+                    self._data_.resolution = arg
+                    
+                elif self.__class__ == ChannelCalibrationData:
+                    if not isinstance(self._data_.maximum, (complex, float, int)) and self._data_.maximum != np.nan:
+                        self._data_.maximum = arg
                         
-                        if resolution_.units != units.units:
-                            resolution_ = resolution_.rescale(units.units)
+            elif isinstance(arg, vigra.AxisInfo):
+                if self.__class__ == AxisCalibrationData:
+                    self._data_.type = arg.typeFlags
+                    self._data_.key = arg.key
+                    self._data_.name = axisTypeName(self._data_.type)
                     
-                # take this even if units not yet defined
-                resolution = quantity2scalar(resolution_)
                 
-            elif isinstance(resolution_, (complex, int, float)):
-                resolution = resolution_
+                # TODO parse description - check AxesCalibration.parse description
                 
-        # finally, set up defaults:
+        axtype = kwargs.pop("type", None)
+        
+        if self.__class__ == AxisCalibrationData:
+            if isSpecificAxisType(axtype):
+                self._data_.type = axtype
+            
+            if isinstance(self._data_.type, str):
+                self._data_.type = axisTypeFromString(self._data_.type)
                 
-        if not isinstance(units, pq.Quantity):
-            units = pixel_unit
+            if not isinstance(self._data_.type, (vigra.AxisType, int)) or not any(self._data_.type & x for x in vigra.AxisType.values):
+                self._data_.type = vigra.AxisType.UnknownAxisType
             
-        if not isinstance(origin, (complex, int, float)):
-            origin = 0.
+            if len(channeldata):
+                self._data_.type = vigra.AxisType.Channels
             
-        if not isinstance(resolution, (complex, int, float)):
-            resolution = 1.
+            if self._data_.key is None:
+                self._data_.key = axisTypeSymbol(self._data_.type, False)
             
-        spurious = [k for k in kwargs if k not in (DataBag.hidden_traits + self.__class__.parameters)]
+        axname = kwargs.pop("name", None)
         
-        #print(f"CalibrationData | {self.__class__.__name__} spurious: {spurious}")
-        
-        for k in spurious:
-            kwargs.pop(k, None)
+        if self.__class__ == AxisCalibrationData:
+            if isinstance(axname, str) and len(axname.strip()):
+                self._data_.name = axname
             
-        kwargs["allow_none"] = True
-        kwargs["use_mutable"] = True
+            if not isinstance(self._data_.name, str) or len(self._data_.name.strip()) == 0:
+                self._data_.name = axisTypeName(self._data_.type)
+                
+        chindex = kwargs.pop("index", None)
+        
+        if self.__class__ == ChannelCalibrationData:
+            if isinstance(chindex, int) and chindex >= 0:
+                self._data_.index = chindex
+        
+        units_ = kwargs.pop("units", None)
+        
+        if isinstance(units_, str):
+            try:
+                units_ = unit_quantity_from_name_or_symbol(units_)
+            except:
+                units_ = None
+        
+        if isinstance(units_, pq.dimensionality.Dimensionality):
+            units_ = [k for k in units_.simplified][0]
+        
+        if isinstance(units_, pq.Quantity):
+            self._data_.units = units_.units
+        
+        if not isinstance(self._data_.units, pq.Quantity):
+            if self.__class__ == AxisCalibrationData:
+                self._data_.units = axisTypeUnits(self._data_.type)
+            elif self.__class__ == ChannelCalibrationData:
+                self._data_.units = channel_unit
+                
+            else:
+                self._data_.units = pq.dimensionless # (UnknownAxisType)
             
-        self._data_ = DataBag(**kwargs)
+        origin_ = kwargs.pop("origin", None)
+        minimum = kwargs.pop("minimum", None)
         
-        print(f"{self.__class__.__name__} (CalibrationData)._data_{self._data_}")
-        self._data_["units"]=units
-        self._data_["origin"]=origin
-        self._data_["resolution"]=resolution
-        print(f"{self.__class__.__name__} (CalibrationData)._data_{self._data_}")
+        origin_ = origin_ if origin_ is not None else minimum
         
+        if isinstance(origin_, pq.Quantity):
+            if not units_convertible(origin_.units, self._data_.units.units):
+                raise TypeError(f"'origin (or minimum)' units {origin_.units} are incompatible with the specified units ({self._data_.units})")
+                
+            if origin_.units != self._data_.units.units:
+                origin_ = origin_.rescale(self._data_.units.units)
+                
+            self._data_.origin = quantity2scalar(o)
+            
+        elif isinstance(origin_, (complex, float, int, np.ndarray)) or origin_ == np.nan:
+            self._data_.origin = quantity2scalar(origin_)
+            
+        resoln  = kwargs.pop("resolution", None)
+        
+        if isinstance(resoln, pq.Quantity):
+            if not units_convertible(resoln.units, self._data_.units.units):
+                raise TypeError(f"'resolution' units {resoln.units} are incompatible with the specified units ({self._data_.units})")
+                
+            if resoln.units != self._data_.units.units:
+                resoln = resoln.rescale(self._data_.units.units)
+                
+            self._data_.resolution = quantity2scalar(resoln)
+        
+        elif isinstance(resoln, (complex, int, float, np.ndarray)) or resoln == np.nan:
+            self._data_.resolution = quantity2scalar(resoln)
+        
+        if self.__class__ == AxisCalibrationData:
+            if self._data_.type & vigra.AxisType.Channels:
+                # bring back channel calibration data if necessary
+                for k, chcal in enumerate(channeldata):
+                    # assign calibrations as they come;
+                    # use their mapped names in kwargs as arguments
+                    # later on, use their own channelname/channelindex fields as needed
+                    self._data_[chcal[0]] = chcal[1]
+                
+        maxval = kwargs.pop("maximum", None)
+        
+        if self.__class__ == ChannelCalibrationData:
+            if isinstance(maxval, pq.Quantity):
+                if not units_convertible(maxval.units, self._data_.units.units):
+                    raise TypeError(f"'maximum value' units {maxval.units} are incompatible with the specified units ({self._data_.units})")
+                    
+                if maxval.units != self._data_.units.units:
+                    maxval = maxval.rescale(self._data_.units.units)
+                    
+                self._data_.maximum = quantity2scalar(maxval)
+                
+            elif isinstance(maxval, (complex, float, int, np.ndarray)) or maxval == np.nan:
+                self._data_.min = quantity2scalar(maxval)
+                
+        # finally, set up defaults if anything was missed
+        if self.__class__ == AxisCalibrationData:
+            if not isSpecificAxisType(self._data_.type):
+                self._data_.type = vigra.AxisType.UnknownAxisType
+                
+            if not isinstance(self._data_.name, str) or len(self._data_.name.strip()) == 0:
+                self._data_.name = axisTypeName(self._data_.type)
+                
+            if not isinstance(self._data_.key, str) or len(self._data_.key.strip()) == 0:
+                self._data_.key = axisTypeSymbol(self._data_.type)
+                
+        if self.__class__ == ChannelCalibrationData:
+            if not isinstance(self._data_.index, int) or self._data_.index < 0:
+                self._data_.index = 0
+                
+            if not isinstance(self._data_.maximum, (complex, float, int)) and self._data_.maximum != np.nan:
+                self._data_.maximum = np.nan
+                
+            if not isinstance(self._data_.name, str) or len(self._data_.name.strip()) == 0:
+                self._data_.name = "channel"
+                
+        if not isinstance(self._data_.units, pq.Quantity):
+            self._data_.units = pq.dimensionless
+            
+        if not isinstance(self._data_.origin, (complex, float, int)):
+            self._data_.origin = 0.
+            
+        if not isinstance(self._data_.resolution, (complex, float, int)):
+            self._data_.resolution = 1.
+            
     def __repr__(self):
-        return self._data_.__repr__()
+        return pformat(self._data_)
         
     def __str__(self):
-        return self._data_.__str__()
+        return pformat(self._data_)
         
     @property
     def units(self) -> pq.Quantity:
         """Get/set the pysical units of measurement.
-        WARNING: Setting this property will adjust the properties 'origin' and
-        'resolution'. These will have to be reset manually.
+        WARNING: Setting this property will NOT adjust (rescale) the 'origin' 
+        and 'resolution' - use self.rescale() for that.
+        Issues a warning if the new units are NOT typical for the axis type.
         """
         return self._data_.units
     
     @units.setter
     def units(self, u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality, str]) -> None:
-        print(f"{self.__class__.__name__} (CalibrationData).units.setter")
-        
-        old_units = self._data_["units"]
-        obs = self._data_.observer
-        print(f"initial trait values: \n{obs._trait_values}")
         if isinstance(u, pq.dimensionality.Dimensionality):
             new_units = [k for k in u.simplified][0]
             
         elif isinstance(u, str):
-            new_units = pq.unit_registry[u]
+            new_units = unit_quantity_from_name_or_symbol(u)
             
-        if isinstance(u, pq.Quantity):
-            if not units_convertible(self._data_.units.units, u.units):
-                #forcibly change units
-                new_units = u
-                #self._data_.units = u
-                
-            elif u.units != self._data_.units:
-                new_units = self._data_.units.rescale(u.units)
-                o = self._data_.origin * self._data_.units
-                o = o.rescale(u.units)
-                self._data_["origin"] = quantity2scalar(o)
-                #self._data_.origin = quantity2scalar(o)
-                r = self._data_.resolution * self._data_.units
-                r = r.rescale(u.units)
-                self._data_["resolution"] = quantity2scalar(r)
-                #self._data_.resolution = quantity2scalar(r)
-                self._data_["units"] = new_units
-                #self._data_.units = new_units
+        elif isinstance(u, pq.Quantity):
+            new_units = u
                 
         else:
             raise TypeError(f"Units expected to be a Python Quantity, Dimensionality, or str; got {type(u).__name__} instead")
+        
+        if hasattr(self, "type"):
+            units_for_type = axisTypeUnits(self.type)
+            axis_type_names = axisTypeStrings(self.type)
+            if not units_convertible(new_units.units, units_for_type.units):
+                warnings.warn(f"Assigning units {new_units} for a {axis_type_names} axis", RuntimeWarning, stacklevel=2)
                 
-        self._data_["units"] = new_units
-        print(f"final trait values: \n{obs._trait_values}")
-        _=self._data_.trait_values() # force traits refreshing
-                
+        self._data_.units = new_units
+        
+    def rescale(self, u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality, str]) -> None:
+        """Rescale units, origin and resolution for new units.
+        
+        New units must be convertible to the current units.
+        """
+        o = self.origin * self.units
+        r = self.resolution * self.units
+        new_o = o.rescale(u)
+        new_r = r.rescale(u)
+        self.units = self.units.rescale(u)
+        self.origin = quantity2scalar(new_o)
+        self.resolution = quantity2scalar(new_r)
+        
+
+    
     @property
     def origin(self):
         """Get/set the origin value
@@ -311,8 +511,7 @@ class CalibrationData(object):
     @origin.setter
     def origin(self, val):
         if isinstance(val, (complex, float, int)):
-            self._data_["origin"] = val
-            #self._data_.origin = val
+            self._data_.origin = val
             
         elif isinstance(val, pq.Quantity):
             if not units_convertible(val.units, self.units.units):
@@ -321,17 +520,15 @@ class CalibrationData(object):
             if val.units != self.units.units:
                 val = val.rescale(self.units.units)
                 
-            self._data_["origin"] = quantity2scalar(val)
-            #self._data_.origin = quantity2scalar(val)
+            self._data_.origin = quantity2scalar(val)
             
         elif isinstance(val, np.ndarray):
-            self._data_["origin"] = quantity2scalar(val)
-            #self._data_.origin = quantity2scalar(val)
+            self._data_.origin = quantity2scalar(val)
             
         else:
             raise TypeError(f"Origin expected a scalar int, float, complex, Python Quantity or numpy array; got {type(val).__name__} instead")
             
-        _=self._data_.trait_values() # force traits refreshing
+        #_=self._data_.trait_values() # force traits refreshing
         
     @property
     def resolution(self):
@@ -342,8 +539,8 @@ class CalibrationData(object):
     @resolution.setter
     def resolution(self, val):
         if isinstance(val, (complex, float, int)):
-            self._data_["resolution"] = val
-            #self._data_.resolution = val
+            self._data_.resolution = val
+            #self._data_["resolution"] = val
             
         elif isinstance(val, pq.Quantity):
             if not units_convertible(val.units, self.units.units):
@@ -352,18 +549,90 @@ class CalibrationData(object):
             if val.units != self.units.units:
                 val = val.rescale(self.units.units)
                 
-            self._data_["resolution"] = quantity2scalar(val)
-            #self._data_.resolution = quantity2scalar(val)
+            self._data_.resolution = quantity2scalar(val)
+            #self._data_["resolution"] = quantity2scalar(val)
             
         elif isinstance(val, np.ndarray):
-            self._data_["resolution"] = quantity2scalar(val)
-            #self._data_.resolution = quantity2scalar(val)
+            self._data_.resolution = quantity2scalar(val)
+            #self._data_["resolution"] = quantity2scalar(val)
             
         else:
             raise TypeError(f"Resolution expected a scalar int, float, complex, Python Quantity or numpy array; got {type(val).__name__} instead")
             
-        _=self._data_.trait_values() # force traits refreshing
+        #_=self._data_.trait_values() # force traits refreshing
         
+class ChannelCalibrationData(CalibrationData):
+    """Encapsulates calibration data for pixel INTENSITIES in a given channel.
+    
+    Do not confuse with the calibration of a Channels axis itself.
+    
+    """
+    parameters = CalibrationData.parameters + ("name","index", "maximum")
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+    @property
+    def minimum(self):
+        """Get/set minimum calibration value.
+        This is the same as origin.
+        """
+        return self.origin
+    
+    @minimum.setter
+    def minimum(self, val):
+        self.origin = val
+        
+    @property
+    def maximum(self):
+        """Get/set the maximum calibration value
+        """
+        return self._data_.maximum
+    
+    @maximum.setter
+    def maximum(self, val):
+        if isinstance(val, (complex, float, int)):
+            self._data_.maximum = val
+            
+        elif isinstance(val, pq.Quantity):
+            if not units_convertible(val.units, self.units.units):
+                raise TypeError(f"Maximum value units ({val.units}) incompatible with my units ({self.units.units})")
+            
+            if val.units != self.units.units:
+                val = val.rescale(self.units.units)
+                
+            self._data_.maximum = quantity2scalar(val)
+            
+        elif isinstance(val, np.ndarray):
+            self._data_.maximum = quantity2scalar(val)
+            
+        else:
+            raise TypeError(f"Maximum value was expected as a scalar int, float, complex, Python Quantity or numpy array; got {type(val).__name__} instead")
+            
+    @property
+    def name(self):
+        return self._data_.name
+    
+    @name.setter
+    def name(self, val:str):
+        if isinstance(val, str) and len(val.strip()):
+            self._data_.name = val
+            #self._data_["name"] = val
+
+        #_=self._data_.trait_values() # force traits refreshing
+            
+    @property
+    def index(self):
+        return self._data_.index
+    
+    @index.setter
+    def index(self, val:int):
+        if isinstance(val, int) and val >= 0:
+            self._data_.index = val
+            #self._data_["index"] = val
+        
+        #_=self._data_.trait_values() # force traits refreshing
+
 class AxisCalibrationData(CalibrationData):
     """Atomic calibration data for an axis of a vigra.VigraArray.
     To be mapped to a vigra.AxisInfo key str in AxesCalibration, or to
@@ -415,250 +684,8 @@ class AxisCalibrationData(CalibrationData):
             when given, the axis type will forcibly set to vigra.AxisType.Channels
         
         """
-        allow_none = kwargs.pop("allow_none", True)
-        use_mutable = kwargs.pop("use_mutable", True)
-        
-        axistype = None
-        axisname = None
-        axiskey = None
-        units = None
-        origin = None
-        resolution = None
-        
-        # cache channel calibration data from kwargs, if any;
-        # use only if axis type is Channels;
-        # also use this to force axistype to channels when axistype not given
-        
-        # clean up channel params in kwargs to ensure consistency
-        c = dict([(k,v) for k,v in kwargs .items() if k.startswith("channel")])
-        
-        channeldata = [ChannelCalibrationData(**v) for v in c.values() if ChannelCalibrationData.isCalibration(v)]
-        
-        for k in c:
-            kwargs.pop(k, None)
-            
-        print("AxisCalibrationData.__init__ *args", args)
-        
-        for arg in args:
-            # below, qwhenever we set the axistype we also set the params derived
-            # from it, if required: axisname, axiskey, units
-            if isinstance(arg, str):
-                if not isSpecificAxisType(axistype):
-                    axistype = axisTypeFromString(arg)
-                    
-                    if len(channeldata):
-                        axistype = vigra.AxisType.Channels
-                    
-                    if isSpecificAxisType(axistype):
-                        if not isinstance(axisname, str) or len(axisname.strip()) == 0:
-                            axisname = axisTypeName(axistype)
-                            
-                        if not isinstance(axiskey, str) or len(axiskey.strip()) == 0:
-                            axiskey = axisTypeSymbol(axistype)
-                            
-                        if not isinstance(units, pq.Quantity):
-                            units = axisTypeUnits(axistype)
-                        
-                elif not isinstance(axisname, str) or len(axisname.strip()) == 0:
-                    axisname = arg
-                    
-            elif isinstance(arg, vigra.AxisType):
-                if not isSpecificAxisType(axistype):
-                    axistype = arg
-                    
-                    if len(channeldata):
-                        axistype = vigra.AxisType.Channels
-                    
-                    if not isinstance(axisname, str) or len(axisname.strip()) == 0:
-                        axisname = axisTypeName(axistype)
-                        
-                    if not isinstance(axiskey, str) or len(axiskey.strip()) == 0:
-                        axiskey = axisTypeSymbol(axistype)
-                    
-                    if not isinstance(units, pq.Quantity):
-                        units = axisTypeUnits(axistype)
-                    
-            elif isinstance(arg, int):
-                if not isSpecificAxisType(axistype):
-                    if isSpecificAxisType(arg): 
-                        if arg == vigra.AxisType.UnknownAxisType:
-                            axistype = vigra.AxisType.UnknownAxisType
-                        elif arg == vigra.AxisType.AllAxes:
-                            axistype = vigra.AxisType.AllAxes
-                        elif arg == vigra.AxisType.NonChannel:
-                            axistype = vigra.AxisType.NonChannel
-                        else:
-                            test = list(v[1] for v in sortedAxisTypes if v[0] & arg)[2:]
-                            if len(test):
-                                axistype = functools.reduce(operator.or_, test)
-                                
-                    if len(channeldata):
-                        axistype = vigra.AxisType.Channels
-                            
-                    if isSpecificAxisType(axistype):
-                        if not isinstance(axisname, str) or len(axisname.strip()) == 0:
-                            axisname = axisTypeName(axistype)
-                            
-                        if not isinstance(axiskey, str) or len(axiskey.strip()) == 0:
-                            axiskey = axisTypeSymbol(axistype)
-                            
-                        if not isinstance(units, pq.Quantity):
-                            units = axisTypeUnits(axistype)
-                            
-                elif not isinstance(origin, (complex, float, int)):
-                    origin = quantity2scalar(arg)
-                    
-                elif not isinstance(resolution, (complex, float, int)):
-                    resolution = quantity2scalar(arg)
-                
-            elif isinstance(arg, pq.Quantity):
-                if not isinstance(units, pq.Quantity):
-                    units = arg.units
-                    
-                elif not isinstance(origin, (complex, float, int)):
-                    if not units_convertible(units.units, arg.units):
-                        raise TypeError(f"'origin' units {arg.units} are incompatible with the specified units ({units})")
-                    
-                    if arg.units != units.units:
-                        arg = arg.rescale(units.units)
-                        
-                    origin = quantity2scalar(arg)
-                    
-                elif not isinstance(resolution, (complex, float, int)):
-                    if not units_convertible(units.units, arg.units):
-                        raise TypeError(f"'origin' units {arg.units} are incompatible with the specified units ({units})")
-                    
-                    if arg.units != units.units:
-                        arg = arg.rescale(units.units)
-                        
-                    resolution = quantity2scalar(arg)
-                    
-            elif isinstance(arg, np.ndarray):
-                if not isinstance(origin, (complex, float, int)):
-                    origin = quantity2scalar(arg)
-                    
-                elif not isinstance(resolution, (complex, float, int)):
-                    resolution = quantity2scalar(arg)
-                
-            elif isinstance(arg, pq.dimensionality.Dimensionality):
-                if not isinstance(units, pq.Quantity):
-                    units = [k for k in units.simplified][0]
-                
-            elif isinstance(arg, (float, complex)):
-                if not isinstance(origin, (complex, float, int)):
-                    origin = arg
-                    
-                elif not isinstance(resolution, (complex, float, int)):
-                    resolution = arg
-                    
-            elif isinstance(arg, vigra.AxisInfo):
-                axistype = arg.typeFlags
-                axiskey = arg.key
-                axisname = axisTypeName(axistype)
-                
-                # TODO parse description - check AxesCalibration.parse description
-                
-        axtype = kwargs.pop("type", None)
-        
-        if isSpecificAxisType(axtype):
-            axistype = axtype
-        
-        if isinstance(axistype, str):
-            axistype = axisTypeFromString(axistype)
-            
-        if not isinstance(axistype, (vigra.AxisType, int)) or not any(axistype & x for x in vigra.AxisType.values):
-            axistype = vigra.AxisType.UnknownAxisType
-        
-        if len(channeldata):
-            axistype = vigra.AxisType.Channels
-        
-        if axiskey is None:
-            axiskey = axisTypeSymbol(axistype, False)
-            
-        axname = kwargs.pop("name", None)
-        
-        if isinstance(axname, str) and len(axname.strip()):
-            axisname = axname
-        
-        if not isinstance(axisname, str) or len(axisname.strip()) == 0:
-            axisname = axisTypeName(axistype)
-        
-        units_ = kwargs.pop("units", None)
-        if isinstance(units_, pq.Quantity):
-            units = units_.units
-        
-        if not isinstance(units, (pq.Quantity, pq.dimensionality.Dimensionality)):
-            units = axisTypeUnits(axistype)
-            
-        if isinstance(units, pq.dimensionality.Dimensionality):
-            units = [k for k in units.simplified][0]
-        
-        origin_ = kwargs.pop("origin", None)
-        
-        if isinstance(origin_, (complex, float, int)):
-            origin = quantity2scalar(origin_)
-            
-        elif isinstance(origin_, pq.Quantity):
-            if not units_convertible(origin_.units, units.units):
-                raise TypeError(f"'origin' units {origin_.units} are incompatible with the specified units ({units})")
-                
-            if origin_.units != units.units:
-                origin_ = origin_.rescale(units)
-                
-            origin = quantity2scalar(o)
-            
-        elif isinstance(origin_, np.ndarray):
-            origin = quantity2scalar(origin_)
-            
-        resoln  = kwargs.pop("resolution", None)
-        
-        if isinstance(resoln, (complex, int, float)):
-            resolution = resoln
-        
-        elif isinstance(resoln, pq.Quantity):
-            if not units_convertible(resoln.units, units.units):
-                raise TypeError(f"'resolution' units {resolution.units} are incompatible with the specified units ({units})")
-                
-            if resoln.units != units.units:
-                resoln = resoln.rescale(units)
-                
-            resolution = quantity2scalar(resoln)
-                    
-        elif isinstance(resoln, np.ndarray):
-            resolution = quantity2scalar(resoln)
-        
-        if axistype & vigra.AxisType.Channels:
-            # bring back channel calibration data if necessary
-            for k, chcal in enumerate(channeldata):
-                # assign calibrations as they come;
-                # later on, use their own channelname/channelindex fields as needed
-                kwargs[f"channel_calibration_{k}"] = chcal
-                
-        if not isinstance(origin, (complex, float, int)):
-            origin = 0.
-            
-        if not isinstance(resolution, (complex, float, int)):
-            resolution = 1.
-            
-        spurious = [k for k in kwargs if k not in (DataBag.hidden_traits + self.__class__.parameters)]
-        
-        for k in spurious:
-            kwargs.pop(k, None)
-            
-        kwargs["allow_none"] = True
-        kwargs["use_mutable"] = True
-            
-        super().__init__(units=units,
-                         origin=origin,
-                         resolution=resolution,
-                         **kwargs)
-        print(f"{self.__class__.__name__}._data_{self._data_}")
-    
-        self._data_["type"] = axistype
-        self._data_["name"] = axisname
-        self._data_["key"]  = axiskey
-        print(f"{self.__class__.__name__}._data_{self._data_}")
-            
+        super().__init__(*args, **kwargs)
+
     @property
     def name(self):
         """Get/set the axis name
@@ -667,13 +694,13 @@ class AxisCalibrationData(CalibrationData):
     
     @name.setter
     def name(self, val:str):
-        print(f"CalibrationData | {self.__class__.__name__}).name.setter _data_: {self._data_}")
+        #print(f"CalibrationData | {self.__class__.__name__}).name.setter _data_: {self._data_}")
         if isinstance(val, str) and len(val.strip()):
             self._data_["name"] = val
             #self._data_.name = val
             
-        print(f"CalibrationData | {self.__class__.__name__}).name.setter _data_: {self._data_}")
-        _=self._data_.trait_values() # force traits refreshing
+        #print(f"CalibrationData | {self.__class__.__name__}).name.setter _data_: {self._data_}")
+        #_=self._data_.trait_values() # force traits refreshing
             
     @property
     def key(self):
@@ -683,13 +710,13 @@ class AxisCalibrationData(CalibrationData):
     
     @key.setter
     def key(self, val:str):
-        print(f"CalibrationData | {self.__class__.__name__}).key.setter _data_: {self._data_}")
+        #print(f"CalibrationData | {self.__class__.__name__}).key.setter _data_: {self._data_}")
         if isinstance(val, str) and len(val.strip()):
             self._data_["key"] = val
             #self._data_.key = val
-        print(f"CalibrationData | {self.__class__.__name__}).key.setter _data_: {self._data_}")
+        #print(f"CalibrationData | {self.__class__.__name__}).key.setter _data_: {self._data_}")
         
-        _=self._data_.trait_values() # force traits refreshing
+        #_=self._data_.trait_values() # force traits refreshing
             
     @property
     def type(self):
@@ -702,11 +729,6 @@ class AxisCalibrationData(CalibrationData):
     
     @type.setter
     def type(self, val:typing.Union[vigra.AxisType, int, str]):
-        #print(f"{self.__class__.__name__} (CalibrationData).type.setter val = {val}; initial _data_:\n{self._data_}")
-        obs = self._data_.observer
-        
-        print(f"initial trait values: \n{obs._trait_values}")
-        
         if isinstance(val, str):
             val = axisTypeFromString(val)
             
@@ -728,240 +750,667 @@ class AxisCalibrationData(CalibrationData):
                     # remove channels
                     chcals = [k for k in self._data_ if k.startswith("channel")]
                     
-                    print(chcals)
-                    
                     for k in chcals:
                         self._data_.pop(k, None)
                         
-            obs = self._data_.observer
-            
-            old_val = self._data_["type"]
-            self._data_["type"] = val
-            print(f"trait values after setting type: \n{obs._trait_values}")
-            
-            new_key = axisTypeSymbol(val)
-            old_key = self._data_["key"]
-            self._data_["key"] = new_key
-            print(f"trait values after setting key: \n{obs._trait_values}")
-            
-            new_name = axisTypeName(val)
-            old_name = self._data_["name"]
-            self._data_["name"] = new_name
-            print(f"trait values after setting name: \n{obs._trait_values}")
-                
-            new_units = axisTypeUnits(val)
-            old_units = self._data_["units"]
-            self._data_["units"] = new_units
-            print(f"trait values after setting units: \n{obs._trait_values}")
-            
-            
-        #self._data_.type = val
-        #self._data_.units = axisTypeUnits(val)
-        #self._data_.key = axisTypeSymbol(val)
-        #self._data_.name = axisTypeName(val)
-                        
-        print(f"final trait values: \n{obs._trait_values}")
-        _=self._data_.trait_values() # force traits refreshing
+            self._data_.type = val
+            self._data_.units = axisTypeUnits(val)
+            self._data_.name = axisTypeName(val)
+            self._data_.key = axisTypeSymbol(val)
             
     @property
     def channels(self):
-        """Iterator through channel calibration data
+        """Iterator through channel calibration data.
+        
+        Generates tuple(name, channel calibration data) where name is the name
+        of this axis calibration field that is mapped to the channel calibration 
+        data.
+        
+        The setter does nothing for a NonChannel axis.
+        
+        To add channels to an axis first make sure the axis type is Channels.
+        """
+        yield from ((k,v) for k,v in self._data_.items() if isinstance(v, ChannelCalibrationData))
+        
+    @channels.setter
+    def channels(self, val:typing.Sequence[typing.Tuple[str, typing.Union[ChannelCalibrationData, dict]]]):
+        if not self.type & vigra.AxisType.Channels:
+            return
+        
+        for k,v in enumerate(val):
+            if ChannelCalibrationData.isCalibration(v[1]):
+                if isinstance(v[0], str) and len(v[0].strip()) and v[0] not in self.parameters:
+                    field = v[0]
+                else:
+                    field = f"channel_{k}"
+                self._data_[field] = ChannelCalibrationData(v[1])
+                
+    @property
+    def channelCalibrations(self):
+        """Iterates through the channel calibraiton data
         """
         yield from (v for v in self._data_.values() if isinstance(v, ChannelCalibrationData))
         
-    @channels.setter
-    def channels(self, val:typing.Sequence):
-        _=self._data_.trait_values() # force traits refreshing
-            
-        pass
+    @channelCalibrations.setter
+    def channelCalibrations(self, val:typing.Sequence[typing.Union[ChannelCalibrationData, dict]]):
+        if not self.type & vigra.AxisType.Channels:
+            return
         
-        
-class ChannelCalibrationData(CalibrationData):
-    """Encapsulates calibration data for pixel INTENSITIES in a given channel.
-    
-    Do not confuse with the calibration of a Channels axis itself.
-    
-    """
-    parameters = CalibrationData.parameters + ("name","index")
-    
-    def __init__(self, *args, **kwargs):
-        channelname = None
-        channelindex = None
-        units = None
-        origin = None
-        resolution = None
-        
-        allow_none = kwargs.pop("allow_none", True)
-        use_mutable = kwargs.pop("use_mutable", True)
-        
-        for arg in args:
-            if isinstance(arg, str) and len(arg.strip()):
-                if not isinstance(channelname, str) or len(channelname.strip()) == 0:
-                    channelname = arg
-                    
-            elif isinstance(arg, int):
-                if not isinstance(channelindex, int) or channelindex < 0:
-                    if arg >= 0:
-                        channelindex = arg
-                        
-                elif not isinstance(origin, (complex, float, int)):
-                    origin = quantity2scalar(arg)
-                    
-                elif not isinstance(resolution, (complex, float, int)):
-                    resolution = quantity2scalar(arg)
-                    
-            elif isinstance(arg, (complex, float)):
-                if not isinstance(origin, (complex, float, int)):
-                    origin = quantity2scalar(arg)
-                    
-                elif not isinstance(resolution, (complex, float, int)):
-                    reslution = quantity2scalar(arg)
-                    
-            elif isinstance(arg, pq.dimensionality.Dimensionality):
-                if not isinstance(units, pq.Quantity):
-                    units = [k for k in arg.simplified][0]
-                    
-            if isinstance(arg, pq.Quantity):
-                if not isinstance(units, pq.Quantity):
-                    units = arg.units
-                    
-                elif not isinstance(origin, (complex, float, int)):
-                    if not units_convertible(units.units, arg.units):
-                        raise TypeError(f"'origin' units {arg.units} incompatible with units {units.units}")
-                    
-                    if arg.units != units.units:
-                        arg = arg.rescale(units.units)
-                        
-                    origin = quantity2scalar(arg)
-                
-                elif not isinstance(resolution, (complex, float, int)):
-                    if not units_convertible(units.units, arg.units):
-                        raise TypeError(f"'resolution' units {arg.units} incompatible with units {units.units}")
-                    
-                    if arg.units != units.units:
-                        arg = arg.rescale(units.units)
-                        
-                    resolution = quantity2scalar(arg)
-                
-            elif isinstance(arg, np.ndarray):
-                if not isinstance(origin, (complex, float, int)):
-                    origin = quantity2scalar(arg)
-                        
-                elif not isinstance(resolution, (complex, float, int)):
-                    resolution = quantity2scalar(arg)
-                    
-        chndx = kwargs.pop("index", None)
-        
-        if isinstance(chndx, int) and chndx >= 0:
-            channelindex = chndx
-                        
-        chname = kwargs.pop("name", None)
-        
-        if isinstance(chname, str) and len(chname.strip()):
-            channelname = chname
-            
-        units_ = kwargs.pop("units",None)
-        
-        if isinstance(units_, pq.Quantity):
-            units = units_.units
-            
-        origin_ = kwargs.pop("origin", None)
-        
-        if isinstance(origin_, (complex, float, int)):
-            origin = origin_
-            
-        elif isinstance(origin_, pq.Quantity):
-            if not units_convertible(origin_.units, units.units):
-                raise TypeError(f"'origin' units {origin_.units} are incompatible with the specified units ({units})")
-                
-            if origin_.units != units.units:
-                origin_ = origin_.rescale(units)
-                
-            origin = quantity2scalar(o)
-            
-        elif isinstance(origin_, np.ndarray):
-            origin = quantity2scalar(origin_)
-            
-        resoln  = kwargs.pop("resolution", None)
-        
-        if isinstance(resoln, (complex, int, float)):
-            resolution = resoln
-        
-        elif isinstance(resoln, pq.Quantity):
-            if not units_convertible(resoln.units, units.units):
-                raise TypeError(f"'resolution' units {resolution.units} are incompatible with the specified units ({units})")
-                
-            if resoln.units != units.units:
-                resoln = resoln.rescale(units)
-                
-            resolution = quantity2scalar(resoln)
-                    
-        elif isinstance(resoln, np.ndarray):
-            resolution = quantity2scalar(resoln)
-        
-        #if axistype & vigra.AxisType.Channels:
-            ## bring back channel calibration data if necessary
-            #kwargs.update(channeldata)
-            
-        if not isinstance(channelindex, int) or channelindex < 0:
-            channelindex = 0
-            
-        if not isinstance(channelname, str) or len(channelname.strip()) == 0:
-            channelname = f"channel_{channelindex}"
-        
-        if not isinstance(units, pq.Quantity):
-            units = arbitrary_unit
-            
-        if not isinstance(origin, (complex, float, int)):
-            origin = 0.
-            
-        if not isinstance(resolution, (complex, float, int)):
-            resolution = 1.
-
-
-        spurious = [k for k in kwargs if k not in DataBag.hidden_traits]
-        
-        for k in spurious:
-            kwargs.pop(k, None)
-            
-        kwargs["allow_none"] = True
-        kwargs["use_mutable"] = True
-            
-        super().__init__(units=units,
-                         origin=origin,
-                         resolution=resolution,
-                         **kwargs)
-        
-        self._data_["index"] = channelindex
-        self._data_["name"] = chanelname
+        for k,v in enumerate(val):
+            self._data_[f"channel_{k}"] = ChannelCalibrationData(v[1])
         
     @property
-    def name(self):
-        return self._data_.name
-    
-    @name.setter
-    def name(self, val:str):
-        if isinstance(val, str) and len(val.strip()):
-            self._data_["name"] = val
-            #self._data_.name = val
-
-        _=self._data_.trait_values() # force traits refreshing
-            
-    @property
-    def index(self):
-        return self._data_.index
-    
-    @index.setter
-    def index(self, val:int):
-        if isinstance(val, int) and val >= 0:
-            self._data_["index"] = val
-            #self._data_.index = val
+    def channelNames(self):
+        """Yields channel names or nothing of there is no ChannelCalibrationData.
+        NonChannel axes have no ChannelCalibrationData
+        """
+        yield from (ch.name for ch in self.channels)
         
-        _=self._data_.trait_values() # force traits refreshing
+    @property
+    def channelIndices(self):
+        """Yields channel indices or nothing of there is no ChannelCalibrationData.
+        NonChannel axes have no ChannelCalibrationData
+        """
+        yield from (ch.index for ch in self.channelCalibrations)
+        
+    @property
+    def nChannels(self):
+        """Returns 0 for NonChannel axis or when there is no ChannelCalibrationData
+        """
+        return len(list(self.channelCalibrations))
+        
+    @property
+    def calibrationString(self):
+        """
+        XML-formatted string with one of the following formats, depending on axis type:
+        
+        1) For a non-channels axis:
+        ----------------------------
+        
+        <axis_calibration>
+            <type>int</type>
+            <key>str</key>
+            <name>str</name>
+            <units>str</units>
+            <origin>float</origin>
+            <resolution>float</resolution>
+        </axis_calibration>
+        
+        2) for a channel axis:
+        ----------------------------
+        
+        <axis_calibration>
+            <type>int</type>
+            <key>str</key>
+            <name>str</name>
+            <channel_0>
+                <index>int</index>
+                <name>str</name>
+                <units>str</units>
+                <minimum>float|complex|int</minimum>
+                <maximum>float|complex|int</maximum>
+                <resolution>float</resolution>
+            </channel_0>
+            <channel_1>
+                <index>int</index>
+                <name>str</name>
+                <units>str</units>
+                <minimum>float|complex|int</minimum>
+                <maximum>float|complex|int</maximum>
+                <resolution>float</resolution>
+            </channel_1>
+            ... etc ...
+        </axis_calibration>
+        
+        """
 
+        strlist = ["<axis_calibration>"]
+        strlist.append(f"<type>{axisTypeStrings(self.type)}</type>")
+        strlist.append(f"<key>{self.key}</key>")
+        strlist.append(f"<name>{self.name}</name>")
+        
+        if self.type & vigra.AxisType.Channels:
+            for ch in self.channels:
+                strlist.append("<channel_%d>" % ch[0])
+                strlist.append(f"<index>{ch[1].index}</index>")
+                strlist.append(f"<name>{ch[1].name}</name>")
+                strlist.append(f"<units>{ch[1].units}</units>")
+                strlist.append(f"<minimum>{ch[1].minimum}</minimum>")
+                strlist.append(f"<maximum>{ch[1].maximum}</maximum>")
+                strlist.append(f"<resolution>{ch[1].resolution}</resolution>")
+                strlist.append("</channel_%d>" % ch[0])
+                
+        else:
+            strlist.append(f"<units>{self.units}</units>")
+            strlist.append(f"<origin>{self.origin}</origin>")
+            strlist.append(f"<resolution>{self.resolution}</resolution>")
+            
+        strlist.append("</axis_calibration>")
+            
+        return "".join(strlist)
+    
+    def addChannelCalibration(self, val:ChannelCalibrationData,
+                              name:typing.Optional[str] = None,
+                              ensure_unique:bool=True):
+        if not self.type & vigra.AxisType.Channels:
+            return
+        
+        if not isinstance(val, ChannelCalibrationData):
+            raise TypeError(f"Expecting a ChannelCalibrationData; got {type(val).__name__} instead")
+        
+        if ensure_unique:
+            names = list(self.channelNames)
+            indices = list(self.channelIndices)
+            
+            if val.name in names:
+                val.name = counter_suffix(val.name, names)
+                
+            if val.index in indices:
+                val.index = max(indices)+1
+                
+        if not isinstance(name, str) or len(name.strip()) == 0 or name in self.parameters:
+            name = f"channel_{self.nChannels}"
+            
+        self._data_[name] = val
+        
+    def removeChannelCalibration(self, index:typing.Union[int, str]) -> typing.Union[ChannelCalibrationData]:
+        """Removes ChannelCalibrationData for channel with specified index or name.
+        
+        Returns the ChannelCalibrationData, if found, else None
+        """
+        chcal = self.channelCalibration(index, True)
+        if chcal is None:
+            return
+        
+        return self._data_.pop(chcal[0], None)
+    
+    def reindexChannels(self, index:typing.Optional[dict]=None) -> None:
+        """Reindexes the channels
+        Does nothing for a NonChannel axis or without ChannelCalibrationData.
+        
+        Parameters:
+        ==========
+        
+        index:dict (optional, default is None) - reindexing map
+        
+            When None, the channel indices are assigned to increasing order from
+            0, in the order of their ChannelCalibrationData
+            
+            When a dict this maps int keys (old index) to int values (new index).
+            
+            WARNING: The values in the reindexing map must be >= 0 and unique
+        
+        """
+        
+        if not self.type & vigra.AxisType.Channels or len(list(self.channels)) == 0:
+            return
+        
+        if isinstance(index, dict):
+            if not all(all(isinstance(i, int) for i in (k,v)) for k,v in index.items()):
+                raise TypeError("Reindexing map must have int keys and values")
+            
+            if any(v < 0 for v in index.values()):
+                raise ValueError("Reindexing map cannot have negative values")
+            
+            old_indices = list(k for k in index) # these are unique by default
+            new_indices = list(unique(v for v in index.values()))
+            
+            if len(new_indices) < len(old_indices):
+                raise TypeError("The reindexing map contains duplicate values")
+            
+            for chcal in self.channels:
+                if chcal.index in index:
+                    chcal.index = index[chcal]
+                    
+        else:
+            for k, chcal in enumerate(self.channels):
+                chcal.index = k
+                
+    def sortedChannels(self, by_index:typing.Union[bool,str]=True):
+        """Yields ChannelCalibrationData sorted by chanel index, name or field.
+        
+        by_index: bool or str
+            When bool: if True, sort by index; else sort by name
+            
+            When by_index is a str, it indicates the field name to sort.
+            
+            CAUTION: When sorting by units, all chanels must have unist with the
+            same dimensionalities, or convertible to each other.
+            
+        """
+        yield from sorted(self.channels, key = lambda x: x.by_index if instance(by_index, str) else x.index if by_index is True else x.name)
+                
+    def channelCalibration(self, index:typing.Union[int, str], full:bool=False):
+        """Returns ChannelCalibrationData for a specific channel, or None
+        Parameters:
+        ==========
+        index: str or int; 
+            When a str, this is the channel name as in the ChannelCalibrationData
+            'name' field
+            When an int, this is the channel index as in the ChannelCalibrationData
+            'index' field.
+            
+        full:bool, optional (default is False)
+            When True, also returns the name this ChannelCalibrationData is 
+            registered with, in this AxisCalibrationData
+        
+        Returns:
+        ========
+        A ChannelCalibrationData or tuple (str, ChannelCalibrationData) if 'full'
+            is True
+        
+        Returns None for NonChannel axis or when there is no ChannelCalibrationData
+        
+        """
+        if not self.type & vigra.AxisType.Channels:
+            return
+        
+        if isinstance(index, int):
+            what = "index"
+            if full is True:
+                chcal = [(k,v) for k,v in self._data_.items() if k.startswith("channel_") and isinstance(v, ChannelCalibrationData) and v.index == index]
+            else:
+                chcal = [v for k,v in self._data_.items() if k.startswith("channel_") and isinstance(v, ChannelCalibrationData) and v.index == index]
+            
+        elif isinstance(index, str):
+            what = "name"
+            if full is True:
+                chcal = [(k,v) for k,v in self._data_.items() if k.startswith("channel_") and isinstance(v, ChannelCalibrationData) and v.name == index]
+            else:
+                chcal = [v for k,v in self._data_.items() if k.startswith("channel_") and isinstance(v, ChannelCalibrationData) and v.name == index]
+            
+        else:
+            raise TypeError(f"Expecting a str or int; got {type(index).__name__} instead.")
+            
+        if len(chcal) > 1:
+            warnings.warn(f"There is more than one channel with the same {what} ({index}).\nThe calibration for the first one will be returned", 
+                        RuntimeWarning, 
+                        stacklevel=2)
+            
+        if len(chcal):
+            return chcal[0]
+        
+    def channelIndex(self, name:str) -> typing.Optional[int]:
+        """Returns the index of the channel with given name.
+        
+        Parameters:
+        ==========
+        
+        name: str; must not be empty or contain only blanks
+        
+        The comparison is made against ChannelCalibrationData.name
+        
+        Returns:
+        ========
+        
+        int: the value of ChannelCalibrationData.index where 
+                ChannelCalibrationData.name is name, or None if not found
+                
+        Returns None for NonChannel axis or when specified channel was not found
+        
+        """
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            return 
+        
+        chcal = self.channelCalibration(name)
+        if chcal is None:
+            #warnings.warn(f"No channel {name} was found")
+            return
+        
+        return chcal.index
+        
+    def setChannelIndex(self, name:str, val:int, 
+                        ensure_unique:bool = True) -> None:
+        """Sets the index of the channel with given name.
+        
+        Parameters:
+        ==========
+        name: str ;  the ChannelCalibrationData.index value for the channel
+        val : str - if empty or contain only blanks it will be ignored
+        ensure_unique: bool, optional (default is True)
+            Avoid duplicate channel names. 
+            
+        Does nothing for a NonChannel axis
+        """
+        if not self.type & vigra.AxisType.Channels:
+            return
+        
+        if isinstance(name, str) and len(name.strip()) == 0:
+            return # avoid empty names
+        
+        if not isinstance(val, int):
+            raise TypeError(f"index must be an int; got {type(val).__name__} instead")
+        if val < 0:
+            raise ValueError(f"index must be >= 0; got {val} instead")
+        
+        chcal = self.channelCalibration(name)
+        
+        if chcal is None:
+            raise KeyError(f"No channel {name} was found")
+        
+        if ensure_unique:
+            indices = unique(list(self.channelIndices))
+            
+            if val in indices:
+                val = max(indices) + 1
+                
+            chcal.index = val
+            
+        else:
+            chcal.index = val
+        
+    def chanelName(self, index:int) -> typing.Optional[str]:
+        """Returns the name of the channel with given index.
+        
+        Parameters:
+        ==========
+        index: int ;  the ChannelCalibrationData.index value for the channel
+        
+        Returns:
+        ========
+        str: the value of ChannelCalibrationData.name where 
+                ChannelCalibrationData.index is index, 
+                
+        Returns None for NonChannel axis or when specified channel was not found
+        
+        """
+        chcal = self.channelCalibration(index)
+        if chcal is None:
+            #warnings.warn(f"No channel {index} was found")
+            return
+        
+        return chcal.name
+        
+    def setChannelName(self, index:int, val:str, 
+                       ensure_unique:bool = True) -> None:
+        """Sets the name of the channel with given index.
+        
+        Parameters:
+        ==========
+        index: int ;  the ChannelCalibrationData.index value for the channel
+        val : str - if empty or contain only blanks it will be ignored
+        ensure_unique: bool, optional (default is True)
+            Avoid duplicate channel names. 
+            
+        Does nothing for a NonChannel axis.
+        """
+        if not self.type & vigra.AxisType.Channels:
+            return
+        
+        if isinstance(val, str) and len(val.strip()): # avoid empty names
+            chcal = self.channelCalibration(index)
+            if chcal is None:
+                raise KeyError(f"No channel {index} was found")
+            
+            if ensure_unique:
+                names = unique(list(self.channelNames))
+                
+                new_val = counter_suffix(val, names)
+                    
+                chcal.name = new_val
+                
+            else:
+                chcal.name = val
+        
+    def channelMinimum(self, index:typing.Union[int, str]) -> typing.Union[complex, float, int]:
+        chcal = self.channelCalibration(index)
+        if chcal is None:
+            #warnings.warn(f"No channel {index} was found")
+            return
+        
+        return chcal.minimum
+        
+    def setChannelMinimum(self, index:typing.Union[int, str], 
+                          val:typing.Union[complex, float, int, np.ndarray]) -> None:
+        if not self.type & vigra.AxisType.Channels:
+            return
+        
+        chcal = self.channelCalibration(index)
+        if chcal is None:
+            raise KeyError(f"No channel {index} was found")
+        
+        chcal.minimum = val
+        
+    def channelMaximum(self, index:typing.Union[int, str]):
+        chcal = self.channelCalibration(index)
+        if chcal is None:
+            #warnings.warn(f"No channel {index} was found")
+            return
+        
+        return chcal.maximum
+        
+    def setChannelMaximum(self, index:typing.Union[int, str], 
+                          val:typing.Union[complex, float, int, np.ndarray]) -> None:
+        
+        if not self.type & vigra.AxisType.Channels:
+            return
+        
+        chcal = self.channelCalibration(index)
+        if chcal is None:
+            raise KeyError(f"No channel {index} was found")
+        
+        chcal.maximum = val
+        
+    def channelResolution(self, index:typing.Union[int, str]):
+        chcal = self.channelCalibration(index)
+        if chcal is None:
+            #warnings.warn(f"No channel {index} was found")
+            return
+        
+        return chcal.resolution
+        
+    def setChannelResolution(self, index:typing.Union[int, str], 
+                             al:typing.Union[complex, float, int, np.ndarray]) -> None:
+        if not self.type & vigra.AxisType.Channels:
+            return
+        
+        chcal = self.channelCalibration(index)
+        if chcal is None:
+            raise KeyError(f"No channel {index} was found")
+        
+        chcal.resolution = val
+        
+    def channelUnits(self, index:typing.Union[int, str]) -> typing.Optional[pq.Quantity]:
+        """Returns the units of the specified channel, or None if not found
+        """
+        chcal = self.channelCalibration(index)
+        if chcal is None:
+            #warnings.warn(f"No channel {index} was found")
+            return
+        
+        return chcal.units
+    
+    def setChannelUnits(self, index:typing.Union[int, str], 
+                        val:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality, str]) -> None:
+        chcal = self.channelCalibration(index)
+        if chcal is None:
+            raise KeyError(f"No channel {index} was found")
+        
+        chcal.units = units
+        
+    def calibrateAxis(self, axInfo:vigra.AxisInfo):
+        """Embeds an XML-formatted string into axInfo's description
+        """
+        if not isinstance(axInfo, vigra.AxisInfo):
+            raise TypeError("First argument must be a vigra.AxisInfo; got %s instead" % type(axInfo).__name__)
+        
+        if not axInfo.typeFlags & self.type:
+            raise ValueError(f"The supplied AxisInfo with key {axInfo.key} has a different type ({axisTypeStrings(axInfo.typeFlags)}) than the one targeted by this calibration ({axisTypeStrings(self.type)})")
+        
+        calibration_string = self.calibrationString
+            
+        # check if there already is (are) any calibration string(s) in axInfo description
+        # then replace them with a single xml-formatted calibration string
+        # generated above
+        # otherwise just append the calibration string to the description
+        
+        # 1) first, remove any name string
+        name_start = axInfo.description.find("<name>")
+        
+        if name_start  > -1:
+            name_stop = axInfo.description.find("</name>")
+            
+            if name_stop > -1:
+                name_stop += len("</name>")
+                
+            else:
+                name_stop = name_start + len("<name>")
+                
+            d = [axInfo.description[0:name_start].strip()]
+            d.append(axInfo.description[name_stop:].strip())
+            
+            axInfo.description = " ".join(d)
+        
+        # 2) then find if there is a previous calibration string in the description
+        calstr_start = axInfo.description.find("<axis_calibration>")
+        
+        if calstr_start > -1: # found previous calibration string
+            calstr_end = axInfo.description.rfind("</axis_calibration>")
+            
+            if calstr_end > -1:
+                calstr_end += len("</axis_calibration>")
+                
+            else:
+                calstr_end  = calstr_start + len("<axis_calibration>")
+                
+            # remove previous calibration string
+            # not interested in what is between these two (susbstring may contain rubbish)
+            # because we're replacing it anyway
+            # just keep the non-calibration contents of the axis info description 
+            s1 = [axInfo.description[0:calstr_start].strip()]
+            s1.append(axInfo.description[calstr_end:].strip())
+            
+            s1.append(self.calibrationString(axInfo.key))
+            
+        else: 
+            s1 = [axInfo.description]
+            s1.append(self.calibrationString(axInfo.key))
+            
+        axInfo.description = " ".join(s1)
+        
+        resolution = self.resolution
+        
+        channels = list(self(channels))
+        
+        if len(channels):
+            resolution = channels[0].resolution
+            
+        axInfo.resolution = resolution if resolution != np.nan else 0.
+        
+        return axInfo # for convenience
+    
+    @staticmethod
+    def parseCalibrationString(cal:typing.Optional[CalibrationData] = None, 
+                               s:typing.Optional[typing.Union[str, vigra.AxisInfo]] = None,
+                               check:bool=False) -> CalibrationData:
+        """"""
+        def __eval_xml_element_text__(param, txt):
+            if param == "units":
+                value = unit_quantity_from_name_or_symbol(txt)
+            elif param in ("key", "name"):
+                value = txt
+            elif param == "type":
+                value = axisTypeFromString(txt)
+            else:
+                value == eval(txt)
+                
+            return value
+            
+        
+        if isinstance(s, vigra.AxisInfo):
+            s = s.description
+            
+        elif not isinstance(s,str) or len(s.strip()) == 0:
+            return
+        
+        if not isinstance(cal, AxisCalibrationData):
+            cal = AxisCalibrationData()
+        
+        calibration_string = None
+        
+        # 1) find axis calibration string <axis_calibration> ... </axis_calibration>
+        start = s.find("<axis_calibration>")
+        
+        if start > -1:
+            stop  = s.find("</axis_calibration>")
+            if stop > -1:
+                stop += len("</axis_calibration>")
+                calibration_string = s[start:stop]
+        
+        if isinstance(calibration_string, str) and len(calibration_string.strip()) > 0:
+            # OK, now extract the relevant xml string
+            try:
+                main_calibration_element = ET.fromstring(calibration_string)
+                
+                # make sure we're OK
+                if main_calibration_element.tag != "axis_calibration":
+                    raise ValueError("Wrong element tag; was expecting 'axis_calibration', instead got %s" % element.tag)
+                
+                # see NOTE: 2021-10-09 23:58:58
+                # xml.etree.ElementTree.Element.getchildren() is absent in Python 3.9.7
+                #element_children = main_calibration_element.getchildren()
+                # NOTE: getchildren() replaced with getXMLChildren():
+                element_children = getXMLChildren(main_calibration_element) # getXMLChildren defined in xmlutils
+                
+                for child_element in element_children:
+                    # these can be <children_X> tags (X is a 0-based index) or a <name> tag
+                    # ignore everything else
+                    if child_element.tag.lower() in AxisCalibrationData.parameters:
+                        param = child_element.tag.lower()
+                        txt = child_element.txt
+                        
+                        if check:
+                            #NOTE: 2021-10-22 13:41:45
+                            #if needed, use below for more stringent checks
+                            val = __eval_xml_element_text__(param, txt)
+                            
+                            if param == "type":
+                                if self._data_.get(param, None) is not None:
+                                    if not val & self._data_[param]:
+                                        raise ValueError(f"Cannot set current axis type {axisTypeStrings(self._data_[param])} to {axisTypeStrings(val)}")
+                                    
+                            elif param =="key":
+                                if self._data_.get(param, None) is not None and self._data_.get("type", None) is not None:
+                                    axtype = self._data_["type"]
+                                    if val != self._data_[param] and val != axisTypeSymbol(axtype):
+                                        warnings.warn(f"Atypical axis key supplied ({val}) for a {axisTypeStrings(axtype)} axis")
+                        else:
+                            setattr(cal, param, _eval_xml_element_text__(param, txt))
+                        
+                                    
+                    else:#if child_element.tag.lower().startswith("channel_"):
+                        chcal = ChannelCalibrationData()
+                        chcalname = child_element.tag.lower()
+                        ch_children = getXMLChildren(child_element)
+                        ch_tags = [c.tag for c in ch_children]
+                        ch_cal_ok = False
+                        if all (t in ChannelCalibrationData.parameters for t in ch_tags):
+                            for param in ChannelCalibrationData.parameters:
+                                if param in ch_tags:
+                                    try:
+                                        setattr(chcal, param, __eval_xml_element_text__(param, ch_children[ch_tags.index(param)].text))
+                                        ch_cal_ok = True
+                                    except:
+                                        ch_cal_ok = False
+                                        # ignore failures
+                                        #traceback.print_exc()
+                                        continue
+                            if ch_cal_ok:
+                                cal.addChannelCalibration(chcal, name=chcalname)
+                        
+                                
+            except Exception as e:
+                traceback.print_exc()
+                print("cannot parse calibration string %s" % calibration_string)
+                raise e
+            
+        return cal
+            
 
 class AxesCalibration(object):
     """Encapsulates calibration of a set of axes.
+    
+    Associates physical units (and names) to a vigra array axis persistently.
     
     An axes calibration for a VigraArray is uniquely determined by the axis type
     and the attributes 'name', 'units', 'origin', and 'resolution', for each 
@@ -971,8 +1420,6 @@ class AxesCalibration(object):
     'name', 'units', 'origin' & 'resolution' parameters. This set is mapped to
     the channel index along the Channel axis.
     
-    The main function of the AxesCalibration objects is to associate physical
-    units (and names) to a vigra array axis in a persistent way.
     
     Quick reminder on vigra.AxisTags, vigra.AxisInfo, and vigra.AxisType objects:
     ----------------------------------------------------------------------------
@@ -1091,16 +1538,6 @@ class AxesCalibration(object):
     
     parameters = ("axistype", "axisname", "origin", "resolution", "units")
     
-    # NOTE: 2021-10-20 08:59:58
-    # calibration is stored as a DataBag of axis calibrations
-    # a key (str) in the DataBag is mapped to a nested DataBag for each axis,
-    # with keys being the parameters above
-    # 
-    # 
-    # in addition, for Channels axes only, an additional "channels" parameter is
-    # mapped to a nested DataBag with "channel_X" keys mapped to calibration
-    # DataBag.
-
     def __init__(self, data = None, 
                  axistype = None, axisname=None,
                  units = None, origin = None, resolution = None, channel = None, 
@@ -1162,13 +1599,9 @@ class AxesCalibration(object):
         # NOTE: 2018-08-01 08:55:15
         # except for "units", all other values in this dictionary are PODs, 
         # not python quantities !!!
-        self._calibration_ = DataBag(allow_none=True)
+        #self._calibration_ = DataBag(allow_none=True)
         #self._calibration_ = dict()
-        
-        # FIXME: 2018-08-27 09:40:10
-        # do we realy need the axiskey?
-        # yes, if we want to use calibration as independent object
-        # I know this is data duplication but I think this is a small price to pay
+        self._calibration_ = Bunch()
         
         # NOTE: 2018-09-11 16:01:09
         # allow overriding calibration with atomic elements, if specified 
@@ -2752,28 +3185,19 @@ class AxesCalibration(object):
             """Looks for elements with the following tags: name, units, origin, resolution
             """
             
-            result = DataBag()
+            result = AxisCalibrationData()
+            #result = DataBag()
             #result = dict()
             
             # NOTE: 2021-10-09 23:58:58
             # xml.etree.ElementTree.Element.getchildren() is absent in Python 3.9.7
             #children = element.getchildren()
             children = getXMLChildren(element)
-            #if len(children) != 3:
-                #raise ValueError("Expecting an XML element with three children; got %s instead" % len(children))
             
             children_tags = [c.tag for c in children]
             
             # NOTE: 2018-08-22 15:28:30
             # relax the stringency; give units, orgin, resolution and name default values
-            
-            # reject tag names that do not belong here
-            #if any([c not in set(mandatory_tags + optional_tags) for c in children_tags]):
-                #raise ValueError("Expecting tags to be one of 'units', 'origin', 'resolution', 'name'")
-            
-            ## check that mandatory tags are present
-            #if any([c not in set(children_tags) for c in mandatory_tags]):
-                #raise ValueError("At least one of 'units', 'origin', 'resolution' should be present ")
             
             u = None
             
@@ -2790,10 +3214,10 @@ class AxesCalibration(object):
                 # NOTE: both arbitrary_unit and pixel_unit are in fact derived
                 # from pq.dimensionless
                 if isChannel:
-                    u = arbitrary_unit
+                    u = channel_unit
                 
                 else:
-                    u = pixel_unit
+                    u = pq.dimensionless
                     
             result["units"] = u
                 
@@ -2920,11 +3344,11 @@ class AxesCalibration(object):
                 # see NOTE: 2021-10-09 23:58:58
                 # xml.etree.ElementTree.Element.getchildren() is absent in Python 3.9.7
                 #element_children = main_calibration_element.getchildren()
-                # NOTE: replaced with the following:
+                # NOTE: getchildren() replaced with getXMLChildren():
                 element_children = getXMLChildren(main_calibration_element) # getXMLChildren defined in xmlutils
                 
                 for child_element in element_children:
-                    # these can be <childrenX> tags (X is a 0-based index) or a <name> tag
+                    # these can be <children_X> tags (X is a 0-based index) or a <name> tag
                     # ignore everything else
                     if child_element.tag.lower().startswith("channel"):
                         # found a channel XML element => this is a channel axis

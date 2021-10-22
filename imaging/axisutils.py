@@ -155,7 +155,9 @@ def axisTypeUnits(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int]) ->
     A python quantity object (quantities.Quantity) that provides a reasonable
     default given the type flags in axisinfo
     
-    For unknown axis types, returns pixel_unit
+    For unknown axis types, returns pixel_unit.
+    
+    Tries to mirror the rules set in axisTypeFromUnits
     
     CAUTION: These are recommended, and not fully enforced
     """

@@ -231,7 +231,7 @@ custom_unit_symbols[Gohm.symbol] = Gohm
 def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]):
     """
     """
-    if isinstance(x, (complex, float, int)):
+    if isinstance(x, (complex, float, int)) or x == np.nan:
         return x
     
     if isinstance(x, np.ndarray):
@@ -514,27 +514,26 @@ def unit_quantity_from_name_or_symbol(s):
     if not isinstance(s, str):
         raise TypeError("Expecting a string; got %s instead" % type(s).__name__)
     
-    if s in pq.__dict__:
-        ret = eval(s, pq.__dict__)
-        #try:
-            #ret = eval(s, pq.__dict__)
+    try:
+        # easy way first
+        return pq.unit_registry(s)
+    
+    except:
+        if s in pq.__dict__:
+            ret = eval(s, pq.__dict__)
+
+        elif s in custom_unit_symbols.keys():
+            ret = custom_unit_symbols[s]
             
-        #except Exception as err:
-            #warnings.warn("String %s could not be evaluated to a Python Quantity" % s, RuntimeWarning)
-            #ret = pq.dimensionless
+        elif s in [u.name for u in custom_unit_symbols.values()]:
+            ret = [u for u in custom_unit_symbols.values() if u.name == s]
             
-    elif s in custom_unit_symbols.keys():
-        ret = custom_unit_symbols[s]
-        
-    elif s in [u.name for u in custom_unit_symbols.values()]:
-        ret = [u for u in custom_unit_symbols.values() if u.name == s]
-        
-    else:
-        warnings.warn("Unknown unit quantity %s" % s, RuntimeWarning)
-        
-        ret = pq.dimensionless
-        
-    return ret
+        else:
+            warnings.warn("Unknown unit quantity %s" % s, RuntimeWarning)
+            
+            ret = pq.dimensionless
+            
+        return ret
         
 def name_from_unit(u):
     """
