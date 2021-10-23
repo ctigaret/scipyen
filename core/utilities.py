@@ -25,6 +25,8 @@ import pandas as pd
 import quantities as pq
 import vigra
 
+#import language_tool_python
+
 try:
     from pyqtgraph import eq # not sure is needed
 except:
@@ -3074,4 +3076,3 @@ def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)) -> i
         raise ValueError
     
     return axis
-

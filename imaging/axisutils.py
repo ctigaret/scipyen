@@ -419,10 +419,26 @@ def axisTypeFromString(s:str) -> vigra.AxisType:
             return vigra.AxisType.UnknownAxisType
     
 def axisTypeStrings(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int, str],
-                    as_expr:bool=False) -> typing.Union[typing.List[str], str]:
-    """Returns string representations of AxisType flags.
+                    as_expr:bool=False, single:bool=False) -> typing.Union[typing.List[str], str]:
+    """Returns a literal representations of AxisType flags.
     
-    When as_expr:bool is False (default):
+    Vigra axis type flags are primitive flags, e.g., vigra.AxisType.Space, or a
+    combination of primitive flags 'OR-ed' together in a meaningful way, such as
+    vigra.AxisType.Space | vigra.AxisType.Frequence.
+        
+    This function returns the literal names of the primitive AxisType flag
+    associated with the axis, s a list.
+    
+    Optionally, the names are returned as a single str, 'joined' by a space
+    (when 'single' is True) or by '|' ('as_expr' is True)
+    
+    WARNING: Although numerically possible, not all combinations of primitive
+    AxisType flags is meaningful!
+    
+    Returns:
+    ========
+    
+    When both 'as_expr' and 'single' are False (the default):
     
         For primitive type flags, returns a list of one string (e.g. ['Space'], 
         ['Time'], etc.)
@@ -431,14 +447,17 @@ def axisTypeStrings(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int, s
         names primitive flags (e.g. ['Frequency', 'Space'], or ['Frequency', 'Time'],
         etc.)
         
-    When as_expr is True, returns a string where the strings otherwise returned 
-        in a list are separated by '|'
+    When 'single' is True, returns a single string where the strings otherwise 
+        returned in a list are separated by ' ' (space).
         
-    WARNING: Although numerically possible, not all combinations of primitive
-    AxisType flags is meaningful!
+    When as_expr is True, returns a single string where the strings otherwise 
+        returned in a list are separated by '|' . In this case the returned 
+        string can be 'transformed' back to a type flag by passing it to the
+        evalAxisTypeExpression() function.
+        
     
-    For example, let:
-    
+    Examples:
+    =========
     in:  v = vigra.AxisType.Frequency | vigra.AxisType.Edge | vigra.AxisType.Space
     
     in:  v
@@ -460,7 +479,6 @@ def axisTypeStrings(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int, s
     in:  v == evalAxisTypeExpression(s)
     out: True
     
-    CAUTION: These are recommended, and not fully enforced
     """
     
     if isinstance(axisinfo, str):
@@ -477,8 +495,8 @@ def axisTypeStrings(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int, s
     primitives = (v[1].name for v in reversed(sortedAxisTypes) if v[0] & typeint)
     
     # NOTE: below, exclude AllAxes and NonChannels because they will always map
-    return "|".join(list(primitives)[2:]) if as_expr else list(primitives)[2:]
-        
+    return "|".join(list(primitives)[2:]) if as_expr else  " ".join(list(primitives[2:])) if single else list(primitives)[2:]
+
 def evalAxisTypeExpression(x:str) -> typing.Union[vigra.AxisType, int]:
     """Evaluates a string representation  of vigra.AxisType type flags.
     
@@ -490,6 +508,8 @@ def evalAxisTypeExpression(x:str) -> typing.Union[vigra.AxisType, int]:
     
     WARNING: Although numerically possible, not all combinations of primitive
     AxisType flags is meaningful!
+    
+    Returns a type flag (int)
     
     """
     return eval("|".join([f"vigra.AxisType.{s}" for s in x.split("|")]))

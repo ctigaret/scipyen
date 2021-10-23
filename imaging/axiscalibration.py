@@ -40,6 +40,8 @@ from .axisutils import (axisTypeName,
                         isSpecificAxisType,
                         )
 
+AxisCalibrationDataType = typing.TypeVar("AxisCalibrationData")
+
 class CalibrationData(object):
     """:Superclass: for Axis and Channel calibrations.
     
@@ -517,8 +519,6 @@ class CalibrationData(object):
         self.units = self.units.rescale(u)
         self.origin = quantity2scalar(new_o)
         self.resolution = quantity2scalar(new_r)
-        
-
     
     @property
     def origin(self):
@@ -840,7 +840,8 @@ class AxisCalibrationData(CalibrationData):
     @property
     def calibrationString(self):
         """
-        XML-formatted string with one of the following formats, depending on axis type:
+        An XML-formatted string with one of the following formats, depending on
+        whether the axis is a Channels axis or not:
         
         1) For a non-channels axis:
         ----------------------------
@@ -1267,82 +1268,239 @@ class AxisCalibrationData(CalibrationData):
         
         chcal.units = units
         
-    def calibrateAxis(self, axInfo:vigra.AxisInfo):
-        """Embeds an XML-formatted string into axInfo's description
+    #def calibrateAxis(self, axInfo:vigra.AxisInfo):
+        #"""Embeds an XML-formatted string into axInfo's description
+        #"""
+        #if not isinstance(axInfo, vigra.AxisInfo):
+            #raise TypeError("First argument must be a vigra.AxisInfo; got %s instead" % type(axInfo).__name__)
+        
+        #if not axInfo.typeFlags & self.type:
+            #raise ValueError(f"The supplied AxisInfo with key {axInfo.key} has a different type ({axisTypeStrings(axInfo.typeFlags)}) than the one targeted by this calibration ({axisTypeStrings(self.type)})")
+        
+        #calibration_string = self.calibrationString
+            
+        ## check if there already is (are) any calibration string(s) in axInfo description
+        ## then replace them with a single xml-formatted calibration string
+        ## generated above
+        ## otherwise just append the calibration string to the description
+        
+        ## 1) first, remove any name string
+        #name_start = axInfo.description.find("<name>")
+        
+        #if name_start  > -1:
+            #name_stop = axInfo.description.find("</name>")
+            
+            #if name_stop > -1:
+                #name_stop += len("</name>")
+                
+            #else:
+                #name_stop = name_start + len("<name>")
+                
+            #d = [axInfo.description[0:name_start].strip()]
+            #d.append(axInfo.description[name_stop:].strip())
+            
+            #axInfo.description = " ".join(d)
+        
+        ## 2) then find if there is a previous calibration string in the description
+        #calstr_start = axInfo.description.find("<axis_calibration>")
+        
+        #if calstr_start > -1: # found previous calibration string
+            #calstr_end = axInfo.description.rfind("</axis_calibration>")
+            
+            #if calstr_end > -1:
+                #calstr_end += len("</axis_calibration>")
+                
+            #else:
+                #calstr_end  = calstr_start + len("<axis_calibration>")
+                
+            ## remove previous calibration string
+            ## not interested in what is between these two (susbstring may contain rubbish)
+            ## because we're replacing it anyway
+            ## just keep the non-calibration contents of the axis info description 
+            #s1 = [axInfo.description[0:calstr_start].strip()]
+            #s1.append(axInfo.description[calstr_end:].strip())
+            
+            #s1.append(self.calibrationString(axInfo.key))
+            
+        #else: 
+            #s1 = [axInfo.description]
+            #s1.append(self.calibrationString(axInfo.key))
+            
+        #axInfo.description = " ".join(s1)
+        
+        #resolution = self.resolution
+        
+        #channels = list(self(channels))
+        
+        #if len(channels):
+            #resolution = channels[0].resolution
+            
+        #axInfo.resolution = resolution if resolution != np.nan else 0.
+        
+        #return axInfo # for convenience
+    
+    def calibrateAxis(self, axinfo:vigra.AxisInfo) -> None:
+        """Associated calibraiton values with a vigra.AxisInfo object.
+        
+        This method does the following:
+        
+        1) If the 'type' and 'key' properties of the calibration data are 
+        identical, respectively, to the 'typeFlags' and 'key' attributes of the 
+        AxisInfo object:
+        
+            * assigns the value of the calibration data 'resolution' property to
+            the 'resolution' attribute of the AxisInfo obejct,
+            
+            * embeds the calibration string of this calibration data in the 
+            'description' attribute of the AxisInfo object.
+            
+            
+        2) If the AxisInfo 'typeFlags' or 'key' are different, respectively, to
+        this calibration 'type' and 'key' properties:
+        
+            * creates a NEW AxisInfo object with 'typeFlags', 'key', 'resolution'
+            and 'description' attributes set according to this calibration data.
+            
+        Returns:
+        ========
+        
+        An updated (possibly, new) AxisInfo object.
+        
+        NOTE 1:
+        For a vigra.AxisInfo object, the attributes 'typeFlags' and 'key' are
+        immutable. The only read/write attributes of an AxisInfo object are
+        'resolution' (float) and 'description' (str).
+        
+        NOTE 2:
+        
+        
         """
-        if not isinstance(axInfo, vigra.AxisInfo):
-            raise TypeError("First argument must be a vigra.AxisInfo; got %s instead" % type(axInfo).__name__)
+        if not isinstance(axinfo, vigra.AxisInfo):
+            raise TypeError(f"'axinfo' expected to be a vigra.AxisInfo object; got {type(axinfo).__name__} instead")
         
-        if not axInfo.typeFlags & self.type:
-            raise ValueError(f"The supplied AxisInfo with key {axInfo.key} has a different type ({axisTypeStrings(axInfo.typeFlags)}) than the one targeted by this calibration ({axisTypeStrings(self.type)})")
-        
-        calibration_string = self.calibrationString
+        if axinfo.typeFlags != self.type or axinfo.key != self.key:
+            return vigra.AxisInfo(key = self.key, typeFlags = self.type, resolution=self.resolution, description=self.calibrationString)
             
-        # check if there already is (are) any calibration string(s) in axInfo description
-        # then replace them with a single xml-formatted calibration string
-        # generated above
-        # otherwise just append the calibration string to the description
-        
-        # 1) first, remove any name string
-        name_start = axInfo.description.find("<name>")
-        
-        if name_start  > -1:
-            name_stop = axInfo.description.find("</name>")
-            
-            if name_stop > -1:
-                name_stop += len("</name>")
-                
-            else:
-                name_stop = name_start + len("<name>")
-                
-            d = [axInfo.description[0:name_start].strip()]
-            d.append(axInfo.description[name_stop:].strip())
-            
-            axInfo.description = " ".join(d)
-        
-        # 2) then find if there is a previous calibration string in the description
-        calstr_start = axInfo.description.find("<axis_calibration>")
-        
-        if calstr_start > -1: # found previous calibration string
-            calstr_end = axInfo.description.rfind("</axis_calibration>")
-            
-            if calstr_end > -1:
-                calstr_end += len("</axis_calibration>")
-                
-            else:
-                calstr_end  = calstr_start + len("<axis_calibration>")
-                
-            # remove previous calibration string
-            # not interested in what is between these two (susbstring may contain rubbish)
-            # because we're replacing it anyway
-            # just keep the non-calibration contents of the axis info description 
-            s1 = [axInfo.description[0:calstr_start].strip()]
-            s1.append(axInfo.description[calstr_end:].strip())
-            
-            s1.append(self.calibrationString(axInfo.key))
-            
-        else: 
-            s1 = [axInfo.description]
-            s1.append(self.calibrationString(axInfo.key))
-            
-        axInfo.description = " ".join(s1)
-        
-        resolution = self.resolution
-        
-        channels = list(self(channels))
-        
-        if len(channels):
-            resolution = channels[0].resolution
-            
-        axInfo.resolution = resolution if resolution != np.nan else 0.
-        
-        return axInfo # for convenience
+        axinfo = self._embedCalibrationString_(self.calibrationString, axinfo)
+        axinfo.resolution = self.resolution
+        return axinfo
     
     @staticmethod
-    def parseCalibrationString(cal:typing.Optional[CalibrationData] = None, 
-                               s:typing.Optional[typing.Union[str, vigra.AxisInfo]] = None,
-                               check:bool=False) -> CalibrationData:
-        """"""
+    def findCalibrationString(s:str):
+        """Returns the coordinates (start & stop) of an XML-formatted calibration
+        sub-string of 's' or None if 's' does not contain an XML-formatted 
+        calibration sub-string.
+        
+        """
+        start = s.find("<axis_calibration>")
+        if start > -1:
+            stop = s.rfind("</axis_calibration>") 
+            if stop > -1:
+                stop += len("</axis_calibration>")
+            else:
+                stop = start + len("<axis_calibration>")
+            return (start, stop)
+            
+    @staticmethod
+    def fromAxisInfo(axinfo:vigra.AxisInfo,
+                     cal:typing.Optional[AxisCalibrationDataType] = None) -> AxisCalibrationDataType:
+        if not isinstance(axinfo, vigra.AxisInfo):
+            raise TypeError(f"'axinfo' expected to be a vigra.AxisInfo object; got {type(axinfo).__name__} instead ")
+        
+        
+        
+        
+    @staticmethod
+    def clearCalibrationString(s:str) -> str:
+        start_stop = AxisCalibrationData.findCalibrationString(s)
+        
+        while start_stop is not None:
+            s = s[0:start_stop[0]] + s[start_stop[1]:]
+            start_stop = AxisCalibrationData.findCalibrationString(s)
+            
+        return s
+    
+    @staticmethod
+    def _embedCalibrationString_(s:str, axinfo:vigra.AxisInfo):
+        """Embeds calibration sub-string in 's' into a vigra.AxisInfo object.
+        
+        Does nothing if 's' does not contain an XML-format calibration string.
+        
+        WARNING, CAUTION: This method does NOT check if the calibration string
+        has appropriate values given the typeflags of the axinfo Object.
+        
+        Parameters:
+        ===========
+        s:str - should contain an XML-formatted calibration sub-string; otherwise
+            the method has no effect
+        
+        axinfo: vigra.AxisInfo object; the calibration (sub) string in 's' will be
+            embedded in the axinfo's 'description' attribute
+        
+        Returns:
+        ========
+        vigra.AxisInfo: this is a reference to the vigra.AxisInfo object passed
+            as the 'axinfo' parameter
+        
+        """
+        if not isinstance(s, str):
+            raise TypeError(f"Expecting a str; got {type(s).__name__} instead")
+            
+        if not isinstance(axinfo, vigra.AxisInfo):
+            raise TypeError(f"Expecting a vigra.AxisInfo object; got {type(axinfo).__name__} instead")
+
+        
+        start_stop = AxisCalibrationData.findCalibrationString(s)
+        
+        if start_stop is None:
+            return
+        
+        cal_str = s[start_stop[0]:start_stop[1]]
+        
+        description = AxisCalibrationData.clearCalibrationString(axinfo.description)
+        
+        description += f" {cal_str}"
+        
+        axinfo.description = description
+        
+        return axinfo # for convenience
+            
+    
+    @staticmethod
+    def fromCalibrationString(s:str,
+                              cal:typing.Optional[AxisCalibrationDataType] = None, 
+                              check:bool=False) -> AxisCalibrationDataType:
+        """AxisCalibrationData factory using a calibration string.
+        
+        For the structure of an XML-formatted calibraiton string see the
+        documentaiton for the AxisCalibrationData.calibrationString property.
+        
+        Parameters:
+        ==========
+        
+        s: str = XML-formatted calibration string (see documentation for
+        AxisCalibrationData.calibrationString property)
+        
+        cal: AxisCalibrationData, optional, default is None
+        
+        
+        check: bool, default is False
+        
+        Returns:
+        ========
+        An AxisCalibrationData instance. 
+            This either a reference to the AxisCalibrationData object passed as
+            the 'cal' parameter, or a new AxisCalibrationData object, otherwise.
+            
+            When 's' is a string containing an XML-formatted calibration string 
+            (see AxisCalibrationData.calibrationString()), the returned value
+            (and 'cal', if passed) will be updated with the calibration values
+            parsed from the string in 's'. Otherwise, the returned value is the
+            original value of 'cal' (if 'cal' is an AxisCalibrationData object) 
+            or a new, 'default' AxisCalibrationData object (as for an axis with 
+            type flags UnknownAxisType).
+        
+        """
         import xml.etree.ElementTree as ET
         
         def __eval_xml_element_text__(param, txt):
@@ -1357,12 +1515,9 @@ class AxisCalibrationData(CalibrationData):
                 
             return value
         
-        if isinstance(cal, (str, vigra.AxisInfo)):
+        if isinstance(cal, str):
             s = cal
             cal = None
-            
-        if isinstance(s, vigra.AxisInfo):
-            s = s.description
             
         if not isinstance(s,str) or len(s.strip()) == 0:
             return
@@ -1410,7 +1565,7 @@ class AxisCalibrationData(CalibrationData):
                             
                             if param == "type":
                                 if cal._data_.get(param, None) is not None:
-                                    if not val & self._data_[param]:
+                                    if not val & cal._data_[param]:
                                         raise ValueError(f"Cannot set current axis type {axisTypeStrings(cal._data_[param])} to {axisTypeStrings(val)}")
                                     
                             elif param =="key":

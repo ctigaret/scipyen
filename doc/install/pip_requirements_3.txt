@@ -10,3 +10,4 @@ scikit-image
 octave_kernel
 gnuplot_kernel
 matlab_kernel
+language_tool_python
