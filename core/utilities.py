@@ -2,7 +2,9 @@
 '''
 Various utilities
 '''
-import traceback, re, itertools, functools, time, typing, warnings, operator, random
+import traceback, re, itertools, functools, time, typing, warnings, operator
+import random, math
+from numbers import Number
 from sys import getsizeof, stderr
 from copy import (copy, deepcopy,)
 from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
@@ -17,7 +19,6 @@ from functools import (partial, partialmethod,)
 from itertools import chain
 import collections
 from collections import deque, OrderedDict
-from numbers import Number
 import numpy as np
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
@@ -146,6 +147,94 @@ class SafeComparator(object):
             #print("y:", y)
             return False
         
+def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarray], 
+            rtol:typing.Optional[Number]=None, 
+            atol:typing.Optional[Number]=None, 
+            use_math:bool=True, 
+            equal_nan:bool=False) -> typing.Union[bool, np.ndarray]:
+    """Generalized isclose.
+    
+    Parameters:
+    ==========
+    x, y: numeric scalars or numpy arrays with identical shapes of where one of
+        them has size 1; 
+    
+    use_math:bool, default is True
+        When True, use math.isclose
+        When False, use numpy.isclose
+        
+        When either 'x' or 'y' are numpy arrays with size > 1 the function will
+        automatically switch to using numpy.isclose
+        
+        For differences between the math.isclose and numpy.isclose, see NOTE.
+        
+    rtol, atol:floats Optional, default values are as for 
+        math.isclose (1e-09 and 0.0) or numpy.isclose (1e-05 and 1e-08)
+        
+    equal_nan:bool, optional, default is False
+        Whether np.nan or math.nan are considered equal to each other
+        
+    Returns:
+    ========
+    bool scalar when math is True, else a numpy array with dtype('bool')
+    
+    NOTE:
+    numpy.isclose:
+    --------------
+    Signature: np.isclose(a, b, rtol=1e-05, atol=1e-08, equal_nan=False)
+    
+    For finite values, isclose uses the following equation to test whether
+    two floating point values are equivalent.
+
+        absolute(`a` - `b`) <= (`atol` + `rtol` * absolute(`b`))
+
+    Unlike the built-in `math.isclose`, the above equation is not symmetric
+    in `a` and `b` -- it assumes `b` is the reference value -- so that
+    `isclose(a, b)` might be different from `isclose(b, a)`. Furthermore,
+    the default value of atol is not zero, and is used to determine what
+    small values should be considered close to zero. the default value is
+    appropriate for expected values of order unity: if the expected values
+    are significantly smaller than one, it can result in false positives.
+    `atol` should be carefully selected for the use case at hand. a zero value
+    for `atol` will result in `False` if either `a` or `b` is zero.
+
+    math.isclose:
+    -------------
+    Signature: math.isclose(a, b, *, rel_tol=1e-09, abs_tol=0.0)
+    
+    If no errors occur, the result will be: 
+    
+        abs(`a`-`b`) <= max(`rel_tol` * max(abs(`a`), abs(`b`)), `abs_tol`).
+
+    For the values to be considered close, the difference between them
+    must be smaller than at least one of the tolerances.
+
+    -inf, inf and NaN behave similarly to the IEEE 754 Standard.  That
+    is, NaN is not close to anything, even itself.  inf and -inf are
+    only close to themselves.
+    
+    """
+    
+    if any(isinstance(v, np.ndarray) and v.size > 1 for v in (x,y)):
+        math = False
+        
+    f_isclose = math.isclose if use_math else partial(np.isclose)
+    
+    if not isinstance(rtol, Number):
+        rtol = inspect.signature(f_close).parameters["rel_tol"].default if use_math else inspect.signature(f_isclose).parameters["rtol"].default
+        
+    if not isinstance(atol, Number):
+        atol = inspect.signature(f_close).parameters["abs_tol"].default if use_math else inspect.signature(f_isclose).parameters["atol"].default
+        
+    f_isclose = partial(math.isclose, rel_tol=rtol, abs_tol=atol) if use_math else partial(np.isclose, rtol=rtol, atol=atol, equal_nan=equal_nan)
+    
+    # emulate equal_nan for math.isclose
+    if use_math:
+        if all(v is math.nan or v is np.nan for v in (x,y)):
+            return True
+        
+    return f_isclose(x,y)
+
 def hashiterable(x:typing.Iterable[typing.Any]) -> Number:
     """Takes into account the order of the elements.
     

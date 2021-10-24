@@ -189,18 +189,21 @@ import neo
 from core.prog import safeWrapper
 from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
-from core.datatypes import (TypeEnum,UnitTypes, Genotypes, 
-                            is_uniform_sequence,
-                            arbitrary_unit, 
+
+from core.quantities import(arbitrary_unit, 
                             pixel_unit, 
                             channel_unit,
                             space_frequency_unit,
                             angle_frequency_unit,
-                            unit_quantity_from_name_or_symbol,
                             day_in_vitro,
                             week_in_vitro, postnatal_day, postnatal_month,
-                            embryonic_day, embryonic_week, embryonic_month,
+                            embryonic_day, embryonic_week, embryonic_month,)
+
+from core.datatypes import (TypeEnum,UnitTypes, Genotypes, 
+                            is_uniform_sequence,
+                            unit_quantity_from_name_or_symbol,
                             )
+
 from core.modelfitting import (FitModel, ModelExpression,)
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.triggerprotocols import TriggerProtocol
@@ -450,7 +453,7 @@ def readHDF5_VigraArray(filenameOrGroup:typing.Union[str, h5py.Group],
     Requirements: the 'h5py' module must be installed.
     '''
     #import h5py
-    file, group = get_file_group_child(filenameOrGroup)
+    file, group, _ = get_file_group_child(filenameOrGroup)
         
     try:
         dataset = group[pathInFile]
@@ -467,10 +470,10 @@ def readHDF5_VigraArray(filenameOrGroup:typing.Union[str, h5py.Group],
             
         axistags = dataset.attrs.get('axistags', None)
         if axistags is not None:
-            data = data.view(arraytypes.VigraArray)
-            data.axistags = arraytypes.AxisTags.fromJSON(axistags)
+            data = data.view(vigra.arraytypes.VigraArray)
+            data.axistags = vigra.arraytypes.AxisTags.fromJSON(axistags)
             if order is None:
-                order = arraytypes.VigraArray.defaultOrder
+                order = vigra.arraytypes.VigraArray.defaultOrder
             data = data.transposeToOrder(order)
         else:
             if order == 'F':
