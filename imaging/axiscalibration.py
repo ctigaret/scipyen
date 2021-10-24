@@ -1339,8 +1339,8 @@ class AxisCalibrationData(CalibrationData):
         
         #return axInfo # for convenience
     
-    def calibrateAxis(self, axinfo:vigra.AxisInfo) -> None:
-        """Associated calibraiton values with a vigra.AxisInfo object.
+    def calibrateAxis(self, axinfo:typing.Optional[vigra.AxisInfo]=None) -> None:
+        """Associates calibration values with a vigra.AxisInfo object.
         
         This method does the following:
         
@@ -1361,10 +1361,13 @@ class AxisCalibrationData(CalibrationData):
             * creates a NEW AxisInfo object with 'typeFlags', 'key', 'resolution'
             and 'description' attributes set according to this calibration data.
             
+        3) If axinfo object is None, creates a new vigra.AxisInfo object 
+        according to this calibration values and returns it.
+        
         Returns:
         ========
         
-        An updated (possibly, new) AxisInfo object.
+        An updated (possibly, new) vigra.AxisInfo object.
         
         NOTE 1:
         For a vigra.AxisInfo object, the attributes 'typeFlags' and 'key' are
@@ -1372,9 +1375,34 @@ class AxisCalibrationData(CalibrationData):
         'resolution' (float) and 'description' (str).
         
         NOTE 2:
+        A) The returned object is a reference to the vigra.AxisInfo 'axinfo'
+        parameter ONLY when the 'typeFlags' and 'key' attributes of 'axinfo' are
+        are identical, respectively, to the 'type' and 'key' properties of this
+        AxisCalibrationData object.
+        
+        B) In all other cases the method returns a NEW vigra.AxisInfo object.
+        
+        This means that the following expression:
+        
+            `axcal.calibrateAxis(img.axistags[0])`
+        
+        will ONLY change img.axistags[0] when 'axcal' does  NOT alter the axis 
+        type and/or key.
+        
+        The workaround is :
+            `img.axistags[0] = axcal.calibrateAxis(img.axistags[0])`
+            
+        
+        
         
         
         """
+        if axinfo is None:
+            return vigra.AxisInfo(key=self.key, 
+                                  typeFlags=self.type,
+                                  resolution=self.resolution,
+                                  description=self.calibrationString)
+        
         if not isinstance(axinfo, vigra.AxisInfo):
             raise TypeError(f"'axinfo' expected to be a vigra.AxisInfo object; got {type(axinfo).__name__} instead")
         

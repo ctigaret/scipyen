@@ -1,6 +1,13 @@
 # -*- coding: utf-8 -*-
 '''
 utilities to enhance axis and axistags handling
+
+    NOTE: vigra defines a set of standard axis type keys: ‘x’, ‘y’, ‘z’, ‘t’, 
+    and ‘c’ and the combinations'fx','fy', and 'fz'. 
+    
+    This module extends this set with symbols for various combinations of 
+    vigra.AxisType flags (see axisTypeSymbol function)
+
 '''
 
 #TODO: find a way to merge AxisSpecs class with datatypes.ScanData.axisquantities
@@ -579,6 +586,7 @@ def axisTypeSymbol(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int],
     ========
     
     A string key corresponding to the type flags in axisinfo object (in upper case).
+    
 
     CAUTION: These are recommended, and not fully enforced
     """

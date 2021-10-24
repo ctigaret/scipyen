@@ -89,7 +89,7 @@ try:
     import magic as libmagic # file identification using libmagic
     
 except Exception as e:
-    warnings.warn("Python module 'magic' not found; advanced file type identification will be limited")
+    #warnings.warn("Python module 'magic' not found; advanced file type identification will be limited")
     libmagic = None
 
 
