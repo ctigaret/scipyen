@@ -43,11 +43,8 @@ from core.quantities import (space_frequency_unit,
                                     channel_unit, 
                                     arbitrary_unit,
                                     pixel_unit,
-                                    )
+                                    units_convertible)
 
-from core.datatypes import units_convertible
-
-#from . import datatypes
 #### END pict.core modules
 
 # NOTE: 2017-10-20 22:10:39

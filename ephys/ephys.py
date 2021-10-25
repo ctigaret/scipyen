@@ -224,6 +224,7 @@ from core import utilities
 from core import neoutils
 from core.utilities import normalized_index
 from core.neoutils import get_index_of_named_signal
+from core.quantities import (units_convertible, check_time_units)
 
 
 #from .patchneo import neo
@@ -531,7 +532,7 @@ def cursors2epoch(*args, **kwargs) -> typing.Union[neo.Epoch, typing.Sequence]:
         for k,c in enumerate(values_):
             if all([isinstance(v, pq.Quantity) for v in c[0:2]]):
                 if c[0].units != c[1].units:
-                    if not dt.units_convertible(c[0], c[1]):
+                    if not units_convertible(c[0], c[1]):
                         raise TypeError("Quantities must have compatible dimensionalities")
                     
                 values = values_ # convert back
@@ -666,7 +667,7 @@ def signal2epoch(sig, name=None, labels=None):
     if not isinstance(sig, neo.IrregularlySampledSignal):
         raise TypeError("Expecting a neo.IrregularlySampledSignal; got %s instead" % type(sig).__name__)
     
-    if not dt.units_convertible(sig.units, sig.times.units):
+    if not units_convertible(sig.units, sig.times.units):
         raise TypeError("Signal was expected to have time units; it has %s instead" % sig.units)
     
     if isinstance(labels, str) and len(labels.strip()):
@@ -1064,7 +1065,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
         t = cursor.x * signal.times.units
         
     elif isinstance(cursor, pq.Quantity):
-        if not dt.units_convertible(cursor, signal.times.units):
+        if not units_convertible(cursor, signal.times.units):
             raise TypeError("Expecting %s for cursor units; got %s instead" % (signal.times.units, cursor.units))
         
         t = cursor
@@ -1078,7 +1079,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
             
         else:
             if t.units != signal.times.units:
-                if not dt.units_convertible(t, signal.times):
+                if not units_convertible(t, signal.times):
                     raise TypeError("Incompatible units for cursor time")
             
             t = t.rescale(signal.times.units)
@@ -1473,7 +1474,7 @@ def intervals2epoch(*args, **kwargs) -> neo.Epoch:
             u = value[0].units #store the units
             
             if value[0].units != value[1].units:
-                if not dt.units_convertible(value[0], value[1]):
+                if not units_convertible(value[0], value[1]):
                     raise TypeError("interval boundaries must have compatible units")
                 
                 else:
@@ -1582,7 +1583,7 @@ def intervals2cursors(*args, **kwargs) -> typing.Sequence:
                 raise TypeError("interval boundaries must be scalar quantities")
             
             if value[0].units != value[1].units:
-                if not dt.units_convertible(value[0], value[1]):
+                if not units_convertible(value[0], value[1]):
                     raise TypeError("interval boundaries must have compatible units")
                 
                 else:
@@ -2886,7 +2887,7 @@ def resample_pchip(sig, new_sampling_period, old_sampling_period = 1):
     
     if isinstance(sig, (neo.AnalogSignal, DataSignal)):
         if isinstance(new_sampling_period, pq.Quantity):
-            if not dt.units_convertible(new_sampling_period, sig.sampling_period):
+            if not units_convertible(new_sampling_period, sig.sampling_period):
                 raise TypeError("new sampling period units (%s) are incompatible with those of the signal's sampling period (%s)" % (new_sampling_period.units, sig.sampling_period.units))
             
             new_sampling_period.rescale(sig.sampling_period.units)
@@ -4184,7 +4185,7 @@ def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs)
             raise TypeError("When specified, domain_units must be a Python UnitQuantity or Quantity object; got %s instead" % type(domain_units).__name__)
         
         
-        if dt.check_time_units(domain_units):
+        if check_time_units(domain_units):
             returnDataSignal = False
             
         else:

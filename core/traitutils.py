@@ -42,7 +42,7 @@ import pandas as pd
 import neo
 import quantities as pq
 from core import datasignal
-from core.datatypes import units_convertible
+from core.quantities import units_convertible
 from core.utilities import gethash, safe_identity_test
 
 # NOTE :2021-08-20 09:50:52

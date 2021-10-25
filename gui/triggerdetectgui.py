@@ -12,9 +12,11 @@ import numpy as np
 import quantities as pq
 from neo import (Block, Segment,)
 
-from core.quantities import arbitrary_unit
-from core.datatypes import (check_time_units, units_convertible,
-                            unit_quantity_from_name_or_symbol, UnitTypes)
+from core.quantities import (arbitrary_unit, check_time_units, units_convertible,
+                            unit_quantity_from_name_or_symbol,quantity2str,)
+
+from core.datatypes import UnitTypes
+
 from core.traitcontainers import DataBag
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 
@@ -30,7 +32,7 @@ from core.triggerprotocols import (TriggerProtocol,
 from core.neoutils import (concatenate_blocks, get_events,
                            check_ephys_data_collection, check_ephys_data)
 
-from core.strutils import (numbers2str,quantity2str,)
+from core.strutils import numbers2str
 
 from gui import quickdialog as qd
 from gui.signalviewer import SignalViewer

@@ -86,6 +86,7 @@ from core.prog import (safeWrapper, deprecation, iter_attribute,
 
 from core import strutils as strutils
 from core import datatypes as dt
+from core.quantities import quantity2str
 from core.traitcontainers import DataBag
 from core.scipyen_config import markConfigurable
 
@@ -93,7 +94,10 @@ from imaging import (axisutils, axiscalibration, vigrautils as vu,)
 from imaging.axisutils import (axisTypeFromString,
                                axisTypeName, 
                                axisTypeSymbol, 
-                               axisTypeUnits,)
+                               axisTypeUnits, )
+
+from imaging.axiscalibration import (AxesCalibration, AxisCalibrationData,)
+
 #from core import neo
 #from core import metaclass_solver
 #### END scipyen core modules
@@ -283,6 +287,8 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         self.units = dt.pixel_unit
         
         self.selectedAxisIndex = 0
+        
+        #self.axesCalibration = AxesCalibration(img)
         
         self.axisMetaData = dict()
         
@@ -2850,7 +2856,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         
         if isinstance(self._data_, vigra.VigraArray):
-            self._currentFrameData_, _ = self._generate_frame_view_(self._displayedChannel_)
+            self._currentFrameData_, _ = self._frameView_(self._displayedChannel_)
             
             imax = self._currentFrameData_.max()
             imin = self._currentFrameData_.min()
@@ -3325,19 +3331,20 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             s = io.StringIO()
             sei = sys.exc_info()
             traceback.print_exception(file=s, *sei)
-            msgbox = QtWidgets.QMessageBox()
-            msgbox.setSizeGripEnabled(True)
-            msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-            #msgbox.setWindowTitle(sei[0].__class__.__name__)
-            msgbox.setWindowTitle(type(e).__name__)
-            msgbox.setText(sei[0].__class__.__name__)
-            msgbox.setDetailedText(s.getvalue())
-            msgbox.exec()
+            self.errorMessage(type(e).__name__, "\n".join([sei[0].__class__.__name__, s.getvalue()]))
+            #msgbox = QtWidgets.QMessageBox()
+            #msgbox.setSizeGripEnabled(True)
+            #msgbox.setIcon(QtWidgets.QMessageBox.Critical)
+            ##msgbox.setWindowTitle(sei[0].__class__.__name__)
+            #msgbox.setWindowTitle(type(e).__name__)
+            #msgbox.setText(sei[0].__class__.__name__)
+            #msgbox.setDetailedText(s.getvalue())
+            #msgbox.exec()
             return False
-            #QtWidgets.QMessageBox.critical(self, "Error", "Data must have at least two non-channel axes; instead it has %d" % (img.axistags.axisTypeCount(vigra.AxisType.NonChannel)))
             
         if np.any(np.iscomplex(img)):
-            QtWidgets.QMessageBox.critical(self, "Error", "ImageViewer cannot display complex-valued data")
+            self.criticalMessage("Error", "ImageViewer cannot yet display complex-valued data")
+            #QtWidgets.QMessageBox.critical(self, "Error", "ImageViewer cannot display complex-valued data")
             return False
             #raise ValueError("Cannot display complex-valued data")
             
@@ -3347,12 +3354,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 #if self._data_.width != img.width or self._data_.height != img.height:
                 if self._data_.shape[self._data_.axistags.index(self.widthAxisInfo.key)] != img.shape[img.axistags.index(widthAxisInfo.key)] or \
                     self._data_.shape[self._data_.axistags.index(self.heightAxisInfo.key)] != img.shape[img.axistags.index(heightAxisInfo.key)]:
-                    msgBox = QtWidgets.QMessageBox()
-                    msgBox.setText("New image frame geometry will invalidate existing cursors.")
-                    msgBox.setInformativeText("Load image and bring all cursors to center?")
-                    msgBox.setStandardButtons(QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel)
-                    msgBox.setDefaultButton(QtWidgets.QMessageBox.Cancel)
-                    msgBox.setIcon(QtWidgets.QMessageBox.Warning)
+                    self.questionMessage("Imageviewer:", "New image frame geometry will invalidate existing cursors.\nLoad image and bring all cursors to center?")
+                    #msgBox = QtWidgets.QMessageBox()
+                    #msgBox.setText("New image frame geometry will invalidate existing cursors.")
+                    #msgBox.setInformativeText("Load image and bring all cursors to center?")
+                    #msgBox.setStandardButtons(QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel)
+                    #msgBox.setDefaultButton(QtWidgets.QMessageBox.Cancel)
+                    #msgBox.setIcon(QtWidgets.QMessageBox.Warning)
                     
                     ret = msgBox.exec()
                     
@@ -3455,7 +3463,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             #if qimg.isGrayScale():
                 #q
     
-    def _generate_frame_view_(self, channel):
+    def _frameView_(self, channel):
         """Returns a slice (frame) of self._data_ along the self.frameAxis
         
         If the slice contains np.nan returns a copy of the image slice.
@@ -3541,7 +3549,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self._displayedChannel_ = channel_index
         
         if isinstance(self._data_, vigra.VigraArray):
-            self._currentFrameData_, _ = self._generate_frame_view_(channel_index) # this is an array view !
+            self._currentFrameData_, _ = self._frameView_(channel_index) # this is an array view !
             
             if isinstance(colorMap, colormaps.colors.Colormap):
                 if self._currentFrameData_.channels == 1:
@@ -3562,17 +3570,23 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 
             # TODO FIXME: what if we view a transposed array ???? (e.g. viewing it on
             # Y or X axis instead of the Z or T axis?)
-            w = self._data_.shape[self._data_.axistags.index(self.widthAxisInfo.key)] # this is not neccessarily space!
-            h = self._data_.shape[self._data_.axistags.index(self.heightAxisInfo.key)] # this is not neccessarily space!
+            width_axis_ndx = self._data_.axistags.index(self.widthAxisInfo.key)
+            height_axis_ndx = self._data_.axistags.index(self.heightAxisInfo.key)
+            w = self._data_.shape[width_axis_ndx] # this is not neccessarily space!
+            h = self._data_.shape[height_axis_ndx] # this is not neccessarily space!
             
             self._image_width_ = w
             self._image_height_= h
             
             # NOTE: 2017-07-26 22:18:14
             # get calibrates axes sizes
-            cals = "(%s x %s)" % \
-                (strutils.quantity2str(vu.getCalibratedAxisSize(self._data_, self.widthAxisInfo.key)), \
-                    strutils.quantity2str(vu.getCalibratedAxisSize(self._data_, self.heightAxisInfo.key)))
+            if self._axes_calibration_ is not None:
+                cals = "(%s x %s)" % (self._axes_calibration_.calibrations[width_axis_ndx].calibratedDistance(w),
+                                      self._axes_calibration_.calibrations[height_axis_ndx].calibratedDistance(h))
+            else:
+                cals = "(%s x %s)" % \
+                    (quantity2str(vu.getCalibratedAxisSize(self._data_, self.widthAxisInfo.key)), \
+                        quantity2str(vu.getCalibratedAxisSize(self._data_, self.heightAxisInfo.key)))
     
             shapeTxt = "%s x %s: %d x %d %s" % \
                 (axisTypeName(self.widthAxisInfo), \
@@ -3914,6 +3928,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
     def _editImageGamma(self):
         pass;
+    
 
     def _displayValueAtCoordinates(self, coords, crsId=None):
         """
@@ -3969,24 +3984,31 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             # below, img is a view NOT a copy !
             #
             
-            img, dimindices = self._generate_frame_view_(self._displayedChannel_)
+            img, dimindices = self._frameView_(self._displayedChannel_)
             
             viewWidthAxisIndex = img.axistags.index(self.widthAxisInfo.key)
             viewHeightAxisIndex = img.axistags.index(self.heightAxisInfo.key)
             
+            viewW = img.shape[viewWidthAxisIndex]
+            viewH = img.shape[viewHeightAxisIndex]
+            
+            # NOTE: 2021-10-25 22:26:53
+            # when given, wx and wy below are, horizontal & vertical cursor
+            # windows, respectively
+            
             if wx is not None:
-                cwx = axiscalibration.AxesCalibration(img.axistags[viewWidthAxisIndex]).getCalibratedAxialDistance(wx, img.axistags[viewWidthAxisIndex])
+                if self._axes_calibration_:
+                    cwx = self._axes_calibration_[viewWidthAxisIndex].calibratedDistance(wx)
+                    swx = " +/- %d (%s) " % (wx//2, quantity2str(cwx/2))
                     
-                swx = " +/- %d (%.2f) " % (wx//2, cwx/2)
-                
             else:
                 swx = ""
                 
             if wy is not None:
-                cwy = axiscalibration.AxesCalibration(img.axistags[viewHeightAxisIndex]).getCalibratedAxialDistance(wy, img.axistags[viewHeightAxisIndex])
+                if self._axes_calibration_:
+                    cwy = self._axes_calibration_[viewHeightAxisIndex].calibratedDistance(wy)
+                    swy = " +/- %d (%s) " % (wy//2, quantity2str(cwy/2))
                     
-                swy = " +/- %d (%.2f) " % (wy//2, cwy/2)
-                
             else:
                 swy = ""
             
@@ -4010,78 +4032,80 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
 
             #print("w: %f, x: %f, h: %f, y: %f" % (w, x, h, y))
             
-            if all([val is not None for val in (x,y)]):
+            if all([v_ is not None for v_ in (x,y)]):
                 if img.ndim >= 2: # there may be a channel axis
-                    cx = axiscalibration.AxesCalibration(img.axistags[viewWidthAxisIndex]).getCalibratedAxisCoordinate(x, img.axistags[viewWidthAxisIndex].key)
-                    cy = axiscalibration.AxesCalibration(img.axistags[viewHeightAxisIndex]).getCalibratedAxisCoordinate(y, img.axistags[viewHeightAxisIndex].key)
-                
-                    scx = "%.2f %s" % (cx.magnitude, cx.units.dimensionality.string)
-                    scy = "%.2f %s" % (cy.magnitude, cy.units.dimensionality.string)
-                    
-                    sx = img.axistags[viewWidthAxisIndex].key 
-                    sy = img.axistags[viewHeightAxisIndex].key
+                    if self._axes_calibration_:
+                        cx = self._axes_calibration_[viewWidthAxisIndex].calibratedMeasure(x)
+                        cy = self._axes_calibration_[viewHeightAxisIndex].calibratedMeasure(y)
+                        scx = quantity2str(cx)
+                        scy = quantity2str(cy)
+                    else:
+                        scx = ""
+                        scy = ""
+                        
+                    widthAxisKey = img.axistags[viewWidthAxisIndex].key 
+                    heightAxisKey = img.axistags[viewHeightAxisIndex].key
                     
                     if img.ndim > 2: # this is possible only when there is a channel axis!
                         if img.channels > 1:
                             val = [float(img.bindAxis("c", k)[x,y,...]) for k in range(img.channels)]
+                            
+                            if self._axes_calibration_:
+                                cval = [self._axes_calibration_["c"].channelCalibration(k).calibratedMeasure(val[k]) for k in range(img.channels)]
+                                sval = "(%s)" % "; ".join(["%s" % quantity2str(v) for v in cval])
+                                
+                            else:
+                                sval = "(%s)" % "; ".join(["%.2f" % v for v in val])
                         
                         else:
                             val = float(img[x,y])
+                            if self._axes_calibration_:
+                                cval = self._axes_calibration_["c"].channelCalibration(0).calibratedMeasure(val)
+                                sval = "(%s)" % quantity2str(cval)
+                            else:
+                                sval = "(%.2f)" % val
                             
                         if self.frameAxisInfo is not None:
                             if isinstance(self.frameAxisInfo, vigra.AxisInfo):
                                 if self.frameAxisInfo not in self._data_.axistags:
                                     raise RuntimeError("frame axis %s not found in the image" % self.frameAxisInfo.key)
                                 
-                                cz = axiscalibration.AxesCalibration(self.frameAxisInfo).getCalibratedAxisCoordinate(self._current_frame_index_, self.frameAxisInfo.key)
-
-                                sz = self.frameAxisInfo.key
-
-                                if isinstance(val, float):
-                                    coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s: %.2f %s)> %.2f" % \
-                                        (crstxt, \
-                                        x, sx, scx, swx, \
-                                        y, sy, scy, swy, \
-                                        self._current_frame_index_, sz, cz.magnitude, cz.units.dimensionality.string, \
-                                        val)
+                                zAxisKey = self.frameAxisInfo.key
+                                frameAxisIndex = self._data_.axistags.index(zAxiskey)
                                 
-                                elif isinstance(val, (tuple, list)):
-                                    valstr = "(" + " ".join(["%.2f" % v for v in val]) + ")"
-                                    
-                                    coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s: %.2f %s)> %s" % \
-                                        (crstxt, \
-                                        x, sx, scx, swx, \
-                                        y, sy, scy, swy, \
-                                        self._current_frame_index_, sz, cz.magnitude, cz.units.dimensionality.string, \
-                                        valstr)
-                                    
-                            else: # self.frameAxisInfo is a tuple
-                                sz_cz = ", ".join(["%s: %s" % (ax.key, strutils.quantity2str(axiscalibration.AxesCalibration(ax).getCalibratedAxisCoordinate(self._current_frame_index_, ax.key))) for ax in self.frameAxisInfo])
+                                if self._axes_calibration_:
+                                    cz = self._axes_calibration_[frameAxisIndex].calibratedMeasure(self._current_frame_index_)
+                                    scz = quantity2str(cz)
+                                else:
+                                    scz = ""
                                 
-                                if isinstance(val, float):
-                                    coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s)> %s" % \
-                                        (crstxt, \
-                                        x, sx, scx, swx, \
-                                        y, sy, scy, swy, \
-                                        self._current_frame_index_, sz_cz, \
-                                        val)
+                                coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s: %s)> %s" % \
+                                    (crstxt, 
+                                    x, widthAxisKey, scx, swx, 
+                                    y, heightAxisKey, scy, swy,
+                                    self._current_frame_index_, zAxisKey, scz,
+                                    sval)
+                            
+                            else: # self.frameAxisInfo is a tuple - FiXME: when does THIS happen ?!?
+                                # FIXME 2021-10-26 00:06:22
+                                if self._axes_calibration_:
+                                    sz_cz = ", ".join(["%s: %s" % (ax.key, quantity2str(self._axes_calibration_[ax.key].calibratedDistance(self._current_frame_index_))) for ax in self.frameAxisInfo])
+                                else:
+                                    sz_cz = ", ".join(["%s: %s" % (ax.key, self._current_frame_index_) for ax in self.frameAxisInfo])
                                 
-                                elif isinstance(val, (tuple, list)):
-                                    valstr = "(" + " ".join(["%.2f" % v for v in val]) + ")"
-                                    
-                                    coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s)> %s" % \
-                                        (crstxt, \
-                                        x, sx, scx, swx, \
-                                        y, sy, scy, swy, \
-                                        self._current_frame_index_, sz_cz, \
-                                        valstr)
+                                coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s)> %s" % \
+                                    (crstxt, \
+                                    x, widthAxisKey, scx, swx, \
+                                    y, heightAxisKey, scy, swy, \
+                                    self._current_frame_index_, sz_cz, \
+                                    val)
                                     
                         else:
                             if isinstance(val, float):
                                 coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s> %s" % \
                                     (crstxt, \
-                                    x, sx, scx, swx, \
-                                    y, sy, scy, swy, \
+                                    x, widthAxisKey, scx, swx, \
+                                    y, heightAxisKey, scy, swy, \
                                     val)
                                 
                             elif isinstance(val, (tuple, list)):
@@ -4089,52 +4113,64 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                     
                                 coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s> %s" % \
                                     (crstxt, \
-                                    x, sx, scx, swx, \
-                                    y, sy, scy, swy, \
+                                    x, widthAxisKey, scx, swx, \
+                                    y, heightAxisKey, scy, swy, \
                                     valstr)
                                 
                                 
-                    else:
+                    else: # ndim == 2
                         val = float(np.squeeze(img[x,y]))
                         
                         coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s> %.2f" % \
                             (crstxt, \
-                            x, sx, scx, swx, \
-                            y, sy, scy, swy, \
+                            x, widthAxisKey, scx, swx, \
+                            y, heightAxisKey, scy, swy, \
                             val)
                     
-                else: # shouldn't realy get here, should we ?!?
+                else: # ndim < 2 shouldn't realy get here, should we ?!?
                     val = float(img[x])
-
-                    cx = axiscalibration.AxesCalibration(img.axistags[viewWidthAxisIndex]).getCalibratedAxisCoordinate(x, img.axistags[viewWidthAxisIndex].key)
-                        
-                    sx = img.axistags[viewWidthAxisIndex].key
                     
-                    scx = "%.2f %s" % (cx.magnitude, cx.units.dimensionality.string)
+                    if self._axes_calibration_:
+                        cx = self._axes_calibration_[viewWidthAxisIndex].calibratedMeasure(x)
+                        scx = quantity2str(cx)
+                    else:
+                        scx = ""
+
+                    widthAxisKey = img.axistags[viewWidthAxisIndex].key
                     
                     coordTxt = "%s<X: %d (%s: %s)%s> %.2f" % \
-                        (crstxt, x, sx, scx, swx, val)
+                        (crstxt, x, widthAxisKey, scx, swx, val)
                     
             else:
                 c_list = list()
                 
                 if y is None:
-                    cx = axiscalibration.AxesCalibration(img.axistags[viewWidthAxisIndex]).getCalibratedAxisCoordinate(x, img.axistags[viewWidthAxisIndex])
+                    if self._axes_calibration_:
+                        cx = self._axes_calibration_[viewWidthAxisIndex].calibratedMeasure(x)
+                        scx = quantity2str(cx)
+                    else:
+                        scx = ""
+                    #cx = axiscalibration.AxesCalibration(img.axistags[viewWidthAxisIndex]).getCalibratedAxisCoordinate(x, img.axistags[viewWidthAxisIndex])
                         
-                    sx = img.axistags[viewWidthAxisIndex].key
+                    widthAxisKey = img.axistags[viewWidthAxisIndex].key
                     
-                    scx = "%.2f %s" % (cx.magnitude, cx.units.dimensionality.string)
+                    #scx = "%.2f %s" % (cx.magnitude, cx.units.dimensionality.string)
                     
-                    c_list.append("%s<X: %d (%s: %s)%s" % ((crstxt, x, sx, scx, swx)))
+                    c_list.append("%s<X: %d (%s: %s)%s" % ((crstxt, x, widthAxisKey, scx, swx)))
                     
                 elif x is None:
-                    cy = axiscalibration.AxesCalibration(img.axistags[viewHeightAxisIndex]).getCalibratedAxisCoordinate(y, img.axistags[viewHeightAxisIndex])
+                    if self._axes_calibration_:
+                        cy = self._axes_calibration_[viewHeightAxisIndex].calibratedMeasure(y)
+                        scy = quantity2str(cy)
+                    else:
+                        scy = ""
+                    #cy = axiscalibration.AxesCalibration(img.axistags[viewHeightAxisIndex]).getCalibratedAxisCoordinate(y, img.axistags[viewHeightAxisIndex])
                         
-                    sy = img.axistags[viewHeightAxisIndex].key
+                    heightAxisKey = img.axistags[viewHeightAxisIndex].key
                     
-                    scy = "%.2f %s" % (cy.magnitude, cy.units.dimensionality.string)
+                    #scy = "%.2f %s" % (cy.magnitude, cy.units.dimensionality.string)
                     
-                    c_list.append("%s<Y: %d (%s: %s)%s" % ((crstxt, y, sy, scy, swy)))
+                    c_list.append("%s<Y: %d (%s: %s)%s" % ((crstxt, y, heightAxisKey, scy, swy)))
                 
                 if img.ndim > 2:
                     if self.frameAxisInfo is not None:
@@ -4142,14 +4178,22 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                             if self.frameAxisInfo not in self._data_.axistags:
                                 raise RuntimeError("frame axis intfo %s not found in the image" % self.frameAxisInfo.key)
                         
-                            cz = axiscalibration.AxesCalibration(self.frameAxisInfo).getCalibratedAxisCoordinate(self._current_frame_index_, self.frameAxisInfo)
+                            if self._axes_calibration_:
+                                cz = quantity2str(self._axes_calibration_[self.frameAxisInfo.key].calibratedMeasure(self._current_frame_index_))
+                            else:
+                                cz = ""
+                            #cz = axiscalibration.AxesCalibration(self.frameAxisInfo).getCalibratedAxisCoordinate(self._current_frame_index_, self.frameAxisInfo)
                         
                             sz = self.frameAxisInfo.key
                         
                             c_list.append(", Z: %d (%s: %s)>" % (self._current_frame_index_, sz, cz))
                             
                         else:
-                            sz_cz = ", ".join(["%s: %s" % (ax.key, axiscalibration.AxesCalibration(ax).getCalibratedAxisCoordinate(self._current_frame_index_, ax.key)) for ax in self.frameAxisInfo])
+                            if self._axes_calibration_:
+                                sz_cz = ", ".join(["%s: %s" % (ax.key, quantity2str(self._axes_calibration_[ax.key].calibratedMeasure(self._current_frame_index_))) for ax in self.frameAxisInfo])
+                                
+                            else:
+                                sz_cz = ", ".join(["%s: %s" % (ax.key, self._current_frame_index_) for ax in self.frameAxisInfo])
                                 
                             c_list.append("(%s)" % sz_cz)
     
@@ -4410,6 +4454,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.viewerWidget.scene.removeItem(self._colorBar)
             
         self._colorBar = None
+        
+        self._axes_calibration_ = None
                 
         if displayChannel is None:
             self._displayedChannel_      = "all"
@@ -4431,6 +4477,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 
             if self._parseVigraArrayData_(data):
                 self._data_  = data
+                self._axes_calibration_ = AxesCalibration(data)
                 self._setup_channels_display_actions_()
                 self.displayFrame()
             
@@ -4453,13 +4500,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 else:
                     arrayAxes = vigra.VigraArray.defaultAxistags(data.ndim, noChannels=True)
                     
+            # NOTE: 2021-10-25 16:29:38
+            # For display purposes only, we construct a VigraArray on the numpy
+            # ndarray passed as 'image'
+            
             self._data_ = vigra.VigraArray(data, axistags=arrayAxes)
+            self._axes_calibration_ = AxesCalibration(self._data_)
             
         else:
             raise TypeError("First argument must be a VigraArray or a numpy.ndarray")
-        
-        #if kwargs.get("show", True):
-            #self.activateWindow()
         
     def clear(self):
         """Clears all image data cursors and rois from this window

@@ -167,10 +167,9 @@ import core.models as models
 import core.signalprocessing as sgp
 import core.neoutils as neoutils
 
-from core.quantities import arbitrary_unit
-
-from core.datatypes import (check_time_units, units_convertible, 
-                            unit_quantity_from_name_or_symbol, UnitTypes)
+from core.quantities import (arbitrary_unit, check_time_units, units_convertible, 
+                            unit_quantity_from_name_or_symbol, )
+from core.datatypes import UnitTypes
 from core.workspacefunctions import validate_varname
 from core.utilities import (get_nested_value, set_nested_value, counter_suffix, )
 from core.prog import (safeWrapper, safeGUIWrapper, )

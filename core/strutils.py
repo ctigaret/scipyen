@@ -147,25 +147,6 @@ class QRNameValidator(QtGui.QValidator):
     def fixup(self, value):
         return str2R(value)
         
-def quantity2str(x, precision = 2, format="f"):
-    if not isinstance(x, (pq.Quantity, pq.UnitQuantity)):
-        raise TypeError("Expecting a python Quantity or UnitQuantity; got %s instead" % type(x).__name__)
-    
-    if x.magnitude.flatten().size != 1:
-        raise TypeError("Expecting a scalar quantity; got a quantity of size %d instead" % x.magnitude.flatten().size)
-    
-    if not isinstance(precision, int):
-        raise TypeError("precision expected to be an int; got %s instead" % type(precision).__name__)
-    
-    if precision <= 0:
-        raise ValueError("precision must be strictly positive; got %d instead" % precision)
-    
-    mag_format = "%d" % precision
-    
-    fmt = "%." + mag_format + format
-    
-    return " ".join([fmt % x.magnitude, x.units.dimensionality.string])
-
 def numbers2str(value:typing.Optional[typing.Union[Number, np.ndarray, tuple, list]], 
                 precision:int=5, format:str="g", show_units=False) -> str:
     """Generates a string representation of numeric data in base 10.

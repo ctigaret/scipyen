@@ -53,6 +53,7 @@ import core.datatypes as dt
 import core.plots as plots
 import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+from core.quantities import units_convertible
 #import core.triggerprotocols
 from core.triggerevent import (TriggerEvent, TriggerEventType)
 from core.triggerprotocols import (TriggerProtocol)
@@ -236,7 +237,7 @@ def segment_Rs_Rin(segment: neo.Segment,
     Im_signal = segment.analogsignals[Im]
     
     if isinstance(Vm, pq.Quantity):
-        if not dt.units_convertible(Vm, pq.V):
+        if not units_convertible(Vm, pq.V):
             raise TypeError("Wrong units for Vm quantity: %s" % Vm.units)
         
         if Vm.size != 1:
@@ -932,7 +933,7 @@ def rheobase_latency(*args, **kwargs):
     xstart = kwargs.get("xstart", 0)
     
     if isinstance(xstart, pq.Quantity):
-        if not dt.units_convertible(xstart, latencies_mean.units):
+        if not units_convertible(xstart, latencies_mean.units):
             raise TypeError("'xstart' expected to have %s units; instead it has %s" % (latencies_mean.units, xstart.units))
         
         if xstart.units != pq.s:
@@ -947,7 +948,7 @@ def rheobase_latency(*args, **kwargs):
     xend = kwargs.get("xend", 0)
     
     if isinstance(xend, pq.Quantity):
-        if not dt.units_convertible(xstart, latencies_mean.units):
+        if not units_convertible(xstart, latencies_mean.units):
             raise TypeError("'xend' expected to have %s units; instead it has %s" % (latencies_mean.units, xend.units))
         
         if xend.units != pq.s:
@@ -1076,7 +1077,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
         t_stop = t_start = t0.durations[0]
         
     elif isinstance(t0, pq.Quantity):
-        if not dt.units_convertible(t0, pq.s):
+        if not units_convertible(t0, pq.s):
             raise TypeError("'t0' expected to have time units; got %s instead" % t0.units)
         
         if t0.size == 1:
@@ -1111,7 +1112,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
             t_stop = t1*pq.s
             
         elif isinstance(t1, pq.Quantity):
-            if not dt.units_convertible(t1, pq.s):
+            if not units_convertible(t1, pq.s):
                 raise TypeError("'t1' expected to have time units; got %s instead" % t1.units)
             
             if t1.size !=1:
@@ -1221,7 +1222,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None,
             baseEpoch = neo.Epoch(times = t_start * vm.times.units,
                                   durations = duration * vm.times.units)
             
-        elif all([(isinstance(v, pq.Quantity) and dt.units_convertible(v, vm.times)) for v in baseEpoch]):
+        elif all([(isinstance(v, pq.Quantity) and units_convertible(v, vm.times)) for v in baseEpoch]):
             times = baseEpoch[0]
             durations = baseEpoch[1]-baseEpoch[0]
             baseEpoch = neo.Epoch(times=times, durations=durations)
@@ -1237,7 +1238,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None,
             ssEpoch = neo.Epoch(times = t_start * vm.times.units,
                                   durations = duration * vm.times.units)
             
-        elif all([(isinstance(v, pq.Quantity) and dt.units_convertible(v, vm.times)) for v in ssEpoch]):
+        elif all([(isinstance(v, pq.Quantity) and units_convertible(v, vm.times)) for v in ssEpoch]):
             times = ssEpoch[0]
             durations = ssEpoch[1]-ssEpoch[0]
             ssEpoch = neo.Epoch(times=times, durations=durations)
@@ -1338,7 +1339,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None,
             Iinj = Iinj * pq.pA
             
         elif isinstance(Iinj, pq.Quantity):
-            if not dt.units_convertible(Iinj, pq.pA):
+            if not units_convertible(Iinj, pq.pA):
                 raise TypeError("Iinj is invalid: %s" % Iinj)
             
         else:
@@ -2133,14 +2134,14 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,
     elif isinstance(triggers, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
         times = triggers.times
         
-        if not dt.units_convertible(times, signal.times.units):
+        if not units_convertible(times, signal.times.units):
             raise TypeError("triggers domain units (%s) are incompatible with this data" % triggers.times.dimensionality)
         
         elif times.units != signal.times.units:
             times = times.rescale(signal.times.units)
         
     elif isinstance(triggers, pq.Quantity):
-        if dt.units_convertible(triggers, signal.times):
+        if units_convertible(triggers, signal.times):
             times = triggers
             
             if triggers.units != signal.times.units:
@@ -2156,7 +2157,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,
         if all([isinstance(v, numbers.Real) for v in triggers]):
             times = np.array(triggers) * signal.times.units
             
-        elif all([isinstance(v, pq.Quantity) and dt.units_convertible(v, signal.times.units) for v in triggers]):
+        elif all([isinstance(v, pq.Quantity) and units_convertible(v, signal.times.units) for v in triggers]):
             times = triggers
             
         else:
@@ -2303,7 +2304,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
         t0 *= signal.times.units
         
     elif isinstance(t0, pq.Quantity):
-        if not dt.units_convertible(t0, signal.times.units):
+        if not units_convertible(t0, signal.times.units):
             raise TypeError("t0 expected to be a float or quantity scalar with %s units" % signal.time.dimensionality)
         
         elif t0.units != signal.times.units:
@@ -2316,7 +2317,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
         t1 *= signal.times.units
         
     elif isinstance(t1, pq.Quantity):
-        if not dt.units_convertible(t1, signal.times.units):
+        if not units_convertible(t1, signal.times.units):
             raise TypeError("t1 expected to be a float or quantity scalar with %s units" % signal.time.dimensionality)
         
         elif t1.units != signal.times.units:
@@ -2341,7 +2342,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
         thr *= pq.V/pq.s
         
     elif isinstance(thr, pq.Quantity):
-        if not dt.units_convertible(thr, dsdt.units):
+        if not units_convertible(thr, dsdt.units):
             raise TypeError("'thr' expected to have %s units; got %s instead" % (dsdt.units.dimensionality, thr.units.dimensionality))
         
         thr = thr.rescale(pq.V/pq.s)
@@ -2597,7 +2598,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
             times = times * sig.time.units
             
         else:
-            if not dt.units_convertible(times, sig.times):
+            if not units_convertible(times, sig.times):
                 raise TypeError("times units (%s) are incompatible with this signal (%s)" % (times.units.dimensionality, sig.times.units.dimensionality))
             
             times = times.rescale(sig.times.units)
@@ -2652,7 +2653,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
             raise ValueError("when a vector, 'after' must have the same length as times")
         
         if isinstance(after, pq.Quantity):
-            if not dt.units_convertible(after, sig.times.units):
+            if not units_convertible(after, sig.times.units):
                 raise TypeError("units of after are incompatible with signal's times units")
             
         else:
@@ -2683,7 +2684,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
                 raise ValueError("'before' had incompatible size" )
             
             if isinstance(before, pq.Quantity):
-                if not dt.units_convertible(before, sig.times.units):
+                if not units_convertible(before, sig.times.units):
                     raise TypeError("'before' has incompatible units")
                 
                 before = before.rescale(sig.times.units)
@@ -2760,7 +2761,7 @@ def extract_pulse_triggered_APs(sig, times, tail = None):
             times = times.flatten() * sig.times.units
                 
         else:
-            if not dt.units_convertible(times, sig.times):
+            if not units_convertible(times, sig.times):
                 raise TypeError("times units (%s) are incompatible with this signal (%s)" % (times.units.dimensionality, sig.times.units.dimensionality))
             
             times = times.rescale(sig.times.units)
@@ -2786,7 +2787,7 @@ def extract_pulse_triggered_APs(sig, times, tail = None):
                 tail *= sig.times.units
                 
             else:
-                if not dt.units_convertible(tail, sig.time.units):
+                if not units_convertible(tail, sig.time.units):
                     raise TypeError("'tail' units (%s) are incompatible with signal's times: %s" % (tail.units.dimensionality, sig.times.units.dimensionality) )
                 
                 tail = tail.rescale(sig.times.units)
@@ -3081,7 +3082,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:neo.AnalogSignal,
             if resample_with_period.size > 1:
                 raise TypeError("new sampling period must be a scalar Quantity; got %s instead" % resample_with_period)
             
-            if dt.units_convertible(resample_with_period, vm.sampling_period):
+            if units_convertible(resample_with_period, vm.sampling_period):
                 if resample_with_period.units != vm.sampling_period.units:
                     resample_with_period.rescale(vm.sampling_period.units)
                     
@@ -3098,7 +3099,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:neo.AnalogSignal,
             if resample_with_rate.size > 1:
                 raise TypeError("new sampling rate must be a scalar Quantity; got %s instead" % resample_with_rate)
         
-            if dt.units_convertible(resample_with_rate, vm.sampling_rate):
+            if units_convertible(resample_with_rate, vm.sampling_rate):
                 if resample_with_rate.units != vm.sampling_rate.units:
                     resample_with_rate.rescale(vm.sampling_rate.units)
                     
@@ -3206,7 +3207,7 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
         min_fast_rise_duration *= pq.s
     
     elif isinstance(min_fast_rise_duration, pq.Quantity):
-        if not dt.units_convertible(min_fast_rise_duration, sig.times):
+        if not units_convertible(min_fast_rise_duration, sig.times):
             raise TypeError("units of 'min_fast_rise_duration' (%s) are not compatible with those of the signal's time domain (%s)" % (min_fast_rise_duration.units, sig.times.units))
         
         if min_fast_rise_duration.units != sig.times.units:
@@ -3586,7 +3587,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
         after *= pq.s
         
     elif isinstance(after, pq.Quantity):
-        if not dt.units_convertible(after, sig.times):
+        if not units_convertible(after, sig.times):
             raise TypeError("units of 'after' (%s) are not compatible with those of the signal's time domain (%s)" % (after.units, sig.times.units))
         
     elif after is not None:
@@ -3611,7 +3612,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
         min_fast_rise_duration *= pq.s
     
     elif isinstance(min_fast_rise_duration, pq.Quantity):
-        if not dt.units_convertible(min_fast_rise_duration, sig.times):
+        if not units_convertible(min_fast_rise_duration, sig.times):
             raise TypeError("units of 'min_fast_rise_duration' (%s) are not compatible with those of the signal's time domain (%s)" % (min_fast_rise_duration.units, sig.times.units))
         
         if min_fast_rise_duration.units != sig.times.units:
@@ -3627,7 +3628,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
         min_ap_isi *= pq.s
         
     elif isinstance(min_ap_isi, pq.Quantity):
-        if not dt.units_convertible(min_ap_isi, sig.times):
+        if not units_convertible(min_ap_isi, sig.times):
             raise TypeError("units of 'min_ap_isi' (%s) are not compatible with those of the signal's time domain (%s)" % (min_ap_isi.units, sig.times.units))
     
         if min_ap_isi.units != sig.times.units:
@@ -3651,7 +3652,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
         decay_ref *= sig.units
         
     elif isinstance(decay_ref, pq.Quantity):
-        if not dt.units_convertible(decay_ref, sig):
+        if not units_convertible(decay_ref, sig):
             raise TypeError("'decay_ref' units (%s) are incompatible with the signal's units (%s)" % (decay_ref.units, sig.units))
         
         if decay_ref.units != sig.units:
@@ -3664,7 +3665,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
         reference_Vm = get_duration_at_Vm * sig.units
         
     elif isinstance(get_duration_at_Vm, pq.Quantity):
-        if not dt.units_convertible(get_duration_at_Vm, sig.units):
+        if not units_convertible(get_duration_at_Vm, sig.units):
             raise TypeError("get_duration_at_Vm expected to have %s units; got %s instead" % (sig.units.dimensionality, get_duration_at_Vm.units.dimensionality))
         
         if get_duration_at_Vm.units != sig.units:
@@ -4212,7 +4213,7 @@ def ap_duration_at_Vm(ap, value, **kwargs): #decay_ref, decay_intercept_approx="
             decay_ref *= ap.units
             
         elif isinstance(decay_ref, pq.Quantity):
-            if not dt.units_convertible(decay_ref, ap.units):
+            if not units_convertible(decay_ref, ap.units):
                 raise TypeError("decay_ref has incompatible units (%s)" % decay_ref.units.dimensionality)
             
             if decay_ref.units != ap.units:
@@ -4226,7 +4227,7 @@ def ap_duration_at_Vm(ap, value, **kwargs): #decay_ref, decay_intercept_approx="
             value *= ap.units
             
         elif isinstance(value, pq.Quantity):
-            if not dt.units_convertible(value, ap.units):
+            if not units_convertible(value, ap.units):
                 raise TypeError("value units (%s) not convertible to signal's units (%s)" % (value.units.dimensionality, ap.units.dimensionality))
             
             value = value.rescale(ap.units)
@@ -4266,7 +4267,7 @@ def ap_phase_plot_data(vm, dvdt=None, smooth_window=None):
     if not isinstance(vm, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % (type(vm).__name__))
     
-    if not dt.units_convertible(vm.units, pq.V):
+    if not units_convertible(vm.units, pq.V):
         warnings.warn("'vm' this does not seem to contain a Vm signal")
     
     if vm.ndim > 2 or (vm.ndim == 2 and vm.shape[1] > 1):
@@ -4323,7 +4324,7 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None,
     if not isinstance(vm, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % (type(vm).__name__))
     
-    if not dt.units_convertible(vm.units, pq.V):
+    if not units_convertible(vm.units, pq.V):
         warnings.warn("this does not seem to be a Vm signal")
     
     if vm.ndim > 2 or (vm.ndim == 2 and vm.shape[1] > 1):
@@ -4345,7 +4346,7 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None,
         dvdt_thr *= dvdt.units
         
     elif isinstance(dvdt_thr, pq.Quantity):
-        if not dt.units_convertible(dvdt_thr, dvdt.units):
+        if not units_convertible(dvdt_thr, dvdt.units):
             raise TypeError("'dvdt_thr' expected to have %s units; got %s instead" % (dvdt.units.dimensionality, dvdt_thr.units.dimensionality))
         
         dvdt_thr = dvdt_thr.rescale(dvdt.units)
@@ -4436,7 +4437,7 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None,
             ref_vm *= vm.units
             
         elif isinstance(ref_vm, pq.Quantity):
-            if not dt.units_convertible(ref_vm, vm.units):
+            if not units_convertible(ref_vm, vm.units):
                 raise TypeError("ref_vm has wrong units: %s" % ref_vm.units.dimensionality)
             
             #print("analyse_AP_waveform vm.units", vm.units)
@@ -5118,7 +5119,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         if Iinj_0.size != 1:
             raise TypeError("Iinj_0 must be a scalar quantity")
         
-        if dt.units_convertible(Iinj_0, pq.pA):
+        if units_convertible(Iinj_0, pq.pA):
             Iinj_0 = Iinj_0.rescale(pq.pA)
             
         else:
@@ -5136,7 +5137,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         if delta_I.size != 1:
             raise TypeError("delta_I must be a scalar quantity")
         
-        if dt.units_convertible(delta_I, pq.pA):
+        if units_convertible(delta_I, pq.pA):
             delta_I = delta_I.rescale(pq.pA)
             
         else:
@@ -5160,7 +5161,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         if all([isinstance(v, float) for v in Iinj]):
             Iinj = np.array(Iinj) * pq.pA
             
-        elif all([isinstance(v, pq.Quantity) and dt.units_convertible(v, pq.pA) for v in Iinj]):
+        elif all([isinstance(v, pq.Quantity) and units_convertible(v, pq.pA) for v in Iinj]):
             Iinj = np.array([v.rescale(pq.pA).magnitude for v in Iinj]) * pq.pA
             
         else:
@@ -5580,7 +5581,7 @@ def analyse_AP_step_injection_series_replicate(*blocks, **kwargs):
                 #step_increment *= results_for_rheo[0]["Delta_I_step"].units
                 
             #elif isinstance(step_increment, pq.Quantity):
-                #if not dt.units_convertible(step_increment, results_for_rheo[0]["Delta_I_step"].units):
+                #if not units_convertible(step_increment, results_for_rheo[0]["Delta_I_step"].units):
                     #raise TypeError("require_same_step_increment has incompatible units (%s); expecting %s" % (step_increment.units, results_for_rheo[0]["Delta_I_step"].units))
                 
             #else:
@@ -6333,7 +6334,7 @@ def summarise_AP_analysis_at_depol_step(*results, **kwargs):
             step_increment *= results_for_rheo[0]["Delta_I_step"].units
             
         elif isinstance(step_increment, pq.Quantity):
-            if not dt.units_convertible(step_increment, results_for_rheo[0]["Delta_I_step"].units):
+            if not units_convertible(step_increment, results_for_rheo[0]["Delta_I_step"].units):
                 raise TypeError("require_same_step_increment has incompatible units (%s); expecting %s" % (step_increment.units, results_for_rheo[0]["Delta_I_step"].units))
             
         else:
@@ -6400,7 +6401,7 @@ def summarise_AP_analysis_at_depol_step(*results, **kwargs):
             test_current *= ret["I"].units
             
         elif isinstance(test_current, pq.Quantity):
-            if not dt.units_convertible(test_current.units, ret["I"].units):
+            if not units_convertible(test_current.units, ret["I"].units):
                 raise TypeError("When specified, test_current must be either a float scalar, or a python quantity in %s " % ret["I"].units.dimensionality.string)
             
             if test_current.units != ret["I"].units:
@@ -6984,7 +6985,7 @@ def report_AP_analysis(data, name=None):
             #if resample_with_period.size > 1:
                 #raise TypeError("new sampling period must be a scalar Quantity; got %s instead" % resample_with_period)
             
-            #if dt.units_convertible(resample_with_period, vstep.sampling_period):
+            #if units_convertible(resample_with_period, vstep.sampling_period):
                 #if resample_with_period.units != vstep.sampling_period.units:
                     #resample_with_period.rescale(vstep.sampling_period.units)
                     
@@ -7001,7 +7002,7 @@ def report_AP_analysis(data, name=None):
             #if resample_with_rate.size > 1:
                 #raise TypeError("new sampling rate must be a scalar Quantity; got %s instead" % resample_with_rate)
         
-            #if dt.units_convertible(resample_with_rate, vstep.sampling_rate):
+            #if units_convertible(resample_with_rate, vstep.sampling_rate):
                 #if resample_with_rate.units != vstep.sampling_rate.units:
                     #resample_with_rate.rescale(vstep.sampling_rate.units)
                     

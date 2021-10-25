@@ -11,16 +11,17 @@ from core import (prog, traitcontainers, strutils, neoutils, models,)
 from core.prog import safeWrapper
 from core.traitcontainers import DataBag
 from core import quantities as cq
-from core.quantities import(arbitrary_unit, pixel_unit, channel_unit,
-                                    space_frequency_unit,
-                                    angle_frequency_unit,day_in_vitro,
-                                    week_in_vitro, postnatal_day, postnatal_month,
-                                    embryonic_day, embryonic_week, embryonic_month,
-                                    )
-
-from core.datatypes import (UnitTypes, Genotypes, 
+from core.quantities import(arbitrary_unit, 
+                            pixel_unit, 
+                            channel_unit,
+                            space_frequency_unit,
+                            angle_frequency_unit,day_in_vitro,
+                            week_in_vitro, postnatal_day, postnatal_month,
+                            embryonic_day, embryonic_week, embryonic_month,
                             unit_quantity_from_name_or_symbol,
-                            )
+                            check_time_units)
+
+from core.datatypes import (UnitTypes, Genotypes, )
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 

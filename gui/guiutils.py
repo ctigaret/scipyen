@@ -5,6 +5,20 @@ from PyQt5 import (QtCore, QtWidgets, QtGui)
 from gui.painting_shared import (FontStyleType, standardQtFontStyles, 
                                  FontWeightType, standardQtFontWeights)
 
+import quantities as pq
+
+class UnitsStringValidator(QtGui.QValidator):
+    def __init__(self, parent=None):
+        super(UnitsStringValidator, self).__init__(parent)
+        
+    def validate(self, s, pos):
+        try:
+            u = eval("1*%s" % (s[0:pos]), pq.__dict__)
+            return QtGui.QValidator.Acceptable
+        
+        except:
+            return QtGui.QValidator.Invalid
+        
 def get_elided_text(s,w):
     fm = QtWidgets.QApplication.fontMetrics()
     return fm.elidedText(s, QtCore.Qt.ElideRight, w)

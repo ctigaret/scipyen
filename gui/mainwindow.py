@@ -292,7 +292,11 @@ if has_vigra:
                                    getNonChannelDimensions,
                                    hasChannelAxis,
                                    )
-    from imaging.axiscalibration import (AxesCalibration,)
+    from imaging.axiscalibration import (AxesCalibration,
+                                         AxisCalibrationData, 
+                                         ChannelCalibrationData, 
+                                         CalibrationData)
+    
     from imaging.scandata import (AnalysisUnit, ScanData,)
 
     import imaging.CaTanalysis as CaTanalysis 

@@ -48,10 +48,13 @@ import neo
 #from neo.core import container
 from neo.core.dataobject import (DataObject, ArrayDict,)
 
-from core.datatypes import (check_time_units, is_string, 
+from core.datatypes import (is_string, 
                             RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
+
+from core.quantities import check_time_units
 from core.neoutils import (get_index_of_named_signal, remove_events, clear_events,
                            is_same_as, get_events)
+
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal, )
 from core.prog import safeWrapper
 from core.triggerevent import (TriggerEvent, TriggerEventType,)

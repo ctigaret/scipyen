@@ -627,6 +627,7 @@ import core.workspacefunctions as wf
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.datatypes as dt
+from core.quantities import units_convertible
 import core.plots as plots
 import core.models as models
 import core.triggerprotocols as tp
@@ -2394,7 +2395,7 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
             testVm = testVm * pq.mV
             
         elif isinstance(testVm, pq.Quantity):
-            if not dt.units_convertible(testVm, pq.V):
+            if not units_convertible(testVm, pq.V):
                 raise TypeError("When a quantity, testVm must have voltage units; got %s instead" % testVm.dimensionality)
             
             if testVm.size != 1:
@@ -2459,7 +2460,7 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
         if isi.size != 1:
             raise ValueError("ISI given explicitly must be a scalar; got %s instead" % isi)
             
-        if not dt.units_convertible(isi, s.analogsignals[signal_index_Im].times):
+        if not units_convertible(isi, s.analogsignals[signal_index_Im].times):
             raise ValueError("ISI given explicitly has units %s which are incompatible with the time axis" % isi.units)
             
         warnings.warn("Inter-stimulus interval is explicitly given: %s" % isi)

@@ -197,11 +197,11 @@ from core.quantities import(arbitrary_unit,
                             angle_frequency_unit,
                             day_in_vitro,
                             week_in_vitro, postnatal_day, postnatal_month,
-                            embryonic_day, embryonic_week, embryonic_month,)
+                            embryonic_day, embryonic_week, embryonic_month,
+                            unit_quantity_from_name_or_symbol,)
 
 from core.datatypes import (TypeEnum,UnitTypes, Genotypes, 
                             is_uniform_sequence,
-                            unit_quantity_from_name_or_symbol,
                             )
 
 from core.modelfitting import (FitModel, ModelExpression,)

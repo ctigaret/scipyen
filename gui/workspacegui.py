@@ -46,16 +46,45 @@ class GuiMessages(object):
         QtWidgets.QMessageBox.warning(self, title, text)
         
     @safeWrapper
-    def detailedMessage(self, title, text, detail="", msgType="Critical"):
-        if not hasattr(QtWidgets.QMessageBox.Icon, msgType):
-            raise ValueError("Invalid msgType %s. Expecting one of %s" % (msgType, ("NoIcon", "Question", "Information", "Warning", "Critical")))
+    def detailedMessage(self, title:str, text:str, 
+                        info:typing.Optional[str]="", 
+                        detail:typing.Optional[str]="", 
+                        msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):
+        """Detailed generic message dialog box
+        title: str  = dialog title
+        text:str =  main message
+        info:str (optional, default is None) informative text
+        detail:str (optional default is None) = detaile dtext shown by expanding
+            the dialog
+        msgType:str (optional default is 'Information')
+            Allowed values are:
+            "NoIcon", "Question", "Information", "Warning", "Critical", a valid
+            pixmap file name, or a valid theme icon name.
+            
+        """
+        if isinstance(msgType, str) and len(msgType.strip()):
+            if getattr(QtWidgets.QMessageBox.Icon, msgType, None) is not None:
+                msgbox.setIcon(getattr(QtWidgets.QMessageBox.Icon, msgType))
+            else:
+                try:
+                    if os.path.isfile(msgType):
+                        pix = QtGui.QtGui.QPixmap(msgType)
+                    else:
+                        pix = QtGui.Icon.fromTheme(msgType).pixmap(QtWidgets.QStyle.PM_MEssageBoxIconSize)
+                        msgBox.setIconPixmap(pix)
+                        
+                except:
+                    msgBox.setIcon("NoIcon")
         
         msgbox = QtWidgets.QMessageBox()
         msgbox.setSizeGripEnabled(True)
-        msgbox.setIcon(getattr(QtWidgets.QMessageBox.Icon, msgType))
         msgbox.setWindowTitle(title)
         msgbox.setText(text)
-        if isinstance(detail, str) and len(detail):
+        
+        if isinstance(info, str) and len(info.strip()):
+            msgbox.setInformativeText(info)
+            
+        if isinstance(detail, str) and len(detail.strip()):
             msgbox.setDetailedText(detail)
             
         msgbox.exec()

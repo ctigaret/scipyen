@@ -28,6 +28,7 @@ from core import (datatypes as dt, signalprocessing as sgp, curvefitting as crvf
 # NOTE: 2020-10-08 09:45:31
 # inside core.utilities, safeWrapper below is imported from core.prog
 from core.utilities import (safeWrapper, counter_suffix, unique, )
+from core.quantities import (units_convertible, check_time_units)
 
 #from .patchneo import neo
 from neo.core import baseneo
@@ -143,7 +144,7 @@ def synthetic_transients(duration, sampling_frequency, *args, **kwargs):
         if len(duration.magnitude.flatten()) != 1:
             raise TypeError("duration expected to be a scalar; got %s instead" % duration)
         
-        if not datatypes.check_time_units(duration):
+        if not check_time_units(duration):
             raise TypeError("When a quantity, duration muste have time units; got %s instead" % duration.units)
         
         kwargs["domain_units"] = duration.units
@@ -197,7 +198,7 @@ def synthetic_spine(field_width, spatial_resolution, *args, **kwargs):
             if len(spatial_resolution.magnitude.flatten()) != 1:
                 raise TypeError("spatial_resolution expected to be a scalar")
             
-            if not dt.units_convertible(width, spatial_resolution):
+            if not units_convertible(width, spatial_resolution):
                 raise TypeError("field_width and spatial_resolution have incompatible units")
             
             # rescale resolution units to width units

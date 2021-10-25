@@ -503,10 +503,13 @@ from .prog import (safeWrapper, deprecation,
                    filter_type, filterfalse_type,
                    iter_attribute)
 
-from .datatypes import (units_convertible, check_time_units, is_string, is_vector,
+from .datatypes import (is_string, is_vector,
                         RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
 
+from .quantities import units_convertible, check_time_units
+
 from .datasignal import (DataSignal, IrregularlySampledDataSignal,)
+
 from .triggerevent import (TriggerEvent, TriggerEventType,)
 
 from . import workspacefunctions

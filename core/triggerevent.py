@@ -15,8 +15,9 @@ import numpy as np
 import quantities as pq
 import neo
 from neo.core.dataobject import (DataObject, ArrayDict,)
-from core.datatypes import (check_time_units, is_string, TypeEnum,
+from core.datatypes import (is_string, TypeEnum,
                             RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
+from core.quantities import check_time_units
 #from core.utilities import unique
 
 def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None, 

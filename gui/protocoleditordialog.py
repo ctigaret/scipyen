@@ -9,10 +9,10 @@ from PyQt5.uic import loadUiType
 import numpy as np
 import quantities as pq
 
-from core.quantities import arbitrary_unit
-from core.datatypes import (check_time_units, units_convertible,
-                            unit_quantity_from_name_or_symbol, UnitTypes, )
-from core.strutils import (quantity2str, numbers2str,)
+from core.quantities import (arbitrary_unit, check_time_units, units_convertible,
+                            unit_quantity_from_name_or_symbol, quantity2str, )
+from core.datatypes import UnitTypes
+from core.strutils import (numbers2str,)
 from core.traitcontainers import DataBag
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.triggerprotocols import TriggerProtocol

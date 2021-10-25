@@ -1,8 +1,7 @@
 import inspect, typing
-#from collections import OrderedDict
 from math import log
 from numpy import log10
-#import numpy as np
+import numpy as np
 import quantities as pq
 
 _pqpfx = sorted(inspect.getmembers(pq.prefixes, lambda x: isinstance(x, (float, int))) + [("deca", pq.prefixes.deka)], key = lambda x: x[1])
@@ -164,5 +163,179 @@ for cq in custom_quantities:
 
 del(custom_quantities, cq, _pqpfx)
 
+def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]):
+    """
+    """
+    if isinstance(x, (complex, float, int)) or x == np.nan:
+        return x
+    
+    if isinstance(x, np.ndarray):
+        if x.size != 1:
+            raise TypeError(f"Expecting a scalar; instead, got an array with size {x.size}")
+        
+        if isinstance(x, pq.Quantity): # this is derived from numpy array
+            v = x.magnitude
+        else:
+            v = x[0]
+    
+    
+        if v.dtype.name.startswith("complex"):
+            return complex(v)
+        
+        if v.dtype.name.startswith("float"):
+            return float(v)
+        
+        if v.dtype.name.startswith("int"):
+            return int(v)
+    
+        raise TypeError(f"Expecting a numeric dtype; got {v.dtype} instead")
+    
+    raise TypeError(f"Expecting a scalar int float, complex, numpy array or Pyhon quantities.Quantity; got {type(x).__name__} instead")
 
-#del(module_mmb)
+def quantity2str(x, precision = 2, format="f"):
+    if not isinstance(x, (pq.Quantity, pq.UnitQuantity)):
+        raise TypeError("Expecting a python Quantity or UnitQuantity; got %s instead" % type(x).__name__)
+    
+    if x.magnitude.flatten().size != 1:
+        raise TypeError("Expecting a scalar quantity; got a quantity of size %d instead" % x.magnitude.flatten().size)
+    
+    if not isinstance(precision, int):
+        raise TypeError("precision expected to be an int; got %s instead" % type(precision).__name__)
+    
+    if precision <= 0:
+        raise ValueError("precision must be strictly positive; got %d instead" % precision)
+    
+    mag_format = "%d" % precision
+    
+    fmt = "%." + mag_format + format
+    
+    return " ".join([fmt % x.magnitude, x.units.dimensionality.string])
+
+def name_from_unit(u):
+    """
+    FIXME make it more intelligent!
+    """
+    d_name = ""
+    
+    if not isinstance(u, (pq.UnitQuantity, pq.Quantity)):
+        return d_name
+        #raise TypeError("Expecting a Quanity or UnitQuanity; got %s instead" % type(u).__name__)
+    
+    unitQuantity = [k for k in u.dimensionality.keys()]
+    
+    
+    if len(unitQuantity):
+        unitQuantity = unitQuantity[0] 
+    
+        d_name = unitQuantity.name
+        
+        if d_name in ("Celsius", "Kelvin", "Fahrenheit"):
+            d_name = "Temperature"
+            
+        elif d_name in ("arcdegree"):
+            d_name = "Angle"
+            
+        elif "volt" in d_name:
+            d_name = "Potential"
+            
+        elif "ampere" in d_name:
+            d_name = "Current"
+            
+        elif "siemens" in d_name:
+            d_name = "Conductance"
+            
+        elif "ohm" in d_name:
+            d_name = "Resistance"
+            
+        elif "coulomb" in d_name:
+            d_name = "Capacitance"
+            
+        elif "hertz" in d_name:
+            d_name = "Frequency"
+        
+        elif any([v in d_name for v in ("meter", "foot", "mile","yard")]):
+            d_name = "Length"
+            
+        elif any([v in d_name for v in ("second", "minute", "day","week", "month", "year")]):
+            d_name = "Time"
+            
+    return d_name
+            
+    
+def check_time_units(value):
+    if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
+        raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)
+    
+    ref = pq.s
+    
+    return value._reference.dimensionality == ref.dimensionality
+    
+def conversion_factor(x:pq.Quantity, y:pq.Quantity):
+    """Calculates the conversion factor from y units to x units.
+    Alternative to pq.quantity.get_conversion_factor()
+    
+    """
+    if not isinstance(x, pq.Quantity):
+        raise TypeError("x expected to be a python Quantity; got %s instead" % type(x).__name__)
+    
+    if not isinstance(y, pq.Quantity):
+        raise TypeError("y expected to be a python Quantity; got %s instead" % type(y).__name__)
+    
+    if x._reference.dimensionality != y._reference.dimensionality:
+        raise TypeError("x and y have incompatible units (%s and %s respectively)" % (x.units, y.units))
+
+    x_dim = pq.quantity.validate_dimensionality(x)
+    y_dim = pq.quantity.validate_dimensionality(y)
+    
+    if x_dim != y_dim:
+        try:
+            cf = pq.quantity.get_conversion_factor(x_dim, y_dim)
+            
+        except AssertionError:
+            raise ValueError("Cannot convert from %s to %s" % (origin_dim.dimensionality, self_dim.dimensionality))
+        
+        return cf
+    
+    else:
+        return 1.0
+
+def units_convertible(x, y):
+    """Checks that the units of python Quantities x and y are identical or convertible to each other.
+    NOTE: To check that x and y have IDENTICAL units simply call 'x.units == y.units'
+    """
+    if not isinstance(x, (pq.Quantity, pq.UnitQuantity)):
+        raise TypeError("x expected to be a python Quantity; got %s instead" % type(x).__name__)
+    
+    if not isinstance(y, (pq.UnitQuantity, pq.Quantity)):
+        raise TypeError("y expected to be a python UnitQuantity or Quantity; got %s instead" % type(y).__name__)
+    
+    return x._reference.dimensionality == y._reference.dimensionality
+
+def unit_quantity_from_name_or_symbol(s):
+    if not isinstance(s, str):
+        raise TypeError("Expecting a string; got %s instead" % type(s).__name__)
+    
+    try:
+        # easy way first
+        return pq.unit_registry[s]
+    
+    except:
+        #traceback.print_exc()
+        try:
+            ret = eval(s, pq.__dict__)
+            
+        except:
+            #traceback.print_exc()
+            if s in custom_unit_symbols.keys():
+                ret = custom_unit_symbols[s]
+                
+            elif s in [u.name for u in custom_unit_symbols.values()]:
+                ret = [u for u in custom_unit_symbols.values() if u.name == s]
+                
+            else:
+                warnings.warn("Unknown unit quantity %s" % s, RuntimeWarning)
+                
+                ret = pq.dimensionless
+            
+        return ret
+        
