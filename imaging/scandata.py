@@ -37,7 +37,10 @@ from core.neoutils import (clear_events, get_index_of_named_signal, neo_copy, is
 from ephys.ephys import (average_segments, )
 
 from imaging.vigrautils import getFrameLayout
-from imaging.axiscalibration import AxesCalibration
+from imaging.axiscalibration import (AxesCalibration, 
+                                     AxisCalibrationData,
+                                     ChannelCalibrationData)
+
 from imaging.imageprocessing import concatenateImages
 from gui import pictgui as pgui
 from gui.pictgui import PlanarGraphics
@@ -10090,7 +10093,7 @@ class ScanData(object):
             #return axcal.channelNames(self.scene[0].axistags["c"])
         
         else:
-            return [axcal.channelNames()[0] for axcal in self._scene_axis_calibrations_]
+            return [axcal.channelNames[0] for axcal in self._scene_axis_calibrations_]
             
             #return [AxesCalibration(s.axistags["c"]).channelNames()[0] for s in self.scene]
             #return [axisChannelName(s.axistags["c"], 0) for s in self.scene]
@@ -10393,7 +10396,7 @@ class ScanData(object):
             if any([s.channels != 1 for s in self._scans_]):
                 raise RuntimeError("Scans array contains more than one multi-channel image")
         
-            return [axcal.channelNames()[0] for axcal in self._scans_axis_calibrations_]
+            return [axcal.channelNames[0] for axcal in self._scans_axis_calibrations_]
         
     @scansChannelNames.setter
     def scansChannelNames(self, value):

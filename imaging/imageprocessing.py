@@ -25,6 +25,11 @@ from imaging.axisutils import (axisTypeFromString,
                                axisTypeSymbol,
                                axisTypeUnits)
 
+from imaging.axiscalibration import (AxesCalibration, 
+                                     AxisCalibrationData, 
+                                     ChannelCalibrationData, 
+                                     CalibrationData)
+
 #from .patchneo import neo
 #### END pict.core modules
 
@@ -1044,7 +1049,7 @@ def slicingSequence(array, slicing):
 def insertAxis(img, axinfo, axdim):
     """Inserts an axis specified by axinfo, at dimension axdim, in image img.
     
-    Returns a copy of img with a new axis inserted.
+    Returns a reference to img with a new axis inserted.
     
     """
     
@@ -1370,7 +1375,7 @@ Arrays are concatenated in two ways, explained here by examples:
                                          |__|
     
     """
-    from .axiscalibration import AxesCalibration
+    #from .axiscalibration import AxesCalibration
 
     catAxis = 0
     
@@ -1410,7 +1415,6 @@ Arrays are concatenated in two ways, explained here by examples:
         
         if isinstance(images[0], vigra.VigraArray):
             # there is only one image; nothing to concatenate here
-            #
             # just return a reference to images[0] image
             return images[0]
         
@@ -1423,40 +1427,8 @@ Arrays are concatenated in two ways, explained here by examples:
         else:
             raise TypeError("Expecting a vigra array, or a sequence of vigra arrays")
             
-        #elif isinstance(images[0],(tuple, list)):
-            #if all ([isinstance(i, dt.PictArray) for i in images[0]]):
-                #images = images[0]
-                #asPictArray = True # return PictArray type
-                
-            #elif any([isinstance(i, dt.PictArray) for i in images[0]]):
-                ## implies mixed sequence of PictArray and VigraArray objects
-                ## cast the VigraArray instances into PictArray
-                #data = list()
-                
-                #for image in images[0]:
-                    #if isinstance(image, vigra.VigraArray):
-                        #data.append(dt.PictArray(image))
-                        
-                    #else:
-                        #data.append(image)
-                        
-                #images = data
-                
-                #asPictArray = True # return PictArray type
-                
-            #elif all([isinstance(i, vigra.VigraArray) for i in images[0]]):
-                ## implies none are PictArrays (as this has been already probed above)
-                #images = images[0]
-                
-                #asPictArray = False # return VigraArray type
-            
-        #else:
-            #raise TypeError("A vigra.VigraArray, datatypes.PictArray or a sequence (tuple or list) of vigra.VigraArray or datatypes.PictArray objects was expected")
-
-
     # NOTE: 2017-10-21 00:05:12
     # by now, images should be a sequence of VigraArrays
-    
     
     #print(images)
     
@@ -1470,29 +1442,13 @@ Arrays are concatenated in two ways, explained here by examples:
     if max_dims != min_dims:
         raise ValueError("Cannot concatenate images with different dimensionalities")
     
-    axistags    = images[0].axistags
     
-    axiscals    = AxesCalibration(images[0])
+    #axes_cals    = AxesCalibration(images[0])
     
-    #if isinstance(images[0], dt.PictArray):
-        #axiscals = images[0].axiscalibration
-        
-    #else:
-        #axiscals    = AxesCalibration(images[0])
-        
     first_shape = images[0].shape
 
     # NOTE: 2018-09-05 22:47:20
-    # sort out the identity of the concatenation axis:
-    #
-    # 1) catAxis given as int (index into first image axistags) =>
-    #    set this to catAxisNdx then set catAxis to the axisinfo of the first image
-    #    with the index given by catAxis in first image axistags
-    # 2) catAxis given as a string (axis info key) => 
-    #   figure out which axis it points to use that as catAxis and set catAxisNdx 
-    #   to its index in the axistags of the first image
-    # 3) catAxis given as vigra.AxisInfo object =>
-    #   set catAxisNdx to its index in first image's axistags
+    # figure out the identity of the concatenation axis:
     #
     # NOTE: a vigra.AxisInfo may be present in two different images; it DOES NOT
     # encapsulate the axis itself (equality test used for inclusion in an axistags
@@ -1505,6 +1461,9 @@ Arrays are concatenated in two ways, explained here by examples:
     # To concatenate along an as yet unexisting  axis, use case (2) or (3)
     #   
     if isinstance(catAxis, int):
+        # catAxis given as int (index into first image's axistags) =>
+        # set this to catAxisNdx then set catAxis to be the axisinfo of the first image
+        # with the index given by catAxis in first image axistags
         if catAxis < 0 or catAxis >= min_dims:
             raise ValueError("concatenation axis index must take values in the semi-open interval [0, %d); got %d instead" % (min_dims, catAxisNdx))
         
@@ -1514,65 +1473,62 @@ Arrays are concatenated in two ways, explained here by examples:
             catAxis = images[0].axistags[catAxisNdx]
             
     elif isinstance(catAxis, str):
+        # catAxis given as a string (axis info key) => 
+        # figure out which axis it points to use that as catAxis and set catAxisNdx 
+        # to its index in the axistags of the first image
         if catAxis not in images[0].axistags:
             # create a new axis then add it to each of the images
-            new_images = list()
             
             catAxisNdx = min_dims
             
             newaxis = vigra.AxisInfo(key = catAxis, typeFlags = axisTypeFromString(catAxis),
                                      resolution=1.0,
                                      description = axisTypeFromString(catAxis))
-            for img in images:
-                new_images.append(insertAxis(img, newaxis, catAxisNdx))
+            
+            #new_images = list()
+            #for img in images:
+                #new_images.append(insertAxis(img, newaxis, catAxisNdx))
+                
+            new_images = [insertAxis(img, newaxis, catAxisNdx) for img in images]
                 
             catAxis = newaxis
                 
             images = new_images
             
-            axistags = images[0].axistags
+            #axistags = images[0].axistags
             
-            axiscals = AxesCalibration(images[0])
+            #axes_cals = AxesCalibration(images[0])
 
-            #if isinstance(images[0], dt.PictArray):
-                #axiscals = images[0].axiscalibration
-                
-            #else:
-                #axiscals = AxesCalibration(images[0])
-            
         else:
-            catAxisNdx = axistags.index(catAxis)
-            catAxis = axistags[catAxisNdx]
+            catAxisNdx = images[0].axistags.index(catAxis)
+            catAxis = images[0].axistags[catAxisNdx]
         
     elif isinstance(catAxis, vigra.AxisInfo):
+        # catAxis given as vigra.AxisInfo object =>
+        # set catAxisNdx to its index in first image's axistags
         if catAxis not in images[0].axistags:
-            new_images = list()
             catAxisNdx = min_dims
+            new_images = [insertAxis(img, catAxis, catAxisNdx) for img in images]
             
-            for img in images:
-                new_images.append(insertAxis(img, catAxis, catAxisNdx))
+            #new_images = list()
+            #for img in images:
+                #new_images.append(insertAxis(img, catAxis, catAxisNdx))
         
             images = new_images
             
-            axistags = images[0].axistags
+            #axistags = images[0].axistags
             
-            axiscals = AxesCalibration(images[0])
-            
-            #if isinstance(images[0], dt.PictArray):
-                #axiscals = images[0].axiscalibration
-                
-            #else:
-                #axiscals = AxesCalibration(images[0])
+            #axes_cals = AxesCalibration(images[0])
             
         else:
-            catAxisNdx = axistags.index(catAxis.key)
+            catAxisNdx = images[0].axistags.index(catAxis.key)
         
     else:
         raise TypeError("concatenation axis must be specified as an int, a str or a vigra.AxisInfo object; got %s instead" % type(catAxis).__name__)
         
-        
-    #if any([isinstance(img, dt.PictArray) for img in images]):
-        #asPictArray = True
+    #axes_calibrations = [AxesCalibration(img) for img in images]
+    axistags    = images[0].axistags
+    axcal       = AxesCalibration(images[0]) # also calibrates the axes of images[0]
         
     # NOTE: 2018-09-05 23:32:14
     # check axistags, axis calibrations and array shapes
@@ -1582,17 +1538,11 @@ Arrays are concatenated in two ways, explained here by examples:
         if img.axistags != axistags:
             raise ValueError("Cannot concatenate images with different AxisInfo objects")
         
-        imgaxiscals = AxesCalibration(img)
+        img_axcal = AxesCalibration(img) # will also calibrate img's axes
         
-        #if isinstance(img, dt.PictArray):
-            #imgaxiscals = img.axiscalibration
-            
-        #else:
-            #imgaxiscals = AxesCalibration(img)
-        
-        for key in imgaxiscals.keys:
+        for key in img_axcal.keys:
             if axistags[key] == catAxis:
-                if not axiscals.is_same_as(imgaxiscals, key, ignore=ignore):
+                if not axcal[key].isclose(img_axcal[key], ignore=ignore):
                     if ignore is None:
                         raise RuntimeError("Cannot concatenate along the axis %s which has non-matching calibration across images" % key)
                     
@@ -1600,7 +1550,7 @@ Arrays are concatenated in two ways, explained here by examples:
                         raise RuntimeError("Cannot concatenate along the axis %s which has non-matching calibration across images, ignoring %s" % (key, str(ignore)))
                 
             else:
-                if not axiscals.is_same_as(imgaxiscals, key, ignore=None):
+                if not axcal[key].isclose(img_axcal[key]):
                     raise RuntimeError("Cannot concatenate images with non-matching calibration for axis %s" % key)
                 
         if not all(first_shape[s] == img.shape[s] for s in range(min_dims) if s != catAxisNdx):
@@ -1608,32 +1558,8 @@ Arrays are concatenated in two ways, explained here by examples:
             
     result = vigra.VigraArray(np.concatenate(images, axis=catAxisNdx), axistags = axistags)
     
-    # save these for later
-    axistags = result.axistags
-    axiscals = AxesCalibration(axistags)
-    
-    #print("concatenate images")
-            
-    for axiskey in axiscals.keys:
-        axiscals.calibrateAxis(result.axistags[axiskey])
-
-    #if asPictArray:
-        #result = dt.PictArray(np.concatenate(images, axis=catAxisNdx),
-                              #axistags = axistags)
-        
-        #result.axiscalibration = axiscals
-        
-    #else:
-        #result = vigra.VigraArray(np.concatenate(images, axis=catAxisNdx), axistags = axistags)
-        
-        ## save these for later
-        #axistags = result.axistags
-        #axiscals = AxesCalibration(axistags)
-        
-        ##print("concatenate images")
-                
-        #for axiskey in axiscals.keys:
-            #axiscals.calibrateAxis(result.axistags[axiskey])
+    #axes_cals = AxesCalibration(result)
+    #axes_cals.calibrateAxes() # axes are calibrate at the tie of AxesCalibration initialization
     
     return result
     

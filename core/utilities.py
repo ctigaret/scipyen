@@ -37,6 +37,7 @@ except:
 from .prog import safeWrapper, deprecation
 
 from .strutils import get_int_sfx
+from .quantities import units_convertible
 
 # NOTE: 2021-07-24 15:03:53
 # moved TO core.datatypes
@@ -147,7 +148,7 @@ class SafeComparator(object):
             #print("y:", y)
             return False
         
-def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarray], 
+def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarray, pq.Quantity], 
             rtol:typing.Optional[Number]=None, 
             atol:typing.Optional[Number]=None, 
             use_math:bool=True, 
@@ -216,7 +217,7 @@ def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarra
     """
     
     if any(isinstance(v, np.ndarray) and v.size > 1 for v in (x,y)):
-        math = False
+        use_math = False
         
     f_isclose = math.isclose if use_math else partial(np.isclose)
     
@@ -228,12 +229,32 @@ def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarra
         
     f_isclose = partial(math.isclose, rel_tol=rtol, abs_tol=atol) if use_math else partial(np.isclose, rtol=rtol, atol=atol, equal_nan=equal_nan)
     
+    if isinstance(x, pq.Quantity):
+        if isinstance(y, pq.Quantity):
+            if not units_convertible(x,y):
+                return False
+            elif x.units != y.units:
+                y = y.rescale(x.units)
+                
+            y = y.magnitude
+            
+        x = x.magnitude
+            
+    elif isinstance(y, pq.Quantity):
+        # on this branch x is definitely NOT a quantity
+        y = y.magnitude
+        
     # emulate equal_nan for math.isclose
     if use_math:
         if all(v is math.nan or v is np.nan for v in (x,y)):
             return True
         
     return f_isclose(x,y)
+
+def all_or_not_all(*args):
+    """Returns True when elements in args are either all True or all False.
+    """
+    return all(args) or all(not(arg) for arg in args)
 
 def hashiterable(x:typing.Iterable[typing.Any]) -> Number:
     """Takes into account the order of the elements.

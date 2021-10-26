@@ -209,7 +209,11 @@ from . import scandata
 from .scandata import (ScanData, AnalysisUnit, check_apiversion, scanDataOptions)
 from . import axisutils
 from .axisutils import dimEnum
-from .axiscalibration import (AxesCalibration, calibration, axisChannelName,)
+from .axiscalibration import (AxesCalibration, 
+                              AxisCalibrationData, 
+                              ChannelCalibrationData,
+                              CalibrationData,  
+                              calibration, axisChannelName,)
 #### END imaging modules
 
 #### BEGIN pict.iolib modules
