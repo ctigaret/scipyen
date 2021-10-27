@@ -438,23 +438,41 @@ def resampleImageAxis(image, new_res, axis=0, p=1000, window=None):
     
     image_cal = AxesCalibration(image)
     
-    if image_cal.getUnits(axisinfo) == pq.dimensionless:
+    if image_cal[axisinfo].units == pq.dimensionless:
         warnings.warn("Resampling along a dimensionless axis")
         
-    if image_cal.getDimensionlessResolution(axisinfo) == 1:
-        warnings.warn("Resampling an axis with original resolution of %s" % image_cal.getDimensionlessResolution(axisinfo) )
+    if image_cal[axisinfo].resolution == 1:
+        warnings.warn("Resampling an axis with original resolution of %s" % image_cal[axisinfo].resolution)
         
-    elif image_cal.getDimensionlessResolution(axisinfo) == 0:
+    elif image_cal[axisinfo].resolution == 0:
         raise ValueError("Cannot resample an axis with zero resolution")
+    
+    #if image_cal.getUnits(axisinfo) == pq.dimensionless:
+        #warnings.warn("Resampling along a dimensionless axis")
+        
+    #if image_cal.getDimensionlessResolution(axisinfo) == 1:
+        #warnings.warn("Resampling an axis with original resolution of %s" % image_cal.getDimensionlessResolution(axisinfo) )
+        
+    #elif image_cal.getDimensionlessResolution(axisinfo) == 0:
+        #raise ValueError("Cannot resample an axis with zero resolution")
     
     if isinstance(new_res, pq.Quantity):
         if new_res.size !=  1:
             raise TypeError("Expecting new_res a scalar; got a shaped array %s" % new_res)
         
-        if new_res.units != image_cal.getUnits(axisinfo):
+        if new_res.units != image_cal[axisinfo].units:
             raise TypeError("New resolution has incompatible units with this axis calibration %s" % cal)
         
         new_res = new_res.magnitude
+        
+    #if isinstance(new_res, pq.Quantity):
+        #if new_res.size !=  1:
+            #raise TypeError("Expecting new_res a scalar; got a shaped array %s" % new_res)
+        
+        #if new_res.units != image_cal.getUnits(axisinfo):
+            #raise TypeError("New resolution has incompatible units with this axis calibration %s" % cal)
+        
+        #new_res = new_res.magnitude
         
     elif not isinstance(new_res, numbers.Real):
         raise TypeError("Expecting new_res a scalar float or Python Quantity; got %s instead" % type(new_res).__name__)
@@ -462,16 +480,27 @@ def resampleImageAxis(image, new_res, axis=0, p=1000, window=None):
     if new_res < 0:
         raise ValueError("New sampling rate (%s) must be strictly positive !" % new_res)
     
-    if new_res > image_cal.getDimensionlessResolution(axisinfo):
-        dn = int(new_res/image_cal.getDimensionlessResolution(axisinfo) * p)
+    if new_res > image_cal[axisinfo].resolution:
+        dn = int(new_res/image_cal[axisinfo].resolution * p)
         up = p
         
-    elif new_res < image_cal.getDimensionlessResolution(axisinfo):
-        up = int(image_cal.getDimensionlessResolution(axisinfo)/new_res * p)
+    elif new_res < image_cal[axisinfo].resolution:
+        up = int(image_cal[axisinfo].resolution/new_res * p)
         dn = p
         
     else:
         return image
+    
+    #if new_res > image_cal.getDimensionlessResolution(axisinfo):
+        #dn = int(new_res/image_cal.getDimensionlessResolution(axisinfo) * p)
+        #up = p
+        
+    #elif new_res < image_cal.getDimensionlessResolution(axisinfo):
+        #up = int(image_cal.getDimensionlessResolution(axisinfo)/new_res * p)
+        #dn = p
+        
+    #else:
+        #return image
     
     #up = int(cal[2]/new_res * p)
     
@@ -480,20 +509,18 @@ def resampleImageAxis(image, new_res, axis=0, p=1000, window=None):
     
     ret = vigra.VigraArray(resample(image, up, dn, axis=axisindex, window = window), axistags=image.axistags)
     
-    units = image_cal.getUnits(axisinfo)
-    origin = image_cal.getDimensionlessOrigin(axisinfo)
+    units = image_cal[axisinfo].units
+    origin = image_cal[axisinfo].origin
     resolution = new_res
     
-    image_cal.setResolution(new_res, axisinfo)
+    image_cal[axisinfo].resolution = new_res
     
     #newCal = AxesCalibration(ret.axistags[axisindex],
                                 #units = units, origin = origin, resolution = resolution, 
                                 #axisname = dt.axisTypeName(ret.axistags[axisindex]),
                                 #axistype = ret.axistags[axisindex].typeFlags)
     
-    #print("newCal", image_cal)
-    
-    image_cal.calibrateAxis(ret.axistags[axisindex])
+    image_cal[axisinfo].calibrateAxis(axisinfo)
     
     #dt.calibrateAxis(ret.axistags[axisindex], (cal[0], cal[1], new_res))
     
@@ -1078,11 +1105,11 @@ def insertAxis(img, axinfo, axdim):
     
     return img[indexobj]
     
-            
 def imageIndexTuple(img, slicing=None, newAxis=None, newAxisDim=None):
     """Idiom for introducing a new axis in an image.
     
-    Returns a tuple useful for indexing a VigraArray taking into account a new axis.
+    Returns a tuple useful for indexing a VigraArray taking into account a new
+    axis.
     
     Positional parameters:
     =====================
@@ -1485,20 +1512,12 @@ Arrays are concatenated in two ways, explained here by examples:
                                      resolution=1.0,
                                      description = axisTypeFromString(catAxis))
             
-            #new_images = list()
-            #for img in images:
-                #new_images.append(insertAxis(img, newaxis, catAxisNdx))
-                
             new_images = [insertAxis(img, newaxis, catAxisNdx) for img in images]
                 
             catAxis = newaxis
                 
             images = new_images
             
-            #axistags = images[0].axistags
-            
-            #axes_cals = AxesCalibration(images[0])
-
         else:
             catAxisNdx = images[0].axistags.index(catAxis)
             catAxis = images[0].axistags[catAxisNdx]
@@ -1510,15 +1529,7 @@ Arrays are concatenated in two ways, explained here by examples:
             catAxisNdx = min_dims
             new_images = [insertAxis(img, catAxis, catAxisNdx) for img in images]
             
-            #new_images = list()
-            #for img in images:
-                #new_images.append(insertAxis(img, catAxis, catAxisNdx))
-        
             images = new_images
-            
-            #axistags = images[0].axistags
-            
-            #axes_cals = AxesCalibration(images[0])
             
         else:
             catAxisNdx = images[0].axistags.index(catAxis.key)
@@ -1526,9 +1537,8 @@ Arrays are concatenated in two ways, explained here by examples:
     else:
         raise TypeError("concatenation axis must be specified as an int, a str or a vigra.AxisInfo object; got %s instead" % type(catAxis).__name__)
         
-    #axes_calibrations = [AxesCalibration(img) for img in images]
     axistags    = images[0].axistags
-    axcal       = AxesCalibration(images[0]) # also calibrates the axes of images[0]
+    axcal       = AxesCalibration(images[0])
         
     # NOTE: 2018-09-05 23:32:14
     # check axistags, axis calibrations and array shapes
@@ -1557,9 +1567,6 @@ Arrays are concatenated in two ways, explained here by examples:
             raise RuntimeError("Images must have identical shapes except along the concatenation axis")
             
     result = vigra.VigraArray(np.concatenate(images, axis=catAxisNdx), axistags = axistags)
-    
-    #axes_cals = AxesCalibration(result)
-    #axes_cals.calibrateAxes() # axes are calibrate at the tie of AxesCalibration initialization
     
     return result
     

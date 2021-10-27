@@ -647,59 +647,59 @@ class AnalysisUnit(object):
             
         self._descriptors_.update(kwargs)
         
-    def _upgrade_API_(self):
-        from gui import pictgui as pgui
+    #def _upgrade_API_(self):
+        #from gui import pictgui as pgui
         
-        def _upgrade_attribute_(old_name, new_name, attr_type, default):
-            needs_must = False
-            if not hasattr(self, new_name):
-                needs_must = True
+        #def _upgrade_attribute_(old_name, new_name, attr_type, default):
+            #needs_must = False
+            #if not hasattr(self, new_name):
+                #needs_must = True
                 
-            else:
-                attribute = getattr(self, new_name)
+            #else:
+                #attribute = getattr(self, new_name)
                 
-                if not isinstance(attribute, attr_type):
-                    needs_must = True
+                #if not isinstance(attribute, attr_type):
+                    #needs_must = True
                     
-            if needs_must:
-                if hasattr(self, old_name):
-                    old_attribute = getattr(self, old_name)
+            #if needs_must:
+                #if hasattr(self, old_name):
+                    #old_attribute = getattr(self, old_name)
                     
-                    if isinstance(old_attribute, attr_type):
-                        setattr(self, new_name, old_attribute)
-                        delattr(self, old_name)
+                    #if isinstance(old_attribute, attr_type):
+                        #setattr(self, new_name, old_attribute)
+                        #delattr(self, old_name)
                         
-                    else:
-                        setattr(self, new_name, default)
-                        delattr(self, old_name)
+                    #else:
+                        #setattr(self, new_name, default)
+                        #delattr(self, old_name)
                         
-                else:
-                    setattr(self, new_name, default)
+                #else:
+                    #setattr(self, new_name, default)
                     
-        if hasattr(self, "apiversion") and isinstance(self.apiversion, tuple) and len(self.apiversion)>=2 and all(isinstance(v, numbers.Number) for v in self.apiversion):
-            vernum = self.apiversion[0] + self.apiversion[1]/10
+        #if hasattr(self, "apiversion") and isinstance(self.apiversion, tuple) and len(self.apiversion)>=2 and all(isinstance(v, numbers.Number) for v in self.apiversion):
+            #vernum = self.apiversion[0] + self.apiversion[1]/10
             
-            if vernum >= 0.2:
-                return
+            #if vernum >= 0.2:
+                #return
             
-        _upgrade_attribute_("__parent__", "_parent_", ScanData, ScanData())
-        _upgrade_attribute_("__inscene__", "_inscene_", bool, False)
-        _upgrade_attribute_("__unit_type__", "_unit_type_", str, "unknown")
-        _upgrade_attribute_("__cell__", "_cell_", str, "NA")
-        _upgrade_attribute_("__field__", "_field_", str, "NA")
-        _upgrade_attribute_("__genotype__", "_genotype_", str, "NA")
-        _upgrade_attribute_("__gender__", "_gender_", str, "NA")
-        _upgrade_attribute_("__age__", "_age_", str, "NA")
-        _upgrade_attribute_("__sample_source__", "_sample_source_", str, "NA")
-        _upgrade_attribute_("__unit_name__", "_unit_name_", (str, type(None)), None)
-        _upgrade_attribute_("__protocols__", "_protocols_", list, list())
-        _upgrade_attribute_("__descriptors__", "_descriptors_", DataBag, DataBag(mutable_types=True, allow_none=True))
-        _upgrade_attribute_("__landmark__", "_landmark_", (PlanarGraphics, type(None)), None)
+        #_upgrade_attribute_("__parent__", "_parent_", ScanData, ScanData())
+        #_upgrade_attribute_("__inscene__", "_inscene_", bool, False)
+        #_upgrade_attribute_("__unit_type__", "_unit_type_", str, "unknown")
+        #_upgrade_attribute_("__cell__", "_cell_", str, "NA")
+        #_upgrade_attribute_("__field__", "_field_", str, "NA")
+        #_upgrade_attribute_("__genotype__", "_genotype_", str, "NA")
+        #_upgrade_attribute_("__gender__", "_gender_", str, "NA")
+        #_upgrade_attribute_("__age__", "_age_", str, "NA")
+        #_upgrade_attribute_("__sample_source__", "_sample_source_", str, "NA")
+        #_upgrade_attribute_("__unit_name__", "_unit_name_", (str, type(None)), None)
+        #_upgrade_attribute_("__protocols__", "_protocols_", list, list())
+        #_upgrade_attribute_("__descriptors__", "_descriptors_", DataBag, DataBag(mutable_types=True, allow_none=True))
+        #_upgrade_attribute_("__landmark__", "_landmark_", (PlanarGraphics, type(None)), None)
         
-        if isinstance(self._landmark_, PlanarGraphics):
-            self._landmark_._upgrade_API_()
+        #if isinstance(self._landmark_, PlanarGraphics):
+            #self._landmark_._upgrade_API_()
             
-        self.apiversion = (0, 2)
+        #self.apiversion = (0, 2)
         
     #"def" __eq__(self, other):
         #if not isinstance(other, AnalysisUnit):
@@ -2342,280 +2342,280 @@ class ScanData(object):
         elif isinstance(triggers, (tuple, list)) and all([isinstance(t, TriggerProtocol) for t in triggers]):
             self._trigger_protocols_[:] = triggers
         
-    def _upgrade_API_(self):
-        """Implements API upgrade 
-        To be called as soon as possible after de-serializing e.g. unpickling.
+    #def _upgrade_API_(self):
+        #"""Implements API upgrade 
+        #To be called as soon as possible after de-serializing e.g. unpickling.
         
-        TODO/FIXME: adapt to a new scenario where all scene image data is a single
-        multi-channel VigraArray
-        """
-        import gui.pictgui as pgui
+        #TODO/FIXME: adapt to a new scenario where all scene image data is a single
+        #multi-channel VigraArray
+        #"""
+        #import gui.pictgui as pgui
         
-        def _upgrade_attribute_(old_name, new_name, attr_type, default):
-            if hasattr(self, new_name):
-                value = getattr(self, new_name)
-                if isinstance(value, attr_type):
-                    return
+        #def _upgrade_attribute_(old_name, new_name, attr_type, default):
+            #if hasattr(self, new_name):
+                #value = getattr(self, new_name)
+                #if isinstance(value, attr_type):
+                    #return
                 
-                else:# CAUTION may wipe out attribute value!
-                    try:
-                        val = attr_type(value)
-                    except:
-                        val = default
+                #else:# CAUTION may wipe out attribute value!
+                    #try:
+                        #val = attr_type(value)
+                    #except:
+                        #val = default
                         
-                    setattr(self, new_name, val) 
+                    #setattr(self, new_name, val) 
             
-            elif hasattr(self, old_name):
-                value = getattr(self, old_name)
-                # CAUTION may wipe out attribute value!
-                if not isinstance(value, attr_type):
-                    try:
-                        value = attr_type(value) # try casting
+            #elif hasattr(self, old_name):
+                #value = getattr(self, old_name)
+                ## CAUTION may wipe out attribute value!
+                #if not isinstance(value, attr_type):
+                    #try:
+                        #value = attr_type(value) # try casting
                         
-                    except:
-                        value = default
+                    #except:
+                        #value = default
                         
-                delattr(self, old_name)
+                #delattr(self, old_name)
                         
-            else:
-                value = default
+            #else:
+                #value = default
             
-            #print("\tvalue", value)
-            setattr(self, new_name, value)
+            ##print("\tvalue", value)
+            #setattr(self, new_name, value)
             
-        def _remove_attribute_(name):
-            if hasattr(self, name):
-                delattr(self, name)
+        #def _remove_attribute_(name):
+            #if hasattr(self, name):
+                #delattr(self, name)
 
-        _upgrade_attribute_("__metadata__", "_metadata_", DataBag, DataBag(mutable_types=True, allow_none=True))
-        _upgrade_attribute_("__name__", "_name_", str, "ScanData")
-        _upgrade_attribute_("__modified__", "_modified_", bool, False)
-        _upgrade_attribute_("__processed__", "_processed_", bool, False)
-        _upgrade_attribute_("__annotations__", "_annotations_", dict, dict())
-        _upgrade_attribute_("__scandatatype__", "_scandatatype_", ScanData.ScanDataType, ScanData.ScanDataType.linescan)
-        _upgrade_attribute_("__analysismode__", "_analysismode_", ScanData.ScanDataAnalysisMode, ScanData.ScanDataAnalysisMode.frame)
-        _upgrade_attribute_("__available_genotypes__", "_available_genotypes_", (tuple, list), ["NA", "wt", "het", "hom"])
-        _upgrade_attribute_("__available_unit_types__", "_available_unit_types_", (tuple, list), ["unknown"] + [s for s in UnitTypes.values()])
-        _upgrade_attribute_("__analysis_options__", "_analysis_options_", dict, dict())
-        _upgrade_attribute_("__scene__", "_scene_", list, list())
-        _upgrade_attribute_("__scene_frame_axis__", "_scene_frame_axis_", (type(None), str), None)
-        #_upgrade_attribute_("__scene_frames__", "_scene_frames_", int, 0)
-        _upgrade_attribute_("__scans__", "_scans_", list, list())
-        _upgrade_attribute_("__scans_frame_axis__", "_scans_frame_axis_", (type(None), str), None)
-        #_upgrade_attribute_("__scans_frames__", "_scans_frames_", int, 0)
+        #_upgrade_attribute_("__metadata__", "_metadata_", DataBag, DataBag(mutable_types=True, allow_none=True))
+        #_upgrade_attribute_("__name__", "_name_", str, "ScanData")
+        #_upgrade_attribute_("__modified__", "_modified_", bool, False)
+        #_upgrade_attribute_("__processed__", "_processed_", bool, False)
+        #_upgrade_attribute_("__annotations__", "_annotations_", dict, dict())
+        #_upgrade_attribute_("__scandatatype__", "_scandatatype_", ScanData.ScanDataType, ScanData.ScanDataType.linescan)
+        #_upgrade_attribute_("__analysismode__", "_analysismode_", ScanData.ScanDataAnalysisMode, ScanData.ScanDataAnalysisMode.frame)
+        #_upgrade_attribute_("__available_genotypes__", "_available_genotypes_", (tuple, list), ["NA", "wt", "het", "hom"])
+        #_upgrade_attribute_("__available_unit_types__", "_available_unit_types_", (tuple, list), ["unknown"] + [s for s in UnitTypes.values()])
+        #_upgrade_attribute_("__analysis_options__", "_analysis_options_", dict, dict())
+        #_upgrade_attribute_("__scene__", "_scene_", list, list())
+        #_upgrade_attribute_("__scene_frame_axis__", "_scene_frame_axis_", (type(None), str), None)
+        ##_upgrade_attribute_("__scene_frames__", "_scene_frames_", int, 0)
+        #_upgrade_attribute_("__scans__", "_scans_", list, list())
+        #_upgrade_attribute_("__scans_frame_axis__", "_scans_frame_axis_", (type(None), str), None)
+        ##_upgrade_attribute_("__scans_frames__", "_scans_frames_", int, 0)
         
-        _remove_attribute_("__scene_ind_channel__")
-        _remove_attribute_("_scene_ind_channel_")
-        _remove_attribute_("__scene_ref_channel__")
-        _remove_attribute_("_scene_ref_channel_")
-        _remove_attribute_("__scans_ind_channel__")
-        _remove_attribute_("_scans_ind_channel_")
-        _remove_attribute_("__scans_ref_channel__")
-        _remove_attribute_("_scans_ref_channel_")
+        #_remove_attribute_("__scene_ind_channel__")
+        #_remove_attribute_("_scene_ind_channel_")
+        #_remove_attribute_("__scene_ref_channel__")
+        #_remove_attribute_("_scene_ref_channel_")
+        #_remove_attribute_("__scans_ind_channel__")
+        #_remove_attribute_("_scans_ind_channel_")
+        #_remove_attribute_("__scans_ref_channel__")
+        #_remove_attribute_("_scans_ref_channel_")
             
-        if not hasattr(self, "_scan_region_scene_profiles_"):
-            if hasattr(self, "__scan_region_scene_profiles__"):
-                self._scan_region_scene_profiles_ = self.__scan_region_scene_profiles__
-                delattr(self, "__scan_region_scene_profiles__")
+        #if not hasattr(self, "_scan_region_scene_profiles_"):
+            #if hasattr(self, "__scan_region_scene_profiles__"):
+                #self._scan_region_scene_profiles_ = self.__scan_region_scene_profiles__
+                #delattr(self, "__scan_region_scene_profiles__")
 
-            elif hasattr(self, "__scanline_profiles_scene__"):
-                self._scan_region_scene_profiles_ = self.__scanline_profiles_scene__
-                self._scan_region_scene_profiles_.name = "Scan region scene profiles"
-                delattr(self, "__scanline_profiles_scene__")
+            #elif hasattr(self, "__scanline_profiles_scene__"):
+                #self._scan_region_scene_profiles_ = self.__scanline_profiles_scene__
+                #self._scan_region_scene_profiles_.name = "Scan region scene profiles"
+                #delattr(self, "__scanline_profiles_scene__")
                 
-            else:
-                self._scan_region_scene_profiles_ = neo.Block(name="Scan region scene profiles")
-                #self._scan_region_scene_profiles_.segments[:] = [neo.Segment(name="frame_%d" %k, index = k) for k in range(self._scene_frames_)]
+            #else:
+                #self._scan_region_scene_profiles_ = neo.Block(name="Scan region scene profiles")
+                ##self._scan_region_scene_profiles_.segments[:] = [neo.Segment(name="frame_%d" %k, index = k) for k in range(self._scene_frames_)]
             
-        if not hasattr(self, "_scan_region_scans_profiles_"):
-            if hasattr(self, "__scan_region_scans_profiles__"):
-                self._scan_region_scans_profiles_ = self.__scan_region_scans_profiles__
-                delattr(self, "__scan_region_scans_profiles__")
+        #if not hasattr(self, "_scan_region_scans_profiles_"):
+            #if hasattr(self, "__scan_region_scans_profiles__"):
+                #self._scan_region_scans_profiles_ = self.__scan_region_scans_profiles__
+                #delattr(self, "__scan_region_scans_profiles__")
                 
-            elif hasattr(self,"__scanline_profiles_scans__"):
-                self._scan_region_scans_profiles_ = self.__scanline_profiles_scans__
-                self._scan_region_scans_profiles_.name = "Scan region scans profiles"
-                delattr(self, "__scanline_profiles_scans__")
+            #elif hasattr(self,"__scanline_profiles_scans__"):
+                #self._scan_region_scans_profiles_ = self.__scanline_profiles_scans__
+                #self._scan_region_scans_profiles_.name = "Scan region scans profiles"
+                #delattr(self, "__scanline_profiles_scans__")
                 
-            else:
-                self._scan_region_scans_profiles_ = neo.Block(name="Scan region scans profiles")
-                #self._scan_region_scans_profiles_.segments = [neo.Segment(name="frame_%d" %k, index = k) for k in range(self._scans_frames_)]
+            #else:
+                #self._scan_region_scans_profiles_ = neo.Block(name="Scan region scans profiles")
+                ##self._scan_region_scans_profiles_.segments = [neo.Segment(name="frame_%d" %k, index = k) for k in range(self._scans_frames_)]
                 
-        _upgrade_attribute_("__scans_axis_calibrations__", "_scans_axis_calibrations_", list, [AxesCalibration(img) for img in self._scans_])
+        #_upgrade_attribute_("__scans_axis_calibrations__", "_scans_axis_calibrations_", list, [AxesCalibration(img) for img in self._scans_])
         
-        for axcal in self._scans_axis_calibrations_:
-            axcal._upgrade_API_()
+        #for axcal in self._scans_axis_calibrations_:
+            #axcal._upgrade_API_()
             
-        _upgrade_attribute_("__scene_axis_calibrations__", "_scene_axis_calibrations_", list, [AxesCalibration(img) for img in self._scene_])
+        #_upgrade_attribute_("__scene_axis_calibrations__", "_scene_axis_calibrations_", list, [AxesCalibration(img) for img in self._scene_])
         
-        for axcal in self._scene_axis_calibrations_:
-            axcal._upgrade_API_()
+        #for axcal in self._scene_axis_calibrations_:
+            #axcal._upgrade_API_()
             
-        _upgrade_attribute_("__scenerois__", "_scenerois_", collections.OrderedDict, collections.OrderedDict())
-        _upgrade_attribute_("__scenecursors__", "_scenecursors_", collections.OrderedDict, collections.OrderedDict())
-        _upgrade_attribute_("__scansrois__", "_scansrois_", collections.OrderedDict, collections.OrderedDict())
-        _upgrade_attribute_("__scanscursors__", "_scanscursors_", collections.OrderedDict, collections.OrderedDict())
-        _upgrade_attribute_("__scene_block__", "_scene_block_", neo.Block, neo.Block(name="Scene"))
-        _upgrade_attribute_("__scans_block__", "_scans_block_", neo.Block, neo.Block(name="Scans"))
+        #_upgrade_attribute_("__scenerois__", "_scenerois_", collections.OrderedDict, collections.OrderedDict())
+        #_upgrade_attribute_("__scenecursors__", "_scenecursors_", collections.OrderedDict, collections.OrderedDict())
+        #_upgrade_attribute_("__scansrois__", "_scansrois_", collections.OrderedDict, collections.OrderedDict())
+        #_upgrade_attribute_("__scanscursors__", "_scanscursors_", collections.OrderedDict, collections.OrderedDict())
+        #_upgrade_attribute_("__scene_block__", "_scene_block_", neo.Block, neo.Block(name="Scene"))
+        #_upgrade_attribute_("__scans_block__", "_scans_block_", neo.Block, neo.Block(name="Scans"))
         
-        if hasattr(self, "__scene_filters__"):
-            delattr(self, "__scene_filters__")
+        #if hasattr(self, "__scene_filters__"):
+            #delattr(self, "__scene_filters__")
             
-        if hasattr(self, "_scene_filters_"):
-            delattr(self, "_scene_filters_")
+        #if hasattr(self, "_scene_filters_"):
+            #delattr(self, "_scene_filters_")
             
-        if hasattr(self, "__scans_filters__"):
-            delattr(self, "__scans_filters__")
+        #if hasattr(self, "__scans_filters__"):
+            #delattr(self, "__scans_filters__")
             
-        if hasattr(self, "_scans_filters_"):
-            delattr(self, "_scans_filters_")
+        #if hasattr(self, "_scans_filters_"):
+            #delattr(self, "_scans_filters_")
             
-        for l in self._scenerois_.values():
-            if isinstance(l, PlanarGraphics):
-                l._upgrade_API_()
+        #for l in self._scenerois_.values():
+            #if isinstance(l, PlanarGraphics):
+                #l._upgrade_API_()
             
-        for l in self._scenecursors_.values():
-            if isinstance(l, PlanarGraphics):
-                l._upgrade_API_()
+        #for l in self._scenecursors_.values():
+            #if isinstance(l, PlanarGraphics):
+                #l._upgrade_API_()
             
-        for l in self._scansrois_.values():
-            if isinstance(l, PlanarGraphics):
-                l._upgrade_API_()
+        #for l in self._scansrois_.values():
+            #if isinstance(l, PlanarGraphics):
+                #l._upgrade_API_()
             
-        for l in self._scanscursors_.values():
-            if isinstance(l, PlanarGraphics):
-                l._upgrade_API_()
+        #for l in self._scanscursors_.values():
+            #if isinstance(l, PlanarGraphics):
+                #l._upgrade_API_()
             
-        _upgrade_attribute_("__electrophysiology__", "_electrophysiology_", neo.Block, neo.Block(name="Electrophysiology"))
-        _upgrade_attribute_("__trigger_protocols__", "_trigger_protocols_", list, list())
-        _upgrade_attribute_("__analysis_unit__", "_analysis_unit_", AnalysisUnit, AnalysisUnit(self))
+        #_upgrade_attribute_("__electrophysiology__", "_electrophysiology_", neo.Block, neo.Block(name="Electrophysiology"))
+        #_upgrade_attribute_("__trigger_protocols__", "_trigger_protocols_", list, list())
+        #_upgrade_attribute_("__analysis_unit__", "_analysis_unit_", AnalysisUnit, AnalysisUnit(self))
         
-        if isinstance(self._analysis_unit_, AnalysisUnit):
-            self._analysis_unit_._upgrade_API_()
+        #if isinstance(self._analysis_unit_, AnalysisUnit):
+            #self._analysis_unit_._upgrade_API_()
         
-        if not hasattr(self, "_scan_region_") or not isinstance(self._scan_region_, (PlanarGraphics, type(None))):
-            if hasattr(self, "__scan_region__"):
-                if isinstance(self.__scan_region__, PlanarGraphics):
-                #print(type(self.__scan_region__))
-                    self._scan_region_ = self.__scan_region__.copy()
+        #if not hasattr(self, "_scan_region_") or not isinstance(self._scan_region_, (PlanarGraphics, type(None))):
+            #if hasattr(self, "__scan_region__"):
+                #if isinstance(self.__scan_region__, PlanarGraphics):
+                ##print(type(self.__scan_region__))
+                    #self._scan_region_ = self.__scan_region__.copy()
                     
-                else:
-                    self._scan_region_ = None
+                #else:
+                    #self._scan_region_ = None
                     
-                delattr(self, "__scan_region__")
+                #delattr(self, "__scan_region__")
                 
-            elif "scanline" in self._scenerois_.keys() and isinstance(self._scenerois_["scanline"], (PlanarGraphics, type(None))):
-                self._scan_region_ = self._scenerois_["scanline"].copy()
-                self._scenerois_.pop("scanline")
+            #elif "scanline" in self._scenerois_.keys() and isinstance(self._scenerois_["scanline"], (PlanarGraphics, type(None))):
+                #self._scan_region_ = self._scenerois_["scanline"].copy()
+                #self._scenerois_.pop("scanline")
                 
-            else:
-                self._scan_region_ = None
+            #else:
+                #self._scan_region_ = None
                 
-        if isinstance(self._scan_region_, PlanarGraphics):
-            self._scan_region_._upgrade_API_()
+        #if isinstance(self._scan_region_, PlanarGraphics):
+            #self._scan_region_._upgrade_API_()
                 
-        if not hasattr(self, "_analysis_units_"):
-            if hasattr(self, "__analysis_units__") and isinstance(self.__analysis_units__, set):
-                self._analysis_units_ = self.__analysis_units__
-                delattr(self, "__analysis_units__")
+        #if not hasattr(self, "_analysis_units_"):
+            #if hasattr(self, "__analysis_units__") and isinstance(self.__analysis_units__, set):
+                #self._analysis_units_ = self.__analysis_units__
+                #delattr(self, "__analysis_units__")
                 
-            elif isinstance(self.__analysis_units__, list):
-                self._analysis_units_ = set(self.__analysis_units__)
-                delattr(self, "__analysis_units__")
+            #elif isinstance(self.__analysis_units__, list):
+                #self._analysis_units_ = set(self.__analysis_units__)
+                #delattr(self, "__analysis_units__")
                 
-            else:
-                self._analysis_units_ = set()
+            #else:
+                #self._analysis_units_ = set()
             
-        if isinstance(self._analysis_units_, set):
-            bad_objs = [obj for obj in self._analysis_units_ if not isinstance(obj, AnalysisUnit)]
+        #if isinstance(self._analysis_units_, set):
+            #bad_objs = [obj for obj in self._analysis_units_ if not isinstance(obj, AnalysisUnit)]
             
-            for o in bad_objs:
-                self._analysis_units_.remove(o)
+            #for o in bad_objs:
+                #self._analysis_units_.remove(o)
                 
-        units = sorted([u for u in self._analysis_units_], key=lambda x: x.name)
+        #units = sorted([u for u in self._analysis_units_], key=lambda x: x.name)
         
-        for u in units: # these must _ALL_ be landmark-based!
-            u._upgrade_API_()
-            if u.landmark is None:
-                self._analysis_units_.remove(u)
+        #for u in units: # these must _ALL_ be landmark-based!
+            #u._upgrade_API_()
+            #if u.landmark is None:
+                #self._analysis_units_.remove(u)
                 
-            if u.inScene:
-                data_block = self._scene_block_
+            #if u.inScene:
+                #data_block = self._scene_block_
 
-                if isinstance(u.landmark, pgui.Cursor):
-                    objects_dict = self._scenecursors_
+                #if isinstance(u.landmark, pgui.Cursor):
+                    #objects_dict = self._scenecursors_
                     
-                else:
-                    objects_dict = self._scenerois_
+                #else:
+                    #objects_dict = self._scenerois_
                     
-            else:
-                data_block = self._scans_block_
+            #else:
+                #data_block = self._scans_block_
                 
-                if isinstance(u.landmark, pgui.Cursor):
-                    objects_dict = self._scanscursors_
+                #if isinstance(u.landmark, pgui.Cursor):
+                    #objects_dict = self._scanscursors_
                     
-                else:
-                    objects_dict = self._scansrois_
+                #else:
+                    #objects_dict = self._scansrois_
                     
-            # landmark-based analysis unit in the scans
-            if u.landmark is not None and u.landmark not in objects_dict.values():
-                # not found as object; check first is it can be found by name
-                if u.landmark.name not in objects_dict.keys():
-                    # not found by name either
-                    # this is a zombie unit => remove it together with the
-                    # associated analysis data
-                    segments = data_block.segments
-                    for seg in segments:
-                        stale_signal_index = get_index_of_named_signal(seg, u.name, silent=True)
-                        if isinstance(stale_signal_index, (tuple, list)):
-                            for ndx in stale_signal_index:
-                                if ndx is not None:
-                                    seg.analogsignals.pop(ndx)
+            ## landmark-based analysis unit in the scans
+            #if u.landmark is not None and u.landmark not in objects_dict.values():
+                ## not found as object; check first is it can be found by name
+                #if u.landmark.name not in objects_dict.keys():
+                    ## not found by name either
+                    ## this is a zombie unit => remove it together with the
+                    ## associated analysis data
+                    #segments = data_block.segments
+                    #for seg in segments:
+                        #stale_signal_index = get_index_of_named_signal(seg, u.name, silent=True)
+                        #if isinstance(stale_signal_index, (tuple, list)):
+                            #for ndx in stale_signal_index:
+                                #if ndx is not None:
+                                    #seg.analogsignals.pop(ndx)
                                     
-                        elif isinstance(stale_signal_index, int):
-                            seg.analogsignals.pop(stale_signal_index)
+                        #elif isinstance(stale_signal_index, int):
+                            #seg.analogsignals.pop(stale_signal_index)
                             
-                    try:
-                        self._analysis_units_.remove(u)
+                    #try:
+                        #self._analysis_units_.remove(u)
                         
-                    except Exception as e:
-                        traceback.print_exc()
+                    #except Exception as e:
+                        #traceback.print_exc()
                     
-                else:
-                    # found by name
-                    existing_landmark = objects_dict[u.landmark.name]
-                    #  => check it has the appropriate type
-                    if u.landmark.type == existing_landmark.type:
-                        # if it has, then assign it to the analysis unit
-                        u.landmark = existing_landmark
+                #else:
+                    ## found by name
+                    #existing_landmark = objects_dict[u.landmark.name]
+                    ##  => check it has the appropriate type
+                    #if u.landmark.type == existing_landmark.type:
+                        ## if it has, then assign it to the analysis unit
+                        #u.landmark = existing_landmark
                         
-                    else:
-                        # it has the wrong type => the same name refers to something else
-                        # => we remove this unit and its associated analysis data
-                        segments = data_block.segments
-                        for seg in segments:
-                            stale_signal_index = get_index_of_named_signal(seg, u.name, silent=True)
-                            if isinstance(stale_signal_index, (tuple, list)):
-                                for ndx in stale_signal_index:
-                                    if ndx is not None:
-                                        seg.analogsignals.pop(ndx)
+                    #else:
+                        ## it has the wrong type => the same name refers to something else
+                        ## => we remove this unit and its associated analysis data
+                        #segments = data_block.segments
+                        #for seg in segments:
+                            #stale_signal_index = get_index_of_named_signal(seg, u.name, silent=True)
+                            #if isinstance(stale_signal_index, (tuple, list)):
+                                #for ndx in stale_signal_index:
+                                    #if ndx is not None:
+                                        #seg.analogsignals.pop(ndx)
                                         
-                            elif isinstance(stale_signal_index, int):
-                                seg.analogsignals.pop(stale_signal_index)
+                            #elif isinstance(stale_signal_index, int):
+                                #seg.analogsignals.pop(stale_signal_index)
                             
-                        try:
-                            self._analysis_units_.remove(u)
+                        #try:
+                            #self._analysis_units_.remove(u)
                             
-                        except Exception as e:
-                            traceback.print_exc()
+                        #except Exception as e:
+                            #traceback.print_exc()
                             
-        neoutils.upgrade_neo_api(self._electrophysiology_)
-        neoutils.upgrade_neo_api(self._scans_block_)
-        neoutils.upgrade_neo_api(self._scene_block_)
-        neoutils.upgrade_neo_api(self._scan_region_scene_profiles_)
-        neoutils.upgrade_neo_api(self._scan_region_scans_profiles_)
+        #neoutils.upgrade_neo_api(self._electrophysiology_)
+        #neoutils.upgrade_neo_api(self._scans_block_)
+        #neoutils.upgrade_neo_api(self._scene_block_)
+        #neoutils.upgrade_neo_api(self._scan_region_scene_profiles_)
+        #neoutils.upgrade_neo_api(self._scan_region_scans_profiles_)
         
-        self.apiversion = ScanData.apiversion
+        #self.apiversion = ScanData.apiversion
                     
     #def __repr__(self):
         #result = list()
@@ -10389,6 +10389,7 @@ class ScanData(object):
             return list()
         
         if len(self._scans_) == 1:
+            
             return self.getScansAxesCalibration(0).channelNames()
             #return AxesCalibration(self.scans[0].axistags["c"]).channelNames()
         

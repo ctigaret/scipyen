@@ -4071,7 +4071,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                     raise RuntimeError("frame axis %s not found in the image" % self.frameAxisInfo.key)
                                 
                                 zAxisKey = self.frameAxisInfo.key
-                                frameAxisIndex = self._data_.axistags.index(zAxiskey)
+                                frameAxisIndex = self._data_.axistags.index(zAxisKey)
                                 
                                 if self._axes_calibration_:
                                     cz = self._axes_calibration_[frameAxisIndex].calibratedMeasure(self._current_frame_index_)
