@@ -1327,7 +1327,7 @@ def concatenateImages(*images, **kwargs):
     ignore: None (default) a string ("units", "origin" or "resolution") or 
         a sequence of any of these strings (e.g. ["units", "origin", "resolution"]) 
         denoting parameters to ignore from the calibration of concatenation axis
-        (see AxesCalibration.is_same_as() for details)
+        (see AxesCalibration.isclose() for details)
         
     Returns:
     ========

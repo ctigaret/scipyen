@@ -2164,7 +2164,7 @@ class AxesCalibration(object):
                     return len(self)
                 raise KeyError(f"AxisCalibrationData for axis {item} not found")
             
-    def is_same_as(self, other, key, channel = 0, ignore=None, 
+    def isclose(self, other, key, channel = 0, ignore=None, 
                    rtol = RELATIVE_TOLERANCE, 
                    atol =  ABSOLUTE_TOLERANCE, 
                    equal_nan = EQUAL_NAN):
@@ -2350,6 +2350,10 @@ class AxesCalibration(object):
         """Read-only
         """
         return self._axistags_
+    
+    @property
+    def channels(self):
+        return len(self["c"].channels)
     
     @property
     def calibrations(self):

@@ -141,11 +141,6 @@ class ScanDataOptions(DataBag):
                            initial = initial, 
                            lower = lower, 
                            upper = upper)
-        #super().__init__(options, 
-                         #mutable_types=mutable_types, 
-                         #use_casting=use_casting,
-                         #allow_none=allow_none)
-        
     @property
     def defaults(self):
         return ScanDataOptions(self.__defaults__())
@@ -1716,7 +1711,7 @@ class ScanData(object):
     """An almost direct translation of matlab LSData data structure.
     Work in progress.
     
-    TODO/FIXME 2018-09-14 10:28:13
+    TODO/FIXME 2018-09-14 10:28:13 - place on back-burner...
     collapse scene and scans data into a multi-channel
     VigraArray, then adapt all methods to this scenario
     
@@ -1730,6 +1725,54 @@ class ScanData(object):
     
     On the upside, it should make the API less convoluted and more uniform
     (we will have to bindAxis("c"...) to access individual channels)
+    
+    NOTE: 2021-10-29 10:41:27 About data component frames
+    
+    Ideally there should be a biunivocal relationship between frames across all
+    compoents, i.e.:
+    
+    scans frame K   -> electrophysiology block, segment K
+                    |
+                    -> scene frame K
+                    
+    However, this is not always practical.
+    
+    A frame index mapping algorithm is needed, which maps a frame index in the
+    "primary" data component to frames in the "secondary" data components to
+    allow "unbalanced" cases where a "secondary" data component has a different
+    number of frames than the "primary" data component.
+    
+    In ScanData the "primary" data compinent is always stored in the "scans"
+    attribute.
+    
+    The "scene" attribute is optional. When present, the scene's purpose is to
+    contextualize the scan data (e.g., for line scans, the scene is a 2D raster
+    scan of the field of view where the line scanning trajectory is defined).
+    
+    The table below gives an overview of the different possible acqusition types
+    and their data components. This is currently based on PrairieView acqusition
+    model but the aim is to extend this to ScanImage data as well.
+    
+    Scan data type  Scans           Scene               Electrophysiology
+    (PrairieView)
+    ============================================================================
+    
+    SingleImage     sequence of     None                None
+                    one frame       
+    
+    ZSeries         sequence of     None                None
+                    frames
+                                
+    TSeries         sequence of     None                None, or neo.Block
+                    frames                              (e.g., in conjunction 
+                                                        with photoactivation)
+                                
+    Line scan       sequence of     sequence of         neo.Block
+                    frames          frames 
+                                    (possibly just
+                                    one frame)
+    
+    
     
     TODO Class documentation
     
@@ -1783,10 +1826,59 @@ class ScanData(object):
         
     apiversion = (0,3)
     
-    _data_components_ = ("scene", "scans", "ephys", 
-                         "scansProfiles", "sceneProfiles", 
-                         "scansBlock", "sceneBlock",
-                         "triggerProtocols")
+    _data_attributes_ = (
+        ("ephys", neo.Block),
+        ("scans", list),
+        ("scansBlock", neo.Block),
+        ("scansProfiles", neo.Block),
+        ("scene", list),
+        ("sceneBlock", neo.Block),
+        ("sceneProfiles", neo.Block),
+        )
+    
+    _graphics_attributes = (
+        ("scansCursors", list),
+        ("scansRois", list),
+        ("scanTrajectory", PlanarGraphics),
+        ("sceneCursors", list),
+        ("sceneRois", list),
+        )
+    
+    _metadata_attributes_ = (
+        ("analysisUnits",list),
+        ("triggerProtocols", list),
+        )
+    
+    _option_attributes_ = (
+        ("analysisOptions", dict),
+        ("analysisMode", ScanDataAnalysisMode),
+        ("type", ScanDataType),
+        )
+    
+    def _get_data_frame_index_(self, index:int) -> Bunch:
+        """Returns a Bunch mapping str keys (data attribute) to int frame indices.
+        Parameters:
+        ===========
+        
+        index: int - this can be a negative index in which case it will behave
+            like a negative index into a sequence
+        
+        """
+        ret = Bunch()
+        
+        if isinstance(self.electrophysiology, neo.Block):
+            if len(self.electrophysiology.segments) == 0:
+                ret["electrophysiology"] = None
+            else:
+                if index not in range(-len(self.electrophysiology.segments), 
+                                      len(self.electrophysiology.segments)-1):
+                    
+                    raise IndexError(f"Index {index} out of range for {len(self.electrophysiology.segments)} electrophysiology segments")
+                
+                ret["electrophysiology"] = index
+        
+        
+        
     
     def _get_data_component_(self, component):
         """
@@ -1799,7 +1891,7 @@ class ScanData(object):
         if component in ("electrophysiology", "ephys"):
             component = ephys
             
-        if component not in self._data_components_:
+        if component not in self._data_attributes_:
             raise ValueError(f"Unknown data component: {component}")
         
         data = getattr(self, component, None)
@@ -1814,15 +1906,16 @@ class ScanData(object):
         component: str, one of: "scans", "scene"
         """
         
-    def __init__(self, scene: (vigra.VigraArray, tuple, list, type(None)) = None, 
-                 scans: (vigra.VigraArray, tuple, list, type(None)) = None, 
-                 metadata: (DataBag, dict, type(None)) = None,
-                 sceneFrameAxis: (vigra.AxisInfo, type(None)) = None, 
-                 scansFrameAxis: (vigra.AxisInfo, type(None)) = None,
-                 name: (str, type(None)) = "ScanData", 
-                 electrophysiology: (neo.Block, type(None)) = None, 
-                 triggers: (str, tuple, list, type(None)) = None,
-                 analysisOptions: (dict, type(None)) = dict()):
+    def __init__(self, scene:typing.Optional[typing.Union[vigra.VigraArray, tuple, list]] = None,
+                 scans:typing.Optional[typing.Union[vigra.VigraArray, tuple, list]] = None, 
+                 metadata:typing.Optional[typing.Union[DataBag]] = None,
+                 sceneFrameAxis:typing.Optional[vigra.AxisInfo] = None, 
+                 scansFrameAxis:typing.Optional[vigra.AxisInfo] = None,
+                 name:typing.Optional[str] = "ScanData", 
+                 electrophysiology:typing.Optional[neo.Block] = None, 
+                 triggers:typing.Optional[typing.Union[str, tuple, list]] = None,
+                 analysisOptions:typing.Optional[DataBag] = DataBag(),
+                 frameIndexMapping: typing.Optional[dict] = None):
         """Constructs a ScanData object.
         
         The object contains only raw (unfiltered) data as given by
@@ -2151,8 +2244,8 @@ class ScanData(object):
         self._available_unit_types_.insert(0, "unknown")
         
         
-        self._scans_axis_calibrations_ = []
-        self._scene_axis_calibrations_ = []
+        self._scans_axes_calibrations_ = []
+        self._scene_axes_calibrations_ = []
         
         # what does this hold? -- Answer: 1D signals derived from the scene
         # -- the scene equivalent of _scans_block_
@@ -2333,7 +2426,7 @@ class ScanData(object):
         self._processed_ = False
         
         # NOTE: 2021-10-28 18:36:14
-        # also set up self._scans_axis_calibrations_ and self._scene_axis_calibrations_
+        # also set up self._scans_axes_calibrations_ and self._scene_axes_calibrations_
         self._parse_image_arrays_(scene, scans, sceneFrameAxis, scansFrameAxis)
         
         self._parse_metadata_(metadata) # will also set up channel names for scene & scans, separately
@@ -2389,14 +2482,46 @@ class ScanData(object):
         elif isinstance(data, vigra.VigraArray):
             (nFrames, frameAxisInfo, widthAxisInfo, heightAxisInfo) = getFrameLayout(data, userFrameAxis = sceneFrameAxis)
             self._scene_ = data
-            self._scene_axis_calibrations_ = [AxesCalibration(data)]
+            self._scene_axes_calibrations_ = [AxesCalibration(data)]
             
             if sceneFrameAxis is None:
                 chindex = data.channelIndex
                 
                 if chindex == data:
                     pass
+                
+    def _parse_img_arr_(self, data, frameAxis=None):
+        if not isinstance(data, (vigra.VigraArray, tuple, list)):
+            raise TypeError(f"Expecting a VigraArray, or a sequence; got {type(data).__name__} instead")
         
+        if isinstance(data, vigra.VigraArray):
+            nframes, frame_axis, width_axis, height_axis = getFrameLayout(data, frameAxis)
+            axes_cal = [AxesCalibration(data)]
+            return ([data],frame_axis, axes_cal)
+            
+            
+        elif isinstance(data, (tuple, list)):
+            if len(data):
+                if not all([isinstance(s, vigra.VigraArray) for s in data]):
+                    raise TypeError("When not empty, data is expected to contain VigraArray objects")
+
+                if not all([s.shape == data[0].shape for s in data[1:]]):
+                    raise TypeError("Image arrays in a sequence must have identical shapes")
+
+                if not all([s.axistags == data[0].axistags for s in data[1:]]):
+                    raise TypeError("Image arrays in a sequence must have identical axistags")
+
+                if not all([s.channels == data[0].channels for s in data[1:]]):
+                    raise TypeError("Image arrays in a sequence must have the same number of channels")
+
+                nframes, frame_axis, width_axis, height_axis = getFrameLayout(data[0], frameAxis)
+                axes_cal = [AxesCalibration(img) for img in data]
+                return (data, frame_axis, axes_cal)
+
+            return (list(), None, None)
+                
+        return (None, None, None)
+                
     #@safeWrapper
     def _parse_image_arrays_(self, scene, scans, sceneFrameAxis=None, scansFrameAxis=None):
         """Assigns image data to the scene and scans data sets.
@@ -2415,133 +2540,19 @@ class ScanData(object):
         multi-channel VigraArray
 
         """
-        #### BEGIN parse scene images
-        # make sure scene profiles and scene data block each have the appropriate number of segments
-        if scene is not None: 
-            # read-out the scene, set up a scene frame axis unless determined by c'tor
-            if isinstance(scene, vigra.VigraArray): # single array
-                self._scene_ = [scene]
-                
-                #print("ScanData._parse_image_arrays_() parsing scene VigraArray")
-                
-                self._scene_axis_calibrations_ = [AxesCalibration(scene)]
-                
-                # NOTE: 2017-11-12 15:45:19
-                # find out frame numbers
-                # FIXME this code should conform to what ImageViewer does !!!
-                # TODO factor this out to a module-level function used by both 
-                # ScanData and ImageViewer !!!
-                
-                nframes, frame_axis, width_axis, height_axis = getFrameLayout(scene, sceneFrameAxis)
-                
-                self._scene_frame_axis_ = frame_axis
-                #self._scene_frames_ = nframes
-                
-            elif isinstance(scene, (tuple, list)):
-                #print("ScanData._parse_image_arrays_() parsing scene from list")
-                
-                if len(scene) == 0:
-                    return
-                
-                if not all([isinstance(s, vigra.VigraArray) for s in scene]):
-                    raise TypeError("When not empty, scene is expected to contain VigraArray objects")
-                    
-                if not all([s.shape == scene[0].shape for s in scene]):
-                    raise TypeError("When given as a sequence, scene arrays must have identical shapes")
-                
-                if not all([s.axistags == scene[0].axistags for s in scene]):
-                    raise TypeError("When given as a sequence, scene arrays must have identical axistags")
-            
-                if not all([s.channels == 1 for s in scene]):
-                    raise TypeError("When not empty, scene is expected to contain single-channel VigraArray objects")
-                
-                self._scene_ = scene
-            
-                self._scene_axis_calibrations_ = [AxesCalibration(s) for s in scene]
-                
-                nframes, frame_axis, width_axis, height_axis = getFrameLayout(scene[0], sceneFrameAxis)
-                
-                self._scene_frame_axis_ = frame_axis
-                #self._scene_frames_ = nframes
-                    
-            else:
-                raise TypeError("scene expected to be a VigraArray or a sequence of VigraArrays ; got %s instead" % (type(scene).__name__))
-            
-            #print("ScanData._parse_image_arrays_() parsing scene region profiles")
-            # NOTE: 2021-09-26 10:16:22
-            # pre-allocate segmeents for the can region profiles
-            # FIXME/TODO shouldn't need to do this...
-            #self._scan_region_scene_profiles_.segments[:] = [neo.Segment(name="frame_%d" %k, index = k) for k in range(self._scene_frames_)]
-            
-            #self._scene_block_.segments[:] = [neo.Segment(name = "frame_%d" % k, index = k) for k in range(self._scene_frames_)]
+        new_scene, scene_frame_axis, scene_axes_calibrations = self._parse_img_arr_(scene, frameAxis=sceneFrameAxis)
+        new_scans, scans_frame_axis, scans_axes_calibrations = self._parse_img_arr_(scans, frameAxis=scansFrameAxis)
 
+        if new_scene is not None:
             self._scenecursors_.clear()
             self._scenerois_.clear()
-            
-        #### END parse scene images
-        
-        #### BEGIN parse scans images
-        # make sure scans profiles and scans data block each have the appropriate number of segments
-        # also clear the analysis units and the scan region 
-        if scans is not None:
-            if isinstance(scans, vigra.VigraArray): # single array
-                #print("ScanData._parse_image_arrays_() parsing scans VigraArray")
-                
-                self._scans_ = [scans]
-                
-                self._scans_axis_calibrations_ = [AxesCalibration(scans)]
-                
-                nframes, frame_axis, width_axis, height_axis = getFrameLayout(scans, scansFrameAxis)
-                
-                self._scans_frame_axis_ = frame_axis
-                
-            elif isinstance(scans, (tuple, list)):
-                #print("ScanData._parse_image_arrays_() parsing scans from list")
-                
-                if len(scans) == 0:
-                    return
-                
-                if not all([isinstance(s, vigra.VigraArray) for s in scans]):
-                    raise TypeError("When not empty, scans sequence is expected to contain VigraArray objects")
-                
-                if not all([s.shape == scans[0].shape for s in scans]):
-                    raise TypeError("All scans expected to have identical shape")
-                
-                if not all([s.axistags == scans[0].axistags for s in scans]):
-                    raise TypeError("All scans expected to have identical axistags")
-                
-                if not all([s.channels == 1 for s in scans]):
-                    raise TypeError("When not empty, scans sequence is expected to contain single-channel VigraArray objects")
-                
-                self._scans_ = scans
-                
-                self._scans_axis_calibrations_ = [AxesCalibration(s) for s in scans]
-                    
-                nframes, frame_axis, width_axis, height_axis = getFrameLayout(scans[0], scansFrameAxis)
-                self._scans_frame_axis_ = frame_axis
-                
-            else:
-                raise TypeError("scans expected to be a VigraArray or a sequence of VigraArray; got %s instead" % (type(scans).__name__))
-            
-            #if self._scene_frames_ > 1 and self._scene_frames_ != self._scans_frames_:
-                #raise ValueError("scene images should either have one frame, or as many frames as the scans images (%d); currently they have %d" % (self._scans_frames_, self._scene_frames_))
-            
-            #self._scan_region_scans_profiles_.segments[:] = [neo.Segment(name="frame_%d" %k, index =k) for k in range(self._scans_frames_)]
-            
-            #self._scans_block_.segments[:] = [neo.Segment(name = "frame_%d" % k, index = k) for k in range(self._scans_frames_)]
-            
-            self._scanscursors_.clear()
-            
-            self._scansrois_.clear()
-            
             self._scan_region_ = None
-            
+
+        if new_scans is not None:
+            self._scanscursors_.clear()
+            self._scansrois_.clear()
             self._analysis_units_.clear()
             
-        #### END parse scans images
-        
-        #print("ScanData._parse_image_arrays_() done")
-        
     @safeWrapper
     def _parse_metadata_(self, value):
         from gui import pictgui as pgui
@@ -3360,16 +3371,16 @@ class ScanData(object):
         """Call this to keep axis calibration in sync with the image array data.
         """
         if isinstance(self.scene, vigra.VigraArray):
-            self._scene_axis_calibrations_ = [AxesCalibration(self.scene)]
+            self._scene_axes_calibrations_ = [AxesCalibration(self.scene)]
             
         elif isinstance(self.scene, (tuple, list)) and  len(self.scene) > 0:
-            self._scene_axis_calibrations_ = [AxesCalibration(img) for img in self.scene]
+            self._scene_axes_calibrations_ = [AxesCalibration(img) for img in self.scene]
             
         if isinstance(self.scans, vigra.VigraArray):
-            self._scans_axis_calibrations_ = [AxesCalibration(self.scans)]
+            self._scans_axes_calibrations_ = [AxesCalibration(self.scans)]
             
         elif isinstance(self.scans, (tuple, list)) and len(self.scans) > 0:
-            self._scans_axis_calibrations_ = [AxesCalibration(img) for img in self.scans]
+            self._scans_axes_calibrations_ = [AxesCalibration(img) for img in self.scans]
             
     #@safeWrapper
     def concatenate(self, source, strict = False, pad_value = None, scanregions=False):#, resample=False, alignment=0):#, src_slice = None, other_slice = None, axis=None):
@@ -7906,7 +7917,7 @@ class ScanData(object):
             ch_index = name_or_index
             
         del self._scans_[ch_index]
-        self._scans_axis_calibrations_[:] = [AxesCalibration(img) for img in self._scans_]
+        self._scans_axes_calibrations_[:] = [AxesCalibration(img) for img in self._scans_]
             
     @safeWrapper
     def removeSceneChannel(self, name_or_index):
@@ -7923,7 +7934,7 @@ class ScanData(object):
             ch_index = name_or_index
             
         del self._scene_[ch_index]
-        self._scene_axis_calibrations_[:] = [AxesCalibration(img) for img in self._scene_]
+        self._scene_axes_calibrations_[:] = [AxesCalibration(img) for img in self._scene_]
         
     def trimScans(self, interval, axis):
         """Removes image data OUTSIDE the specified interval along the specified axis .
@@ -8634,7 +8645,7 @@ class ScanData(object):
                     raise ValueError("channel %d not found in self.scene[0] with %d channels" % (channel, self.scene[0].channels))
                 
                 else:
-                    return self._scene_axis_calibrations_[0] # because there is only one VigraArray here
+                    return self._scene_axes_calibrations_[0] # because there is only one VigraArray here
                 
             else:
                 raise ValueError("channel %d not found in self.scene with %d channels" % (channel, len(self.scene)))
@@ -8642,7 +8653,7 @@ class ScanData(object):
                 
         else:
             # self.scene is a list of single-channel VigraArrays
-            return self._scene_axis_calibrations_[channel]
+            return self._scene_axes_calibrations_[channel]
             
         
     def getScansAxesCalibration(self, channel=0):
@@ -8673,7 +8684,7 @@ class ScanData(object):
                     raise ValueError("channel %d not found in self.scans[0] with %d channels" % (channel, self.scans[0].channels))
                 
                 else:
-                    return self._scans_axis_calibrations_[0] # because there is only one VigraArray here
+                    return self._scans_axes_calibrations_[0] # because there is only one VigraArray here
                 
             else:
                 raise ValueError("channel %d not found in self.scans with %d channels" % (channel, len(self.scans)))
@@ -8681,7 +8692,7 @@ class ScanData(object):
                 
         else:
             # self.scene is a list of single-channel VigraArrays
-            return self._scans_axis_calibrations_[channel]
+            return self._scans_axes_calibrations_[channel]
             
         
         
