@@ -21,6 +21,8 @@ from core.quantities import(arbitrary_unit,
                             unit_quantity_from_name_or_symbol,
                             check_time_units)
 
+from core.utilities import (get_index_for_seq, )
+
 from core.datatypes import (UnitTypes, Genotypes, )
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
@@ -1742,8 +1744,9 @@ class ScanData(object):
     allow "unbalanced" cases where a "secondary" data component has a different
     number of frames than the "primary" data component.
     
-    In ScanData the "primary" data compinent is always stored in the "scans"
-    attribute.
+    In ScanData the "primary" data component is always stored in the "scans"
+    attribute. When this is None or empty, then the primary data component is 
+    "scene".
     
     The "scene" attribute is optional. When present, the scene's purpose is to
     contextualize the scan data (e.g., for line scans, the scene is a 2D raster
@@ -1859,27 +1862,47 @@ class ScanData(object):
         """Returns a Bunch mapping str keys (data attribute) to int frame indices.
         Parameters:
         ===========
-        
-        index: int - this can be a negative index in which case it will behave
-            like a negative index into a sequence
+        index: int - index of the primary data frame; 
+                this can be a negative index in which case it will behave like a 
+                negative sequence index
+                
+        NOTE: the primary data is "scans"; when "scans" is None or empty,
+            tyhen the primary data  is "scene" if not None and not empty
         
         """
         ret = Bunch()
+        ret.scans = None
+        ret.scene = None
+        ret.electrophysiology = None
         
-        if isinstance(self.electrophysiology, neo.Block):
-            if len(self.electrophysiology.segments) == 0:
-                ret["electrophysiology"] = None
-            else:
-                if index not in range(-len(self.electrophysiology.segments), 
-                                      len(self.electrophysiology.segments)-1):
-                    
-                    raise IndexError(f"Index {index} out of range for {len(self.electrophysiology.segments)} electrophysiology segments")
+        if isinstance(self.scans, list) and len(self.scans):
+            ret.scans = get_index_for_seq(index, 
+                                          self.scans, 
+                                          self.scans)
+            
+            if isinstance(self.scene, list):
+                ret.scene = get_index_for_seq(index, 
+                                              self.scans, 
+                                              self.scene, 
+                                              self.scene_mapping)
+                            
+            if isinstance(self.electrophysiology, neo.Block) and len(self.electrophysiology.segments):
+                ret.electrophysiology = get_index_for_seq(index, 
+                                                          self.scans, 
+                                                          self.electrophysiology.segments, 
+                                                          self.ephys_mapping)
                 
-                ret["electrophysiology"] = index
+        elif isinstance(self.scene, list) and len(self.scene):
+            ret.scene = get_index_for_seq(index, 
+                                          self.scene, 
+                                          self.scene)
+            
+            if isinstance(self.electrophysiology, neo.Block) and len(self.electrophysiology.segments):
+                ret.electrophysiology = get_index_for_seq(index, 
+                                                        self.scene, 
+                                                        self.electrophysiology.segments,
+                                                        self.ephys_mapping)
         
-        
-        
-    
     def _get_data_component_(self, component):
         """
         Parameters:
@@ -1905,7 +1928,8 @@ class ScanData(object):
         ==========
         component: str, one of: "scans", "scene"
         """
-        
+        pass
+    
     def __init__(self, scene:typing.Optional[typing.Union[vigra.VigraArray, tuple, list]] = None,
                  scans:typing.Optional[typing.Union[vigra.VigraArray, tuple, list]] = None, 
                  metadata:typing.Optional[typing.Union[DataBag]] = None,
@@ -1915,7 +1939,8 @@ class ScanData(object):
                  electrophysiology:typing.Optional[neo.Block] = None, 
                  triggers:typing.Optional[typing.Union[str, tuple, list]] = None,
                  analysisOptions:typing.Optional[DataBag] = DataBag(),
-                 frameIndexMapping: typing.Optional[dict] = None):
+                 scene_mapping:typing.Optional[dict] = None,
+                 ephys_mapping: typing.Optional[dict] = None):
         """Constructs a ScanData object.
         
         The object contains only raw (unfiltered) data as given by
@@ -2280,6 +2305,17 @@ class ScanData(object):
         self._scans_ = list()
         self._scans_frame_axis_ = None
         #self._scans_frames_ = 0
+        
+        # NOTE: 2021-10-29 23:31:41
+        # mapping of primary data frame indices to scene frame indices
+        # maps scans frame indices (if scans exist) to scene frame indices
+        # not used if neither scans nor scene exist
+        self._scene_frame_mapping_ = scene_mapping
+        # mapping of primary data frame indices to electrophysiology segment indices
+        # maps scans frame indices to ephys segment indices, if scans exist, else
+        # maps scene frame indcies to ephys segent indices, if scene exists
+        # not used when electrophysiology data is absent
+        self._ephys_frame_mapping_ = ephys_mapping
             
         # CAUTION: the contents of _analysis_options_ are problem-dependent
         # and typically will be changed at application level
@@ -8821,6 +8857,44 @@ class ScanData(object):
     # properties
     # ###
     
+    @property
+    def scene_mapping(self) -> typing.Optional[dict]:
+        return self._scene_frame_mapping_
+    
+    @scene_mapping.setter
+    def scene_mapping(self, val:typing.Optional[dict] = None) -> None:
+        if isinstance(val, dict):
+            if not all(isinstance(k, (int, range, tuple)) for k in val):
+                raise TypeError("Expecting a mapping with keys of type int, range, tuple")
+            
+            if not all(isinstance(v, int) for v in val.values()):
+                raise TypeError("Expecting a mapping with values of type int")
+            
+            
+        elif val is not None:
+            raise TypeError(f"Expecting a mapping or None; for {type(val).__name__} instead")
+    
+        self._scene_frame_mapping_ = val
+        
+    @property
+    def ephys_mapping(self) -> typing.Optional[dict]:
+        return self._ephys_frame_mapping_
+    
+    @ephys_mapping.setter
+    def ephys_mapping(self, val:typing.Optional[dict] = None) -> None:
+        if isinstance(val, dict):
+            if not all(isinstance(k, (int, range, tuple)) for k in val):
+                raise TypeError("Expecting a mapping with keys of type int, range, tuple")
+            
+            if not all(isinstance(v, int) for v in val.values()):
+                raise TypeError("Expecting a mapping with values of type int")
+            
+            
+        elif val is not None:
+            raise TypeError(f"Expecting a mapping or None; for {type(val).__name__} instead")
+    
+        self._ephys_frame_mapping_ = val
+        
     @property
     def genotype(self):
         if not hasattr(self, "_analysis_unit_"):

@@ -442,6 +442,188 @@ def gethash(x:typing.Any) -> Number:
         return hash(type(x))
         #return HASHRANDSEED + hash(type(x))
         
+def get_index_for_seq(index:int, 
+                        test:typing.Sequence[typing.Any], 
+                        target:typing.Sequence[typing.Any], 
+                        mapping:typing.Optional[dict]=None) -> int:
+    """Heuristic for computing an index into the target sequence.
+    
+    Returns an index into the `target` sequence given `index`:int index into
+    the `test` sequence and an optional index mapping.
+    
+    Parameters:
+    ===========
+    index: int; If negative it will be treated as a negative sequence index
+                (i.e., reversed indexing)
+                
+    test: Sequence or instance of a type implementing the methods 
+        `__len__` and `__getitem__`, and for which `index` int is a valid 
+        index.
+    
+    target: Sequence or instance of a type implementing the methods 
+        `__len__` and `__getitem__`, and for which a corresponding int index
+        is returned.
+    
+    mapping:dict; optional, default is None.
+        When present, it is expected to contain key/value mappings such that:
+        
+        key: int, range, tuple : indices valid for the `test` sequence
+        
+        value: int: index valid for the `target` sequence
+        
+    Returns:
+    =======
+    int: index into the target sequence
+    
+    When both test and target have the same length, this is the same value 
+        as `index`.
+        
+    When target has length 1, it always returns the value 0 (zero).
+    
+    Otherwise:
+    
+    When `mapping` is a dict with key/value pairs as above, 
+        returns the value mapped to the key that:
+        a) equals `index`, when key is a str
+        b) contains `index`, when key is a tuple or range
+        
+    When `mapping` is None (the default):
+    
+    a) if `target` is shorter than `test`:
+    a.1) for a positive `index`, the function returns:
+        a.1.1) the value of `index` if index is in the semi-open interval 
+            [0, len(target))
+            
+        a.1.2) -1 if index is >= len(target) (i.e., returns the index of
+            the last element in `target`)
+            
+    a.2) for a negative `index` (reverse indexing) the function returns
+        max(min(ndx, -1), -len(target)) where
+        
+        ndx = `index` + let(test) - len(target)
+        
+    b) if `target` is longer than `test`:
+    b.1) for a positive `index` returns:
+        
+        min(index, len(test)-1)
+        
+    b.2) for a negative `index` returns:
+    
+        max(ndx, -len(target)) where
+        
+        ndx = index + len(test) - len(target)
+    
+    Examples:
+    ========
+    
+    In [1]: from core.utilities import get_index_for_seq
+
+    In [2]: a = [1,2,3,4,5,6]
+
+    In [3]: b = [2,4,6]
+
+    In [4]: b[get_index_for_seq(5,a,b)]
+    Out[4]: 6
+
+    In [5]: b[get_index_for_seq(2,a,b)]
+    Out[5]: 6
+
+    In [6]: b[get_index_for_seq(-1,a,b)]
+    Out[6]: 6
+
+    In [7]: b[get_index_for_seq(-5,a,b)]
+    Out[7]: 4
+
+    In [8]: b[get_index_for_seq(-6,a,b)]
+    Out[8]: 2
+
+    In [9]: a[get_index_for_seq(1, b, a)]
+    Out[9]: 2
+
+    In [10]: a[get_index_for_seq(-1, b, a)]
+    Out[10]: 3
+
+    In [11]: a[get_index_for_seq(-2, b, a)]
+    Out[11]: 2
+
+    In [12]: a[get_index_for_seq(-4, b, a)]
+    
+    IndexError: Index -4 out of range for test sequence
+
+    In [13]: a[get_index_for_seq(-4, a, b)]
+    Out[13]: 6
+    
+    
+    
+    """
+    if not isinstance(index, int):
+        raise TypeError(f"`index` expected to be an int; got {type(index).__name__} instead")
+    
+    if not isinstance(test, collections.abc.Sequence) or not all(hasattr(test, a) for a in ("__len__", "__getitem__")):
+        raise TypeError(f"`test` expected to be a Sequence-like object; got {type(test).__name__} instead")
+    
+    if not isinstance(target, collections.abc.Sequence) or not all(hasattr(target, a) for a in ("__len__", "__getitem__")):
+        raise TypeError(f"`target` expected to be a Sequence-like; got {type(target).__name__} instead")
+    
+    if index not in range(-len(test),(len(test))):
+        raise IndexError(f"Index {index} out of range for test sequence")
+    
+    if len(target) == len(test):
+        return index
+    
+    elif len(target) == 1:
+        return 0
+    
+    elif isinstance(mapping, dict):
+        for key in mapping:
+            if (isinstance(key, int) and key == index) or (isinstance(key, range, tuple) and index in key):
+                if mapping[key] in range(-len(target),(len(target))):
+                    return mapping[key]
+                else:
+                    return IndexError(f"Index {mapping[key]} out of range for target sequence")
+            
+    else:
+        if len(target) < len(test):
+            # test posindex:    0,  1,  2,  3,  4,  5
+            # test negindex:   -6, -5, -4, -3, -2, -1
+            # trgt posindex:    0,  1,  2,  3
+            # trgt negindex:   -4, -3, -2, -1
+            # dlen = 2
+            if index >= len(target):
+                return - 1 # index of last element in target
+                
+            elif index < 0:
+                dlen = len(test) - len(target)
+                ndx = index + dlen
+                return max(min(ndx, -1), -len(target))
+                #if ndx >= 0:
+                    #return -1
+                #else:
+                    #return ndx
+                    
+            else:
+                return index
+                
+        else: # case len(target) == len(test) dealt with above
+            # here len(target) > len(test)
+            # test posindex:    0,  1,  2,  3
+            # test negindex:   -4, -3, -2, -1
+            # trgt posindex:    0,  1,  2,  3,  4,  5
+            # trgt negindex:   -6, -5, -4, -3, -2, -1
+            # dlen = -2
+            # apply index to target[0:len(test)]
+            if index < 0:
+                dlen = len(test) - len(target)
+                ndx = index + dlen
+                return max(ndx, -len(target))
+                #return min(max(ndx, -len(target)), -len(target))
+                #if ndx < -len(target):
+                    #return -len(target)
+                #else:
+                    #return ndx
+            else:
+                return min(index, len(test)-1)
+            
 def total_size(o, handlers={}, verbose=False):
     """ Returns the approximate memory footprint an object and all of its contents.
 
