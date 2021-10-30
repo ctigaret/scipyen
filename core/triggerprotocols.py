@@ -457,7 +457,7 @@ class TriggerProtocol(object):
             
         result += ["\timaging delay: %s" % str(self.__imaging_delay__)]
         
-        result += ["\tsegment index: %s" % str(self.__segment_index__)]
+        result += ["\tframe (segment): %s" % str(self.__segment_index__)]
         result += ["\n"]
         
         return "\n".join(result)

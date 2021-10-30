@@ -509,6 +509,16 @@ def filterfalse_attribute(iterable:typing.Iterable, attribute:str, value:typing.
     return filter(lambda x: not predicate(getattr(x, attribute, None) if silentfail else getattr(x, attribute),
                                           value), iterable)
     
+
+def get_properties(obj):
+    if not isinstance(obj, type):
+        obj = type(obj)
+        
+    #return [i[0] for i in inspect.getmembers(obj, lambda x: inspect.isdatadescriptor(x) and isinstance(x), property)]
+    return [i[0] for i in inspect.getmembers(obj, lambda x: isinstance(x, property))]
+    
+    
+
 # ### END module functions
 
 # ### BEGIN Decorators

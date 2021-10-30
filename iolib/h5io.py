@@ -318,15 +318,15 @@ def parse_func(f):
                               }) for p_name, p in sig.parameters.items())
 
 def data2hdf(x:typing.Any, 
-               filenameOrGroup:typing.Union[str, h5py.Group], 
-               pathInFile:typing.Optional[str]=None,
-               mode:typing.Optional[str] = None) -> None:
+             filenameOrGroup:typing.Union[str, h5py.Group], 
+             pathInFile:typing.Optional[str]=None,
+             mode:typing.Optional[str] = None) -> None:
     
     if mode is None or not isinstance(mode, str) or len(mode.strip()) == 0:
-        mode = "r"
+        mode = "w"
     
-    if not isinstance(x, collections.abc.Mapping):
-        raise TypeError(f"Expecting a mapping; got {type(x).__name__} instead")
+    #if not isinstance(x, collections.abc.Mapping):
+        #raise TypeError(f"Expecting a mapping; got {type(x).__name__} instead")
     
     file, group, childname = get_file_group_child(filenameOrGroup, pathInFile, mode)
     

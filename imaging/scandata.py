@@ -5,6 +5,7 @@ import numpy as np
 import quantities as pq
 import neo
 import vigra
+import h5py
 
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
@@ -1922,14 +1923,6 @@ class ScanData(object):
         if data is None:
             return
         
-    def _get_image_frame_axis_(self, component):
-        """
-        Parameters:
-        ==========
-        component: str, one of: "scans", "scene"
-        """
-        pass
-    
     def __init__(self, scene:typing.Optional[typing.Union[vigra.VigraArray, tuple, list]] = None,
                  scans:typing.Optional[typing.Union[vigra.VigraArray, tuple, list]] = None, 
                  metadata:typing.Optional[typing.Union[DataBag]] = None,
@@ -2427,13 +2420,22 @@ class ScanData(object):
         
         # NOTE: 2018-06-16 18:37:07
         # these are now ordered dictionaries
-        self._scansrois_ = collections.OrderedDict()   # use for general analysis
+        #self._scansrois_ = collections.OrderedDict()   # use for general analysis
+        self._scansrois_ = dict()   # use for general analysis
             
-        self._scenerois_ = collections.OrderedDict()
+        #self._scenerois_ = collections.OrderedDict()
+        self._scenerois_ = dict()
         
-        self._scanscursors_ = collections.OrderedDict()
+        self._scanscursors_ = dict()
         
-        self._scenecursors_ = collections.OrderedDict()
+        self._scenecursors_ = dict()
+        
+        # NOTE: 2018-04-13 10:22:10
+        # A PlanarGraphics object in the scene data set, defining the scanning 
+        # trajectory or sub-region in the scene; might be a line, polyline, 
+        # rectangle, a disjoint set of rois, etc.
+        # For linescan data, this is usually called "scanline"
+        self._scan_region_ = None
         
         self._trigger_protocols_ = list() # of TriggerProtocol objects
         
@@ -2446,14 +2448,6 @@ class ScanData(object):
         # a set of nested analysis units defined within the data -- all analysis units
         # in this set are landmark-based and thus are different from self._analysis_unit_
         self._analysis_units_ = set() 
-        
-        # NOTE: 2018-04-13 10:22:10
-        # a PlanarGraphics object in the scene data set, defining the scanning 
-        # trajectory (or sub-region) in the scene, from where the scans data
-        # has been collected; might be a line, polyline, rectangle,
-        # a disjoint set of rois, etc.
-        # for linescan data, this is typically called "scanline"
-        self._scan_region_ = None
         
         self._name_ = name
         
@@ -2577,27 +2571,32 @@ class ScanData(object):
 
         """
         new_scene, scene_frame_axis, scene_axes_calibrations = self._parse_img_arr_(scene, frameAxis=sceneFrameAxis)
+        
+        #print(new_scene)
         new_scans, scans_frame_axis, scans_axes_calibrations = self._parse_img_arr_(scans, frameAxis=scansFrameAxis)
 
         if new_scene is not None:
             self._scenecursors_.clear()
             self._scenerois_.clear()
             self._scan_region_ = None
+            self._scene_ = new_scene
+            self._scene_frame_axis_ = scene_frame_axis
+            self._scene_axes_calibrations_ = scene_axes_calibrations
 
         if new_scans is not None:
             self._scanscursors_.clear()
             self._scansrois_.clear()
             self._analysis_units_.clear()
-            
+            self._scans_ = new_scans
+            self._scans_frame_axis_ = scans_frame_axis
+            self._scans_axes_calibrations_ = scans_axes_calibrations
+        
     @safeWrapper
     def _parse_metadata_(self, value):
+        """Sets up analysis type
+        """
         from gui import pictgui as pgui
-        #from systems import PrairieView
         from systems.PrairieView import PVSequenceType
-        #print("ScanData._parse_metadata_()")
-        
-        #print("metadata: ", value)
-        
         if value is None:
             self._metadata_ = None
             return
@@ -2617,9 +2616,6 @@ class ScanData(object):
                     self._analysismode_ = ScanData.ScanDataAnalysisMode.frame
                     self._scandatatype_ = ScanData.ScanDataType.linescan
                     
-                    #print("ScanData._parse_metadata_ coordinates", value.sequences[0].definition.coordinates)
-                    
-                    #print("ScanData._parse_metadata_() build roi as Path")
                     roi = pgui.Path(*value.sequences[0].definition.coordinates)
                     
                     if roi.type.name in ("line", "polyline", "arc", "quad", "cubic") or\
@@ -2627,16 +2623,10 @@ class ScanData(object):
                         roi.name = "scanline"
                     
                     else:
-                        roi.name = "scan"
+                        roi.name = "scanregion"
                         
-                    # NOTE: 2020-11-30 10:02:35:
-                    # no need for this: the scann region should be the same in
-                    # all frames when scandata is imported
-                    #roi.frameIndices = [f for f in range(self.sceneFrames)]
                     self._scan_region_ = roi
                         
-                    #self._scan_region_.frameIndices = [f for f in range(self.sceneFrames)]
-                    
             else: # TODO parse ScanImage data structures as well
                 # see NOTE: 2017-11-19 22:27:30 _analysismode_ and _scandatatype_
                 raise NotImplementedError("%s data not yet supported" % value.type)
@@ -10058,13 +10048,46 @@ class ScanData(object):
     
     @property
     def scansBlock(self):
-        """Contains data derived from analysis of cursors and/ror rois in scans frames
+        """Contains data derived from analysis of cursors and/or rois in scans frames
         """
         return self._scans_block_
     
     @property
     def sceneBlock(self):
         return self._scene_block_
+    
+    def writeHDF5(self, fileNameOrGroup:typing.Union[str, h5py.Group],
+                  pathInfile:typing.Optional[str]=None) -> None:
+        from iolib.h5io import get_file_group_child
+        
+        if isinstance(fileNameOrGroup, h5py.File):
+            if not fileNameOrGroup:
+                raise ValueError(f"HDF5 file {fileNameOrGroup} is closed; cannot continue")
+            
+            if fileNameOrGroup.mode != "r+":
+                raise ValueError("Cannot write to a read-only file")
+            
+        file, group, childname = get_file_group_child(fileNameOrGroup, pathInfile, "a")
+        
+        # TODO: write the following as datasets in subgroups
+        # scans
+        # scene
+        # ephys - avoid neo.NixIO/nix !
+        # scans block
+        # scene block
+        # scans profiles
+        # scene profiles
+        # triggerProtocols
+        #   check consistency with the trigger events embedded in 
+        #   ephys, scans/scene block, analysis units
+        # landmarks
+        # analysis units
+        # options
+        # 
+        # TODO write the following as group attributes
+        # name
+        # analysis mode
+        # 
     
 
 def concatenateScanData(*data, resample=True):
@@ -10462,42 +10485,3 @@ def scanDataOptions(detection_predicate=1.3, roi_width = 10,
     
     return ret
 
-#def generate_scandata_image_list_by_protocol(nChannels, protocol_images):
-    # TODO: scenes should all have same shape;
-    # When this condition is NOT satisfied, since the scene images have 2D data,
-    # one might try to implement a clever image alignment algorithm to set up
-    # some padding
-    #
-    # scans might have different widths if scanline length has changes from one
-    # batch to another - in this case width padding must be made symmetrical 
-    # around mid-vertical column
-    #
-    # scans might also have different lengths (if sweep duration has changed from
-    # one batch acquisition to another) - in this case length padding shoudl be 
-    # made at the *end* of the scans image
-    # 
-    #if len(protocol_images != nChannels):
-        #raise ValueError("protocol_images mismatch with number of channels (%d vs %s)" % (len(protocol_images), nChannels))
-    
-    #result = list()
-    
-    #for k in range(nChannels):
-        #if len(protocol_images[k]) == 0:
-            #continue
-        
-        #widths = [img.width for img in protocol_images[k]]
-        
-        #if not all([w == widths[0] for w in widths]):
-            #maxWidth = max(widths)
-            #padded = list()
-            
-            #for img in protocol_images[k]:
-                #if img.width < maxWidth:
-                    #pad = maxWidth - img.width
-                    
-                    #pad_pre = pad//2
-                    #pad_post = pad//2 + pad%2
-                    
-                    #new_img = padAxis(img, "x", pad_pre, pad_post, np.nan)
-                
-    
