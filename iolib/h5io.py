@@ -178,6 +178,7 @@ independently from pictio.
 
 
 import os, sys, tempfile, types, typing, collections, inspect, functools, itertools
+import collections.abc
 import numpy as np
 import h5py
 import nixio as nix 
@@ -201,7 +202,7 @@ from core.quantities import(arbitrary_unit,
                             unit_quantity_from_name_or_symbol,)
 
 from core.datatypes import (TypeEnum,UnitTypes, Genotypes, 
-                            is_uniform_sequence,
+                            is_uniform_sequence, is_namedtuple,
                             )
 
 from core.modelfitting import (FitModel, ModelExpression,)
@@ -235,26 +236,64 @@ from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse,
 
 def generic_data_attrs(data):
     attrs = dict()
-    
-    type_name = type(data).__name__
-    
-    if type_name == "instance":
-        type_name = data.__class__.__name__
-        module_name = data.__class__.__module__
+    ##attrs["type_name"] = type(data).__name__
+    ##attrs["module_name"] = type(data).__module__
+    ##if isinstance(data, type):
+        ##attrs["python_class"] = ".".join([data.__module__, data.__name__])
+    ##else:
+        ##attrs["python_class"] = ".".join([type(data).__module__, type(data).__name__])
         
-    elif type_name == "type":
-        type_name = data.__name__
-        module_name = data.__module__
+    
+    ##if is_namedtuple(data):
+        ##fields_list = list(f for f in data._fields)
+        ##attrs["python_class_def"] = f"{type(data).__name__} = collections.namedtuple({type(data).__name__}, {fields_list})"
+        ##init = list()
+        ##init.append(f"{type(data).__name__}(")
+        ##init.append(", ".join(list(n + ' = {}' for n in data._fields)))
+        ##init.append(")")
+        ##attrs["python_data_init"] = "".join(init)
+        
+    
+    #if inspect.isfunction(data):
+        #attrs["func_name"] = data.__name__
+    
+    if isinstance(data, type): # in case data is already a type
+        attrs["type_name"] = data.__name__
+        attrs["module_name"] = data.__module__
+        attrs["python_class"] = ".".join([data.__module__, data.__name__])
+        if data.__module__ == "__main__" and not inspect.isbuiltin(data):
+            if is_namedtuple(data):
+                fields_list = list(f for f in data._fields)
+                attrs["python_class_def"] = f"{data.__name__} = collections.namedtuple({data.__name__}, {list(fields_list)})"
+            else:
+                attrs["python_class_def"] = f"class {data.__name__}()"
+                
+        else:
+            attrs["python_class_def"] = "" # left to import at read time?
+        
+    #elif type(data).__name__ == "instance":
+        #attrs["type_name"] = data.__class__.__name__
+        #attrs["module_name"] = data.__class__.__module__
+        #attrs["python_class"] = ".".join([attrs["module_name"], attrs["type_name"]])
         
     else:
-        module_name = type(data).__module__
-    
-    #elif type_name == "namedtuple":
+        attrs["type_name"] = type(data).__name__
+        attrs["module_name"] = type(data).__module__
+        attrs["python_class"] = ".".join([attrs["module_name"], attrs["type_name"]])
+        if is_namedtuple(data):
+            fields_list = list(f for f in data._fields)
+            attrs["python_class_def"] = f"{type(data).__name__} = collections.namedtuple({type(data).__name__}, {fields_list})"
+            init = list()
+            init.append(f"{type(data).__name__}(")
+            init.append(", ".join(list(n + ' = {}' for n in data._fields)))
+            init.append(")")
+            attrs["python_data_init"] = "".join(init)
+            
         
-    attrs["type_name"] = type_name
-    attrs["module_name"] = module_name
-    attrs["python_class"] = ".".join([module_name, type_name])
-    
+        if inspect.isfunction(data):
+            attrs["func_name"] = data.__name__
+            
+        
     return attrs
     
 def get_file_group_child(filenameOrGroup:typing.Union[str, h5py.Group],
@@ -266,13 +305,19 @@ def get_file_group_child(filenameOrGroup:typing.Union[str, h5py.Group],
     if mode is None or not isinstance(mode, str) or len(mode.strip()) == 0:
         mode = "r"
         
-    if isinstance(filenameOrGroup, h5py.Group):
-        file = None
-        group = filenameOrGroup
-    else:
+    if isinstance(filenameOrGroup, str):
         file = h5py.File(filenameOrGroup, mode=mode)
         group = file['/']
         
+    elif isinstance(filenameOrGroup, h5py.File):
+        file = fileNameOrGroup
+        group = file['/']
+    elif isinstance(filenameOrGroup, h5py.Group):
+        file = None
+        group = filenameOrGroup
+    else:
+        raise TypeError(f"Expecting a str, h5py File or h5py Group; got {type(fileNameOrGroup).__name__} instead")
+    
     childname = None
         
     if isinstance(pathInFile, str) and len(pathInFile.strip()):
@@ -313,17 +358,17 @@ def parse_func(f):
         
     
     return dict((p_name, {"kind":p.kind.name, 
-                              "default": __identify__(p.default),
-                              "annotation": __identify__(p.annotation),
-                              }) for p_name, p in sig.parameters.items())
+                          "default": __identify__(p.default),
+                          "annotation": __identify__(p.annotation),
+                          }) for p_name, p in sig.parameters.items())
 
 def data2hdf(x:typing.Any, 
              filenameOrGroup:typing.Union[str, h5py.Group], 
              pathInFile:typing.Optional[str]=None,
              mode:typing.Optional[str] = None) -> None:
     
-    if mode is None or not isinstance(mode, str) or len(mode.strip()) == 0:
-        mode = "w"
+    #if mode is None or not isinstance(mode, str) or len(mode.strip()) == 0:
+        #mode = "w"
     
     #if not isinstance(x, collections.abc.Mapping):
         #raise TypeError(f"Expecting a mapping; got {type(x).__name__} instead")
@@ -363,6 +408,9 @@ def data2hdf(x:typing.Any,
         x_type = type(x)
         if issubclass(x_type, collections.abc.Iterable):
             if issubclass(x_type, collections.abc.Mapping): # -> Group with nested Group objects
+                objgroup = group.create_group()
+                for key, val in x.items():
+                    continue
                 pass
             elif issubclass(x_type, collections.abc.Sequence): #-> Group or Dataset
                 pass

@@ -7,7 +7,7 @@ Decorators, context managers, and helper functions & classes for programming
 
 from pprint import pprint
 
-import enum, io, os, re, itertools, sys, time, traceback, types, typing
+import enum, io, os, re, itertools, sys, time, traceback, types, typing, collections
 import importlib, inspect, pathlib, warnings, operator, functools
 from functools import singledispatch, update_wrapper, wraps
 from contextlib import (contextmanager, ContextDecorator,)
@@ -518,7 +518,34 @@ def get_properties(obj):
     return [i[0] for i in inspect.getmembers(obj, lambda x: isinstance(x, property))]
     
     
-
+def parent_types(data):
+    """Returns a tuple of the immediate ancestor types of data.
+    The order is as specified in the data type's definition, if data is an 
+    instance, or in data definition if data is a type.
+    
+    Parameter:
+    =========
+    data: instance or type
+    
+    Returns:
+    ========
+    A tuple, possibly empty, with the immediate ancestor types of data
+    
+    The tuple is useful in reconstructing the data's type (or data if itself is 
+    a type).
+    
+    """
+    if not isinstance(data, type):
+        data = type(data)
+    types = inspect.getmro(data)[1:-1] # omit data ([0]) and object ([-1])
+    anc = set(types)
+    for typ in types:
+        anc = anc - set(inspect.getmro(typ)[1:-1])
+        
+    ndx = [types.index(t) for t in anc]
+    
+    return tuple(types[k] for k in sorted(ndx))
+                    
 # ### END module functions
 
 # ### BEGIN Decorators

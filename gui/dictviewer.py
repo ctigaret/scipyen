@@ -229,7 +229,7 @@ class InteractiveTreeWidget(DataTreeWidget):
             
         widget = None
         desc = ""
-        childs = {}
+        children = {}
         
         #print("typeStr", typeStr, "typeTip", typeTip)
         
@@ -251,28 +251,28 @@ class InteractiveTreeWidget(DataTreeWidget):
                 if isinstance(data, dict):
                     desc = "length=%d" % len(data)
                     if isinstance(data, OrderedDict):
-                        childs = data
+                        children = data
                         
                     else:
-                        #childs = OrderedDict(sorted(data.items())) # does not support mixed key types!
+                        #children = OrderedDict(sorted(data.items())) # does not support mixed key types!
                         # NOTE: 2021-07-20 09:52:34
                         # dict objects with mixed key types cannot be sorted
                         # therefore we resort to an indexing vector
                         ndx = [i[1] for i in sorted((str(k[0]), k[1]) for k in zip(data.keys(), range(len(data))))]
                         items = [i for i in data.items()]
-                        childs = OrderedDict([items[k] for k in ndx])
+                        children = OrderedDict([items[k] for k in ndx])
                         
                 elif isinstance(data, (list, tuple, deque)):
                     desc = "length=%d" % len(data)
                     # NOTE: 2021-07-24 14:57:02
                     # accommodate namedtuple types
                     if is_namedtuple(data):
-                        childs = data._asdict()
+                        children = data._asdict()
                     else:
-                        childs = OrderedDict(enumerate(data))
+                        children = OrderedDict(enumerate(data))
             
         elif HAVE_METAARRAY and (hasattr(data, 'implements') and data.implements('MetaArray')):
-            childs = OrderedDict([
+            children = OrderedDict([
                 ('data', data.view(np.ndarray)),
                 ('meta', data.infoCopy())
             ])
@@ -312,6 +312,7 @@ class InteractiveTreeWidget(DataTreeWidget):
             ##widget = QtWidgets.QPlainTextEdit(asUnicode(data))
             #widget.setMaximumHeight(200)
             #widget.setReadOnly(True)
+            
         elif isinstance(data, neo.core.dataobject.DataObject):
             desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
             if data.size == 1:
@@ -324,7 +325,6 @@ class InteractiveTreeWidget(DataTreeWidget):
                 widget.setMaximumHeight(200)
                 widget.readOnly=True
                 
-            
         elif isinstance(data, pq.Quantity):
             desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
             if data.size == 1:
@@ -337,7 +337,6 @@ class InteractiveTreeWidget(DataTreeWidget):
                 widget.setMaximumHeight(200)
                 widget.readOnly=True
                 
-            
         elif isinstance(data, np.ndarray):
             desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
             widget = TableEditorWidget(parent=self)
@@ -363,7 +362,7 @@ class InteractiveTreeWidget(DataTreeWidget):
             desc = str(data)
             #desc = asUnicode(data)
         
-        return typeStr, desc, childs, widget, typeTip
+        return typeStr, desc, children, widget, typeTip
     
     def buildTree(self, data, parent, name="", nameTip = "", hideRoot=False, path=()):
         #from pyqtgraph.python2_3 import asUnicode
@@ -413,7 +412,7 @@ class InteractiveTreeWidget(DataTreeWidget):
             parent.addChild(node)
         
         # record the path to the node so it can be retrieved later
-        # (this is used by DiffTreeWidget)
+        # (this is used by the tree widget)
         
         # NOTE: 2021-08-15 14:41:32
         # self.nodes is a dict
@@ -421,7 +420,7 @@ class InteractiveTreeWidget(DataTreeWidget):
         # as dict key
         self.nodes[path] = node
         
-        typeStr, desc, childs, widget, typeTip = self.parse(data)
+        typeStr, desc, children, widget, typeTip = self.parse(data)
         
         node.setToolTip(0, nameTip)
         node.setText(1, typeStr)
@@ -450,9 +449,9 @@ class InteractiveTreeWidget(DataTreeWidget):
             self.setFirstItemColumnSpanned(subnode, True)
             
         # recurse to children
-        for key, data in childs.items():
+        for key, data in children.items():
             if isinstance(key, type):
-                keyrepr = key.__name__
+                keyrepr = f"{key.__module__}.{key.__name__}"
                 keytip = str(key)
                 #keytip = asUnicode(key)
                 
@@ -467,7 +466,8 @@ class InteractiveTreeWidget(DataTreeWidget):
                 keytip = type(key).__name__
                 
             keyTypeTip = "key / index type: %s" % keytip
-            self.buildTree(data, node, keyrepr, keyTypeTip, path=path+(key,))
+            self.buildTree(data, node, keyrepr, keyTypeTip, path=path+(keyrepr,))
+            #self.buildTree(data, node, keyrepr, keyTypeTip, path=path+(key,))
 
         
 class DataViewer(ScipyenViewer):

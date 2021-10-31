@@ -343,7 +343,15 @@ def is_dotted_name(s):
     return isinstance(s, str) and '.' in s
 
 def is_namedtuple(x):
-    return isinstance(x, tuple) and all([hasattr(x, a) for a in ("_asdict", "_fields", "_make", "_replace", "_source")])
+    if isinstance(x, type):
+        ret = issubclass(x, tuple)
+    else:
+        ret = issubclass(type(x), tuple)
+        
+    if ret: 
+        ret &= all([hasattr(x, a) for a in ("_asdict", "_fields", "_make", "_replace")])
+        
+    return ret
     
 def is_string(array):
     """Determine whether the argument has a string or character datatype, when
