@@ -188,6 +188,7 @@ import quantities as pq
 import neo
 
 from core.prog import safeWrapper
+from core import prog
 from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 
@@ -261,21 +262,13 @@ def generic_data_attrs(data):
         attrs["type_name"] = data.__name__
         attrs["module_name"] = data.__module__
         attrs["python_class"] = ".".join([data.__module__, data.__name__])
-        if data.__module__ == "__main__" and not inspect.isbuiltin(data):
-            if is_namedtuple(data):
-                fields_list = list(f for f in data._fields)
-                attrs["python_class_def"] = f"{data.__name__} = collections.namedtuple({data.__name__}, {list(fields_list)})"
-            else:
-                attrs["python_class_def"] = f"class {data.__name__}()"
-                
+        
+        if is_namedtuple(data):
+            fields_list = list(f for f in data._fields)
+            attrs["python_class_def"] = f"{data.__name__} = collections.namedtuple({data.__name__}, {list(fields_list)})"
         else:
-            attrs["python_class_def"] = "" # left to import at read time?
-        
-    #elif type(data).__name__ == "instance":
-        #attrs["type_name"] = data.__class__.__name__
-        #attrs["module_name"] = data.__class__.__module__
-        #attrs["python_class"] = ".".join([attrs["module_name"], attrs["type_name"]])
-        
+            
+            attrs["python_class_def"] = prog.class_def(data)
     else:
         attrs["type_name"] = type(data).__name__
         attrs["module_name"] = type(data).__module__
@@ -288,6 +281,8 @@ def generic_data_attrs(data):
             init.append(", ".join(list(n + ' = {}' for n in data._fields)))
             init.append(")")
             attrs["python_data_init"] = "".join(init)
+        else:
+            attrs["python_class_def"] = prog.class_def(data)
             
         
         if inspect.isfunction(data):

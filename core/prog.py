@@ -517,6 +517,11 @@ def get_properties(obj):
     #return [i[0] for i in inspect.getmembers(obj, lambda x: inspect.isdatadescriptor(x) and isinstance(x), property)]
     return [i[0] for i in inspect.getmembers(obj, lambda x: isinstance(x, property))]
     
+def full_class_name(data):
+    if not isinstance(data, type):
+        data = type(data)
+        
+    return ".".join([data.__module__, data.__name__])    
     
 def parent_types(data):
     """Returns a tuple of the immediate ancestor types of data.
@@ -545,6 +550,14 @@ def parent_types(data):
     ndx = [types.index(t) for t in anc]
     
     return tuple(types[k] for k in sorted(ndx))
+
+def class_def(data):
+    if not isinstance(data, type):
+        data = type(data)
+        
+    ss = "(" + ", ".join([f"{p.__module__}.{p.__name__}" for p in parent_types(data)]) + ")"
+    return full_class_name(data) + ss
+    
                     
 # ### END module functions
 
