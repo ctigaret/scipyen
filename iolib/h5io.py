@@ -237,27 +237,7 @@ from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse,
 
 def generic_data_attrs(data):
     attrs = dict()
-    ##attrs["type_name"] = type(data).__name__
-    ##attrs["module_name"] = type(data).__module__
-    ##if isinstance(data, type):
-        ##attrs["python_class"] = ".".join([data.__module__, data.__name__])
-    ##else:
-        ##attrs["python_class"] = ".".join([type(data).__module__, type(data).__name__])
-        
-    
-    ##if is_namedtuple(data):
-        ##fields_list = list(f for f in data._fields)
-        ##attrs["python_class_def"] = f"{type(data).__name__} = collections.namedtuple({type(data).__name__}, {fields_list})"
-        ##init = list()
-        ##init.append(f"{type(data).__name__}(")
-        ##init.append(", ".join(list(n + ' = {}' for n in data._fields)))
-        ##init.append(")")
-        ##attrs["python_data_init"] = "".join(init)
-        
-    
-    #if inspect.isfunction(data):
-        #attrs["func_name"] = data.__name__
-    
+
     if isinstance(data, type): # in case data is already a type
         attrs["type_name"] = data.__name__
         attrs["module_name"] = data.__module__
@@ -362,8 +342,8 @@ def data2hdf(x:typing.Any,
              pathInFile:typing.Optional[str]=None,
              mode:typing.Optional[str] = None) -> None:
     
-    #if mode is None or not isinstance(mode, str) or len(mode.strip()) == 0:
-        #mode = "w"
+    if mode is None or not isinstance(mode, str) or len(mode.strip()) == 0:
+        mode = "w"
     
     #if not isinstance(x, collections.abc.Mapping):
         #raise TypeError(f"Expecting a mapping; got {type(x).__name__} instead")
@@ -403,12 +383,17 @@ def data2hdf(x:typing.Any,
         x_type = type(x)
         if issubclass(x_type, collections.abc.Iterable):
             if issubclass(x_type, collections.abc.Mapping): # -> Group with nested Group objects
-                objgroup = group.create_group()
+                objgroup = group.create_group(childname)
                 for key, val in x.items():
-                    continue
-                pass
+                    data2hdf(val, group, objgroup)
+                    #continue
             elif issubclass(x_type, collections.abc.Sequence): #-> Group or Dataset
-                pass
+                if all(isinstance(v, (bool, bytes, complex, float, int, str)) for v in x):
+                    dset = group.create_dataset(childname, data = x)
+                else:
+                    grp = group.create_group(childname)
+                    for k, v in enumerate(x):
+                        data2hdf(v, grp, f"{k}" )
             
             else:
                 raise TypeError(f"Object type {x_type.__name__} not yet supported")

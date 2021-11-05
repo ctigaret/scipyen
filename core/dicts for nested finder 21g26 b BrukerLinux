@@ -12,8 +12,8 @@ ddd = {"a":0, "b":{1:1,2:2,3:{"a":1}}, "c":{"c":3}}
 d = {"a":{"a":1,"b":2,"c":[3,4,[5,6]]}, "b":{7:8, 9:[10,11, np.arange(13)],"9":np.arange(13), "d":p}, 12:{"a":(2,4,6), "c":"txt"},"d":p, "e":(1, p)}
 from core.utilities import NestedFinder
 
-from collections import namedtuple
 from core.utilities import NestedFinder
+from collections import namedtuple
 Point = namedtuple("Point", ("x", "y"))
 p = Point(11,22)
 ar = np.arange(5)
