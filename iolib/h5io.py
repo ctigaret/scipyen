@@ -177,10 +177,12 @@ independently from pictio.
 
 
 
-import os, sys, tempfile, types, typing, collections, inspect, functools, itertools
-import collections.abc
-import numpy as np
+import os, sys, tempfile, traceback
+import types, typing, inspect, functools, itertools
+import collections, collections.abc
+import json
 import h5py
+import numpy as np
 import nixio as nix 
 import vigra
 import pandas as pd
@@ -235,40 +237,47 @@ from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse,
 #   (for data sets deeply nested, the intermediary groups must also be present)
 #   
 
-def generic_data_attrs(data):
+def generic_data_attrs(data, prefix=""):
     attrs = dict()
+    
+    if isinstance(prefix, str) and len(prefix.strip()):
+        if not prefix.endswith("_"):
+            prefix += "_"
+        
+    else:
+        prefix = ""
 
     if isinstance(data, type): # in case data is already a type
-        attrs["type_name"] = data.__name__
-        attrs["module_name"] = data.__module__
-        attrs["python_class"] = ".".join([data.__module__, data.__name__])
+        attrs[f"{prefix}type_name"] = data.__name__
+        attrs[f"{prefix}module_name"] = data.__module__
+        attrs[f"{prefix}python_class"] = ".".join([data.__module__, data.__name__])
         
         if is_namedtuple(data):
             fields_list = list(f for f in data._fields)
-            attrs["python_class_def"] = f"{data.__name__} = collections.namedtuple({data.__name__}, {list(fields_list)})"
+            attrs[f"{prefix}python_class_def"] = f"{data.__name__} = collections.namedtuple({data.__name__}, {list(fields_list)})"
         else:
             
-            attrs["python_class_def"] = prog.class_def(data)
+            attrs[f"{prefix}python_class_def"] = prog.class_def(data)
     else:
-        attrs["type_name"] = type(data).__name__
-        attrs["module_name"] = type(data).__module__
-        attrs["python_class"] = ".".join([attrs["module_name"], attrs["type_name"]])
+        attrs[f"{prefix}type_name"] = type(data).__name__
+        attrs[f"{prefix}module_name"] = type(data).__module__
+        attrs[f"{prefix}python_class"] = ".".join([attrs[f"{prefix}module_name"], attrs[f"{prefix}type_name"]])
         if is_namedtuple(data):
             fields_list = list(f for f in data._fields)
-            attrs["python_class_def"] = f"{type(data).__name__} = collections.namedtuple({type(data).__name__}, {fields_list})"
+            attrs[f"{prefix}python_class_def"] = f"{type(data).__name__} = collections.namedtuple({type(data).__name__}, {fields_list})"
             init = list()
             init.append(f"{type(data).__name__}(")
             init.append(", ".join(list(n + ' = {}' for n in data._fields)))
             init.append(")")
-            attrs["python_data_init"] = "".join(init)
+            attrs[f"{prefix}python_data_init"] = "".join(init)
         else:
-            attrs["python_class_def"] = prog.class_def(data)
+            attrs[f"{prefix}python_class_def"] = prog.class_def(data)
             
         
         if inspect.isfunction(data):
-            attrs["func_name"] = data.__name__
+            attrs[f"{prefix}func_name"] = data.__name__
             
-        
+    
     return attrs
     
 def get_file_group_child(filenameOrGroup:typing.Union[str, h5py.Group],
@@ -280,13 +289,18 @@ def get_file_group_child(filenameOrGroup:typing.Union[str, h5py.Group],
     if mode is None or not isinstance(mode, str) or len(mode.strip()) == 0:
         mode = "r"
         
+    external = False
+    
     if isinstance(filenameOrGroup, str):
         file = h5py.File(filenameOrGroup, mode=mode)
         group = file['/']
         
     elif isinstance(filenameOrGroup, h5py.File):
         file = fileNameOrGroup
+        if file:
+            external = True
         group = file['/']
+        
     elif isinstance(filenameOrGroup, h5py.Group):
         file = None
         group = filenameOrGroup
@@ -305,7 +319,7 @@ def get_file_group_child(filenameOrGroup:typing.Union[str, h5py.Group],
             g = group.get(groupname, default=None)
             
             if g is None:
-                group = group.create_group(groupname)
+                group = group.create_group(groupname, track_order=True)
                 
             elif not isinstance(g, h5py.Group):
                 raise IOError(f"Invalid path: {pathInFile}")
@@ -315,7 +329,7 @@ def get_file_group_child(filenameOrGroup:typing.Union[str, h5py.Group],
         
         childname = levels[-1]
 
-    return file, group, childname
+    return file, group, childname, external
 
     
 def parse_func(f):
@@ -337,6 +351,15 @@ def parse_func(f):
                           "annotation": __identify__(p.annotation),
                           }) for p_name, p in sig.parameters.items())
 
+def dict_entry_to_hdf(key:typing.Any):#, parent:h5py.Group):
+    attrs = generic_data_attrs(key, "key")
+    if not isinstance(key, str):
+        name = json.dumps(key)
+    else:
+        name = key
+    
+    return name, attrs
+
 def data2hdf(x:typing.Any, 
              filenameOrGroup:typing.Union[str, h5py.Group], 
              pathInFile:typing.Optional[str]=None,
@@ -348,103 +371,127 @@ def data2hdf(x:typing.Any,
     #if not isinstance(x, collections.abc.Mapping):
         #raise TypeError(f"Expecting a mapping; got {type(x).__name__} instead")
     
-    file, group, childname = get_file_group_child(filenameOrGroup, pathInFile, mode)
+    file, group, childname, external = get_file_group_child(filenameOrGroup, pathInFile, mode)
     
-    x_attrs = generic_data_attrs(x)
+    try:
     
-    if isinstance(x, (bool, bytes, complex, float, int, str)): # -> Dataset
-        dset = group.create_dataset(childname, data = x)
-        dset.attrs.update(x_attrs)
+        x_attrs = generic_data_attrs(x)
         
-    elif isinstance(x, vigra.VigraArray): # -> Dataset
-        target = group if file is None else file
-        dset = writeHDF5_VigraArray(x, target, childname)
-        dset.attrs.update(x_attrs)
-        
-    elif isinstance(x, neo.core.container.Container): # -> Group
-        pass
-        
-    elif isinstance(x, neo.core.dataobject.DataObject): # -> Dataset
-        pass
-        
-    elif isinstance(x, pq.Quantity): # -> Dataset
-        # generic Quantity object: create a Dataset for its magnitude,
-        # adorn attrs with dimensionality
-        pass
-    
-    elif isinstance(x, np.ndarray): # -> Dataset
-        if x.dtype is np.dtype(object):
-            raise TypeError("Numpy arrays of Python objects are not supported")
-        
-        dset = group.create_dataset(childname, data=x)
-        dset.attrs.update(x_attrs)
-        
-    else:
-        x_type = type(x)
-        if issubclass(x_type, collections.abc.Iterable):
-            if issubclass(x_type, collections.abc.Mapping): # -> Group with nested Group objects
-                objgroup = group.create_group(childname)
-                for key, val in x.items():
-                    data2hdf(val, group, objgroup)
-                    #continue
-            elif issubclass(x_type, collections.abc.Sequence): #-> Group or Dataset
-                if all(isinstance(v, (bool, bytes, complex, float, int, str)) for v in x):
-                    dset = group.create_dataset(childname, data = x)
-                else:
-                    grp = group.create_group(childname)
-                    for k, v in enumerate(x):
-                        data2hdf(v, grp, f"{k}" )
+        if isinstance(x, (bool, bytes, complex, float, int, str)): # -> Dataset
+            dset = group.create_dataset(childname, data = x)
+            dset.attrs.update(x_attrs)
+            #group[childname]=dset
             
-            else:
-                raise TypeError(f"Object type {x_type.__name__} not yet supported")
+        elif isinstance(x, vigra.VigraArray): # -> Dataset
+            target = group if file is None else file
+            dset = writeHDF5_VigraArray(x, target, childname)
+            dset.attrs.update(x_attrs)
+            #target[childname] = dset
             
-        else: # (user-defined class) -> Group 
+        elif isinstance(x, neo.core.container.Container): # -> Group
             pass
             
-        for key in x.__iter__():
-            if isinstance(key, str):
-                childname = key
-                attr_key_type = "str"
-            else:
-                childname=str(key)
-                attr_key_type = type(key)
-                
-            value = x.__getitem__(key, None)
+        elif isinstance(x, neo.core.dataobject.DataObject): # -> Dataset
+            pass
             
-            value_attrs = generic_data_attrs(value)
+        elif isinstance(x, pq.Quantity): # -> Dataset
+            # generic Quantity object: create a Dataset for its magnitude,
+            # adorn attrs with dimensionality
+            pass
+        
+        elif isinstance(x, np.ndarray): # -> Dataset
+            if x.dtype is np.dtype(object):
+                raise TypeError("Numpy arrays of Python objects are not supported")
             
-            #if isinstance(value, collections.abc.Mapping):
-            if issubclass(value_type, collections.abc.Mapping):
-                data2hdf(value, group, childname)
-                
-            #elif isinstance(value, collections.abc.Sequence):
-            elif issubclass(value_type, collections.abc.Sequence):
-                if is_uniform_sequence(value):
-                    # NOTE: 2021-10-19 08:47:03
-                    # uniform sequences stored as HDF5 dataset IF their elements are
-                    # PODs
-                    element_type = type(value[0])
-                    if element_type in (bool, bytes, complex, float, int, str):
-                        # convert to numpy array then store as dataset
-                        dtype = np.dtype(element_type)
-                        
-                        dset = group.create_dataset(childname, data=value, dtype=dtype)
-                        dset.attrs.update(value_attrs)
+            dset = group.create_dataset(childname, data=x)
+            dset.attrs.update(x_attrs)
+            group[childname]=dset
+            
+        else:
+            x_type = type(x)
+            if issubclass(x_type, collections.abc.Iterable):
+                print("data2hdf Iterable")
+                if issubclass(x_type, collections.abc.Mapping): # -> Group with nested Group objects
+                    print("data2hdf Mapping")
+                    objgroup = group.create_group(childname, track_order=True)
+                    for key, val in x.items():
+                        print(f"key: {key}; value: ", type(val))
+                        keyname, attrs = dict_entry_to_hdf(key)
+                        print(f"keyname: {keyname}")
+                        print("attrs\n", attrs)
+                        keygroup = objgroup.create_group(keyname, track_order=True)
+                        keygroup.attrs.update(attrs)
+                        data2hdf(val, keygroup)
+                elif issubclass(x_type, collections.abc.Sequence): #-> Group or Dataset
+                    print("data2hdf Sequence")
+                    if all(isinstance(v, (bool, bytes, complex, float, int, str)) for v in x):
+                        dset = group.create_dataset(childname, data = x) 
+                        dset.attrs.update(x_attrs)
                     else:
-                        # create a child group then iterate through elements
-                        grp = group.create_group(childname)
-                        for k, e in enumerate(value):
-                            k
+                        for k, v in enumerate(x):
+                            keyname = f"{k}"
+                            keygroup = group.create_group(childname, track_order=True)
+                            keyattrs = generic_data_attrs(k, "index")
+                            keygroup.attrs.update(keyattrs)
+                            data2hdf(v, keygroup)
+                
+                else:
+                    raise TypeError(f"Object type {x_type.__name__} not yet supported")
+                
+            else: # (user-defined class) -> Group 
+                pass
+            
+    except:
+        traceback.print_exc()
+        
+    if not external:
+        if file:
+            file.close
+            
+        #for key in x.__iter__():
+            #if isinstance(key, str):
+                #childname = key
+                #attr_key_type = "str"
+            #else:
+                #childname=str(key)
+                #attr_key_type = type(key)
+                
+            #value = x.__getitem__(key, None)
+            
+            #value_attrs = generic_data_attrs(value)
+            
+            ##if isinstance(value, collections.abc.Mapping):
+            #if issubclass(value_type, collections.abc.Mapping):
+                #data2hdf(value, group, childname)
+                
+            ##elif isinstance(value, collections.abc.Sequence):
+            #elif issubclass(value_type, collections.abc.Sequence):
+                #if is_uniform_sequence(value):
+                    ## NOTE: 2021-10-19 08:47:03
+                    ## uniform sequences stored as HDF5 dataset IF their elements are
+                    ## PODs
+                    #element_type = type(value[0])
+                    #if element_type in (bool, bytes, complex, float, int, str):
+                        ## convert to numpy array then store as dataset
+                        #dtype = np.dtype(element_type)
                         
-                else: # create child group iterate through elements
-                    for k,e in enumerate(value):
+                        #dset = group.create_dataset(childname, data=value, dtype=dtype)
+                        #dset.attrs.update(value_attrs)
+                    #else:
+                        ## create a child group then iterate through elements
+                        #grp = group.create_group(childname)
+                        #for k, e in enumerate(value):
+                            #k
                         
-                        data2hdf()
+                #else: # create child group iterate through elements
+                    #for k,e in enumerate(value):
+                        
+                        #data2hdf()
                     
-            elif value_type in (bool, bytes, complex, float, int, str):
-                dtype = np.dtype(value_type)
-                dset = group.create_dataset(childname, data=value, dtype=dtype)
-                dset.attr["python_class"] = value_type.__name__
+            #elif value_type in (bool, bytes, complex, float, int, str):
+                #dtype = np.dtype(value_type)
+                #dset = group.create_dataset(childname, data=value, dtype=dtype)
+                #dset.attr["python_class"] = value_type.__name__
         
         
                 
