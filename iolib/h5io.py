@@ -36,7 +36,7 @@ independently from pictio.
         and order indexed flags - see h5p api - followed by instatiation of the
         h5py.Group(groupid)
         
-    5) use the newly-created group as a filenameOrGroup parameter to vigra.writeHDF5()
+    5) use the newly-created group as a fileNameOrGroup parameter to vigra.writeHDF5()
     
     CAUTION: a nix.File cannot be used as context manager (i.e. one cannot
     use the idiom with nix.File(...) as nixfile: ...)
@@ -180,6 +180,7 @@ independently from pictio.
 import os, sys, tempfile, traceback
 import types, typing, inspect, functools, itertools
 import collections, collections.abc
+from uuid import uuid4
 import json
 import h5py
 import numpy as np
@@ -219,7 +220,7 @@ from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse,
                          PlanarGraphics, Rect, Text, VerticalCursor,)
 
 # NOTE: 2021-10-18 12:08:18 in all functions below:
-# filenameOrGroup is either:
+# fileNameOrGroup is either:
 #   a str, the file name of a target HDF5 file (possible, relative to cwd)
 #
 #       In this case, the functions will work on the root group ('/') of the 
@@ -231,7 +232,7 @@ from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse,
 #
 #   This can be a HDF5 'path' (from the root '/' to, and including, the data set
 #       name) or just the data set name (in which case the data set will be
-#       relative to the filenameOrGroup)
+#       relative to the fileNameOrGroup)
 #   
 #   for reading functions, the named data set must already exist in the group
 #   (for data sets deeply nested, the intermediary groups must also be present)
@@ -280,7 +281,7 @@ def generic_data_attrs(data, prefix=""):
     
     return attrs
     
-def get_file_group_child(filenameOrGroup:typing.Union[str, h5py.Group],
+def get_file_group_child(fileNameOrGroup:typing.Union[str, h5py.Group],
                        pathInFile:typing.Optional[str] = None, 
                        mode:typing.Optional[str]=None) -> typing.Tuple[typing.Optional[h5py.File], h5py.Group, typing.Optional[str]]:
     """Common tool for coherent syntax of h5io read/write functions.
@@ -290,20 +291,21 @@ def get_file_group_child(filenameOrGroup:typing.Union[str, h5py.Group],
         mode = "r"
         
     external = False
+    print("get_file_group_child fileNameOrGroup", fileNameOrGroup, "pathInFile", pathInFile, "mode", mode)
     
-    if isinstance(filenameOrGroup, str):
-        file = h5py.File(filenameOrGroup, mode=mode)
+    if isinstance(fileNameOrGroup, str):
+        file = h5py.File(fileNameOrGroup, mode=mode)
         group = file['/']
         
-    elif isinstance(filenameOrGroup, h5py.File):
+    elif isinstance(fileNameOrGroup, h5py.File):
         file = fileNameOrGroup
         if file:
             external = True
         group = file['/']
         
-    elif isinstance(filenameOrGroup, h5py.Group):
+    elif isinstance(fileNameOrGroup, h5py.Group):
         file = None
-        group = filenameOrGroup
+        group = fileNameOrGroup
     else:
         raise TypeError(f"Expecting a str, h5py File or h5py Group; got {type(fileNameOrGroup).__name__} instead")
     
@@ -313,7 +315,7 @@ def get_file_group_child(filenameOrGroup:typing.Union[str, h5py.Group],
         levels = pathInFile.split('/')
         
         for groupname in levels[:-1]:
-            if len(groupanme.strip()) == 0:
+            if len(groupname.strip()) == 0:
                 continue
             
             g = group.get(groupname, default=None)
@@ -328,6 +330,9 @@ def get_file_group_child(filenameOrGroup:typing.Union[str, h5py.Group],
                 group = g
         
         childname = levels[-1]
+        
+    if not isinstance(childname, str) or len(childname.strip()) == 0:
+        childname = group.name
 
     return file, group, childname, external
 
@@ -351,17 +356,54 @@ def parse_func(f):
                           "annotation": __identify__(p.annotation),
                           }) for p_name, p in sig.parameters.items())
 
-def dict_entry_to_hdf(key:typing.Any):#, parent:h5py.Group):
-    attrs = generic_data_attrs(key, "key")
-    if not isinstance(key, str):
-        name = json.dumps(key)
+def hdf_entry(x:typing.Any, attr_prefix="key"):#, parent:h5py.Group):
+    attrs = generic_data_attrs(x, attr_prefix)
+    if not isinstance(x, str):
+        name = f"{type(x).__module__}.{type(x).__name__}_{uuid4().hex}"
+        #name = json.dumps(x)
     else:
-        name = key
+        name = x
     
-    return name, attrs
+    return type(x), name, attrs
+
+def make_dataset(x:typing.Any, group:h5py.Group, name:typing.Optional[str]=None):
+    x_type, x_name, x_attrs = hdf_entry(x, "")
+    
+    if not isinstance(name, str) or len(name.strip()) == 0:
+        name = x_name
+        
+    if isinstance(x, (bool, bytes, complex, float, int, str)):
+        dset = group.create_dataset(name, data = x)
+        dset.attrs.update(x_attrs)
+        
+    elif isinstance(x, vigra.VigraArray):
+        x.writeHDF5(group,name)
+        dset = group[name]
+        dset.attrs.update(x_attrs)
+        
+    elif isinstance(x, neo.AnalogSignal):
+        data = np.transpose(x.magnitude)
+        x_meta = dict()
+        x_meta["description"] = x.description
+        x_meta["units"] = x.dimensionality.string
+        x_meta["t_units"] = x.t_start.units.dimensionality.string
+        x_meta["t_start"] = x.t_start.magnitude.item()
+        x_meta["t_name"] = "Time"
+        
+        
+    elif isinstance(x, pq.Quantity):
+        dset = group.create_dataset(name, data=x.magnitude)
+        x_attrs.update({"units": x.dimensionality.string})
+        dset.attrs.update(x_attrs)
+        
+    elif isinstance(x, np.ndarray):
+        dset = group.create_dataset(name, data = x)
+        dset.attrs.update(x_attrs)
+        
+        
 
 def data2hdf(x:typing.Any, 
-             filenameOrGroup:typing.Union[str, h5py.Group], 
+             fileNameOrGroup:typing.Union[str, h5py.Group], 
              pathInFile:typing.Optional[str]=None,
              mode:typing.Optional[str] = None) -> None:
     
@@ -371,22 +413,27 @@ def data2hdf(x:typing.Any,
     #if not isinstance(x, collections.abc.Mapping):
         #raise TypeError(f"Expecting a mapping; got {type(x).__name__} instead")
     
-    file, group, childname, external = get_file_group_child(filenameOrGroup, pathInFile, mode)
+    file, group, childname, external = get_file_group_child(fileNameOrGroup, pathInFile, mode)
+    
+    print("data2hdf file", file, "group", group, "childname", childname, "external", external)
     
     try:
     
-        x_attrs = generic_data_attrs(x)
+        #x_attrs = generic_data_attrs(x)
+        x_type, x_name, x_attrs = hdf_entry(x)
+        
+        entry_name = childname if isinstance(childname, str) and len(childname.strip()) else x_name
         
         if isinstance(x, (bool, bytes, complex, float, int, str)): # -> Dataset
-            dset = group.create_dataset(childname, data = x)
+            
+            dsetname = f"{x.__class__.__name__}"
+            dset = group.create_dataset(entry_name, data = x)
             dset.attrs.update(x_attrs)
-            #group[childname]=dset
             
         elif isinstance(x, vigra.VigraArray): # -> Dataset
             target = group if file is None else file
-            dset = writeHDF5_VigraArray(x, target, childname)
+            dset = writeHDF5_VigraArray(x, target, entry_name)
             dset.attrs.update(x_attrs)
-            #target[childname] = dset
             
         elif isinstance(x, neo.core.container.Container): # -> Group
             pass
@@ -403,36 +450,40 @@ def data2hdf(x:typing.Any,
             if x.dtype is np.dtype(object):
                 raise TypeError("Numpy arrays of Python objects are not supported")
             
-            dset = group.create_dataset(childname, data=x)
+            dset = group.create_dataset(entry_name, data=x)
             dset.attrs.update(x_attrs)
-            group[childname]=dset
+            #group[childname]=dset
             
         else:
-            x_type = type(x)
             if issubclass(x_type, collections.abc.Iterable):
-                print("data2hdf Iterable")
+                #print("data2hdf Iterable")
                 if issubclass(x_type, collections.abc.Mapping): # -> Group with nested Group objects
-                    print("data2hdf Mapping")
-                    objgroup = group.create_group(childname, track_order=True)
+                    #print("data2hdf Mapping")
+                    objgroup = group.create_group(entry_name, track_order=True)
                     for key, val in x.items():
                         print(f"key: {key}; value: ", type(val))
-                        keyname, attrs = dict_entry_to_hdf(key)
+                        key_type, keyname, attrs = hdf_entry(key)
                         print(f"keyname: {keyname}")
                         print("attrs\n", attrs)
                         keygroup = objgroup.create_group(keyname, track_order=True)
                         keygroup.attrs.update(attrs)
-                        data2hdf(val, keygroup)
+                        print("keygroup", keygroup)
+                        print("call data2hdf")
+                        data2hdf(val, keygroup, pathInFile=keygroup.name)
                 elif issubclass(x_type, collections.abc.Sequence): #-> Group or Dataset
-                    print("data2hdf Sequence")
+                    #print("data2hdf Sequence")
                     if all(isinstance(v, (bool, bytes, complex, float, int, str)) for v in x):
-                        dset = group.create_dataset(childname, data = x) 
+                        dset = group.create_dataset(x_name, data = x) 
                         dset.attrs.update(x_attrs)
                     else:
+                        grp = group.create_group(entry_name, track_order=True)
                         for k, v in enumerate(x):
                             keyname = f"{k}"
-                            keygroup = group.create_group(childname, track_order=True)
+                            keygroup = group.create_group(keyname, track_order=True)
                             keyattrs = generic_data_attrs(k, "index")
                             keygroup.attrs.update(keyattrs)
+                            print("keygroup", keygroup)
+                            print("call data2hdf")
                             data2hdf(v, keygroup)
                 
                 else:
@@ -444,60 +495,14 @@ def data2hdf(x:typing.Any,
     except:
         traceback.print_exc()
         
+    #print("file", file)
+    #print("external", external)
+        
     if not external:
         if file:
             file.close
             
-        #for key in x.__iter__():
-            #if isinstance(key, str):
-                #childname = key
-                #attr_key_type = "str"
-            #else:
-                #childname=str(key)
-                #attr_key_type = type(key)
-                
-            #value = x.__getitem__(key, None)
-            
-            #value_attrs = generic_data_attrs(value)
-            
-            ##if isinstance(value, collections.abc.Mapping):
-            #if issubclass(value_type, collections.abc.Mapping):
-                #data2hdf(value, group, childname)
-                
-            ##elif isinstance(value, collections.abc.Sequence):
-            #elif issubclass(value_type, collections.abc.Sequence):
-                #if is_uniform_sequence(value):
-                    ## NOTE: 2021-10-19 08:47:03
-                    ## uniform sequences stored as HDF5 dataset IF their elements are
-                    ## PODs
-                    #element_type = type(value[0])
-                    #if element_type in (bool, bytes, complex, float, int, str):
-                        ## convert to numpy array then store as dataset
-                        #dtype = np.dtype(element_type)
-                        
-                        #dset = group.create_dataset(childname, data=value, dtype=dtype)
-                        #dset.attrs.update(value_attrs)
-                    #else:
-                        ## create a child group then iterate through elements
-                        #grp = group.create_group(childname)
-                        #for k, e in enumerate(value):
-                            #k
-                        
-                #else: # create child group iterate through elements
-                    #for k,e in enumerate(value):
-                        
-                        #data2hdf()
-                    
-            #elif value_type in (bool, bytes, complex, float, int, str):
-                #dtype = np.dtype(value_type)
-                #dset = group.create_dataset(childname, data=value, dtype=dtype)
-                #dset.attr["python_class"] = value_type.__name__
-        
-        
-                
-                
-            
-def readHDF5_VigraArray(filenameOrGroup:typing.Union[str, h5py.Group], 
+def readHDF5_VigraArray(fileNameOrGroup:typing.Union[str, h5py.Group], 
                         pathInFile:str, 
                         order:typing.Optional[str]=None):
     '''Read an array from an HDF5 file.
@@ -508,13 +513,13 @@ def readHDF5_VigraArray(filenameOrGroup:typing.Union[str, h5py.Group],
     Parameters:
     ===========
     
-    'filenameOrGroup' : str or h5py.Group
+    'fileNameOrGroup' : str or h5py.Group
         When a str, it contains a filename
         When a hy5py.Group this is a group object referring to an already open 
         HDF5 file, or present in an already open HDF5 file
         
     'pathInFile' : str is the name of the dataset to be read, including 
-    intermediate groups (when a HDF5 'path' - like string). If 'filenameOrGroup'
+    intermediate groups (when a HDF5 'path' - like string). If 'fileNameOrGroup'
     is a group object, the path is relative to this group, otherwise it is 
     relative to the file's root group.
 
@@ -528,7 +533,7 @@ def readHDF5_VigraArray(filenameOrGroup:typing.Union[str, h5py.Group],
     Requirements: the 'h5py' module must be installed.
     '''
     #import h5py
-    file, group, _ = get_file_group_child(filenameOrGroup)
+    file, group, _ = get_file_group_child(fileNameOrGroup)
         
     try:
         dataset = group[pathInFile]
@@ -557,14 +562,14 @@ def readHDF5_VigraArray(filenameOrGroup:typing.Union[str, h5py.Group],
                 raise IOError("readHDF5(): unsupported order '%s'" % order)
     finally:
         # NOTE: 2021-10-17 09:42:50 Original code
-        # This only closes 'file' when filenameOrGroup if a HDF5 File object
+        # This only closes 'file' when fileNameOrGroup if a HDF5 File object
         # otherwise does nothing
         if file is not None:
             file.close()
     return data
 
-def readHDF5_str(filenameOrGroup, pathInFile):
-    file, group = get_file_group_child(filenameOrGroup)
+def readHDF5_str(fileNameOrGroup, pathInFile):
+    file, group = get_file_group_child(fileNameOrGroup)
         
     try:
         dataset = group[pathInFile]
@@ -584,17 +589,17 @@ def readHDF5_str(filenameOrGroup, pathInFile):
             
     return data
 
-def writeHDF5_VigraArray(x, filenameOrGroup, pathInFile, mode="a", compression=None, chunks=None):
+def writeHDF5_VigraArray(x, fileNameOrGroup, pathInFile, mode="a", compression=None, chunks=None):
     """Variant of vigra.impex.writeHDF5 returning the created h5py.Dataset object
     Also populates the dataset's dimension scales.
     
     Modified from vira.impex.writeHDF5 (C) U.Koethe
     """
-    if isinstance(filenameOrGroup, h5py.Group):
+    if isinstance(fileNameOrGroup, h5py.Group):
         file = None
-        group = filenameOrGroup
+        group = fileNameOrGroup
     else:
-        file = h5py.File(filenameOrGroup, mode=mode)
+        file = h5py.File(fileNameOrGroup, mode=mode)
         group = file['/']
         
     #dataset = None
@@ -638,7 +643,7 @@ def writeHDF5_VigraArray(x, filenameOrGroup, pathInFile, mode="a", compression=N
 
     
 
-def writeHDF5_NeoBlock(data, filenameOrGroup, pathInFile, use_temp_file=True):
+def writeHDF5_NeoBlock(data, fileNameOrGroup, pathInFile, use_temp_file=True):
     if not isinstance(data, neo.Block):
         raise TypeError(f"Expecting a neo.Block; got {type(data).__name__} instead")
     
@@ -648,7 +653,7 @@ def writeHDF5_NeoBlock(data, filenameOrGroup, pathInFile, use_temp_file=True):
     else:
         data_name = data.name
         
-    file, group = get_file_group_child(filenameOrGroup)
+    file, group = get_file_group_child(fileNameOrGroup)
     
     try:
         levels = pathInFile.split('/')
@@ -684,7 +689,7 @@ def writeHDF5_NeoBlock(data, filenameOrGroup, pathInFile, use_temp_file=True):
             file.close()
 
     
-def write_dict(data, filenameOrGroup, pathInFile):
+def write_dict(data, fileNameOrGroup, pathInFile):
     if not isinstance(data, dict):
         raise TypeError(f"Expecting a dict; got {type(data).__name__} instead")
     

@@ -192,9 +192,13 @@ def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]
     
     raise TypeError(f"Expecting a scalar int float, complex, numpy array or Pyhon quantities.Quantity; got {type(x).__name__} instead")
 
-def quantity2str(x, precision = 2, format="f"):
-    if not isinstance(x, (pq.Quantity, pq.UnitQuantity)):
+def quantity2str(x:typing.Union[pq.Quantity, pq.UnitQuantity, pq.dimensionality.Dimensionality], 
+                 precision:int = 2, 
+                 format:str="f"):
+    if not isinstance(x, (pq.Quantity, pq.UnitQuantity, pq.dimensionality.Dimensionality)):
         raise TypeError("Expecting a python Quantity or UnitQuantity; got %s instead" % type(x).__name__)
+    if isinstance(x, pq.dimensionality.Dimensionality):
+        return x.string
     
     if x.magnitude.flatten().size != 1:
         raise TypeError("Expecting a scalar quantity; got a quantity of size %d instead" % x.magnitude.flatten().size)
