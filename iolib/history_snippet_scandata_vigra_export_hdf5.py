@@ -24,7 +24,7 @@ import nixio as nix
 
 newAxisInfo = vigra.AxisInfo(key="t1", typeFlags=vigra.AxisType.Time, 
                                                        resolution=1, 
-                                                       description=axisTypeName(axisTypeKeys["t"]))
+                                                       description=axisTypeName(standarsAxisTypeKeys["t"]))
 newAxisCal = AxesCalibration(newAxisInfo,
                                                        units=pq.s,
                                                        origin=0,
@@ -112,7 +112,7 @@ nix_file._h5file # this is a HDF5 file; can one add vigra writeHDF5 to it?
 # 1. writing:
 newAxisInfo = vigra.AxisInfo(key="t1", typeFlags=vigra.AxisType.Time, 
                                                        resolution=1, 
-                                                       description=axisTypeName(axisTypeKeys["t"]))
+                                                       description=axisTypeName(standarsAxisTypeKeys["t"]))
 newAxisCal = AxesCalibration(newAxisInfo,
                                                        units=pq.s,
                                                        origin=0,

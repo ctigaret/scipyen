@@ -72,14 +72,12 @@ from core.quantities import (space_frequency_unit,
 # ?                 Unknown
 # s                 NonChannel
 # l                 AllAxes
-__standard_axis_tag_keys__ = ("x", "y", "z", "t", "c", "n", "e", "fx", "fy", "fz", "ft")
-__specific_axis_tag_keys__ = tuple(list(__standard_axis_tag_keys__)  + ["a", "f", "ft", "fa"])
-__all_axis_tag_keys__ = tuple(list(__specific_axis_tag_keys__) + ["?", "l"])
+
 
 """Maps vigra.AxisInfo keys (str, lower case) to vigra.AxisType flags
 On its way to DEPRECATION
 """
-axisTypeKeys = Bunch({
+standardAxisTypeKeys = Bunch({
     "a": vigra.AxisType.Angle,
     "c": vigra.AxisType.Channels,
     "e": vigra.AxisType.Edge,
@@ -101,6 +99,10 @@ axisTypeKeys = Bunch({
     "l": vigra.AxisType.AllAxes,
     }
     )
+
+STANDARD_AXIS_TAGS_KEYS = tuple(k for k in standardAxisTypeKeys)
+#STANDARD_AXIS_TAGS_KEYS = ("?", "a", "c", "e", "f", "fa", "ft", "fx", "fy", "fz", "l", "n", "t", "x", "y", "z")
+
 """See docstring for axisTypeFromUnits for details.
 """
 primitive_axis_type_units = {
@@ -332,7 +334,7 @@ def axisTypeFromUnits(u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionali
     
 def axisTypeFromString(s:str) -> vigra.AxisType:
     """Inverse lookup of axis type flags from descriptive string or axis info key.
-    Performs the reverse of axisTypeName and the reverse mapping of axisTypeKeys.
+    Performs the reverse of axisTypeName and the reverse mapping of standardAxisTypeKeys.
     
     CAUTION: These are recommended, and not fully enforced
     
@@ -362,7 +364,8 @@ def axisTypeFromString(s:str) -> vigra.AxisType:
                            "sf", "xf", "yf", "xf"):
             return vigra.AxisType.Frequency | vigra.AxisType.Space
         
-        elif s.lower() in ("temporal frequency range", "temporal frequency", "temporal sampling", "ft", "tf"):
+        elif s.lower() in ("temporal frequency range", "temporal frequency", "temporal sampling", 
+                           "ft", "tf"):
             return vigra.AxisType.Frequency | vigra.AxisType.Time
         
         elif s.lower() in ("angular frequency range", "angular frequency", "angular sampling", "fa", "af"):

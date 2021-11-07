@@ -6,6 +6,7 @@ from .axiscalibration import (AxesCalibration,
                               AxisCalibrationData,
                               ChannelCalibrationData,)
 from imaging import axisutils
+from imaging.axisutils import STANDARD_AXIS_TAGS_KEYS
 
 def getFrameLayout(img:vigra.VigraArray, 
                    userFrameAxis:typing.Optional[typing.Union[str, vigra.AxisInfo, int, 
@@ -498,7 +499,7 @@ def specifyAxisTags(image, newtags, newshape=None, in_place=False):
             a = newtags
             
         for c in a:
-            if c not in __all_axis_tag_keys__:
+            if c not in STANDARD_AXIS_TAGS_KEYS:
                 raise ValueError("Invalid AxisInfo key: %s" % c)
             
         tagslist = [vigra.AxisInfo(c, axisTypeFromString[c]) for c in a]

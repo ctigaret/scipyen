@@ -212,7 +212,10 @@ from core.datatypes import (TypeEnum,UnitTypes, Genotypes,
 from core.modelfitting import (FitModel, ModelExpression,)
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.triggerprotocols import TriggerProtocol
-from imaging.axiscalibration import AxesCalibration
+from imaging.axiscalibration import (AxesCalibration, 
+                                     AxisCalibrationData, 
+                                     ChannelCalibrationData)
+
 from imaging.indicator import IndicatorCalibration
 from imaging.scandata import (AnalysisUnit, ScanData,)
 from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse, 
@@ -220,6 +223,7 @@ from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse,
                          PlanarGraphics, Rect, Text, VerticalCursor,)
 
 # NOTE: 2021-10-18 12:08:18 in all functions below:
+# FIXME: 2021-11-07 16:50:14
 # fileNameOrGroup is either:
 #   a str, the file name of a target HDF5 file (possible, relative to cwd)
 #
@@ -366,7 +370,71 @@ def hdf_entry(x:typing.Any, attr_prefix="key"):#, parent:h5py.Group):
     
     return type(x), name, attrs
 
-def make_dataset(x:typing.Any, group:h5py.Group, name:typing.Optional[str]=None):
+def from_dataset(dset:typing.Union[str, h5py.Dataset],
+                 group:h5py.Group, order:typing.Optional[str]=None):
+    if isinstance(dset, str) and len(dset.strip()):
+        dset = group[dset] # raises exception if dset does not exist in group
+        
+    elif not isinstance(dset, h5py.Dataset):
+        raise TypeError(f"Expecting a str (data set name) or HDF5 data set; gpt {type(dset).__name__} instead")
+    
+    data = dset[()]
+    
+    if "axistags" in dset.attrs: # => vigra array
+        data = data.view(vigra.VigraArray)
+        data.axistags = vigra.arraytypes.AxisTags.fromJSON(dset.attrs["axistags"])
+        
+        # NOTE: 2021-11-07 21:54:25
+        # code below will override whatever calibration info was embedded in
+        # the axistags at the time of writing into the HDF5 dataset, IF such
+        # information is found in the HDF5 Dimension scales objects
+        for dim in dset.dims: 
+            if all(s in dim.keys() for s in ("name", "units", "origin", "resolution")) and dim.label in data.axistags:
+                cal = dict()
+                if "name" in dim:
+                    cal["name"] = dim["name"][()].decode()
+                    
+                if "units" in dim:
+                    cal["units"] = unit_quantity_from_name_or_symbol(dim["units"][()].decode())
+                    
+                if "origin" in dim:
+                    cal["origin"] = float(dim["origin"][()])
+            
+                if "resolution" in dim:
+                    cal["resolution"] = float(dim["resolution"][()])
+                    
+                if isinstance(dim.label, str) and len(dim.label.strip()):
+                    cal["type"] = dim.label
+                    cal["key"] = dim.label
+                    
+                if AxisCalibrationData.isCalibration(cal):
+                    axcal = AxisCalibrationData(cal)
+                    axcal.calibrateAxis(data.axistags[dim.label])
+                    
+        if order is None:
+            order = vigra.VigraArray.defaultOrder
+        elif order not in ("V", "C", "F", "A", None):
+            raise IOError(f"Unsupported order {order} for VigraArray")
+        
+        if order == "F":
+            data = data.transpose()
+        else:
+            data = data.transposeToOrder(order)
+            
+    elif isinstance(data, bytes):
+        data = data.decode()
+            
+    return data
+            
+        
+        
+        
+    
+
+def make_dataset(x:typing.Any, group:h5py.Group, 
+                 name:typing.Optional[str]=None,
+                 compression:typing.Optional[str]=None,
+                 chunks:typing.Optional[bool]=None):
     x_type, x_name, x_attrs = hdf_entry(x, "")
     
     if not isinstance(name, str) or len(name.strip()) == 0:
@@ -377,10 +445,50 @@ def make_dataset(x:typing.Any, group:h5py.Group, name:typing.Optional[str]=None)
         dset.attrs.update(x_attrs)
         
     elif isinstance(x, vigra.VigraArray):
-        x.writeHDF5(group,name)
-        dset = group[name]
+        # NOTE: 2021-11-07 13:58:50
+        # writeHDF5 stores a transposeToNumpyOrder() view of the vigra array in
+        # a HDF5 dataset; the axistags are embedded (json version) in the HDF5
+        # dataset attribute 'axistags' (attrs)
+        # NO HDF5 dimension scales are used/populated by vigra API
+        # NOTE: 2021-11-07 14:04:56
+        # there is nothing inherently wrong in using dimension scales; it is up
+        # to the HDF5 file reader if dimension scales are to be used, and how;
+        # (the only objection might be that dimension scales in this context are
+        # reduntant information, but I think the space cost is acceptable)
+        # The advantage of using dimension scales is that they can be reveal
+        # more easily (or 'naturally') the axes calibrations to a generic
+        # HDF5 viewer/reader, whereas the information in axistags is relatively
+        # more cryptic.
+        
+        # We want the dimension scales to reflect the axes in the order they are
+        # stored in the dataset.
+        data = x.transposeToNumpyOrder()
+        dset = group.crate_dataset(name, data=data, compression=compression, chunks=chunks)
+        x_attrs["axistags"] = data.axistags.toJSON()
         dset.attrs.update(x_attrs)
         
+        # For each axis, we attach FOUR HDF5 dimension scales: 
+        # name (str), units (str), origin (float), and resolution (float)
+        x_tr_axcal = AxesCalibration(data)
+        
+        calgrp = group.create_group(f"{name}_axes", track_order=True)
+        
+        for k, cal in enumerate(x_tr_axcal):
+            axcalgrp = calgrp.create_group(f"{cal.key}", track_order=True)
+            ds_origin = axcalgrp.create_dataset("origin", data = cal.origin)
+            ds_origin.make_scale("origin")
+            ds_resolution = axcalgrp.create_dataset("resolution", data = cal.resolution)
+            ds_resolution.make_scale("resolution")
+            ds_units = axcalgrp.create_dataset("units", data = cal.units.dimensionality.string)
+            ds_units.make_scale("units")
+            ds_name = axcalgrp.create_dataset("name", data = cal.name)
+            ds_name.make_scale("name")
+            dset.dims[k].attach_scale(ds_name)
+            dset.dims[k].attach_scale(ds_units)
+            dset.dims[k].attach_scale(ds_origin)
+            dset.dims[k].attach_scale(ds_resolution)
+            dset.dims[k].label = f"{cal.key}"
+            
     elif isinstance(x, neo.AnalogSignal):
         data = np.transpose(x.magnitude)
         x_meta = dict()

@@ -135,27 +135,38 @@ class CalibrationData(object):
         *args is a (possibly empty) sequence of parameters (comma-separated)
         where each parameter can be of one of the following types:
         
-        CalibrationData or a :subclass:  AxisCalibrationData, ChannelCalibrationData
+        1) CalibrationData or a :subclass:  AxisCalibrationData, ChannelCalibrationData
             
-        vigra.AxisInfo, vigra.AxisType
+        2) vigra.AxisInfo, 
         
-        a mapping (dict) with key/value pairs appropriate for this object type
+        3) vigra.AxisType
         
-        int, complex, float (including the special float values 
-                            numpy.nan and math.nan)
-        str
+        4) a mapping (dict) with key/value pairs appropriate for this object type
         
-        Python Quantity, Python quantities.dimensionality.Dimensionality
+        5) int, 
         
-        numpy array
+        6) complex, 
         
-        The object will be fully initialized by the first parameter satisfying
-        the conditions below and all other var-positional and var-keyword 
-        parameters will be ignored:
-        a) is of the same type as the object initialized
-        b) is a vigra.AxisInfo
-        c) is a mapping with appropriate key/value pairs
-        d) is a str containing an XML-formatted calibration string
+        7) float (including the values numpy.nan and math.nan)
+        
+        8) str
+        
+        9) Python Quantity, 
+        
+        10) Python quantities.dimensionality.Dimensionality
+        
+        11) numpy array
+        
+        The object will be fully initialized by the first var-positional 
+        parameter that satisfies the conditions below and all other var-positional 
+        and var-keyword parameters will be ignored:
+        a) parameter is of the same type as the object initialized (copy constructor)
+        b) parameter is a vigra.AxisInfo
+        c) parameter is a mapping with appropriate key/value pairs
+        d) parameter is a str containing an XML-formatted calibration string
+        
+        When the parameter is a vigra.AxisInfo, axis calibration data will NOT
+        be embedded in its 'description' attribute.
         
         With the exception of var-positional parameters described above, all
         other var-positional parameters may be specified more than once. These 
@@ -560,6 +571,11 @@ class CalibrationData(object):
                 
                 if self._data_.key is None:
                     self._data_.key = axisTypeSymbol(self._data_.type, False)
+                    
+        axkey = kwargs.pop("key", None) # allow specific overriding of the key field
+        if isinstance(axkey, str) and len(axkey.strip()):
+            # WARNING Thsi is NOT checked
+            self._data_.key = axkey
             
         axname = kwargs.pop("name", None)
         if axname is not None:
@@ -1021,6 +1037,7 @@ class ChannelCalibrationData(CalibrationData):
 
 class AxisCalibrationData(CalibrationData):
     """Atomic calibration data for an axis of a vigra.VigraArray.
+    
     To be mapped to a vigra.AxisInfo key str in AxesCalibration, or to
     a key str with format "channel_X", in a parent AxisCalibrationData object
     for an axis of type Channels
@@ -1974,9 +1991,6 @@ class AxesCalibration(object):
                 
                 self._calibration_ = [AxisCalibrationData(axinfo) for axinfo in args[0].axistags]
                 
-                #for k, axinfo in enumerate(self._axistags_):
-                    #self._calibration_[k].calibrateAxis(axinfo)
-                    
                 return
 
             elif isinstance(args[0], vigra.AxisTags):
@@ -2035,11 +2049,11 @@ class AxesCalibration(object):
                         except:
                             cal = AxisCalibrationData() #  create default UnknownAxisType
                             
-                        self._axistags_.append(cal.axisInfo) # this axinfo already contains a calibration string in its description
+                        #self._axistags_.append(cal.axisInfo) 
                         self._calibration_.append(cal)
                         
                     elif isinstance(arg, AxisCalibrationData):
-                        self._axistags_.append(arg.axisInfo) # this axinfo already contains a calibration string in its description
+                        #self._axistags_.append(arg.axisInfo) 
                         self._calibration_.append(arg)
                         
                     else:
@@ -2339,9 +2353,9 @@ class AxesCalibration(object):
         """
         yield from (cal.key for cal in self._calibration_)
     
-    @property
+    #@property
     def keys(self):
-        """Aalias to self.axiskeys
+        """Alias to self.axiskeys
         """
         yield from self.axiskeys
     
@@ -2358,6 +2372,13 @@ class AxesCalibration(object):
     @property
     def calibrations(self):
         return self._calibration_
+    
+    #@property
+    def values(self):
+        yield from (cal for cal in self)
+        
+    def items(self):
+        yield from ((cal.key, cal) for cal in self)
     
     #@property
     def typeFlags(self, key):
@@ -2381,7 +2402,7 @@ class AxesCalibration(object):
         More channels can then be added using setChannelCalibration(), and calibration
         data for each channel can be modified using other setXXX methods
             
-        WARNING: this function breaks axes bookkeeping by the VigraArray object
+        FIXME/WARNING: this function breaks axes bookkeeping by the VigraArray object
         that owns the axistags!!!
         
         Parameters:
