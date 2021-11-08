@@ -316,7 +316,7 @@ class CalibrationData(object):
         if len(args) == 1 and AxisCalibrationData.isCalibration(args[0]):
             if isinstance(args[0], dict):
                 kwargs = args[0]
-                args.clear()
+                args = tuple()
             elif isinstance(args[0], AxisCalibrationData):
                 self._data_.update(args[0]._data_)
                 return
@@ -1283,10 +1283,13 @@ class AxisCalibrationData(CalibrationData):
             
         if self.type & vigra.AxisType.Channels:
             for ch in self.channels:
-                strlist.append(f"<{ch[0]}>")
-                for p in sorted(ChannelCalibrationData.parameters):
-                    strlist.append(__gen_xml_element__(ch[1], p))
-                strlist.append(f"</{ch[0]}>")
+                # NOTE: 2021-11-08 11:35:19
+                # only append channel info if there are channel calibrations
+                if "virtual" not in ch[0]:
+                    strlist.append(f"<{ch[0]}>")
+                    for p in sorted(ChannelCalibrationData.parameters):
+                        strlist.append(__gen_xml_element__(ch[1], p))
+                    strlist.append(f"</{ch[0]}>")
                 
         strlist.append("</axis_calibration>")
         
@@ -1300,9 +1303,6 @@ class AxisCalibrationData(CalibrationData):
         return vigra.AxisInfo(key = self.key, typeFlags = self.type, resolution=self.resolution, description=self.calibrationString)
         
     
-    #def addChannelCalibration(self, val:ChannelCalibrationData,
-                              #name:typing.Optional[str] = None,
-                              #ensure_unique:bool=True):
     def addChannelCalibration(self, val:ChannelCalibrationData, name:str):
         if not self.type & vigra.AxisType.Channels:
             return
@@ -1844,8 +1844,6 @@ class AxisCalibrationData(CalibrationData):
         
         cal = AxisCalibrationData()
         
-        #print("cal.channels", cal.channelCalibrations)
-        
         if not isinstance(s,str) or len(s.strip()) == 0 or not s.startswith("<axis_calibration>") or not s.endswith("</axis_calibration>"):
             raise ValueError("This is not an axis calibration string")
             
@@ -1861,8 +1859,6 @@ class AxisCalibrationData(CalibrationData):
             # xml.etree.ElementTree.Element.getchildren() is absent in Python 3.9.7
             element_children = getXMLChildren(cal_xml_element) # getXMLChildren defined in xmlutils
             
-            #caldict = dict()
-            
             for child_element in element_children:
                 # these can be <children_X> tags (X is a 0-based index) or a <name> tag
                 # ignore everything else
@@ -1876,7 +1872,6 @@ class AxisCalibrationData(CalibrationData):
                     chcalname = child_element.tag.lower()
                     ch_children = getXMLChildren(child_element)
                     ch_tags = dict((c.tag, c.text) for c in ch_children)
-                    ch_cal_ok = False
                     for param in ChannelCalibrationData.parameters:
                         if param in ch_tags:
                             value = __eval_xml_element_text__(param, ch_tags[param])
@@ -1884,9 +1879,6 @@ class AxisCalibrationData(CalibrationData):
                             
                     if len(chcaldict):
                         chcal = ChannelCalibrationData(**chcaldict)
-                        #print("to add:", chcal)
-                        #for i in chcaldict.items():
-                            #setattr(chcal, i[0], i[1])
                         cal.addChannelCalibration(chcal, name=chcal.name)
                             
         except Exception as e:

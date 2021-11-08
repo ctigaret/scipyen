@@ -212,11 +212,12 @@ from core.datatypes import (TypeEnum,UnitTypes, Genotypes,
 from core.modelfitting import (FitModel, ModelExpression,)
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.triggerprotocols import TriggerProtocol
+from core.utilities import unique
 from imaging.axiscalibration import (AxesCalibration, 
                                      AxisCalibrationData, 
                                      ChannelCalibrationData)
 
-from imaging.indicator import IndicatorCalibration
+from imaging.indicator import IndicatorCalibration # do not confuse with ChannelCalibrationData
 from imaging.scandata import (AnalysisUnit, ScanData,)
 from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse, 
                          HorizontalCursor, Line, Move, Quad, Path, 
@@ -371,65 +372,97 @@ def hdf_entry(x:typing.Any, attr_prefix="key"):#, parent:h5py.Group):
     return type(x), name, attrs
 
 def from_dataset(dset:typing.Union[str, h5py.Dataset],
-                 group:h5py.Group, order:typing.Optional[str]=None):
+                 group:h5py.Group:typing.Optional[h5py.Group]=None, 
+                 order:typing.Optional[str]=None):
     if isinstance(dset, str) and len(dset.strip()):
+        if not isinstance(group, h5py.Group):
+            raise TypeError(f"When the data set is indicated by its name, 'group' must a h5py.Group; got {type(group).__name__} instead")
         dset = group[dset] # raises exception if dset does not exist in group
         
     elif not isinstance(dset, h5py.Dataset):
-        raise TypeError(f"Expecting a str (data set name) or HDF5 data set; gpt {type(dset).__name__} instead")
+        raise TypeError(f"Expecting a str (data set name) or HDF5 data set; got {type(dset).__name__} instead")
     
     data = dset[()]
+    data_name = dset.name.split('/')[-1]
     
-    if "axistags" in dset.attrs: # => vigra array
-        data = data.view(vigra.VigraArray)
-        data.axistags = vigra.arraytypes.AxisTags.fromJSON(dset.attrs["axistags"])
-        
-        # NOTE: 2021-11-07 21:54:25
-        # code below will override whatever calibration info was embedded in
-        # the axistags at the time of writing into the HDF5 dataset, IF such
-        # information is found in the HDF5 Dimension scales objects
-        for dim in dset.dims: 
-            if all(s in dim.keys() for s in ("name", "units", "origin", "resolution")) and dim.label in data.axistags:
-                cal = dict()
-                if "name" in dim:
-                    cal["name"] = dim["name"][()].decode()
-                    
-                if "units" in dim:
-                    cal["units"] = unit_quantity_from_name_or_symbol(dim["units"][()].decode())
-                    
-                if "origin" in dim:
-                    cal["origin"] = float(dim["origin"][()])
+    if not isinstance(group, h5py.Group): # not really required, is it?!?
+        group = dset.parent
+
+    if "python_class" in dset.attrs:
+        try:
+            klass = eval(dset.attrs["python_class"])
+        except:
+            traceback.print_exc()
+            klass = None
             
-                if "resolution" in dim:
-                    cal["resolution"] = float(dim["resolution"][()])
-                    
-                if isinstance(dim.label, str) and len(dim.label.strip()):
-                    cal["type"] = dim.label
-                    cal["key"] = dim.label
-                    
-                if AxisCalibrationData.isCalibration(cal):
-                    axcal = AxisCalibrationData(cal)
-                    axcal.calibrateAxis(data.axistags[dim.label])
-                    
-        if order is None:
-            order = vigra.VigraArray.defaultOrder
-        elif order not in ("V", "C", "F", "A", None):
-            raise IOError(f"Unsupported order {order} for VigraArray")
+    if klass is vigra.VigraArray or "axistags" in dset.attrs:
+        data = data.view(vigra.VigraArray)
         
-        if order == "F":
-            data = data.transpose()
-        else:
-            data = data.transposeToOrder(order)
+        if "axistags" in dset.attrs: # => vigra array
+            data = data.view(vigra.VigraArray)
+            data.axistags = vigra.arraytypes.AxisTags.fromJSON(dset.attrs["axistags"])
+            
+            # NOTE: 2021-11-07 21:54:25
+            # code below will override whatever calibration info was embedded in
+            # the axistags at the time of writing into the HDF5 dataset, IF such
+            # information is found in the HDF5 Dimension scales objects
+            for dim in dset.dims: 
+                if all(s in dim.keys() for s in ("name", "units", "origin", "resolution")) and dim.label in data.axistags:
+                    cal = dict()
+                    if "name" in dim:
+                        cal["name"] = dim["name"][()].decode()
+                        
+                    if "units" in dim:
+                        cal["units"] = unit_quantity_from_name_or_symbol(dim["units"][()].decode())
+                        
+                    if "origin" in dim:
+                        cal["origin"] = float(dim["origin"][()])
+                
+                    if "resolution" in dim:
+                        cal["resolution"] = float(dim["resolution"][()])
+                        
+                    if isinstance(dim.label, str) and len(dim.label.strip()):
+                        cal["type"] = dim.label
+                        cal["key"] = dim.label
+                        
+                    if AxisCalibrationData.isCalibration(cal):
+                        axcal = AxisCalibrationData(cal)
+                        if axcal.type & vigra.AxisType.Channels:
+                            channels = unique(key.split('_')[0] for key in dim.keys() if any(key.endswith(s) for s in ("_name", "_units", "_origin", "_resolution", "_maximum", "_index")))
+                            for ch in channels:
+                                chcal = dict()
+                                if f"{ch}_name" in dim:
+                                    chcal["name"] = dim[f"{ch}_name"][()].decode()
+                                if f"{ch}_units" in dim:
+                                    chcal["units"] = unit_quantity_from_name_or_symbol(dim[f"{ch}_units"][()].decode())
+                                if f"{ch}_origin" in dim:
+                                    chcal["origin"] = float(dim[f"{ch}_origin"][()])
+                                if f"{ch}_resolution" in dim:
+                                    chcal["resolution"] = float(dim[f"{ch}_resolution"][()])
+                                if f"{ch}_maximum" in dim:
+                                    chcal["maximum"] = float(dim[f"{ch}_maximum"][()])
+                                if f"{ch}_index" in dim:
+                                    chcal["index"] = int(dim[f"{ch}_index"][()])
+                                    
+                                if ChannelCalibrationData.isCalibration(chcal):
+                                    axcal.addChannelCalibration(ChannelCalibrationData(chcal))
+
+                        axcal.calibrateAxis(data.axistags[dim.label])
+                        
+            if order is None:
+                order = vigra.VigraArray.defaultOrder
+            elif order not in ("V", "C", "F", "A", None):
+                raise IOError(f"Unsupported order {order} for VigraArray")
+            
+            if order == "F":
+                data = data.transpose()
+            else:
+                data = data.transposeToOrder(order)
             
     elif isinstance(data, bytes):
         data = data.decode()
             
     return data
-            
-        
-        
-        
-    
 
 def make_dataset(x:typing.Any, group:h5py.Group, 
                  name:typing.Optional[str]=None,
@@ -463,7 +496,7 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         # We want the dimension scales to reflect the axes in the order they are
         # stored in the dataset.
         data = x.transposeToNumpyOrder()
-        dset = group.crate_dataset(name, data=data, compression=compression, chunks=chunks)
+        dset = group.create_dataset(name, data=data, compression=compression, chunks=chunks)
         x_attrs["axistags"] = data.axistags.toJSON()
         dset.attrs.update(x_attrs)
         
@@ -473,6 +506,7 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         
         calgrp = group.create_group(f"{name}_axes", track_order=True)
         
+        #for k, cal, axistag in enumerate(zip(x_tr_axcal, data.axistags)):
         for k, cal in enumerate(x_tr_axcal):
             axcalgrp = calgrp.create_group(f"{cal.key}", track_order=True)
             ds_origin = axcalgrp.create_dataset("origin", data = cal.origin)
@@ -483,20 +517,93 @@ def make_dataset(x:typing.Any, group:h5py.Group,
             ds_units.make_scale("units")
             ds_name = axcalgrp.create_dataset("name", data = cal.name)
             ds_name.make_scale("name")
+                
             dset.dims[k].attach_scale(ds_name)
             dset.dims[k].attach_scale(ds_units)
             dset.dims[k].attach_scale(ds_origin)
             dset.dims[k].attach_scale(ds_resolution)
+            
+            if cal.type & vigra.AxisType.Channels:
+                # check to see if there are non-virtual channel calibrations
+                # a singleton channels axis might be virtual hence without a
+                # concrete channel calibration
+                channels = [ch for ch in cal.channels if "virtual" not in ch[0]]
+                if len(channels):
+                    channels_group = axcalgrp.create_group("channels", track_order=True)
+                    for channel in channels:
+                        channel_group = channels_group.create_group(channel[0], track_order=True)
+                        ds_chn_origin = channel_group.create_dataset(f"{channel[0]}_origin", data = channel[1].origin)
+                        ds_chn_origin.make_scale(f"{channel[0]}_origin")
+                        ds_chn_resolution = channel_group.create_dataset(f"{channel[0]}_resolution", data = channel[1].resolution)
+                        ds_chn_resolution.make_scale(f"{channel[0]}_resolution")
+                        ds_chn_maximum = channel_group.create_dataset(f"{channel[0]}_maximum", data=channel[1].maximum)
+                        ds_chn_maximum.make_scale(f"{channel[0]}_maximum")
+                        ds_chn_index = channel_group.create_dataset(f"{channel[0]}_index", data = channel[1].index)
+                        ds_chn_index.make_scale(f"{channel[0]}_index")
+                        ds_chn_units = channel_group.create_dataset(f"{channel[0]}_units", data = channel[1].units.dimensionality.string)
+                        ds_chn_units.make_scale(f"{channel[0]}_units")
+                        ds_chn_name = channel_group.create_dataset(f"{channel[0]}_name", data = channel[1].name)
+                        ds_chn_name.make_scale(f"{channel[0]}_name") # channel name, not axis name!
+                        
+                        dset.dims[k].attach_scale(ds_chn_name)
+                        dset.dims[k].attach_scale(ds_chn_units)
+                        dset.dims[k].attach_scale(ds_chn_index)
+                        dset.dims[k].attach_scale(ds_chn_origin)
+                        dset.dims[k].attach_scale(ds_chn_resolution)
+                        dset.dims[k].attach_scale(ds_chn_maximum)
+                        
             dset.dims[k].label = f"{cal.key}"
             
-    elif isinstance(x, neo.AnalogSignal):
-        data = np.transpose(x.magnitude)
+    elif isinstance(x, (neo.AnalogSignal, DataSignal)):
+        data = np.transpose(x.magnitude) # axis 0 becomes axis 1 and vice-versa!
         x_meta = dict()
         x_meta["description"] = x.description
-        x_meta["units"] = x.dimensionality.string
-        x_meta["t_units"] = x.t_start.units.dimensionality.string
-        x_meta["t_start"] = x.t_start.magnitude.item()
-        x_meta["t_name"] = "Time"
+        x_meta["file_origin"] = x.file_origin
+        #x_meta["units"] = x.dimensionality.string
+        #x_meta["t_units"] = x.t_start.units.dimensionality.string
+        #x_meta["t_start"] = x.t_start.magnitude.item()
+        #x_meta["t_name"] = "Time"
+        x_meta.update(x_attrs)
+        
+        dset = group.create_dataset(f"{name}", data = data)
+        dset.attrs.update(x_meta)
+        
+        calgrp = group.create_group(f"{name}_axes", track_order=True)
+        
+        for k in range(2):
+            axcalgrp = calgrp.create_group(f"axis_{k}", track_order=True)
+            
+            if k == 0: # axis 0 is the channels axis (NOT neo channelview!)
+                ds_units = axcalgrp.create_dataset("signal_units", data = x.dimensionality.string)
+                ds_units.make_scale("signal_units")
+                # (un)fortunately(?), individual channels (i.e. data columns) in
+                # neo signals are not named
+                ds_name = axcalgrp.create_dataset("signal_name", data = x.name)
+                ds_name.make_scale("signal_name")
+                
+            else: # axis 1 is now the time (or domain) axis
+                ds_origin = axcalgrp.create_dataset("domain_origin", data = x.t_start.magnitude.item())
+                ds_origin.make_scale("domain_origin")
+                ds_units = axcalgrp.create_dataset("domain_units", data = x.t_units.dimensionality.string)
+                ds_units.make_scale("domain_units")
+                ds_rate = axcalgrp.create_dataset("sampling_rate", data = x.sampling_rate.magnitude.item())
+                ds_rate.make_scale("sampling_rate")
+                ds_rate_units = axcalgrp.create_dataset("sampling_rate_units", data = x.sampling_rate.units.dimensionality.string)
+                ds_rate_units.make_scale("sampling_rate_units")
+                
+                dset.dims[k].attach_scale(ds_origin)
+                dset.dims[k].attach_scale(ds_units)
+                dset.dims[k].attach_scale(ds_rate)
+                dset.dims[k].attach_scale(ds_rate_units)
+                
+                if isinstance(x, DataSignal):
+                    dset.dims[k].label = x.domain_name
+                else:
+                    dset.dims[k].label="Time"
+            
+        
+        
+        
         
         
     elif isinstance(x, pq.Quantity):

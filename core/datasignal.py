@@ -369,21 +369,6 @@ class DataSignal(neo.basesignal.BaseSignal):
     def nanrange(self, **kwargs):
         return self.nanmax(**kwargs) - self.nanmin(**kwargs)
     
-    #@property
-    #def index(self):
-        #return self._index
-    
-    #@index.setter
-    #def index(self, value):
-        #if value is None:
-            #self._index = 0
-            #return
-        
-        #if not isinstance(value, int):
-            #raise TypeError("Expecting an int; got %s instead" % type(value).__name__)
-        
-        #self._index = value
-        
     @property
     def origin(self):
         """The domain coordinate of the first data sample in the signal.

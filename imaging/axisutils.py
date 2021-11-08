@@ -332,7 +332,7 @@ def axisTypeFromUnits(u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionali
             return vigra.AxisType.Channels
         
     
-def axisTypeFromString(s:str) -> vigra.AxisType:
+def axisTypeFromString(s:str) -> typing.Union[vigra.AxisType, int]:
     """Inverse lookup of axis type flags from descriptive string or axis info key.
     Performs the reverse of axisTypeName and the reverse mapping of standardAxisTypeKeys.
     
