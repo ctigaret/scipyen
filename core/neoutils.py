@@ -483,7 +483,8 @@ import traceback, datetime, numbers, inspect, warnings, typing, types
 from collections import deque
 import operator
 from itertools import chain, filterfalse
-from functools import partial
+from functools import partial, reduce
+from copy import deepcopy
 from enum import (Enum, IntEnum,)
 #### END core python modules
 
@@ -607,6 +608,55 @@ if __debug__:
 
     __debug_count__ = 0
     
+def merge_array_annotations(a0:ArrayDict, a1:ArrayDict):
+    if not all(isinstance(a, (ArrayDict, dict)) for a in (a0,a1)):
+        raise TypeError("Expecting two neo.core.dataobject.ArrayDict objects")
+    
+    merged_array_annotations = {}
+    omitted_keys_a0 = []
+    # Concatenating arrays for each key
+    
+    for key in a0:
+        #length = len(a0[key])
+        try:
+            value = deepcopy(a0[key])
+            other_value = deepcopy(a1[key])
+            # Quantities need to be rescaled to common unit
+            if isinstance(value, pq.Quantity):
+                try:
+                    other_value = other_value.rescale(value.units)
+                except ValueError:
+                    raise ValueError("Could not merge array annotations "
+                                        "due to different units")
+                merged_array_annotations[key] = np.append(value, other_value) * value.units
+            else:
+                merged_array_annotations[key] = np.append(value, other_value)
+                
+            #length = len(merged_array_annotations[key])
+
+        except KeyError:
+            # Save the  omitted keys to be able to print them
+            omitted_keys_a0.append(key)
+            continue
+    # Also save omitted keys from 'other'
+    omitted_keys_a1 = [key for key in a1 if key not in a0]
+
+    # Warn if keys were omitted
+    if omitted_keys_a1 or omitted_keys_a0:
+        warnings.warn("The following array annotations were omitted, because they were only "
+                        "present in one of the merged objects: {} from the one that was merged "
+                        "into and {} from the one that was merged into the other"
+                        "".format(omitted_keys_a0, omitted_keys_a1), UserWarning)
+
+    # Return the merged array_annotations
+    length = max(len(v) for v in merged_array_annotations.values())
+    ret = ArrayDict(length)
+    for k,v in merged_array_annotations.items():
+        ret[k] = v
+    
+    return ret
+    
+    
 def combine_time_ranges(time_ranges):
     """This is neo.AnalogSignal._concatenate_time_ranges()
     Copied here for use with DataSignal object too
@@ -626,6 +676,13 @@ def combine_time_ranges(time_ranges):
 def invert_time_ranges(time_ranges):
     """This is neo.AnalogSignal._invert_time_ranges()
     """
+    i=0
+    new_ranges = list()
+    while i < len(time_ranges)-1:
+        new_ranges.append((time_ranges[i][1], time_ranges[i+1][0]))
+        i += 1
+        
+    return new_ranges
     
     
     
@@ -2278,41 +2335,22 @@ def concatenate_signals(*args, axis:int = 1,
                         ignore_domain:bool = False, 
                         ignore_units:bool = False,
                         set_domain_start:typing.Optional[float] = None, 
-                        padding:bool=False,
+                        padding:typing.Optional[typing.Union[bool, pq.Quantity]]=False,
                         overwrite:bool=False):
     """Concatenates regularly sampled signals.
     
     Implements the functionality of neo.AnalogSignal's merge() and concatenate()
-    methods with some restrictions relaxed (detailed below)
+    but allows a sequence of signals instead of being restricted to two signals.
     
     When the 'axis' parameters is the default (1, one) this is useful to collapse
     several analog signals into a single multi-channel signal ('merging').
     
-    Here a "channel" is taken in the data column sense.
-    
-    Typically, neo.AnalogSignal objects are basically column vectors, event though
-    the neo API does not enforce this. 
-    
-    The single-column structure of an analog signal follows naturally from the 
-    univocal "one source - one signal" relationship, but has the (slight) 
-    disadvantage that two related signals (e.g., a recorded signal and the result
-    of a model fit through the recorded data) would result in separate 
-    AnalogSignal objects, which may not always be desirable.
-    
-    A good example is the need to store the new (fitted) signals alongside the
-    recorded signals in a neo Segment by extending the Segment's 'analogsignals' 
-    attribute. While the relation of the new signals to the original ones can be 
-    made explicit by a judicious naming of the new signals, plotting these
-    separate signal objects on a common system of axes becomes inconvenient.
-    
-    Since the neo.AnalogSignal API does NOT prevent a signal from containing
-    more than one data columns, we can store related signal data alongside the
-    original signal by "merging" them into one multi-column signal.
+    Here a "channel" is one data column in the signal.
     
     When the 'axis' parameter is 0, this simply collates the signals 'end-to-end'
     ('concatenating').
     
-    Concatenated signals should have identical units, and compatible domains.
+    Source signals should have identical units, and compatible domains.
     
     Concatenating signals brings a few restrictions in addition to those derived
     from concatenating numpy arrays; these restrictions can be relaxed by setting
@@ -2324,15 +2362,9 @@ def concatenate_signals(*args, axis:int = 1,
     2) all signals should have identical domains (units, origin e.g. 't_start', 
         and sampling_rate)
         
-    Restrictions of neo.AnalogSignal's merge() and concatenate() methods that are
-    relaxed or ignored here:
-    
-    1) can concatenate signals belonging to different segments (in this case,
-        the resulting signal's segment attribute is set to None!)
+    This function can concatenate signals belonging to different segments (in 
+    this case, the resulting signal's segment attribute is set to None!)
         
-    2) can concatenate several signals in a single call (not just two)
-        
-    
     
     Var-positional parameters:
     -------------------------
@@ -2357,8 +2389,22 @@ def concatenate_signals(*args, axis:int = 1,
         
     ignore_units = bool, default False
         When True, will skip checks for units compatibilty among signals.
+        
+    padding, overlap: parameters used when signals are concatenated across the
+    domain axis (see neo.AnalogSignal.concatenate() for details)
     
     """
+    def __get_default_attr__(val, default):
+        return default if val is None else val
+    
+    def __get_attrs__(s):
+        yield from (__get_default_attr__(getattr(s, attr[0], None), attr[1]) for attr in (("description", ""),
+                                                                                          ("name", ""), 
+                                                                                          ("file_origin", ""),
+                                                                                          ("annotations", {}),
+                                                                                          ("array_annotations", ArrayDict(s.shape[-1]))))
+        
+    
     if len(args) == 1:
         if isinstance(args[0], (tuple, list)):
             signals = args[0]
@@ -2370,7 +2416,7 @@ def concatenate_signals(*args, axis:int = 1,
         
     # NOTE 2019-09-11 12:31:00:
     # a sequence of signals
-    # break-up the conditions so that we enforce al element to be of the SAME type
+    # break-up the conditions so that we enforce all element to be of the SAME type
     # instead of either one of the two types -- i.e. do NOT accept sequences of
     # mixed types !!!
     if all([isinstance(sig, neo.AnalogSignal) for sig in signals]) or \
@@ -2407,14 +2453,11 @@ def concatenate_signals(*args, axis:int = 1,
         else:
             t_start = signals[0].t_start
             
-        sig_names = ["signal_%d" % k if sig.name is None else sig.name for (k, sig) in enumerate(signals)]
+        #sig_names = ["signal_%d" % k if sig.name is None else sig.name for (k, sig) in enumerate(signals)]
             
-        concat_sig_names = ", ".join(sig_names)
+        #concat_sig_names = ", ".join(sig_names)
         
         sampling_rate = signals[0].sampling_rate
-        
-        if not all(s.sampling_rate == sampling_rate for s in signals[1:]):
-            raise TypeError("All signals must have the same sampling rate")
         
         units_0 = signals[0].units
         
@@ -2424,75 +2467,125 @@ def concatenate_signals(*args, axis:int = 1,
         else:
             signal_data = [signals[0]] + [sig.rescale(units_0).magnitude if sig.units != units_0 else sig.magnitude for sig in signals[1:]]
             
-        if axis == 1: #  merging
-            data = np.hstack(signal_data)
-            kwargs = dict()
-            descr = list()
-            names = list()
-            files = list()
-            merged_annotations = dict()
-            merged_array_annotations = dict()
-            for k,s in enumerate(signals):
-                descr.append(getattr(s, "description", ""))
-                names.append(getattr(s, "name", ""))
-                files.append(getattr(s, ,"file_origin", ""))
-                if k == 0:
-                    merged_annotations = s.annotations
-                    merged_array_annotations = s.array_annotations
-                else:
-                    merged_annotations = merge_annotations(merged_annotations, s.annotations)
-                    merged_array_annotations = s._merge_array_annotations(merged_array_annotations)
-                
-            kwargs["name"] = "merged(" + ", ".join(names) + ")"
-            kwargs["description"] = "merged(" + ", ".join(descr) + ")"
-            kwargs["file_orgin"] = "merged(" + ", ".join(files) + ")"
-            kwargs.update(merged_annotations)
-            kwargs["array_annotations"] = merged_array_annotations
+        action = "merged" if axis == 1 else "concatenated"
+        
+        descr, names, files, annots, aannots = tuple(((zip(*tuple(tuple(__get_attrs__(s)) for s in signals)))))
+        #descr, names, files, annots, aannots = tuple(((zip(*tuple(tuple(map(lambda x: "" if x is None else x, __get_attrs__(s))) for s in signals)))))
+        
+        kwargs = dict()
+        
+        if sum(len(x) for x in descr) > 0:
+            kwargs["description"] = f"{action}(" + ", ".join(descr) + ")"
             
-            result = neo.AnalogSignal(np.concatenate(signal_data, axis=axis),
-                                        units = units_0,
-                                        t_start = t_start,
-                                        sampling_rate = sampling_rate,
-                                        **kwargs)
+        if sum(len(x) for x in names) > 0:
+            kwargs["name"] = f"{action}(" + ", ".join(names) + ")"
+            
+                               
+        if sum(len(x) for x in files) > 0:
+            kwargs["file_origin"] = f"{action}(" + ", ".join(files) + ")"
+        
+        
+        f_annots = intersect_annotations if axis == 0 else merge_annotations
+        f_aannots = intersect_annotations if axis == 0 else merge_array_annotations
+        
+        new_annotations = reduce(f_annots, annots)
+        new_array_annotations = reduce(f_aannots, aannots)
+        
+        #new_annotations = dict()
+        #new_array_annotations = dict()
+        
+        
+        
+        #for k,s in enumerate(signals):
+            #if k == 0:
+                #new_annotations = s.annotations
+                #new_array_annotations = s.array_annotations
+            #else:
+                #if axis == 0:
+                    #new_annotations = intersect_annotations(new_annotations, s.annotations)
+                    #new_array_annotations = intersect_annotations(new_array_annotations, s.array_annotations)
+                #else:
+                    #new_annotations = merge_annotations(new_annotations, s.annotations)
+                    #new_array_annotations = s._merge_array_annotations(new_array_annotations)
+                    
+        
+        if axis == 0:
+            kwargs["annotations"] = new_annotations
+        else:
+            kwargs.update(new_annotations)
+            
+        kwargs["array_annotations"] = new_array_annotations
+        
+        if axis == 1: #  merging
+            # NOTE: 2021-11-08 19:39:33
+            # code parts from neo.core.basesignal.BaseSignal.merge()
+            data = np.hstack(signal_data)
+            
+            result = neo.AnalogSignal(data, units=units_0, t_start=t_start,
+                                      dtype = signals[0].dtype,
+                                      sampling_rate=sampling_rate, **kwargs)
+            
+            #result = neo.AnalogSignal(np.concatenate(signal_data, axis=axis),
+                                        #units = units_0,
+                                        #t_start = t_start,
+                                        #sampling_rate = sampling_rate,
                                         #name = "Concatenated signal",
                                         #description = "Concatenated %s" % concat_sig_names)
             
         else: # concatenation on the domain axis
-            kwargs = dict()
-            descr = list()
-            names = list()
-            files = list()
-            merged_annotations = dict()
-            merged_array_annotations = dict()
-            for k,s in enumerate(signals):
-                descr.append(getattr(s, "description", ""))
-                names.append(getattr(s, "name", ""))
-                files.append(getattr(s, ,"file_origin", ""))
-                if k == 0:
-                    merged_annotations = s.annotations
-                    merged_array_annotations = s.array_annotations
-                else:
-                    merged_annotations = merge_annotations(merged_annotations, s.annotations)
-                    merged_array_annotations = s._merge_array_annotations(merged_array_annotations)
-                
-            kwargs["name"] = "merged(" + ", ".join(names) + ")"
-            kwargs["description"] = "merged(" + ", ".join(descr) + ")"
-            kwargs["file_orgin"] = "merged(" + ", ".join(files) + ")"
-            kwargs.update(merged_annotations)
-            kwargs["array_annotations"] = merged_array_annotations
-            
+            # NOTE: 2021-11-08 19:39:04
+            # code parts from neo.AnalogSignal.concatenate()
             # check gaps and overlaps in the signal's domains
             combined_time_ranges = combine_time_ranges([(s.t_start, s.t_stop) for s in signals])
             
-            #missing_time_ranges=
+            missing_time_ranges=invert_time_ranges(combined_time_ranges)
+            if len(missing_time_ranges):
+                diffs = np.diff(np.asarray(missing_time_ranges), axis=1)
+            else:
+                diffs = list()
+                
+            if any(diffs > signals[0].sampling_period):
+                if padding is False:
+                    padding = True
+                    
+                if padding is True:
+                    padding = np.nan * units_0
+                    
+                if isinstance(padding, pq.Quantity):
+                    padding = padding.rescale(units_0).magnitude
+                else:
+                    raise MergeError(f"Invalid padding {padding}")
+                
+            else:
+                padding = np.nan
+                
             
-        
-            result = neo.AnalogSignal(np.concatenate(signal_data, axis=axis),
-                                        units = units_0,
-                                        t_start = t_start,
-                                        sampling_rate = sampling_rate,
-                                        name = "Concatenated signal",
-                                        description = "Concatenated %s" % concat_sig_names)
+            t_start = min([s.t_start for s in signals])
+            t_stop = max([s.t_stop for s in signals])
+            n_samples = int(np.rint(((t_stop - t_start) * sampling_rate).rescale("dimensionless").magnitude))
+            shape = (n_samples, ) + signals[0].shape[1:]
+            
+            result = neo.AnalogSignal(np.full(shape=shape, fill_value = padding,
+                                              dtype = signals[0].dtype),
+                                              sampling_rate = sampling_rate, 
+                                              t_start = t_start,
+                                              units = units_0,
+                                              **kwargs)
+            
+            if not overwrite:
+                signals = signals[::-1]
+                
+            sigs = list(signals)
+                
+            while len(sigs) > 0:
+                result.splice(sigs.pop(0), copy=False)
+                
+            #result = neo.AnalogSignal(np.concatenate(signal_data, axis=axis),
+                                        #units = units_0,
+                                        #t_start = t_start,
+                                        #sampling_rate = sampling_rate,
+                                        #name = "Concatenated signal",
+                                        #description = "Concatenated %s" % concat_sig_names)
         
         if all(s.segment == signals[0].segment for s in signals):
             result.segment = signals[0].segment
@@ -3371,33 +3464,7 @@ def upgrade_neo_api(x):
                 upgrade_neo_api(x[k])
         
     
-#@safeWrapper
-#def merge_signal_channels(*args, name=""):
-    #"""Returns an analog signal containing merged channels of the analog signals in args
-    #"""
-    #def __internal_merge__(*signals):
-        #sigs = [s.magnitude for s in signals]
-        #ret_sig = signals[0].__class__(np.concatenate(sigs, axis=1), 
-                                       #units = signals[0].units,
-                                       #sampling_period = signals[0].sampling_period,
-                                       #t_start = signals[0].t_start,
-                                       #name=name)
-        
-        #return ret_sig
-        
-    
-    if not all([isinstance(s, neo.AnalogSignal) for s in args]) and \
-        not all([isinstance(s, DataSignal) for s in args]):
-        raise TypeError("All data in the parameter sequence must be either AnalogSignal objects or DataSignal objects")
-        
-    if not all([s.shape[0] == args[0].shape[0] for s in args]):
-        raise ValueError("Signals must have same axis length")
-    
-    if not all([s.sampling_period == args[0].sampling_period for s in args]):
-        raise ValueError("All signals must have the same sampling period")
-    
-    return __internal_merge__(*args)
-
+@safeWrapper
 def get_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence],
                as_dict:bool=False, flat:bool=False,
                triggers:typing.Optional[typing.Union[bool, str, int, type, typing.Sequence]]=None,
