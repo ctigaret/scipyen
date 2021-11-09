@@ -77,6 +77,8 @@ def check_neo_patch(exc_info:tuple):
     
     obj_name = last_frame_summary.name
     
+    print(obj_name)
+    
     return identify_neo_patch(obj_name)
     
     #if any([s in last_frame_summary.name.lower() for s in  ("neo", "event", "epoch", "analogsignalarray", "analogsignal", "irregularlysampledsignal")]):

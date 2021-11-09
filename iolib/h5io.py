@@ -373,7 +373,7 @@ def hdf_entry(x:typing.Any, attr_prefix="key"):#, parent:h5py.Group):
     return type(x), name, attrs
 
 def from_dataset(dset:typing.Union[str, h5py.Dataset],
-                 group:h5py.Group:typing.Optional[h5py.Group]=None, 
+                 group:typing.Optional[h5py.Group]=None, 
                  order:typing.Optional[str]=None):
     if isinstance(dset, str) and len(dset.strip()):
         if not isinstance(group, h5py.Group):
@@ -558,12 +558,18 @@ def make_dataset(x:typing.Any, group:h5py.Group,
     elif isinstance(x, (neo.AnalogSignal, DataSignal)):
         data = np.transpose(x.magnitude) # axis 0 becomes axis 1 and vice-versa!
         x_meta = dict()
-        x_meta["description"] = x.description
-        x_meta["file_origin"] = x.file_origin
-        x_meta.update(x.annotations)
         x_meta.update(x_attrs)
+        #x_meta["description"] = "" if x.description is None else f"{x.description}"
+        #x_meta["file_origin"] = f"{x.file_origin}"
+        #annotations = dict()
+        #for k,v in x.annotations.items():
+            #annotations[k] = f"{v}"
+            
+        #if len(annotations):
+            #x_meta.update(x.annotations)
         
-        dset = group.create_dataset(f"{name}", data = data)
+        dset = group.create_dataset(name, data = data)
+        print("x_meta", x_meta)
         dset.attrs.update(x_meta)
         
         calgrp = group.create_group(f"{name}_axes", track_order=True)
@@ -578,7 +584,7 @@ def make_dataset(x:typing.Any, group:h5py.Group,
                 # neo signals are not named
                 data_name = getattr(x, "name", None)
                 if not isinstance(data_name, str) or len(data_name.strip()) == 0:
-                    data_name = x_name
+                    data_name = name
                 ds_name = axcalgrp.create_dataset("signal_name", data = data_name)
                 ds_name.make_scale("signal_name")
                 

@@ -30,12 +30,7 @@ import numpy as np
 import pandas as pd
 #import xarray as xa
 import h5py
-has_vigra=False
-try:
-    import vigra
-    has_vigra=True
-except:
-    pass
+import vigra
 import neo
 import confuse # for programmatic read/write of non-gui settings
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -53,9 +48,8 @@ from core.prog import (ContextExecutor, safeWrapper, check_neo_patch,
 
 from core.workspacefunctions import (user_workspace, assignin, debug_scipyen,
                                      get_symbol_in_namespace,)
-if has_vigra:
-    from imaging import (axisutils, axiscalibration, scandata, )
-    from imaging.axisutils import *
+from imaging import (axisutils, axiscalibration, scandata, )
+from imaging.axisutils import *
 
 #import datatypes
 #### END pict.core modules
@@ -107,12 +101,12 @@ SUPPORTED_EPHYS_FILES.sort()
 SUPPORTED_GENERIC_FILES = __generic_formats__
 SUPPORTED_GENERIC_FILES.sort()
 
-if has_vigra:
-    __vigra_formats__ = vigra.impex.listExtensions()
-    #SUPPORTED_IMAGE_TYPES = __vigra_formats__.split() + [i for i in bioformats.READABLE_FORMATS if i not in __vigra_formats__]
-    SUPPORTED_IMAGE_TYPES = __vigra_formats__.split() # + [i for i in bioformats.READABLE_FORMATS if i not in __vigra_formats__]
-    #del(i)
-    SUPPORTED_IMAGE_TYPES.sort()
+#if has_vigra:
+__vigra_formats__ = vigra.impex.listExtensions()
+#SUPPORTED_IMAGE_TYPES = __vigra_formats__.split() + [i for i in bioformats.READABLE_FORMATS if i not in __vigra_formats__]
+SUPPORTED_IMAGE_TYPES = __vigra_formats__.split() # + [i for i in bioformats.READABLE_FORMATS if i not in __vigra_formats__]
+#del(i)
+SUPPORTED_IMAGE_TYPES.sort()
 
 # NOTE: 2017-06-29 14:36:20
 # move file handling from ScipyenWindow here
@@ -129,10 +123,10 @@ if os.path.isfile(user_mime_types_file):
     mimetypes_knownfiles.append(user_mime_types_file)
 
 mimetypes.init(mimetypes_knownfiles)
-if has_vigra:
-    for ext in SUPPORTED_IMAGE_TYPES:
-        if mimetypes.guess_type("_."+ext)[0] is None:
-            mimetypes.add_type("image/"+ext, "."+ext)
+for ext in SUPPORTED_IMAGE_TYPES:
+    if mimetypes.guess_type("_."+ext)[0] is None:
+        mimetypes.add_type(f"image/{ext}", "."+ext)
+        mimetypes.add_type(f"image/x-{ext}", "."+ext)
         
 # NOTE: 2019-04-21 18:16:01
 # manual, old & cumbersome way
@@ -148,6 +142,24 @@ mimetypes.add_type("application/x-octave", ".oct")
 mimetypes.add_type("text/plain", ".cfg") # adds to already known extensions
 
 class CustomUnpickler(pickle.Unpickler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        super().dispatch[pickle.REDUCE[0]] = self.load_reduce
+        
+    #def load(self):
+        #return super().load()
+    
+    @safeWrapper
+    def load_reduce(self):
+        stack = self.stack
+        args = stack.pop()
+        func = stack[-1]
+        print("CustomUnpickler.load_reduce: func", func)
+        stack[-1] = func(*args)
+        
+#CustomUnpickler.dispatch[pickle.REDUCE[0]] = CustomUnpickler.load_reduce
+    
+class PatchUnpickler(pickle.Unpickler):
     """ Custom unpickler
         NOTE: 2020-10-30 16:30:16
         This is supposed to deal with pickled data expects classes or functions
@@ -317,7 +329,7 @@ class CustomUnpickler(pickle.Unpickler):
             else:
                 print("\t\t### NOT FOUND ###")
                 
-        #print("resukt:", result)
+        #print("result:", result)
             
         return result
     
@@ -354,9 +366,9 @@ class CustomUnpickler(pickle.Unpickler):
         # confused with matplotlib.widgets.Cursor (hence the latter is returned
         # in lieu of the former) - see also NOTE: 2020-12-23 15:11:49 in pictgui.py
         from unittest import mock
-        #print("\n***CustomUnpickler.find_class(%s, %s)***\n" % (modname, symbol))
+        #print("\n***PatchUnpickler.find_class(%s, %s)***\n" % (modname, symbol))
         if debug_scipyen():
-            print("\n***CustomUnpickler.find_class(%s, %s)***\n" % (modname, symbol))
+            print("\n***PatchUnpickler.find_class(%s, %s)***\n" % (modname, symbol))
         
         try:
             # NOTE: 2020-10-30 14:54:16
@@ -421,7 +433,7 @@ class CustomUnpickler(pickle.Unpickler):
                 except Exception as e1:
                     traceback.print_exc()
                     exc_info = sys.exc_info()
-                    #print("\t### CustomUnpickler.find_class(...) Exception: ###")
+                    #print("\t### PatchUnpickler.find_class(...) Exception: ###")
                     #print("\t### exc_info: ###", exc_info)
                     raise
         
@@ -1289,15 +1301,15 @@ def custom_unpickle(src:typing.Union[str, io.BufferedReader]):#,
     if isinstance(src, str):
         if os.path.isfile(src):
             with open(src, mode="rb") as fileSrc:
-                return CustomUnpickler(fileSrc).load()
-                #return CustomUnpickler(fileSrc, exc_info=exc_info).load()
+                return PatchUnpickler(fileSrc).load()
+                #return PatchUnpickler(fileSrc, exc_info=exc_info).load()
             
         else:
             raise FileNotFoundError()
             
     elif isinstance(src, io.BufferedReader):
-        return CustomUnpickler(src).load()
-        #return CustomUnpickler(src, exc_info=exc_info).load()
+        return PatchUnpickler(src).load()
+        #return PatchUnpickler(src, exc_info=exc_info).load()
     
     else:
         raise TypeError("Expecting a str containing an exiting file name or a BufferedReader; got %s instead" % type(src).__name__)
@@ -1314,12 +1326,12 @@ def loadPickleFile(fileName):
     such as those created in the user workspace - a good example is that of
     namedtuple instances - unless they are defined in a loaded module.
     
+    Moreover it will fail to load neo objects created with older neo versions.
+    
     """
     with open(fileName, mode="rb") as fileSrc:
         result = pickle.load(fileSrc)
         
-    return result
-    
             
 def loadPickleFile_old(fileName):
     from unittest import mock
@@ -1828,7 +1840,8 @@ def loadTextFile(fileName, forceText=False):
 fileLoaders = collections.defaultdict(lambda: None) # default dict where missing keys return None
 
 for e in SUPPORTED_IMAGE_TYPES:
-    fileLoaders["image/"+e] = loadImageFile
+    fileLoaders[f"image/{e}"] = loadImageFile
+    fileLoaders[f"image/x-{e}"] = loadImageFile
     
 fileLoaders["application/axon-data"] = loadAxonFile
 fileLoaders["application/x-crossover-abf"] = loadAxonFile
