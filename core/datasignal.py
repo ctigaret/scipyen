@@ -4,7 +4,9 @@ import quantities as pq
 
 import neo
 from neo.core import baseneo
+from neo.core.baseneo import BaseNeo
 from neo.core import basesignal
+from neo.core.basesignal import BaseSignal
 from neo.core import container
 from neo.core.dataobject import DataObject, ArrayDict
 
@@ -40,12 +42,8 @@ def _new_IrregularlySampledDataSignal(cls, domain, signal, units=None, domain_un
     return obj
 
 
-class DataSignal(neo.basesignal.BaseSignal):
-    """Emulates a "generic" neo.AnalogSignal.
-    
-    Does not enforce a time domain (domain units need not be time units).
-       
-    TODO implement parent container object + channel index functionality as well
+class DataSignal(BaseSignal):
+    """A "generic" neo.AnalogSignal with domain not restricted to time.
     
     Very much modeled after neo.AnalogSignal
     """
@@ -86,9 +84,9 @@ class DataSignal(neo.basesignal.BaseSignal):
     _recommended_attrs = neo.baseneo.BaseNeo._recommended_attrs
 
     def __new__(cls, signal, units=None, dtype=None, copy=True, 
-                origin=0*pq.dimensionless, sampling_period=None, sampling_rate=None, 
+                t_start=0*pq.dimensionless, sampling_period=None, sampling_rate=None, 
                 name=None, file_origin=None, description=None, 
-                **annotations):
+                array_annotations=None, **annotations):
         
         if units is None:
             if not hasattr(signal, "units"):
@@ -103,17 +101,17 @@ class DataSignal(neo.basesignal.BaseSignal):
         if obj.ndim == 1:
             obj.shape = (-1,1)
             
-        if origin is None:
+        if t_start is None:
             obj._origin = 0 * pq.dimensionless
             
         else:
-            if not isinstance(origin, pq.Quantity):
+            if not isinstance(t_start, pq.Quantity):
                 raise TypeError("Expecting a Quantity for origin; got %s instead" % (type(origin).__name__))
             
-            elif origin.size > 1:
+            elif t_start.size > 1:
                 raise TypeError("origin must be a scalar quantity; got %s instead" % origin)
             
-            obj._origin = origin
+            obj._origin = t_start
         
         if sampling_period is None:
             # sampling period not given
@@ -169,23 +167,22 @@ class DataSignal(neo.basesignal.BaseSignal):
             obj._sampling_period = sampling_period * obj._origin.units
         
         obj.segment=None
-        obj.channelIndex=None
+        #obj.channelIndex=None
 
         return obj
     
     def __init__(self, signal, units=None, dtype=None, copy=True, 
-                 origin=0*pq.dimensionless, sampling_rate=None, sampling_period=None,
+                 t_start=0*pq.dimensionless, sampling_rate=None, sampling_period=None,
                  name=None, file_origin=None, description=None, 
-                 **annotations):
+                 array_annotations=None, **annotations):
         
         """DataSignal constructor.
-        units: the signal's units (NOT the units of the domain)
-        origin: python Quantity in the units of the domain, NOT of the signal
         
         """
         
-        baseneo.BaseNeo.__init__(self, name=name, file_origin = file_origin, 
-                         description=description, **annotations)
+        DataObject.__init__(self, name=name, file_origin=file_origin, 
+                         description=description, 
+                         array_annotations=array_annotations, **annotations)
         
         self.__domain_name__ = name_from_unit(self.domain)
         
@@ -207,7 +204,7 @@ class DataSignal(neo.basesignal.BaseSignal):
         self.file_origin        = getattr(obj, "file_origin",   None)
         self.description        = getattr(obj, "description",   None)
         self.segment            = getattr(obj, "segment",       None)
-        self.channel_index      = getattr(obj, "channel_index", None)
+        #self.channel_index      = getattr(obj, "channel_index", None)
     
     def __reduce__(self):
         return _new_DataSignal, (self.__class__, 
@@ -392,30 +389,32 @@ class DataSignal(neo.basesignal.BaseSignal):
             raise TypeError("Expecting a scalar quantity; got %s instead" % (type(value).__name__))
     
     @property
-    def domain_start(self):
-        return self.t_start
+    def domain_begin(self):
+        """Alias to self.origin
+        """
+        return self.origin
     
     @property
-    def domain_stop(self):
-        return self.t_stop
+    def domain_end(self):
+        """Alias to self.t_stop, which is an alias to self.domain[-1]
+        """
+        return self.origin + self.extent
     
     @property
     def t_start(self):
         """The domain coordinate of the first data sample in the signal.
-        A convenience equivalent of neo.AnalogSignal.t_start
+        Alias to self.origin; convenience equivalent of neo.AnalogSignal.t_start
         
-        Read-only; t_stop can ny be changed by altering sampling_rate or sampling_period
         """
-        return self._origin
+        return self.origin
     
     @property
     def t_stop(self):
         """The domain coordinate of the last data sample in the signal.
-        
+        Read-only; alias to self.domain_end
         A convenience equivalent of neo.AnalogSignal.t_stop
         """
-        
-        return self.domain[-1]
+        return self.domain_end
     
     @t_start.setter
     def t_start(self, value):
@@ -505,10 +504,22 @@ class DataSignal(neo.basesignal.BaseSignal):
     def domain_name(self, value):
         if isinstance(value, str) and len(value.strip()):
             self.__domain_name__ = value
+            
+    @property
+    def extent(self):
+        """The extent of this signal in its domain
+        """
+        return self.shape[0] / self.sampling_rate
+    
+    @property
+    def duration(self):
+        """Alias to self extent
+        """
+        return self.extent
     
     @property
     def domain(self):
-        """The domain coordinate for the data samples in the signal.
+        """The domain for the data samples in the signal.
         
         Equivalent to neo.AnalogSignal.times. Read-only.
         
@@ -524,11 +535,10 @@ class DataSignal(neo.basesignal.BaseSignal):
     
     @property
     def times(self):
-        """The domain coordinate for the data samples in the signal.
+        """The domain for the data samples in the signal.
+        Alias to self.domain
         
         Provided for api compatibility with neo.AnalogSignal
-        
-        Return self.domain
         
         """
         return self.domain
@@ -1044,11 +1054,11 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         return self.times[1:] - self.times[:-1]
 
     @property
-    def domain_start(self):
+    def domain_begin(self):
         return self.t_start
     
     @property
-    def domain_stop(self):
+    def domain_end(self):
         return self.t_stop
     
     @property

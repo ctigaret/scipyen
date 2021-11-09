@@ -189,6 +189,7 @@ import vigra
 import pandas as pd
 import quantities as pq
 import neo
+from neo.core.dataobject import ArrayDict
 
 from core.prog import safeWrapper
 from core import prog
@@ -559,10 +560,7 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         x_meta = dict()
         x_meta["description"] = x.description
         x_meta["file_origin"] = x.file_origin
-        #x_meta["units"] = x.dimensionality.string
-        #x_meta["t_units"] = x.t_start.units.dimensionality.string
-        #x_meta["t_start"] = x.t_start.magnitude.item()
-        #x_meta["t_name"] = "Time"
+        x_meta.update(x.annotations)
         x_meta.update(x_attrs)
         
         dset = group.create_dataset(f"{name}", data = data)
@@ -573,14 +571,62 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         for k in range(2):
             axcalgrp = calgrp.create_group(f"axis_{k}", track_order=True)
             
-            if k == 0: # axis 0 is the channels axis (NOT neo channelview!)
+            if k == 0: # axis 0 is now the channels axis
                 ds_units = axcalgrp.create_dataset("signal_units", data = x.dimensionality.string)
                 ds_units.make_scale("signal_units")
                 # (un)fortunately(?), individual channels (i.e. data columns) in
                 # neo signals are not named
-                ds_name = axcalgrp.create_dataset("signal_name", data = x.name)
+                data_name = getattr(x, "name", None)
+                if not isinstance(data_name, str) or len(data_name.strip()) == 0:
+                    data_name = x_name
+                ds_name = axcalgrp.create_dataset("signal_name", data = data_name)
                 ds_name.make_scale("signal_name")
                 
+                dset.dims[k].attach_scale(ds_name)
+                dset.dims[k].attach_scale(ds_units)
+
+                channels_group = axcalgrp.create_group("channels", track_order=True)
+                
+                array_annotations = getattr(x, "array_annotations", None)
+                
+                if isinstance(array_annotations, ArrayDict):
+                    channels_group.attrs.update(array_annotations)
+                    
+                else:
+                    array_annotations = dict() # shim for below
+                
+                for k in x.shape[-1]:
+                    if "channel_ids" in array_annotations:
+                        channel_id = array_annotations["channel_ids"][k].item()
+                    else:
+                        channel_id = f"{k}"
+                        
+                    if "channel_names" in array_annotations:
+                        channel_name = array_annotations["channel_names"][k].item()
+                    else:
+                        channel_name = f"{k}"
+                        
+                    ds_chn_index = channels_group.create_dataset(f"channel_{k}_index", data=k)
+                    ds_chn_index.make_scale(f"channel_{k}_index")
+                    
+                    ds_chn_id = channels_group.create_dataset(f"channel_{k}_id", data = channel_id)
+                    ds_chn_id.make_scale(f"channel_{k}_id")
+                    
+                    ds_chn_name = channels_group.create_dataset(f"channel_{k}_name", data = channel_name)
+                    ds_chn_name.make_scale(f"channel_{k}_name")
+                    
+                    dset.dims[k].attach_scale(ds_chn_index)
+                    dset.dims[k].attach_scale(ds_chn_id)
+                    dset.dims[k].attach_scale(ds_chn_name)
+                    
+                    for key in array_annotations:
+                        if key not in ("channel_ids", "channel_names"):
+                            ds_chn_key = channels_group.create_dataset(f"channel_{k}_{key}", data = array_annotations[key][k].item())
+                            ds_chn_key.make_scale(f"channel_{k}_{key}")
+                            dset.dims[k].attach_scale(ds_chn_key)
+                    
+                dset.dims[k].label = data_name
+                    
             else: # axis 1 is now the time (or domain) axis
                 ds_origin = axcalgrp.create_dataset("domain_origin", data = x.t_start.magnitude.item())
                 ds_origin.make_scale("domain_origin")
@@ -601,10 +647,6 @@ def make_dataset(x:typing.Any, group:h5py.Group,
                 else:
                     dset.dims[k].label="Time"
             
-        
-        
-        
-        
         
     elif isinstance(x, pq.Quantity):
         dset = group.create_dataset(name, data=x.magnitude)

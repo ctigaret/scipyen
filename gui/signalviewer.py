@@ -3859,13 +3859,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.irregularSignalChannelIndex    = irregularSignalChannels
             self.separateSignalChannels         = separateSignalChannels
 
-        elif isinstance(y, neo.core.Unit):
-            raise NotImplementedError("Plotting neo.core.Unit objects is not yet implemented") 
-            # TODO - see Epochs as example
-            self.y = y
-            self.frameIndex = range(1)
-            self._number_of_frames_ = 1
-            #self.overlays.clear() # tyaken from ancillary data in the Unit; TODO
+        #elif isinstance(y, neo.core.Unit): # Unit is out of neo  
+            #raise NotImplementedError("Plotting neo.core.Unit objects is not yet implemented") 
+            ## TODO - see Epochs as example
+            #self.y = y
+            #self.frameIndex = range(1)
+            #self._number_of_frames_ = 1
+            ##self.overlays.clear() # taken from ancillary data in the Unit; TODO
         
         elif isinstance(y, neo.core.SpikeTrain): # plot a SpikeTrain independently of data
             # TODO - see Epochs as example

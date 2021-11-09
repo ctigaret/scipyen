@@ -663,7 +663,7 @@ def combine_time_ranges(time_ranges):
     """
     time_ranges = sorted(time_ranges)
     new_ranges = time_ranges[:1]
-    
+
     for t_start, t_stop in time_ranges[1:]:
         if t_start > new_ranges[-1][1]:
             new_ranges.append((t_start, t_stop))
@@ -2335,8 +2335,10 @@ def concatenate_signals(*args, axis:int = 1,
                         ignore_domain:bool = False, 
                         ignore_units:bool = False,
                         set_domain_start:typing.Optional[float] = None, 
+                        force_contiguous:bool=True,
                         padding:typing.Optional[typing.Union[bool, pq.Quantity]]=False,
-                        overwrite:bool=False):
+                        overwrite:bool=False,
+                        ):
     """Concatenates regularly sampled signals.
     
     Implements the functionality of neo.AnalogSignal's merge() and concatenate()
@@ -2390,7 +2392,11 @@ def concatenate_signals(*args, axis:int = 1,
     ignore_units = bool, default False
         When True, will skip checks for units compatibilty among signals.
         
-    padding, overlap: parameters used when signals are concatenated across the
+    force_contiguous:bool, default True
+        When concatenating signals across the domain axis, assign new domain
+        values when signals' domains overlap
+        
+    padding, overwrite: parameters used when signals are concatenated across the
     domain axis (see neo.AnalogSignal.concatenate() for details)
     
     """
@@ -2421,38 +2427,29 @@ def concatenate_signals(*args, axis:int = 1,
     # mixed types !!!
     if all([isinstance(sig, neo.AnalogSignal) for sig in signals]) or \
         all([isinstance(sig, DataSignal) for sig in signals]):
+        sig_klass = type(signals[0])
+        
         sig_shapes = [[s for s in sig.shape] for sig in signals]
         
         for s in sig_shapes:
             s[axis] = None
             
         if not all(sig_shapes[0] == s for s in sig_shapes):
-            raise TypeError("signals do not have identical shapes on non-concatenating axes")
+            raise MergeError("Signals do not have identical shapes on non-concatenating axes")
         
-        # NOTE: axis 0 is the domain axis!
-        if axis > 0 or axis == -1:
-            if not ignore_domain:
-                if not all([sig.t_start == signals[0].t_start for sig in signals[1:]]):
-                    raise ValueError("To concatenate signals on 2nd dimension they must have identical domains ")
-                
         # this is needed for any concatenation axis!
         if not ignore_domain:
-            if not all([np.isclose(sig.sampling_rate.magnitude, signals[0].sampling_rate.magnitude) for sig in signals[1:]]):
-                raise ValueError("To concatenate signals on the 2nd dimension they must all have the same sampling rate")
-            
             if not all([sig.times.units] == signals[0].times.units for sig in signals[1:]):
-                raise ValueError("To concatenate signals on 2nd dimension they must have identical domain units ")
+                raise MergeError("Cannot concatenate signals having different domain units ")
             
-        if not ignore_units:
-            if not all([units_convertible(sig.units, signals[0].units) for sig in signals[1:]]):
-                warnings.warn("There are signals with non-convertible units; this may become an error in the future")
+            if not all([np.isclose(sig.sampling_rate.magnitude, signals[0].sampling_rate.magnitude) for sig in signals[1:]]):
+                raise MergeError("Cannot concatenate signals having different sampling rates")
             
-        if isinstance(set_domain_start, float):
-            t_start = set_domin_start * signals[0].times.units
-        
-        else:
-            t_start = signals[0].t_start
-            
+            # NOTE: axis 0 is the domain axis!
+            if axis > 0 or axis == -1:
+                if not all([sig.t_start == signals[0].t_start for sig in signals[1:]]):
+                    raise MergeError("Cannot merge channels of signals that have different domains ")
+                
         #sig_names = ["signal_%d" % k if sig.name is None else sig.name for (k, sig) in enumerate(signals)]
             
         #concat_sig_names = ", ".join(sig_names)
@@ -2465,7 +2462,10 @@ def concatenate_signals(*args, axis:int = 1,
             signal_data = [sig.magnitude for sig in signals]
             
         else:
-            signal_data = [signals[0]] + [sig.rescale(units_0).magnitude if sig.units != units_0 else sig.magnitude for sig in signals[1:]]
+            if not all([units_convertible(sig.units, signals[0].units) for sig in signals[1:]]):
+                raise MergeError("There are signals with non-convertible units; this may become an error in the future")
+            
+            signal_data = [signals[0].magnitude] + [sig.rescale(units_0).magnitude if sig.units != units_0 else sig.magnitude for sig in signals[1:]]
             
         action = "merged" if axis == 1 else "concatenated"
         
@@ -2491,24 +2491,6 @@ def concatenate_signals(*args, axis:int = 1,
         new_annotations = reduce(f_annots, annots)
         new_array_annotations = reduce(f_aannots, aannots)
         
-        #new_annotations = dict()
-        #new_array_annotations = dict()
-        
-        
-        
-        #for k,s in enumerate(signals):
-            #if k == 0:
-                #new_annotations = s.annotations
-                #new_array_annotations = s.array_annotations
-            #else:
-                #if axis == 0:
-                    #new_annotations = intersect_annotations(new_annotations, s.annotations)
-                    #new_array_annotations = intersect_annotations(new_array_annotations, s.array_annotations)
-                #else:
-                    #new_annotations = merge_annotations(new_annotations, s.annotations)
-                    #new_array_annotations = s._merge_array_annotations(new_array_annotations)
-                    
-        
         if axis == 0:
             kwargs["annotations"] = new_annotations
         else:
@@ -2521,72 +2503,83 @@ def concatenate_signals(*args, axis:int = 1,
             # code parts from neo.core.basesignal.BaseSignal.merge()
             data = np.hstack(signal_data)
             
+            #if isinstance(set_domain_start, float):
+                #t_start = set_domain_start * signals[0].times.units
+            
+            #else:
+                #t_start = signals[0].t_start
+            
             result = neo.AnalogSignal(data, units=units_0, t_start=t_start,
                                       dtype = signals[0].dtype,
                                       sampling_rate=sampling_rate, **kwargs)
             
-            #result = neo.AnalogSignal(np.concatenate(signal_data, axis=axis),
-                                        #units = units_0,
-                                        #t_start = t_start,
-                                        #sampling_rate = sampling_rate,
-                                        #name = "Concatenated signal",
-                                        #description = "Concatenated %s" % concat_sig_names)
-            
+                
         else: # concatenation on the domain axis
             # NOTE: 2021-11-08 19:39:04
             # code parts from neo.AnalogSignal.concatenate()
             # check gaps and overlaps in the signal's domains
-            combined_time_ranges = combine_time_ranges([(s.t_start, s.t_stop) for s in signals])
-            
-            missing_time_ranges=invert_time_ranges(combined_time_ranges)
-            if len(missing_time_ranges):
-                diffs = np.diff(np.asarray(missing_time_ranges), axis=1)
+            if force_contiguous:
+                data = np.vstack(signal_data)
+                t_start = signals[0].t_start
             else:
-                diffs = list()
-                
-            if any(diffs > signals[0].sampling_period):
-                if padding is False:
-                    padding = True
-                    
-                if padding is True:
-                    padding = np.nan * units_0
-                    
-                if isinstance(padding, pq.Quantity):
-                    padding = padding.rescale(units_0).magnitude
+                if ignore_domain:
+                    t_start = 0*signals[0].times.units
+                    t_stop = sum(s.duration.magnitude.item() for s in signals) * signals[0].times.units
                 else:
-                    raise MergeError(f"Invalid padding {padding}")
+                    combined_time_ranges = combine_time_ranges(((s.t_start, s.t_stop) for s in signals))
+                    
+                    missing_time_ranges=invert_time_ranges(combined_time_ranges)
+                    
+                    if len(missing_time_ranges):
+                        diffs = np.diff(np.asarray(missing_time_ranges), axis=1)
+                    else:
+                        diffs = list()
+                        
+                    if any(diffs > signals[0].sampling_period):
+                        if padding is False:
+                            padding = True
+                            
+                        if padding is True:
+                            padding = np.nan * units_0
+                            
+                        if isinstance(padding, pq.Quantity):
+                            padding = padding.rescale(units_0).magnitude
+                        else:
+                            raise MergeError(f"Invalid padding {padding}")
+                        
+                    else:
+                        padding = np.nan
+                        
+                    t_start = min([s.t_start for s in signals])
+                    t_stop = max([s.t_stop for s in signals])
+                    
+                n_samples = int(np.rint(((t_stop - t_start) * sampling_rate).rescale("dimensionless").magnitude))
                 
-            else:
-                padding = np.nan
+                #print("t_start", t_start, "t_stop", t_stop, "n_samples", n_samples)
                 
+                shape = (n_samples, ) + signals[0].shape[1:]
+                
+                data = np.full(shape=shape, fill_value=padding, dtype=signals[0].dtype)
             
-            t_start = min([s.t_start for s in signals])
-            t_stop = max([s.t_stop for s in signals])
-            n_samples = int(np.rint(((t_stop - t_start) * sampling_rate).rescale("dimensionless").magnitude))
-            shape = (n_samples, ) + signals[0].shape[1:]
+                
+            if isinstance(set_domain_start, float):
+                t_start = set_domain_start * signals[0].times.units
             
-            result = neo.AnalogSignal(np.full(shape=shape, fill_value = padding,
-                                              dtype = signals[0].dtype),
-                                              sampling_rate = sampling_rate, 
-                                              t_start = t_start,
-                                              units = units_0,
-                                              **kwargs)
+            result = neo.AnalogSignal(data,
+                                      sampling_rate = sampling_rate, 
+                                      t_start = t_start,
+                                      units = units_0,
+                                      **kwargs)
             
-            if not overwrite:
-                signals = signals[::-1]
+            if not force_contiguous:
+                if not overwrite:
+                    signals = signals[::-1]
+                    
+                sigs = list(signals)
                 
-            sigs = list(signals)
+                while len(sigs) > 0:
+                    result.splice(sigs.pop(0), copy=False)
                 
-            while len(sigs) > 0:
-                result.splice(sigs.pop(0), copy=False)
-                
-            #result = neo.AnalogSignal(np.concatenate(signal_data, axis=axis),
-                                        #units = units_0,
-                                        #t_start = t_start,
-                                        #sampling_rate = sampling_rate,
-                                        #name = "Concatenated signal",
-                                        #description = "Concatenated %s" % concat_sig_names)
-        
         if all(s.segment == signals[0].segment for s in signals):
             result.segment = signals[0].segment
                                     
