@@ -445,8 +445,9 @@ def __ndArray2csv__(data, writer):
 # NOTE: 2017-09-21 16:34:21
 # BioFormats dumped mid 2017 because there are no good python ports to it
 # (it uses javabridge which is suboptimal)
-def loadImageFile(fileName:str, asVolume:bool=False, axisspec:[collections.OrderedDict, None]=None) -> ([vigra.VigraArray, np.ndarray],):
-    ''' Reads pixel data from an image file
+#def loadImageFile(fileName:str, asVolume:bool=False, axisspec:[collections.OrderedDict, None]=None) -> ([vigra.VigraArray, np.ndarray],):
+def loadImageFile(fileName:str, asVolume:bool=False) -> vigra.VigraArray:
+    ''' Reads pixel data from a raster image file
     Uses the vigra impex library.
     
     
@@ -469,18 +470,6 @@ def loadImageFile(fileName:str, asVolume:bool=False, axisspec:[collections.Order
             this could be very hard, because TIFF specification does not mandate this, 
             and therefore TIFF writers do no necessarily include this information either.
             
-    axisspec = collections.OrderedDict with the following constraints:
-            1) must contain maximum five elements
-            2) acceptable keys: 'x', 'y', 'z', 'c', and 't'
-            3) values are 'k', '~', or integers: when 'k', they will be replaced by the values 
-             read from the file; when '~', they are calculated from the total numbers of samples
-            4) the _order_ of the keys as specified in the axisspec will take
-             precedence over what is read from the file
-             
-             This may result in a reshape() called on the returned data.
-             
-             Raises an error if the new shape is not compatible with the number of samples in the data.
-             
     NOTE: Things to be aware of:
     
     If fileName is the first in what looks like an image series, asVolume=True 
@@ -507,20 +496,20 @@ def loadImageFile(fileName:str, asVolume:bool=False, axisspec:[collections.Order
         
     #mdata = readImageMetadata(fileName)
     
-    if axisspec is not None:# TODO FIXME we're not using this kind of axisspec anymore, are we?
-        if type(axisspec) is collections.OrderedDict:
-            parsedAxisspec = collections.OrderedDict(zip(ret.axistags.keys(), ret.shape))
+    #if axisspec is not None:# TODO FIXME we're not using this kind of axisspec anymore, are we?
+        #if type(axisspec) is collections.OrderedDict:
+            #parsedAxisspec = collections.OrderedDict(zip(ret.axistags.keys(), ret.shape))
             
-            axisspec = verifyAxisSpecs(axisspec, parsedAxisspec)
+            #axisspec = verifyAxisSpecs(axisspec, parsedAxisspec)
             
-            # by now, all tags given in axisspec should have values different than None
-            #print("axisspec: ", axisspec)
+            ## by now, all tags given in axisspec should have values different than None
+            ##print("axisspec: ", axisspec)
             
-            ret.shape = axisspec.values()
-            ret.axistags = vigra.VigraArray.defaultAxistags(tagKeysAsString(axisspec))
+            #ret.shape = axisspec.values()
+            #ret.axistags = vigra.VigraArray.defaultAxistags(tagKeysAsString(axisspec))
                     
-        else:
-            raise ValueError('axisspec must be a collections.OrderedDict, or None')
+        #else:
+            #raise ValueError('axisspec must be a collections.OrderedDict, or None')
         
     #return (ret, mdata)
     return ret
@@ -1991,111 +1980,111 @@ def loadFile(fName):
     
     return value
 
-@safeWrapper
-def writeHDF5(obj, filenameOrGroup, pathInFile, compression=None, chunks=None, track_order=True):
-    """
-    TODO Work in progress, do NOT use
-    """
-    if not isinstance(obj, dict):
-        raise TypeError("Expecting a dict; got %s instead" % type(obj).__name__)
+#@safeWrapper
+#def writeHDF5(obj, filenameOrGroup, pathInFile, compression=None, chunks=None, track_order=True):
+    #"""
+    #TODO Work in progress, do NOT use
+    #"""
+    #if not isinstance(obj, dict):
+        #raise TypeError("Expecting a dict; got %s instead" % type(obj).__name__)
     
-    group = None
+    #group = None
     
-    if isinstance(filenameOrGroup, str):
-        if len(filenameOrGroup.strip()) == 0:
-            raise ValueError("when a str, 'filenameOrGroup' must not be empty")
+    #if isinstance(filenameOrGroup, str):
+        #if len(filenameOrGroup.strip()) == 0:
+            #raise ValueError("when a str, 'filenameOrGroup' must not be empty")
         
-        else:
-            filenameOrGroup = h5py.File(filenameOrGroup, "w")
+        #else:
+            #filenameOrGroup = h5py.File(filenameOrGroup, "w")
             
-    elif not isinstance(filenameOrGroup, h5py.Group):
-        raise TypeError("'filenameOrGroup' expected to be a str or a h5py.Group; got %s instead" % type(filenameOrGroup).__name__)
+    #elif not isinstance(filenameOrGroup, h5py.Group):
+        #raise TypeError("'filenameOrGroup' expected to be a str or a h5py.Group; got %s instead" % type(filenameOrGroup).__name__)
     
-    if isinstance(pathInFile, str):
-        if len(pathInFile.strip()) == 0:
-            raise ValueError("'pathInFile' must not be empty")
+    #if isinstance(pathInFile, str):
+        #if len(pathInFile.strip()) == 0:
+            #raise ValueError("'pathInFile' must not be empty")
         
-    else:
-        raise TypeError("'pathInFile' expected to be astr; got %s instead" % pathInFile)
+    #else:
+        #raise TypeError("'pathInFile' expected to be astr; got %s instead" % pathInFile)
     
-    group = filenameOrGroup.create_group(pathInFile, track_order=track_order)
+    #group = filenameOrGroup.create_group(pathInFile, track_order=track_order)
     
-    if isinstance(obj. dict):
-        for key, value in obj.items():
-            key_group = writeHDF5(value, group, key, track_order = track_order)
+    #if isinstance(obj. dict):
+        #for key, value in obj.items():
+            #key_group = writeHDF5(value, group, key, track_order = track_order)
             
-    elif isinstance(value, vigra.VigraArray):
-        vigra.impex.writeHDF5(value, group, key,compression=compression, chunks=chunks)
+    #elif isinstance(value, vigra.VigraArray):
+        #vigra.impex.writeHDF5(value, group, key,compression=compression, chunks=chunks)
         
-    elif isinstance(value, np.ndarray):
-        group.create_dataset(key, shape=value.shape, dtype=value.dtype, data=data, 
-                            chunks=chunks, compression=compression, track_order=track_order)
+    #elif isinstance(value, np.ndarray):
+        #group.create_dataset(key, shape=value.shape, dtype=value.dtype, data=data, 
+                            #chunks=chunks, compression=compression, track_order=track_order)
         
-    elif isinstance(value, (tuple, list)):
-        array = np.array(value)
-        group.create_dataset(key, shape=array.shape, dtype=array.dtype, data=array, 
-                            chunks=chunks, compression=compression, track_order=track_order)
+    #elif isinstance(value, (tuple, list)):
+        #array = np.array(value)
+        #group.create_dataset(key, shape=array.shape, dtype=array.dtype, data=array, 
+                            #chunks=chunks, compression=compression, track_order=track_order)
         
 
-    #if "/" in pathInFile:
-        #group_path = [s for s in pathInFile.split("/") if len(s.strip())]
+    ##if "/" in pathInFile:
+        ##group_path = [s for s in pathInFile.split("/") if len(s.strip())]
         
-    if isinstance(filenameOrGroup, h5py.File):
-        filenameOrGroup.close()
+    #if isinstance(filenameOrGroup, h5py.File):
+        #filenameOrGroup.close()
         
-    return filenameOrGroup
+    #return filenameOrGroup
     
-@safeWrapper
-def export_to_hdf5(obj, filenameOrGroup, name=None):
-    """
-    Parameters:
-    ----------
+#@safeWrapper
+#def export_to_hdf5(obj, filenameOrGroup, name=None):
+    #"""
+    #Parameters:
+    #----------
     
-    obj: Python object
+    #obj: Python object
     
-    file_name: str
-        name of the hdf5 file written to disk
+    #file_name: str
+        #name of the hdf5 file written to disk
         
-    name: str or None (default)
-        group name for storing the object inside the file
+    #name: str or None (default)
+        #group name for storing the object inside the file
         
-        When None (default) or an empty string, the object is stored under a 
-        group called "object" unless object is a dict in which case its members are
-        stored at the top level in the file.
+        #When None (default) or an empty string, the object is stored under a 
+        #group called "object" unless object is a dict in which case its members are
+        #stored at the top level in the file.
         
-    """
-    # TODO
-    if not isinstance(filenameOrGroup, str):
-        raise TypeError("file_name must be a str; got %s instead" % type(file_name).__name__)
+    #"""
+    ## TODO
+    #if not isinstance(filenameOrGroup, str):
+        #raise TypeError("file_name must be a str; got %s instead" % type(file_name).__name__)
     
-    if len(file_name.strip()) == 0:
-        raise ValueError("file_name is empty")
+    #if len(file_name.strip()) == 0:
+        #raise ValueError("file_name is empty")
     
-    fn, fext = os.path.splitext(file_name)
+    #fn, fext = os.path.splitext(file_name)
     
-    if len(fext.strip) <= 1:
-        fext = ".hdf5"
+    #if len(fext.strip) <= 1:
+        #fext = ".hdf5"
         
-        file_name = "".join((fn, fext))
+        #file_name = "".join((fn, fext))
 
-    f = h5py.File(file_name, "w")
+    #f = h5py.File(file_name, "w")
     
-    if isinstance(obj, dict):
-        if isinstance(name, str) and len(name.strip()):
-            obj_group = f.create_group(name, track_order=True)
+    #if isinstance(obj, dict):
+        #if isinstance(name, str) and len(name.strip()):
+            #obj_group = f.create_group(name, track_order=True)
             
-        else:
-            for k, v in obj.items():
-                key_group = f.create_group("%s" % k, track_order=True)
+        #else:
+            #for k, v in obj.items():
+                #key_group = f.create_group("%s" % k, track_order=True)
             
-    else:
-        if isinstance(name, str) and len(name.strip()):
-            obj_group = f.create_group(name, track_order=True)
+    #else:
+        #if isinstance(name, str) and len(name.strip()):
+            #obj_group = f.create_group(name, track_order=True)
             
-        else:
-            obj_group = f.create_group("object", track_order=True)
+        #else:
+            #obj_group = f.create_group("object", track_order=True)
             
-    f.close()
+    #f.close()
     
 @safeWrapper
 def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None, 

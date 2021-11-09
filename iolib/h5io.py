@@ -207,7 +207,8 @@ from core.quantities import(arbitrary_unit,
                             unit_quantity_from_name_or_symbol,)
 
 from core.datatypes import (TypeEnum,UnitTypes, Genotypes, 
-                            is_uniform_sequence, is_namedtuple,
+                            is_uniform_sequence, is_namedtuple, is_string,
+                            is_numeric_string, is_numeric, NUMPY_STRING_KINDS,
                             )
 
 from core.modelfitting import (FitModel, ModelExpression,)
@@ -243,6 +244,46 @@ from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse,
 #   for reading functions, the named data set must already exist in the group
 #   (for data sets deeply nested, the intermediary groups must also be present)
 #   
+
+def string2hdf(s):
+    if not isinstance(s, str):
+        raise TypeError(f"Expecting a str; got {type(s).__name__} instead")
+    
+    return np.array(s, dtype=h5py.string_dtype())
+
+def make_attr_dict(**kwargs):
+    ret = dict()
+    
+    for k,v in kwargs.items():
+        if isinstance(v, str):
+            ret[k] = string2hdf(v)
+            
+        elif isinstance(v, np.ndarray):
+            if v.dtype.kind in NUMPY_STRING_KINDS:
+                ret[k] = np.asarray(v, dtype=h5py.string_dtype(), order="K")
+                
+            else:
+                ret[k] = v
+            
+        else:
+            ret[k] = v
+            
+    return ret
+
+def make_attr(x):
+    if isinstance(x, str):
+        return string2hdf(x)
+    
+    if isinstance(x, np.ndarray):
+        if x.dtype.kind in NUMPY_STRING_KINDS:
+            return np.asarray(x, dtype=h5py.string_dtype(), order="K")
+    
+    return x
+
+#def read_attr_dict(attrs):
+    #ret = dict()
+    #for k, v in attrs.items:
+        #if 
 
 def generic_data_attrs(data, prefix=""):
     attrs = dict()
@@ -282,8 +323,7 @@ def generic_data_attrs(data, prefix=""):
             
         
         if inspect.isfunction(data):
-            attrs[f"{prefix}func_name"] = data.__name__
-            
+            attrs[f"{prefix}func_name"] = data.__name__            
     
     return attrs
     
@@ -363,7 +403,7 @@ def parse_func(f):
                           }) for p_name, p in sig.parameters.items())
 
 def hdf_entry(x:typing.Any, attr_prefix="key"):#, parent:h5py.Group):
-    attrs = generic_data_attrs(x, attr_prefix)
+    attrs = make_attr_dict(**generic_data_attrs(x, attr_prefix))
     if not isinstance(x, str):
         name = f"{type(x).__module__}.{type(x).__name__}_{uuid4().hex}"
         #name = json.dumps(x)
@@ -429,7 +469,7 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
                     if AxisCalibrationData.isCalibration(cal):
                         axcal = AxisCalibrationData(cal)
                         if axcal.type & vigra.AxisType.Channels:
-                            channels = unique(key.split('_')[0] for key in dim.keys() if any(key.endswith(s) for s in ("_name", "_units", "_origin", "_resolution", "_maximum", "_index")))
+                            channels = unique([key.split('_')[0] for key in dim.keys() if any(key.endswith(s) for s in ("_name", "_units", "_origin", "_resolution", "_maximum", "_index"))])
                             for ch in channels:
                                 chcal = dict()
                                 if f"{ch}_name" in dim:
@@ -469,14 +509,47 @@ def make_dataset(x:typing.Any, group:h5py.Group,
                  name:typing.Optional[str]=None,
                  compression:typing.Optional[str]=None,
                  chunks:typing.Optional[bool]=None):
+    """Creates a HDF5 datasets for supported Python types
+    
+    Parameters:
+    ===========
+    x: a Python object
+    group: parent group where the data set is created
+    compression, chunks - passed on to create_dataset
+    
+    Returns:
+    =======
+    h5py.Dataset or None (if the python object is not supported)
+    
+    Its `attrs` member contains a generic set of data attributes relevant to the
+    Python object `x`.
+    
+    Side effects:
+    ============
+    
+    One or more, possibily nested, h5py.Group objects may be created in the parent
+    `group`, alongside the newly-created dataset. 
+    These additional groups contain ancillary data (or `metadata`) associated with
+    the Python object, such as HDF5 dimension scales (containing axes information 
+    for numpy arrays and types derived from numpy arrays) and other datasets 
+    pertaining to members of the Python object (when themselves are of more elaborate
+    types).
+    
+    Other object `metadata` are stored as HDF attributes of the created data set.
+    
+    
+    """
     x_type, x_name, x_attrs = hdf_entry(x, "")
     
     if not isinstance(name, str) or len(name.strip()) == 0:
         name = x_name
         
-    if isinstance(x, (bool, bytes, complex, float, int, str)):
+    if isinstance(x, (bool, bytes, complex, float, int)):
         dset = group.create_dataset(name, data = x)
         dset.attrs.update(x_attrs)
+        
+    elif isinstance(x, str):
+        dset = group.create_dataset(name, data = x, dtype = h5py.string_dtype())
         
     elif isinstance(x, vigra.VigraArray):
         # NOTE: 2021-11-07 13:58:50
@@ -498,7 +571,7 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         # stored in the dataset.
         data = x.transposeToNumpyOrder()
         dset = group.create_dataset(name, data=data, compression=compression, chunks=chunks)
-        x_attrs["axistags"] = data.axistags.toJSON()
+        x_attrs["axistags"] = string2hdf(data.axistags.toJSON())
         dset.attrs.update(x_attrs)
         
         # For each axis, we attach FOUR HDF5 dimension scales: 
@@ -510,13 +583,24 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         #for k, cal, axistag in enumerate(zip(x_tr_axcal, data.axistags)):
         for k, cal in enumerate(x_tr_axcal):
             axcalgrp = calgrp.create_group(f"{cal.key}", track_order=True)
-            ds_origin = axcalgrp.create_dataset("origin", data = cal.origin)
+            
+            #ds_origin = axcalgrp.create_dataset("origin", data = cal.origin)
+            ds_origin = make_dataset(cal.origin, axcalgrp, name = "origin")
             ds_origin.make_scale("origin")
-            ds_resolution = axcalgrp.create_dataset("resolution", data = cal.resolution)
+            
+            #ds_resolution = axcalgrp.create_dataset("resolution", data = cal.resolution)
+            ds_resolution = make_dataset(cal.resolution, axcalgrp, name = "resolution")
             ds_resolution.make_scale("resolution")
-            ds_units = axcalgrp.create_dataset("units", data = cal.units.dimensionality.string)
+            
+            #ds_units = axcalgrp.create_dataset("units", data = cal.units.dimensionality.string, 
+                                               #dtype=h5py.string_dtype())
+            ds_units = make_dataset(cal.units.dimensionality.string, axcalgrp,
+                                    name="units")
             ds_units.make_scale("units")
-            ds_name = axcalgrp.create_dataset("name", data = cal.name)
+            
+            #ds_name = axcalgrp.create_dataset("name", data = cal.name, 
+                                              #dtype=h5py.string_dtype())
+            ds_name = make_dataset(cal.name, axcalgrp, name = "name")
             ds_name.make_scale("name")
                 
             dset.dims[k].attach_scale(ds_name)
@@ -533,17 +617,32 @@ def make_dataset(x:typing.Any, group:h5py.Group,
                     channels_group = axcalgrp.create_group("channels", track_order=True)
                     for channel in channels:
                         channel_group = channels_group.create_group(channel[0], track_order=True)
-                        ds_chn_origin = channel_group.create_dataset(f"{channel[0]}_origin", data = channel[1].origin)
+                        
+                        #ds_chn_origin = channel_group.create_dataset(f"{channel[0]}_origin", data = channel[1].origin)
+                        ds_chn_origin = make_dataset(channel[1].origin, channel_group, name=f"{channel[0]}_origin")
                         ds_chn_origin.make_scale(f"{channel[0]}_origin")
-                        ds_chn_resolution = channel_group.create_dataset(f"{channel[0]}_resolution", data = channel[1].resolution)
+                        
+                        #ds_chn_resolution = channel_group.create_dataset(f"{channel[0]}_resolution", data = channel[1].resolution)
+                        ds_chn_resolution = make_dataset(channel[1].resolution, channel_group, name=f"{channel[0]}_resolution")
                         ds_chn_resolution.make_scale(f"{channel[0]}_resolution")
-                        ds_chn_maximum = channel_group.create_dataset(f"{channel[0]}_maximum", data=channel[1].maximum)
+                        
+                        #ds_chn_maximum = channel_group.create_dataset(f"{channel[0]}_maximum", data=channel[1].maximum)
+                        ds_chn_maximum = make_dataset(channel[1].maximum, channel_group, name = f"{channel[0]}_maximum")
                         ds_chn_maximum.make_scale(f"{channel[0]}_maximum")
-                        ds_chn_index = channel_group.create_dataset(f"{channel[0]}_index", data = channel[1].index)
+                        
+                        #ds_chn_index = channel_group.create_dataset(f"{channel[0]}_index", data = channel[1].index)
+                        ds_chn_index = make_dataset(channel[1].index, channel_group, name=f"{channel[0]}_index")
                         ds_chn_index.make_scale(f"{channel[0]}_index")
-                        ds_chn_units = channel_group.create_dataset(f"{channel[0]}_units", data = channel[1].units.dimensionality.string)
+                        
+                        #ds_chn_units = channel_group.create_dataset(f"{channel[0]}_units", data = channel[1].units.dimensionality.string,
+                                                                    #dtype=h5py.string_dtype())
+                        ds_chn_units = make_dataset(channel[1].units.dimensionality.string, channel_group, 
+                                                    name = f"{channel[0]}_units")
                         ds_chn_units.make_scale(f"{channel[0]}_units")
-                        ds_chn_name = channel_group.create_dataset(f"{channel[0]}_name", data = channel[1].name)
+                        
+                        #ds_chn_name = channel_group.create_dataset(f"{channel[0]}_name", data = channel[1].name,
+                                                                   #dtype=h5py.string_dtype())
+                        ds_chn_name = make_dataset(channel[1].name, channel_group, name=f"{channel[0]}_name")
                         ds_chn_name.make_scale(f"{channel[0]}_name") # channel name, not axis name!
                         
                         dset.dims[k].attach_scale(ds_chn_name)
@@ -555,38 +654,50 @@ def make_dataset(x:typing.Any, group:h5py.Group,
                         
             dset.dims[k].label = f"{cal.key}"
             
-    elif isinstance(x, (neo.AnalogSignal, DataSignal)):
+    elif isinstance(x, (neo.AnalogSignal, DataSignal, neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
+        # axis 0 is the domain axis; for irregularly sampled signals we store 
+        # the domain separately
+        # axis 1 is the signal axis
+        # after transposition, signal axis is axis 0; domain axis is axis 1
         data = np.transpose(x.magnitude) # axis 0 becomes axis 1 and vice-versa!
         x_meta = dict()
         x_meta.update(x_attrs)
-        #x_meta["description"] = "" if x.description is None else f"{x.description}"
-        #x_meta["file_origin"] = f"{x.file_origin}"
-        #annotations = dict()
-        #for k,v in x.annotations.items():
-            #annotations[k] = f"{v}"
+        
+        x_meta["description"] = make_attr("" if x.description is None else f"{x.description}")
+        x_meta["file_origin"] = make_attr(f"{x.file_origin}")
+        annotations = make_attr_dict(**x.annotations)
             
-        #if len(annotations):
-            #x_meta.update(x.annotations)
+        if len(annotations):
+            x_meta.update(annotations)
         
         dset = group.create_dataset(name, data = data)
-        print("x_meta", x_meta)
+        #print("x_meta", x_meta)
         dset.attrs.update(x_meta)
+        dom_dset = None # place holder for irregularly sampled signals' domain data
+        
+        if isinstance(x, (IrregularlySampledDataSignal, neo.IrregularlySampledSignal)):
+            domain_group = group.create_group("domain", track_order = True)
+            domain_name = x.domain_name if isinstance(x, IrregularlySampledDataSignal) else "Time"
+            dom_dset = make_dataset(x.times.magnitude, domain_group, name=domain_name)
         
         calgrp = group.create_group(f"{name}_axes", track_order=True)
         
         for k in range(2):
             axcalgrp = calgrp.create_group(f"axis_{k}", track_order=True)
             
-            if k == 0: # axis 0 is now the channels axis
-                ds_units = axcalgrp.create_dataset("signal_units", data = x.dimensionality.string)
-                ds_units.make_scale("signal_units")
+            if k == 0: # axis 0 is now the signal axis
+                ds_units = make_dataset(x.dimensionality.string, axcalgrp, name="units")
+                ds_units.make_scale("units")
                 # (un)fortunately(?), individual channels (i.e. data columns) in
                 # neo signals are not named
                 data_name = getattr(x, "name", None)
+                
                 if not isinstance(data_name, str) or len(data_name.strip()) == 0:
                     data_name = name
-                ds_name = axcalgrp.create_dataset("signal_name", data = data_name)
-                ds_name.make_scale("signal_name")
+                    
+                #print("data_name", data_name, "name", name)
+                ds_name = make_dataset(data_name, axcalgrp, name = "name")
+                ds_name.make_scale("name")
                 
                 dset.dims[k].attach_scale(ds_name)
                 dset.dims[k].attach_scale(ds_units)
@@ -596,12 +707,12 @@ def make_dataset(x:typing.Any, group:h5py.Group,
                 array_annotations = getattr(x, "array_annotations", None)
                 
                 if isinstance(array_annotations, ArrayDict):
-                    channels_group.attrs.update(array_annotations)
+                    channels_group.attrs.update(make_attr_dict(**array_annotations))
                     
                 else:
                     array_annotations = dict() # shim for below
                 
-                for k in x.shape[-1]:
+                for k in range(x.shape[-1]):
                     if "channel_ids" in array_annotations:
                         channel_id = array_annotations["channel_ids"][k].item()
                     else:
@@ -612,14 +723,16 @@ def make_dataset(x:typing.Any, group:h5py.Group,
                     else:
                         channel_name = f"{k}"
                         
-                    ds_chn_index = channels_group.create_dataset(f"channel_{k}_index", data=k)
-                    ds_chn_index.make_scale(f"channel_{k}_index")
+                    channel_group = channels_group.create_group(f"channel_{k}", track_order=True)
                     
-                    ds_chn_id = channels_group.create_dataset(f"channel_{k}_id", data = channel_id)
-                    ds_chn_id.make_scale(f"channel_{k}_id")
+                    ds_chn_index = make_dataset(k, channel_group, name="index")
+                    ds_chn_index.make_scale("index")
                     
-                    ds_chn_name = channels_group.create_dataset(f"channel_{k}_name", data = channel_name)
-                    ds_chn_name.make_scale(f"channel_{k}_name")
+                    ds_chn_id = make_dataset(channel_id, channel_group, name="id")
+                    ds_chn_id.make_scale("id")
+                    
+                    ds_chn_name = make_dataset(channel_name, channel_group, name="name")
+                    ds_chn_name.make_scale("name")
                     
                     dset.dims[k].attach_scale(ds_chn_index)
                     dset.dims[k].attach_scale(ds_chn_id)
@@ -627,43 +740,64 @@ def make_dataset(x:typing.Any, group:h5py.Group,
                     
                     for key in array_annotations:
                         if key not in ("channel_ids", "channel_names"):
-                            ds_chn_key = channels_group.create_dataset(f"channel_{k}_{key}", data = array_annotations[key][k].item())
-                            ds_chn_key.make_scale(f"channel_{k}_{key}")
+                            ds_chn_key = make_dataset(array_annotations[key][k].item(), channel_group, name=key)
+                            ds_chn_key.make_scale(f"{key}")
                             dset.dims[k].attach_scale(ds_chn_key)
                     
                 dset.dims[k].label = data_name
                     
             else: # axis 1 is now the time (or domain) axis
-                ds_origin = axcalgrp.create_dataset("domain_origin", data = x.t_start.magnitude.item())
-                ds_origin.make_scale("domain_origin")
-                ds_units = axcalgrp.create_dataset("domain_units", data = x.t_units.dimensionality.string)
-                ds_units.make_scale("domain_units")
-                ds_rate = axcalgrp.create_dataset("sampling_rate", data = x.sampling_rate.magnitude.item())
-                ds_rate.make_scale("sampling_rate")
-                ds_rate_units = axcalgrp.create_dataset("sampling_rate_units", data = x.sampling_rate.units.dimensionality.string)
-                ds_rate_units.make_scale("sampling_rate_units")
-                
-                dset.dims[k].attach_scale(ds_origin)
-                dset.dims[k].attach_scale(ds_units)
-                dset.dims[k].attach_scale(ds_rate)
-                dset.dims[k].attach_scale(ds_rate_units)
-                
-                if isinstance(x, DataSignal):
-                    dset.dims[k].label = x.domain_name
+                #if isinstance(x, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
+                    #continue # save this axis as a separate dataset
+                if isinstance(x, (DataSignal, IrregularlySampledDataSignal)):
+                    domain_name = x.domain_name
                 else:
-                    dset.dims[k].label="Time"
-            
-        
+                    domain_name = "Time"
+                    
+                ds_dom_origin = make_dataset(x.t_start.magnitude.item(), axcalgrp, name="origin")
+                ds_dom_origin.make_scale("origin")
+                
+                ds_dom_units = make_dataset(x.times.units.dimensionality.string, axcalgrp, name="domain_units")
+                ds_dom_units.make_scale("domain_units")
+                
+                ds_dom_name = make_dataset(domain_name, axcalgrp, name="domain_name")
+                ds_dom_name.make_scale("domain_name")
+                
+                ds_dom_rate = make_dataset(x.sampling_rate.magnitude.item(), axcalgrp, name="sampling_rate")
+                ds_dom_rate.make_scale("sampling_rate")
+
+                ds_dom_rate_units = make_dataset(x.sampling_rate.units.dimensionality.string, axcalgrp, name="sampling_rate_units")
+                ds_dom_rate_units.make_scale("sampling_rate_units")
+                
+                if isinstance(x, (IrregularlySampledDataSignal, neo.IrregularlySampledSignal)) and isinstance(dom_dset, h5py.Dataset):
+                    #dom_dset created above
+                    dom_dset.dims[0].attach_scale(ds_dom_name)
+                    dom_dset.dims[0].attach_scale(ds_dom_origin)
+                    dom_dset.dims[0].attach_scale(ds_dom_units)
+                    dom_dset.dims[0].attach_scale(ds_dom_rate)
+                    dom_dset.dims[0].attach_scale(ds_dom_rate_units)
+                else:
+                    dset.dims[k].attach_scale(ds_dom_name)
+                    dset.dims[k].attach_scale(ds_dom_origin)
+                    dset.dims[k].attach_scale(ds_dom_units)
+                    dset.dims[k].attach_scale(ds_dom_rate)
+                    dset.dims[k].attach_scale(ds_dom_rate_units)
+                
+                dset.dims[k].label = domain_name
+                
     elif isinstance(x, pq.Quantity):
-        dset = group.create_dataset(name, data=x.magnitude)
-        x_attrs.update({"units": x.dimensionality.string})
+        dset = make_dataset(x.magnitude, group, name=name)
+        x_attrs.update(make_attr_dict(units = x.dimensionality.string))
         dset.attrs.update(x_attrs)
         
     elif isinstance(x, np.ndarray):
-        dset = group.create_dataset(name, data = x)
+        dset = make_dataset(x, group, name)
         dset.attrs.update(x_attrs)
         
+    else:
+        dset = None
         
+    return dset
 
 def data2hdf(x:typing.Any, 
              fileNameOrGroup:typing.Union[str, h5py.Group], 
@@ -771,7 +905,7 @@ def readHDF5_VigraArray(fileNameOrGroup:typing.Union[str, h5py.Group],
     '''Read an array from an HDF5 file.
     
     Modified version of vigra.impex.readHDF5() for the new h5py API:
-    A DataSet object does NOT have a "value" attribute in h5py v3.4.0
+    A Dataset object does NOT have a "value" attribute in h5py v3.4.0
     
     Parameters:
     ===========

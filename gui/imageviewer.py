@@ -3558,7 +3558,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                         
                     cFrame = self._applyColorTable_(self._currentFrameData_, colorMap)
                     
-                    self.viewerWidget.view(cFrame.qimage(normalize = self._imageNormalize))
+                    if cFrame.min() == cFrame.max():
+                        self.viewerWidget.view(cFrame.qimage(normalize = False))
+                    else:
+                        self.viewerWidget.view(cFrame.qimage(normalize = self._imageNormalize))
                     
                 else: # don't apply color map to a multi-band frame data
                     #warnings.warn("Cannot apply color map to a multi-band image")

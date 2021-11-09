@@ -529,6 +529,10 @@ class CalibrationData(object):
                         self._data_.units = axisTypeUnits(self._data_.type)
                         self._data_.origin = 0.
                         self._data_.resolution = 1. if arg.resolution == 0. else arg.resolution
+                        # bring back channel calibrations if appropriate
+                        if self._data_.type & vigra.AxisType.Channels:
+                            for k, chcal in enumerate(channeldata):
+                                self._data_[chcal[0]] = chcal[1]
                         
                     else:
                         cal = AxisCalibrationData.fromCalibrationString(arg.description[cal_str_start_stop[0]:cal_str_start_stop[1]])
@@ -1303,7 +1307,17 @@ class AxisCalibrationData(CalibrationData):
         return vigra.AxisInfo(key = self.key, typeFlags = self.type, resolution=self.resolution, description=self.calibrationString)
         
     
-    def addChannelCalibration(self, val:ChannelCalibrationData, name:str):
+    def addChannelCalibration(self, val:ChannelCalibrationData, name:str=None):
+        """Add/set ChannelCalibrationData
+        
+        NOTE: name is the name under which this channel calibration is stored
+        in self.channelCalibrations (i.e. the 'key'), NOT the channel's name
+        
+        Generally, once the calibration data has been stored, there is no much
+        point in changing the key; the relevant information (channel index and
+        name) is stord inside self.channelCalibrations property
+        
+        """
         if not self.type & vigra.AxisType.Channels:
             return
         
@@ -1326,7 +1340,7 @@ class AxisCalibrationData(CalibrationData):
         Returns the ChannelCalibrationData, if found, else None.
         
         """
-        chcal = self.channelCalibration(index, True)
+        chcal = self.getChannelCalibration(index, True)
         if chcal is None:
             return
         
@@ -1540,7 +1554,7 @@ class AxisCalibrationData(CalibrationData):
             return
         
         if isinstance(val, str) and len(val.strip()): # avoid empty names
-            chcal = self.channelCalibration(index)
+            chcal = self.getChannelCalibration(index)
             isvirtual = "virtual" in chcal.name
             chcal.name = val
             if isvirtual: # a virtual channel calibration -> make it a real one
@@ -1982,6 +1996,12 @@ class AxesCalibration(object):
                 self._axistags_ = args[0].axistags
                 
                 self._calibration_ = [AxisCalibrationData(axinfo) for axinfo in args[0].axistags]
+                
+                # set up channel calibrations with default values:
+                if args[0].channelIndex != args[0].ndim: # real channel axis exists
+                    chax_index = args[0].axistags.index("c")
+                    for k in range(args[0].channels):
+                        self._calibration_[chax_index].addChannelCalibration(ChannelCalibrationData(), name=f"channel_{k}")
                 
                 return
 

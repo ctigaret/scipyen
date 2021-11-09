@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Vigra input/output functions moved here so that we can separate dependencies
-from vigranumpy (which may or may ont be available on the platform)
+"""Vigra input/output functions to be moved here so that we can separate dependencies
+from vigranumpy (which may or may not be available on the platform)
+NOTE: 2021-11-09 17:47:35
+Migration aborted: VIGRA is mandaotyr for scipyen on ALL platforms
 """
 from __future__ import print_function
 import sys, os, typing, traceback, inspect, warnings, io, importlib
