@@ -2509,9 +2509,9 @@ def concatenate_signals(*args, axis:int = 1,
             #else:
                 #t_start = signals[0].t_start
             
-            result = neo.AnalogSignal(data, units=units_0, t_start=t_start,
-                                      dtype = signals[0].dtype,
-                                      sampling_rate=sampling_rate, **kwargs)
+            result = sig_klass(data, units=units_0, t_start=t_start,
+                               dtype = signals[0].dtype,
+                               sampling_rate=sampling_rate, **kwargs)
             
                 
         else: # concatenation on the domain axis
@@ -2565,11 +2565,11 @@ def concatenate_signals(*args, axis:int = 1,
             if isinstance(set_domain_start, float):
                 t_start = set_domain_start * signals[0].times.units
             
-            result = neo.AnalogSignal(data,
-                                      sampling_rate = sampling_rate, 
-                                      t_start = t_start,
-                                      units = units_0,
-                                      **kwargs)
+            result = sig_klass(data,
+                               sampling_rate = sampling_rate, 
+                               t_start = t_start,
+                               units = units_0,
+                               **kwargs)
             
             if not force_contiguous:
                 if not overwrite:

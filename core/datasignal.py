@@ -14,30 +14,41 @@ from core.quantities import (units_convertible, name_from_unit)
 
 
 def _new_DataSignal(cls, signal, units=None, dtype=None, copy=True,
-                    origin=0*pq.dimensionless, sampling_period=None,
+                    t_start=0*pq.dimensionless, sampling_period=None,
                     sampling_rate=None, name=None, file_origin=None,
-                    description=None, annotations=None,
-                    channel_index=None, segment=None):
+                    description=None, array_annotations=None, annotations=None,
+                    #channel_index=None, 
+                    segment=None):
+    if not isinstance(array_annotations, ArrayDict):
+        array_annotations = ArrayDict(signal.shape[-1])
     obj = cls(signal=signal, units=units, dtype=dtype, copy=copy,
               origin=origin, sampling_period=sampling_period, sampling_rate=sampling_rate,
               name=name, file_origin=file_origin, description=description,
+              array_annotations=array_annotations,
               **annotations)
     
-    obj.channel_index = channel_index
+    #obj.channel_index = channel_index
     obj.segment = segment
     
     return obj
 
-def _new_IrregularlySampledDataSignal(cls, domain, signal, units=None, domain_units=None,
-                                      dtype=None, copy=True, name=None,file_origin=None,
-                                      description=None,annotations=None,segment=None,
-                                      channel_index=None):
+def _new_IrregularlySampledDataSignal(cls, domain, signal, units=None, 
+                                      domain_units=None, dtype=None, copy=True, 
+                                      name=None,file_origin=None,
+                                      description=None,annotations=None,
+                                      array_annotations=None,
+                                      #channel_index=None,
+                                      segment=None,
+                                      ):
+    if not isinstance(array_annotations, ArrayDict):
+        array_annotations = ArrayDict(signal.shape[-1])
+        
     obj = cls(domain=domain,signal=signal,units=units,domain_units=domain_units,
               dtype=dtype,copy=copy,name=name,file_origin=file_origin,
-              description=description, **annotations)
+              description=description, array_annotations=array_annotations,**annotations)
     
     obj.segment=segment
-    obj.channel_index = channel_index
+    #obj.channel_index = channel_index
     
     return obj
 
@@ -167,7 +178,7 @@ class DataSignal(BaseSignal):
             obj._sampling_period = sampling_period * obj._origin.units
         
         obj.segment=None
-        #obj.channelIndex=None
+        obj.channel_index=None
 
         return obj
     
@@ -177,7 +188,6 @@ class DataSignal(BaseSignal):
                  array_annotations=None, **annotations):
         
         """DataSignal constructor.
-        
         """
         
         DataObject.__init__(self, name=name, file_origin=file_origin, 
@@ -203,8 +213,9 @@ class DataSignal(BaseSignal):
         self.name               = getattr(obj, "name",          None)
         self.file_origin        = getattr(obj, "file_origin",   None)
         self.description        = getattr(obj, "description",   None)
-        self.segment            = getattr(obj, "segment",       None)
         #self.channel_index      = getattr(obj, "channel_index", None)
+        self.segment            = getattr(obj, "segment",       None)
+        self.array_annotations  = getattr(obj, "array_annotations", None)
     
     def __reduce__(self):
         return _new_DataSignal, (self.__class__, 
@@ -219,7 +230,8 @@ class DataSignal(BaseSignal):
                                  self.file_origin, 
                                  self.description,
                                  self.annotations,
-                                 self.channel_index,
+                                 self.array_annotations,
+                                 #self.channel_index,
                                  self.segment)
     
     def __deepcopy__(self, memo):
@@ -598,7 +610,7 @@ class DataSignal(BaseSignal):
                              sampling_rate=self.sampling_rate)
         
         obj._copy_data_complement(self)
-        #obj.channel_index = self.channel_index # FIXME TODO channel index functionality
+        #obj.channel_index = self.channel_index #
         #obj.segment = self.segment             # FIXME TODO parent container functionality
         obj.annotations.update(self.annotations)
 
@@ -767,7 +779,257 @@ class DataSignal(BaseSignal):
             
         return signal
 
-class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
+    def downsample(self, downsampling_factor, **kwargs):
+        """
+        Downsample the data of a signal.
+        This method reduces the number of samples of the AnalogSignal to a fraction of the
+        original number of samples, defined by `downsampling_factor`.
+        This method is a wrapper of scipy.signal.decimate and accepts the same set of keyword
+        arguments, except for specifying the axis of resampling, which is fixed to the first axis
+        here.
+
+        Parameters:
+        -----------
+        downsampling_factor: integer
+            Factor used for decimation of samples. Scipy recommends to call decimate multiple times
+            for downsampling factors higher than 13 when using IIR downsampling (default).
+
+        Returns:
+        --------
+        downsampled_signal: :class:`AnalogSignal`
+            New instance of a :class:`AnalogSignal` object containing the resampled data points.
+            The original :class:`AnalogSignal` is not modified.
+
+        Note:
+        -----
+        For resampling the signal with a fixed number of samples, see `resample` method.
+        """
+
+        if not HAVE_SCIPY:
+            raise ImportError('Decimating requires availability of scipy.signal')
+
+        # Resampling is only permitted along the time axis (axis=0)
+        if 'axis' in kwargs:
+            kwargs.pop('axis')
+
+        downsampled_data = scipy.signal.decimate(self.magnitude, downsampling_factor, axis=0,
+                                                 **kwargs)
+        downsampled_signal = self.duplicate_with_new_data(downsampled_data)
+
+        # since the number of channels stays the same, we can also copy array annotations here
+        downsampled_signal.array_annotations = self.array_annotations.copy()
+        downsampled_signal.sampling_rate = self.sampling_rate / downsampling_factor
+
+        return downsampled_signal
+
+    def resample(self, sample_count, **kwargs):
+        """
+        Resample the data points of the signal.
+        This method interpolates the signal and returns a new signal with a fixed number of
+        samples defined by `sample_count`.
+        This method is a wrapper of scipy.signal.resample and accepts the same set of keyword
+        arguments, except for specifying the axis of resampling which is fixed to the first axis
+        here, and the sample positions. .
+
+        Parameters:
+        -----------
+        sample_count: integer
+            Number of desired samples. The resulting signal starts at the same sample as the
+            original and is sampled regularly.
+
+        Returns:
+        --------
+        resampled_signal: :class:`DataSignal`
+            New instance of a :class:`DataSignal` object containing the resampled data points.
+            The original :class:`DataSignal` is not modified.
+
+        Note:
+        -----
+        For reducing the number of samples to a fraction of the original, see `downsample` method
+        """
+
+        if not HAVE_SCIPY:
+            raise ImportError('Resampling requires availability of scipy.signal')
+
+        # Resampling is only permitted along the time axis (axis=0)
+        if 'axis' in kwargs:
+            kwargs.pop('axis')
+        if 't' in kwargs:
+            kwargs.pop('t')
+
+        resampled_data, resampled_times = scipy.signal.resample(self.magnitude, sample_count,
+                                                                t=self.times, axis=0, **kwargs)
+
+        resampled_signal = self.duplicate_with_new_data(resampled_data)
+        resampled_signal.sampling_rate = (sample_count / self.shape[0]) * self.sampling_rate
+
+        # since the number of channels stays the same, we can also copy array annotations here
+        resampled_signal.array_annotations = self.array_annotations.copy()
+
+        return resampled_signal
+
+    def rectify(self, **kwargs):
+        """
+        Rectify the signal.
+        This method rectifies the signal by taking the absolute value.
+        This method is a wrapper of numpy.absolute() and accepts the same set of keyword
+        arguments.
+
+        Returns:
+        --------
+        resampled_signal: :class:`DataSignal`
+            New instance of a :class:`DataSignal` object containing the rectified data points.
+            The original :class:`DataSignal` is not modified.
+
+        """
+
+        # Use numpy to get the absolute value of the signal
+        rectified_data = np.absolute(self.magnitude, **kwargs)
+
+        rectified_signal = self.duplicate_with_new_data(rectified_data)
+
+        # the sampling rate stays constant
+        rectified_signal.sampling_rate = self.sampling_rate
+
+        # since the number of channels stays the same, we can also copy array annotations here
+        rectified_signal.array_annotations = self.array_annotations.copy()
+
+        return rectified_signal
+
+    def concatenate(self, *signals, overwrite:bool=False, padding:bool=False):
+        """
+        Concatenate multiple DataSignal objects across the domain axis.
+
+        Units, sampling_rate and number of signal traces must be the same
+        for all signals. Otherwise a ValueError is raised.
+        Note that timestamps of concatenated signals might shift in oder to
+        align the sampling times of all signals.
+
+        Parameters
+        ----------
+        signals: DataSignal objects
+            DataSignals that will be concatenated
+        overwrite : bool
+            If True, samples of the earlier (lower index in `signals`)
+            signals are overwritten by that of later (higher index in `signals`)
+            signals.
+            If False, samples of the later are overwritten by earlier signal.
+            Default: False
+        padding : bool, scalar quantity
+            Sampling values to use as padding in case signals do not overlap.
+            If False, do not apply padding. Signals have to align or
+            overlap. If True, signals will be padded using
+            np.NaN as pad values. If a scalar quantity is provided, this
+            will be used for padding. The other signal is moved
+            forward in time by maximum one sampling period to
+            align the sampling times of both signals.
+            Default: False
+
+        Returns
+        -------
+        signal: DataSignal
+            concatenated output signal
+        """
+
+        # Sanity of inputs
+        if not hasattr(signals, '__iter__'):
+            raise TypeError('signals must be iterable')
+        if not all([isinstance(a, DataSignal) for a in signals]):
+            raise TypeError('Entries of anasiglist have to be of type neo.DataSignal')
+        if len(signals) == 0:
+            return self
+
+        signals = [self] + list(signals)
+
+        # Check required common attributes: units, sampling_rate and shape[-1]
+        shared_attributes = ['units', 'sampling_rate']
+        attribute_values = [tuple((getattr(anasig, attr) for attr in shared_attributes))
+                            for anasig in signals]
+        # add shape dimensions that do not relate to time
+        attribute_values = [(attribute_values[i] + (signals[i].shape[1:],))
+                            for i in range(len(signals))]
+        if not all([attrs == attribute_values[0] for attrs in attribute_values]):
+            raise MergeError(
+                f'AnalogSignals have to share {shared_attributes} attributes to be concatenated.')
+        units, sr, shape = attribute_values[0]
+
+        # find gaps between Analogsignals
+        combined_time_ranges = self._concatenate_time_ranges(
+            [(s.t_start, s.t_stop) for s in signals])
+        missing_time_ranges = self._invert_time_ranges(combined_time_ranges)
+        if len(missing_time_ranges):
+            diffs = np.diff(np.asarray(missing_time_ranges), axis=1)
+        else:
+            diffs = []
+
+        if padding is False and any(diffs > signals[0].sampling_period):
+            raise MergeError(f'Signals are not continuous. Can not concatenate signals with gaps. '
+                             f'Please provide a padding value.')
+        if padding is not False:
+            logger.warning('Signals will be padded using {}.'.format(padding))
+            if padding is True:
+                padding = np.NaN * units
+            if isinstance(padding, pq.Quantity):
+                padding = padding.rescale(units).magnitude
+            else:
+                raise MergeError('Invalid type of padding value. Please provide a bool value '
+                                 'or a quantities object.')
+
+        t_start = min([a.t_start for a in signals])
+        t_stop = max([a.t_stop for a in signals])
+        n_samples = int(np.rint(((t_stop - t_start) * sr).rescale('dimensionless').magnitude))
+        shape = (n_samples,) + shape
+
+        # Collect attributes and annotations across all concatenated signals
+        kwargs = {}
+        common_annotations = signals[0].annotations
+        common_array_annotations = signals[0].array_annotations
+        for anasig in signals[1:]:
+            common_annotations = intersect_annotations(common_annotations, anasig.annotations)
+            common_array_annotations = intersect_annotations(common_array_annotations,
+                                                             anasig.array_annotations)
+
+        kwargs['annotations'] = common_annotations
+        kwargs['array_annotations'] = common_array_annotations
+
+        for name in ("name", "description", "file_origin"):
+            attr = [getattr(s, name) for s in signals]
+            if all([a == attr[0] for a in attr]):
+                kwargs[name] = attr[0]
+            else:
+                kwargs[name] = f'concatenation ({attr})'
+
+        conc_signal = DataSignal(np.full(shape=shape, fill_value=padding, dtype=signals[0].dtype),
+                                   sampling_rate=sr, t_start=t_start, units=units, **kwargs)
+
+        if not overwrite:
+            signals = signals[::-1]
+        while len(signals) > 0:
+            conc_signal.splice(signals.pop(0), copy=False)
+
+        return conc_signal
+
+    def _concatenate_time_ranges(self, time_ranges):
+        time_ranges = sorted(time_ranges)
+        new_ranges = time_ranges[:1]
+        for t_start, t_stop in time_ranges[1:]:
+            # time range are non continuous -> define new range
+            if t_start > new_ranges[-1][1]:
+                new_ranges.append((t_start, t_stop))
+            # time range is continuous -> extend time range
+            elif t_stop > new_ranges[-1][1]:
+                new_ranges[-1] = (new_ranges[-1][0], t_stop)
+        return new_ranges
+
+    def _invert_time_ranges(self, time_ranges):
+        i = 0
+        new_ranges = []
+        while i < len(time_ranges) - 1:
+            new_ranges.append((time_ranges[i][1], time_ranges[i + 1][0]))
+            i += 1
+        return new_ranges
+
+class IrregularlySampledDataSignal(BaseSignal):
     """Almost literal copy of the neo.IrregularlySampledSignal, accepting a domain other than time
     """
     _single_parent_objects = ("Segment", "ChannelIndex") 
@@ -780,13 +1042,9 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
     
     _recommended_attrs = neo.baseneo.BaseNeo._recommended_attrs
 
-    #"def" __new__(cls, domain, signal, units=None, domain_units=None, dtype=None, 
-                #copy=True, name=None, file_origin=None, description=None, 
-                #**annotations):
-        
     def __new__(cls, domain, signal, units=None, domain_units=None, dtype=np.dtype("float64"), 
                 copy=True, name=None, file_origin=None, description=None, 
-                **annotations):
+                array_annotations=None, **annotations):
         
         if units is None:
             if not hasattr(signal, "units"):
@@ -813,18 +1071,23 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
             if domain_units != domain.units:
                 domain = domain.rescale(domain_units)
                 
-        obj._domain = pq.Quantity(domain, units = domain_units,dtype=float, copy=copy)
+        obj._domain = pq.Quantity(domain, units = domain_units,
+                                  dtype=float, copy=copy)
                 
         obj.segment=None
-        obj.channelIndex=None
+        #obj.channel_index=None
 
         return obj
                 
     def __init__(self, domain, signal, units=None, domain_units=None, dtype=None,
                  copy=True, name=None, file_origin=None, description=None,
-                 **annotations):
-        baseneo.BaseNeo.__init__(self, name=name, file_origin=file_origin,
-                                 description=description, **annotations)
+                 array_annotations=None, **annotations):
+        DataObject.__init__(self, name=name, file_origin=file_origin,
+                            desciption=description, 
+                            array_annotations=array_annotations,
+                            **annotations)
+        #baseneo.BaseNeo.__init__(self, name=name, file_origin=file_origin,
+                                 #description=description, **annotations)
         
         self.__domain_name__ = name_from_unit(self._domain)
         
@@ -845,26 +1108,31 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
                                                    self.file_origin,
                                                    self.description,
                                                    self.annotations,
+                                                   self.array_annotations,
+                                                   #self.channel_index,
                                                    self.segment,
-                                                   self.channel_index)
+                                                   )
     
     def __array_finalize__(self, obj):
-        super(IrregularlySampledDataSignal, self).__array_finalize__(obj)
+        super(DataSignal, self).__array_finalize__(obj)
         self._domain = getattr(obj, "_domain", None)
         self.annotations        = getattr(obj, "annotations",   {})
         self.name               = getattr(obj, "name",          None)
         self.file_origin        = getattr(obj, "file_origin",   None)
         self.description        = getattr(obj, "description",   None)
         self.segment            = getattr(obj, "segment",       None)
-        self.channel_index      = getattr(obj, "channel_index", None)
+        #self.channel_index      = getattr(obj, "channel_index", None)
+        self.array_annotations  = getattr(obj, "array_annotations", None)
         self.__domain_name__    = name_from_unit(self._domain)
         
     def __deepcopy__(self, memo):
         cls = self.__class__
         new_signal = cls(self.domain, np.array(self), units=self.units,
                          domain_units=self.domain.units, dtype=self.dtype,
-                         t_start=self.t_start, name=self.name,
-                         file_origin=self.file_origin, description=self.description)
+                         name=self.name, file_origin=self.file_origin, 
+                         description=self.description,
+                         array_annotations=self.array_annotations,
+                         annotations = self.annotations)
         new_signal.__dict__.update(self.__dict__)
         memo[id(self)] = new_signal
         for k, v in self.__dict__.items():
@@ -1023,15 +1291,71 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         TODO interpolation
         """
         if interpolation is None:
-            return (self[:-1] * self.sampling_intervals.reshape(-1, 1)).sum() / self.duration
+            return np.sum(self[:-1] * self.sampling_intervals.reshape(-1, 1), axis=1) / self.duration
+        else:
+            raise NotImplementedError
+        
+    def nanmean(self, interpolation=None):
+        """
+        TODO: Interpolation
+        """
+        if interpolation is None:
+            return np.nansum(self[:-1] * self.sampling_intervals.reshape(-1, 1), axis=1) / self.duration
+            
         else:
             raise NotImplementedError
 
-    def resample(self, at=None, interpolation=None):
+    def resample(self, sample_count, **kwargs):
+        """
+        Resample the data points of the signal.
+        This method interpolates the signal and returns a new signal with a fixed number of
+        samples defined by `sample_count`.
+        This function is a wrapper of scipy.signal.resample and accepts the same set of keyword
+        arguments, except for specifying the axis of resampling which is fixed to the first axis
+        here, and the sample positions. .
+
+        Parameters:
+        -----------
+        sample_count: integer
+            Number of desired samples. The resulting signal starts at the same sample as the
+            original and is sampled regularly.
+
+        Returns:
+        --------
+        resampled_signal: :class:`DataSignal`
+            New instance of a :class:`DataSignal` object containing the resampled data points.
+            The original :class:`IrregularlySampledDataSignal` is not modified.
+        """
+
+        if not HAVE_SCIPY:
+            raise ImportError('Resampling requires availability of scipy.signal')
+
+        # Resampling is only permitted along the time axis (axis=0)
+        if 'axis' in kwargs:
+            kwargs.pop('axis')
+        if 't' in kwargs:
+            kwargs.pop('t')
+
+        resampled_data, resampled_times = scipy.signal.resample(self.magnitude, sample_count,
+                                                                t=self.times.magnitude,
+                                                                axis=0, **kwargs)
+
+        new_sampling_rate = (sample_count - 1) / self.duration
+        resampled_signal = DataSignal(resampled_data, units=self.units, dtype=self.dtype,
+                                        t_start=self.t_start,
+                                        sampling_rate=new_sampling_rate,
+                                        array_annotations=self.array_annotations.copy(),
+                                        **self.annotations.copy())
+
+        # since the number of channels stays the same, we can also copy array annotations here
+        resampled_signal.array_annotations = self.array_annotations.copy()
+        return resampled_signal
+
+    def resample_interp(self, at=None, interpolation=None):
         '''
         TODO
-        Resample the signal, returning either an :class:`AnalogSignal` object
-        or another :class:`IrregularlySampledSignal` object.
+        Resample the signal, returning either an :class:`DataSignal` object
+        or another :class:`IrregularlySampledDataSignal` object.
 
         Arguments:
             :at: either a :class:`Quantity` array containing the times at
@@ -1044,6 +1368,28 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         # further interpolation methods could be added
         raise NotImplementedError
     
+    def time_shift(self, t_shift):
+        """
+        Shifts a :class:`IrregularlySampledSignal` to start at a new time.
+
+        Parameters:
+        -----------
+        t_shift: Quantity (time)
+            Amount of time by which to shift the :class:`IrregularlySampledSignal`.
+
+        Returns:
+        --------
+        new_sig: :class:`SpikeTrain`
+            New instance of a :class:`IrregularlySampledSignal` object
+            starting at t_shift later than the original :class:`IrregularlySampledSignal`
+            (the original :class:`IrregularlySampledSignal` is not modified).
+        """
+        new_sig = deepcopy(self)
+
+        new_sig.times += t_shift
+
+        return new_sig
+
     @property
     def sampling_intervals(self):
         '''
@@ -1051,15 +1397,15 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
 
         (:attr:`times[1:]` - :attr:`times`[:-1])
         '''
-        return self.times[1:] - self.times[:-1]
+        return self.domain[1:] - self.domain[:-1]
 
     @property
     def domain_begin(self):
-        return self.t_start
+        return self.domain[0]
     
     @property
     def domain_end(self):
-        return self.t_stop
+        return self.domain[-1]
     
     @property
     def t_start(self):
@@ -1069,7 +1415,7 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         Read-only
         
         """
-        return self._origin
+        return self.domain_begin
     
     @property
     def t_stop(self):
@@ -1081,8 +1427,7 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         
         """
         
-        return self.domain[-1]
-    
+        return self.domain_end
     
     def range(self, **kwargs):
         return self.max(**kwargs) - self.min(**kwargs)
@@ -1090,21 +1435,6 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
     def nanrange(self, **kwargs):
         return self.nanmax(**kwargs) - self.nanmin(**kwargs)
     
-    #@property
-    #def index(self):
-        #return self._index
-    
-    #@index.setter
-    #def index(self, value):
-        #if value is None:
-            #self._index = 0
-            #return
-        
-        #if not isinstance(value, int):
-            #raise TypeError("Expecting an int; got %s instead" % type(value).__name__)
-        
-        #self._index = value
-        
     @property
     def extent(self):
         """The extent of the data domain of the signal, as a quantity.
@@ -1115,13 +1445,17 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         period or sampling rate.
         
         """
-        return self.shape[0] * self.sampling_period
+        return self.domain[-1] - self.domain[0]
+    
+    @property
+    def duration(self):
+        return self.extent
     
     @property
     def end(self):
         """The equivalent of neo.AnalogSignal.t_stop
         """
-        return self.origin + self.extent
+        return self.domain[0] + self.extent
     
     @property
     def name(self):
@@ -1253,7 +1587,7 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         obj = self.__class__(domain=self.domain, signal=signal, units=to_u)
         
         obj._copy_data_complement(self)
-        #obj.channel_index = self.channel_index # FIXME TODO channel index functionality
+        #obj.channel_index = self.channel_index 
         #obj.segment = self.segment             # FIXME TODO parent container functionality
         obj.annotations.update(self.annotations)
 
@@ -1261,12 +1595,11 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
 
     def duplicate_with_new_array(self, signal):
         '''
-        Create a new :class:`AnalogSignal` with the same metadata
+        Create a new :class:`IrregularlySampledDataSignal` with the same metadata
         but different data
         '''
         #signal is the new signal
-        obj = self.__class__(signal=signal, units=self.units,
-                             sampling_rate=self.sampling_rate)
+        obj = self.__class__(domain=signal.domain, signal=signal, units=self.units)
         
         obj._copy_data_complement(self)
         obj.annotations.update(self.annotations)
@@ -1275,26 +1608,22 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
 
     def _check_consistency(self, other):
         '''
-        Check if the attributes of another :class:`AnalogSignal`
+        Check if the attributes of another :class:`IrregularlySampledDataSignal`
         are compatible with this one.
         '''
         if isinstance(other, IrregularlySampledDataSignal):
-            for attr in "origin", "sampling_rate", "sampling_period":
+            for attr in ("domain", "units", "domain_units"):
                 if getattr(self, attr) != getattr(other, attr):
                     raise ValueError("Inconsistent values of %s" % attr)
             # how to handle name and annotations?
 
     def _copy_data_complement(self, other):
         '''
-        Copy the metadata from another :class:`AnalogSignal`.
+        Copy the metadata from another :class:`IrregularlySampledDataSignal`.
         '''
-        for attr in ("origin", "sampling_rate", "sampling_period", "name", "file_origin",
-                     "description", "annotations"):
+        for attr in ("origin", "name", "file_origin", "domain", "units", "domain_units",
+                     "description", "annotations", "array_annotations"):
             setattr(self, attr, getattr(other, attr, None))
-            
-        #for attr in ("origin", "sampling_rate", "sampling_period", "name", "file_origin",
-                     #"description", "annotations", "_domain"):
-            #setattr(self, attr, getattr(other, attr, None))
             
     def interval(self, start, stop):
         '''The equivalent of neo.AnalogSignal.time_slice.
@@ -1345,64 +1674,143 @@ class IrregularlySampledDataSignal(neo.basesignal.BaseSignal):
         
         return self.interval(start, stop)
 
-    #"def" merge(self, other):
-        #'''
-        #Merge another :class:`DataSignal` into this one.
+    def concatenate(self, other, allow_overlap=False):
+        '''
+        Combine this and another signal along the time axis.
 
-        #The :class:`DataSignal` objects are concatenated horizontally
-        #(column-wise, :func:`np.hstack`).
+        The signal objects are concatenated vertically
+        (row-wise, :func:`np.vstack`). Patching can be
+        used to combine signals across segments.
+        Note: Only array annotations common to
+        both signals are attached to the concatenated signal.
 
-        #If the attributes of the two :class:`DataSignal` are not
-        #compatible, an Exception is raised.
-        #'''
-        #if self.sampling_rate != other.sampling_rate:
-            #raise MergeError("Cannot merge, different sampling rates")
-        
-        #if self.origin != other.origin:
-            #raise MergeError("Cannot merge, different origins")
-        
-        ## NOTE: FIXME TODO implement parent container functionality
-        ##
+        If the attributes of the two signal are not
+        compatible, an Exception is raised.
 
-        #if hasattr(self, "lazy_shape"):
-            #if hasattr(other, "lazy_shape"):
-                #if self.lazy_shape[0] != other.lazy_shape[0]:
-                    #raise MergeError("Cannot merge signals of different length.")
-                
-                #merged_lazy_shape = (self.lazy_shape[0], self.lazy_shape[1] + other.lazy_shape[1])
-                
-            #else:
-                #raise MergeError("Cannot merge a lazy object with a real object.")
-            
-        #if other.units != self.units:
-            #other = other.rescale(self.units)
-            
-        #stack = np.hstack(map(np.array, (self, other)))
-        
-        #kwargs = {}
-        
-        #for name in ("name", "description", "file_origin"):
-            #attr_self = getattr(self, name)
-            #attr_other = getattr(other, name)
-            #if attr_self == attr_other:
-                #kwargs[name] = attr_self
-            #else:
-                #kwargs[name] = "merge(%s, %s)" % (attr_self, attr_other)
-                
-        #merged_annotations = neo.core.baseneo.merge_annotations(self.annotations,
-                                               #other.annotations)
-        #kwargs.update(merged_annotations)
-        
-        #signal = DataSignal(stack, units=self.units, dtype=self.dtype,
-                              #copy=False, origin=self.origint,
-                              #sampling_rate=self.sampling_rate,
-                              #**kwargs)
-        
-        ## NOTE: 2017-11-15 23:34:23 FIXME TODO
-        ## implement channel index functionality
-        ##
+        Required attributes of the signal are used.
 
-        #if hasattr(self, "lazy_shape"):
-            #signal.lazy_shape = merged_lazy_shape
-            
-        #return signal
+        Parameters
+        ----------
+        other : neo.BaseSignal
+            The object that is merged into this one.
+        allow_overlap : bool
+            If false, overlapping samples between the two
+            signals are not permitted and an ValueError is raised.
+            If true, no check for overlapping samples is
+            performed and all samples are combined.
+
+        Returns
+        -------
+        signal : neo.IrregularlySampledDataSignal
+            Signal containing all non-overlapping samples of
+            both source signals.
+
+        Raises
+        ------
+        MergeError
+            If `other` object has incompatible attributes.
+        '''
+
+        for attr in self._necessary_attrs:
+            if not (attr[0] in ['signal', 'times', 't_start', 't_stop', 'times']):
+                if getattr(self, attr[0], None) != getattr(other, attr[0], None):
+                    raise MergeError(
+                        "Cannot concatenate these two signals as the %s differ." % attr[0])
+
+        if hasattr(self, "lazy_shape"):
+            if hasattr(other, "lazy_shape"):
+                if self.lazy_shape[-1] != other.lazy_shape[-1]:
+                    raise MergeError("Cannot concatenate signals as they contain"
+                                     " different numbers of traces.")
+                merged_lazy_shape = (self.lazy_shape[0] + other.lazy_shape[0], self.lazy_shape[-1])
+            else:
+                raise MergeError("Cannot concatenate a lazy object with a real object.")
+        if other.units != self.units:
+            other = other.rescale(self.units)
+
+        new_times = np.hstack((self.times, other.times))
+        sorting = np.argsort(new_times)
+        new_samples = np.vstack((self.magnitude, other.magnitude))
+
+        kwargs = {}
+        for name in ("name", "description", "file_origin"):
+            attr_self = getattr(self, name)
+            attr_other = getattr(other, name)
+            if attr_self == attr_other:
+                kwargs[name] = attr_self
+            else:
+                kwargs[name] = "merge({}, {})".format(attr_self, attr_other)
+        merged_annotations = merge_annotations(self.annotations, other.annotations)
+        kwargs.update(merged_annotations)
+
+        kwargs['array_annotations'] = intersect_annotations(self.array_annotations,
+                                                            other.array_annotations)
+
+        if not allow_overlap:
+            if max(self.t_start, other.t_start) <= min(self.t_stop, other.t_stop):
+                raise ValueError('Can not combine signals that overlap in time. Allow for '
+                                 'overlapping samples using the "no_overlap" parameter.')
+
+        t_start = min(self.t_start, other.t_start)
+        t_stop = max(self.t_start, other.t_start)
+
+        signal = IrregularlySampledDataSignal(signal=new_samples[sorting], times=new_times[sorting],
+                                          units=self.units, dtype=self.dtype, copy=False,
+                                          t_start=t_start, t_stop=t_stop, **kwargs)
+        signal.segment = None
+
+        if hasattr(self, "lazy_shape"):
+            signal.lazy_shape = merged_lazy_shape
+
+        return signal
+    
+    def merge(self, other):
+        '''
+        Merge another signal into this one.
+
+        The signal objects are concatenated horizontally
+        (column-wise, :func:`np.hstack`).
+
+        If the attributes of the two signals are not
+        compatible, an Exception is raised.
+
+        Required attributes of the signal are used.
+        '''
+
+        if not np.array_equal(self.times, other.times):
+            raise MergeError("Cannot merge these two signals as the sample times differ.")
+
+        if self.segment != other.segment:
+            raise MergeError(
+                "Cannot merge these two signals as they belong to different segments.")
+        if hasattr(self, "lazy_shape"):
+            if hasattr(other, "lazy_shape"):
+                if self.lazy_shape[0] != other.lazy_shape[0]:
+                    raise MergeError("Cannot merge signals of different length.")
+                merged_lazy_shape = (self.lazy_shape[0], self.lazy_shape[1] + other.lazy_shape[1])
+            else:
+                raise MergeError("Cannot merge a lazy object with a real object.")
+        if other.units != self.units:
+            other = other.rescale(self.units)
+        stack = np.hstack((self.magnitude, other.magnitude))
+        kwargs = {}
+        for name in ("name", "description", "file_origin"):
+            attr_self = getattr(self, name)
+            attr_other = getattr(other, name)
+            if attr_self == attr_other:
+                kwargs[name] = attr_self
+            else:
+                kwargs[name] = "merge({}, {})".format(attr_self, attr_other)
+        merged_annotations = merge_annotations(self.annotations, other.annotations)
+        kwargs.update(merged_annotations)
+
+        signal = self.__class__(self.times, stack, units=self.units, dtype=self.dtype,
+                                copy=False, **kwargs)
+        signal.segment = self.segment
+        signal.array_annotate(**self._merge_array_annotations(other))
+
+        if hasattr(self, "lazy_shape"):
+            signal.lazy_shape = merged_lazy_shape
+
+        return signal
+
