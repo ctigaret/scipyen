@@ -33,7 +33,12 @@ class MatrixViewer(ScipyenViewer):
     * gui.tableeditor.TableEditorWidget for extended functionality
     
     """
-    supported_types = (np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D)
+    supported_types = (
+                       np.ndarray, 
+                       vigra.VigraArray,
+                       vigra.filters.Kernel1D, 
+                       vigra.filters.Kernel2D,
+                       )
     view_action_name = "Matrix"
     
     #def __init__(self, data: (np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 

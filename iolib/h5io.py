@@ -192,10 +192,13 @@ import quantities as pq
 import neo
 from neo.core.dataobject import ArrayDict
 
+import core
 from core.prog import safeWrapper
 from core import prog
 from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
+from core.triggerevent import (TriggerEvent, TriggerEventType)
+from core.triggerprotocols import TriggerProtocol
 
 from core.quantities import(arbitrary_unit, 
                             pixel_unit, 
@@ -217,12 +220,14 @@ from core.modelfitting import (FitModel, ModelExpression,)
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.triggerprotocols import TriggerProtocol
 from core.utilities import unique
+import imaging
+from core import modelfitting
 from imaging.axiscalibration import (AxesCalibration, 
                                      AxisCalibrationData, 
                                      ChannelCalibrationData)
 
 from imaging.indicator import IndicatorCalibration # do not confuse with ChannelCalibrationData
-from imaging.scandata import (AnalysisUnit, ScanData,)
+from imaging.scandata import (AnalysisUnit, ScanData, ScanDataOptions,)
 from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse, 
                          HorizontalCursor, Line, Move, Quad, Path, 
                          PlanarGraphics, Rect, Text, VerticalCursor,)
@@ -680,15 +685,15 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
                     sigcal["name"] = dim["name"][()].decode()
                     
                 channel_data = unique([(k,v) for k,v in dim.items() if k.startswith("channel_")])
-                print("channel_data", channel_data)
+                #print("channel_data", channel_data)
                 entries = unique([k[0].split("_")[-1] for k in channel_data])
-                print("entries", entries)
+                #print("entries", entries)
                 
                 for k in range(data.shape[-1]):
                     for entry in entries:
                         if f"channel_{k}_{entry}" in dim.keys():
                             val = dim[f"channel_{k}_{entry}"]
-                            print(k, "entry", entry, "val", val)
+                            #print(k, "entry", entry, "val", val)
                             if entry == "id":
                                 arr_ann["channel_ids"].append(val[()].decode())
                             elif entry == "name":
@@ -726,7 +731,7 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
                 if "sampling_rate_units" in dim:
                     domcal["sampling_rate_units"] = unit_quantity_from_name_or_symbol(dim["sampling_rate_units"][()].decode())
                     
-        print("arr_ann", arr_ann)
+        #print("arr_ann", arr_ann)
         array_annotations = ArrayDict(data.shape[-1], **arr_ann)
             
         if klass in (neo.AnalogSignal, DataSignal):

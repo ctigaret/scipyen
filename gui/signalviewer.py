@@ -362,12 +362,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     # TODO: 2019-11-01 22:43:50
     # implement viewing for all these
-    supported_types = (neo.Block, neo.Segment, neo.AnalogSignal, 
-                       neo.IrregularlySampledSignal, neo.SpikeTrain, neo.Event,
-                       neo.Epoch, neo.core.baseneo.BaseNeo,
-                       DataSignal, IrregularlySampledDataSignal,
-                       TriggerEvent,TriggerProtocol,
-                       vigra.filters.Kernel1D, np.ndarray,
+    supported_types = (neo.Block, neo.Segment, neo.AnalogSignal, DataSignal, 
+                       neo.IrregularlySampledSignal,
+                       IrregularlySampledDataSignal,
+                       neo.SpikeTrain, 
+                       neo.Event,
+                       neo.Epoch, 
+                       neo.core.baseneo.BaseNeo,
+                       TriggerEvent,
+                       TriggerProtocol,
+                       vigra.filters.Kernel1D, 
+                       np.ndarray,
                        tuple, list)
     
     view_action_name = "Signal"

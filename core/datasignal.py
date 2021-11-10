@@ -1,3 +1,4 @@
+import numbers
 import numpy as np
 
 import quantities as pq
@@ -95,7 +96,8 @@ class DataSignal(BaseSignal):
     _recommended_attrs = neo.baseneo.BaseNeo._recommended_attrs
 
     def __new__(cls, signal, units=None, dtype=None, copy=True, 
-                t_start=0*pq.dimensionless, sampling_period=None, sampling_rate=None, 
+                t_start=0*pq.dimensionless, origin=0*pq.dimensionless, 
+                sampling_period=None, sampling_rate=None, 
                 name=None, file_origin=None, description=None, 
                 array_annotations=None, **annotations):
         
@@ -112,17 +114,19 @@ class DataSignal(BaseSignal):
         if obj.ndim == 1:
             obj.shape = (-1,1)
             
-        if t_start is None:
-            obj._origin = 0 * pq.dimensionless
-            
-        else:
+        obj._origin = 0 * pq.dimensionless
+        
+        if isinstance(origin, pq.Quantity):
+            t_start = origin
+        
+        elif t_start is not None:
             if not isinstance(t_start, pq.Quantity):
                 raise TypeError("Expecting a Quantity for origin; got %s instead" % (type(origin).__name__))
             
             elif t_start.size > 1:
                 raise TypeError("origin must be a scalar quantity; got %s instead" % origin)
             
-            obj._origin = t_start
+        obj._origin = t_start
         
         if sampling_period is None:
             # sampling period not given
@@ -134,7 +138,7 @@ class DataSignal(BaseSignal):
             elif isinstance(sampling_rate, pq.Quantity): # calculate from sampling rate if given
                 # sampling period not given, sampling rate given as Quantity =>
                 # calculate sampling_period from given sampling_rate
-                if origin.units == pq.dimensionless and sampling_rate.units != pq.dimensionless:
+                if t_start.units == pq.dimensionless and sampling_rate.units != pq.dimensionless:
                     obj._origin = origin.magnitude * (1/sampling_rate).units
                     
                 if sampling_rate.units != 1/obj._origin.units:
@@ -159,7 +163,7 @@ class DataSignal(BaseSignal):
             
         elif isinstance(sampling_period, pq.Quantity):
             # sampling period given; disregard sampling rate if given at all
-            if origin.units == pq.dimensionless and sampling_period.units != pq.dimensionless:
+            if t_start.units == pq.dimensionless and sampling_period.units != pq.dimensionless:
                 obj._origin = origin.magnitude * sampling_period.units
                 
             if sampling_period.units != obj._origin.units:
