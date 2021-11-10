@@ -520,8 +520,6 @@ class CalibrationData(object):
                     
                     cal_str_start_stop = AxisCalibrationData.findCalibrationString(arg.description)
                     
-                    #print("cal_str_start_stop", cal_str_start_stop)
-                    
                     if cal_str_start_stop is None:
                         self._data_.type = axtype
                         self._data_.key = axkey
@@ -536,18 +534,9 @@ class CalibrationData(object):
                         
                     else:
                         cal = AxisCalibrationData.fromCalibrationString(arg.description[cal_str_start_stop[0]:cal_str_start_stop[1]])
-                    
+
                         self._data_.update(cal._data_)
                         
-                        if cal.type != arg.typeFlags:
-                            self._data_.type = arg.typeFlags
-                            self._data_.key = arg.key
-                            self._data_.name = axisTypeName(self._data_.type)
-                            self._data_.units = axisTypeUnits(self._data_.type)
-                            
-                        elif cal.key != arg.key:
-                            self._data_.key = arg.key
-                            
                     return # only allow one AxisInfo argument
                 
                 else:
@@ -1067,7 +1056,13 @@ class AxisCalibrationData(CalibrationData):
             return self._data_[key]
         
         raise KeyError(f"key {key} not found")
+    
+    def __setitem__(self, key, val):
+        if not isinstance(key, str):
+            raise TypeError(f"Expecting a str; got {type(key).__name__} instead")
         
+        if key in self._data_:
+            setattr(self, key, val)
 
     @property
     def name(self):
@@ -1133,9 +1128,8 @@ class AxisCalibrationData(CalibrationData):
         
         The list is may be empty.
         
-        Generator for tuples (a,b) where:
-        `a`: str is the field name mapped to a ChannelCalibrationData
-        `b`: a ChannelCalibrationData
+        This behaviour is different from that of the `channelCalibrations`
+        property where at least one (virtual) channel calibration is returned.
         
         The setter expects a sequence of tuples (a,b) with:
         `a`:str = the field name that will be mapped to the ChannelCalibrationData
@@ -1144,13 +1138,7 @@ class AxisCalibrationData(CalibrationData):
             
         The setter has no effect for a NonChannel axis
         """
-        ret = list((k,v) for k,v in self._data_.items() if isinstance(v, ChannelCalibrationData))
-        if len(ret) == 0 and self.type == vigra.AxisType.Channels:
-            cal = ChannelCalibrationData()
-            cal.name = "virtual_channel_0"
-            return [(cal.name, cal)]
-        
-        return ret
+        return list((k,v) for k,v in self._data_.items() if isinstance(v, ChannelCalibrationData))
         
     @channels.setter
     def channels(self, val:typing.Sequence[typing.Tuple[str, typing.Union[ChannelCalibrationData, dict]]]):
@@ -1167,9 +1155,15 @@ class AxisCalibrationData(CalibrationData):
                 
     @property
     def channelCalibrations(self):
-        """A list of channel calibrations or empty list
+        """A list of channel calibrations with at least one member (virtual channels)
+        To get the actual channel calibrations, use `channels` property.
+        
+        The setter of this property expects a tuple (str, ChannelCalibrationData)
+        as for the `channels` property setter (it actualy delegates to the
+        latter).
         """
         ret = list(v for v in self._data_.values() if isinstance(v, ChannelCalibrationData))
+        
         if len(ret) == 0 and self.type == vigra.AxisType.Channels:
             cal = ChannelCalibrationData()
             cal.name = "virtual_channel_0"
@@ -1178,12 +1172,14 @@ class AxisCalibrationData(CalibrationData):
         return ret
         
     @channelCalibrations.setter
-    def channelCalibrations(self, val:typing.Sequence[typing.Union[ChannelCalibrationData, dict]]):
+    def channelCalibrations(self, val:typing.Sequence[typing.Tuple[str, typing.Union[ChannelCalibrationData, dict]]]):
         if not self.type & vigra.AxisType.Channels:
             return
         
-        for k,v in enumerate(val):
-            self._data_[f"channel_{k}"] = ChannelCalibrationData(v[1])
+        self.channels = val
+        
+        #for k,v in enumerate(val):
+            #self._data_[f"channel_{k}"] = ChannelCalibrationData(v[1])
         
     @property
     def channelNames(self):
@@ -1201,7 +1197,8 @@ class AxisCalibrationData(CalibrationData):
         
     @property
     def nChannels(self):
-        """Returns 0 for NonChannel axis or when there is no ChannelCalibrationData
+        """Returns 0 for NonChannel axis, 1 for virtual Channels axis
+        To get the actual of channel calibrations use `channels` property.
         """
         return len(list(self.channelCalibrations))
         
@@ -1330,7 +1327,7 @@ class AxisCalibrationData(CalibrationData):
             name = calname
         
         if not isinstance(name, str) or len(name.strip()) == 0 or name in self.parameters:
-            name = f"channel_{self.nChannels}"
+            name = f"channel_{len(self.channels)}"
             
         self._data_[name] = val
         
@@ -1401,6 +1398,15 @@ class AxisCalibrationData(CalibrationData):
             
         """
         yield from sorted(self.channels, key = lambda x: x.by_index if instance(by_index, str) else x.index if by_index is True else x.name)
+        
+    def clearChannels(self):
+        """Removes all ChannelCalibrationData associated with this object.
+        """
+        if not self.type & vigra.AxisType.Channels:
+            return
+        
+        for (k,c) in self.channels:
+            self._data_.pop(k, None)
                 
     def getChannelCalibration(self, index:typing.Optional[typing.Union[int, str]]=None, 
                            full:bool=False):
@@ -1485,7 +1491,7 @@ class AxisCalibrationData(CalibrationData):
         if not isinstance(name, str) or len(name.strip()) == 0:
             return 
         
-        chcal = self.channelCalibration(name)
+        chcal = self.getChannelCalibration(name)
         return chcal.index
         
     def setChannelIndex(self, name:str, val:int) -> None:
@@ -1511,7 +1517,7 @@ class AxisCalibrationData(CalibrationData):
         if val < 0:
             raise ValueError(f"index must be >= 0; got {val} instead")
         
-        chcal = self.channelCalibration(name)
+        chcal = self.getChannelCalibration(name)
         isvirtual = "virtual" in chcal.name
         chcal.index = val
             
@@ -1564,7 +1570,7 @@ class AxisCalibrationData(CalibrationData):
         if not self.type & vigra.AxisType.Channels:
             return
         
-        chcal = self.channelCalibration(index)
+        chcal = self.getChannelCalibration(index)
         
         return chcal.minimum
         
@@ -1573,7 +1579,7 @@ class AxisCalibrationData(CalibrationData):
         if not self.type & vigra.AxisType.Channels:
             return
         
-        chcal = self.channelCalibration(index)
+        chcal = self.getChannelCalibration(index)
         chcal.minimum = val
         if "virtual" in chcal.name:
             chcal.name = "channel_0"
@@ -1583,7 +1589,7 @@ class AxisCalibrationData(CalibrationData):
     def getChannelMaximum(self, index:typing.Union[int, str]):
         if not self.type & vigra.AxisType.Channels:
             return
-        chcal = self.channelCalibration(index)
+        chcal = self.getChannelCalibration(index)
         
         return chcal.maximum
         
@@ -1593,7 +1599,7 @@ class AxisCalibrationData(CalibrationData):
         if not self.type & vigra.AxisType.Channels:
             return
         
-        chcal = self.channelCalibration(index)
+        chcal = self.getChannelCalibration(index)
         isvirtual = "virtual" in chcal.name
         chcal.maximum = val
         if isvirtual:
@@ -1601,7 +1607,7 @@ class AxisCalibrationData(CalibrationData):
             self.addChannelCalibration(chcal, chcal.name)
         
     def getChannelResolution(self, index:typing.Union[int, str]):
-        chcal = self.channelCalibration(index)
+        chcal = self.getChannelCalibration(index)
         if "virtual" in chcal.name:
             chcal.name = "channel_0"
             self.addChannelCalibration(chcal, "channel_0")
@@ -1613,7 +1619,7 @@ class AxisCalibrationData(CalibrationData):
         if not self.type & vigra.AxisType.Channels:
             return
         
-        chcal = self.channelCalibration(index)
+        chcal = self.getChannelCalibration(index)
         isvirtual = "virtual" in chcal.name
         chcal.resolution = val
         if isvirtual:
@@ -1624,7 +1630,7 @@ class AxisCalibrationData(CalibrationData):
     def getChannelUnits(self, index:typing.Union[int, str]) -> typing.Optional[pq.Quantity]:
         """Returns the units of the specified channel, or None if not found
         """
-        chcal = self.channelCalibration(index)
+        chcal = self.getChannelCalibration(index)
         if chcal is None:
             #warnings.warn(f"No channel {index} was found")
             return
@@ -1636,9 +1642,9 @@ class AxisCalibrationData(CalibrationData):
         if not self.type & vigra.AxisType.Channels:
             return
         
-        chcal = self.channelCalibration(index)
+        chcal = self.getChannelCalibration(index)
         isvirtual = "virtual" in chcal.name
-        chcal.units = units
+        chcal.units = val
         
         if isvirtual:
             chcal.name = "channel_0"
@@ -1997,11 +2003,20 @@ class AxesCalibration(object):
                 
                 self._calibration_ = [AxisCalibrationData(axinfo) for axinfo in args[0].axistags]
                 
-                # set up channel calibrations with default values:
+                #set up channel calibrations with default values:
                 if args[0].channelIndex != args[0].ndim: # real channel axis exists
                     chax_index = args[0].axistags.index("c")
-                    for k in range(args[0].channels):
-                        self._calibration_[chax_index].addChannelCalibration(ChannelCalibrationData(name=f"channel_{k}", index=k), name=f"channel_{k}")
+                    # Make sure we don't overwrite existing channel calibrations
+                    if len(self._calibration_[chax_index].channels) < args[0].channels:
+                        for k in range(len(self._calibration_[chax_index].channels), args[0].channels):
+                            self._calibration_[chax_index].addChannelCalibration(ChannelCalibrationData(name=f"channel_{k}", index=k), name=f"channel_{k}")
+                    elif len(self._calibration_[chax_index].channels) > args[0].channels:
+                        extra = list()
+                        for k in range(args[0].channels, len(self._calibration_[chax_index].channels)):
+                            extra.append(self._calibration_[chax_index].channels[k])
+                            
+                        for k,c in extra:
+                            self._calibration_[chax_index]._data_.pop(k, None)
                 
                 return
 

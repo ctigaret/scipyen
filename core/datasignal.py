@@ -1042,7 +1042,8 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     _recommended_attrs = neo.baseneo.BaseNeo._recommended_attrs
 
-    def __new__(cls, domain, signal, units=None, domain_units=None, dtype=np.dtype("float64"), 
+    def __new__(cls, domain, signal, units=None, domain_units=None, time_units=None,
+                dtype=np.dtype("float64"), 
                 copy=True, name=None, file_origin=None, description=None, 
                 array_annotations=None, **annotations):
         
@@ -1061,7 +1062,10 @@ class IrregularlySampledDataSignal(BaseSignal):
 
             
         if domain_units is None:
-            if hasattr(domain, "units"):
+            if isinstance(time_units, pq.Quantity):
+                domain_units = time_units
+
+            elif hasattr(domain, "units"):
                 domain_units = domain.units
                 
             else:
@@ -1079,8 +1083,8 @@ class IrregularlySampledDataSignal(BaseSignal):
 
         return obj
                 
-    def __init__(self, domain, signal, units=None, domain_units=None, dtype=None,
-                 copy=True, name=None, file_origin=None, description=None,
+    def __init__(self, domain, signal, units=None, domain_units=None, time_units=None,
+                 dtype=None, copy=True, name=None, file_origin=None, description=None,
                  array_annotations=None, **annotations):
         DataObject.__init__(self, name=name, file_origin=file_origin,
                             desciption=description, 

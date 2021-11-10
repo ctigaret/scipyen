@@ -177,11 +177,12 @@ independently from pictio.
 
 
 
-import os, sys, tempfile, traceback
+import os, sys, tempfile, traceback, warnings
 import types, typing, inspect, functools, itertools
+from pprint import (pprint, pformat)
 import collections, collections.abc
 from uuid import uuid4
-import json
+import json, pickle
 import h5py
 import numpy as np
 import nixio as nix 
@@ -204,7 +205,8 @@ from core.quantities import(arbitrary_unit,
                             day_in_vitro,
                             week_in_vitro, postnatal_day, postnatal_month,
                             embryonic_day, embryonic_week, embryonic_month,
-                            unit_quantity_from_name_or_symbol,)
+                            unit_quantity_from_name_or_symbol,
+                            name_from_unit)
 
 from core.datatypes import (TypeEnum,UnitTypes, Genotypes, 
                             is_uniform_sequence, is_namedtuple, is_string,
@@ -245,6 +247,93 @@ from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse,
 #   (for data sets deeply nested, the intermediary groups must also be present)
 #   
 
+class HDFDataError(Exception):
+    pass
+
+def print_hdf(v):
+    return v if isinstance(v, str) else v.decode() if isinstance(v, bytes) else v[()]
+
+def h5py_dataset_iterator(g:h5py.Group, prefix:str=''):
+    """HDF5 Group traverser.
+    
+    See Answer 1 in 
+    https://stackoverflow.com/questions/50117513/can-you-view-hdf5-files-in-pycharm
+    
+    Moved outside of exploreHDF ("traverse_datasets") to be widely accessible
+    
+    Parameters:
+    ===========
+    g:h5py.Group (this can also be a h5py.File).
+        It is the responsibility of the caller to manage `g` (e.g. close it, if
+        it is a File object).
+        
+    prefix:str, optional default is ""; name of the parent
+    
+    """
+    for key in g.keys():
+        item = g[key]
+        path = '{}/{}'.format(prefix, key)
+        if isinstance(item, h5py.Dataset): # test for dataset
+            #yield (path, item)
+            yield (path, item, item.attrs)
+        elif isinstance(item, h5py.Group): # test for group (go down)
+            print(f"Group '{item.name}' attributes:")
+            for k,v in item.attrs.items():
+                print(f"\t{k}: {print_hdf(v)}")
+            #pprint(dict(item.attrs))
+            yield from h5py_dataset_iterator(item, path)
+            
+def exploreHDF(hdf_file:typing.Union[str, h5py.Group]):
+    """Traverse all datasets across all groups in HDF5 file.
+
+    See Answer 1 in 
+    https://stackoverflow.com/questions/50117513/can-you-view-hdf5-files-in-pycharm
+    
+    exploreHDF('file.h5')
+
+    /DataSet1 <HDF5 dataset "DataSet1": shape (655559, 260), type "<f4">
+    /DataSet2 <HDF5 dataset "DataSet2": shape (22076, 10000), type "<f4">
+    /index <HDF5 dataset "index": shape (677635,), type "|V384">
+    
+    """
+
+    #import h5py # already imported at the top
+    
+    
+    def __print_iter__(path, dset, attrs):
+        print(path, f"Dataset '{dset.name}':", dset)
+        print("with attributes:")
+        for k,v in attrs.items():
+            print(f"\t{k}: {print_hdf(v)}")
+        #pprint(dict(attrs))
+        print("\n")
+        if len(dset.dims):
+            print("with dimension scales:")
+            for kd, dim in enumerate(dset.dims):
+                print(f"\tdimension {kd}:")
+                for k,v in dim.items():
+                    print(f"\t\t{k}: {print_hdf(v)}, (type: {type(v)}, dtype: {v.dtype.kind})")
+                #pprint(dim)
+            print("\n")
+
+    if isinstance(hdf_file, str):
+        if os.path.isfile(hdf_file):
+            with h5py.File(hdf_file, 'r') as f:
+                for (path, dset, attrs) in h5py_dataset_iterator(f):
+                    __print_iter__(path, dset, attrs)
+                #for (path, dset) in h5py_dataset_iterator(f):
+                    #print(path, dset)
+                    
+    elif isinstance(hdf_file, h5py.Group):
+        # file created/opened outside this function; 
+        # the caller should manage/close it as they see fit
+        for (path, dset, attrs) in h5py_dataset_iterator(hdf_file):
+            __print_iter__(path, dset, attrs)
+        #for (path, dset) in h5py_dataset_iterator(f):
+            #print(path, dset)
+
+    #return None
+
 def string2hdf(s):
     if not isinstance(s, str):
         raise TypeError(f"Expecting a str; got {type(s).__name__} instead")
@@ -270,6 +359,31 @@ def make_attr_dict(**kwargs):
             
     return ret
 
+def from_attr_dict(attrs):
+    ret = dict()
+    for k,v in attrs.items():
+        # NOTE: 2021-11-10 12:47:52
+        # FIXME / TODO
+        if hasattr(v, "dtype"):
+            print("v:", v)
+            print("v[()]", v[()])
+            if v.dtype == h5py.string_dtype():
+                v = np.array(v, dtype=np.dtype("U"))
+                
+            elif v.dtype.kind == "O":
+                if type(v[()]) == bytes:
+                    v = v[()].decode()
+                    
+                else:
+                    v = v[()]
+                    
+            else:
+                v = v[()]
+                
+        ret[k] = v
+        
+    return ret
+                
 def make_attr(x):
     if isinstance(x, str):
         return string2hdf(x)
@@ -426,7 +540,7 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
     data = dset[()]
     data_name = dset.name.split('/')[-1]
     
-    if not isinstance(group, h5py.Group): # not really required, is it?!?
+    if not isinstance(group, h5py.Group):
         group = dset.parent
 
     if "python_class" in dset.attrs:
@@ -469,24 +583,29 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
                     if AxisCalibrationData.isCalibration(cal):
                         axcal = AxisCalibrationData(cal)
                         if axcal.type & vigra.AxisType.Channels:
-                            channels = unique([key.split('_')[0] for key in dim.keys() if any(key.endswith(s) for s in ("_name", "_units", "_origin", "_resolution", "_maximum", "_index"))])
-                            for ch in channels:
+                            channels = unique(["_".join(key.split('_')[:2]) for key in dim.keys() if any(key.endswith(s) for s in ("_name", "_units", "_origin", "_resolution", "_maximum", "_index"))])
+                            print("channels", channels)
+                            for ch_key in channels:
                                 chcal = dict()
-                                if "name" in dim:
-                                    chcal["name"] = dim["name"][()].decode()
-                                if "units" in dim:
-                                    chcal["units"] = unit_quantity_from_name_or_symbol(dim["units"][()].decode())
-                                if "origin" in dim:
-                                    chcal["origin"] = float(dim["origin"][()])
-                                if "resolution" in dim:
-                                    chcal["resolution"] = float(dim["resolution"][()])
-                                if "maximum" in dim:
-                                    chcal["maximum"] = float(dim["maximum"][()])
-                                if "index" in dim:
-                                    chcal["index"] = int(dim["index"][()])
+                                if f"{ch_key}_name" in dim:
+                                    chcal["name"] = dim[f"{ch_key}_name"][()].decode()
+                                if f"{ch_key}_units" in dim:
+                                    chcal["units"] = unit_quantity_from_name_or_symbol(dim[f"{ch_key}_units"][()].decode())
+                                if f"{ch_key}_origin" in dim:
+                                    chcal["origin"] = float(dim[f"{ch_key}_origin"][()])
+                                if f"{ch_key}_resolution" in dim:
+                                    chcal["resolution"] = float(dim[f"{ch_key}_resolution"][()])
+                                if f"{ch_key}_maximum" in dim:
+                                    chcal["maximum"] = float(dim[f"{ch_key}_maximum"][()])
+                                if f"{ch_key}_index" in dim:
+                                    chcal["index"] = int(dim[f"{ch_key}_index"][()])
+                                    
+                                #print("chcal", chcal)
                                     
                                 if ChannelCalibrationData.isCalibration(chcal):
-                                    axcal.addChannelCalibration(ChannelCalibrationData(chcal))
+                                    axcal.addChannelCalibration(ChannelCalibrationData(chcal), name=ch_key)
+                                    
+                            #print("axcal", axcal)
 
                         axcal.calibrateAxis(data.axistags[dim.label])
                         
@@ -499,6 +618,159 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
                 data = data.transpose()
             else:
                 data = data.transposeToOrder(order)
+                
+    elif klass in (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal):
+        attrs = dict(dset.attrs)
+        
+        file_origin = attrs.pop("file_origin", None)
+        if file_origin is None:
+            file_origin = ""
+        elif not isinstance(file_origin, str):
+            file_origin = file_origin[()].decode()
+            
+        description = attrs.pop("description", None)
+        if description is None:
+            description = ""
+        elif not isinstance(description, str):
+            description = description[()].decode()
+            
+        annotations = dict()
+            
+        annotations = attrs.pop("annotations", None)
+        if annotations is None:
+            annotations = dict()
+            
+        if isinstance(annotations, str):
+            try:
+                annotations = json.loads(annotations)
+            except:
+                warnings.warn(f"Cannot read annotations {annotations} from json")
+                
+        elif isinstance(annotations, bytes):
+            try:
+                annotations = json.loads(annotations[()].decode())
+            except:
+                warnings.warn(f"Cannot read annotations {annotations} from json")
+                try:
+                    annotations = pickle.loads(annotations)
+                except:
+                    warnings.warn(f"Cannot read annotations {annotations}")
+                
+                
+        data = data.view(np.ndarray).transpose()
+        sigcal = {"units": pq.dimensionless, "name": klass.__name__}
+        domcal = {"units": pq.s if klass in (neo.AnalogSignal, neo.IrregularlySampledSignal) else pq.dimensionless,
+                  "name": "",
+                  "t_start": 0.,
+                  "sampling_rate": None,
+                  "sampling_rate_units": pq.Hz if klass in (neo.AnalogSignal, DataSignal) else pq.dimensionless,
+                  "times": None # will be populated from domain data set for irregular signals
+                  }
+        
+        arr_ann = {"channel_ids": list(), "channel_names": list()}
+        
+        for k, dim in enumerate(dset.dims):
+            # NOTE: these are for transposed axes!
+            #print(k, "dim:")
+            #print([v for v in dim.values()])
+            if k == 0: # => signal axis (1) in the final data!
+                if "units" in dim:
+                    sigcal["units"] = unit_quantity_from_name_or_symbol(dim["units"][()].decode())
+                if "name" in dim:
+                    sigcal["name"] = dim["name"][()].decode()
+                    
+                channel_data = unique([(k,v) for k,v in dim.items() if k.startswith("channel_")])
+                print("channel_data", channel_data)
+                entries = unique([k[0].split("_")[-1] for k in channel_data])
+                print("entries", entries)
+                
+                for k in range(data.shape[-1]):
+                    for entry in entries:
+                        if f"channel_{k}_{entry}" in dim.keys():
+                            val = dim[f"channel_{k}_{entry}"]
+                            print(k, "entry", entry, "val", val)
+                            if entry == "id":
+                                arr_ann["channel_ids"].append(val[()].decode())
+                            elif entry == "name":
+                                arr_ann["channel_names"].append(val[()].decode())
+                            else:
+                                if entry not in arr_ann:
+                                    arr_ann[entry] = list()
+                                    
+                                if val.dtype == h5py.string_dtype():
+                                    val = val[()].decode()
+                                elif val.dtype.kind == "O":
+                                    if type(val[()]) == bytes:
+                                        val = val[()].decode()
+                                    else:
+                                        val = val[()]
+                                    
+                                else:
+                                    val = val[()]
+                                
+                                arr_ann[entry].append(val)
+                    
+            else: # => domain axis (0) in the final data - dimension scales here ONLY for AnalogSignal and DataSignal
+                if "domain_origin" in dim:
+                    domcal["t_start"] = dim["domain_origin"][()]
+                    
+                if "domain_units" in dim:
+                    domcal["units"] = unit_quantity_from_name_or_symbol(dim["domain_units"][()].decode())
+                    
+                if "domain_name" in dim:
+                    domcal["name"] = dim["domain_name"][()].decode()
+                    
+                if "sampling_rate" in dim:
+                    domcal["sampling_rate"] =dim["sampling_rate"][()]
+                    
+                if "sampling_rate_units" in dim:
+                    domcal["sampling_rate_units"] = unit_quantity_from_name_or_symbol(dim["sampling_rate_units"][()].decode())
+                    
+        print("arr_ann", arr_ann)
+        array_annotations = ArrayDict(data.shape[-1], **arr_ann)
+            
+        if klass in (neo.AnalogSignal, DataSignal):
+            data = klass(data, units = sigcal["units"], name=sigcal["name"],
+                            t_start = domcal["t_start"] * domcal["units"],
+                            sampling_rate = domcal["sampling_rate"] * domcal["sampling_rate_units"],
+                            file_origin=file_origin,
+                            description=description,
+                            array_annotations = array_annotations,
+                            **annotations)
+            data.segment = None
+            
+        elif klass in (neo.IrregularlySampledSignal, IrregularlySampledDataSignal):
+            # need to read the domain data set:
+            domain_group = group.get([f"{data_name}_domain"], None)
+            if isinstance(domain_group, h5py.Group):
+                dom_dset = domain_group.get(f"{data_name}_domain_set", None)
+                if isinstance(dom_set, h5py.Dataset):
+                    domcal["times"] = dom_dset[()]
+                    dim = dom_set.dims[0]
+                    # everything else is in the dimension scales
+                    if "domain_units" in dim:
+                        domcal["units"] = unit_quantity_from_name_or_symbol(dim["domain_units"][()].decode())
+                        
+                    if "domain_name" in dim:
+                        domcal["name"] = dim["domain_name"][()].decode()
+                        
+                else:
+                    raise HDFDataError(f"Cannot find a domain Dataset for the irregularly sampled signal {data_name}")
+            else:
+                raise HDFDataError(f"Cannot find a domain Group for the irregularly sampled signal {data_name}")
+
+            if klass is neo.IrregularlySampledDataSignal:
+                data = klass(domcal["times"] * domcal["units"], data, units = sigcal["units"],
+                            time_units=domcal["units"], name=sigcal["name"],
+                            file_origin = file_origin,
+                            description = description,
+                            array_annotations = array_annotations, **annotations)
+            else:
+                data = klass(domcal["times"] * domcal["units"], data, units = sigcal["units"],
+                            domain_units=domcal["units"], name=sigcal["name"],
+                            file_origin = file_origin,
+                            description = description,
+                            array_annotations = array_annotations, **annotations)
             
     elif isinstance(data, bytes):
         data = data.decode()
@@ -577,6 +849,7 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         # For each axis, we attach FOUR HDF5 dimension scales: 
         # name (str), units (str), origin (float), and resolution (float)
         x_tr_axcal = AxesCalibration(data)
+        #print("x_tr_axcal", x_tr_axcal)
         
         calgrp = group.create_group(f"{name}_axes", track_order=True)
         
@@ -612,24 +885,24 @@ def make_dataset(x:typing.Any, group:h5py.Group,
                     for channel in channels:
                         channel_group = channels_group.create_group(channel[0], track_order=True)
                         
-                        ds_chn_origin = make_dataset(channel[1].origin, channel_group, name="origin")
-                        ds_chn_origin.make_scale("origin")
+                        ds_chn_origin = make_dataset(channel[1].origin, channel_group, name=f"{channel[0]}_origin")
+                        ds_chn_origin.make_scale(f"{channel[0]}_origin")
                         
-                        ds_chn_resolution = make_dataset(channel[1].resolution, channel_group, name="resolution")
-                        ds_chn_resolution.make_scale("resolution")
+                        ds_chn_resolution = make_dataset(channel[1].resolution, channel_group, name=f"{channel[0]}_resolution")
+                        ds_chn_resolution.make_scale(f"{channel[0]}_resolution")
                         
-                        ds_chn_maximum = make_dataset(channel[1].maximum, channel_group, name = "maximum")
-                        ds_chn_maximum.make_scale("maximum")
+                        ds_chn_maximum = make_dataset(channel[1].maximum, channel_group, name = f"{channel[0]}_maximum")
+                        ds_chn_maximum.make_scale(f"{channel[0]}_maximum")
                         
-                        ds_chn_index = make_dataset(channel[1].index, channel_group, name="index")
-                        ds_chn_index.make_scale("index")
+                        ds_chn_index = make_dataset(channel[1].index, channel_group, name=f"{channel[0]}_index")
+                        ds_chn_index.make_scale(f"{channel[0]}_index")
                         
                         ds_chn_units = make_dataset(channel[1].units.dimensionality.string, channel_group, 
-                                                    name = "units")
-                        ds_chn_units.make_scale("units")
+                                                    name = f"{channel[0]}_units")
+                        ds_chn_units.make_scale(f"{channel[0]}_units")
                         
-                        ds_chn_name = make_dataset(channel[1].name, channel_group, name="name")
-                        ds_chn_name.make_scale("name") # channel name, not axis name!
+                        ds_chn_name = make_dataset(channel[1].name, channel_group, name=f"{channel[0]}_name")
+                        ds_chn_name.make_scale(f"{channel[0]}_name") # channel name, not axis name!
                         
                         dset.dims[k].attach_scale(ds_chn_name)
                         dset.dims[k].attach_scale(ds_chn_units)
@@ -651,10 +924,22 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         
         x_meta["description"] = make_attr("" if x.description is None else f"{x.description}")
         x_meta["file_origin"] = make_attr(f"{x.file_origin}")
-        annotations = make_attr_dict(**x.annotations)
+        annot = None
+        try:
+            annot = json.dumps(x.annotations)
+        except:
+            # unencodable in json:
+            try:
+                annot = pickle.dumps(x.annotations) # pickling is a bit cheating ...
+            except:
+                warnings.warn(f"Cannot encode anotations {x.annotations}")
             
-        if len(annotations):
-            x_meta.update(annotations)
+        if annot is not None:
+            x_meta["annotations"] = annot
+        #annotations = make_attr_dict(**x.annotations)
+            
+        #if len(annotations):
+            #x_meta.update(annotations)
         
         dset = group.create_dataset(name, data = data)
         #print("x_meta", x_meta)
@@ -662,9 +947,10 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         dom_dset = None # place holder for irregularly sampled signals' domain data
         
         if isinstance(x, (IrregularlySampledDataSignal, neo.IrregularlySampledSignal)):
-            domain_group = group.create_group("domain", track_order = True)
+            domain_group = group.create_group(f"{name}_domain", track_order = True)
             domain_name = x.domain_name if isinstance(x, IrregularlySampledDataSignal) else "Time"
-            dom_dset = make_dataset(x.times.magnitude, domain_group, name=domain_name)
+            dom_dset = make_dataset(x.times.magnitude, domain_group, name=f"{name}_domain_set")
+            dom_dset.attrs["name"] = domain_name
         
         calgrp = group.create_group(f"{name}_axes", track_order=True)
         
@@ -711,23 +997,23 @@ def make_dataset(x:typing.Any, group:h5py.Group,
                         
                     channel_group = channels_group.create_group(f"channel_{k}", track_order=True)
                     
-                    ds_chn_index = make_dataset(k, channel_group, name="index")
-                    ds_chn_index.make_scale("index")
+                    #ds_chn_index = make_dataset(k, channel_group, name=f"channel_{k}_index")
+                    #ds_chn_index.make_scale(f"channel_{k}_index")
                     
-                    ds_chn_id = make_dataset(channel_id, channel_group, name="id")
-                    ds_chn_id.make_scale("id")
+                    ds_chn_id = make_dataset(channel_id, channel_group, name=f"channel_{k}_id")
+                    ds_chn_id.make_scale(f"channel_{k}_id")
                     
-                    ds_chn_name = make_dataset(channel_name, channel_group, name="name")
-                    ds_chn_name.make_scale("name")
+                    ds_chn_name = make_dataset(channel_name, channel_group, name=f"channel_{k}_name")
+                    ds_chn_name.make_scale(f"channel_{k}_name")
                     
-                    dset.dims[k].attach_scale(ds_chn_index)
+                    #dset.dims[k].attach_scale(ds_chn_index)
                     dset.dims[k].attach_scale(ds_chn_id)
                     dset.dims[k].attach_scale(ds_chn_name)
                     
                     for key in array_annotations:
                         if key not in ("channel_ids", "channel_names"):
-                            ds_chn_key = make_dataset(array_annotations[key][k].item(), channel_group, name=key)
-                            ds_chn_key.make_scale(f"{key}")
+                            ds_chn_key = make_dataset(array_annotations[key][k].item(), channel_group, name=f"channel_{k}_{key}")
+                            ds_chn_key.make_scale(f"channel_{k}_{key}")
                             dset.dims[k].attach_scale(ds_chn_key)
                     
                 dset.dims[k].label = data_name
@@ -740,28 +1026,29 @@ def make_dataset(x:typing.Any, group:h5py.Group,
                 else:
                     domain_name = "Time"
                     
-                ds_dom_origin = make_dataset(x.t_start.magnitude.item(), axcalgrp, name="origin")
-                ds_dom_origin.make_scale("origin")
-                
                 ds_dom_units = make_dataset(x.times.units.dimensionality.string, axcalgrp, name="domain_units")
                 ds_dom_units.make_scale("domain_units")
                 
                 ds_dom_name = make_dataset(domain_name, axcalgrp, name="domain_name")
                 ds_dom_name.make_scale("domain_name")
                 
-                ds_dom_rate = make_dataset(x.sampling_rate.magnitude.item(), axcalgrp, name="sampling_rate")
-                ds_dom_rate.make_scale("sampling_rate")
+                if isinstance(x, (DataSignal, neo.AnalogSignal)):
+                    ds_dom_origin = make_dataset(x.t_start.magnitude.item(), axcalgrp, name="domain_origin")
+                    ds_dom_origin.make_scale("domain_origin")
+                    
+                    ds_dom_rate = make_dataset(x.sampling_rate.magnitude.item(), axcalgrp, name="sampling_rate")
+                    ds_dom_rate.make_scale("sampling_rate")
 
-                ds_dom_rate_units = make_dataset(x.sampling_rate.units.dimensionality.string, axcalgrp, name="sampling_rate_units")
-                ds_dom_rate_units.make_scale("sampling_rate_units")
+                    ds_dom_rate_units = make_dataset(x.sampling_rate.units.dimensionality.string, axcalgrp, name="sampling_rate_units")
+                    ds_dom_rate_units.make_scale("sampling_rate_units")
                 
                 if isinstance(x, (IrregularlySampledDataSignal, neo.IrregularlySampledSignal)) and isinstance(dom_dset, h5py.Dataset):
                     #dom_dset created above
                     dom_dset.dims[0].attach_scale(ds_dom_name)
-                    dom_dset.dims[0].attach_scale(ds_dom_origin)
+                    #dom_dset.dims[0].attach_scale(ds_dom_origin)
                     dom_dset.dims[0].attach_scale(ds_dom_units)
-                    dom_dset.dims[0].attach_scale(ds_dom_rate)
-                    dom_dset.dims[0].attach_scale(ds_dom_rate_units)
+                    #dom_dset.dims[0].attach_scale(ds_dom_rate)
+                    #dom_dset.dims[0].attach_scale(ds_dom_rate_units)
                 else:
                     dset.dims[k].attach_scale(ds_dom_name)
                     dset.dims[k].attach_scale(ds_dom_origin)

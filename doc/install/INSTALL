@@ -365,7 +365,7 @@ pip install -r $HOME/scipyen/doc/installation/pip_requirements_3.txt
 
 
 ================================================================================
-5. Make final script links while still in the active python ivrtual environment
+5. Make final script links while still in the active python virtual environment
 ================================================================================
 
 cd $HOME/scipyen/
@@ -412,6 +412,15 @@ With this final procedure, the $VIRTUAL_ENV directory tree should look like this
         
 NOTE: lib64 is typically a symbolic link to lib
 
+================================================================================
+7.Optional: Install h5pyViewer
+NOTE: This does not seem to be maintained anymore: pip install h5pyViewer fails
+================================================================================
+
+Grab the git repo:
+    git clone https://github.com/ganymede42/h5pyViewer.git
+    
+Get your fingers dirty...
 ================================================================================
                                 
                                 !!! DONE !!!
