@@ -472,18 +472,31 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
                             channels = unique([key.split('_')[0] for key in dim.keys() if any(key.endswith(s) for s in ("_name", "_units", "_origin", "_resolution", "_maximum", "_index"))])
                             for ch in channels:
                                 chcal = dict()
-                                if f"{ch}_name" in dim:
-                                    chcal["name"] = dim[f"{ch}_name"][()].decode()
-                                if f"{ch}_units" in dim:
-                                    chcal["units"] = unit_quantity_from_name_or_symbol(dim[f"{ch}_units"][()].decode())
-                                if f"{ch}_origin" in dim:
-                                    chcal["origin"] = float(dim[f"{ch}_origin"][()])
-                                if f"{ch}_resolution" in dim:
-                                    chcal["resolution"] = float(dim[f"{ch}_resolution"][()])
-                                if f"{ch}_maximum" in dim:
-                                    chcal["maximum"] = float(dim[f"{ch}_maximum"][()])
-                                if f"{ch}_index" in dim:
-                                    chcal["index"] = int(dim[f"{ch}_index"][()])
+                                if "name" in dim:
+                                    chcal["name"] = dim["name"][()].decode()
+                                if "units" in dim:
+                                    chcal["units"] = unit_quantity_from_name_or_symbol(dim["units"][()].decode())
+                                if "origin" in dim:
+                                    chcal["origin"] = float(dim["origin"][()])
+                                if "resolution" in dim:
+                                    chcal["resolution"] = float(dim["resolution"][()])
+                                if "maximum" in dim:
+                                    chcal["maximum"] = float(dim["maximum"][()])
+                                if "index" in dim:
+                                    chcal["index"] = int(dim["index"][()])
+                                    
+                                #if f"{ch}_name" in dim:
+                                    #chcal["name"] = dim[f"{ch}_name"][()].decode()
+                                #if f"{ch}_units" in dim:
+                                    #chcal["units"] = unit_quantity_from_name_or_symbol(dim[f"{ch}_units"][()].decode())
+                                #if f"{ch}_origin" in dim:
+                                    #chcal["origin"] = float(dim[f"{ch}_origin"][()])
+                                #if f"{ch}_resolution" in dim:
+                                    #chcal["resolution"] = float(dim[f"{ch}_resolution"][()])
+                                #if f"{ch}_maximum" in dim:
+                                    #chcal["maximum"] = float(dim[f"{ch}_maximum"][()])
+                                #if f"{ch}_index" in dim:
+                                    #chcal["index"] = int(dim[f"{ch}_index"][()])
                                     
                                 if ChannelCalibrationData.isCalibration(chcal):
                                     axcal.addChannelCalibration(ChannelCalibrationData(chcal))
@@ -584,22 +597,16 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         for k, cal in enumerate(x_tr_axcal):
             axcalgrp = calgrp.create_group(f"{cal.key}", track_order=True)
             
-            #ds_origin = axcalgrp.create_dataset("origin", data = cal.origin)
             ds_origin = make_dataset(cal.origin, axcalgrp, name = "origin")
             ds_origin.make_scale("origin")
             
-            #ds_resolution = axcalgrp.create_dataset("resolution", data = cal.resolution)
             ds_resolution = make_dataset(cal.resolution, axcalgrp, name = "resolution")
             ds_resolution.make_scale("resolution")
             
-            #ds_units = axcalgrp.create_dataset("units", data = cal.units.dimensionality.string, 
-                                               #dtype=h5py.string_dtype())
             ds_units = make_dataset(cal.units.dimensionality.string, axcalgrp,
                                     name="units")
             ds_units.make_scale("units")
             
-            #ds_name = axcalgrp.create_dataset("name", data = cal.name, 
-                                              #dtype=h5py.string_dtype())
             ds_name = make_dataset(cal.name, axcalgrp, name = "name")
             ds_name.make_scale("name")
                 
@@ -618,32 +625,43 @@ def make_dataset(x:typing.Any, group:h5py.Group,
                     for channel in channels:
                         channel_group = channels_group.create_group(channel[0], track_order=True)
                         
-                        #ds_chn_origin = channel_group.create_dataset(f"{channel[0]}_origin", data = channel[1].origin)
-                        ds_chn_origin = make_dataset(channel[1].origin, channel_group, name=f"{channel[0]}_origin")
-                        ds_chn_origin.make_scale(f"{channel[0]}_origin")
+                        ds_chn_origin = make_dataset(channel[1].origin, channel_group, name="origin")
+                        ds_chn_origin.make_scale("origin")
                         
-                        #ds_chn_resolution = channel_group.create_dataset(f"{channel[0]}_resolution", data = channel[1].resolution)
-                        ds_chn_resolution = make_dataset(channel[1].resolution, channel_group, name=f"{channel[0]}_resolution")
-                        ds_chn_resolution.make_scale(f"{channel[0]}_resolution")
+                        ds_chn_resolution = make_dataset(channel[1].resolution, channel_group, name="resolution")
+                        ds_chn_resolution.make_scale("resolution")
                         
-                        #ds_chn_maximum = channel_group.create_dataset(f"{channel[0]}_maximum", data=channel[1].maximum)
-                        ds_chn_maximum = make_dataset(channel[1].maximum, channel_group, name = f"{channel[0]}_maximum")
-                        ds_chn_maximum.make_scale(f"{channel[0]}_maximum")
+                        ds_chn_maximum = make_dataset(channel[1].maximum, channel_group, name = "maximum")
+                        ds_chn_maximum.make_scale("maximum")
                         
-                        #ds_chn_index = channel_group.create_dataset(f"{channel[0]}_index", data = channel[1].index)
-                        ds_chn_index = make_dataset(channel[1].index, channel_group, name=f"{channel[0]}_index")
-                        ds_chn_index.make_scale(f"{channel[0]}_index")
+                        ds_chn_index = make_dataset(channel[1].index, channel_group, name="index")
+                        ds_chn_index.make_scale("index")
                         
-                        #ds_chn_units = channel_group.create_dataset(f"{channel[0]}_units", data = channel[1].units.dimensionality.string,
-                                                                    #dtype=h5py.string_dtype())
                         ds_chn_units = make_dataset(channel[1].units.dimensionality.string, channel_group, 
-                                                    name = f"{channel[0]}_units")
-                        ds_chn_units.make_scale(f"{channel[0]}_units")
+                                                    name = "units")
+                        ds_chn_units.make_scale("units")
                         
-                        #ds_chn_name = channel_group.create_dataset(f"{channel[0]}_name", data = channel[1].name,
-                                                                   #dtype=h5py.string_dtype())
-                        ds_chn_name = make_dataset(channel[1].name, channel_group, name=f"{channel[0]}_name")
-                        ds_chn_name.make_scale(f"{channel[0]}_name") # channel name, not axis name!
+                        ds_chn_name = make_dataset(channel[1].name, channel_group, name="name")
+                        ds_chn_name.make_scale("name") # channel name, not axis name!
+                        
+                        #ds_chn_origin = make_dataset(channel[1].origin, channel_group, name=f"{channel[0]}_origin")
+                        #ds_chn_origin.make_scale(f"{channel[0]}_origin")
+                        
+                        #ds_chn_resolution = make_dataset(channel[1].resolution, channel_group, name=f"{channel[0]}_resolution")
+                        #ds_chn_resolution.make_scale(f"{channel[0]}_resolution")
+                        
+                        #ds_chn_maximum = make_dataset(channel[1].maximum, channel_group, name = f"{channel[0]}_maximum")
+                        #ds_chn_maximum.make_scale(f"{channel[0]}_maximum")
+                        
+                        #ds_chn_index = make_dataset(channel[1].index, channel_group, name=f"{channel[0]}_index")
+                        #ds_chn_index.make_scale(f"{channel[0]}_index")
+                        
+                        #ds_chn_units = make_dataset(channel[1].units.dimensionality.string, channel_group, 
+                                                    #name = f"{channel[0]}_units")
+                        #ds_chn_units.make_scale(f"{channel[0]}_units")
+                        
+                        #ds_chn_name = make_dataset(channel[1].name, channel_group, name=f"{channel[0]}_name")
+                        #ds_chn_name.make_scale(f"{channel[0]}_name") # channel name, not axis name!
                         
                         dset.dims[k].attach_scale(ds_chn_name)
                         dset.dims[k].attach_scale(ds_chn_units)

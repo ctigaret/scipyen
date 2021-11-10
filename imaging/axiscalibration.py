@@ -1535,7 +1535,7 @@ class AxisCalibrationData(CalibrationData):
         
         """
         if self.type == vigra.AxisType.Channels:
-            chcal = self.channelCalibration(index)
+            chcal = self.getChannelCalibration(index)
             return chcal.name
         
     def setChannelName(self, index:int, val:str) -> None: # ensure_unique:bool = True) -> None:
@@ -2001,7 +2001,7 @@ class AxesCalibration(object):
                 if args[0].channelIndex != args[0].ndim: # real channel axis exists
                     chax_index = args[0].axistags.index("c")
                     for k in range(args[0].channels):
-                        self._calibration_[chax_index].addChannelCalibration(ChannelCalibrationData(), name=f"channel_{k}")
+                        self._calibration_[chax_index].addChannelCalibration(ChannelCalibrationData(name=f"channel_{k}", index=k), name=f"channel_{k}")
                 
                 return
 

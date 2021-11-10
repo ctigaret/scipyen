@@ -64,12 +64,6 @@ import neo
 import vigra
 #import vigra.pyqt 
 import matplotlib as mpl
-# NOTE 2020-11-28 10:03:15
-# taken care of when importing cmaps, below
-#try:
-    #import cmocean # some cool palettes/luts
-#except:
-    #pass
 
 from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
@@ -104,6 +98,7 @@ from imaging.axiscalibration import (AxesCalibration, AxisCalibrationData,)
 
 #### BEGIN scipyen iolib modules
 from iolib import pictio as pio
+from iolib import h5io
 #### END scipyen iolib modules
 
 #### BEGIN scipyen gui modules
@@ -117,6 +112,7 @@ from . import pictgui as pgui
 # this should automatically import our custom colormaps AND ocean colormaps if found
 from . import scipyen_colormaps as colormaps 
 from . import quickdialog
+from . import painting_shared
 #### END scipyen gui modules
 
 mpl.rcParams['backend']='Qt5Agg'
@@ -130,8 +126,8 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 #print(__module_path__)
 
-#import qimage2ndarray 
-#from qimage2ndarray import gray2qimage, array2qimage, alpha_view, rgb_view, byte_view
+import qimage2ndarray 
+from qimage2ndarray import gray2qimage, array2qimage, alpha_view, rgb_view, byte_view
 
 # don't use this yet, until we fully understand how to deal with VigraQt colormap
 #mechanism from Python side
@@ -509,15 +505,11 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
 
         self.slot_generateCalibration()
         
-        
-
 class GraphicsImageViewerScene(QtWidgets.QGraphicsScene):
     signalMouseAt = pyqtSignal(int,int,name="signalMouseAt")
     
     signalMouseLeave = pyqtSignal()
     
-    #signalDeselectGraphics = pyqtSignal()
-
     def __init__(self, gpix=None, rect = None, **args):
         if rect is not None:
             super(GraphicsImageViewerScene, self).__init__(rect = rect, **args)
@@ -529,12 +521,6 @@ class GraphicsImageViewerScene(QtWidgets.QGraphicsScene):
         
         self.graphicsItemDragMode=False
 
-        #self._contextMenu = QtWidgets.QMenu("Scene Menu", super())
-        
-        #self._addCursorAction = self._contextMenu.addAction("Add cursor")
-        #self._addCursorAction.triggered.connect(self._slotAddCursor)
-        
-        
     ####
     # public methods
     ####
@@ -727,11 +713,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
         self._imageGraphicsView.setScene(self.__scene__)
         
-        #NOTE: 2017-03-25 22:31:12
-        # this is unnecessary: just connect the signal from the scene to the 
-        # container of this widget direcly (we get access to the scene by calling self.scene())
-        #self.__scene__.signalMouseAt[int,int].connect(self._reportPixelValueAtMousePosInWidget)
-        
         if img is not None:
             if isinstance(img, QtGui.QImage):
                 self.__scene__.rootImage = QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap.fromImage(img))
@@ -749,6 +730,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.setupUi(self)
         self._imageGraphicsView.setViewportUpdateMode(QtWidgets.QGraphicsView.FullViewportUpdate)
         self._imageGraphicsView.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
+        self._imageGraphicsView.setBackgroundBrush(QtGui.QBrush(painting_shared.make_transparent_bg(size=24)))
         self._topLabel.clear()
         
     def _zoomView(self, val):
@@ -2248,9 +2230,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._imageNormalize             = None
         self._imageGamma                 = None
         self._colorMap                   = None
+        self._tempColorMap               = None
         self._prevColorMap               = None
         self._colorBar                   = None
-        self._colorbar_width_           = 20
+        self._colorbar_width_            = 20
         
         #self._separateChannels           = False
         
@@ -2351,13 +2334,33 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     ####
     
     @property
+    def colorMapObj(self) -> colormaps.mpl.colors.Colormap:
+        """The colormap used as default for displaying gray-scale images
+        This is not a configurable property; however, changing it will result in
+        a new value of the colorMap property
+        """
+        if not isinstance(self._colorMap, colormaps.mpl.colors.Colormap):
+            if isinstance(self._prevColorMap, colormaps.mpl.colors.Colormap):
+                self._colorMap = self._prevColorMap
+            else:
+                self._colorMap = colormaps.get("grey")
+        
+        return self._colorMap
+    
+    @colorMapObj.setter
+    def colorMapObj(self, val:colormaps.mpl.colors.Colormap) -> None:
+        if isinstance(val, colormaps.mpl.colors.Colormap):
+            self._colorMap = val
+        
+    @property
     def colorMap(self) -> str:
-        """Colormap property.
+        """Name of the colormap used as default for displaying gray-scale images.
         This is the 'name' attribute (str) of a matplotlib.colors.Colormap object.
         This is so that the name can be safely stored in QSettings.
         
-        The property setter accepts a matplotlib.colors.Colormap object or a str
-        with a valid colormap name (see gui.sciyen_colormaps module)
+        The colorMap property setter accepts a matplotlib.colors.Colormap object
+        or a str (valid colormap name, see gui.sciyen_colormaps module).
+        If str is not a valid colormap name the default color map will not be changed.
         """
         if not isinstance(self._colorMap, colormaps.mpl.colors.Colormap):
             if isinstance(self._prevColorMap, colormaps.mpl.colors.Colormap):
@@ -2367,7 +2370,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             #self.displayFrame()
             
         return self._colorMap.name
-        
+    
     @markConfigurable("ColorMap")
     @colorMap.setter
     def colorMap(self, val:typing.Union[str, colormaps.mpl.colors.Colormap]):
@@ -2395,6 +2398,38 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.configurable_traits["ColorMap"] = cmap_name
         
         self.displayFrame()
+        
+    @property
+    def temporaryColorMap(self)->str:
+        """Name of a temporary colormap or None.
+        A temporary colormap is to be used for displaying 'channel' images (e.g.,
+        2D Vigra arrays representing an image 'channel').
+        In order to be used, the temporary colormap needs to be passed as the
+        'colorMap' parameter to self.displayFrame().
+        By default, the temporary colormap is None.
+        The setter of this property acceps either a str (colormap name) or a 
+        mpl.colors.Colormap object. 
+        When a str, if this is not a valid colormap name, the temporary colormap
+        is set to None.
+        This is not a configurable property.
+        """
+        if isinstance(self._tempColorMap, colormaps.mpl.colors.Colormap):
+            return self._tempColorMap.name
+            
+    @temporaryColorMap.setter
+    def temporaryColorMap(self, val:typing.Union[colormaps.mpl.colors.Colormap,str]):
+        if val is None:
+            self._tempColorMap = None
+        elif isinstance(val, str):
+            self._tempColorMap = colormaps.get(val, None)
+        elif isinstance(val, colormaps.mpl.colors.Colormap):
+            self._tempColorMap = val
+        else:
+            raise TypeError(f"Expecting a str, matplotlib colormap or None; got {type(val).__name__} instead")
+        
+        if isinstance(self._tempColorMap, colormaps.colors.Colormap):
+            self.displayFrame(colorMap = self._tempColorMap)
+        
         
     def getPlanarGraphicsColor(self, ID):
         
@@ -3526,13 +3561,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         return img_view, dimindices
         
     @safeWrapper
-    def displayFrame(self, channel_index = None, colorMap:typing.Optional[colormaps.colors.Colormap] = None):
+    def displayFrame(self, channel_index = None, 
+                     colorMap:typing.Optional[colormaps.colors.Colormap] = None,
+                     asAlphaChannel:bool=False):
         if channel_index is None:
             channel_index = self._displayedChannel_
             
         if not isinstance(colorMap, colormaps.colors.Colormap):
             colorMap = self._colorMap
-        
+                
         if isinstance(channel_index, str):
             if channel_index.lower().strip() != "all":
                 raise ValueError("When a string, channel_index must be 'all' -- case-insensitive; got %s instead" % channel_index)
@@ -3551,25 +3588,56 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if isinstance(self._data_, vigra.VigraArray):
             self._currentFrameData_, _ = self._frameView_(channel_index) # this is an array view !
             
-            if isinstance(colorMap, colormaps.colors.Colormap):
+            if asAlphaChannel:
                 if self._currentFrameData_.channels == 1:
                     if self._currentFrameData_.channelIndex < self._currentFrameData_.ndim:
                         self._currentFrameData_ = self._currentFrameData_.squeeze()
                         
-                    cFrame = self._applyColorTable_(self._currentFrameData_, colorMap)
+                    red = vigra.VigraArray(np.full(self._currentFrameData_.shape, fill_value=0.),
+                                             axistags=vigra.VigraArray.defaultAxistags('xy'))
                     
-                    if cFrame.min() == cFrame.max():
-                        self.viewerWidget.view(cFrame.qimage(normalize = False))
-                    else:
-                        self.viewerWidget.view(cFrame.qimage(normalize = self._imageNormalize))
+                    green = vigra.VigraArray(np.full(self._currentFrameData_.shape, fill_value=0.),
+                                             axistags=vigra.VigraArray.defaultAxistags('xy'))
                     
-                else: # don't apply color map to a multi-band frame data
-                    #warnings.warn("Cannot apply color map to a multi-band image")
-                    self._currentFrameData_ = self._currentFrameData_.squeeze().copy()
-                    self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self._imageNormalize))
-            
+                    blue = vigra.VigraArray(np.full(self._currentFrameData_.shape, fill_value=0.),
+                                             axistags=vigra.VigraArray.defaultAxistags('xy'))
+                    
+                    frame = vigra.VigraArray(np.concatenate((red[Ellipsis, np.newaxis],
+                                                             green[Ellipsis, np.newaxis],
+                                                             blue[Ellipsis,np.newaxis],
+                                                             self._currentFrameData_[Ellipsis,np.newaxis]),
+                                                            axis=2),
+                                            axistags = vigra.VigraArray.defaultAxistags('xyc'))
+                    
+                    self.viewerWidget.view(frame.qimage(normalize=False))
+                    #if frame.min() == frame.max():
+                        #self.viewerWidget.view(frame.qimage(normalize=False))
+                    #else:
+                        #self.viewerWidget.view(frame.qimage(normalize=self._imageNormalize))
+                    
             else:
-                self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self._imageNormalize))
+                if isinstance(colorMap, colormaps.colors.Colormap):
+                    if self._currentFrameData_.channels == 1:
+                        if self._currentFrameData_.channelIndex < self._currentFrameData_.ndim:
+                            self._currentFrameData_ = self._currentFrameData_.squeeze()
+                            
+                        cFrame = self._applyColorTable_(self._currentFrameData_, colorMap)
+                        
+                        if cFrame.min() == cFrame.max():
+                            self.viewerWidget.view(cFrame.qimage(normalize = False))
+                        else:
+                            self.viewerWidget.view(cFrame.qimage(normalize = self._imageNormalize))
+                        
+                    else: # don't apply color map to a multi-band frame data
+                        #warnings.warn("Cannot apply color map to a multi-band image")
+                        self._currentFrameData_ = self._currentFrameData_.squeeze().copy()
+                        self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self._imageNormalize))
+                
+                else:
+                    if self._currentFrameData_.min() == cFrame.max():
+                        self.viewerWidget.view(self._currentFrameData_.qimage(normalize = False))
+                    else:
+                        self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self._imageNormalize))
                 
             # TODO FIXME: what if we view a transposed array ???? (e.g. viewing it on
             # Y or X axis instead of the Z or T axis?)
@@ -4415,18 +4483,21 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._displayedChannel_ = "all"
         
     def view(self, image, doc_title=None, normalize=True, colormap=None, gamma=None,
-             frameAxis=None, displayChannel=None, frameIndex=None, get_focus=True):
+             frameAxis=None, displayChannel=None, asAlphaChannel=False, frameIndex=None, get_focus=True):
         # NOTE: 2020-09-24 14:19:57
         # this calls ancestor instance method ScipyenFrameViewer.setData(...)
         self.setData(image, doc_title=doc_title, normalize=normalize, colormap=colormap, gamma=gamma,
-                     frameAxis=frameAxis, frameIndex=None, displayChannel=displayChannel, get_focus=get_focus)
+                     frameAxis=frameAxis, frameIndex=None, displayChannel=displayChannel, 
+                     asAlphaChannel=asAlphaChannel,get_focus=get_focus)
         
     def _set_data_(self, data, normalize=True, colormap = None, gamma = None, 
-            frameAxis=None, frameIndex=None, 
-            arrayAxes:(type(None), vigra.AxisTags) = None, 
-            displayChannel = None, 
-            doc_title:(str, type(None)) = None,
-            *args, **kwargs):
+                   tempColorMap = None,
+                   frameAxis=None, frameIndex=None, 
+                   arrayAxes:(type(None), vigra.AxisTags) = None, 
+                   displayChannel = None, 
+                   doc_title:(str, type(None)) = None,
+                   asAlphaChannel:bool=False,
+                   *args, **kwargs):
         '''
         SYNTAX: self.view(image, title = None, normalize = True, colormap = None, gamma = None, separateChannels = False, frameAxis = None)
     
@@ -4438,7 +4509,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             normalize: bool, default True
             
-            colormap: default None
+            colormap: default None; when given, overrides the colormap configuration
+                set up in preferences ONLY for this image
+                
             
             gamma: float scalar or None (default)
             
@@ -4452,9 +4525,25 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         if isinstance(colormap, colormaps.colors.Colormap):
             self._colorMap = colormap
+            
+        elif isinstance(colormap, str):
+            cmap = colormaps.get(colormap, None)
+            if isinstance(cmap, colormaps.colors.Colormap):
+                self._colorMap = cmap
 
         if self._colorBar is not None:
             self.viewerWidget.scene.removeItem(self._colorBar)
+            
+        if isinstance(tempColorMap, colormaps.colors.Colormap):
+            self._tempColorMap = tempColorMap
+            
+        elif isinstance(tempColorMap, str):
+            cmap = colormaps.get(tempColorMap, None)
+            if isinstance(cmap, colormaps.colors.Colormap):
+                self._tempColorMap = cmap
+                
+        else:
+            self._tempColorMap = None
             
         self._colorBar = None
         
@@ -4482,7 +4571,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 self._data_  = data
                 self._axes_calibration_ = AxesCalibration(data)
                 self._setup_channels_display_actions_()
-                self.displayFrame()
+                self.displayFrame(asAlphaChannel=asAlphaChannel)
             
         elif isinstance(data, (QtGui.QImage, QtGui.QPixmap)):
             self._number_of_frames_ = 1
