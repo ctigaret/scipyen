@@ -3861,7 +3861,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.irregularSignalIndex  = None
             self.signalChannelIndex    = None
             
-            self.irregularSignalChannelIndex    = irregularSignalChannels
+            self.irregularSignalChannelIndex    = irregularSignalChannelIndex
             self.separateSignalChannels         = separateSignalChannels
 
         #elif isinstance(y, neo.core.Unit): # Unit is out of neo  

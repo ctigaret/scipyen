@@ -746,12 +746,12 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
             
         elif klass in (neo.IrregularlySampledSignal, IrregularlySampledDataSignal):
             # need to read the domain data set:
-            domain_group = group.get([f"{data_name}_domain"], None)
+            domain_group = group.get(f"{data_name}_domain", None)
             if isinstance(domain_group, h5py.Group):
                 dom_dset = domain_group.get(f"{data_name}_domain_set", None)
-                if isinstance(dom_set, h5py.Dataset):
+                if isinstance(dom_dset, h5py.Dataset):
                     domcal["times"] = dom_dset[()]
-                    dim = dom_set.dims[0]
+                    dim = dom_dset.dims[0]
                     # everything else is in the dimension scales
                     if "domain_units" in dim:
                         domcal["units"] = unit_quantity_from_name_or_symbol(dim["domain_units"][()].decode())
@@ -764,7 +764,7 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
             else:
                 raise HDFDataError(f"Cannot find a domain Group for the irregularly sampled signal {data_name}")
 
-            if klass is neo.IrregularlySampledDataSignal:
+            if klass is neo.IrregularlySampledSignal:
                 data = klass(domcal["times"] * domcal["units"], data, units = sigcal["units"],
                             time_units=domcal["units"], name=sigcal["name"],
                             file_origin = file_origin,
@@ -776,6 +776,8 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
                             file_origin = file_origin,
                             description = description,
                             array_annotations = array_annotations, **annotations)
+                
+            data.segment = None
             
     elif isinstance(data, bytes):
         data = data.decode()
@@ -1069,7 +1071,7 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         dset.attrs.update(x_attrs)
         
     elif isinstance(x, np.ndarray):
-        dset = make_dataset(x, group, name)
+        dset = group.create_dataset(name, data = x)
         dset.attrs.update(x_attrs)
         
     else:

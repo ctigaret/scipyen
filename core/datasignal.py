@@ -1091,12 +1091,10 @@ class IrregularlySampledDataSignal(BaseSignal):
                  dtype=None, copy=True, name=None, file_origin=None, description=None,
                  array_annotations=None, **annotations):
         DataObject.__init__(self, name=name, file_origin=file_origin,
-                            desciption=description, 
+                            description=description, 
                             array_annotations=array_annotations,
                             **annotations)
-        #baseneo.BaseNeo.__init__(self, name=name, file_origin=file_origin,
-                                 #description=description, **annotations)
-        
+
         self.__domain_name__ = name_from_unit(self._domain)
         
         if isinstance(name, str):
@@ -1122,7 +1120,7 @@ class IrregularlySampledDataSignal(BaseSignal):
                                                    )
     
     def __array_finalize__(self, obj):
-        super(DataSignal, self).__array_finalize__(obj)
+        super(IrregularlySampledDataSignal, self).__array_finalize__(obj)
         self._domain = getattr(obj, "_domain", None)
         self.annotations        = getattr(obj, "annotations",   {})
         self.name               = getattr(obj, "name",          None)
