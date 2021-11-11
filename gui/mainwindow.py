@@ -225,9 +225,10 @@ from core.prog import (safeWrapper, deprecation, iter_attribute,
 # matplotlib (aliased as mpl; for versatile plotting)
 from core.traitcontainers import DataBag
 from core.triggerprotocols import TriggerProtocol
-from core.triggerevent import (TriggerEvent, TriggerEventType, )
+from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, )
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
+from core.datazone import DataZone
 
 # ### END expose important data types
 #### END scipyen core modules

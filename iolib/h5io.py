@@ -197,7 +197,8 @@ from core.prog import safeWrapper
 from core import prog
 from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
-from core.triggerevent import (TriggerEvent, TriggerEventType)
+from core.datazone import DataZone
+from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType)
 from core.triggerprotocols import TriggerProtocol
 
 from core.quantities import(arbitrary_unit, 
@@ -349,18 +350,19 @@ def make_attr_dict(**kwargs):
     ret = dict()
     
     for k,v in kwargs.items():
-        if isinstance(v, str):
-            ret[k] = string2hdf(v)
+        ret[k] = make_attr(v)
+        #if isinstance(v, str):
+            #ret[k] = string2hdf(v)
             
-        elif isinstance(v, np.ndarray):
-            if v.dtype.kind in NUMPY_STRING_KINDS:
-                ret[k] = np.asarray(v, dtype=h5py.string_dtype(), order="K")
+        #elif isinstance(v, np.ndarray):
+            #if v.dtype.kind in NUMPY_STRING_KINDS:
+                #ret[k] = np.asarray(v, dtype=h5py.string_dtype(), order="K")
                 
-            else:
-                ret[k] = v
+            #else:
+                #ret[k] = v
             
-        else:
-            ret[k] = v
+        #else:
+            #ret[k] = v
             
     return ret
 
@@ -392,6 +394,13 @@ def from_attr_dict(attrs):
 def make_attr(x):
     if isinstance(x, str):
         return string2hdf(x)
+    
+    if isinstance(x, (list, tuple, dict)): 
+        # will raise exception if elements or values are not json-able
+        try:
+            return json.dumps(x)
+        except:
+            raise HDFDataError(f"The object {x}\n with type {type(x).__name__} cannot be serialized in json")
     
     if isinstance(x, np.ndarray):
         if x.dtype.kind in NUMPY_STRING_KINDS:
@@ -958,10 +967,6 @@ def make_dataset(x:typing.Any, group:h5py.Group,
             
         if annot is not None:
             x_meta["annotations"] = annot
-        #annotations = make_attr_dict(**x.annotations)
-            
-        #if len(annotations):
-            #x_meta.update(annotations)
         
         dset = group.create_dataset(name, data = data)
         #print("x_meta", x_meta)
@@ -1076,8 +1081,43 @@ def make_dataset(x:typing.Any, group:h5py.Group,
     elif isinstance(x, neo.SpikeTrain):
         pass
                 
-    elif isinstance(x, neo.Event):
-        data = np.transpose(x.magnitude)
+    elif isinstance(x, (neo.Event, TriggerEvent, DataMark)):
+        data = np.transpose(x.times.magnitude)
+        x_meta = dict()
+        x_meta.update(x_attrs)
+        x_meta["description"] = make_attr("" if x.description is None else f"{x.description}")
+        x_meta["file_origin"] = make_attr(f"{x.file_origin}")
+        annot = None
+        try:
+            annot = json.dumps(x.annotations)
+        except:
+            # unencodable in json:
+            try:
+                annot = pickle.dumps(x.annotations) # pickling is a bit cheating ...
+            except:
+                warnings.warn(f"Cannot encode anotations {x.annotations}")
+            
+        if annot is not None:
+            x_meta["annotations"] = annot
+            
+        x_meta["labels"] = make_attr(x.labels)
+        
+        if isinstance(x, TriggerEvent):
+            x_meta["TriggerEventType"] = x.type
+            
+        elif isinstance(x, DataMark):
+            x_meta["MarkType"] = x.type
+            
+        dset = group.create_dataset(name, data=data)
+        dset.attrs.update(x_meta)
+        calgrp = group.create_group(f"{name}_axes", track_order=True)
+        axcalgrp = calgrp.create_group("axis_0", track_order=True)
+        ds_units = make_dataset(x.times.units.dimensionality.string, axcalgrp, name="units")
+        ds_units.make_scale("units")
+        dset.dims[0].attach_scale(ds_units)
+        dset.dims[0].label=name_from_unit
+        
+        
         pass
                 
     elif isinstance(x, pq.Quantity):
@@ -1194,143 +1234,143 @@ def data2hdf(x:typing.Any,
         if file:
             file.close
             
-def readHDF5_VigraArray(fileNameOrGroup:typing.Union[str, h5py.Group], 
-                        pathInFile:str, 
-                        order:typing.Optional[str]=None):
-    '''Read an array from an HDF5 file.
+#def readHDF5_VigraArray(fileNameOrGroup:typing.Union[str, h5py.Group], 
+                        #pathInFile:str, 
+                        #order:typing.Optional[str]=None):
+    #'''Read an array from an HDF5 file.
     
-    Modified version of vigra.impex.readHDF5() for the new h5py API:
-    A Dataset object does NOT have a "value" attribute in h5py v3.4.0
+    #Modified version of vigra.impex.readHDF5() for the new h5py API:
+    #A Dataset object does NOT have a "value" attribute in h5py v3.4.0
     
-    Parameters:
-    ===========
+    #Parameters:
+    #===========
     
-    'fileNameOrGroup' : str or h5py.Group
-        When a str, it contains a filename
-        When a hy5py.Group this is a group object referring to an already open 
-        HDF5 file, or present in an already open HDF5 file
+    #'fileNameOrGroup' : str or h5py.Group
+        #When a str, it contains a filename
+        #When a hy5py.Group this is a group object referring to an already open 
+        #HDF5 file, or present in an already open HDF5 file
         
-    'pathInFile' : str is the name of the dataset to be read, including 
-    intermediate groups (when a HDF5 'path' - like string). If 'fileNameOrGroup'
-    is a group object, the path is relative to this group, otherwise it is 
-    relative to the file's root group.
+    #'pathInFile' : str is the name of the dataset to be read, including 
+    #intermediate groups (when a HDF5 'path' - like string). If 'fileNameOrGroup'
+    #is a group object, the path is relative to this group, otherwise it is 
+    #relative to the file's root group.
 
-    If the dataset has an attribute 'axistags', the returned array
-    will have type :class:`~vigra.VigraArray` and will be transposed
-    into the given 'order' ('vigra.VigraArray.defaultOrder'
-    will be used if no order is given).  Otherwise, the returned
-    array is a plain 'numpy.ndarray'. In this case, order='F' will
-    return the array transposed into Fortran order.
+    #If the dataset has an attribute 'axistags', the returned array
+    #will have type :class:`~vigra.VigraArray` and will be transposed
+    #into the given 'order' ('vigra.VigraArray.defaultOrder'
+    #will be used if no order is given).  Otherwise, the returned
+    #array is a plain 'numpy.ndarray'. In this case, order='F' will
+    #return the array transposed into Fortran order.
 
-    Requirements: the 'h5py' module must be installed.
-    '''
-    #import h5py
-    file, group, _ = get_file_group_child(fileNameOrGroup)
+    #Requirements: the 'h5py' module must be installed.
+    #'''
+    ##import h5py
+    #file, group, _ = get_file_group_child(fileNameOrGroup)
         
-    try:
-        dataset = group[pathInFile]
-        if not isinstance(dataset, h5py.Dataset):
-            raise IOError("readHDF5(): '%s' is not a dataset" % pathInFile)
-        if hasattr(dataset, "value"):
-            # NOTE: keep this for older h5py API
-            data = dataset.value # <- offending line (cezar.tigaret@gmail.com)
-        else:
-            # NOTE: 2021-10-17 09:38:13
-            # the following returns a numpy array, see:
-            # https://docs.h5py.org/en/latest/high/dataset.html#reading-writing-data
-            data = dataset[()] 
+    #try:
+        #dataset = group[pathInFile]
+        #if not isinstance(dataset, h5py.Dataset):
+            #raise IOError("readHDF5(): '%s' is not a dataset" % pathInFile)
+        #if hasattr(dataset, "value"):
+            ## NOTE: keep this for older h5py API
+            #data = dataset.value # <- offending line (cezar.tigaret@gmail.com)
+        #else:
+            ## NOTE: 2021-10-17 09:38:13
+            ## the following returns a numpy array, see:
+            ## https://docs.h5py.org/en/latest/high/dataset.html#reading-writing-data
+            #data = dataset[()] 
             
-        axistags = dataset.attrs.get('axistags', None)
-        if axistags is not None:
-            data = data.view(vigra.arraytypes.VigraArray)
-            data.axistags = vigra.arraytypes.AxisTags.fromJSON(axistags)
-            if order is None:
-                order = vigra.arraytypes.VigraArray.defaultOrder
-            data = data.transposeToOrder(order)
-        else:
-            if order == 'F':
-                data = data.transpose()
-            elif order not in [None, 'C', 'A']:
-                raise IOError("readHDF5(): unsupported order '%s'" % order)
-    finally:
-        # NOTE: 2021-10-17 09:42:50 Original code
-        # This only closes 'file' when fileNameOrGroup if a HDF5 File object
-        # otherwise does nothing
-        if file is not None:
-            file.close()
-    return data
+        #axistags = dataset.attrs.get('axistags', None)
+        #if axistags is not None:
+            #data = data.view(vigra.arraytypes.VigraArray)
+            #data.axistags = vigra.arraytypes.AxisTags.fromJSON(axistags)
+            #if order is None:
+                #order = vigra.arraytypes.VigraArray.defaultOrder
+            #data = data.transposeToOrder(order)
+        #else:
+            #if order == 'F':
+                #data = data.transpose()
+            #elif order not in [None, 'C', 'A']:
+                #raise IOError("readHDF5(): unsupported order '%s'" % order)
+    #finally:
+        ## NOTE: 2021-10-17 09:42:50 Original code
+        ## This only closes 'file' when fileNameOrGroup if a HDF5 File object
+        ## otherwise does nothing
+        #if file is not None:
+            #file.close()
+    #return data
 
-def readHDF5_str(fileNameOrGroup, pathInFile):
-    file, group = get_file_group_child(fileNameOrGroup)
+#def readHDF5_str(fileNameOrGroup, pathInFile):
+    #file, group = get_file_group_child(fileNameOrGroup)
         
-    try:
-        dataset = group[pathInFile]
-        if not isinstance(dataset, h5py.Dataset):
-            raise IOError("readHDF5(): '%s' is not a dataset" % pathInFile)
+    #try:
+        #dataset = group[pathInFile]
+        #if not isinstance(dataset, h5py.Dataset):
+            #raise IOError("readHDF5(): '%s' is not a dataset" % pathInFile)
         
-        encoding = group.attrs.get("encoding", "utf-8")
+        #encoding = group.attrs.get("encoding", "utf-8")
 
-        data = dataset[()]
+        #data = dataset[()]
         
-        if isinstance(data, bytes):
-            data = data.decode(encoding)
+        #if isinstance(data, bytes):
+            #data = data.decode(encoding)
             
-    finally:
-        if file is not None:
-            file.close()
+    #finally:
+        #if file is not None:
+            #file.close()
             
-    return data
+    #return data
 
-def writeHDF5_VigraArray(x, fileNameOrGroup, pathInFile, mode="a", compression=None, chunks=None):
-    """Variant of vigra.impex.writeHDF5 returning the created h5py.Dataset object
-    Also populates the dataset's dimension scales.
+#def writeHDF5_VigraArray(x, fileNameOrGroup, pathInFile, mode="a", compression=None, chunks=None):
+    #"""Variant of vigra.impex.writeHDF5 returning the created h5py.Dataset object
+    #Also populates the dataset's dimension scales.
     
-    Modified from vira.impex.writeHDF5 (C) U.Koethe
-    """
-    if isinstance(fileNameOrGroup, h5py.Group):
-        file = None
-        group = fileNameOrGroup
-    else:
-        file = h5py.File(fileNameOrGroup, mode=mode)
-        group = file['/']
+    #Modified from vira.impex.writeHDF5 (C) U.Koethe
+    #"""
+    #if isinstance(fileNameOrGroup, h5py.Group):
+        #file = None
+        #group = fileNameOrGroup
+    #else:
+        #file = h5py.File(fileNameOrGroup, mode=mode)
+        #group = file['/']
         
-    #dataset = None
+    ##dataset = None
         
-    try:
-        levels = pathInFile.split('/')
-        for groupname in levels[:-1]:
-            if groupname == '':
-                continue
-            g = group.get(groupname, default=None)
-            if g is None:
-                group = group.create_group(groupname)
-            elif not isinstance(g, h5py.Group):
-                raise IOError("writeHDF5(): invalid path '%s'" % pathInFile)
-            else:
-                group = g
-        dataset = group.get(levels[-1], default=None)
-        if dataset is not None:
-            if isinstance(dataset, h5py.Dataset):
-                del group[levels[-1]]
-            else:
-                raise IOError("writeHDF5(): cannot replace '%s' because it is not a dataset" % pathInFile)
-        try:
-            x = x.transposeToNumpyOrder()
-        except:
-            pass
-        dataset = group.create_dataset(levels[-1], data=x, compression=compression, chunks=chunks)
-        if hasattr(x, 'axistags'):
-            dataset.attrs['axistags'] = x.axistags.toJSON()
-            axcalgroup = group.create_group("axis")
-            for k, axt in enumerate(x.axistags):
-                dataset.dims[k].label = axt.key
+    #try:
+        #levels = pathInFile.split('/')
+        #for groupname in levels[:-1]:
+            #if groupname == '':
+                #continue
+            #g = group.get(groupname, default=None)
+            #if g is None:
+                #group = group.create_group(groupname)
+            #elif not isinstance(g, h5py.Group):
+                #raise IOError("writeHDF5(): invalid path '%s'" % pathInFile)
+            #else:
+                #group = g
+        #dataset = group.get(levels[-1], default=None)
+        #if dataset is not None:
+            #if isinstance(dataset, h5py.Dataset):
+                #del group[levels[-1]]
+            #else:
+                #raise IOError("writeHDF5(): cannot replace '%s' because it is not a dataset" % pathInFile)
+        #try:
+            #x = x.transposeToNumpyOrder()
+        #except:
+            #pass
+        #dataset = group.create_dataset(levels[-1], data=x, compression=compression, chunks=chunks)
+        #if hasattr(x, 'axistags'):
+            #dataset.attrs['axistags'] = x.axistags.toJSON()
+            #axcalgroup = group.create_group("axis")
+            #for k, axt in enumerate(x.axistags):
+                #dataset.dims[k].label = axt.key
             
             
-    finally:
-        if file is not None:
-            file.close()
+    #finally:
+        #if file is not None:
+            #file.close()
             
-    return dataset
+    #return dataset
 
 
     

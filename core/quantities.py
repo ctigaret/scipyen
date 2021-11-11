@@ -3,6 +3,7 @@ from math import log
 from numpy import log10
 import numpy as np
 import quantities as pq
+from traitlets import Bunch
 
 _pqpfx = sorted(inspect.getmembers(pq.prefixes, lambda x: isinstance(x, (float, int))) + [("deca", pq.prefixes.deka)], key = lambda x: x[1])
                             
@@ -163,6 +164,51 @@ for cq in custom_quantities:
 
 del(custom_quantities, cq, _pqpfx)
 
+def __get_standard_units_definitions():
+    ret = dict()
+    unitsmodules = [(k,v) for (k,v) in pq.units.__dict__.items() if inspect.ismodule(v)]
+    
+    for module in unitsmodules:
+        # check for all quantities
+        # some modules of compound units might also show up as containing irreducible units (when simplified) so we need
+        # to take this into account
+        
+        module_units = list([(kn, kv) for kn, kv in module[1].__dict__.items() if isinstance(kv, pq.UnitQuantity)])
+        
+        # NOTE: UnitQuantity, as well as Dimensionality are hashable object types
+        # hence they can be used as dict keys
+        
+        if len(module_units):
+            units = set(u[1] for u in module_units)
+            ir_units = set(u[1] for u in module_units if isinstance(u[1], pq.unitquantity.IrreducibleUnit) and type(u[1]).__name__.replace("Unit","") == module[0].capitalize())
+            der_units = units - ir_units
+            ret[module[0]]=dict()
+            ret[module[0]]["irreducibles"] = ir_units
+            ret[module[0]]["derived"] = der_units
+            
+        # reverse-locate irreducibles
+        
+        irreducibles = dict()
+        for k, v in ret.items():
+            if len(v["irreducibles"]):
+                for i in v["irreducibles"]:
+                    if i not in irreducibles:
+                        irreducibles[i] = set()
+                    irreducibles[i].add(k)
+                    
+        derived = dict()
+        for k, v in ret.items():
+            if len(v["derived"]):
+                for i in v["derived"]:
+                    if i not in derived:
+                        derived[i] = set()
+                    derived[i].add(k)
+            
+    return ret, irreducibles, derived
+
+UNITS_DICT, IRREDUCIBLES, DERIVED = __get_standard_units_definitions()
+        
+
 def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]):
     """
     """
@@ -219,16 +265,18 @@ def name_from_unit(u):
     """
     FIXME make it more intelligent!
     """
-    d_name = ""
+    d_name = "Quantity"
     
     if not isinstance(u, (pq.UnitQuantity, pq.Quantity)):
         return d_name
-        #raise TypeError("Expecting a Quanity or UnitQuanity; got %s instead" % type(u).__name__)
+        #raise TypeError("Expecting a Quantity or UnitQuantity; got %s instead" % type(u).__name__)
+        
+    dim = u.dimensionality
+    #dimsim = dimsim.simplfied
     
-    unitQuantity = [k for k in u.dimensionality.keys()]
+    unitQuantity = [k for k in dim.keys()]
     
-    
-    if len(unitQuantity):
+    if len(unitQuantity) == 1:
         unitQuantity = unitQuantity[0] 
     
         d_name = unitQuantity.name
@@ -257,11 +305,23 @@ def name_from_unit(u):
         elif "hertz" in d_name:
             d_name = "Frequency"
         
-        elif any([v in d_name for v in ("meter", "foot", "mile","yard")]):
+        elif any([v in d_name for v in ("meter", "foot", "mile", "yard")]):
             d_name = "Length"
             
         elif any([v in d_name for v in ("second", "minute", "day","week", "month", "year")]):
             d_name = "Time"
+            
+        else:
+            mod_name = list()
+            if unitQuantity in IRREDUCIBLES:
+                mod_name = list(IRREDUCIBLES[unitQuantity])
+                
+            elif unitQuantity in DERIVED:
+                mod_name = list(DERIVED[unitQuantity])
+                
+            if len(mod_name)
+            
+            
             
     return d_name
             

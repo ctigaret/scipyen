@@ -28,7 +28,9 @@ from core.datatypes import (UnitTypes, Genotypes, )
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 
-from core.triggerevent import (TriggerEvent, TriggerEventType,)
+from core.datazone import DataZone
+
+from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType,)
 
 from core.triggerprotocols import (TriggerProtocol,
                                    embed_trigger_protocol, 

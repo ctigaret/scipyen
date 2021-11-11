@@ -175,8 +175,9 @@ from core.utilities import (get_nested_value, set_nested_value, counter_suffix, 
 from core.prog import (safeWrapper, safeGUIWrapper, )
 #import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+from core.datazone import DataZone
 #import core.triggerprotocols
-from core.triggerevent import (TriggerEvent, TriggerEventType, )
+from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import (TriggerProtocol,
                                    auto_detect_trigger_protocols,
                                    parse_trigger_protocols)
