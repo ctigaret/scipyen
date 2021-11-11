@@ -281,6 +281,9 @@ def name_from_unit(u):
     
         d_name = unitQuantity.name
         
+        if "arbitrary unit" in d_name:
+            d_name = "A.U."
+        
         if d_name in ("Celsius", "Kelvin", "Fahrenheit"):
             d_name = "Temperature"
             
@@ -308,20 +311,33 @@ def name_from_unit(u):
         elif any([v in d_name for v in ("meter", "foot", "mile", "yard")]):
             d_name = "Length"
             
+        elif "postnatal" in d_name:
+            d_name = "Age"
+            
+        elif "in vitro" in d_name:
+            d_name = "Age in vitro"
+            
+        elif "embryonic" in d_name:
+            d_name = "Embryonic age"
+            
         elif any([v in d_name for v in ("second", "minute", "day","week", "month", "year")]):
             d_name = "Time"
             
         else:
-            mod_name = list()
-            if unitQuantity in IRREDUCIBLES:
-                mod_name = list(IRREDUCIBLES[unitQuantity])
-                
-            elif unitQuantity in DERIVED:
-                mod_name = list(DERIVED[unitQuantity])
-                
-            if len(mod_name)
-            
-            
+            d_name = type(unitQuantity).__name__.replace("Unit", "")
+            if d_name == "Quantity":
+                mod_name = list()
+                if unitQuantity in DERIVED:
+                    mod_name = list(DERIVED[unitQuantity])
+                    
+                if len(mod_name)=1:
+                    d_name = mod_name[0].capitalize()
+                    
+                else:
+                    d_name = unitQuantity.name.capitalize()
+      
+    else:
+        d_name = f"Compound Quantity {u.dimensionality.string}"
             
     return d_name
             
@@ -386,7 +402,7 @@ def unit_quantity_from_name_or_symbol(s):
     except:
         #traceback.print_exc()
         try:
-            ret = eval(s, pq.__dict__)
+            ret = eval(s, pq.__dict__) # this accepts dimensionality strings
             
         except:
             #traceback.print_exc()

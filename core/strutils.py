@@ -60,7 +60,7 @@ def get_int_sfx(s, sep = "_"):
 def str2symbol(s):
     """Returns a string that can be used as valid Python symbol (a.k.a variable name).
     
-    If argument can already be sued as a symbol ('s.isidentifier() is True') 
+    If argument can already be used as a symbol ('s.isidentifier() is True') 
     returns the argument unchanged.
     
     Otherwise:

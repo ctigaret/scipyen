@@ -614,13 +614,9 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
                                 if f"{ch_key}_index" in dim:
                                     chcal["index"] = int(dim[f"{ch_key}_index"][()])
                                     
-                                #print("chcal", chcal)
-                                    
                                 if ChannelCalibrationData.isCalibration(chcal):
                                     axcal.addChannelCalibration(ChannelCalibrationData(chcal), name=ch_key)
                                     
-                            #print("axcal", axcal)
-
                         axcal.calibrateAxis(data.axistags[dim.label])
                         
             if order is None:
@@ -740,7 +736,6 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
                 if "sampling_rate_units" in dim:
                     domcal["sampling_rate_units"] = unit_quantity_from_name_or_symbol(dim["sampling_rate_units"][()].decode())
                     
-        #print("arr_ann", arr_ann)
         array_annotations = ArrayDict(data.shape[-1], **arr_ann)
             
         if klass in (neo.AnalogSignal, DataSignal):
@@ -787,6 +782,111 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
                             array_annotations = array_annotations, **annotations)
                 
             data.segment = None
+            
+    elif klass in (neo.Event, TriggerEvent, DataMark):
+        attrs = dict(dset.attrs)
+        
+        file_origin = attrs.pop("file_origin", None)
+        if file_origin is None:
+            file_origin = ""
+        elif not isinstance(file_origin, str):
+            file_origin = file_origin[()].decode()
+            
+        description = attrs.pop("description", None)
+        if description is None:
+            description = ""
+        elif not isinstance(description, str):
+            description = description[()].decode()
+            
+        annotations = dict()
+            
+        annotations = attrs.pop("annotations", None)
+        if annotations is None:
+            annotations = dict()
+            
+        if isinstance(annotations, str):
+            try:
+                annotations = json.loads(annotations)
+            except:
+                warnings.warn(f"Cannot read annotations {annotations} from json")
+                
+        elif isinstance(annotations, bytes):
+            try:
+                annotations = json.loads(annotations[()].decode())
+            except:
+                warnings.warn(f"Cannot read annotations {annotations} from json")
+                try:
+                    annotations = pickle.loads(annotations)
+                except:
+                    warnings.warn(f"Cannot read annotations {annotations}")
+                
+        labels = attrs.pop("labels", None)
+        
+        if isinstance(labels, str):
+            if not labels.isidentifier():
+                try:
+                    labels = json.loads(labels)
+                except:
+                    traceback.print_exc()
+                    labels = None
+                
+        elif isinstance(labels, np.ndarray):
+            labels = np.asarray(labels, dtype=np.dtype"U"))
+                
+        elif labels is not None: # how ot interpret anything else? loose it for now
+            labels = None
+                
+        data = data.view(np.ndarray).transpose()
+        
+        dim = dset.dims[0]
+        
+        #name = dim.label
+        
+        if "units" in dim:
+            units = unit_quantity_from_name_or_symbol(dim["units"][()].decode())
+        else:
+            units = pq.arbitrary_unit if klass is DataMark else pq.s
+            
+            
+        data = klass(times=data, labels=labels,units=units,name=data_name,
+                    description=description,file_origin=file_origin,
+                    **annotations)
+        
+        if klass is DataMark:
+            event_type = attrs.pop("MarkType", None)
+            if event_type is not None:
+                data.type = event_type
+                
+        elif klass is TriggerEventType:
+            event_type = attrs.pop("TriggerEventType", None)
+            if event_type is not None:
+                data.type = event_type
+            
+        arr_ann = dict()
+        
+        for key in dim:
+            if key != "units":
+                val = dim[key]
+                if key not in arr_ann:
+                    arr_ann[key] = list()
+                    
+                if val.dtype == h5py.string_dtype():
+                    val = val[()].decode()
+                    
+                elif val.dtype.kind= "O":
+                    if type(val[()]) == bytes:
+                        val = val[()].decode()
+                    else:
+                        val = val[()]
+                else:
+                    val = val[()]
+                arr_ann[key].append(val)
+                
+        if len(arr_ann):
+            array_annotations = ArrayDict(data._get_arr_ann_length(), **arr_ann)
+            
+            data.array_annotations = array_annotations
+        
             
     elif isinstance(data, bytes):
         data = data.decode()
@@ -1087,6 +1187,7 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         x_meta.update(x_attrs)
         x_meta["description"] = make_attr("" if x.description is None else f"{x.description}")
         x_meta["file_origin"] = make_attr(f"{x.file_origin}")
+        
         annot = None
         try:
             annot = json.dumps(x.annotations)
@@ -1100,6 +1201,8 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         if annot is not None:
             x_meta["annotations"] = annot
             
+        array_annotations = getattr(x, "array_annotations", None)
+        
         x_meta["labels"] = make_attr(x.labels)
         
         if isinstance(x, TriggerEvent):
@@ -1112,14 +1215,25 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         dset.attrs.update(x_meta)
         calgrp = group.create_group(f"{name}_axes", track_order=True)
         axcalgrp = calgrp.create_group("axis_0", track_order=True)
+        
+        if isinstance(array_annotations, ArrayDict):
+            axcalgrp.attrs.update(make_attr_dict(**array_annotations))
+            
+        else:
+            array_annotations = dict() # shim for below
+                
         ds_units = make_dataset(x.times.units.dimensionality.string, axcalgrp, name="units")
         ds_units.make_scale("units")
         dset.dims[0].attach_scale(ds_units)
-        dset.dims[0].label=name_from_unit
+        dset.dims[0].label=name_from_unit(x.times.units)
         
+        # NOTE: events and datamarks are ALWAYS 1D (or supposed to be) so we
+        # don't iterate through 2nd dimension here (axis 1)
+        for key in array_annotations:
+            ds_key = make_dataset(array_annotations[key][0].item(), axcalgroup, name=key)
+            ds_key.make_scale(key)
+            dset.dims[0].attach_scale(ds_key)
         
-        pass
-                
     elif isinstance(x, pq.Quantity):
         dset = make_dataset(x.magnitude, group, name=name)
         x_attrs.update(make_attr_dict(units = x.dimensionality.string))
