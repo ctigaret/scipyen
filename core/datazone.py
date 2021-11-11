@@ -46,9 +46,9 @@ class DataZone(DataObject):
             if times is None:
                 places = np.array([])
             elif isinstance(times, (tuple, list)):
-                places = np.array(times)
+                places = np.array(times).flatten()
             elif isinstance(times, pq.Quantity):
-                places = times
+                places = times.flatten()
                 
         elif instance(places, (tuple, list)):
             places = np.array(places)
@@ -56,11 +56,15 @@ class DataZone(DataObject):
         elif not isinstance(places, pq.Quantity):
             places = np.array([])
             
+        else:
+            places = places.flatten()
+            
+            
         if extents is None:
             if durations is None:
                 extents = np.array([])
             elif isinstance(durations, (tuple, list)):
-                extents = np.array(durations)
+                extents = np.array(durations).flatten()
             elif isinstance(durations, pq.Quantity):
                 extents = durations
                 
@@ -344,8 +348,10 @@ class DataZone(DataObject):
     
     @extents.setter
     def extents(self, extents):
-        if extents is not None and self.extents.size > 0 and len(extents) != self.extents.size:
-            raise ValueError(f"Argument has wrong size {len(extents)}; expecting {self.extents.size}")
+        if extents is not None and self.places.size > 0 and len(extents) != self.extents.size:
+            raise ValueError(f"Argument has wrong size {len(extents)}; expecting {self.places.size}")
+        
+        self._extents = extents
         
     @property
     def durations(self):

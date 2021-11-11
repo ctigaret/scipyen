@@ -330,7 +330,7 @@ def name_from_unit(u):
                 if unitQuantity in DERIVED:
                     mod_name = list(DERIVED[unitQuantity])
                     
-                if len(mod_name)=1:
+                if len(mod_name)==1:
                     d_name = mod_name[0].capitalize()
                     
                 else:

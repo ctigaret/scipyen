@@ -831,14 +831,14 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
                     labels = None
                 
         elif isinstance(labels, np.ndarray):
-            labels = np.asarray(labels, dtype=np.dtype"U"))
+            labels = np.asarray(labels, dtype=np.dtype("U"))
                 
         elif labels is not None: # how ot interpret anything else? loose it for now
             labels = None
                 
         data = data.view(np.ndarray).transpose()
         
-        dim = dset.dims[0]
+        dim = dset.dims[1]
         
         #name = dim.label
         
@@ -873,7 +873,7 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
                 if val.dtype == h5py.string_dtype():
                     val = val[()].decode()
                     
-                elif val.dtype.kind= "O":
+                elif val.dtype.kind == "O":
                     if type(val[()]) == bytes:
                         val = val[()].decode()
                     else:
@@ -886,7 +886,108 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
             array_annotations = ArrayDict(data._get_arr_ann_length(), **arr_ann)
             
             data.array_annotations = array_annotations
+            
+    elif klass in (neo.Epoch, DataZone):
+        attrs = dict(dset.attrs)
         
+        file_origin = attrs.pop("file_origin", None)
+        if file_origin is None:
+            file_origin = ""
+        elif not isinstance(file_origin, str):
+            file_origin = file_origin[()].decode()
+            
+        description = attrs.pop("description", None)
+        if description is None:
+            description = ""
+        elif not isinstance(description, str):
+            description = description[()].decode()
+            
+        annotations = dict()
+            
+        annotations = attrs.pop("annotations", None)
+        if annotations is None:
+            annotations = dict()
+            
+        if isinstance(annotations, str):
+            try:
+                annotations = json.loads(annotations)
+            except:
+                warnings.warn(f"Cannot read annotations {annotations} from json")
+                
+        elif isinstance(annotations, bytes):
+            try:
+                annotations = json.loads(annotations[()].decode())
+            except:
+                warnings.warn(f"Cannot read annotations {annotations} from json")
+                try:
+                    annotations = pickle.loads(annotations)
+                except:
+                    warnings.warn(f"Cannot read annotations {annotations}")
+                
+        labels = attrs.pop("labels", None)
+        
+        if isinstance(labels, str):
+            if not labels.isidentifier():
+                try:
+                    labels = json.loads(labels)
+                except:
+                    traceback.print_exc()
+                    labels = None
+                
+        elif isinstance(labels, np.ndarray):
+            labels = np.asarray(labels, dtype=np.dtype("U"))
+                
+        elif labels is not None: # how ot interpret anything else? loose it for now
+            labels = None
+                
+        dim = dset.dims[1]
+        
+        #name = dim.label
+        
+        if "units" in dim:
+            units = unit_quantity_from_name_or_symbol(dim["units"][()].decode())
+        else:
+            units = pq.arbitrary_unit if klass is DataMark else pq.s
+            
+            
+        data = data.view(np.ndarray).transpose()
+        
+        times = np.atleast_1d(data[:,0])
+        
+        if data.shape[-1] == 2:
+            durations = np.atleast_1d(data[:,1])
+            
+        else:
+            durations = None
+        
+        data = klass(times=data, durations=durations, labels=labels,units=units,
+                     name=data_name, description=description, file_origin=file_origin,
+                    **annotations)
+        
+        arr_ann = dict()
+        
+        for key in dim:
+            if key != "units":
+                val = dim[key]
+                if key not in arr_ann:
+                    arr_ann[key] = list()
+                    
+                if val.dtype == h5py.string_dtype():
+                    val = val[()].decode()
+                    
+                elif val.dtype.kind == "O":
+                    if type(val[()]) == bytes:
+                        val = val[()].decode()
+                    else:
+                        val = val[()]
+                else:
+                    val = val[()]
+                arr_ann[key].append(val)
+                
+        if len(arr_ann):
+            array_annotations = ArrayDict(data._get_arr_ann_length(), **arr_ann)
+            
+            data.array_annotations = array_annotations
             
     elif isinstance(data, bytes):
         data = data.decode()
@@ -905,8 +1006,6 @@ def make_dataset(x:typing.Any, group:h5py.Group,
     TODO: neo.DataObject
         TODO: neo.SpikeTrain
         TODO: neo.ImageSequence
-        TODO: neo.Epoch
-        TODO: neo.Event
         
     TODO: neo.Container:
         TODO: neo.Block
@@ -914,6 +1013,54 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         
     TODO: neo.ChannelView
     TODO: neo.RegionOfInterest
+    
+    TODO: vigra.filters.Kernel1D, Kernel2D
+    
+    TODO: pictgui.PlanarGraphics
+    
+    TODO: TriggerProtocol
+    
+    TODO: pandas.Series, pandas.DataFrame
+    
+    TODO: core.modelfitting.FitModel, ModelExpression
+    
+    TODO: imaging:
+        TODO: scandata.ScanData, AnalysisUnit
+        TODO: axiscalibration.AxesCalibration, AxisCalibrationData, ChannelCalibrationData
+            NOTE: these are written as DimensionScales; since they are 'volatile'
+                objects, there is no real need to write them to HDF5 as such.
+                
+                HOWEVER, in the interest of generality I should perhaps contemplate
+                a way to read/write objects of these types from/to HDF5 data 
+                structure.
+                CAUTION: this may confuse a library user: are these objects to be
+                attached to a (vigra array, numpy array, etc) when they are found
+                inside a HDF5 data structure, or treated as independent objects
+                with a life of their own?
+                
+                As a rule of thumb, these objects are NEVER to be written directly
+                into the usual HDF5 hierarchy (Group/Dataset) unless there is a
+                specific intention to do so, and with the explicit purpose of
+                storing them as 'free-standing' entities (not that it would make
+                much sense to do so...)
+                
+                I all other scenarios - i.e. when they ARE attached to an array
+                - they are to be 'decomposed' and their elements are to be written
+                into the array's dimension scales (to be later read and used to
+                'recompose' the array information).
+                
+                See the case for VigraArray in make_dataset and from_dataset
+                functions.
+                
+    NOTE: About array annotations of neo data objects.
+        These are used to store information associated with a specific 'channel'
+        in the numeric array of the neo data object (a.k.a 'signal channel')
+        
+        An array annotation is a so-called ArrayDict where each key is mapped to 
+        a 1D numpy array with the same length as the number of channels in the 
+        signal (at least this is what I understand from reading the source code;
+        the official documentation in the neo package tends to be somewhat
+        ambiguous).
     
     Parameters:
     ===========
@@ -945,6 +1092,11 @@ def make_dataset(x:typing.Any, group:h5py.Group,
     """
     x_type, x_name, x_attrs = hdf_entry(x, "")
     
+    data_name = getattr(x, "name", None)
+    
+    if not isinstance(data_name, str) or len(data_name.strip()) == 0:
+        data_name = name
+                    
     if not isinstance(name, str) or len(name.strip()) == 0:
         name = x_name
         
@@ -980,8 +1132,11 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         
         # For each axis, we attach FOUR HDF5 dimension scales: 
         # name (str), units (str), origin (float), and resolution (float)
+        # in addition, for a Channels axis (of which there can be at most ONE)
+        # we create four dimension scales for each channel - except when the
+        # Channels axis is non-existent: the data has one 'virtual' channel which
+        # by definition is uncalibrated.
         x_tr_axcal = AxesCalibration(data)
-        #print("x_tr_axcal", x_tr_axcal)
         
         calgrp = group.create_group(f"{name}_axes", track_order=True)
         
@@ -1081,108 +1236,107 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         
         calgrp = group.create_group(f"{name}_axes", track_order=True)
         
-        for k in range(2):
-            axcalgrp = calgrp.create_group(f"axis_{k}", track_order=True)
+        # axis 0 is now the signal axis
+        signal_axis_group = calgrp.create_group(f"signal_axis", track_order=True)
+        ds_units = make_dataset(x.dimensionality.string, signal_axis_group, name="units")
+        ds_units.make_scale("units")
+        # (un)fortunately(?), individual channels (i.e. data columns) in
+        # neo signals are not named
+        #data_name = getattr(x, "name", None)
+        
+        #if not isinstance(data_name, str) or len(data_name.strip()) == 0:
+            #data_name = name
             
-            if k == 0: # axis 0 is now the signal axis
-                ds_units = make_dataset(x.dimensionality.string, axcalgrp, name="units")
-                ds_units.make_scale("units")
-                # (un)fortunately(?), individual channels (i.e. data columns) in
-                # neo signals are not named
-                data_name = getattr(x, "name", None)
-                
-                if not isinstance(data_name, str) or len(data_name.strip()) == 0:
-                    data_name = name
-                    
-                #print("data_name", data_name, "name", name)
-                ds_name = make_dataset(data_name, axcalgrp, name = "name")
-                ds_name.make_scale("name")
-                
-                dset.dims[k].attach_scale(ds_name)
-                dset.dims[k].attach_scale(ds_units)
+        #print("data_name", data_name, "name", name)
+        ds_name = make_dataset(data_name, signal_axis_group, name = "name")
+        ds_name.make_scale("name")
+        
+        dset.dims[0].attach_scale(ds_name)
+        dset.dims[0].attach_scale(ds_units)
 
-                channels_group = axcalgrp.create_group("channels", track_order=True)
+        channels_group = signal_axis_group.create_group("channels", track_order=True)
+        
+        array_annotations = getattr(x, "array_annotations", None)
+        
+        if isinstance(array_annotations, ArrayDict):
+            channels_group.attrs.update(make_attr_dict(**array_annotations))
+            
+        else:
+            array_annotations = dict() # shim for below
+        
+        for l in range(x.shape[-1]):
+            if "channel_ids" in array_annotations:
+                channel_id = array_annotations["channel_ids"][l].item()
+            else:
+                channel_id = f"{l}"
                 
-                array_annotations = getattr(x, "array_annotations", None)
+            if "channel_names" in array_annotations:
+                channel_name = array_annotations["channel_names"][l].item()
+            else:
+                channel_name = f"{l}"
                 
-                if isinstance(array_annotations, ArrayDict):
-                    channels_group.attrs.update(make_attr_dict(**array_annotations))
+            channel_group = channels_group.create_group(f"channel_{l}", track_order=True)
+            
+            ds_chn_id = make_dataset(channel_id, channel_group, name=f"channel_{l}_id")
+            ds_chn_id.make_scale(f"channel_{l}_id")
+            
+            ds_chn_name = make_dataset(channel_name, channel_group, name=f"channel_{l}_name")
+            ds_chn_name.make_scale(f"channel_{l}_name")
+            
+            dset.dims[0].attach_scale(ds_chn_id)
+            dset.dims[0].attach_scale(ds_chn_name)
+            
+            for key in array_annotations:
+                if key not in ("channel_ids", "channel_names"):
+                    ds_chn_key = make_dataset(array_annotations[key][k].item(), channel_group, name=f"channel_{l}_{key}")
+                    ds_chn_key.make_scale(f"channel_{l}_{key}")
+                    dset.dims[0].attach_scale(ds_chn_key)
+            
+        dset.dims[k].label = data_name
                     
-                else:
-                    array_annotations = dict() # shim for below
-                
-                for l in range(x.shape[-1]):
-                    if "channel_ids" in array_annotations:
-                        channel_id = array_annotations["channel_ids"][l].item()
-                    else:
-                        channel_id = f"{l}"
-                        
-                    if "channel_names" in array_annotations:
-                        channel_name = array_annotations["channel_names"][l].item()
-                    else:
-                        channel_name = f"{l}"
-                        
-                    channel_group = channels_group.create_group(f"channel_{l}", track_order=True)
-                    
-                    ds_chn_id = make_dataset(channel_id, channel_group, name=f"channel_{l}_id")
-                    ds_chn_id.make_scale(f"channel_{l}_id")
-                    
-                    ds_chn_name = make_dataset(channel_name, channel_group, name=f"channel_{l}_name")
-                    ds_chn_name.make_scale(f"channel_{l}_name")
-                    
-                    dset.dims[k].attach_scale(ds_chn_id)
-                    dset.dims[k].attach_scale(ds_chn_name)
-                    
-                    for key in array_annotations:
-                        if key not in ("channel_ids", "channel_names"):
-                            ds_chn_key = make_dataset(array_annotations[key][k].item(), channel_group, name=f"channel_{l}_{key}")
-                            ds_chn_key.make_scale(f"channel_{l}_{key}")
-                            dset.dims[k].attach_scale(ds_chn_key)
-                    
-                dset.dims[k].label = data_name
-                    
-            else: # axis 1 is now the time (or domain) axis
-                #if isinstance(x, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
-                    #continue # save this axis as a separate dataset
-                if isinstance(x, (DataSignal, IrregularlySampledDataSignal)):
-                    domain_name = x.domain_name
-                else:
-                    domain_name = "Time"
-                    
-                ds_dom_units = make_dataset(x.times.units.dimensionality.string, axcalgrp, name="domain_units")
-                ds_dom_units.make_scale("domain_units")
-                
-                ds_dom_name = make_dataset(domain_name, axcalgrp, name="domain_name")
-                ds_dom_name.make_scale("domain_name")
-                
-                if isinstance(x, (DataSignal, neo.AnalogSignal)):
-                    ds_dom_origin = make_dataset(x.t_start.magnitude.item(), axcalgrp, name="domain_origin")
-                    ds_dom_origin.make_scale("domain_origin")
-                    
-                    ds_dom_rate = make_dataset(x.sampling_rate.magnitude.item(), axcalgrp, name="sampling_rate")
-                    ds_dom_rate.make_scale("sampling_rate")
+        # axis 1 is now the time (or domain) axis
+        domain_axis_group = calgrp.create_group(f"signal_domain", track_order=True)
+        #if isinstance(x, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
+            #continue # save this axis as a separate dataset
+        if isinstance(x, (DataSignal, IrregularlySampledDataSignal)):
+            domain_name = x.domain_name
+        else:
+            domain_name = "Time"
+            
+        ds_dom_units = make_dataset(x.times.units.dimensionality.string, domain_axis_group, name="domain_units")
+        ds_dom_units.make_scale("domain_units")
+        
+        ds_dom_name = make_dataset(domain_name, domain_axis_group, name="domain_name")
+        ds_dom_name.make_scale("domain_name")
+        
+        if isinstance(x, (DataSignal, neo.AnalogSignal)):
+            ds_dom_origin = make_dataset(x.t_start.magnitude.item(), domain_axis_group, name="domain_origin")
+            ds_dom_origin.make_scale("domain_origin")
+            
+            ds_dom_rate = make_dataset(x.sampling_rate.magnitude.item(), domain_axis_group, name="sampling_rate")
+            ds_dom_rate.make_scale("sampling_rate")
 
-                    ds_dom_rate_units = make_dataset(x.sampling_rate.units.dimensionality.string, axcalgrp, name="sampling_rate_units")
-                    ds_dom_rate_units.make_scale("sampling_rate_units")
-                
-                if isinstance(x, (IrregularlySampledDataSignal, neo.IrregularlySampledSignal)) and isinstance(dom_dset, h5py.Dataset):
-                    #dom_dset created above
-                    dom_dset.dims[0].attach_scale(ds_dom_name)
-                    dom_dset.dims[0].attach_scale(ds_dom_units)
-                else:
-                    dset.dims[k].attach_scale(ds_dom_name)
-                    dset.dims[k].attach_scale(ds_dom_origin)
-                    dset.dims[k].attach_scale(ds_dom_units)
-                    dset.dims[k].attach_scale(ds_dom_rate)
-                    dset.dims[k].attach_scale(ds_dom_rate_units)
-                
-                dset.dims[k].label = domain_name
-                
-    elif isinstance(x, neo.SpikeTrain):
-        pass
+            ds_dom_rate_units = make_dataset(x.sampling_rate.units.dimensionality.string, domain_axis_group, name="sampling_rate_units")
+            ds_dom_rate_units.make_scale("sampling_rate_units")
+        
+        if isinstance(x, (IrregularlySampledDataSignal, neo.IrregularlySampledSignal)) and isinstance(dom_dset, h5py.Dataset):
+            #dom_dset created above
+            dom_dset.dims[0].attach_scale(ds_dom_name)
+            dom_dset.dims[0].attach_scale(ds_dom_units)
+        else:
+            dset.dims[1].attach_scale(ds_dom_name)
+            dset.dims[1].attach_scale(ds_dom_origin)
+            dset.dims[1].attach_scale(ds_dom_units)
+            dset.dims[1].attach_scale(ds_dom_rate)
+            dset.dims[1].attach_scale(ds_dom_rate_units)
+        
+        dset.dims[k].label = domain_name
                 
     elif isinstance(x, (neo.Event, TriggerEvent, DataMark)):
-        data = np.transpose(x.times.magnitude)
+        # NOTE: 2021-11-11 22:23:15
+        # even if this is tranposed, there is only one (relevant) axis: that
+        # containing the domain (which is the same as the signal)
+        data = np.transpose(np.atleast_1d(x.times.magnitude.flatten()))
         x_meta = dict()
         x_meta.update(x_attrs)
         x_meta["description"] = make_attr("" if x.description is None else f"{x.description}")
@@ -1213,8 +1367,71 @@ def make_dataset(x:typing.Any, group:h5py.Group,
             
         dset = group.create_dataset(name, data=data)
         dset.attrs.update(x_meta)
+        
+        # these groups store axis information; we do NOT have AxisCalibrationData
+        # objects for these kind of arrays (yet...; maybe I should extend AxisCalibrationData
+        # to neo signals-like data as well)
         calgrp = group.create_group(f"{name}_axes", track_order=True)
-        axcalgrp = calgrp.create_group("axis_0", track_order=True)
+        axcalgrp = calgrp.create_group("signal_domain", track_order=True)
+        
+        dset.dims[0].label = data_name
+        if isinstance(array_annotations, ArrayDict):
+            axcalgrp.attrs.update(make_attr_dict(**array_annotations))
+            
+        else:
+            array_annotations = dict() # shim for below
+            
+        for key in array_annotations:
+            ds_key = make_dataset(array_annotations[key][0].item(), axcalgroup, name=key)
+            ds_key.make_scale(key)
+            dset.dims[0].attach_scale(ds_key)
+            
+                
+        ds_units = make_dataset(x.times.units.dimensionality.string, axcalgrp, name="units")
+        ds_units.make_scale("units")
+        dset.dims[1].attach_scale(ds_units)
+        dset.dims[1].label=name_from_unit(x.times.units)
+        
+        # NOTE: events and datamarks are ALWAYS 1D (or supposed to be) so we
+        # don't iterate through 2nd dimension here (axis 1)
+    elif isinstance(x, neo.Epoch, DataZone):
+        if len(x.durations):
+            data = np.transpose(np.concatenate((np.atleast_1d(x.times.magnitude.flatten()),
+                                   np.atleast_1d(x.durations.magnitude.flatten()),
+                                   axis=1)))
+            
+        else:
+            data = np.transpose(np.at_least_1d(x.times.magnitude.flatten()))
+            
+        x_meta = dict()
+        x_meta.update(x_attrs)
+        x_meta["description"] = make_attr("" if x.description is None else f"{x.description}")
+        x_meta["file_origin"] = make_attr(f"{x.file_origin}")
+        
+        annot = None
+        try:
+            annot = json.dumps(x.annotations)
+        except:
+            # unencodable in json:
+            try:
+                annot = pickle.dumps(x.annotations) # pickling is a bit cheating ...
+            except:
+                warnings.warn(f"Cannot encode anotations {x.annotations}")
+            
+        if annot is not None:
+            x_meta["annotations"] = annot
+            
+        array_annotations = getattr(x, "array_annotations", None)
+        
+        x_meta["labels"] = make_attr(x.labels)
+        
+        dset = group.create_dataset(name, data=data)
+        dset.attrs.update(x_meta)
+        
+        dset.dims[0].label = data_name
+        
+        calgrp = group.create_group(f"{name}_axes", track_order=True)
+        axcalgrp = calgrp.create_group("signal_domain", track_order=True)
         
         if isinstance(array_annotations, ArrayDict):
             axcalgrp.attrs.update(make_attr_dict(**array_annotations))
@@ -1222,18 +1439,102 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         else:
             array_annotations = dict() # shim for below
                 
-        ds_units = make_dataset(x.times.units.dimensionality.string, axcalgrp, name="units")
-        ds_units.make_scale("units")
-        dset.dims[0].attach_scale(ds_units)
-        dset.dims[0].label=name_from_unit(x.times.units)
-        
         # NOTE: events and datamarks are ALWAYS 1D (or supposed to be) so we
         # don't iterate through 2nd dimension here (axis 1)
         for key in array_annotations:
             ds_key = make_dataset(array_annotations[key][0].item(), axcalgroup, name=key)
             ds_key.make_scale(key)
             dset.dims[0].attach_scale(ds_key)
+            
+        ds_units = make_dataset(x.times.units.dimensionality.string, axcalgrp, name="units")
+        ds_units.make_scale("units")
+        dset.dims[1].attach_scale(ds_units)
+        dset.dims[1].label=name_from_unit(x.times.units)
         
+    elif isinstance(x, neo.SpikeTrain):
+        x_meta = dict()
+        x_meta.update(x_attrs)
+        
+        x_meta["description"] = make_attr("" if x.description is None else f"{x.description}")
+        x_meta["file_origin"] = make_attr(f"{x.file_origin}")
+        
+        annot = None
+        try:
+            annot = json.dumps(x.annotations)
+        except:
+            # unencodable in json:
+            try:
+                annot = pickle.dumps(x.annotations) # pickling is a bit cheating ...
+            except:
+                warnings.warn(f"Cannot encode anotations {x.annotations}")
+            
+        if annot is not None:
+            x_meta["annotations"] = annot
+            
+        times = x.times.magnitude
+        
+        # this one should go to a dataset of its own
+        waveforms = x.waveforms # quantity array 3D (spike, channel, time)
+        
+        # data to go into the main dataset's dimension scales for the domain axis (axis 0):
+        sampling_rate = x.sampling_rate # scalar quantity
+        left_sweep = x.left_sweep # 1D quantity array (but really, a scalar...?)
+        duration = x.duration # quantity scalar
+        units = x.times.units
+        sampling_rate_units = x.sampling_rate.units
+        t_start = x.t_start # quantity scalar
+        t_stop = x.t_stop # quantity scalar
+        
+        # NOTE: 2021-11-11 22:22:04
+        # here we only transpose the times array (column vector -> row vector)
+        # after tranposition axis 0 is the signal axis; axis 1 is the domain axis
+        
+        dset = group.create_dataset(name, data=times.transpose())
+        dset.attrs.update(x_meta)
+        
+        
+        calgrp = group.create_group(f"{name}_axes", track_order=True)
+        signal_group = calgrp.create_group("")
+        domain_group = calgrp.create_group("signal_domain", track_order=True)
+        
+        dset.dims[0].label = data_name
+        if isinstance(array_annotations, ArrayDict):
+            axcalgrp.attrs.update(make_attr_dict(**array_annotations))
+            
+        else:
+            array_annotations = dict() # shim for below
+                
+        for key in array_annotations:
+            ds_key = make_dataset(array_annotations[key][0].item(), axcalgroup, name=key)
+            ds_key.make_scale(key)
+            dset.dims[0].attach_scale(ds_key)
+            
+        
+        ds_units = make_dataset(units.dimensionality.string, axcalgrp, name="units")
+        ds_units.make_scale("units")
+        dset.dims[1].attach_scale(ds_units)
+        dset.dims[1].label=name_from_unit(x.times.units)
+        
+        ds_dom_origin = make_dataset(x.t_start.magnitude.item(), axcalgrp, name="domain_origin")
+        ds_dom_origin.make_scale("domain_origin")
+        
+        ds_dom_end = make_dataset(x.t_stop.magnitude.item(), axcalgrp, name="domain_end")
+        ds_dom_origin.make_scale("domain_end")
+        
+        ds_dom_rate = make_dataset(x.sampling_rate.magnitude.item(), axcalgrp, name="sampling_rate")
+        ds_dom_rate.make_scale("sampling_rate")
+
+        ds_dom_rate_units = make_dataset(x.sampling_rate.units.dimensionality.string, axcalgrp, name="sampling_rate_units")
+        ds_dom_rate_units.make_scale("sampling_rate_units")
+                
+        # NOTE: events and datamarks are ALWAYS 1D (or supposed to be) so we
+        # don't iterate through 2nd dimension here (axis 1)
+        for key in array_annotations:
+            ds_key = make_dataset(array_annotations[key][0].item(), axcalgroup, name=key)
+            ds_key.make_scale(key)
+            dset.dims[0].attach_scale(ds_key)
+            
+            
     elif isinstance(x, pq.Quantity):
         dset = make_dataset(x.magnitude, group, name=name)
         x_attrs.update(make_attr_dict(units = x.dimensionality.string))
