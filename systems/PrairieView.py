@@ -877,9 +877,13 @@ class PVFrame(object):
                 
             else:
                 axis_2_info = fdata.axistags["c"]
-                #axis_2_info.description = self.files[k]["channelName"]
+                
+            #print("channel name", self.files[k]["channelName"])
+                
+            axis_2_info.description = self.files[k]["channelName"]
             
             axis_2_cal = AxisCalibrationData(axis_2_info)
+            axis_2_cal.setChannelName(0, self.files[k]["channelName"])
                                         
             # add ChannelCalibrationData to the AxisCalibrationData for Channels
             # axis (3rd)

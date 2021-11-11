@@ -1,3 +1,4 @@
+from copy import deepcopy
 import numbers
 import numpy as np
 
@@ -1627,9 +1628,18 @@ class IrregularlySampledDataSignal(BaseSignal):
         '''
         Copy the metadata from another :class:`IrregularlySampledDataSignal`.
         '''
-        for attr in ("origin", "name", "file_origin", "domain", "units", "domain_units",
-                     "description", "annotations", "array_annotations"):
-            setattr(self, attr, getattr(other, attr, None))
+        #for attr in ("origin", "name", "file_origin", "domain", "units", "domain_units",
+                     #"description", "annotations", "array_annotations"):
+        for attr in ("origin", "name", "file_origin", "description", 
+                     "annotations", "array_annotations"):
+            setattr(self, attr, deepcopy(getattr(other, attr, None)))
+            #print("attr", attr)
+            #if attr == "units":
+                
+            #elif attr == "domain_units":
+                
+                #setattr(self, attr, deepcopy(getattr(other, attr, pq.dimensionless)))
+            #else:
             
     def interval(self, start, stop):
         '''The equivalent of neo.AnalogSignal.time_slice.

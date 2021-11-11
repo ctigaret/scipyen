@@ -1737,10 +1737,7 @@ def ap_waveform_roots(w, value, interpolate=False):
             decay_y = end_sample_ge_value
             decay_x = time_of_end_sample_ge_value
             
-    #else:
-        #warnings.warn("could not find the intercept of the decay with %s" % value, RuntimeWarning)
-            
-    return rise_x, rise_y, rise_cslope, decay_x, decay_y, decay_cslope
+    return float(rise_x), float(rise_y), float(rise_cslope), float(decay_x), float(decay_y), float(decay_cslope)
 
 def analyse_AP_pulse_trains(data, segment_index=None, signal_index=0,
                             triggers=None, tail=None,
@@ -3916,8 +3913,10 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
                 # (a) extrapolate a straight line from the point on half-max and 
                 #   find its intercept with the Vm onset value
                 if decay_intercept_approx.strip().lower() == "linear":
+                    #print("decay_ref", decay_ref)
                     if isinstance(decay_ref, str):
                         if decay_ref == "hm":
+                            #print("hm_decay_slope", hm_decay_slope)
                             decay_onset_Vm_x = (ap_Vm_onset_values.magnitude[k] - vm_at_half_max.magnitude[k]) / hm_decay_slope + hm_decay_x
                             
                         elif decay_ref == "qm":
@@ -3962,7 +3961,12 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
             times_of_0_vm_on_decay.append(decay_0mV_x)
             
             times_of_onset_vm_on_rise.append(rise_onset_Vm_x)
-            times_of_onset_vm_on_decay.append(decay_onset_Vm_x)
+            #times_of_onset_vm_on_decay.append(decay_onset_Vm_x)
+            
+            if isinstance(decay_onset_Vm_x, (tuple, list, np.ndarray)):
+                times_of_onset_vm_on_decay.append(decay_onset_Vm_x[0])
+            else:
+                times_of_onset_vm_on_decay.append(decay_onset_Vm_x)
             
         except Exception as e:
             print("in waveform %d:" % k)
@@ -3982,6 +3986,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10,
     time_array_0mV_decay = np.array(times_of_0_vm_on_decay).flatten() * sig.times.units
     
     time_array_onset_Vm_rise = np.array(times_of_onset_vm_on_rise).flatten() * sig.times.units
+    #print("times_of_onset_vm_on_decay", times_of_onset_vm_on_decay)
     time_array_onset_Vm_decay = np.array(times_of_onset_vm_on_decay).flatten() * sig.times.units
     
     ap_Vm_hmax_values = neo.IrregularlySampledSignal(time_array_half_max_rise,
@@ -4773,7 +4778,6 @@ def analyse_AP_step_injection_series(data, **kwargs):
         this must contain as many elements as injection steps, and these must be
         python quantities in units compatible with pA
         
-        
     rheo: boolean, default True
     
         When True, the function attempts to calculate the rheobase & membrane
@@ -4837,7 +4841,8 @@ def analyse_AP_step_injection_series(data, **kwargs):
         
         default is 0 (no boxcar filtering)
         
-    method: str, one of "state_levels" (default) or "kmeans"
+    method: str, one of "state_levels" (default) or "kmeans": methiod for detection
+        "up" vs "down" states of the step current injection waveform
     
     adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
         called from ephys.parse_step_waveform_signal() 
@@ -5179,8 +5184,6 @@ def analyse_AP_step_injection_series(data, **kwargs):
             
     else:
         raise TypeError("Unexpected type for Iinj: %s" % type(Iinj).__name__)
-        
-        
             
     #print(kwargs)
     
@@ -7407,7 +7410,9 @@ def analyse_AP_step_injection(segment,
         # check to see if there already is a spike train of APs; don't just append
         for k, st in enumerate(segment.spiketrains):
             if is_AP_spiketrain(st):
-                segment.spiketrains[k] = ap_train
+                #segment.spiketrains[k] = ap_train
+                # NOTE: in neo >= 0.10.0 segment.spiketrains is a neo.SpikeTrainList
+                list(segment.spiketrains)[k] = ap_train
                 
     else:
         segment.spiketrains.append(ap_train)

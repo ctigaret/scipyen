@@ -536,6 +536,7 @@ class CalibrationData(object):
                         cal = AxisCalibrationData.fromCalibrationString(arg.description[cal_str_start_stop[0]:cal_str_start_stop[1]])
 
                         self._data_.update(cal._data_)
+                        self._data_.key = arg.key
                         
                     return # only allow one AxisInfo argument
                 

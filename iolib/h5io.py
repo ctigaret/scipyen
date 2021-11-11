@@ -790,6 +790,22 @@ def make_dataset(x:typing.Any, group:h5py.Group,
                  chunks:typing.Optional[bool]=None):
     """Creates a HDF5 datasets for supported Python types
     
+    TODO: for neo.DataObjects make reference to segment when segment is included
+        in the same HDF file
+        
+    TODO: neo.DataObject
+        TODO: neo.SpikeTrain
+        TODO: neo.ImageSequence
+        TODO: neo.Epoch
+        TODO: neo.Event
+        
+    TODO: neo.Container:
+        TODO: neo.Block
+        TODO: neo.Group
+        
+    TODO: neo.ChannelView
+    TODO: neo.RegionOfInterest
+    
     Parameters:
     ===========
     x: a Python object
@@ -860,7 +876,6 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         
         calgrp = group.create_group(f"{name}_axes", track_order=True)
         
-        #for k, cal, axistag in enumerate(zip(x_tr_axcal, data.axistags)):
         for k, cal in enumerate(x_tr_axcal):
             axcalgrp = calgrp.create_group(f"{cal.key}", track_order=True)
             
@@ -991,36 +1006,32 @@ def make_dataset(x:typing.Any, group:h5py.Group,
                 else:
                     array_annotations = dict() # shim for below
                 
-                for k in range(x.shape[-1]):
+                for l in range(x.shape[-1]):
                     if "channel_ids" in array_annotations:
-                        channel_id = array_annotations["channel_ids"][k].item()
+                        channel_id = array_annotations["channel_ids"][l].item()
                     else:
-                        channel_id = f"{k}"
+                        channel_id = f"{l}"
                         
                     if "channel_names" in array_annotations:
-                        channel_name = array_annotations["channel_names"][k].item()
+                        channel_name = array_annotations["channel_names"][l].item()
                     else:
-                        channel_name = f"{k}"
+                        channel_name = f"{l}"
                         
-                    channel_group = channels_group.create_group(f"channel_{k}", track_order=True)
+                    channel_group = channels_group.create_group(f"channel_{l}", track_order=True)
                     
-                    #ds_chn_index = make_dataset(k, channel_group, name=f"channel_{k}_index")
-                    #ds_chn_index.make_scale(f"channel_{k}_index")
+                    ds_chn_id = make_dataset(channel_id, channel_group, name=f"channel_{l}_id")
+                    ds_chn_id.make_scale(f"channel_{l}_id")
                     
-                    ds_chn_id = make_dataset(channel_id, channel_group, name=f"channel_{k}_id")
-                    ds_chn_id.make_scale(f"channel_{k}_id")
+                    ds_chn_name = make_dataset(channel_name, channel_group, name=f"channel_{l}_name")
+                    ds_chn_name.make_scale(f"channel_{l}_name")
                     
-                    ds_chn_name = make_dataset(channel_name, channel_group, name=f"channel_{k}_name")
-                    ds_chn_name.make_scale(f"channel_{k}_name")
-                    
-                    #dset.dims[k].attach_scale(ds_chn_index)
                     dset.dims[k].attach_scale(ds_chn_id)
                     dset.dims[k].attach_scale(ds_chn_name)
                     
                     for key in array_annotations:
                         if key not in ("channel_ids", "channel_names"):
-                            ds_chn_key = make_dataset(array_annotations[key][k].item(), channel_group, name=f"channel_{k}_{key}")
-                            ds_chn_key.make_scale(f"channel_{k}_{key}")
+                            ds_chn_key = make_dataset(array_annotations[key][k].item(), channel_group, name=f"channel_{l}_{key}")
+                            ds_chn_key.make_scale(f"channel_{l}_{key}")
                             dset.dims[k].attach_scale(ds_chn_key)
                     
                 dset.dims[k].label = data_name
@@ -1052,10 +1063,7 @@ def make_dataset(x:typing.Any, group:h5py.Group,
                 if isinstance(x, (IrregularlySampledDataSignal, neo.IrregularlySampledSignal)) and isinstance(dom_dset, h5py.Dataset):
                     #dom_dset created above
                     dom_dset.dims[0].attach_scale(ds_dom_name)
-                    #dom_dset.dims[0].attach_scale(ds_dom_origin)
                     dom_dset.dims[0].attach_scale(ds_dom_units)
-                    #dom_dset.dims[0].attach_scale(ds_dom_rate)
-                    #dom_dset.dims[0].attach_scale(ds_dom_rate_units)
                 else:
                     dset.dims[k].attach_scale(ds_dom_name)
                     dset.dims[k].attach_scale(ds_dom_origin)
@@ -1064,6 +1072,13 @@ def make_dataset(x:typing.Any, group:h5py.Group,
                     dset.dims[k].attach_scale(ds_dom_rate_units)
                 
                 dset.dims[k].label = domain_name
+                
+    elif isinstance(x, neo.SpikeTrain):
+        pass
+                
+    elif isinstance(x, neo.Event):
+        data = np.transpose(x.magnitude)
+        pass
                 
     elif isinstance(x, pq.Quantity):
         dset = make_dataset(x.magnitude, group, name=name)

@@ -2503,11 +2503,11 @@ def concatenate_signals(*args, axis:int = 1,
             # code parts from neo.core.basesignal.BaseSignal.merge()
             data = np.hstack(signal_data)
             
-            #if isinstance(set_domain_start, float):
-                #t_start = set_domain_start * signals[0].times.units
+            if isinstance(set_domain_start, float):
+                t_start = set_domain_start * signals[0].times.units
             
-            #else:
-                #t_start = signals[0].t_start
+            else:
+                t_start = signals[0].t_start
             
             result = sig_klass(data, units=units_0, t_start=t_start,
                                dtype = signals[0].dtype,

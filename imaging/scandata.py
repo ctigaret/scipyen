@@ -9681,7 +9681,10 @@ class ScanData(object):
         if len(self.scene) == 0:
             return list()
         
-        return AxesCalibration(self.scene[0])["c"].channelNames
+        if len(self.scene) == 1:
+            return AxesCalibration(self.scene[0])["c"].channelNames
+        
+        return list(itertools.chain.from_iterable((AxesCalibration(self.scene[k])["c"].channelNames for k in range(len(self.scene)))))
         
     @sceneChannelNames.setter
     def sceneChannelNames(self, value):
@@ -9969,7 +9972,11 @@ class ScanData(object):
         if len(self._scans_) == 0:
             return list()
         
-        return AxesCalibration(self.scans[0])["c"].channelNames # to ensure we get a virtual channel if needed
+        if len(self.scans) == 1: # this may be a multi-band image
+            return AxesCalibration(self.scans[0])["c"].channelNames # to ensure we get a virtual channel if needed
+
+        return list(itertools.chain.from_iterable((AxesCalibration(self.scans[k])["c"].channelNames for k in range(len(self.scans)))))
+                
         
     @scansChannelNames.setter
     def scansChannelNames(self, value):

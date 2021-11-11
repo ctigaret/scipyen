@@ -1469,7 +1469,6 @@ Arrays are concatenated in two ways, explained here by examples:
     if max_dims != min_dims:
         raise ValueError("Cannot concatenate images with different dimensionalities")
     
-    
     #axes_cals    = AxesCalibration(images[0])
     
     first_shape = images[0].shape
@@ -1548,9 +1547,11 @@ Arrays are concatenated in two ways, explained here by examples:
         if img.axistags != axistags:
             raise ValueError("Cannot concatenate images with different AxisInfo objects")
         
-        img_axcal = AxesCalibration(img) # will also calibrate img's axes
-        
-        for key in img_axcal.keys:
+        img_axcal = AxesCalibration(img)
+        #print("img_axcal", img_axcal)
+        #print("axistags", axistags)
+        for key in img_axcal.keys():
+            #print("key", key)
             if axistags[key] == catAxis:
                 if not axcal[key].isclose(img_axcal[key], ignore=ignore):
                     if ignore is None:
