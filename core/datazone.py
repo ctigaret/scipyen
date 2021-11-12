@@ -107,7 +107,7 @@ class DataZone(DataObject):
             if labels.size != places.size and labels.size:
                 raise ValueError("Labels array has different length to times")
             
-        obj = pq.Quantity.__new__(cls, times, units = places.dimensionality)
+        obj = pq.Quantity.__new__(cls, places, units = places.dimensionality)
         
         obj._labels = labels
         obj._extents = extents
@@ -121,6 +121,7 @@ class DataZone(DataObject):
                             description=description, 
                             array_annotations=array_annotations, **annotations)
                 
+        self.__domain_name__ = name_from_unit(self.places)
             
             
     def __reduce__(self):
@@ -138,6 +139,7 @@ class DataZone(DataObject):
         self.file_origin = getattr(obj, "file_origin", None)
         self.description = getattr(obj, "description", None)
         self.segment = getattr(obj, "segment", None)
+        self.__domain_name__ = cq.name_from_unit(self.places)
         
         if not hasattr(self, "array_annotations"):
             self.array_annotations = ArrayDict(self._get_arr_ann_length())
@@ -331,10 +333,38 @@ class DataZone(DataObject):
             original :class:`Epoch` (the original :class:`Epoch` is not modified).
         """
         return self.shift(t_shift)
+    
+    def set_durations(self, durations):
+        """For API compatibility with neo.Epoch
+        """
+        self.extents = durations
+        
+    def get_durations(self):
+        return self.extents
 
+    @property
+    def domain_name(self):
+        """A brief description of the domain name
+        """
+        if self.__domain_name__ is None:
+            self.__domain_name__ = name_from_unit(self.domain)
+            
+        return self.__domain_name__
+    
+    @domain_name.setter
+    def domain_name(self, value):
+        if isinstance(value, str) and len(value.strip()):
+            self.__domain_name__ = value
+    
     @property
     def places(self):
         return pq.Quantity(self)
+
+    @property
+    def domain(self):
+        """Alias to self.places for API compatibility with DataSignal
+        """
+        return self.places
 
     @property
     def times(self):

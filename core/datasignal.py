@@ -221,6 +221,7 @@ class DataSignal(BaseSignal):
         #self.channel_index      = getattr(obj, "channel_index", None)
         self.segment            = getattr(obj, "segment",       None)
         self.array_annotations  = getattr(obj, "array_annotations", None)
+        self.__domain_name__    = name_from_unit(self._origin)
     
     def __reduce__(self):
         return _new_DataSignal, (self.__class__, 
@@ -1084,7 +1085,6 @@ class IrregularlySampledDataSignal(BaseSignal):
                                   dtype=float, copy=copy)
                 
         obj.segment=None
-        #obj.channel_index=None
 
         return obj
                 

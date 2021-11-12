@@ -20,6 +20,7 @@ from .workspacefunctions import debug_scipyen
 #from . import neoevent as neoevent
 #from . import neoepoch as neoepoch
 
+from iolib import jsonio
 
 class ContextExecutor(ContextDecorator):
     def __enter__(self):
@@ -68,6 +69,47 @@ class Timer(object):
         self.stop()
         
 # ### BEGIN module functions
+
+def classify_signature(sig:typing.Union[inspect.Signature, types.FunctionType], 
+                       funcname:typing.Optional[str]=None,
+                       modname:typing.Optional[str]=None):
+    from inspect import Parameter
+    
+    qualname = funcname
+    if isinstance(sig, types.FunctionType):
+        funcname = sig.__name__
+        modname = sig.__module__
+        qualname = sig.__qualname__
+        sig = inspect.signature(sig)
+        
+    if not isinstance(sig, inspect.Signature):
+        raise TypeError(f"Expecting a Signature object, a function, or a method; got {type(sig).__name__} instead")
+    
+    if not isinstance(funcname, str) or len(funcname.strip()) == 0:
+        funcname = None
+        
+    if not isinstance(modname, str) or len(modname.strip()) == 0:
+        modname = None
+        
+    if not isinstance(qualname, str) or len(qualname.strip()) == 0:
+        qualname = None
+    
+    pos_params = dict((parname, None if val.annotation is Parameter.empty else val.annotation) for parname, val in sig.parameters.items() if val.kind is Parameter.POSITIONAL_ONLY)
+    
+    named_params = dict((parname, (None if val.default is Parameter.empty else val.default, None if val.annotation is Parameter.empty else val.annotation)) for (parname, val) in sig.parameters.items() if parname not in ("cls", "self") and parname not in pos_params and val.kind not in (Parameter.VAR_KEYWORD, Parameter.VAR_POSITIONAL))
+    
+    varkw_params = dict((parname, None if val.annotation is Parameter.empty else val.annotation) for parname, val in sig.parameters.items() if val.kind is Parameter.VAR_KEYWORD)
+    
+    varpos_params = dict((parname, None if val.annotation is Parameter.empty else val.annotation) for parname, val in sig.parameters.items() if val.kind is Parameter.VAR_POSITIONAL)
+    
+    return {"name": funcname, 
+            "qualname": qualname,
+            "module": modname,
+            "positional": pos_params, 
+            "named": named_params, 
+            "varpos": varpos_params, 
+            "varkw": varkw_params,
+            "returns": sig.return_annotation}
 
 def check_neo_patch(exc_info:tuple):
     stack_summary = traceback.extract_tb(exc_info[2])

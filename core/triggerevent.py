@@ -1095,6 +1095,8 @@ class TriggerEvent(DataMark):
         
         else:
             return "event"
+        
+    parseTimeValues = DataMark.parseValues
     
     def __new__(cls, times=None, labels=None, units=None, name=None, description=None,
                 file_origin=None, event_type=None, array_annotations=None, **annotations):
