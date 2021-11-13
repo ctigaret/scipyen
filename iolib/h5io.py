@@ -211,7 +211,7 @@ from core.quantities import(arbitrary_unit,
                             week_in_vitro, postnatal_day, postnatal_month,
                             embryonic_day, embryonic_week, embryonic_month,
                             unit_quantity_from_name_or_symbol,
-                            name_from_unit)
+                            name_from_unit, units_convertible)
 
 from core.datatypes import (TypeEnum,UnitTypes, Genotypes, 
                             is_uniform_sequence, is_namedtuple, is_string,
@@ -222,6 +222,7 @@ from core.modelfitting import (FitModel, ModelExpression,)
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.triggerprotocols import TriggerProtocol
 from core.utilities import unique
+from core.strutils import (str2symbol, str2float, numbers2str, get_int_sfx,)
 import imaging
 from core import modelfitting
 from imaging.axiscalibration import (AxesCalibration, 
@@ -360,8 +361,8 @@ def from_attr_dict(attrs):
         # NOTE: 2021-11-10 12:47:52
         # FIXME / TODO
         if hasattr(v, "dtype"):
-            print("v:", v)
-            print("v[()]", v[()])
+            #print("v:", v)
+            #print("v[()]", v[()])
             if v.dtype == h5py.string_dtype():
                 v = np.array(v, dtype=np.dtype("U"))
                 
@@ -391,6 +392,7 @@ def make_attr(x):
             raise HDFDataError(f"The object {x}\n with type {type(x).__name__} cannot be serialized in json")
     
     if isinstance(x, np.ndarray):
+        #print("dtype", x.dtype, "kind", x.dtype.kind)
         if x.dtype.kind in NUMPY_STRING_KINDS:
             return np.asarray(x, dtype=h5py.string_dtype(), order="K")
     
@@ -414,6 +416,8 @@ def generic_data_type_attrs(data:typing.Any, prefix:str="") -> dict:
         
     else:
         prefix = ""
+        
+    attrs = dict()
     
     attrs[f"{prefix}type_name"] = data_type.__name__
     attrs[f"{prefix}module_name"] = data_type.__module__
@@ -526,6 +530,7 @@ def parse_func(f):
 
 def hdf_entry(x:typing.Any, attr_prefix="key"):#, parent:h5py.Group):
     attrs = make_attr_dict(**generic_data_attrs(x, attr_prefix))
+    
     if not isinstance(x, str):
         name = f"{type(x).__module__}.{type(x).__name__}_{uuid4().hex}"
         #name = json.dumps(x)
@@ -1856,19 +1861,19 @@ class NeoContainerHDFIO(object):
     pass
     
 class NeoDataObjectHDFIO(object):
-    def __init__(h5group:h5py.Group, name:str, 
+    def __init__(self, h5group:h5py.Group, name:str, 
                  compression:typing.Optional[str]="gzip", 
                  chunks:typing.Optional[bool]=None):
-        self.group = h5group
-        self.name=name
-        self.compression=compression
-        self.chunks = chunks
+        self.group          = h5group
+        self.name           = str2symbol(name)
+        self.compression    = compression
+        self.chunks         = chunks
         
     def get_meta(self, obj:neo.core.dataobject.DataObject) -> tuple: 
         """This must be called at the beginning of every write... method
         """
         if not isinstance(obj, neo.core.dataobject.DataObject):
-            raise TypeError(f"Object type {typ(obj).__name__} is not supported")
+            raise TypeError(f"Object type {type(obj).__name__} is not supported")
         x_type, x_name, x_attrs = hdf_entry(obj, "")
         
         
@@ -1876,8 +1881,8 @@ class NeoDataObjectHDFIO(object):
         
         x_meta.update(x_attrs)
         
-        x_meta["description"] = make_attr("" if x.description is None else f"{x.description}")
-        x_meta["file_origin"] = make_attr(f"{x.file_origin}")
+        x_meta["description"] = make_attr("" if obj.description is None else f"{obj.description}")
+        x_meta["file_origin"] = make_attr(f"{obj.file_origin}")
 
         # NOTE: 2021-11-12 11:25:23
         # below we migrate to using our own custom json codec (see jsonio module)
@@ -1887,24 +1892,24 @@ class NeoDataObjectHDFIO(object):
         # "non-json-able" data
         annot = None
         try:
-            annot = json.dumps(x.annotations, cls=jsonio.CustomEncoder)
+            annot = json.dumps(obj.annotations, cls=jsonio.CustomEncoder)
         except:
             # unencodable in json:
             try:
-                annot = pickle.dumps(x.annotations) # pickling is a bit cheating ...
+                annot = pickle.dumps(obj.annotations) # pickling is a bit cheating ...
             except:
-                warnings.warn(f"Cannot encode anotations {x.annotations}")
+                warnings.warn(f"Cannot encode anotations {obj.annotations}")
             
         if annot is not None:
             x_meta["annotations"] = annot
             
         if hasattr(obj, "mark_type"): 
             # TriggerEvent and DataMark
-            x_meta["EventType"] = x.type
+            x_meta["EventType"] = make_attr(obj.type.name)
             
         if hasattr(obj, "labels"): 
             # neo.Event, TriggerEvent, DataMark, neo.Epoch, and DataZone
-            x_meta["labels"] = obj.labels
+            x_meta["labels"] = make_attr(obj.labels)
             
         data_name = getattr(obj, "name", None)
         return x_meta, data_name
@@ -1916,11 +1921,8 @@ class NeoDataObjectHDFIO(object):
                         domain_name:str,
                         axis_name:str, 
                         units: pq.Quantity,
-                        origin: typing.Optional[pq.Quantity] = None,
-                        sampling_rate: typing.Optional[pq.Quantity]=None,
-                        sampling_period: typing.Optional[pq.Quantity] = None,
                         array_annotations:typing.Optional[ArrayDict]=None,
-                        array_data:typing.Optional[np.ndarray] = None,
+                        axis_array:typing.Optional[np.ndarray] = None,
                         **kwargs
                         ):
         """
@@ -1981,10 +1983,13 @@ class NeoDataObjectHDFIO(object):
             created in the specific axesgroup, to store the channel information
             used to create dimension scales for the axis
             
-        axis_data: numpy array or None
+        axis_array: numpy array or None
         
-        **kwargs: name/vaulw pairs where name: obj attribute name (property) and
+        **kwargs: name/value pairs where name: obj attribute name (property) and
             value is a pq.Quantity
+            
+            The keys are names of properties available for the signal object, e.g.
+            such as 't_start', 'sampling_rate', etc.
             
             NOTE: All Quantities must have units compatible with the axis's units
             
@@ -1997,8 +2002,8 @@ class NeoDataObjectHDFIO(object):
         # this data set (see NOTE: 2021-11-12 16:05:29 and NOTE: 2021-11-12 17:35:27
         # in self.writeDataObject) 
         
-        if isinstance(axis_data, np.ndarray):
-            axis_dset = axesgroup.create_dataset(axis_name, data = axis_data)
+        if isinstance(axis_array, np.ndarray):
+            axis_dset = axesgroup.create_dataset(axis_name, data = axis_array)
             
         else:
             axis_dset = axesgroup.create_dataset(axis_name, data = h5py.Empty("f"))
@@ -2012,7 +2017,8 @@ class NeoDataObjectHDFIO(object):
             channels_group = axesgroup.create_group("channels", track_order=True)
             channels_group.attrs["array_annotations"] = jsonio.dumps(array_annotations, cls=jsonio.CustomEncoder)
             
-            for l in range(x.shape[-1]):
+            #for l in range(x.shape[-1]):
+            for l in array_annotations.length:
                 if "channel_ids" in array_annotations:
                     channel_id = array_annotations["channel_ids"][l].item()
                 else:
@@ -2034,19 +2040,19 @@ class NeoDataObjectHDFIO(object):
                 channel_dset.make_scale(f"channel_{l}")
                 dset.dims[axis].attach_scale(channel_dset)
                 
-        for key, val in kwargs:
-            if not isinstance(val, pq.Quantity):
-                raise TypeError(f"Expecting a python quantity; got {type(val).__name__} instead")
+        for key, val in kwargs.items():
+            if not isinstance(val, (pq.Quantity, np.ndarray)):
+                raise TypeError(f"Expecting a python quantity or a numpy array; got {type(val).__name__} instead")
             
-            if key == "sampling_rate"
-                if not cq.units_convertible(val, 1/units):
+            if key == "sampling_rate":
+                if isinstance(val, pq.Quantity) and not units_convertible(val, 1/units):
                     warnings.warn(f"Writing {key} with units {val.units} incompatible with axis units {1/units}")
             else:
-                if not cq.units_convertible(val, units):
+                if isinstance(val, pq.Quantity) and not units_convertible(val, units):
                     warnings.warn(f"Writing {key} with units {val.units} incompatible with axis units {units}")
                     
             if key in ("origin", "t_start"):
-                axis_dset.attrs["origin"] = origin.magnitude
+                axis_dset.attrs["origin"] = val.magnitude
             else:
                 axis_dset.attrs[key] = val.magnitude
                 
@@ -2057,12 +2063,11 @@ class NeoDataObjectHDFIO(object):
         return axis_dset
 
     def make_dimensions_scales(self, obj, data_name, dset):
-        if self._x_meta is None:
-            raise RuntimeError("No metadata yet; have you called self.get_meta ?")
+        data_name = str2symbol(data_name)
         
         axesgrp = self.group.create_group(f"{self.name}_axes", track_order = True)
         
-        sig_kind = cq.name_from_unit(obj.units)
+        sig_kind = name_from_unit(obj.units)
         domain_name = obj.domain_name if isinstance(obj, (neo.IrregularlySampledDataSignal, DataSignal)) else "Time"
         
         if isinstance(obj, neo.ImageSequence):
@@ -2094,7 +2099,7 @@ class NeoDataObjectHDFIO(object):
             if isinstance(obj, neo.IrregularlySampledSignal, IrregularlySampledDataSignal):
                 dom_ax_dset = self.make_axis_scale(dset, axesgrp, 1, domain_name, "domain_axis",
                                     units = obj.times.units,
-                                    axis_data = obj.times.magnitude)
+                                    axis_array = obj.times.magnitude)
                 
             else:
                 dom_ax_dset = self.make_axis_scale(dset, axesgrp, 1, domain_name, "domain_axis",
@@ -2124,7 +2129,11 @@ class NeoDataObjectHDFIO(object):
         
         """
         if any(v is None for v in (x_meta, data_name)):
-            x_meta, data_name = self.getmeta(obj)
+            x_meta, data_name = self.get_meta(obj)
+            
+        data_name = str2symbol(data_name)
+            
+        #print("x_meta", x_meta)
             
         if not isinstance(obj, neo.core.dataobject.DataObject):
             raise TypeError(f"{type(obj).__name__} objects are not supported")
@@ -2132,7 +2141,8 @@ class NeoDataObjectHDFIO(object):
         
         if isinstance(obj, neo.ImageSequence):
             dset = self.writeImageSequence(obj, x_meta, data_name)
-        elif isinstance(obj, neo.BaseSignal):
+            
+        elif isinstance(obj, neo.core.basesignal.BaseSignal):
             dset = self.writeSignal(obj, x_meta, data_name)
             
         else:
@@ -2152,7 +2162,7 @@ class NeoDataObjectHDFIO(object):
             axesgrp = self.group.create_group(f"{self.name}_axes", track_order=True)
             
             if isinstance(obj, DataMark):
-                aux_name = f"{obj.type}"
+                aux_name = "Events" if isinstance(obj, TriggerEvent) else "Marks"
                 
             elif isinstance(obj, DataZone):
                 aux_name = "Extents"
@@ -2166,23 +2176,23 @@ class NeoDataObjectHDFIO(object):
             else:
                 aux_name = type(obj).__name__.capitalize()
             
-            if isinstance(obj, TriggerEvent, neo.Epoch, neo.Event, neo.SpikeTrain):
+            if isinstance(obj, (TriggerEvent, neo.Epoch, neo.Event, neo.SpikeTrain)):
                 domain_name = "Times"
             else:
                 domain_name = getattr(obj, "domain_name", "domain")
             
-            if isinstance(obj, neo.Epoch, DataZone):
+            if isinstance(obj, (neo.Epoch, DataZone)):
                 self.make_axis_scale(dset, axesgrp, 0, domain_name, aux_name, 
                                     units = obj.units,
-                                    axis_data = obj.durations.magnitude)
+                                    axis_array = obj.durations.magnitude)
                 
             else:
                 kwargs = dict()
                 if isinstance(obj, neo.SpikeTrain):
-                    kwargs["t_start"] = obj.t_start.magnitude
-                    kwargs["t_stop"] = obj.t_stop.magnitude
-                    kwargs["left_sweep"] = obj.left_sweep.magnitude
-                    kwargs["sampling_rate"] = obj.sampling_rate.magnitude
+                    kwargs["t_start"] = obj.t_start
+                    kwargs["t_stop"] = obj.t_stop
+                    kwargs["left_sweep"] = obj.left_sweep
+                    kwargs["sampling_rate"] = obj.sampling_rate
                     
                 self.make_axis_scale(dset, axesgrp, 0, domain_name, aux_name,
                                      units = obj.units,
@@ -2190,20 +2200,60 @@ class NeoDataObjectHDFIO(object):
                 
             # NOTE: 2021-11-12 18:32:23
             # finally, store the waveforms in the spiketrain
-            # these are a quantity array 3D (spike K , channel L, time)
-            # so for each spike (axis 0), in each channel (axis 1) there is a 
+            # By CONVENTION, these are a quantity array 3D (spike K , channel L, 
+            # time, T) such that:
+            # for each spike (axis 0), in each channel (axis 1) there is a 
             # vector of data over time (axis 2) representing the spike data
             # recorded in channel L for the Kth spike !!!
+            #
+            # This means that:
+            # the element at slice T, column L, row K is a sample from spike K
+            # in channel L, at time T:
+            #
+            # waveforms[K, L, T]
+            #
+            # and the waveform of the individual spike K in channel L is
+            #
+            # waveforms[K, L, :]
+            #
+            # CAUTION: this layout is currently NOT enforced in neo (as of 0.10.0),
+            # and the waveforms can be just a simple numpy array (even a 2D one)
+            # 
+            # for a 2D waveforms data (matrix) a single channel is assumed such
+            # that element at column L, row K is a sample of spike K at time L:
+            #
+            # waveforms[K,L]
+            #
+            # and the waveform of the individual spike K is:
+            #
+            # waveforms [K,:]
+            #
+            
             if isinstance(obj, neo.SpikeTrain):
                 waveforms = getattr(obj, "waveforms", None)
-                if isinstance(waveforms, np.ndarray) and waveforms.size > 0 and waveforms.ndim==3:
-                    wave_set = axesgrp.create_dataset("waveforms", data = waveforms)
+                if isinstance(waveforms, np.ndarray) and waveforms.size > 0 and waveforms.ndim in (2,3):
+                    if isinstance(waveforms, pq.Quantity):
+                        units = waveforms.units
+                        waveforms = waveforms.magnitude
+                    else:
+                        units = pq.dimensionless
+                        
+                    
+                    wave_dset = axesgrp.create_dataset("waveforms", data = waveforms)
+                    wave_dset.attrs["units"] = units
                     self.make_axis_scale(wave_set, axesgrp, 0, "Spikes", "spike #",
                                          units=pq.dimensionless)
-                    self.make_axis_scale(wave_set, axesgrp, 1, "Channels", "channel #",
-                                         units=pq.dimensionless)
-                    self.make_axis_scale(wave_set, axesgrp, 2, "Spike", cq.name_from_unit(waveform.units),
-                                         units=waveforms.units)
+                    
+                    if waveforms.ndim == 2:
+                        self.make_axis_scale(wave_set, axesgrp, 1, "Time", name_from_unit(waveform.units),
+                                            units=obj.units)
+                        
+                    else:
+                        self.make_axis_scale(wave_set, axesgrp, 1, "Channels", "channel #",
+                                            units=pq.dimensionless)
+                        
+                        self.make_axis_scale(wave_set, axesgrp, 2, "Time", name_from_unit(waveform.units),
+                                            units=obj.units)
                     
                 
             
@@ -2232,7 +2282,9 @@ class NeoDataObjectHDFIO(object):
             raise TypeError(f"{type(obj).__name__} objects are not supported")
         
         if any(v is None for v in (x_meta, data_name)):
-            x_meta, data_name = self.getmeta(obj)
+            x_meta, data_name = self.get_meta(obj)
+            
+        data_name = str2symbol(data_name)
             
         # NOTE: 2021-11-12 16:03:29
         # in spite of all temptations, I won't store the 'times' values in the 
@@ -2254,8 +2306,10 @@ class NeoDataObjectHDFIO(object):
             raise TypeError(f"{type(obj).__name__} objects are not supported")
         
         if any(v is None for v in (x_meta, data_name)):
-            x_meta, data_name = self.getmeta(obj)
+            x_meta, data_name = self.get_meta(obj)
             
+        data_name = str2symbol(data_name)
+        
         # NOTE: Three axes: frame, row, column; 
         # of these, 'frame' is in temporal domain (sampling rate/frame duration)
         # row, column (y, x) are in spatial domain

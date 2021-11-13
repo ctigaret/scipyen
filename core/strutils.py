@@ -73,11 +73,11 @@ def str2symbol(s):
     if not isinstance(s, str):
         raise TypeError("Expecting a str; got %s instead" % type(s).__name__)
     
-    if keyword.iskeyword(s):
-        s = "data_"+s
-    
     if s.isidentifier():
         return s
+    
+    if keyword.iskeyword(s):
+        s = "data_"+s
     
     # replace any punctuation & white spaces with "_"
     #print("str2symbol: ", s)
