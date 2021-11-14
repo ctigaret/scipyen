@@ -146,10 +146,12 @@ from core.datatypes import (array_slice, is_column_vector, is_vector, )
 
 from core.utilities import (normalized_index, normalized_axis_index, 
                             normalized_sample_index,)
-
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
-from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.triggerprotocols import TriggerProtocol
+# NOTE: 2021-11-13 16:27:30
+# new types: DataMark and DataZone
+from core.triggerevent import (TriggerEvent, TriggerEventType, DataMark)
+from core.datazone import DataZone
 from core.workspacefunctions import validate_varname
 from core.scipyen_config import markConfigurable
 from core.traitcontainers import DataBag
@@ -172,6 +174,7 @@ from .scipyenviewer import (ScipyenViewer, ScipyenFrameViewer,Bunch)
 from .dictviewer import (InteractiveTreeWidget, DataViewer,)
 from .cursors import SignalCursor
 from .colorwidgets import ColorSelectionWidget, quickColorDialog
+from gui.pictgui import GuiWorker
 #### END pict.gui modules
 
 # each spike is a small vertical line centered at 0.0, height of 1
@@ -212,6 +215,10 @@ DEPRECATED here
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 Ui_SignalViewerWindow, QMainWindow = __loadUiType__(os.path.join(__module_path__,'signalviewer.ui'))
+
+#class PlotWorker(QtCore.QObject):
+    
+    #pass
  
 class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     """ A plotter for multi-sweep signals ("frames" or "segments"), with cursors.
@@ -356,6 +363,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     #dockedWidgetsNames = ["coordinatesDockWidget"]
 
     sig_activated = pyqtSignal(int, name="sig_activated")
+    sig_plot = pyqtSignal(dict, name="sig_plot")
     
     closeMe  = pyqtSignal(int)
     frameChanged = pyqtSignal(int)
@@ -429,6 +437,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         super(QMainWindow, self).__init__(parent)
         
+        self.threadpool = QtCore.QThreadPool()
+        
         if y is None:
             if x is not None:  # only the data variable Y is passed, 
                 y = x
@@ -464,6 +474,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # NOTE: self._number_of_frames_ is defined in ScipyenFrameViewer
         self.frameAxis = None
         self.frameIndex = None
+        
+        # data axis for numpy arrays - ionly used to plot numpy arrays
+        self.dataAxis = None
         
         # index into neo.ChannelIndex objects (if any)
         # ATTENTION: 2019-11-21 21:42:29
@@ -503,11 +516,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         #### BEGIN selective representation of neo objects components
         
-        # NOTE: 2020-03-09 13:56:32
+        # NOTE: 2020-03-09 13:56:32 self._cached_epochs_
+        # needed for replotting neo.Epoch/DataZone object after rescaling the 
+        # axis; 
         # maps frame index to a list of neo.Epochs
         # frames without epochs are absent from the map
         self._cached_epochs_ = dict()
-        self._shown_spike_trains_ = dict()
         self._plotted_analogsignal_index = list() # which analog signals do we actually plot?
         self._plotted_irregularsignal_index = list() # which irregular signals do we actually plot?
 
@@ -836,6 +850,159 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     # ### BEGIN private methods
                 
+    def _clear_lris_(self):
+        for k, ax in enumerate(self.axes):
+            lris = [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]
+            
+            if len(lris):
+                for l in lris:
+                    ax.removeItem(l)
+                    
+    def _prep_entity_dict_(self, obj, elem_types):
+        entities = dict()
+        
+        if isinstance(obj, elem_types):
+            name = getattr(obj, "name", None)
+            if isinstance(name, str) and len(name.strip()):
+                entities[name] = e
+            else:
+                entities[0] = e
+            
+        elif hasattr(obj, "__iter__"): # e.g. tuple, list, neo.SpikeTrainList
+            if all(isinstance(e, elem_types) in obj):
+                for k, e in enumerate(obj):
+                    name = getattr(e, "name", None)
+                    if isinstance(name, str) and len(name.strip()):
+                        entities[name] = e
+                    else:
+                        entities[k] = e
+            else:
+                raise TypeError(f"Elements of the interable expected to be {elem_types} ")
+            
+        else:
+            raise TypeError(f"Expecting an object of {elem_types} type or an iterable containing such objects; got {tyoe(obj).__name__} instead")
+                        
+        return entities
+    
+    @safeWrapper
+    def _plot_discrete_entities_(self, entities, axis=None, **kwargs):
+        if len(entities) == 0:
+            return
+        
+        try:
+            if len(self.axes) == 0:
+                self._prepareAxes_(1)
+                if axis is None or isinstance(axes, int) and axis != 0:
+                    axis = 0
+                    
+            if not isinstance(axis, int):
+                axis = 0 # (by default)
+                
+            else:
+                if axis < 0 or axis >= len(self.axes):
+                    raise ValueError(f"Wrong axis index {axis} for {len(self.axes)} axes")
+            
+            entities_axis = self.signalsLayout.getItem(axis, 0)
+                
+            symbolcolors = cycle(self.defaultLineColorsList)
+            symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
+            symbolPen.setCosmetic(True)
+            
+            labelStyle = {"color": "#000000"}
+            
+            height_interval = 1/len(entities)
+            
+            if isinstance(entities, dict):
+                entities_list  = list(entities.values())
+                
+            else:
+                entities_list = entities
+            
+            if all(isinstance(v, (neo.Event, DataMark)) for v in entities_list):
+                max_len =  max((len(event.times) for event in entities_list))
+                xx = [np.full((1,max_len), np.nan) for event in entities_list]
+                    
+                yy = list()
+                
+                for k_event, event in enumerate(entities_list):
+                    if hasattr(event, "type"):
+                        data_name = event.type.name
+                        
+                    elif hasattr(event, "name"):
+                        data_name= event.name
+                        
+                    else:
+                        data_name=" "
+                        
+                    if isinstance(data_name, str):
+                        if data_name == "presynaptic":
+                            data_name = "pre"
+                            
+                        elif data_name == "postsynaptic":
+                            data_name = "post"
+                            
+                        elif data_name == "photostimulation":
+                            data_name = "photo"
+                            
+                        elif "imaging" in data_name:
+                            data_name = "img"
+                    
+                    if len(event.times):
+                        xx[k_event][:,:len(event.times)] = np.atleast_2d(event.times)[:]
+                        yy.append(np.full(xx[k_event].shape, height_interval * k_event + height_interval/2))
+                        
+                xx_ = np.concatenate(xx).T
+                yy_ = np.concatenate(yy).T
+                
+                if yy_.shape[1] > 10:
+                    self.sig_plot.emit(self._make_sig_plot_dict_(entities_axis,
+                                            xx_, yy_,
+                                            pen=None,
+                                            name=data_name,
+                                            symbol="event", 
+                                            symbolcolorcycle=symbolcolors))
+                else:
+                    self._plot_numeric_data_(entities_axis, xx_, yy_,
+                                            pen=None, name=data_name,
+                                            symbol="event", 
+                                            symbolcolorcycle=symbolcolors)
+                
+                entities_axis.axes["left"]["item"].setPen(None)
+                entities_axis.axes["left"]["item"].setLabel("Events", **labelStyle)
+                entities_axis.axes["left"]["item"].setStyle(showValues=False)
+                
+            elif all(isinstance(v, neo.SpikeTrain) for v in entities_list):
+                trains_x_list = list()
+                trains_y_list = list()
+                
+                for k_train, train in enumerate(entities_list):
+                    data_name = getattr(train, "name", None)
+                    data_name = data_name if isinstance(data_name, str) and len(data_name.strip()) else "%d" % k_train
+                    
+                    x = train.times.magnitude.flatten()
+                    y = np.full(x.shape, height_interval * k_train + height_interval/2)
+                    
+                    trains_x_list.append(x)
+                    trains_y_list.append(y)
+                    
+                    xx_ = np.concatenate(trains_x_list, axis=np.newaxis)
+                    yy_ = np.concatenate(trains_y_list, axis=np.newaxis)
+                    
+                    if yy_.ndim > 1 and yy_.shape[1] > 10:
+                        self.sig_plot.emit(self._make_sig_plot_dict_(entities_axis, xx_, yy_, symbol="spike",
+                                                pen=None, name=data_name,
+                                                symbolPen=QtGui.QPen(QtGui.QColor(next(symbolcolors)))))
+                    else:
+                        self._plot_numeric_data_(entities_axis, xx_, yy_, symbol="spike",
+                                                pen=None, name=data_name,
+                                                symbolPen=QtGui.QPen(QtGui.QColor(next(symbolcolors))))
+                        
+                entities_axis.axes["left"]["item"].setPen(None)
+                entities_axis.axes["left"]["item"].setLabel("Spike Trains", **labelStyle)
+                
+        except:
+            traceback.print_exc()
+        
     def _update_annotations_(self, data=None):
         self.dataAnnotations.clear()
         
@@ -929,7 +1096,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             return
 
     def _configureUI_ (self):
+        # NOTE: 2021-11-13 23:24:12
+        # signal/slot connections & UI for pg.PlotItem objects are configured in
+        # self._prepareAxes_()
         self.setupUi(self)
+        
+        self.sig_plot.connect(self._plot_numeric_data_thr_, type = QtCore.Qt.QueuedConnection)
         
         if self.viewerWidgetContainer.layout() is None:
             self.viewerWidgetContainer.setLayout(QtWidgets.QGridLayout(self.viewerWidgetContainer))
@@ -1270,6 +1442,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         
         def _use_coords_sequence_(seq, xw, yw, lbls):
+            """Adds cursors based on a sequence of cursor coordinates
+            """
             for (k, coords) in enumerate(seq):
                 x, y = _addCursors_parse_coords_(coords)
             
@@ -3669,23 +3843,25 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                      irregularSignalIndex,
                      irregularSignalChannelAxis,
                      irregularSignalChannelIndex,
-                     separateSignalChannels):
+                     separateSignalChannels) -> bool:
         """Sets up the data model, essentially -- "interprets" the data 
-        structure sich that plotting of different types of objects containing
+        structure such that plotting of different types of objects containing
         numeric data sequences is made possible.
         
         These objects can be:
         
-        1) data sequences: numpy arrays and specialized objects derived from
+        1) numpy arrays and specialized objects derived from
         numpy arrays such as quantities, neo signals (which are derived from 
         quantities), vigra arrays, but also vigra kernels, and python sequences 
         of numbers.
         
-        2) containers of data sequences (at the moment only containers from 
+        2) containers of (1) (at the moment only containers from 
         neo library are supported, e.g.Block and Segment)
         
         TODO: Pandas dataframes and series
         """
+        
+        
         
         # NOTE: 2019-04-30 09:55:33
         # assign to x and y, BUT:
@@ -3700,7 +3876,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             else:
                 warngins.warn("I need something to plot")
-                return
+                return False
             
         if isinstance(y, neo.baseneo.BaseNeo):
             self.globalAnnotations = {type(y).__name__ : y.annotations}
@@ -3713,8 +3889,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             #### BEGIN NOTE 2019-11-24 22:32:46: 
             # no need for these so reset to None
             # but definitely used when self.y is a signal, not a container of signals!
+            self.dataAxis = 0 # data as column vectors
+            self.signalChannelAxis = 1 
             self.frameAxis = None
-            self.signalChannelAxis = None 
             self.signalChannelIndex = None
             self.irregularSignalChannelAxis = None
             self.irregularSignalChannelIndex = None
@@ -3731,43 +3908,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # NOTE: this is used when self.y is a structured signal object,
             # but not for a block, channel index, or segment
 
-            # NOTE: 2019-11-24 11:57:29
-            # ALTERNATIVE means of selecting which segments to plot.
-            # If a neo.ChannelIndex index is specified, and its signals 
-            # belong to self.y then the viewer should only plot those segments
-            # that contain signals linked to the specified channel
-            
-            ## ATTENTION do the same at _plotSegment_() stage
-            #if isinstance(channelIndex, neo.ChannelIndex) and channelIndex in self.y.channel_indexes:
-                ## NOTE: 2019-11-24 21:48:37
-                ## select segments & signals by neo channel index, but
-                ## reject this channel index if it does not belong to y
-                ## which is a neo.Block.
-                
-                ## select segments containing signals linked with this channel
-                ## index, AND belong to self.y !
-                #channel_segments = [s for s in get_segments_in_channel_index(channelIndex) if s.block is self.y]
-                
-                #if len(channel_segments):
-                    #self.frameIndex = [self.y.segments.index(s) for s in channel_segments]
-                    #self._number_of_frames_ = len(self.frameIndex)
-                    #self.channelIndex = channelIndex
-                    
-                #else:
-                    ## no success: this channel index has nothing to do with self.y
-                    #warnings.warn("Channel index %s has no signals in this %s and will be ignored" % (self.channelIndex, type(self.y).__name__), RuntimeWarning)
-                    
-                    #self.channelIndex = None
-                    
-            #elif channelIndex is not None:
-                #raise TypeError("channelIndex expected to be a neo.ChannelIndex or None; got %s instead" % type(channelIndex).__name__)
+            # NOTE: 2021-11-13 19:00:47
+            # ChannelIndex is out of neo
                     
             self.frameIndex = normalized_index(self._data_frames_, frameIndex)
             self._number_of_frames_ = len(self.frameIndex)
-            #if self.channelIndex is None: # the above failed
-                #self.frameIndex = normalized_index(self._data_frames_, frameIndex)
-                #self._number_of_frames_ = len(self.frameIndex)
-                #self.channelIndex = None
             
             #### BEGIN NOTE: 2019-11-21 23:09:52 
             # TODO/FIXME handle self.plot_start and self.plot_start
@@ -3786,30 +3931,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self._data_frames_ = 1
             self.frameIndex = range(self._number_of_frames_) 
             
+            # only used for individual signals
+            self.dataAxis = 0 # data as column vectors
+            self.signalChannelAxis = 1 
+            self.signalChannelIndex = None
+            
             # see NOTE: 2019-11-22 08:37:38  - the same principle applies
             self.signalIndex = signalIndex
             self.irregularSignalIndex = irregularSignalIndex
             
-            # only used for individual signals
-            self.signalChannelAxis = None 
-            self.signalChannelIndex = None
             self.irregularSignalChannelAxis = None
             self.irregularSignalChannelIndex = None
             self.separateSignalChannels = False
             
-            #self.channelIndex = channelIndex
-
-        #elif isinstance(y, neo.core.ChannelIndex):
-            ## NOTE: ChannelIndex is OUT in neo >= 0.10.0
-            #raise NotImplementedError("Plotting neo.core.ChannelIndex object is not yet implemented") 
-            ##NOTE: 2017-04-08 22:21:21 I need to think carefully about this
-            ## a ChannelIndex:
-            ## 1) groups all analog signals inside a block accross segments, OR
-            ## 2) indexes a SUBSET of the channels within an analogsignal, OR
-            ## 3) contains neo.core.Unit objects
-            ##self.frameIndex = range(1)
-            ##self._plotEpochs_(clear=True)
-        
         elif isinstance(y, (neo.core.AnalogSignal, DataSignal)):
             self.y = y
             
@@ -3823,6 +3957,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # but the signal's channels MAY be plotted one per frame, if frameAxis is one
             # signal domain is already present, although it can be overridden
             # by user-supplied "x" data
+            
+            self.dataAxis = 0 # data as column vectors
             
             if not isinstance(frameAxis, (int, type(None))):
                 raise TypeError("For AnalogSignal and DataSignal, frameAxis must be an int or None; got %s instead" % type(frameAxis).__name__)
@@ -3852,6 +3988,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         elif isinstance(y, (neo.core.IrregularlySampledSignal,  IrregularlySampledDataSignal)):
             self.y = y
             self.frameIndex = range(1)
+            self.dataAxis = 0 # data as column vectors
+            self.signalChannelAxis = 1
             #self.signalIndex = range(1)
             
             self._number_of_frames_ = 1
@@ -3864,42 +4002,30 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.irregularSignalChannelIndex    = irregularSignalChannelIndex
             self.separateSignalChannels         = separateSignalChannels
 
-        #elif isinstance(y, neo.core.Unit): # Unit is out of neo  
-            #raise NotImplementedError("Plotting neo.core.Unit objects is not yet implemented") 
-            ## TODO - see Epochs as example
-            #self.y = y
-            #self.frameIndex = range(1)
-            #self._number_of_frames_ = 1
-            ##self.overlays.clear() # taken from ancillary data in the Unit; TODO
-        
         elif isinstance(y, neo.core.SpikeTrain): # plot a SpikeTrain independently of data
-            # TODO - see Epochs as example
             self.y = y
-            self._plotSpikeTrains_(y)
+            self.dataAxis = 0 # data as column vectors
+            self.signalChannelAxis = 1
             self.frameIndex = range(1)
             self._number_of_frames_ = 1
-            #self.overlays.append(self.y) # plotted as overlaid spike train
-            #raise NotImplementedError("Plotting stand-alone neo.core.SpikeTrain objects is not yet implemented")
-            
-            #self.frameIndex = range(1)
-            #self.signalIndex = range(1)
-            #raise TypeError("Plotting neo.core.SpikeTrain objects is not yet implemented") 
-            # TODO
+            self._plotSpikeTrains_(y) # plots spike trains indepedently of the 
+            # enclosing segment
         
-        elif isinstance(y, neo.core.Event): # plot an event independently of data
-            # TODO - see Epochs as example
-            #self.overlays.append(self.y) # plotted as overlaid event
-            raise NotImplementedError("Plotting stand-alone neo.core.Event objects is not yet implemented") 
+        elif isinstance(y, (neo.core.Event, DataMark )): # plot an event independently of data
             self.y = y
+            self.dataAxis = 0 # data as column vectors
+            self.signalChannelAxis = 1
             self.frameIndex = range(1)
             self._number_of_frames_ = 1
-            # TODO
+            self._plotEvents_(y)
             #NOTE: EventArray has been ditched as of neo v. 0.5.0
         
-        elif isinstance(y, neo.core.Epoch): # plot an Epoch independently of data
+        elif isinstance(y, (neo.core.Epoch, DataZone)): # plot an Epoch independently of data
             #self.dataAnnotations.append({"Epoch %s" % y.name: y.annotations})
             #pass # delegated to displayFrame()
             self.y = y
+            self.dataAxis = 0 # data as column vectors
+            self.signalChannelAxis = 1
             self.frameIndex = range(1)
             self._number_of_frames_ = 1
             self._plotEpochs_(self.y)
@@ -3916,24 +4042,26 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.x, self.y = vigraKernel1D_to_ndarray(self.y)
             self._plotEpochs_(clear=True)
             
+            self.dataAxis = 0 # data as column vectors
             self.frameIndex = range(1)
             self.signalIndex = range(1)
             self._number_of_frames_ = 1
             
         elif isinstance(y, np.ndarray):
-            # NOTE: 2019-11-22 12:29:43
-            # this includes vigra.VigraArray
-            self.y = y
-            
-            if self.y.ndim > 3: 
+            # this includes vigra.VigraArray, quantities.Quantity
+            if y.ndim > 3: 
                 raise ValueError('\nCannot plot data with more than 3 dimensions\n')
             
+            self.y = y
+            
             if self.y.ndim == 1: # one frame, one channel
+                self.dataAxis = 0 # data as column vectors
+                self.signalChannelAxis = None
                 self.frameAxis = None
                 self.frameIndex = range(1)
                 self.signalChannelIndex = range(1)
                 self._number_of_frames_ = 1
-                dataAxis = 0
+                self.dataAxis = 0
                 
             elif self.y.ndim == 2:
                 if not isinstance(frameAxis, (int, str, vigra.AxisInfo, type(None))):
@@ -3943,8 +4071,18 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     raise TypeError("Signal channel axis must be None, or an int (vigra arrays also accept str or AxisInfo); got %s instead" % type(signalChannelAxis))
                 
                 if signalChannelAxis is None:
-                    # by default we take columns as signal channels
-                    signalChannelAxis = 1
+                    if isinstance(self.y, vigra.VigraArray):
+                        # this is the only case where we allow for signalChannelAxis
+                        # to be omitted from the call parameters (for array with 
+                        # at least 2D)
+                        if self.y.channelIndex == self.y.ndim: # no real channel axis
+                            # take columns as signal channels (consider self.y as
+                            # an horizontal vector of column vectors)
+                            signalChannelAxis = 1
+                        else:
+                            signalChannelAxis = self.y.channelIndex
+                    else:
+                        raise TypeError("signalChannelAxis must be specified when plotting numpy arrays")
                     
                 else:
                     if isinstance(self.y, vigra.VigraArray):
@@ -3959,7 +4097,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
                 self.signalChannelAxis = signalChannelAxis
                 
-                dataAxis = 1 if self.signalChannelAxis == 0 else 0
+                self.dataAxis = 1 if self.signalChannelAxis == 0 else 0
                 
                 self.signalChannelIndex = normalized_sample_index(self.y, self.signalChannelAxis, signalChannelIndex)
                 
@@ -3979,7 +4117,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     # with plot items stacked in a column in one frame
                         
                 else:
-                    # for 2D arrays, this forces plotting one channel per frame
+                    # for 2D arrays, specifying a frameAxis forces the plotting 
+                    # of one channel per frame
                     frameAxis = normalized_axis_index(self.y, frameAxis)
                     
                     # NOTE: 2019-11-22 14:24:16
@@ -3998,8 +4137,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 
             elif self.y.ndim == 3: 
                 # NOTE: 2019-11-22 13:33:27
-                # interpreted as several channels (axis 1) by several frames (axis 2) or vice-versa
-                # therefore both frameAxis and signalChannelAxis MUST be specified
+                # both frameAxis and signalChannelAxis MUST be specified
                 #
                 if frameAxis is None:
                     raise TypeError("For 3D arrays the frame axis must be specified")
@@ -4027,7 +4165,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
                 self.signalChannelIndex = normalized_sample_index(self.y, self.signalChannelAxis, signalChannelIndex)
                 
-                dataAxis = list(axes)[0]
+                self.dataAxis = list(axes)[0]
 
                 # NOTE: 2019-11-22 14:15:46
                 # diplayframe() needs to decide whether to plot all channels 
@@ -4037,14 +4175,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.separateSignalChannels = separateSignalChannels
                 
             if x is None:
-                xx = np.linspace(0, self.y.shape[dataAxis], self.y.shape[dataAxis], 
+                xx = np.linspace(0, self.y.shape[self.dataAxis], self.y.shape[self.dataAxis], 
                                 endpoint=False)[:, np.newaxis]
                     
                 self.x = xx
                 
             else:
                 if isinstance(x, (tuple, list)):
-                    if len(x) != self.y.shape[dataAxis]:
+                    if len(x) != self.y.shape[self.dataAxis]:
                         raise TypeError("The supplied signal domain (x) must have the same size as the data axis %s" % dataAxis)
                     
                     self.x = np.array(x)
@@ -4053,7 +4191,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if not is_vector(x):
                         raise TypeError("The supplied signal domain (x) must be a vector")
                     
-                    if len(x) != self.y.shape[dataAxis]:
+                    if len(x) != self.y.shape[self.dataAxis]:
                         raise TypeError("The supplied signal domain (x) must have the same size as the data axis %s" % dataAxis)
                         
                     if is_column_vector(x):
@@ -4065,18 +4203,20 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     raise TypeError("Signal domain (x) must be None, a Python iterable of scalars or a numpy array (vector)")
                         
-        elif isinstance(y, (tuple, list)):
+        elif isinstance(y, (tuple, list)) or hasattr(y, "__iter__"): # second condition to cover for new things like neo.SpikeTrainList (v >= 0.10.0)
             # pythonic sequence of stuff to plot
             # TODO 2020-03-08 11:05:06
             # code for sequence of neo.SpikeTrain, and sequence of neo.Event
             self.separateSignalChannels         = separateSignalChannels
-            self.signalChannelAxis              = signalChannelAxis # only used for ndarrays, see below 
+            self.signalChannelAxis              = signalChannelAxis 
 
             if np.all([isinstance(i, vigra.filters.Kernel1D) for i in y]):
                 self._plotEpochs_(clear=True)
                 self.frameIndex = range(len(y))
                 self._number_of_frames_ = len(self.frameIndex)
                 self.signalIndex = 1
+                self.dataAxis = 0
+                self.signalChannelAxis = 1 
                 xx, yy = [vigraKernel1D_to_ndarray(i) for i in y]
                 
                 if x is None:
@@ -4109,12 +4249,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 #self.dataAnnotations = [{s.name: s.annotations} for s in y]
                 self.frameIndex = range(len(y))
                 self.frameAxis = None
+                
                 self._data_frames_ = len(y)
                 self._number_of_frames_ = len(self.frameIndex)
                 
                 self.separateSignalChannels         = False
                 
-                self.signalChannelAxis = None
+                self.dataAxis = 0
+                self.signalChannelAxis = 1
                 self.signalChannelIndex = None
                 self.irregularSignalChannelAxis     = None
                 self.irregularSignalChannelIndex    = None
@@ -4132,7 +4274,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.x = None
                 self.y = y 
                 self.frameAxis = None
-                self.signalChannelAxis = None 
+                self.dataAxis = 0
+                self.signalChannelAxis = 1 
                 self.signalChannelIndex = None
                 self.irregularSignalChannelAxis = None
                 self.irregularSignalChannelIndex = None
@@ -4143,7 +4286,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.signalIndex                    = signalIndex
                 self.irregularSignalIndex           = irregularSignalIndex
                 
-            elif all([isinstance(i, (neo.core.AnalogSignal, neo.core.IrregularlySampledSignal,  DataSignal)) for i in y]):
+            elif all([isinstance(i, (neo.core.AnalogSignal, neo.core.IrregularlySampledSignal,  
+                                     DataSignal, IrregularlySampledDataSignal)) for i in y]):
                 # NOTE: 2019-11-30 09:42:27
                 # Treat this as a segment, EXCEPT that each signal is plotted
                 # in its own frame. This is because in a generic container
@@ -4153,6 +4297,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 # frame then either collected them in a segment, or concatenate
                 # them in a 3D numpy array.
                 #self.dataAnnotations = [{s.name: s.annotations} for s in y]
+                self.dataAxis = 0
+                self.signalChannelAxis = 1
                 self.frameAxis = None
                 self.frameIndex = range(len(y))
                 self._data_frames_ = len(y)
@@ -4162,21 +4308,38 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.x = None
                 self.y = y
                 
-            elif all([isinstance(i, neo.Epoch) for i in y]):
+            elif all([isinstance(i, (neo.Epoch, DataZone, neo.Event, DataMark)) for i in y]):
                 #self.dataAnnotations = [{s.name: s.annotations} for s in y]
                 self.y = y
+                self.dataAxis = 0
+                self.signalChannelAxis = 1
+                self.frameIndex = range(1)
+                self._number_of_frames_ = 1
+                self._plotEpochs_(self.y)
+            
+            elif all([isinstance(i, neo.SpikeTrain) for i in y]):
+                #self.dataAnnotations = [{s.name: s.annotations} for s in y]
+                self.y = y
+                self.dataAxis = 0
+                self.signalChannelAxis = 1
                 self._plotEpochs_(self.y)
                 self.frameIndex = range(1)
                 self._number_of_frames_ = 1
             
             elif all([isinstance(i, np.ndarray) and i.ndim <= 2 for i in y]):
+                if signalChannelAxis is None:
+                    raise TypeError("signalChannelAxis must be specified for 2D arrays")
+                
+                self.signalChannelAxis = signalChannelAxis
+                self.dataAxis = 1 if self.signalChannelAxis == 0 else 0
+                    
                 self._plotEpochs_(clear=True)
                 self.frameIndex = range(len(y))
                 self._number_of_frames_ = len(self.frameIndex)
                 self.signalIndex = 1
 
                 if x is None:
-                    x = [np.linspace(0, y_.shape[0], y_.shape[0], endpoint=False)[:,np.newaxis] for y_ in y]
+                    x = [np.linspace(0, y_.shape[self.dataAxis], y_.shape[self.dataAxis], endpoint=False)[:,np.newaxis] for y_ in y]
                     
                 else: 
                     # x might be a single 1D array (or 2D array with 2nd 
@@ -4198,11 +4361,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.y = y
             
             else:
-                raise TypeError("Can only plot a list of 1D vigra filter kernels or 1D/2D numpy arrays")
+                raise TypeError("Can only plot a list of 1D vigra filter kernels, 1D/2D numpy arrays, or neo-like signals")
             
         else:
             raise TypeError("Plotting is not implemented for %s data types" % type(self.y).__name__)
 
+        return True
+    
     @safeWrapper
     def _set_data_(self,
                    x:(neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)), 
@@ -4258,23 +4423,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # remove gremlins from previous plot
             self._plotEpochs_(clear=True)
 
-            self._parse_data_(x=x, y=y, frameIndex=frameIndex, frameAxis=frameAxis,
+            dataOK = self._parse_data_(x=x, y=y, frameIndex=frameIndex, frameAxis=frameAxis,
                               signalIndex=signalIndex, signalChannelAxis=signalChannelAxis,
                               signalChannelIndex=signalChannelIndex,
                               irregularSignalIndex=irregularSignalIndex,
                               irregularSignalChannelAxis=irregularSignalChannelAxis,
                               irregularSignalChannelIndex=irregularSignalChannelIndex,
                               separateSignalChannels=separateSignalChannels)
-            
-            #self._parse_data_(x=x, y=y, frameIndex=frameIndex, frameAxis=frameAxis,
-                              #signalIndex=signalIndex, signalChannelAxis=signalChannelAxis,
-                              #signalChannelIndex=signalChannelIndex,
-                              #irregularSignalIndex=irregularSignalIndex,
-                              #irregularSignalChannelAxis=irregularSignalChannelAxis,
-                              #irregularSignalChannelIndex=irregularSignalChannelIndex,
-                              #separateSignalChannels=separateSignalChannels,
-                              #channelIndex=channelIndex,
-                              #unitIndex=unitIndex)
             
             self.actionDetect_Triggers.setEnabled(check_ephys_data_collection(self.y))
                         
@@ -4305,7 +4460,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             self.nFramesLabel.setText("of %d" % self._number_of_frames_)
             
-            self.displayFrame()
+            if dataOK:
+                self.displayFrame()
+            else:
+                warnings.warn("Could not parse the data")
+                return
             
             self._update_annotations_()
             
@@ -4878,7 +5037,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         neo.Event                       -> _plotSignal_
         datatypes.DataSignal            -> _plotSignal_
         vigra.Kernel1D, vigra.Kernel2D  -> _plotArray_ (after conversion to numpy.ndarray)
-        numpy.ndarray                   -> _plotArray_ (including vigra.VigraArray)
+        numpy.ndarray                   -> _plotArray_ (including vigra.VigraArray and quantity arrays)
         
         sequence (iterable)             -> _plotSequence_
             The sequence can contain these types:
@@ -5072,56 +5231,45 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._update_annotations_()
         
     @safeWrapper
-    def _plotSpikeTrains_(self, trains: typing.Optional[neo.SpikeTrain] = None, clear:bool = False, **kwargs):
+    def _plotSpikeTrains_(self, 
+                          trains:typing.Optional[typing.Union[neo.SpikeTrain, tuple, list]] = None, 
+                          clear:bool = False, 
+                          **kwargs):
+                          #from_cache: bool = False,
         """Plots stand-alone spike trains.
         CAUTION: DO NOT use when plotting spike trains associated with a neo.Segment or neo.Unit!
         """
         if trains is None or clear:
-            for k, ax in enumerate(self.axes):
-                lris = [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]
-                
-                if len(lris):
-                    for l in lris:
-                        ax.removeItem(l)
-                        
-        self._shown_spike_trains_.clear()
+            self._clear_lris_()
         
         if trains is None:
             return
-            
-        trains_dict = dict()
         
-        if isinstance(trains, (tuple, list)):
-            if all([isinstance(s, neo.SpikeTrain) for s in trains]):
-                for k, t in enumerate(trains):
-                    if t.name is None or (isinstance(t.name, str) and len(t.name.strip()==0)):
-                        tag = k
-                        
-                    else:
-                        tag = t.name
-                        
-                    trains_dict[tag] = t
-                    
-            else:
-                raise TypeError("All elements in the 'trains' sequence mus be neo.SpikeTrain objects")
-            
-        elif isinstance(trains, neo.SpikeTrain):
-            if trains.name is None or (isinstance(trains.name, str) and len(trains.name.strip()==0)):
-                tag = 0
-                
-            else:
-                tag = trains.name
-                
-            trains_dict[tag] = trains
-            
-        else:
-            raise TypeError("Expecting a neo.SpikeTrain or a sequence (tuple, list) of neo.SpikeTrain objects; got %s instead" % type(trains).__name__)
+        trains_dict = self._prep_entity_dict_(trains, neo.SpikeTrain)
         
-        self._plot_trains_dict_(trains_dict, **kwargs)
+        self._plot_discrete_entities_(trains_dict, **kwargs)
+            
+    @safeWrapper
+    def _plotEvents_(self,
+                     events: typing.Optional[typing.Union[neo.Event, DataMark, typing.Sequence]] = None, 
+                     clear: bool = True,
+                     from_cache: bool = False,
+                     **kwargs):
+        
+        if events is None or clear:
+            self._clear_lris_()
+            #self._cached_events_.clear()
+            
+        if events is None:
+            return
+        
+        events_dict = self._prep_entity_dict_(events, (neo.Event, DataMark))
+        
+        self._plot_discrete_entities_(events_dict, **kwargs)
         
     @safeWrapper
     def _plotEpochs_(self, 
-                     epochs: typing.Optional[typing.Union[neo.Epoch, typing.Sequence]] = None, 
+                     epochs: typing.Optional[typing.Union[neo.Epoch, DataZone, typing.Sequence]] = None, 
                      clear: bool = True,
                      from_cache: bool = False,
                      **kwargs):
@@ -5309,8 +5457,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 for l in lris:
                     ax.removeItem(l)
         
-        #print("SignalViewer._plotEpochs_ epochs:", epochs)
-        
         epoch_seq = None
         
         if epochs is None or len(epochs) == 0:
@@ -5364,50 +5510,50 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             self._cached_epochs_.pop(self.currentFrame, None)
                     
-    @safeWrapper
-    def _plot_trains_dict_(self, trains_dict, **kwargs):
-        if len(trains_dict) == 0:
-            return
+    #@safeWrapper
+    #def _plot_trains_dict_(self, trains_dict, **kwargs):
+        #if len(trains_dict) == 0:
+            #return
         
-        try:
-            if len(self.axes) == 0:
-                self._prepareAxes_(1)
+        #try:
+            #if len(self.axes) == 0:
+                #self._prepareAxes_(1)
                 
-            spike_train_axis = self.signalsLayout.getItem(0,0)
+            #spike_train_axis = self.signalsLayout.getItem(0,0)
             
-            height_interval = 1/len(trains_dict)
+            #height_interval = 1/len(trains_dict)
             
-            colors = cycle(self.defaultLineColorsList)
+            #colors = cycle(self.defaultLineColorsList)
             
-            labelStyle = {"color": "#000000"}
+            #labelStyle = {"color": "#000000"}
 
-            trains_x_list = list()
-            trains_y_list = list()
+            #trains_x_list = list()
+            #trains_y_list = list()
             
-            for k_train, (tag, train) in enumerate(trains_dict.items()):
-                data_name = tag if isinstance(tag, str) else "%d" % tag
+            #for k_train, (tag, train) in enumerate(trains_dict.items()):
+                #data_name = tag if isinstance(tag, str) else "%d" % tag
                 
-                x = train.times.magnitude.flatten()
-                y = np.full(x.shape, height_interval * k_train + height_interval/2)
+                #x = train.times.magnitude.flatten()
+                #y = np.full(x.shape, height_interval * k_train + height_interval/2)
                 
-                trains_x_list.append(x)
-                trains_y_list.append(y)
+                #trains_x_list.append(x)
+                #trains_y_list.append(y)
                 
-            tr_x = np.concatenate(trains_x_list, axis=np.newaxis)
-            tr_y = np.concatenate(trains_y_list, axis=np.newaxis)
+            #tr_x = np.concatenate(trains_x_list, axis=np.newaxis)
+            #tr_y = np.concatenate(trains_y_list, axis=np.newaxis)
             
-            self._plot_numeric_data_(spike_train_axis,
-                                        tr_x, tr_y, 
-                                        symbol="spike",
-                                        pen=None,
-                                        name=data_name,
-                                        symbolPen=QtGui.QPen(QtGui.QColor(next(colors))))
+            #self._plot_numeric_data_(spike_train_axis,
+                                        #tr_x, tr_y, 
+                                        #symbol="spike",
+                                        #pen=None,
+                                        #name=data_name,
+                                        #symbolPen=QtGui.QPen(QtGui.QColor(next(colors))))
                 
-            spike_train_axis.axes["left"]["item"].setPen(None)
-            spike_train_axis.axes["left"]["item"].setLabel("Spike Trains", **labelStyle)
+            #spike_train_axis.axes["left"]["item"].setPen(None)
+            #spike_train_axis.axes["left"]["item"].setLabel("Spike Trains", **labelStyle)
             
-        except Exception as e:
-            traceback.print_exc()
+        #except Exception as e:
+            #traceback.print_exc()
             
     @safeWrapper
     def _plotSegment_(self, seg, *args, **kwargs):
@@ -5579,14 +5725,24 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             plotItem = self.signalsLayout.getItem(kAx,0)
             
-            self._plot_numeric_data_(plotItem,
-                                     sig.times,
-                                     sig.magnitude,
-                                     xlabel = "%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
-                                     ylabel = "%s (%s)" % (sig_name, signal.units.dimensionality),
-                                     name=sig_name,
-                                     symbol=None,
-                                     **kwargs)
+            if sig.shape[1] > 10:
+                self.sig_plot.emit(self._make_sig_plot_dict_(plotItem,
+                                        sig.times,
+                                        sig.magnitude,
+                                        xlabel = "%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
+                                        ylabel = "%s (%s)" % (sig_name, signal.units.dimensionality),
+                                        name=sig_name,
+                                        symbol=None,
+                                        **kwargs))
+            else:
+                self._plot_numeric_data_(plotItem,
+                                        sig.times,
+                                        sig.magnitude,
+                                        xlabel = "%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
+                                        ylabel = "%s (%s)" % (sig_name, signal.units.dimensionality),
+                                        name=sig_name,
+                                        symbol=None,
+                                        **kwargs)
             
             signal_axis.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
                                                autoReduceTextSpace=False)
@@ -5604,8 +5760,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 domain_name = signal.domain_name # alternative is a IrregularlySampledDataSignal
         
-            #print("_plotSegment_ irregular signal", signal.name, kAx)
-            
             if self.plot_start is not None:
                 if self.plot_stop is not None:
                     sig = signal.time_slice(self.plot_start, self.plot_stop)
@@ -5621,14 +5775,23 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     sig = signal
                         
             plotItem = self.signalsLayout.getItem(kAx, 0)
-
-            self._plot_numeric_data_(plotItem,
-                                     sig.times,
-                                     sig.magnitude,
-                                     xlabel = "Time (%s)" % sig.t_start.units.dimensionality,
-                                     ylabel = "%s (%s)" % (sig.name, signal.units.dimensionality),
-                                     symbol = None,
-                                     **kwargs)
+            
+            if sig.shape[1] > 10:
+                self.sig_plot.emit(self._make_sig_plot_dict_(plotItem,
+                                        sig.times,
+                                        sig.magnitude,
+                                        xlabel = "Time (%s)" % sig.t_start.units.dimensionality,
+                                        ylabel = "%s (%s)" % (sig.name, signal.units.dimensionality),
+                                        symbol = None,
+                                        **kwargs))
+            else:
+                self._plot_numeric_data_(plotItem,
+                                        sig.times,
+                                        sig.magnitude,
+                                        xlabel = "Time (%s)" % sig.t_start.units.dimensionality,
+                                        ylabel = "%s (%s)" % (sig.name, signal.units.dimensionality),
+                                        symbol = None,
+                                        **kwargs)
             
             signal_axis.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
                                                autoReduceTextSpace=False)
@@ -5651,52 +5814,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             height_interval = 1/len(spiketrains) 
             
-            trains_x_list = list()
-            trains_y_list = list()
-            
-            max_len = max((len(train.times) for train in spiketrains))
-            xx = [np.full((1,max_len), np.nan) for train in spiketrains]
-            yy = list()
-            
-            for k_train, train in enumerate(spiketrains):
-                if hasattr(train, "name"):
-                    data_name=train.name
-                else:
-                    data_name="spikes"
-                    
-                if len(train.times):
-                    xx[k_train][:,:len(train.times)] = np.atleast_2d(train.times)[:]
-                    yy.append(np.full(xx[k_train].shape, height_interval * k_train + height_interval/2))
-                    
-                #x = train.times.flatten()
-                #y = np.full(x.shape, height_interval * k_train + height_interval/2)
-                
-                #trains_x_list.append(x)
-                #trains_y_list.append(y)
-                
-            self._plot_numeric_data_(spike_train_axis,
-                                     np.concatenate(xx).T,
-                                     np.concatenate(yy).T,
-                                     pen=None,
-                                     name=data_name,
-                                     symbol="spike",
-                                     symbolPen = symbolPen,
-                                     symbolcolorcycle = symbolcolors)
-                
-            #tr_x = np.concatenate(trains_x_list, axis=np.newaxis)
-            #tr_y = np.concatenate(trains_y_list, axis=np.newaxis)
-            
-            #self._plot_numeric_data_(spike_train_axis,
-                                        #tr_x, tr_y, 
-                                        #pen=None,
-                                        #name=data_name,
-                                        #symbol="spike",
-                                        #symbolPen = symbolPen,
-                                        #symbolcolorcycle = symbolcolors)
-                
-            spike_train_axis.axes["left"]["item"].setPen(None)
-            spike_train_axis.axes["left"]["item"].setLabel("Spike Trains", **labelStyle)
-            spike_train_axis.axes["left"]["item"].setStyle(showValues=False)
+            self._plot_discrete_entities_(spiketrains, axis=kAx, **kwargs)
 
             kAx +=1
                 
@@ -5716,50 +5834,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             height_interval = 1/len(events)
             
-            max_len =  max((len(event.times) for event in events))
-            xx = [np.full((1,max_len), np.nan) for event in events]
-                
-            yy = list()
-            
-            for k_event, event in enumerate(events):
-                if hasattr(event, "type"):
-                    data_name = event.type.name
-                    
-                elif hasattr(event, "name"):
-                    data_name= event.name
-                    
-                else:
-                    data_name=" "
-                    
-                if isinstance(data_name, str):
-                    if data_name == "presynaptic":
-                        data_name = "pre"
-                        
-                    elif data_name == "postsynaptic":
-                        data_name = "post"
-                        
-                    elif data_name == "photostimulation":
-                        data_name = "photo"
-                        
-                    elif "imaging" in data_name:
-                        data_name = "img"
-                
-                if len(event.times):
-                    xx[k_event][:,:len(event.times)] = np.atleast_2d(event.times)[:]
-                    yy.append(np.full(xx[k_event].shape, height_interval * k_event + height_interval/2))
-                    
-
-            self._plot_numeric_data_(event_axis,
-                                     np.concatenate(xx).T,
-                                     np.concatenate(yy).T,
-                                     pen=None,
-                                     name=data_name,
-                                     symbol="event", 
-                                     symbolcolorcycle=symbolcolors)
-            
-            event_axis.axes["left"]["item"].setPen(None)
-            event_axis.axes["left"]["item"].setLabel("Events", **labelStyle)
-            event_axis.axes["left"]["item"].setStyle(showValues=False)
+            self._plot_discrete_entities_(events, axis=kAx, **kwargs)
                 
             kAx +=1
             
@@ -5768,7 +5843,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #### BEGIN plot epochs
         # common logic for stand-alone epochs and for epochs associated with
         # a neo.Segment
-        #print("SignalViewer._plotSegment_ => epochs:", seg.epochs)
         self._plotEpochs_(seg.epochs)
         #### END plot epochs
         
@@ -5801,30 +5875,42 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if y.ndim == 1:
             self._prepareAxes_(1)
             self._plot_numeric_data_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs)
+            #self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs))
             
         elif y.ndim == 2:
-            #print("SignalViewer _plotArray_ frameAxis", self.frameAxis)
-            #print("SignalViewer _plotArray_ number of frames", self._number_of_frames_)
-            
             if self.frameAxis is None:
                 if self.separateSignalChannels:
                     # plot each channel in one axis; all axes on the same frame
                     self._prepareAxes_(len(self.signalChannelIndex))
                     for kchn, chNdx in enumerate(self.signalChannelIndex):
-                        self._plot_numeric_data_(self.plotItem(kchn),
-                                                 x, y[array_slice(y, {self.signalChannelAxis:chNdx})],
-                                                 *args, **kwargs)
+                        y_ = y[array_slice(y, {self.signalChannelAxis:chNdx})]
+                        if y_.shape[self.signalChannelAxis] > 10:
+                            self.sigplot.emit(self._make_sig_plot_dict_(self.plotItem(kchn),
+                                                    x, y_,
+                                                    *args, **kwargs))
+                        else:
+                            self._plot_numeric_data_(self.plotItem(kchn),
+                                                    x, y_,
+                                                    *args, **kwargs)
                         
                 else:
                     # plot everything in the same axis
                     self._prepareAxes_(1)
-                    self._plot_numeric_data_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs)
+                    if y.shape[self.signalChannelAxis] > 10:
+                        self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs))
+                    else:
+                        self._plot_numeric_data_(self.plotItem(0), x, y, name="Analog signal", *args, **kwargs)
                     
             else:
                 self._prepareAxes_(1) # one axis per frame: one channel per frame
-                self._plot_numeric_data_(self.plotItem(0), 
-                                         x, y[array_slice(y, {self.frameAxis:self.currentFrame})],
-                                         *args, **kwargs)
+                y_ = y[array_slice(y, {self.frameAxis:self.currentFrame})]
+                if y_.shape[self.signalChannelAxis] > 10:
+                    self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), 
+                                            x, y_,
+                                            *args, **kwargs))
+                else:
+                        
+                    self._plot_numeric_data_(self.plotItem(0), x, y_, *args, **kwargs)
                 
         elif y.ndim == 3:
             # the number of frame is definitely > 1 and there are more than
@@ -5832,17 +5918,24 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             if self.separateChannels:
                 self._prepareAxes_(len(self.signalChannelIndex))
                 for kchn, chNdx in enumerate(self.signalChannelIndex):
-                    self._plot_numeric_data_(self.plotItem(kchn),
-                                             x, y[array_slice(y, {self.signalChannelAxis, chNdx})],
-                                             *args, **kwargs)
+                    y_ = y[array_slice(y, {self.signalChannelAxis:chNdx})]
+                    if y_.shape[self.signalChannelAxis] > 10:
+                        self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(kchn),
+                                                x, y_, *args, **kwargs))
+                    else:
+                        self._plot_numeric_data_(self.plotItem(kchn),
+                                                x, y_, *args, **kwargs)
                 
             else:
                 self._prepareAxes_(1)
-                self._plot_numeric_data_(self.plotItem(0), 
-                                         x, y[array_slice(y, {self.frameAxis:self.currentFrame})],
-                                         *args, **kwargs)
-                
-                
+                y_ = y[array_slice(y, {self.frameAxis:self.currentFrame})]
+                if y_.shape[self.signalChannelAxis] > 10:
+                    self.sig_plot.emit(self._make_sig_plot_dict_(self.plotItem(0), 
+                                            x, y_, *args, **kwargs))
+                else:
+                    self._plot_numeric_data_(self.plotItem(0), 
+                                            x, y_, *args, **kwargs)
+                    
         else:
             raise TypeError("numpy arrays with more than three dimensions are not supported")
         
@@ -5916,13 +6009,62 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
         else:
             self._prepareAxes_(1, sigNames = [signal_name])
-            
-            self._plot_numeric_data_(self.axis(0), np.array(sig.times), 
+            if sig.shape[1] > 10:
+                self.sig_plot.emit(self._make_sig_plot_dict_(self.axis(0), np.array(sig.times), 
                                        np.array(sig.magnitude), 
                                        ylabel="%s (%s)" % (signal_name, sig.units.dimensionality), 
                                        xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
-                                       *args, **kwargs)
+                                       *args, **kwargs))
+            else:
+                self._plot_numeric_data_(self.axis(0), np.array(sig.times), 
+                                        np.array(sig.magnitude), 
+                                        ylabel="%s (%s)" % (signal_name, sig.units.dimensionality), 
+                                        xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
+                                        *args, **kwargs)
+            
+    def _make_sig_plot_dict_(self,plotItem: pg.PlotItem, 
+                            x:np.ndarray, 
+                            y:np.ndarray,
+                            xlabel:(str, type(None))=None, 
+                            xunits: (str, pq.Quantity, type(None))=None,
+                            ylabel:(str, type(None))=None, 
+                            yunits:(str, pq.Quantity, type(None))=None,
+                            title:(str, type(None))=None, 
+                            name:(str, type(None))=None,
+                            symbolcolorcycle:(cycle, type(None))=None,
+                            *args, **kwargs):
+        
+        return {"plotItem":plotItem, 
+                "x": x, "y": y, 
+                "xlabel": xlabel, "xunits": xunits, 
+                "ylabel": ylabel, "yunits": yunits,
+                "title": title, "name": name, 
+                "symbolcolorcycle": symbolcolorcycle,
+                "args": args, "kwargs": kwargs}
                     
+    @safeWrapper
+    @pyqtSlot(dict)
+    def _plot_numeric_data_thr_(self, data:dict):  
+        """For dict's keys and values see parameters of self._plot_numeric_data_
+        """
+        self.statusBar().showMessage("Working...")
+        plotItem            = data.pop("plotItem")
+        x                   = data.pop("x")
+        y                   = data.pop("y")
+        xlabel              = data.pop("xlabel", None)
+        xunits              = data.pop("xunits", None)
+        ylabel              = data.pop("ylabel", None)
+        yunits              = data.pop("yunits", None)
+        title               = data.pop("title", None)
+        name                = data.pop("name", None)
+        symbolcolorcycle    = data.pop("symbolcolorcycle", None)
+        args                = data.pop("args", tuple())
+        kwargs              = data.pop("args", dict())
+
+        self._plot_numeric_data_(plotItem,  x, y, xlabel, xunits, ylabel, yunits,
+                                title, name, symbolcolorcycle, *args, **kwargs)
+        
+        self.statusBar().clearMessage()
 
     @safeWrapper
     def _plot_numeric_data_(self, 
@@ -5936,7 +6078,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                             title:(str, type(None))=None, 
                             name:(str, type(None))=None,
                             symbolcolorcycle:(cycle, type(None))=None,
-                            #overlay:bool = False,
                             *args, **kwargs):
         """ The workhorse that does the actual plotting of signals
         
@@ -5951,13 +6092,19 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         # NOTE: 2019-04-06 09:37:51 
         # there are issues with SVG export of curves containing np.nan
-        
+        #print("x.shape", x.shape)
+        #print("y.shape", y.shape)
+        #print("dataAxis", self.dataAxis)
         x = np.atleast_1d(x)
         y = np.atleast_1d(y)
+        #print("x.shape", x.shape)
+        #print("y.shape", y.shape)
         
-        if x.shape[0] != y.shape[0]:
+        dataAxis = self.dataAxis if isinstance(self.dataAxis, int) else 0
+        
+        if x.shape[0] != y.shape[dataAxis]:
             raise ValueError("x and y have different sizes on their first axes")
-        
+            
         if x.ndim > 2:
             raise TypeError("x expected to be a vector or matrix; got an array with %d dimensions instead" % x.ndim)
         
@@ -5999,7 +6146,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             kwargs["name"]=name
             
         if y.ndim == 1:
-            y_nan_ndx = np/atleast_1d(np.isnan(y))
+            y_nan_ndx = np.atleast_1d(np.isnan(y))
             
             if any(y_nan_ndx):
                 yy = y[~y_nan_ndx]
@@ -6034,17 +6181,20 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 for item in plotDataItems[y.shape[1]:]:
                     plotItem.removeItem(item)
             
-            for k in range(y.shape[1]):
-                y_ = np.atleast_1d(y[:,k].squeeze())
-                y_nan_ndx = np.isnan(y_)
+            for k in range(y.shape[self.signalChannelAxis]):
+                #y_ = np.atleast_1d(y[:,k].squeeze())
+                y_ = np.atleast_1d(y[array_slice(y, {self.signalChannelAxis:k})].squeeze())
                 
-                if x.ndim == 2 and x.shape[1] == y.shape[1]:
+                if x.shape[0] == y_.shape[dataAxis]:
+                    y_ = y_.T
+                
+                if x.ndim == 2 and x.shape[1] == y.shape[self.signalChannelAxis]:
                     x_ = np.atleast_1d(x[:,k].squeeze())
                     
                 else:
                     x_ = np.atleast_1d(x.squeeze())
                     
-                #if np.any(y_nan_ndx):
+                y_nan_ndx = np.isnan(y_)
                 if any(y_nan_ndx): # np.bool_ not iterable in numpy 1.21.2
                     yy = y_[~y_nan_ndx]
                     xx = x_[~y_nan_ndx]
@@ -6077,6 +6227,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         
                     else:
                         kwargs["symbolPen"] = symbolPen # same symbol pen as defined above!
+                        
+                #print("xx.shape", xx.shape, "yy.shape", y.shape)
                     
                 if k < len(plotDataItems):
                     plotDataItems[k].clear()
@@ -6349,7 +6501,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         
             # FIXME this shouldn't really be here? if it's already connected then what?
             if self.signalsLayout.scene() is not None:
-                self.signalsLayout.scene().sigMouseClicked.connect(self.slot_mouseClickSelectPlotItem)
+                self.signalsLayout.scene().sigMouseClicked.connect(self._slot_mouseClickSelectPlotItem)
                 
             if nAxes == 1:
                 p = self.signalsLayout.getItem(0,0)
@@ -6361,13 +6513,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # connect plot items scene hover events to report mouse cursor coordinates
         for p in self.axes:
             if p.scene():
-                p.scene().sigMouseMoved[object].connect(self.slot_mouseMovedInPlotItem)
-                p.scene().sigMouseHover[object].connect(self.slot_mouseHoverInPlotItem)
+                p.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
+                p.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
             
                 
     @pyqtSlot(object)
     @safeWrapper
-    def slot_mouseHoverInPlotItem(self, obj): 
+    def _slot_mouseHoverInPlotItem(self, obj): 
         """ Connected to a PlotItem's scene sigMouseHover signal.
         
         The signal does NOT report mouse position!
@@ -6390,17 +6542,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
     @pyqtSlot(object)
     @safeWrapper
-    def slot_mouseMovedInPlotItem(self, pos): # pos is a QPointF
+    def _slot_mouseMovedInPlotItem(self, pos): # pos is a QPointF
         # connected to a PlotItem's scene!
         # at this stage there should already be a _focussed_plot_item_
         if isinstance(self._focussed_plot_item_, pg.PlotItem):
-            self.reportMouseCoordinatesInAxis(pos, self._focussed_plot_item_)
+            self._reportMouseCoordinatesInAxis_(pos, self._focussed_plot_item_)
                 
         else:
             self._update_coordinates_viewer_()
             
     @safeWrapper
-    def reportMouseCoordinatesInAxis(self, pos, plotitem):
+    def _reportMouseCoordinatesInAxis_(self, pos, plotitem):
         if isinstance(plotitem, pg.PlotItem):
             if plotitem.sceneBoundingRect().contains(pos):
                 plots, rc = zip(*self.plotItemsWithLayoutPositions)
@@ -6436,7 +6588,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
     @pyqtSlot(object)
     @safeWrapper
-    def slot_mouseClickSelectPlotItem(self, evt):
+    def _slot_mouseClickSelectPlotItem(self, evt):
         focusItem = self.sender().focusItem()
         
         if len(self.axes) == 0:

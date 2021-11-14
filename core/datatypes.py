@@ -221,7 +221,7 @@ def array_slice(data:np.ndarray, slicing:(dict, type(None))):
     """Dynamic slicing of nD arrays and introducing new axis in the array.
     """
     if not isinstance(data, np.ndarray):
-        raise TypeError("data expected to be a numpy ndarray or vigra array; got %s instead" % type(data).__name__)
+        raise TypeError("data expected to be a numpy ndarray or a type derived from numpy ndarray; got %s instead" % type(data).__name__)
     
     indexobj = [slice(0,k) for k in data.shape]
     
