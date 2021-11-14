@@ -631,6 +631,9 @@ def safeWrapper(f, *args, **kwargs):
             stars = "".join(["*"]*len(f.__name__))
             print("\n%s\nIn function %s:\n%s" % (stars, f.__name__, stars))
             traceback.print_exc()
+            #print("Call stack:")
+            #traceback.print_stack()
+            #print("%s" % stars)
             
     return wrapper
 
