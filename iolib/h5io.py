@@ -179,6 +179,7 @@ independently from pictio.
 
 import os, sys, tempfile, traceback, warnings
 import types, typing, inspect, functools, itertools
+from functools import singledispatch
 from pprint import (pprint, pformat)
 import collections, collections.abc
 from uuid import uuid4
@@ -539,6 +540,292 @@ def hdf_entry(x:typing.Any, attr_prefix="key"):#, parent:h5py.Group):
         name = x
     
     return type(x), name, attrs
+
+def make_axis_scale(dset:h5py.Dataset, 
+                    axesgroup:h5py.Group,
+                    axis:int, 
+                    domain_name:str,
+                    axis_name:str, 
+                    units: pq.Quantity,
+                    array_annotations:typing.Optional[ArrayDict]=None,
+                    axis_array:typing.Optional[np.ndarray] = None,
+                    **kwargs
+                    ):
+    """
+    
+    Creates dimension scales attached to the dataset dimension indicated by
+    the 'axis' parameter.
+    
+    dset: h5py.Dataset - the target dataset
+    
+    axesgroup: h5py.Group - target group where addtional axis-related datasets
+        will be written, when necessary(*)
+    
+    axis: int: 0 <= axis < len(dset.dims)
+    
+    domain_name:str name of the axis domain, e.g. "Time", "Potential", "Current",
+        etc.
+        
+    axis_name:str axis name - the name of the axis 
+        for 1D signals this is typically the domain name (see 'domain_name') but
+        for 2D signals where both axes are in the same domain (e.g. an image)
+        this further qualifies the axis (e.g., 'width', 'height')
+        
+    units: pq.Quantity - this is EITHER:
+        the units associated with the data in 'dset', when the axis is the
+            'signal axis', OR:
+            
+        the units of the definition domain of the data in 'dset', when the 
+        axis if the domain axis of the data in 'dset'.
+        
+        NOTE: 1D signals are BY CONVENTION stored as column vectors.
+        
+        Representation of time-varying quantity (a 'signal') of N samples:
+        * with data recorded through a single recording channel:
+            - 1D numpy array -> just one axis - axis 0 - the 'domain axis' 
+                shape: (N, ), vector
+                
+            - 2D numpy array with the second axis (axis 1) being a singleton axis
+                shape: (N, 1), 'column vector'
+            
+            In either case, axis 0 is the domain axis with domain_name = "Time"
+            and axis_name "Time"; axis 1 (when it exists) is the channel axis.
+            
+        * with data recorded through more than one channel:
+            2D numpy array with shape (N,M) where M is the number of channels
+                axis 0 - the domain axis (as above)
+                axis 1 - channel axis
+                
+        The domain axis usually associates units of the quantity representing the 
+        domain of the signal: e.g. 's' for time, 'um' for space, etc
+
+        All channels of a signal SHOULD have the same units, since they contain
+        values of the same physical measure (albeit possibly with different 
+        scaling or amplification factors). Furthermore, the sampling period (and 
+        obviously, rate) is identical for all the channels - hence the domain is
+        common.
+        
+        In electrophysiology, fortunately most acquisition systems usually manage
+        the channel calibration such that the data stored in a channel represents 
+        the values of the physical measure recorded by the system, instead of the
+        raw (uncalibrated) amplifier output.
+        
+        In imaging, however, as in the more general case, the concept of 
+        channels may be taken in a looser sense (unfortunately): most image 
+        acquisition system record pixel intensity data in each channel.
+        
+        In multiphoton imaging an "acquisition signal" can represent fluorescent
+        data from an indicator, or data obtained from a transmitted light detector
+        (sometimes dubbed the "DIC" channel in some acquisition software). 
+        
+        Even two fluorescent "channels" acquired from the same source or field 
+        of view can represent two different quantities, depending on what the
+        fluorescent indicator is used for.
+        
+        For this reason, each channel needs to associate its own calibration data
+        to account for the correspondence between the pixel intensity in that 
+        channel and the value of the imaged physical measure.
+        
+        Furthermore, from a numerical point of view, the pixel intensities can 
+        be represented as scalar values (in "gray-scale" images) or as sequences
+        of scalars (RGB, RGBAlpha, Luv, etc) in so-called multi-band images
+        (also loosely called multi-channel images).
+        
+        The distinction between a "pixel channel" and a data channel can be
+        further blurred when gray scale images (each form one "data" channel)
+        are merged into a multi-band image (mostly for display convenience).
+        
+        One thing that all the image channels have in common is the definition
+        domain of the physical measure (time, space, frequency, etc) and hence
+        their sampling period (or "resolution").
+        
+        
+        In a nutshell:
+        
+            domain axis, or axes: common to all signal/image channels
+                one axis for 1D arrays or for 2D arrays where second axis (axis 1)
+                is a singleton axis
+                
+                two axes for numpy arrays with at least two dimensions; these
+                can be any combination of (space, time, frequency, angle) axes 
+                as appropriate (see vigra.AxisType for details).
+                
+            channel axis: (for whatever a "channel" is taken to represent)
+                only exists for numpy arrays with at least two dimensions
+                typically is the highest-order axis (e.g, 2nd axis for a 1D signal
+                3rd axis for an image, 4th axis for a volume, etc).
+                
+            For imaging, vigra library saves the day through the AxisTags concepts
+            (see vigranumpy documentation). Acipyen add to this the concept of
+            CalibrationData: AxisCalibrationData and ChannelCalibrationData, with
+            the latter used to encapsulate calibrate the pixel intensities in a 
+            given image channel.
+            
+            For electrophysiology, the neo package considers all signals as
+            column vectors, with the domain given in the neo object metadata
+            ('times' attribute). Scipyen extents this for signals defined on 
+            domains other than time (see DataSignal, IrregularlySampledDataSignal,
+            DataZone, DataMark).
+        
+        
+            
+                
+            
+            
+            
+            represented by a 1D numpy array, or a 2D numpy array where the 
+            this is represented by a numpy array
+    
+    origin: scalar pq.Quantity; optional, default is None
+        This is the value of the signal's 't_start' property, for regularly
+        sampled signals neo.AnalogSignal, DataSignal, and neo.ImageSequence
+        
+    sampling_rate, sampling_period: scalar pq.Quantity 
+        only one should be given, as appropriate for the signal
+        
+        Some signals offers both. Note that in some cases one of them is a 
+        stored value, and the other is calculated (dynamic property).
+    
+    array_annotations: neo.core.dataobject.ArrayDict or None
+    
+        In most cases this is None. When an ArrayDict, it will be used to 
+        populate the attributes of the data set used as axis dimension scale
+        
+        This is typically useful to provide channel information for axes 
+        in the signal domain.
+        
+        If passed as an ArrayDict, a channel group named "channels" will be
+        created in the specific axesgroup, to store the channel information
+        used to create dimension scales for the axis
+        
+    axis_array: numpy array or None
+    
+    **kwargs: name/value pairs where name: obj attribute name (property) and
+        value is a pq.Quantity
+        
+        The keys are names of properties available for the signal object, e.g.
+        such as 't_start', 'sampling_rate', etc.
+        
+        NOTE: All Quantities must have units compatible with the axis's units
+        
+    """
+    
+    # create an empty data set, store in its 'attrs' property
+    # NOTE: irregular signals and array-like data objects Epoch & Zone also
+    # provide a 'parallel' set of data  - the 'durations' property - we store 
+    # that separately as a dimension scale labeled 'durations' attached to
+    # this data set (see NOTE: 2021-11-12 16:05:29 and NOTE: 2021-11-12 17:35:27
+    # in self.writeDataObject) 
+    
+    if isinstance(axis_array, np.ndarray):
+        axis_dset = axesgroup.create_dataset(axis_name, data = axis_array)
+        
+    else:
+        axis_dset = axesgroup.create_dataset(axis_name, data = h5py.Empty("f"))
+        
+    axis_dset.attrs["name"] = axis_name
+    # these are either signal units, or domain units
+    axis_dset.attrs["units"] = units.dimensionality.string 
+    
+    if isinstance(array_annotations, ArrayDict) and len (array_annotations):
+        # CAUTION Only for signal domain!
+        channels_group = axesgroup.create_group("channels", track_order=True)
+        channels_group.attrs["array_annotations"] = jsonio.dumps(array_annotations, cls=jsonio.CustomEncoder)
+        
+        #for l in range(x.shape[-1]):
+        for l in array_annotations.length:
+            if "channel_ids" in array_annotations:
+                channel_id = array_annotations["channel_ids"][l].item()
+            else:
+                channel_id = f"{l}"
+                
+            if "channel_names" in array_annotations:
+                channel_name = array_annotations["channel_names"][l].item()
+            else:
+                channel_name = f"{l}"
+                
+            channel_dset = channels_group.create_dataset(f"channel_{l}", data=h5py.Empty("f"))
+            channel_dset.attrs["id"] = channel_id
+            channel_dset.attrs["name"] = channel_name
+            
+            for key in array_annotations:
+                if key not in ("channel_ids", "channel_names"):
+                    channel_dset.attrs[key] = array_annotations[key][k].item()
+                    
+            channel_dset.make_scale(f"channel_{l}")
+            dset.dims[axis].attach_scale(channel_dset)
+            
+    for key, val in kwargs.items():
+        if not isinstance(val, (pq.Quantity, np.ndarray)):
+            raise TypeError(f"Expecting a python quantity or a numpy array; got {type(val).__name__} instead")
+        
+        if key == "sampling_rate":
+            if isinstance(val, pq.Quantity) and not units_convertible(val, 1/units):
+                warnings.warn(f"Writing {key} with units {val.units} incompatible with axis units {1/units}")
+        else:
+            if isinstance(val, pq.Quantity) and not units_convertible(val, units):
+                warnings.warn(f"Writing {key} with units {val.units} incompatible with axis units {units}")
+                
+        if key in ("origin", "t_start"):
+            axis_dset.attrs["origin"] = val.magnitude
+        else:
+            axis_dset.attrs[key] = val.magnitude
+            
+    axis_dset.make_scale(axis_name)
+    dset.dims[axis].attach_scale(axis_dset)
+    dset.dims[axis].label = domain_name
+    
+    return axis_dset
+
+@singledispatch
+def get_metadata(obj):
+    raise TypeError(f"Objects of type {type(obj).__name__} are not yet supported")
+
+@get_metadata.register(neo.core.dataobject.DataObject)
+def _(obj):
+    x_type, x_name, x_attrs = hdf_entry(obj, "")
+    
+    x_meta = dict()
+    x_meta.update(x_attrs)
+    
+    x_meta["description"] = make_attr("" if obj.description is None else f"{obj.description}")
+    x_meta["file_origin"] = make_attr(f"{obj.file_origin}")
+
+    # NOTE: 2021-11-12 11:25:23
+    # below we migrate to using our own custom json codec (see jsonio module)
+    # we still keep the pickle fallback until we are satisfied we can do away
+    # with it ...
+    # any future changes must be brought to the custom codec to accomodate
+    # "non-json-able" data
+    annot = None
+    try:
+        annot = json.dumps(obj.annotations, cls=jsonio.CustomEncoder)
+    except:
+        # unencodable in json:
+        try:
+            annot = pickle.dumps(obj.annotations) # pickling is a bit cheating ...
+        except:
+            warnings.warn(f"Cannot encode anotations {obj.annotations}")
+        
+    if annot is not None:
+        x_meta["annotations"] = annot
+        
+    if hasattr(obj, "mark_type"): 
+        # TriggerEvent and DataMark
+        x_meta["EventType"] = make_attr(obj.type.name)
+        
+    if hasattr(obj, "labels"): 
+        # neo.Event, TriggerEvent, DataMark, neo.Epoch, and DataZone
+        x_meta["labels"] = make_attr(obj.labels)
+        
+    data_name = getattr(obj, "name", None)
+    
+    return x_meta, data_name
+    
+    
+    
+    
+
 
 def from_dataset(dset:typing.Union[str, h5py.Dataset],
                  group:typing.Optional[h5py.Group]=None, 
@@ -1952,8 +2239,7 @@ class NeoDataObjectHDFIO(object):
         Creates dimension scales attached to the dataset dimension indicated by
         the 'axis' parameter.
         
-        dset: h5py.Dataset - the target dataset containing with obj data;
-                            this function will populate its attrs property
+        dset: h5py.Dataset - the target dataset
         
         axesgroup: h5py.Group where addtional datasets will be written
             This is supposed to reside alongside dset, in dset's parent group.
