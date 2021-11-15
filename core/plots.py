@@ -36,6 +36,7 @@ from seaborn.external.six import string_types
 
 #### BEGIN pict.core modules
 from . import datatypes as dt
+from imaging import vigrautils as vu
 #### END pict.core modules
 
 # TODO 2019-09-06 13:08:18
@@ -1254,7 +1255,7 @@ def plotVigraKernel1D(val, fig=None, label=None, xlabel=None, ylabel=None,
     if not isinstance(val, vigra.filters.Kernel1D):
         raise TypeError("A vigra Kernel1D was expected; got %s instead" % type(val).__name__)
     
-    [x,y] = dt.vigraKernel1D_to_ndarray(val)
+    [x,y] = vu.vK1D2array(val)
     
     if fig is None:
         fig = plt.figure()
@@ -1272,16 +1273,8 @@ def plotVigraKernel1D(val, fig=None, label=None, xlabel=None, ylabel=None,
     
     if isinstance(plotStyle, str):
         cmd = "ax." + plotStyle + "(x, y, **kwargs)"
-        #if isinstance(label, str):
-            #cmd = "ax." + plotStyle + "(x, y, legend=label, **kwargs)"
-        
-        #else:
-            
+
         ret = eval(cmd)
-        
-        #if isinstance(label, str):
-            #plt.legend([label])
-        
         
     else:
         ret = ax.stem(x,y, **kwargs)
@@ -1294,6 +1287,112 @@ def plotVigraKernel1D(val, fig=None, label=None, xlabel=None, ylabel=None,
     fig.canvas.draw_idle()
     
     return ret
+
+def plotVigraKernel(val, fig=None, label=None, xlabel=None, ylabel=None,
+                      newPlot=False, plotStyle=None, tick_direction="in",
+                      **kwargs):
+    """
+    Important kwargs:
+    ----------------
+    plotStyle: str: 
+        for 1D kernels: any valid 1D plot command (e.g., "stem", which is also the
+                    default for 1D kernels) 
+                    
+        for 2D kernels: "scatter", "image", or "matrix"
+        
+    interpolation None (default), or str as below; only for 2D kernels
+        'none', 'antialiased', 'nearest', 'bilinear', 'bicubic', 'spline16', 
+        'spline36', 'hanning', 'hamming', 'hermite', 'kaiser', 'quadric', 'catrom',
+        'gaussian', 'bessel', 'mitchell', 'sinc', 'lanczos', 'blackman'.
+    """
+    if not isinstance(val, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
+        raise TypeError(f"A vigra Kernel (1D or 2D) was expected; got {type(val).__name__} instead")
+    
+    [x,y] = vu.kernel2array(val)
+    
+    if fig is None:
+        fig = plt.figure()
+        
+    elif isinstance(fig, numbers.Integral):
+        fig = plt.figure(fig)
+        
+    elif isinstance(fig, mpl.figure.Figure):
+        fig = plt.figure(fig.number)
+        
+    if newPlot:
+        plt.clf()
+        
+    ax = plt.gca()
+    
+    kwargs.pop("c", None)
+    kwargs.pop("s", None)
+    
+    if isinstance(plotStyle, str):
+        if isinstance(val, vigra.filters.Kernel2D):
+            if not isinstance(x, list) or len(x) != 2:
+                raise TypeError("Incompatible 'x' parameter for plotting a 2D kernel; expecting a meshgrid ")
+            
+            if plotStyle == "scatter":
+                kwargs.pop("c", None)
+                kwargs.pop("s", None)
+                
+                c = mpl.colors.Normalize(y.min(), y.max())(y).ravel()
+                x_ = x[0].ravel()
+                y_ = x[1].ravel()
+                
+                ret = ax.scatter(x_, y_, c=c, **kwargs)
+                
+            elif plotStyle == "image":
+                #from matplotlib.image import NonUniformImage
+                x_ = x[0][0,:]
+                y_ = x[1][:,0]
+                z = mpl.colors.Normalize(y.min(), y.max())(y)
+                
+                ret = ax.imshow(z, extent =  (x_.min(), x_.max(), y_.min(), y_.max()), **kwargs)
+                
+            elif plotStyle == "matrix":
+                #from matplotlib.image import NonUniformImage
+                x_ = x[0][0,:]
+                y_ = x[1][:,0]
+                z = mpl.colors.Normalize(y.min(), y.max())(y)
+                
+                ret = ax.matshow(z, extent =  (x_.min(), x_.max(), y_.min(), y_.max()), **kwargs)
+                
+            else:
+                raise NotImplementedError(f"{plotStyle} not implemented for 2D kernels")
+                
+        else:
+            cmd = "ax." + plotStyle + "(x, y, **kwargs)"
+
+            ret = eval(cmd)
+        
+    else:
+        if isinstance(val, vigra.filters.Kernel2D):
+            if not isinstance(x, list) or len(x) != 2:
+                raise TypeError("Incompatible 'x' parameter for plotting a 2D kernel; expecting a meshgrid ")
+            
+            kwargs.pop("c", None)
+            kwargs.pop("s", None)
+            
+            c = mpl.colors.Normalize(y.min(), y.max())(y).ravel()
+            x_ = x[0].ravel()
+            y_ = x[1].ravel()
+            
+            ret = ax.scatter(x_, y_, c=c, **kwargs)
+            
+        else:
+            ret = ax.stem(x, y, **kwargs)
+            
+    if isinstance(label, str):
+        ret.set_label(label)
+        plt.legend(loc="best")
+        
+            
+    fig.canvas.draw_idle()
+    
+    return ret
+
+        
         
     
 def barplot_sb(*args, x=None, y=None, hue=None, data=None, order=None, 

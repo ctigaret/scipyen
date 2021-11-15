@@ -153,7 +153,7 @@ from core.scipyen_config import markConfigurable
 from core.traitcontainers import DataBag
 
 
-from imaging.vigrautils import vigraKernel1D_to_ndarray
+from imaging.vigrautils import vK1D2array
 
 from ephys import ephys as ephys
 from ephys.ephys import (cursors2epoch, )
@@ -966,7 +966,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     @_interpret_signal.register(vigra.filters.Kernel1D)
     def _(self, x:vigra.filters.Kernel1D, **kwargs):
-        xx, yy = vigraKernel1D_to_ndarray(x)
+        xx, yy = vK1D2array(x)
         ret = dict( x = xx,
                     y = yy,
                     dataAxis = 0,
@@ -4213,7 +4213,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.signalIndex = 1
                 self.dataAxis = 0
                 self.signalChannelAxis = 1 
-                xx, yy = [vigraKernel1D_to_ndarray(i) for i in y]
+                xx, yy = [vK1D2array(i) for i in y]
                 
                 if x is None:
                     x = xx
@@ -4429,6 +4429,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 warngins.warn("I need something to plot")
                 return False
             
+        # default param values
+        self.separateSignalChannels = False
+        self.signalChannelAxis = 1
+        self.dataAxis = 0 # data as column vectors
+            
         if isinstance(y, neo.baseneo.BaseNeo):
             self.globalAnnotations = {type(y).__name__ : y.annotations}
         
@@ -4589,7 +4594,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self._docTitle_ = self.y.name
         
         elif isinstance(y, vigra.filters.Kernel1D):
-            self.x, self.y = vigraKernel1D_to_ndarray(self.y)
+            self.x, self.y = vK1D2array(y)
             self._plotEpochs_(clear=True)
             
             self.dataAxis = 0 # data as column vectors
@@ -4641,6 +4646,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.signalChannelIndex = range(1)
                 self._number_of_frames_ = 1
                 self.dataAxis = 0
+                self.separateSignalChannels = False
                 
             elif self.y.ndim == 2:
                 if not isinstance(frameAxis, (int, str, vigra.AxisInfo, type(None))):
@@ -4796,7 +4802,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.signalIndex = 1
                 self.dataAxis = 0
                 self.signalChannelAxis = 1 
-                xx, yy = [vigraKernel1D_to_ndarray(i) for i in y]
+                xx, yy = [vK1D2array(i) for i in y]
                 
                 if x is None:
                     x = xx

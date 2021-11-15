@@ -3485,6 +3485,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.console.close()
             self.console = None
             
+        plt.close("all")
+
         self.saveSettings()
         
         #self.app.closeAllWindows()

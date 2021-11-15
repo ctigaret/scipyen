@@ -223,14 +223,15 @@ from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.triggerprotocols import TriggerProtocol
 from core.utilities import unique
 from core.strutils import (str2symbol, str2float, numbers2str, get_int_sfx,)
-import imaging
 from core import modelfitting
+import imaging
 from imaging.axiscalibration import (AxesCalibration, 
                                      AxisCalibrationData, 
                                      ChannelCalibrationData)
 
 from imaging.indicator import IndicatorCalibration # do not confuse with ChannelCalibrationData
 from imaging.scandata import (AnalysisUnit, ScanData, ScanDataOptions,)
+from imaging import vigrautils as vu
 from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse, 
                          HorizontalCursor, Line, Move, Quad, Path, 
                          PlanarGraphics, Rect, Text, VerticalCursor,)
@@ -1409,6 +1410,7 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         
         # NOTE: events and datamarks are ALWAYS 1D (or supposed to be) so we
         # don't iterate through 2nd dimension here (axis 1)
+        
     elif isinstance(x, neo.Epoch, DataZone):
         if len(x.durations):
             data = np.transpose(np.concatenate((np.atleast_1d(x.times.magnitude.flatten()),
@@ -1549,7 +1551,6 @@ def make_dataset(x:typing.Any, group:h5py.Group,
             ds_key.make_scale(key)
             dset.dims[0].attach_scale(ds_key)
             
-            
     elif isinstance(x, pq.Quantity):
         dset = make_dataset(x.magnitude, group, name=name)
         x_attrs.update(make_attr_dict(units = x.dimensionality.string))
@@ -1558,6 +1559,27 @@ def make_dataset(x:typing.Any, group:h5py.Group,
     elif isinstance(x, np.ndarray):
         dset = group.create_dataset(name, data = x)
         dset.attrs.update(x_attrs)
+        
+    elif isinstance(x, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
+        dset = group.create_dataset(name, data = vu.kernel2array(x, True)) # 'True' returns a numpy array
+        dset.attrs.update(x_attrs)
+        
+        # NOTE: 2021-11-15 17:44:13
+        # to reconstitute 1D kernel:
+        # k1d = vigra.filters.Kernel1D()
+        # xy = group[dataset_name] => 2D array
+        # left = int(xy[0,0])
+        # right = int(xy[-1,0])
+        # contents = xy[:,1]
+        # l1d.initExplicitly(left, right, xy[:,1])
+        #
+        # to reconstitute 2D kernel:
+        # k2d = vigra.filters.Kernel2D()
+        # xy = group[dataset_name] => 3D array
+        # upperLeft = (int(xy[-1,-1,0]), int(xy[-1,-1,1]))
+        # lowerRight = (int(xy[0,0,0]), int(xy[0,0,1]))
+        # contents = xy[:,:,2]
+        # k2d.initExplicitly(upperLeft, lowerRight, contents)
         
     else:
         dset = None
