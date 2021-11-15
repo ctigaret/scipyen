@@ -870,7 +870,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         return ret
         
     
-    @_interpret_signal.register
+    @_interpret_signal.register(neo.Block)
     def _(self, x:neo.Block, **kwargs):
         #### BEGIN NOTE: 2019-11-21 23:09:52 
         # TODO/FIXME handle self.plot_start and self.plot_start
@@ -896,7 +896,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         return ret
                 
-    @_interpret_signal.register
+    @_interpret_signal.register(neo.Segment)
     def _(self, x:neo.Segment, **kwargs):
         ret = dict( x = None,
                     y = x,
@@ -918,7 +918,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         return ret
     
-    @_interpret_signal.register
+    @_interpret_signal.register(neo.core.dataobject.DataObject)
     def _(self, x:neo.core.dataobject.DataObject, **kwargs):
         if isinstance(x, neo.ImageSequence):
             raise NotImplementedError("Cannot plot neo.ImageSequence; use ImageViewer instead")
@@ -935,7 +935,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     globalAnnotations = {type(x).__name__ : x.annotations},
                     docTitle = None
                     )
-
+        print("_interpret_signal", type(x))
         if isinstance(x, (neo.core.basesignal.BaseSignal, neo.SpikeTrain, neo.Event, neo.Epoch, DataMark, DataZone)):
             ret["signalChannelAxis"] = 1
             ret["signalChannelIndex"] = normalized_sample_index(x.as_array(), ret["signalChannelAxis"], kwargs.get("signalChannelIndex", None))
@@ -964,7 +964,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         return ret
     
-    @_interpret_signal.register
+    @_interpret_signal.register(vigra.filters.Kernel1D)
     def _(self, x:vigra.filters.Kernel1D, **kwargs):
         xx, yy = vigraKernel1D_to_ndarray(x)
         ret = dict( x = xx,
@@ -986,7 +986,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         return ret
     
-    @_interpret_signal.register
+    @_interpret_signal.register(np.ndarray)
     def _(self, x:np.ndarray, **kwargs):
         if x.ndim > 3:
             raise ValueError('Cannot plot data with more than 3 dimensions')
@@ -1156,7 +1156,21 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     #@_interpret_signal.register
     #def _(self, x:Iterable, **kwargs):
-        # TODO/FIXME create single dispatched method for sequence element
+        ## TODO
+        #separateSignalChannels  = kwargs.pop("separateSignalChannels", False)
+        #signalChannelAxis       = kwargs.pop("signalChannelAxis", 1)
+        #frameIndex              = kwargs.pop("frameIndex", range(len(x)))
+        #signalIndex             = kwargs.pop("signalIndex", 1)
+        #dataAxis                = kwargs.pop("dataAxis", 0)
+        
+        #dcts = [self._interpret_signal(x_) for x_ in x]
+        
+        #xx = [dct["x"] for dct in dcts]
+        #yy = [dct["y"] for dct in dcts]
+        
+        #dataAxis                = 0
+        #_number_of_frames_      = len(frameIndex)
+        
         #pass
         
     def _clear_lris_(self):
@@ -4147,7 +4161,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 ax_dict["item"].setStyle(tickFont=value)
                 
     @safeWrapper
-    def _parse_data_(self, 
+    def _parse_data_new_(self, 
                      x, 
                      y,
                      frameIndex,
@@ -4346,6 +4360,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 raise TypeError("Can only plot a list of 1D vigra filter kernels, 1D/2D numpy arrays, or neo-like signals")
             
         else:
+            print("_parse_data_", type(y))
             dct = self._interpret_signal(y, x_data=x, 
                                          frameAxis=frameAxis,
                                          frameIndex=frameIndex,
@@ -4364,9 +4379,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     setattr(self, k, v)
             #raise TypeError("Plotting is not implemented for %s data types" % type(self.y).__name__)
-
             
         return True
+
     @safeWrapper
     def _parse_data_old_(self, 
                      x, 
@@ -4932,6 +4947,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
             
         return True
+    
+    _parse_data_ = _parse_data_old_
     
     @safeWrapper
     def _set_data_(self,
