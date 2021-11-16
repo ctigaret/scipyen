@@ -1,16 +1,13 @@
 """Collection of functions to read/write objects to HDF5 files.
 
-To avoid circular module dependencies, this module should be imported
-independently from pictio.
-
 STORING SIGNALS AND IMAGES IN HDF5 OBJECT HIERARCHY:
 ====================================================
 
 NOTE: HDF5 object hierarchy consists of:
-h5py.Group (these INCLUDE h5py.File which is behavies like a h5py.Group with IO 
-    functionality)
+h5py.Group (this type is an ancestor of h5py.File which behavies like a 
+h5py.Group with IO functionality)
     
-A Groups is a container of:
+A Group is a container of:
     
 h5py.Dataset - similar to a numpy array including having the 'ndim' and 'shape'
     properties.
@@ -30,7 +27,7 @@ Dimension scales:
     
 Both Group and Dataset objects associate attributes ('attr' property) which is a
 dict-like object (a 'mapping') with str keys mapped to any type of basic Python
-data type (numeric scalars and strings) but not Python containers!
+data type (numeric scalars and strings, but not Python containers)!
 
 
 NOTE: 1D signals are BY CONVENTION represented as column vectors.
@@ -647,6 +644,7 @@ import types, typing, inspect, functools, itertools
 from functools import singledispatch
 from pprint import (pprint, pformat)
 import collections, collections.abc
+from collections import (deque, namedtuple)
 from uuid import uuid4
 import json, pickle
 import h5py
@@ -857,6 +855,9 @@ def make_attr(x:typing.Union[str, list, tuple, dict, deque, np.ndarray]):
         #print("dtype", x.dtype, "kind", x.dtype.kind)
         if x.dtype.kind in NUMPY_STRING_KINDS:
             return np.asarray(x, dtype=h5py.string_dtype(), order="K")
+        
+        else:
+            return jsonio.dumps(x)
     
     return x
 
@@ -893,7 +894,7 @@ def from_attr_dict(attrs):
         # FIXME / TODO
         if hasattr(v, "dtype"):
             if v.dtype == h5py.string_dtype():
-                v = np.array(v, dtype=np.dtype("U"))
+                v = np.array(v, dtype=np.dtype("U"))[()]
                 
             elif v.dtype.kind == "O":
                 if type(v[()]) == bytes:
@@ -904,6 +905,13 @@ def from_attr_dict(attrs):
                     
             else:
                 v = v[()]
+                
+            if isinstance(v, str) and v.startswith("{") and v.endswith("}"):
+                v = jsonio.loads(v)
+                
+        elif isinstance(v, str):
+            if v.startswith("{") and v.endswith("}"):
+                v = jsonio.loads(v)
                 
         ret[k] = v
         
@@ -1045,20 +1053,69 @@ def hdf_entry(x:typing.Any, attr_prefix="key"):#, parent:h5py.Group):
     
     return type(x), name, attrs
 
+@singledispatch
+def make_axis_dict(obj, axisindex:int):
+    raise TypeError(f"Objects of type {type(obj).__name__} are not yet supported")
+
+@make_axis_dict.register(vigra.VigraArray)
+def _(obj, axisindex:typing.Union[int, str]):
+    from imaging import axisutils, axiscalibration
+    from imaging.axiscalibration import (AxisCalibrationData, ChannelCalibrationData, AxesCalibration)
+    if isinstance(axisindex, int):
+        if axisindex < 0 or axisindex >= obj.ndim:
+            raise ValueError(f"Invalid axisindex {axisindex}")
+        
+    elif isinstance(axisindex, str):
+        if axisindex not in obj.axistags:
+            raise ValueError(f"Invalid axisindex {axisindex}")
+        
+    else:
+        raise TypeError(f"Invalid axisindex type; expecting a str or int, got {tytpe(axisindex).__name__} instead.")
+    
+    
+    axisinfo = obj.axistags[axisindex]
+    
+    axiscal = AxisCalibrationData(axisinfo)
+    
+    return make_attr_dict(description = axisinfo.description, **axiscal._data_)
+    
+@make_axis_dict.register(vigra.AxisTags)
+def _(obj, axisindex:typing.Union[int, str]):
+    from imaging import axisutils, axiscalibration
+    from imaging.axiscalibration import (AxisCalibrationData, ChannelCalibrationData, AxesCalibration)
+    if isinstance(axisindex, int):
+        if axisindex < 0 or axisindex >= len(obj):
+            raise ValueError(f"Invalid axisindex {axisindex}")
+        
+    elif isinstance(axisindex, str):
+        if axisindex not in obj:
+            raise ValueError(f"Invalid axisindex {axisindex}")
+        
+    else:
+        raise TypeError(f"Invalid axisindex type; expecting a str or int, got {tytpe(axisindex).__name__} instead.")
+    
+    
+    axisinfo = obj[axisindex]
+    
+    axiscal = AxisCalibrationData(axisinfo)
+    
+    return make_attr_dict(description = axisinfo.description, **axiscal._data_)
+    
+
 def make_axis_scale(dset:h5py.Dataset, 
                     axesgroup:h5py.Group,
-                    axis:int, 
-                    domain_name:str,
+                    dimindex:int, 
+                    axdict: dict,
                     axis_name:str, 
+                    domain_name:str,
                     units: pq.Quantity,
                     array_annotations:typing.Optional[ArrayDict]=None,
                     axis_array:typing.Optional[np.ndarray] = None,
                     **kwargs
                     ):
     """
-    
-    Creates dimension scales attached to the dataset dimension indicated by
-    the 'axis' parameter.
+    Creates an axis dataset used to generate dimension scales for the dimension
+    speficied in dimindex
     
     Parameters:
     -----------
@@ -1066,9 +1123,23 @@ def make_axis_scale(dset:h5py.Dataset,
     dset: h5py.Dataset - the target dataset
     
     axesgroup: h5py.Group - target group where addtional axis-related datasets
-        will be written, when necessary(*)
+        will be written, when necessary
     
-    axis: int: 0 <= axis < len(dset.dims)
+    dimindex: int; index of the dset's dimension scale: 
+        0 <= dimindex < len(dset.dims)
+        
+    axisdict: a dictionary with key:str mapped to values: objects usable as
+        attributes for the axis data set (see make_attr_dict and make_attr)
+        
+        The keys depend on the type of the Python object written to the target
+        data set and are detailed in the documentation of this module.
+        
+        However, the following keys/value type pairings are mandatory:
+        'axis_name': str
+        'axis_title': str
+        'units': str string representation of axis units
+        
+        See also make_axis_dict
     
     domain_name:str name of the axis domain, e.g. "Time", "Potential", "Current",
         etc.
@@ -1128,7 +1199,7 @@ def make_axis_scale(dset:h5py.Dataset,
     # in self.writeDataObject) 
     
     if isinstance(axis_array, np.ndarray):
-        axis_dset = axesgroup.create_dataset(axis_name, data = axis_array)
+        axis_dset = axesgroup.create_dataset(f"{axis_name}_values", data = axis_array)
         
     else:
         axis_dset = axesgroup.create_dataset(axis_name, data = h5py.Empty("f"))
@@ -1142,7 +1213,6 @@ def make_axis_scale(dset:h5py.Dataset,
         channels_group = axesgroup.create_group("channels", track_order=True)
         channels_group.attrs["array_annotations"] = jsonio.dumps(array_annotations, cls=jsonio.CustomEncoder)
         
-        #for l in range(x.shape[-1]):
         for l in array_annotations.length:
             if "channel_ids" in array_annotations:
                 channel_id = array_annotations["channel_ids"][l].item()

@@ -2,22 +2,23 @@
 """
 
 import json, sys, traceback, typing
+from collections import deque, namedtuple
 import numpy as np
 import quantities as pq
 import vigra
 from core import quantities as cq
-from imaging import vigrautils as vu
 
 class CustomEncoder(json.JSONEncoder):
     """Almost complete round trip for a subset of Python types - read side.
     
-    Implemented types:
+    Supported types:
     type
     complex
     UnitQuantity
     Quantity
     numpy chararray, structured array, recarray and ndarray (with caveats, 
     see below)
+    vigra.filters Kernel1D, and Kernel2D
     
     Pass this :class: as the 'cls' parameter to json.dump & json.dumps
     (this is what dump and dumps functions in this module do)
@@ -161,6 +162,11 @@ class CustomEncoder(json.JSONEncoder):
     # dt = np.dtype('U25')  # 25-character string
 
     def default(self, obj):
+        from imaging import vigrautils as vu
+        
+        if any(hasattr(obj,name) for name in ("toJSON", "to_json", "write_json", "writeJSON")):
+            raise TypeError(f"The {type(obj).__name__} object appears capable to write itself to JSON and is not supported here")
+        
         if isinstance(obj, complex):
             return {"__complex__", [obj.real, obj.imag]}
         
@@ -169,12 +175,18 @@ class CustomEncoder(json.JSONEncoder):
         
         if isinstance(obj, vigra.filters.Kernel1D):
             xy = vu.kernel2array(obj, True)
-            return ("__kernel1D__": {"value":xy.toList()})
+            return {"__kernel1D__": {"value":xy.toList()}}
         
         if isinstance(obj, vigra.filters.Kernel2D):
             xy = vu.kernel2array(obj, True)
-            return ("__kernel2D__": {"value":xy.toList()})
-            
+            return {"__kernel2D__": {"value":xy.toList()}}
+        
+        #if isinstance(obj, vigra.AxisInfo):
+            #return {"__axisinfo__": {"key": obj.key,
+                                     #"typeFlags": obj.typeFlags,
+                                     #"resolution": obj.resolution,
+                                     #"description": obj.description}}
+        
         
         #if isinstance(obj, pq.Quantity):
             #if isinstance(obj, pq.UnitQuantity):
@@ -220,7 +232,7 @@ class CustomEncoder(json.JSONEncoder):
                             #"dtype": dtype2json(obj.dtype)}}
             
             if isinstance(obj, pq.Quantity):
-                if isinstance(obj.UnitQuantity):
+                if isinstance(obj, pq.UnitQuantity):
                     return {entry: obj.dimensionality.string}
                 else:
                     return {entry: {"value": obj.magnitude.tolist(), 
@@ -396,7 +408,7 @@ def decode_hook(dct):
                 return eval(typename, module.__dict__)
             else:
                 return eval(typename) # fingers crossed...
-                
+            
         else:
             return dct
     else:

@@ -1034,7 +1034,7 @@ class AxisCalibrationData(CalibrationData):
     
     To be mapped to a vigra.AxisInfo key str in AxesCalibration, or to
     a key str with format "channel_X", in a parent AxisCalibrationData object
-    for an axis of type Channels
+    for an axis of type Channels.
     
     The axis calibration is uniquely determined by the axis type (vigra.AxisType
     flags), axis name, units (Python Quantity object), origin and resolution 
@@ -1042,6 +1042,10 @@ class AxisCalibrationData(CalibrationData):
     
     In addition an axis of type Channels will also associate an AxisCalibrationData
     object for each of its channels.
+    
+    NOTE: an AxisCalibrationData can be constructed by passing a vigra.AxisInfo
+    object as sole parameter. However, the AxisInfo object will NOT be stored in 
+    the newly create AxisCalibrationData object.
     
     """
     parameters = CalibrationData.parameters + ("type", "name", "key")
