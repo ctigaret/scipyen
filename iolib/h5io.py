@@ -2268,7 +2268,7 @@ def make_dataset(x:typing.Any, group:h5py.Group,
         # left = int(xy[0,0])
         # right = int(xy[-1,0])
         # contents = xy[:,1]
-        # l1d.initExplicitly(left, right, xy[:,1])
+        # k1d.initExplicitly(left, right, xy[:,1])
         #
         # to reconstitute 2D kernel:
         # k2d = vigra.filters.Kernel2D()

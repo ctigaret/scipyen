@@ -6,6 +6,7 @@ import numpy as np
 import quantities as pq
 import vigra
 from core import quantities as cq
+from imaging import vigrautils as vu
 
 class CustomEncoder(json.JSONEncoder):
     """Almost complete round trip for a subset of Python types - read side.
@@ -165,6 +166,15 @@ class CustomEncoder(json.JSONEncoder):
         
         if isinstance(obj, type):
             return {"__type__": f"{obj.__module__}.{obj.__name__}"}
+        
+        if isinstance(obj, vigra.filters.Kernel1D):
+            xy = vu.kernel2array(obj, True)
+            return ("__kernel1D__": {"value":xy.toList()})
+        
+        if isinstance(obj, vigra.filters.Kernel2D):
+            xy = vu.kernel2array(obj, True)
+            return ("__kernel2D__": {"value":xy.toList()})
+            
         
         #if isinstance(obj, pq.Quantity):
             #if isinstance(obj, pq.UnitQuantity):
@@ -352,6 +362,26 @@ def decode_hook(dct):
                 return vigra.VigraArray(ret, axistags=vigra.AxisTags.fromJSON(val["axistags"]), 
                                        order=val.get("order", None))
                 
+            return ret
+        
+        elif "__kernel1D__" in dct:
+            val = dct["__kernel1D__"]
+            xy = np.array(val["value"])
+            left = int(xy[0,0])
+            right = int(xy[-1,0])
+            values = xy[:,1]
+            ret = vigra.filters.Kernel1D()
+            ret.initExplicitly(left, right, values)
+            return ret
+        
+        elif "__kernel2D__" in dct:
+            val = dct["__kernel2D__"]
+            xy = np.array(val["value"])
+            upperLeft = (int(xy[-1,-1,0]), int(xy[-1,-1,1]))
+            lowerRight = (int(xy[0,0,0]), int(xy[0,0,1]))
+            values = xy[:,:,]
+            ret = vigra.filters.Kernel2D()
+            ret.initExplicitly(upperLeft, lowerRight, values)
             return ret
         
         elif "__type__" in dct:
