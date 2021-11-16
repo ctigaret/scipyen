@@ -454,7 +454,9 @@ Mappings (dict and all dict-like flavours except for DataBag):
         the nested subgroup contains a dataset or a subgroup according to the
         type of object mapped to the key (the 'value')
         
-Specific Scipyen types define their own toHDF5 and fromHDF5 methods:
+Specific Scipyen types (should) define their own toHDF5 and fromHDF5 methods 
+using function calls in this module.
+
 TriggerProtocol
 ModelExpression
 FitModel
@@ -462,54 +464,54 @@ ScanData
         
 
 ================================================================================
-
-
-    
-    NOTE: 2021-10-12 09:29:38
-
-    ==============
-    Design notes:
-    ==============
-
-    An object is the HDF5 File root (/)
-    
-    Instance attributes & properties (but NEITHER methods, NOR :class: attributes)
-    correspond to the following HDF5 structures:
-    
-    Python types:               HDF5 Structure:          Attribute:
-    ============================================================================
-    bool and numeric scalars    dataset                 "type": type's name
-    sequences (list, tuple)     
-    str                         
-    
-    
-    Possible strategies: 
-    A) embed a VigraArray as HDF5 in a nix.File accessed via
-    neo.NixIO:
-    
-    1) create a neo.NixIO file -> a physical file in the file system
-    2) access the nix_file inside the neo_nixio file object
-    3) access the _h5file of the nix_file
-    4) create a group inside the _h5file using h5py API:
-    
-    4.1) this is a HDF5 Group, NOT a nix H5Group!
-    
-    4.2) we can create it using the strategy in nix i.e., via low-level h5py api
-        e.g. h5g.create() a groupid, to enable group creation with order tracked
-        and order indexed flags - see h5p api - followed by instatiation of the
-        h5py.Group(groupid)
-        
-    5) use the newly-created group as a fileNameOrGroup parameter to vigra.writeHDF5()
-    
-    CAUTION: a nix.File cannot be used as context manager (i.e. one cannot
-    use the idiom with nix.File(...) as nixfile: ...)
-    But the neo.NixIO can be used as context manager:
-    with neo.NixIO(...) as neo_nixio_file: ...
-        (the underlying HDF5 file object is open in the neo.NixIO c'tor)
-    
-    see history_snipper_scandata_vigra_export_hdf5.py
     
 """
+
+
+    
+    #NOTE: 2021-10-12 09:29:38
+
+    #==============
+    #Design notes:
+    #==============
+
+    #An object is the HDF5 File root (/)
+    
+    #Instance attributes & properties (but NEITHER methods, NOR :class: attributes)
+    #correspond to the following HDF5 structures:
+    
+    #Python types:               HDF5 Structure:          Attribute:
+    #============================================================================
+    #bool and numeric scalars    dataset                 "type": type's name
+    #sequences (list, tuple)     
+    #str                         
+    
+    
+    #Possible strategies: 
+    #A) embed a VigraArray as HDF5 in a nix.File accessed via
+    #neo.NixIO:
+    
+    #1) create a neo.NixIO file -> a physical file in the file system
+    #2) access the nix_file inside the neo_nixio file object
+    #3) access the _h5file of the nix_file
+    #4) create a group inside the _h5file using h5py API:
+    
+    #4.1) this is a HDF5 Group, NOT a nix H5Group!
+    
+    #4.2) we can create it using the strategy in nix i.e., via low-level h5py api
+        #e.g. h5g.create() a groupid, to enable group creation with order tracked
+        #and order indexed flags - see h5p api - followed by instatiation of the
+        #h5py.Group(groupid)
+        
+    #5) use the newly-created group as a fileNameOrGroup parameter to vigra.writeHDF5()
+    
+    #CAUTION: a nix.File cannot be used as context manager (i.e. one cannot
+    #use the idiom with nix.File(...) as nixfile: ...)
+    #But the neo.NixIO can be used as context manager:
+    #with neo.NixIO(...) as neo_nixio_file: ...
+        #(the underlying HDF5 file object is open in the neo.NixIO c'tor)
+    
+    #see history_snipper_scandata_vigra_export_hdf5.py
 
 # NOTE: 2021-10-15 10:43:03
 # 
@@ -656,7 +658,7 @@ import quantities as pq
 import neo
 from neo.core.dataobject import ArrayDict
 
-from . import jsonio
+from . import jsonio # brings the CustomEncoder type and the decode_hook function
 import core
 from core.prog import safeWrapper
 from core import prog
@@ -813,21 +815,83 @@ def string2hdf(s):
     
     return np.array(s, dtype=h5py.string_dtype())
 
+def make_attr(x:typing.Union[str, list, tuple, dict, deque, np.ndarray]):
+    """Returns a representation of 'x' as atttribute of a Group or Dataset
+    
+    Parameters:
+    -----------
+    'x': basic Python type (str or scalar number), or numpy array
+    
+    Returns:
+    --------
+    A string when 'x' is a str, or is a container with elements that can be
+        written to a JSON-formatted string.
+        
+        As a rule of thumb, these objects should be relatively small, and the 
+        container should be relatively simple.
+    
+    A numpy array with dtype j5py.string_dtype() when 'x' is a numpy array with
+    dtype.kind of 'S' or 'U' (i.e., strings)
+    
+    'x' itself in any other case.
+    
+    CAUTION h5py will raise exception when 'x' is of a type that h5py cannot 
+    store as attrs value to a Group or Dataset.
+    
+    """
+    if isinstance(x, str):
+        return string2hdf(x)
+    
+    if isinstance(x, (list, tuple, dict)): 
+        # will raise exception if elements or values are not json-able
+        # CAUTION Do not use large data objects here!
+        # We use the CustomEncoder which has wider coverage and its own 
+        # limitations/caveats
+        # 
+        try:
+            return jsonio.dumps(x)
+        except:
+            raise HDFDataError(f"The object {x}\n with type {type(x).__name__} cannot be serialized in json")
+    
+    if isinstance(x, np.ndarray):
+        #print("dtype", x.dtype, "kind", x.dtype.kind)
+        if x.dtype.kind in NUMPY_STRING_KINDS:
+            return np.asarray(x, dtype=h5py.string_dtype(), order="K")
+    
+    return x
+
 def make_attr_dict(**kwargs):
+    """Generates a dict with contents to be stored in a Group or Dataset 'attrs'.
+    
+    The returned dict object maps keys (str) to values that can be stored as
+    attrs values into a h5py Group or Dataset.
+    
+    To store the dict, simply call:
+    
+        `obj.attrs.update(x)`
+        
+        , where:
+    
+            'obj' is a h5py Group or Dataset
+            'x' is the dict object returned by this function.
+    
+    """
     ret = dict()
     
     for k,v in kwargs.items():
         ret[k] = make_attr(v)
+        
     return ret
 
 def from_attr_dict(attrs):
+    """Generates a dict object from a h5py Group or Dataset 'attrs' property.
+    Not exactly a complete roundtrip...
+    """
     ret = dict()
     for k,v in attrs.items():
         # NOTE: 2021-11-10 12:47:52
         # FIXME / TODO
         if hasattr(v, "dtype"):
-            #print("v:", v)
-            #print("v[()]", v[()])
             if v.dtype == h5py.string_dtype():
                 v = np.array(v, dtype=np.dtype("U"))
                 
@@ -845,29 +909,6 @@ def from_attr_dict(attrs):
         
     return ret
                 
-def make_attr(x):
-    if isinstance(x, str):
-        return string2hdf(x)
-    
-    if isinstance(x, (list, tuple, dict)): 
-        # will raise exception if elements or values are not json-able
-        try:
-            return json.dumps(x)
-        except:
-            raise HDFDataError(f"The object {x}\n with type {type(x).__name__} cannot be serialized in json")
-    
-    if isinstance(x, np.ndarray):
-        #print("dtype", x.dtype, "kind", x.dtype.kind)
-        if x.dtype.kind in NUMPY_STRING_KINDS:
-            return np.asarray(x, dtype=h5py.string_dtype(), order="K")
-    
-    return x
-
-#def read_attr_dict(attrs):
-    #ret = dict()
-    #for k, v in attrs.items:
-        #if 
-        
 def generic_data_type_attrs(data:typing.Any, prefix:str="") -> dict:
     if not isinstance(data, type):
         data_type = type(data)
