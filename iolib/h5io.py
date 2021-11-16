@@ -1,7 +1,470 @@
-"""Collection of functions to read/write to HDF5 files
+"""Collection of functions to read/write objects to HDF5 files.
+
 To avoid circular module dependencies, this module should be imported
 independently from pictio.
 
+STORING SIGNALS AND IMAGES IN HDF5 OBJECT HIERARCHY:
+====================================================
+
+NOTE: HDF5 object hierarchy consists of:
+h5py.Group (these INCLUDE h5py.File which is behavies like a h5py.Group with IO 
+    functionality)
+    
+A Groups is a container of:
+    
+h5py.Dataset - similar to a numpy array including having the 'ndim' and 'shape'
+    properties.
+
+Dimension scales:
+    A data set can associate a dimension scale with each axis (or dimension);
+    while these are opaque objects whuch are not supposed to be directly 
+    constructed by the user, they are managed by the Dataset accessed via its
+    'dims' property:
+    
+    dataset.dims[0] ... dataset.dims[k] for 0 <= k < len(dataset.dims))
+    
+    A dimension scale can be constructed from another data set (as a reference)
+    stored along the main data set preferably in the same group, but certainly in
+    the same file (although HDF5 allows external references, I will keep the code
+    simpler and avoid this strategy).
+    
+Both Group and Dataset objects associate attributes ('attr' property) which is a
+dict-like object (a 'mapping') with str keys mapped to any type of basic Python
+data type (numeric scalars and strings) but not Python containers!
+
+
+NOTE: 1D signals are BY CONVENTION represented as column vectors.
+    
+    Representation of time-varying quantity (a 'signal') of N samples:
+    * with data recorded through a single recording channel:
+        - 1D numpy array -> just one axis - axis 0 - the 'domain axis' 
+            shape: (N, ), vector
+            
+        - 2D numpy array with the second axis (axis 1) being a singleton axis
+            shape: (N, 1), 'column vector'
+        
+        In either case, axis 0 is the domain axis with domain_name = "Time"
+        and axis_name "Time"; axis 1 (when it exists) is the channel axis.
+        
+    * with data recorded through more than one channel:
+        2D numpy array with shape (N,M) where M is the number of channels
+            axis 0 - the domain axis (as above)
+            axis 1 - channel axis
+            
+    The domain axis usually associates units of the quantity representing the 
+    domain of the signal: e.g. 's' for time, 'um' for space, etc.
+
+    All channels of a signal SHOULD have the same units, since they contain
+    values of the same physical measure (albeit possibly with different 
+    scaling or amplification factors). Furthermore, the sampling period (and 
+    obviously, rate) is identical for all the channels - hence the domain is
+    common.
+    
+    In electrophysiology, fortunately most acquisition systems usually manage
+    the channel calibration such that the data stored in a channel represents 
+    the values of the physical measure recorded by the system, instead of the
+    raw (uncalibrated) amplifier output.
+    
+    In imaging, however, as in the more general case, the concept of 
+    channels may be taken in a looser sense (unfortunately): most image 
+    acquisition system record pixel intensity data in each channel.
+    
+    In multiphoton imaging an "acquisition signal" can represent fluorescent
+    data from an indicator, or data obtained from a transmitted light detector
+    (sometimes dubbed the "DIC" channel in some acquisition software). 
+    
+    Even two fluorescent "channels" acquired from the same source or field 
+    of view can represent two different quantities, depending on what the
+    fluorescent indicator is used for.
+    
+    For this reason, each channel needs to associate its own calibration data
+    to account for the correspondence between the pixel intensity in that 
+    channel and the value of the imaged physical measure.
+    
+    Furthermore, from a numerical point of view, the pixel intensities can 
+    be represented as scalar values (in "gray-scale" images) or as sequences
+    of scalars (RGB, RGBAlpha, Luv, etc) in so-called multi-band images
+    (also loosely called multi-channel images).
+    
+    The distinction between a "pixel channel" and a data channel can be
+    further blurred when gray scale images (each form one "data" channel)
+    are merged into a multi-band image (mostly for display convenience).
+    
+    One thing that all the image channels have in common is the definition
+    domain of the physical measure (time, space, frequency, etc) and hence
+    their sampling period (or "resolution").
+    
+    
+    In a nutshell:
+    
+        domain axis, or axes: common to all signal/image channels
+            one axis for 1D arrays or for 2D arrays where second axis (axis 1)
+            is a singleton axis
+            
+            two axes for numpy arrays with at least two dimensions; these
+            can be any combination of (space, time, frequency, angle) axes 
+            as appropriate (see vigra.AxisType for details).
+            
+        channel axis: (for whatever a "channel" is taken to represent)
+            only exists for numpy arrays with at least two dimensions
+            typically is the highest-order axis (e.g, 2nd axis for a 1D signal
+            3rd axis for an image, 4th axis for a volume, etc).
+            
+        For imaging, vigra library saves the day through the AxisTags concepts
+        (see vigranumpy documentation). Acipyen add to this the concept of
+        CalibrationData: AxisCalibrationData and ChannelCalibrationData, with
+        the latter used to encapsulate calibrate the pixel intensities in a 
+        given image channel.
+        
+        For electrophysiology, the neo package considers all signals as
+        column vectors, with the domain given in the neo object metadata
+        ('times' attribute). Scipyen extents this for signals defined on 
+        domains other than time (see DataSignal, IrregularlySampledDataSignal,
+        DataZone, DataMark).
+        
+    Representation of signals and images as h5py Dataset objects ('signal datasets'):
+    
+    * Each dimension of the data set associates a dimension scale. The dimension
+    scales are made from h5py Dataset objects stored in a h5py.Group usually 
+    located in the same group as the dataset's parent, and named after the 
+    signal's dataset name suffixed with "_axes".
+    
+    The <dataset_name>_axes group contains the data sets that store axis 
+    information ('axis data sets'). With few exceptions, the axis information 
+    itself is stored as attributes of the axis data set (key/value pairs in the
+    axis data set 'attrs' property)
+    
+    The exceptions are for the domain axis of irregularly sampled signals, 
+    neo.Epoch and DataZone objects which associate additional array-like domain 
+    information:
+    * the actual "times" values for irregular signals
+    * the "durations" values for Epoch and DataZone objects
+    
+    Dimension scales are constructed from these 'axis data sets' using the 
+    'Dataset.make_scale()' method, then attached to the corresponding dimension of
+    the 'signal data set' using the Dimension scale's 'attach_scale()' method.
+    
+    The various combinations are described in the table below
+    
+Object      Signal  Data            Dimension   Comment Axis data   Axis data set
+type        data    set             cale               data        attrs keys:
+type        set     attrs                              set
+================================================================================  
+BaseSignal(1)
+
+* regularly sampled signals(2):
+
+            2D      metadata        dims[0]     domain  empty set   'units': str(4)          
+                    including       'label'             (3)         't_start' OR 'origin':  float scalar       
+                    annotations      =                               
+                                    signal.name                                              
+                                                                    'sampling_rate' OR        
+                                                                    'sampling_period': float scalar                  
+                                                                    
+                                                                    'sampling_rate_units': str
+                                                                    'sampling_period_units': str
+                                                            
+                                                                    'name': str = the domain name(5)
+                                                
+                                    dims[1]     signal  empty set   'units' : str(3)       
+                                                                    'name':str = signal name    
+                                                                    
+                                                                    << optional keys >>    
+                                                                    
+                                                                    'origin': float scalar                  
+                                                                    'resolution': float scalar    
+                                                                    'ADClevels': float scalar    
+                                                                    
+                                                channel empty set   'units':str    
+                                                (6)                 'name': str = signal.name_channel_k for kth channel 
+                                                                    
+                                                                    << optional keys >>    
+                                                                    
+                                                                    'origin': float scalar                  
+                                                                    'resolution': float scalar        
+                                                                    'ADClevels': float scalar  
+                                                                    'index': int = k
+                                                                    
+                                                                    other keys from  'array_annotations'    
+                                    
+                                    
+* irregularly sampled signals (7):
+
+            2D      metadata,       dims[0]     domain  'times'    'units' : str(4)      
+                    annotations     'label'             values     't_start' OR 'origin':float scalar     
+                                     =                          
+                                    signal.name                                          
+                                                            
+                                                                    'name':str = the domain name(5)
+                                                
+                                    dims[1]     signal  empty set   'units' : str(3)   
+                                                                    'name':str = signal name
+                                                                    
+                                                                    << optional keys >>
+                                                                    
+                                                                    'origin': float scalar              
+                                                                    'resolution': float scalar
+                                                                    'ADClevels': float scalar
+                                                                    
+                                                channel empty set   'units':str
+                                                (6)                 'name': str = signal.name_channel_k for kth channel
+                                                                
+                                                                    << optional keys >>
+                                                                    
+                                                                    'origin': float scalar              
+                                                                    'resolution': float scalar    
+                                                                    'ADClevels': float scalar
+                                                                    
+                                                                    other keys from 'array_annotations'
+                                        
+                                    
+* neo.ImageSequence:   by definition these are gray-scale (single-channel or
+                        single-band images) ; their units and signal name go 
+                        as attributes of the signal data set, in the metadata
+
+            3D      metadata,       dims[0]  frame axis             'sampling_rate': float scalar
+                    anotations                                      'sampling_rate_units' : str
+                    
+                                    dims[1]  height axis            'spatial_scale: float_scalar
+                                                                    'spatial_scale_units': str
+                                                                    
+                                    dims[2]  width axis             'spatial_scale'
+                                                                    'spatial_scale_units': str
+
+
+DataObject other than BaseSignal (8)
+        For these, the signal data set already contains their "times" values.
+        moreover, these are by defintion single-channel.
+
+neo.Event, DataMark (including TriggerEvent)
+
+            1D      metadata        dims[0]     domain  'labels'    'name':str = the domain name           
+                    annotations    'label'               values     
+                                    set to                                      
+                                    signal.name                                          
+                                                
+neo.Epoch, DataZone - the data set contains the 'times' or 'places' in column 0 
+                        and 'durations' or 'extents', respectively, in column 1
+
+            2D      metadata        dims[0]     domain  empty set   'name':str = the domain name           
+                    annotations     'label'                           
+                                    set to                                      
+                                    signal.name                                          
+                                                                                
+                                    dims[1]             'labels' 
+                                    'label'             (numpy dtype(U))
+                                    set to 'labels'
+                                    
+neo.SpikeTrain - the data set can be multi-channel (each channel from a different 
+                cell) with the 'times' for each channel in a column
+                
+    SpikeTrain objects also have a 'waveforms' propery which when not empty it is 
+    a pq.Quantity array (all waveforms are assumed to represent the same physical
+    measure, typically electrical potential, the "data" associated with each spike
+    "time stamp"). 
+    
+    This is stored as a h5py Dataset in the axes group is also added as dimension
+    scale to the dims[1] of the signal data set of the spike train.
+    
+    The waveforms data set has its own dimension scales (see below).
+                
+            2D      metadata        dims[0]     domain  empty set   'name': str = "Time"
+                    annotations
+                                    dims[1]     channel empty set   'name': str = channel_k
+                                               
+                                                waveforms (see below)
+                                               
+                                               
+neo.SpikeTrain.waveforms: neo API specifies a 3D pq.Quantity array:
+
+            3D     'name':str       dims[0]     spike    empty set   'name': str = 'spike #'
+    [spike_number, 'waveforms'                                       'units': str = 'dimensionless'
+     channel,      'units':str =  
+     time]         waveform.units                               
+                                    dims[1]     channel  empty set    'name': str = 'channel_k'
+                      
+                                    dims[2]     domain   empty set    'name': str ='Time' 
+                    
+                    
+    However, the 3D layout is not enforced and waveforms from a singleton channel
+    can be stored as a 2D array [spike, time]
+    
+            2D      'name':str      dims[0]     spike    empty set     'name': str = 'spike #'
+                    'waveforms'                                        'units' : str = 'dimensionless'
+                    'units' str =
+                    waveforms.units
+                    
+                                    dims[1]     domain   empty set     'name': str = domain's name, usually "Time"
+                                                                       'units': str = domain units e.g. 's'
+                                                                       
+vigra.VigraArray- N-dimensional numeric arrays
+    ND data set containing the VigraArray data transposed to numpy order
+                    
+            ND      metadata        dims[k]     kth axis empty set 
+                    'axistags'
+                                                constructed from corresponding 
+                                                AxisCalibrationData object and
+                                                has the following atrributes:
+                                                'key'
+                                                'name'
+                                                'units'
+                                                'origin'
+                                                'resolution'
+                                                
+        NOTE: when kth axis is a Channels axis (at most one) then dims[k]
+        associated dimension scales for each channel created in a 
+        group '<signal_name>_channels' alongside the axes group.
+        
+        A channel dimension scale is constructed from empty data sets
+        and has the following attributes:
+        'name', 
+        'units', 
+        'origin', 
+        'resolution', 
+        'maximum',
+        'index': int the channel's index along the channels axis
+        
+        The atttributes are populated from ChannelCalibrationData for the 
+        corresponding channel.
+        
+vigra.filters.Kernel1D: - stored as 2D array (column vectors) with the 
+        domain (kernel sample coordinates) on column 0 and
+        kernel sample values on column 1 (see vigrautils.kernel2array())
+        
+        ATTENTION: No dimension scales are attached to the data set
+    
+        NOTE: to reconstitute an 1D kernel:
+        k1d = vigra.filters.Kernel1D()
+        xy = group[dataset_name] => 2D array
+        left = int(xy[0,0])
+        right = int(xy[-1,0])
+        contents = xy[:,1]
+        l1d.initExplicitly(left, right, xy[:,1])
+        
+vigra.filters.Kernel2D: stored as 3D array with:
+        [x coordinates, y coordinates, sample values] slices where each 
+        slice if a 2D array (see vigrautils.kernel2array)
+    
+        ATTENTION: No dimension scales are attached to the data set
+                
+        NOTE: to reconstitute a 2D kernel:
+        k2d = vigra.filters.Kernel2D()
+        xy = group[dataset_name] => 3D array
+        upperLeft = (int(xy[-1,-1,0]), int(xy[-1,-1,1]))
+        lowerRight = (int(xy[0,0,0]), int(xy[0,0,1]))
+        contents = xy[:,:,2]
+        k2d.initExplicitly(upperLeft, lowerRight, contents)
+        
+Python quantities.Quantity arrays (pq.Quantity):
+        ND data set; attrs keys include
+        'units' : str = data.units.dimensionality.string
+              
+        ATTENTION: No dimension scales are attached to the data set
+        
+Pandas data structures (pd) TODO WORK IN PROGRESS
+
+pd.Series:
+
+pd.DataFrame
+        
+numpy array:
+        ND data set; attrs include only the generic data attributs ('metadata')
+        
+        ATTENTION: No dimension scales are attached to the data set
+        
+numpy chararray, string, numpy array with dtype.kind 'S' or 'U':
+    stored as datasets with dtype h5py.string_dtype() array (variable length strings)
+
+numpy structured arrays and recarrays: ATTENTION: NOT YET SUPPORTED
+        
+homogeneous lists of fundamental numeric python data types (numbers.Number,
+    bytes)
+        1D data set
+        
+        ATTENTION: No dimension scales are attached to the data set
+        
+homogeneous nested lists (that can be converted to plain ND numpy arrays)
+        ND data set
+        
+        ATTENTION: No dimension scales are attached to the data set
+
+
+        ATTENTION: No dimension scales are attached to the data set
+        
+basic Python scalars (numbers.Number, bytes, str) -> 1D data set
+
+NOTE: python strings can be stored directly as values to dataset attr keys!
+
+================================================================================
+(1) neo.core.basesignal.BaseSignal type of objects; these include:
+    neo's signals types:    neo.AnalogSignal, neo.IrregularlySampledSignal
+    Scipyen's signal types: DataSignal, IrregularlySampledDataSignal
+    
+(2): neo.AnalogSignal, DataSignal
+    
+(3) h5py.Empty("f") except for irregular signals and neo DataObject types that 
+    are NOT BaseSignal types: neo.Epoch, DataZone
+
+(4) This is the value of units.dimensionality.string where units is the domain's
+'units' property (a pq.Quantity object)
+
+(5) "Time" for neo signals or the signal's 'domain_name' property
+
+(6) in addition to the signal empty set; ONLY for multi-channel signals
+
+(7) These are irregularly sampled signals (neo.IrregularlySampledSignal and 
+    Scipyen's IrregularlySampledDataSignal) that inherit from neo's BaseSignal
+   
+(8) neo.Event, DataMark, neo.Epoch, DataZone
+
+=> 'signal data sets' are 2D data sets 
+        with len(dims) == 2:
+        dims[0]: the domain axis;
+            the dimension scale is constructed from an empty data set
+    
+    => 1D or 2D data sets, with
+    dims[0] = the domain axis (see above)
+    dims[1] = the "channels" axis;
+        
+    
+STORING PYTHON CONTAINER OBJECTS IN HDF5 OBJECT HIERARCHY
+================================================================================
+Inhomogeneous sequences/iterables (list, tuple, deque):
+
+    stored as a group with attrs populated from the object metadata 
+    
+    for each element, create a nested subgroup named after the index of the 
+    element in the sequence
+    
+        this subgroup will contain either:
+            a dataset (if the element is a data object type as in the table 
+            above, or a plain basic Python type such as number, bytes or str)
+            
+            a group (if the element is a inhomogeneous sequence or mapping)
+
+    
+Mappings (dict and all dict-like flavours except for DataBag): 
+    stored as a group with attrs populated from the object metadata 
+    
+    for each key/value pair:
+        create a nested subgroup named appropriately (see below); the subgroup's
+        'attrs' property contains metadata indicating the type of the key (str,
+        int, or any hashable object) and a way to construct it.
+        
+        the nested subgroup contains a dataset or a subgroup according to the
+        type of object mapped to the key (the 'value')
+        
+Specific Scipyen types define their own toHDF5 and fromHDF5 methods:
+TriggerProtocol
+ModelExpression
+FitModel
+ScanData
+        
+
+================================================================================
+
+
+    
     NOTE: 2021-10-12 09:29:38
 
     ==============
@@ -556,6 +1019,9 @@ def make_axis_scale(dset:h5py.Dataset,
     Creates dimension scales attached to the dataset dimension indicated by
     the 'axis' parameter.
     
+    Parameters:
+    -----------
+    
     dset: h5py.Dataset - the target dataset
     
     axesgroup: h5py.Group - target group where addtional axis-related datasets
@@ -578,104 +1044,7 @@ def make_axis_scale(dset:h5py.Dataset,
         the units of the definition domain of the data in 'dset', when the 
         axis if the domain axis of the data in 'dset'.
         
-        NOTE: 1D signals are BY CONVENTION stored as column vectors.
         
-        Representation of time-varying quantity (a 'signal') of N samples:
-        * with data recorded through a single recording channel:
-            - 1D numpy array -> just one axis - axis 0 - the 'domain axis' 
-                shape: (N, ), vector
-                
-            - 2D numpy array with the second axis (axis 1) being a singleton axis
-                shape: (N, 1), 'column vector'
-            
-            In either case, axis 0 is the domain axis with domain_name = "Time"
-            and axis_name "Time"; axis 1 (when it exists) is the channel axis.
-            
-        * with data recorded through more than one channel:
-            2D numpy array with shape (N,M) where M is the number of channels
-                axis 0 - the domain axis (as above)
-                axis 1 - channel axis
-                
-        The domain axis usually associates units of the quantity representing the 
-        domain of the signal: e.g. 's' for time, 'um' for space, etc
-
-        All channels of a signal SHOULD have the same units, since they contain
-        values of the same physical measure (albeit possibly with different 
-        scaling or amplification factors). Furthermore, the sampling period (and 
-        obviously, rate) is identical for all the channels - hence the domain is
-        common.
-        
-        In electrophysiology, fortunately most acquisition systems usually manage
-        the channel calibration such that the data stored in a channel represents 
-        the values of the physical measure recorded by the system, instead of the
-        raw (uncalibrated) amplifier output.
-        
-        In imaging, however, as in the more general case, the concept of 
-        channels may be taken in a looser sense (unfortunately): most image 
-        acquisition system record pixel intensity data in each channel.
-        
-        In multiphoton imaging an "acquisition signal" can represent fluorescent
-        data from an indicator, or data obtained from a transmitted light detector
-        (sometimes dubbed the "DIC" channel in some acquisition software). 
-        
-        Even two fluorescent "channels" acquired from the same source or field 
-        of view can represent two different quantities, depending on what the
-        fluorescent indicator is used for.
-        
-        For this reason, each channel needs to associate its own calibration data
-        to account for the correspondence between the pixel intensity in that 
-        channel and the value of the imaged physical measure.
-        
-        Furthermore, from a numerical point of view, the pixel intensities can 
-        be represented as scalar values (in "gray-scale" images) or as sequences
-        of scalars (RGB, RGBAlpha, Luv, etc) in so-called multi-band images
-        (also loosely called multi-channel images).
-        
-        The distinction between a "pixel channel" and a data channel can be
-        further blurred when gray scale images (each form one "data" channel)
-        are merged into a multi-band image (mostly for display convenience).
-        
-        One thing that all the image channels have in common is the definition
-        domain of the physical measure (time, space, frequency, etc) and hence
-        their sampling period (or "resolution").
-        
-        
-        In a nutshell:
-        
-            domain axis, or axes: common to all signal/image channels
-                one axis for 1D arrays or for 2D arrays where second axis (axis 1)
-                is a singleton axis
-                
-                two axes for numpy arrays with at least two dimensions; these
-                can be any combination of (space, time, frequency, angle) axes 
-                as appropriate (see vigra.AxisType for details).
-                
-            channel axis: (for whatever a "channel" is taken to represent)
-                only exists for numpy arrays with at least two dimensions
-                typically is the highest-order axis (e.g, 2nd axis for a 1D signal
-                3rd axis for an image, 4th axis for a volume, etc).
-                
-            For imaging, vigra library saves the day through the AxisTags concepts
-            (see vigranumpy documentation). Acipyen add to this the concept of
-            CalibrationData: AxisCalibrationData and ChannelCalibrationData, with
-            the latter used to encapsulate calibrate the pixel intensities in a 
-            given image channel.
-            
-            For electrophysiology, the neo package considers all signals as
-            column vectors, with the domain given in the neo object metadata
-            ('times' attribute). Scipyen extents this for signals defined on 
-            domains other than time (see DataSignal, IrregularlySampledDataSignal,
-            DataZone, DataMark).
-        
-        
-            
-                
-            
-            
-            
-            represented by a 1D numpy array, or a 2D numpy array where the 
-            this is represented by a numpy array
-    
     origin: scalar pq.Quantity; optional, default is None
         This is the value of the signal's 't_start' property, for regularly
         sampled signals neo.AnalogSignal, DataSignal, and neo.ImageSequence

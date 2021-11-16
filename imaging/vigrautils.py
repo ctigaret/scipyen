@@ -303,16 +303,6 @@ def vK1D2array(value, compact=False):
     
     return x, y
 
-    #y = []
-    
-    #for t in range(value.left(), value.right()+1):
-        #y.append(value[t])
-    
-    #y = np.array(y)
-    #y.shape = (value.size(), 1)
-    
-    #return x, y
-
 def vK2D2array(value, compact=False):
     xx = np.linspace(value.lowerRight()[0], value.upperLeft()[0], value.width(), 
                      dtype=np.dtype(int))
