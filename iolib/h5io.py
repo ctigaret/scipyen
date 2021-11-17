@@ -658,7 +658,7 @@ from neo.core.dataobject import ArrayDict
 
 from . import jsonio # brings the CustomEncoder type and the decode_hook function
 import core
-from core.prog import safeWrapper
+from core.prog import (safeWrapper, classify_signature,)
 from core import prog
 from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
@@ -919,7 +919,8 @@ def from_attr_dict(attrs):
         
     return ret
                 
-def generic_data_type_attrs(data:typing.Any, prefix:str="") -> dict:
+#@singledispatch
+def generic_data_attrs(data, prefix=""):
     if not isinstance(data, type):
         data_type = type(data)
         
@@ -935,9 +936,9 @@ def generic_data_type_attrs(data:typing.Any, prefix:str="") -> dict:
         
     attrs = dict()
     
-    attrs[f"{prefix}type_name"] = data_type.__name__
-    attrs[f"{prefix}module_name"] = data_type.__module__
-    attrs[f"{prefix}python_class"] = ".".join([data_type.__module__, data_type.__name__])
+    attrs[f"{prefix}type_name"] = data.__name__
+    attrs[f"{prefix}module_name"] = data.__module__
+    attrs[f"{prefix}python_class"] = ".".join([data.__module__, data.__name__])
     
     if is_namedtuple(data_type):
         fields_list = list(f for f in data_type._fields)
@@ -946,13 +947,19 @@ def generic_data_type_attrs(data:typing.Any, prefix:str="") -> dict:
         attrs[f"{prefix}python_class_def"] = prog.class_def(data_type)
         
     if hasattr(data_type, "__new__"):
-        sig_new = inspect.signature(data_type.__new__)
+        sig_dict = classify_signature(getattr(data_type, "__new__"))
+        
+        new_func_name = ".".join([sig_dict["module"], sig_dict["qualname"]])
+        
+        positional = list(sig_dict["positional"])
+        
+        named = list(sig_dict)
+        
+        
+        attrs[f"{prefix}python_new"] = new_cmd
         
         
     return attrs
-    
-
-def generic_data_attrs(data, prefix=""):
     attrs = dict()
     
     if isinstance(prefix, str) and len(prefix.strip()):
@@ -962,12 +969,24 @@ def generic_data_attrs(data, prefix=""):
     else:
         prefix = ""
         
-    attrs = generic_data_type_attrs(data, prefix=prefix)
+    attrs = generic_data_attrs(type(data), prefix=prefix)
         
     if inspect.isfunction(data):
         attrs[f"{prefix}func_name"] = data.__name__            
     
     return attrs
+
+#@generic_data_attrs.register(types.FunctionType)
+#def _(obj, prefix:str="") -> dict:
+    #if isinstance(prefix, str) and len(prefix.strip()):
+        #if not prefix.endswith("_"):
+            #prefix += "_"
+        
+    #else:
+        #prefix = ""
+        
+    #return {f"{prefix}func_name": data.__name__}
+    
     
 def get_file_group_child(fileNameOrGroup:typing.Union[str, h5py.Group],
                        pathInFile:typing.Optional[str] = None, 
@@ -1055,8 +1074,9 @@ def hdf_entry(x:typing.Any, attr_prefix="key"):#, parent:h5py.Group):
     
     return type(x), name, attrs
 
-def make_neo_dataobj_dict(obj):
-    """Generated an attribute dict specific to the neo DataObject type.
+@singledispatch
+def make_dataset_attrs(obj):
+    """Generates an attribute dict for HDF5 datasets.
     The result is passed through make_attr_dict before mergins into a HDF5 
     Dataset attrs property.
     
@@ -1087,15 +1107,16 @@ def make_neo_dataobj_dict(obj):
     unit            SpikeTrain                      ???? Unit is out of neo hierarchy
     ============================================================================
     """
-    if not isinstance(obj, neo.core.dataobject.DataObject):
-        raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
     
+
+@make_dataset_attrs.register(neo.core.dataobject.DataObject)
+def _(obj):
     ret = {"name": obj.name,
            "units":obj.units,
            "segment": "__ref__" if obj.segment else None
            }
     if isinstance(obj, (neo.core.basesignal.BaseSignal)):
-        ret,.update(
+        ret.update(
                     {"file_origin": obj.file_origin,
                      "description": obj.description,
                     }

@@ -22,6 +22,12 @@ from .workspacefunctions import debug_scipyen
 
 from iolib import jsonio
 
+class SignatureDict(types.SimpleNamespace):
+    def __init__(self, / , *args, **kwargs):
+        #self.__signature__ = None
+        super().__init__(*args, **kwargs)
+        
+
 class ContextExecutor(ContextDecorator):
     def __enter__(self):
         return self
@@ -72,7 +78,7 @@ class Timer(object):
 
 def classify_signature(sig:typing.Union[inspect.Signature, types.FunctionType], 
                        funcname:typing.Optional[str]=None,
-                       modname:typing.Optional[str]=None):
+                       modname:typing.Optional[str]=None) -> SignatureDict:
     from inspect import Parameter
     
     qualname = funcname
@@ -102,15 +108,42 @@ def classify_signature(sig:typing.Union[inspect.Signature, types.FunctionType],
     
     varpos_params = dict((parname, None if val.annotation is Parameter.empty else val.annotation) for parname, val in sig.parameters.items() if val.kind is Parameter.VAR_POSITIONAL)
     
-    return {"name": funcname, 
-            "qualname": qualname,
-            "module": modname,
-            "positional": pos_params, 
-            "named": named_params, 
-            "varpos": varpos_params, 
-            "varkw": varkw_params,
-            "returns": sig.return_annotation}
+    return SignatureDict(name = funcname, qualname = qualname, module = modname,
+                         positional = pos_params, named = named_params, 
+                         varpos = varpos_params, varkw = varkw_params,
+                         returns = sig.return_annotation)
 
+def stringify_signature(f:typing.Union[types.FunctionType, inspect.Signature, SignatureDict], 
+                        as_constructor:bool=False):
+    
+    if isinstance(f, (types.FunctionType, inspect.Signature)):
+        f = classify_signature(f)
+        
+    elif not isinstance(f, SignatureDict):
+        raise TypeError(f"Expecting a function, a function Signature, or a SignatureDict")
+    
+    if f.name in ("__init__", "__new__"):
+        as_constructor = True
+        
+        
+        
+    if as_constructor:
+        clsname = f.qualname.split(".")[0]
+        func = [".".join([f.module, clsname])]
+    else:
+        func = [".".join([f.module, f.qualname])]
+    func.append("(")
+    params = list(f.positional.keys())
+    if len(params):
+        params.append("/")
+    params.extend(list(f.named.keys()))
+    params.extend([f"*{argname}" for argname in f.varpos.keys()])
+    params.extend([f"**{argname}" for argname in f.varkw.keys()])
+    func.append(", ".join(params))
+    func.append(")")
+    
+    return "".join(func)
+    
 def check_neo_patch(exc_info:tuple):
     stack_summary = traceback.extract_tb(exc_info[2])
     frame_names = [f.name for f in stack_summary]

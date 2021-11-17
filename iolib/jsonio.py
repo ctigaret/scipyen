@@ -1,7 +1,7 @@
 """JSON codecs
 """
 
-import json, sys, traceback, typing
+import json, sys, traceback, typing, collections
 from collections import deque, namedtuple
 import numpy as np
 import quantities as pq
@@ -163,40 +163,35 @@ class CustomEncoder(json.JSONEncoder):
 
     def default(self, obj):
         from imaging import vigrautils as vu
+        from core import prog
+        from core.datatypes import is_namedtuple
         
         if any(hasattr(obj,name) for name in ("toJSON", "to_json", "write_json", "writeJSON")):
             raise NotImplementedError(f"The {type(obj).__name__} object appears capable to write itself to JSON and is not supported here")
         
         if isinstance(obj, complex):
-            return {"__complex__", [obj.real, obj.imag]}
+            return {"__complex__", {"__value__":[obj.real, obj.imag]}}
         
         if isinstance(obj, type):
-            return {"__type__": f"{obj.__module__}.{obj.__name__}"}
+            return {"__type__": {"__value__": f"{obj.__module__}.{obj.__name__}"}}
+        
+        if is_namedtuple(obj):
+            fields = ", ".join([f"'{field}'" for f in obj._fields])
+            return {".".join([type(obj).__module__, type(obj).__name__]):
+                        {"class": "".join(["collections.namedtuple(", f"'{type(obj).__name__}', ", "(", fields, "))"]),
+                         "__value__":obj}}
         
         if isinstance(obj, vigra.filters.Kernel1D):
             xy = vu.kernel2array(obj, True)
-            return {"__kernel1D__": {"value":xy.toList()}}
+            return {"__kernel1D__": {"__value__":xy.toList()}}
         
         if isinstance(obj, vigra.filters.Kernel2D):
             xy = vu.kernel2array(obj, True)
-            return {"__kernel2D__": {"value":xy.toList()}}
+            return {"__kernel2D__": {"__value__":xy.toList()}}
         
-        #if isinstance(obj, vigra.AxisInfo):
-            #return {"__axisinfo__": {"key": obj.key,
-                                     #"typeFlags": obj.typeFlags,
-                                     #"resolution": obj.resolution,
-                                     #"description": obj.description}}
+        if isinstance(obj, prog.SignatureDict):
+            return {".".join([type(obj).__module__, type(obj).__qualname__]): {"__value__": obj.__dict__}}
         
-        
-        #if isinstance(obj, pq.Quantity):
-            #if isinstance(obj, pq.UnitQuantity):
-                #return {"__unitquantity__": obj.dimensionality.string}
-
-            #return {"__quantity__": {"value": obj.magnitude.tolist(), 
-                                     #"units": obj.units.dimensionality.string,
-                                     #"dtype": dtype2json(obj.dtype)}
-                    #}
-            
         if isinstance(obj, np.ndarray):
             # NOTE: 2021-11-16 16:21:24
             # this includes numpy chararray (usually created as a 'view'
@@ -228,48 +223,24 @@ class CustomEncoder(json.JSONEncoder):
             else:
                 entry = "__numpyarray__"
                 
-            #return {entry: {"value": obj.tolist(),
-                            #"dtype": dtype2json(obj.dtype)}}
-            
             if isinstance(obj, pq.Quantity):
                 if isinstance(obj, pq.UnitQuantity):
-                    return {entry: obj.dimensionality.string}
+                    return {entry: {"__value__": obj.dimensionality.string}}
                 else:
-                    return {entry: {"value": obj.magnitude.tolist(), 
-                                    "units": obj.units.dimensionality.string,
-                                    "dtype": dtype2json(obj.dtype)}}
+                    return {entry: {"__value__": obj.magnitude.tolist(), 
+                                    "__units__": obj.units.dimensionality.string,
+                                    "__dtype__": dtype2json(obj.dtype)}}
                 
             elif isinstance(obj, vigra.VigraArray):
-                return {entry: {"value": obj.tolist(),
-                                "dtype": dtype2json(obj.dtype),
-                                "axistags":obj.axistags.toJSON(),
-                                "order": obj.order}}
+                return {entry: {"__value__": obj.tolist(),
+                                "__dtype__": dtype2json(obj.dtype),
+                                "__axistags__":obj.axistags.toJSON(),
+                                "__order__": obj.order}}
             
             else:
-                return {entry: {"value": obj.tolist(),
-                                "dtype": dtype2json(obj.dtype)}}
+                return {entry: {"__value__": obj.tolist(),
+                                "__dtype__": dtype2json(obj.dtype)}}
                 
-                
-            #if fields is not None:
-                #if obj.dtype.name.startswith("record"): # recarray
-                    #return  {"__recarray__": {"value": obj.tolist(),
-                                              #"dtype":dtype2json(obj.dtype)}
-                            #}
-                #else:
-                    #return  {"__structarray__": {"value": obj.tolist(),
-                                                 #"dtype":dtype2json(obj.dtype, True)}
-                            #}
-                    
-            #else:
-                #if isinstance(obj, np.chararray):
-                    #return {"__chararray__": {"value": obj.tolist(), 
-                                        #"dtype": dtype2json(obj.dtype)}
-                            #}
-                #else:
-                    #return {"__numpyarray__": {"value": obj.tolist(), 
-                                        #"dtype": dtype2json(obj.dtype)}
-                            #}
-        
         return json.JSONEncoder.default(self, obj)
     
 def dtype2json(d:np.dtype, struct:bool=False) -> typing.Union[str, dict]:
@@ -325,11 +296,21 @@ def decode_hook(dct):
     Use it whenever the json was dumped using the CustomEncoder :class: (defined
     in this module) as 'cls' parameter.
     """
+    from core import prog
     if len(dct) == 1: # only work on dict with a single entry here
-        if "__complex__" in dct:
-            val = dct["__complex__"]
+        key = list(dct.keys())[0]
+        data = dct[key]
+        if data is None or not isinstance(data, dict):
+            return dct
+        #print("data", data)
+        val = data.get("__value__", None)
+        
+        if val is None:
+            return dct
+        
+        if key == "__complex__":
             if isinstance(val, (tuple, list)) and len(val) == 2:
-                return complex(val[0], val[1])
+                return complex(*val)
             
             elif isinstance(val, dict) and all(k in val for k in ("real", "imag")):
                 return complex(val["real"], val["imag"])
@@ -337,48 +318,44 @@ def decode_hook(dct):
             else:
                 return val
             
-        elif "__unitquantity__" in dct:
-            val = dct["__unitquantity__"]
+        elif key == "__unitquantity__":
             return cq.unit_quantity_from_name_or_symbol(val)
         
-        #elif "__quantity__" in dct:
-            #val = dct["__quantity__"]
-            #magnitude = np.array(val["value"], dtype = json2dtype(val["dtype"]))
-            #units = cq.unit_quantity_from_name_or_symbol(val["units"])
-            #return magnitude * units
+        elif key.endswith("SignatureDict"):
+            return prog.SignatureDict(**val)
         
-        elif any(e.endswith("array__") for e in dct):
+        #elif any(e.endswith("array__") for e in dct):
+        elif key.endswith("array__"):
             entry = list(dct.keys())[0]
             val = dct[entry]
-            if entry in ("__structarray__", "__recarray__"):
-                value = list(tuple(x) for x in val["value"])
+            if key in ("__structarray__", "__recarray__"):
+                value = list(tuple(x) for x in val)
             else:
-                value = val["value"]
+                value = val["__value__"]
                 
-            if entry == "__recarray__":
-                dtype = json2dtype(dict((name, (json2dtype(value[0]), value[1])) for name, value in val["dtype"].items()))
+            if key == "__recarray__":
+                dtype = json2dtype(dict((name, (json2dtype(value[0]), value[1])) for name, value in data["__dtype__"].items()))
             else:
-                dtype = json2dtype(val["dtype"])
+                dtype = json2dtype(data["__dtype__"])
             
             ret = np.array(value, dtype=dtype)
             
-            if entry in ("__chararray__", "__recarray__"):
-                artype = eval(entry.replace("__", ""), np.__dict__)
+            if key in ("__chararray__", "__recarray__"):
+                artype = eval(key.replace("__", ""), np.__dict__)
                 return ret.view(artype)
             
-            if entry == "__quantityarray__":
-                units = cq.unit_quantity_from_name_or_symbol(val["units"])
+            if key == "__quantityarray__":
+                units = cq.unit_quantity_from_name_or_symbol(data["__units__"])
                 return ret * units
             
             if entry == "__vigraarray__":
-                return vigra.VigraArray(ret, axistags=vigra.AxisTags.fromJSON(val["axistags"]), 
-                                       order=val.get("order", None))
+                return vigra.VigraArray(ret, axistags=vigra.AxisTags.fromJSON(data["__axistags__"]), 
+                                    order=data.get("__order__", None))
                 
             return ret
         
-        elif "__kernel1D__" in dct:
-            val = dct["__kernel1D__"]
-            xy = np.array(val["value"])
+        elif key == "__kernel1D__":
+            xy = np.array(val)
             left = int(xy[0,0])
             right = int(xy[-1,0])
             values = xy[:,1]
@@ -386,9 +363,8 @@ def decode_hook(dct):
             ret.initExplicitly(left, right, values)
             return ret
         
-        elif "__kernel2D__" in dct:
-            val = dct["__kernel2D__"]
-            xy = np.array(val["value"])
+        elif key == "__kernel2D__":
+            xy = np.array(val)
             upperLeft = (int(xy[-1,-1,0]), int(xy[-1,-1,1]))
             lowerRight = (int(xy[0,0,0]), int(xy[0,0,1]))
             values = xy[:,:,]
@@ -396,8 +372,7 @@ def decode_hook(dct):
             ret.initExplicitly(upperLeft, lowerRight, values)
             return ret
         
-        elif "__type__" in dct:
-            val = dct["__type__"]
+        elif key == "__type__":
             #print("val", val)
             if "." in val:
                 components = val.split(".")
@@ -413,6 +388,96 @@ def decode_hook(dct):
             return dct
     else:
         return dct
+    
+        #try:
+                
+            #if key.startswith("__main__"):
+                #typeobj = eval(dct[typename]["class"])
+            #else:
+                #typeobj = eval(key)
+                
+            #if is_namedtuple(typeobj):
+                #return typeobj(*val)
+                
+            #return typeobj(val)
+            
+        #except:
+            #if key == "__complex__":
+                #if isinstance(val, (tuple, list)) and len(val) == 2:
+                    #return complex(*val)
+                
+                #elif isinstance(val, dict) and all(k in val for k in ("real", "imag")):
+                    #return complex(val["real"], val["imag"])
+                
+                #else:
+                    #return val
+                
+            #elif key == "__unitquantity__":
+                #return cq.unit_quantity_from_name_or_symbol(val)
+            
+            #elif key.endswith("SignatureDict"):
+                #return prog.SignatureDict(**val)
+            
+            ##elif any(e.endswith("array__") for e in dct):
+            #elif key.endswith("array__"):
+                #entry = list(dct.keys())[0]
+                #val = dct[entry]
+                #if key in ("__structarray__", "__recarray__"):
+                    #value = list(tuple(x) for x in val)
+                #else:
+                    #value = val["__value__"]
+                    
+                #if key == "__recarray__":
+                    #dtype = json2dtype(dict((name, (json2dtype(value[0]), value[1])) for name, value in data["__dtype__"].items()))
+                #else:
+                    #dtype = json2dtype(data["__dtype__"])
+                
+                #ret = np.array(value, dtype=dtype)
+                
+                #if key in ("__chararray__", "__recarray__"):
+                    #artype = eval(key.replace("__", ""), np.__dict__)
+                    #return ret.view(artype)
+                
+                #if key == "__quantityarray__":
+                    #units = cq.unit_quantity_from_name_or_symbol(data["__units__"])
+                    #return ret * units
+                
+                #if entry == "__vigraarray__":
+                    #return vigra.VigraArray(ret, axistags=vigra.AxisTags.fromJSON(data["__axistags__"]), 
+                                        #order=data.get("__order__", None))
+                    
+                #return ret
+            
+            #elif key == "__kernel1D__":
+                #xy = np.array(val)
+                #left = int(xy[0,0])
+                #right = int(xy[-1,0])
+                #values = xy[:,1]
+                #ret = vigra.filters.Kernel1D()
+                #ret.initExplicitly(left, right, values)
+                #return ret
+            
+            #elif key == "__kernel2D__":
+                #xy = np.array(val)
+                #upperLeft = (int(xy[-1,-1,0]), int(xy[-1,-1,1]))
+                #lowerRight = (int(xy[0,0,0]), int(xy[0,0,1]))
+                #values = xy[:,:,]
+                #ret = vigra.filters.Kernel2D()
+                #ret.initExplicitly(upperLeft, lowerRight, values)
+                #return ret
+            
+            #elif key == "__type__":
+                ##print("val", val)
+                #if "." in val:
+                    #components = val.split(".")
+                    #typename = components[-1]
+                    #modname = ".".join(components[:-1])
+                    ##print("modname", modname, "typename", typename)
+                    #module = sys.modules[modname]
+                    #return eval(typename, module.__dict__)
+                #else:
+                    #return eval(typename) # fingers crossed...
+                
             
 def dumps(obj, *args, **kwargs):
     kwargs["cls"] = CustomEncoder
