@@ -908,8 +908,15 @@ class CalibrationData(object):
         return (self.units.units, self.calibratedOrigin, self.calibratedResolution)
     
     @property
-    def asTuple(self):
-        yield from (getattr(self, p) for p in self.parameters if hasattr(self, p))
+    def data(self):
+        """Returns the calibration data as a dict
+        """
+        ret = dict(self._data_)
+        
+        if hasattr(self, "type") and self.type & vigra.AxisType.Channels:
+            ret.update(dict((c[0], c[1].data) for c in self.channels))
+            
+        return ret
     
     def calibratedCoordinate(self, value):
         if not isinstance(value, numbers.Number):

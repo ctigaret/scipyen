@@ -993,7 +993,6 @@ class DataMark(DataObject):
         self.type = value
         
 
-#class TriggerEvent(DataObject):
 class TriggerEvent(DataMark):
     """Trigger event.
     

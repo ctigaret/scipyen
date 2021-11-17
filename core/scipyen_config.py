@@ -1226,7 +1226,10 @@ class ScipyenConfigurable(object):
                         val  = getter()
 
                     if val != v:
-                        user_conf[k].set(val)
+                        if hasattr(user_conf[k], "set"):
+                            user_conf[k].set(val)
+                        else:
+                            user_conf[k] = val
                         #user_conf[k] = val
                         changed = True
                         

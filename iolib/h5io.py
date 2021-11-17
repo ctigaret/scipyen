@@ -857,7 +857,9 @@ def make_attr(x:typing.Union[str, list, tuple, dict, deque, np.ndarray]):
             return np.asarray(x, dtype=h5py.string_dtype(), order="K")
         
         else:
-            return jsonio.dumps(x)
+            # NOTE: for UnitQuantities stores dimensionality string
+            #
+            return jsonio.dumps(x) 
     
     return x
 
@@ -1053,9 +1055,425 @@ def hdf_entry(x:typing.Any, attr_prefix="key"):#, parent:h5py.Group):
     
     return type(x), name, attrs
 
+def make_neo_dataobj_dict(obj):
+    """Generated an attribute dict specific to the neo DataObject type.
+    The result is passed through make_attr_dict before mergins into a HDF5 
+    Dataset attrs property.
+    
+    This is used for the actual numeric data of the object, NOT for its axes.
+    
+    ============================================================================
+    Mandatory key/value pairs 
+    
+    Key name        Object type                     type: value
+    ============================================================================
+    name            DataObject                      str: obj.name
+    units           DataObject                      str (JSON): obj.units
+    file_origin                                     str: obj.file_origin
+    description                                     str: obj.description
+    
+    segment                                         None or h5py reference to 
+                                                    segment data set
+    <field_name>                                    as in the obj.annotations
+                                                    dictionary
+    
+    ============================================================================
+    
+    ============================================================================
+    Optional key/value pairs 
+    
+    Key name        Object type                     type: value
+    ============================================================================
+    unit            SpikeTrain                      ???? Unit is out of neo hierarchy
+    ============================================================================
+    """
+    if not isinstance(obj, neo.core.dataobject.DataObject):
+        raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
+    
+    ret = {"name": obj.name,
+           "units":obj.units,
+           "segment": "__ref__" if obj.segment else None
+           }
+    if isinstance(obj, (neo.core.basesignal.BaseSignal)):
+        ret,.update(
+                    {"file_origin": obj.file_origin,
+                     "description": obj.description,
+                    }
+                    )
+    if isinstance(obj, neo.SpikeTrain):
+        ret["unit"] = obj.unit
+    
+    ret.update(obj.annotations)
+    
+    return make_attr_dict(**ret)
+    
+    
 @singledispatch
 def make_axis_dict(obj, axisindex:int):
-    raise TypeError(f"Objects of type {type(obj).__name__} are not yet supported")
+    """Returns a dict with axis information for storage in HDF5 hierarchy.
+    
+    Used to build dimension scales for a signal dataset and where necessary,
+    additional datasets with data array associated with the axis.
+    
+    The dimension scale for a signal dataset axis (or dimension) is constructed
+    from an axis dataset (h5py.Dataset) stored in an axes group alongside the
+    object's data set (i.e. in the same parent group as the object's data set).
+    
+    Semantic interpretation of the array axes:
+    ------------------------------------------
+    * Axes for neo and neo-like objects
+    
+    Signals in neo package have up to two axes (except for ImageSequence and
+    SpikeTrain.waveforms property, which have up to three axes):
+    
+    axis 0 is the domain axis:
+        for objects in the neo package the domain is always time; 
+        
+        for Scipyen's own neo-like objects (DataSignal, IrregularlySampledDataSignal,
+        DataMark, DataZone) this domain can by anything that makes sense semantically,
+        for the signal (time, space, etc.).
+        
+        for SpikeTrain.waveforms data, this axis is the spike index axis
+        
+        for ImageSequence objects, this is the "frame index" axis
+    
+    axis 1: 
+        for "proper" signals - that inherit from neo's Basesignal type - this 
+            is the "channels" axis and always exists (signals are 2D arrays) 
+            even if the signal has only  one channel; 
+            
+            the channel information is typically stored in the 'array_annotations' 
+            property of the signal which, when present, contains fields (str) 
+            mapped to 1D numpy arrays of scalar dtypes (numbers or str) with as 
+            many elements as the number of channels in the signal.
+            
+        
+        for ImageSequence objects this is a spatial axis (vertical direction)
+        
+        for SpikeTrain.waveforms data, 
+            when the waveform data is a 3D array, this axis is the "channel" axis 
+            (in the sense of recording channel)
+            
+            when the waveform data is a 2D array, this axis is the "signal" axis
+            (in units of the signal, typically, electrical potential units)
+        
+        NOTE: absent in SpikeTrain, Event, Epoch, DataMark and DataZone objects 
+            because they are 1D arrays (of times or places, etc.).
+        
+    axis 2: present in ImageSequence and optionally in SpikeTrain.waveforms data
+        
+        for ImageSequence objects this is a spatial axis (orthogonal to axis 1, 
+            i.e. in the horizontal direction)
+        
+        for SpikeTrain.waveforms as 3D arrays, it is the "signal" axis itself
+            (see above)
+        
+        NOTE: absent in SpikeTrain, Event, Epoch, DataMark and DataZone objects 
+            because they are 1D arrays (of times or places, etc.).
+        
+    * VigraArrays benefit from the vigra's framework of objects that make
+        understanding the semantics of the array axes very easy.
+        
+        Each axis brings its own vigra.AxisInfo objects which encapsulate the 
+        axis' semantics. the AxisInfo objects are stored in the VigraArray
+        'axistags' property.
+        
+        Except for a Channels axis, all other axes represent a domain (time, 
+        space, angle, edge, frequency) such that the data array is defined on a
+        combination of domains indicated by their corresponding axes.
+        
+        For example:
+        space, or time, or frequency, etc   -> 1D signal (e.g, a single line scan or a point scan over time)
+        space x space                       -> image 
+        time x space                        -> time sequence of signals along space (e.g time series of line scans)
+        space x space x space               -> volume 
+        space x space x time                -> time sequence of images
+        space x space x space x time        -> time sequence of volumes
+        space frequency x space frequency   >  forward Fourier transform of an image
+
+        ... and so on ...
+        
+        The Channels axis may be absent in single-channel data (is a "virtual" axis).
+        
+        When present, the Channels axis is usually (or should be) on the highest 
+        dimension of the array  - although this is not strictly enforced. This
+        axis carries the information of the physical measure encoded in the 
+        data's 'pixels'.
+        
+        The semantic of each axis in a VigraArray is represented by the associated
+        vigra.AxisInfo objects, stored in the array's axis tags.
+        
+        The axes datasets for Vigra arrays are always empty. The information
+        associated with each axis is retrieved from the corresponding 
+        vigra.AxisInfo object contained in the array's 'axistags' property, 
+        using a Scipyen AxisCalibrationData object as intermediary.
+        
+        For a Channels axis, the AxisCalibrationData also contains information
+        for each of the channels in the image, when available.
+        
+    Contents of the axis dataset:
+    ------------------------------
+    With the exceptions described below, the axis dataset is an empty HDF5 
+    dataset (h5py.Empty("f")) where the 'attrs' property stores axis information 
+    of numeric scalar or string types, as key/value pairs.
+        
+    * Domain axis exceptions:
+        
+    1) For irregularly sampled signals, the axis data set for the signal's domain
+    (e.g. time or space) contains the actual time, or more generally, the domain,
+    values when (or where) each of the signal samples were recorded. 
+    
+    2) neo.Epoch, and Scipyen's own DataZone objects are array-like neo data 
+    objects, not to be treated as signals.
+    
+    Their main dataset already contains time (or domain) values where the epochs 
+    (or data zones) start. 
+    
+    The domain axis data sets contains additional domain values, namely, the 
+    'durations' of the epochs or the 'extents' of the data zones (for compatibility,
+    both objects store this information in their 'durations' property).
+    
+    Additional HDF5 data sets:
+    --------------------------
+    1) 'waveforms' data set for neo.SpikeTrain objects.
+    
+    neo.SpikeTrain objects associate a 2D or 3D numeric numpy array with the 
+    spike waveforms, with axes: [spike, channel, time]
+    
+    This array is stored as a 'waveforms' dataset in the same
+    group as the axis datasets of the spike train.
+    
+    NOTE: that a SpikeTrain itself is an array of time values, possibly with
+    multiple channels (as column vectors), all belonging to the same 'unit' or 
+    'cell' (the channels are recording channels). A neo.Segment can store
+    several spike trains in its 'spiketrains' property which is a 
+    neo.spiketrainlisyt.SpikeTrainList object; each spike train there comes from
+    a different 'unit' or 'cell'.
+    
+    Therefore the axis dataset for axis 0 (domain) of a SpikeTrain is empty; its
+    'attrs' property is expected to store the units information (time units).
+    
+    However, the waveforms dataset has its own dimension scales as follows:
+    
+    axis 0: spikes axis
+    axis 1: channel (3D waveforms array) or time (2D waveforms array)
+    axis 2: times (domain) only for 3D waveforms array)
+    
+    
+    2) 'labels' data set for Epoch, Event, DataMark and DataZone objects
+    
+    This sata set stores the 'labels' property of these objects.
+    
+    neo.Event, neo.Epoch, and Scipyen's own DataMark and DataZone objects are 
+    array-like neo objects where the main data is the domain itself (time, space,
+    etc) and the values (e.g. "time stamps") stored in the main HDF5 data set.
+    
+    In this respect, they are similar to the SpikeTrain objects.
+    
+    Each event, epoch, data mark or data zone associates a str label, stored in 
+    the 'labels' property - this is a 1D array of strings, with as many elements
+    as the number of events/epochs/marks/zones in the object.
+    
+    In most cases the axis dataset is an Empty dataset (h5py.Empty("f")).
+    
+    Exceptions are irregularly sampled signal types and the DataObject types 
+    Epoch and DataZone where the axis datasets contains:
+    
+    * the 'times' property of irregularly sampled signals
+    
+    * the 'durations' property of Epoch and DataZone
+    
+    3) 'channels' data sets: for each channel calibration in a VigraArray
+    Channels axis, and additional empty HDF5 data set is created in the axes
+    group, ONLY if channel calibration is provided in the Channels axis
+    axistag (i.e. "virtual"channel axes atre skipped)
+    
+    
+    As mentioned above, additional HDF5 data sets are created in the same 
+    axes group (h5py.Group object) as the axes data sets.
+    
+    Contents of the axis attrs dictionary:
+    --------------------------------------
+    NOTE 1: Below, 
+    neo.BaseSignal objects are:
+        neo.AnalogSignal, neo.IrregularlySampledSignal, neo.ImageSequence
+        core.datasignal.DataSignal, 
+        core.datasignal.IrregularlySampledDataSignal
+        
+    neo.DataObject objects are: BaseSignal objects AND:
+        neo.Epoch, neo.Event, neo.SpikeTrain
+        core.triggerevent.DataMark, 
+        core.datazone.DataZone
+        
+    For space reasons the modules there they are defined are omitted
+    from the type name.
+    
+    NOTE 2: 'waveforms' are python Quantity arrays
+    
+    ============================================================================
+    Mandatory key/value pairs 
+    
+    Key name        Object type                     type: value
+                                                    semantics
+                                                    specific storage
+    ============================================================================
+    key             VigraArray                      str:                     
+                                                    AxisInfo.key             
+    
+                    BaseSignal                      str: <1 or 2 chars>, 
+                                                    domain type name (axis 0)
+                                                    physical measure name (axis 1)
+                                                    applies heuristic in
+                                                    core.quantities.name_from_unit
+                                                
+                    ImageSequence                   str:                     
+                                                    "t" for axis 0           
+                                                    "y" for axis 1         
+                                                    "x" for axis 2         
+                                                
+    name            VigraArray                      str                      
+    
+                    ImageSequence                   str:                     
+                                                    "frames" for axis 0       
+                                                    "height" for axis 1         
+                                                    "width"  for axis 2         
+                                                
+                    BaseSignal                      str:                     
+                                                    domain name for axis 0   
+                                                    signal name for axis 1         
+                                                
+    units           VigraArray                      str:                     
+                                                    dimensionality of        
+                                                    asociated physical     
+                                                    measure     
+                                                
+                    BaseSignal                      str:                     
+                                                    axis 0: domain units     
+                                                    axis 1: signal units      
+                                                
+                    ImageSequence                   str:                     
+                                                    axis 0: time units       
+                                                    axs 1 & 2: space units     
+                                                
+    ============================================================================
+    
+    ============================================================================
+    Optional key/value pairs (present only for the specific object types below):
+    
+    Key name        Object type                     type: value
+                                                    semantics
+                                                    specific storage
+    ============================================================================
+    axinfo_description     
+                    VigraArray                      str:                        
+                                                    AxisInfo.description 
+                                                    
+    axinfo_key      VigraArray                      str:
+                                                    AxisInfo.key
+                                                    
+    axinfo_typeFlags
+                    VigraArray                      int: 
+                                                    AxisInfo.typeFlags
+                                                    
+    axinfo_resolution
+                    VigraArray                      float, int
+                                                    AxisInfo.resolution
+                    
+    
+    origin          VigraArray                      float:                      
+                                                    CalibrationData.origin      
+                                                    (default 0.0)
+    
+                    AnalogSignal,                   float: signal.t_start
+                    DataSignal,                     (only for axis 0)
+                    ImageSequence,
+                    SpikeTrain
+                            
+    domain          IrregularlySampledSignal,       1D ndarray float dtype:
+                    IrregularlySampledDataSignal    this is signal.times
+                                                    property 
+                                                    stored AS the axis dataset;
+                                                    only for axis 0
+                                                    
+                    Epoch                           1D ndarray, float dtype:
+                    DataZone                        this is signal.durations
+                                                    stored AS the axis dataset;
+                                                    only for axis 0
+                            
+    labels          Event,                          1d ndarray dtype <U
+                    DataMark                        signal.labels property
+                    Epoch                           stored as axis_labels
+                    DataZone                        dataset alongside the axis
+                                                    dataset;
+                                                    
+                                                    
+    waweforms       SpikeTrain                      2D or 3D ndarray float dtype:
+                                                    'waveforms' property
+                                                    stored as separate dataset
+                                                    with its own dimension scales
+    
+    resolution      VigraArray                      float:
+                                                    CalibrationData.resolution
+                                                    (default: AxisInfo.resolution
+                                                    or 1.0)
+    
+    sampling_rate   AnalogSignal,                   float: signal.sampling_rate
+                    DataSignal,                     axis 0 only
+
+                    ImageSequence                   float: data.sampling_rate
+                                                    axis 0 only
+                                                    
+                    SpikeTrain                      float: sampling_rate of
+                                                    the train's waveforms
+                                                    stored as dimension scale
+                                                    in that data set;
+                                                    only when waveforms are 
+                                                    present
+                                                    NOTE: because waveforms are
+                                                    just a pq.Quantity, this 
+                                                    information is "grafted" to 
+                                                    the waveforms' axis '
+                                                    although it belongs to the 
+                                                    SpikeTrain itself
+                                                    
+    sampling_period 
+                    AnalogSignal,                   float: signal.sampling_period
+                    DataSignal                      axis 0 only
+                            
+                    ImageSequence                   float: 
+                                                    axis 0: data.frame_duration
+                                                    axes 1  2: data.spatial_scale
+                                                    NOTE: spatial_scale is not well
+                                                    documented and appears to be
+                                                    just a scalar float
+                                                    
+                            
+    left_sweep      SpikeTrain                      float
+                                                    axis 0 (domain) only
+                                                    assumed to have the times'
+                                                    units
+                                                    
+    end             SpikeTrain                      float: obj.t_stop
+                                                    axis 0 (domain) only
+                                                    assumed to have the times'
+                                                    units
+                                                    
+                                                    
+    <channel name
+    string>         VigraArray                      dict (only for Channels axes)
+                                                    this will be used to generate
+                                                    channel_axis datasets
+                                                    
+    <field name     DataObject                      numpy array
+     string>        EXCEPT                          only for axis 1 (channels)
+                    ImageSequence                   and only if array_annotations
+                                                    if present and conformant.
+    ============================================================================
+    
+    NOTE 3: axis units are pq.Quantities (including pq.UnitQuantities) and 
+    are stored in JSON format
+    """
+    raise NotImplementedError(f"{type(obj).__name__} objects are not yet supported")
 
 @make_axis_dict.register(vigra.VigraArray)
 def _(obj, axisindex:typing.Union[int, str]):
@@ -1070,14 +1488,19 @@ def _(obj, axisindex:typing.Union[int, str]):
             raise ValueError(f"Invalid axisindex {axisindex}")
         
     else:
-        raise TypeError(f"Invalid axisindex type; expecting a str or int, got {tytpe(axisindex).__name__} instead.")
-    
+        raise TypeError(f"Invalid axisindex type; expecting a str or int, got {type(axisindex).__name__} instead.")
     
     axisinfo = obj.axistags[axisindex]
     
     axiscal = AxisCalibrationData(axisinfo)
     
-    return make_attr_dict(description = axisinfo.description, **axiscal._data_)
+    data = axiscal.data
+    
+    return make_attr_dict(axinfo_key = axisinfo.key,
+                          axinfo_typeFlags = axisinfo.typeFlags,
+                          axinfo_description = axisinfo.description, 
+                          axinfo_resolution=axisinfo.resolution, 
+                          **axiscal._data_)
     
 @make_axis_dict.register(vigra.AxisTags)
 def _(obj, axisindex:typing.Union[int, str]):
@@ -1099,9 +1522,157 @@ def _(obj, axisindex:typing.Union[int, str]):
     
     axiscal = AxisCalibrationData(axisinfo)
     
-    return make_attr_dict(description = axisinfo.description, **axiscal._data_)
-    
+    return make_attr_dict(axinfo_key = axisinfo.key,
+                          axinfo_typFlags = axisinfo.typeFlags,
+                          axinfo_description = axisinfo.description, 
+                          axinfo_resolution=axisinfo.resolution,
+                          **axiscal.data)
 
+@make_axis_dict.register(neo.core.dataobject.DataObject)
+def _(obj, axisindex:int):
+    # axis 0 = domain axis (e.g. times)
+    # axis 1 = channel axis (may be singleton for a single-channel signal)
+    if isinstance(axisindex, int):
+        if axisindex < 0 or axisindex >= obj.ndim:
+            raise ValueError(f"Invalid axisindex {axisindex} for {type(obj).__name__} object")
+        
+    else:
+        raise TypeError(f"'axisindex' expected to be an int; got {type(axisindex).__name__} instead")
+    
+    seed = dict()
+    seed["key"] = cq.name_from_unit(obj.times.units) if axisindex == 0 else cs.name_from_unit(obj.units)
+    seed["name"] = seed["key"] if axisindex == 0 else getattr(obj, "name", type(obj).__name__)
+    seed["units"] = obj.times.units if axisindex == 0 else obj.units
+    
+    if axisindex == 1: 
+        # channels axis
+        #  NOTE: 2021-11-17 13:41:04
+        # array annotations SHOULD be empty for non-signals
+        # ImageSequence does NOT have array_annotations member
+        array_annotations = getattr(obj,"array_annotations", None)
+        if isinstance(array_annotations, ArrayDict) and len(array_annotations): # this is the number of fields NOT channels!
+            # NOTE: skip silently is length different for obj size on axis 1
+            if array_annotations.length == obj.shape[1]:
+                for field, value in array_annotations:
+                    ret[field] = value
+    
+    if isinstance(obj, neo.core.basesignal.BaseSignal):
+        ret = make_neo_signal_axis_dict(obj, axisindex)
+    else:
+        ret = make_neo_data_axis_dict(obj, axisindex)
+    seed.update(ret)
+    
+    return make_attr_dict(**seed)
+        
+@singledispatch        
+def make_neo_signal_axis_dict(obj, axisindex:int):
+    """See make make_axis_dict for details
+    """
+    raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
+
+@make_neo_signal_axis_dict.register(neo.AnalogSignal)
+def _(obj, axisindex):
+    ret = dict()
+    if axisindex == 0:
+        # domain axis
+        ret["origin"] = obj.t_start
+        ret["sampling_rate"] = obj.sampling_rate
+        ret["sampling_period"] = obj.sampling_period
+
+    return ret
+
+@make_neo_signal_axis_dict.register(DataSignal)
+def _(obj, axisindex):
+    ret = dict()
+    if axisindex == 0:
+        # domain axis
+        ret["origin"] = obj.t_start
+        ret["sampling_rate"] = obj.sampling_rate
+        ret["sampling_period"] = obj.sampling_period
+
+    return ret
+
+@make_neo_signal_axis_dict.register(neo.IrregularlySampledSignal)
+def _(obj, axisindex):
+    ret = dict()
+    if axisindex == 0:
+        ret["domain"] = obj.times
+        
+    return ret
+
+@make_neo_signal_axis_dict.register(IrregularlySampledDataSignal)
+def _(obj, axisindex):
+    ret = dict()
+    if axisindex == 0:
+        ret["domain"] = obj.times
+        
+    return ret
+
+@make_neo_signal_axis_dict.register(neo.ImageSequence)
+def _(obj, axisindex):
+    ret = dict()
+    if axisindex == 0:
+        ret["key"] = "t"
+        ret["name"] = "frames"
+        ret["units"] = obj.t_start.units
+        ret["origin"] = obj.t_start
+        ret["sampling_rate"] = obj.sampling_rate
+        
+    else: # axis 1 or 2
+        ret["key"] = "s"
+        ret["name"] = "height" if axisindex == 1 else "width"
+        ret["spatial_scale"] = obj.spatial_scale
+        
+
+@singledispatch
+def make_neo_data_axis_dict(obj, axisindex):
+    raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
+    
+@make_neo_data_axis_dict.register(neo.SpikeTrain)
+def _(obj, axisindex):
+    ret = dict()
+    if axisindex == 0:
+        ret["origin"] = obj.t_start
+        ret["left_sweep"] = obj.left_sweep
+        ret["waveforms"] = obj.waveforms
+        ret["end"] = obj.t_stop
+        if obj.waveforms.size > 0:
+            ret["sampling_rate"] = obj.sampling_rate
+        
+    return ret
+
+@make_neo_data_axis_dict.register(neo.Event)
+def _(obj, axisindex):
+    ret = dict()
+    if axisindex == 0:
+        ret["labels"] = obj.labels
+    return ret
+
+@make_neo_data_axis_dict.register(DataMark)
+def _(obj, axisindex):
+    ret = dict()
+    if axisindex == 0:
+        ret["labels"] = obj.labels
+    return ret
+
+@make_neo_data_axis_dict.register(neo.Epoch)
+def _(obj, axisindex):
+    ret = dict()
+    if axisindex == 0:
+        ret["labels"] = obj.labels
+        ret["durations"] = obj.durations
+    return ret
+
+@make_neo_data_axis_dict.register(DataZone)
+def _(obj, axisindex):
+    ret = dict()
+    if axisindex == 0:
+        ret["labels"] = obj.labels
+        ret["durations"] = obj.durations
+    return ret
+
+
+        
 def make_axis_scale(dset:h5py.Dataset, 
                     axesgroup:h5py.Group,
                     dimindex:int, 

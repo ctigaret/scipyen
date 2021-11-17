@@ -165,7 +165,7 @@ class CustomEncoder(json.JSONEncoder):
         from imaging import vigrautils as vu
         
         if any(hasattr(obj,name) for name in ("toJSON", "to_json", "write_json", "writeJSON")):
-            raise TypeError(f"The {type(obj).__name__} object appears capable to write itself to JSON and is not supported here")
+            raise NotImplementedError(f"The {type(obj).__name__} object appears capable to write itself to JSON and is not supported here")
         
         if isinstance(obj, complex):
             return {"__complex__", [obj.real, obj.imag]}
