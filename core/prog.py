@@ -22,6 +22,11 @@ from .workspacefunctions import debug_scipyen
 
 from iolib import jsonio
 
+CALLABLES = (types.FunctionType, types.MethodType,
+             types.WrapperDescriptorType, types.MethodWrapperType,
+             types.BuiltinFunctionType, types.BuiltinMethodType,
+             types.MethodDescriptorType, types.ClassMethodDescriptorType)
+
 class SignatureDict(types.SimpleNamespace):
     def __init__(self, / , *args, **kwargs):
         #self.__signature__ = None
@@ -76,15 +81,15 @@ class Timer(object):
         
 # ### BEGIN module functions
 
-def classify_signature(sig:typing.Union[inspect.Signature, types.FunctionType], 
+def classify_signature(sig, 
                        funcname:typing.Optional[str]=None,
                        modname:typing.Optional[str]=None) -> SignatureDict:
     from inspect import Parameter
     
     qualname = funcname
-    if isinstance(sig, types.FunctionType):
+    if isinstance(sig, CALLABLES):
         funcname = sig.__name__
-        modname = sig.__module__
+        modname = getattr(sig, "__module__", None)
         qualname = sig.__qualname__
         sig = inspect.signature(sig)
         

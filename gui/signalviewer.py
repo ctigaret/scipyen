@@ -153,7 +153,7 @@ from core.scipyen_config import markConfigurable
 from core.traitcontainers import DataBag
 
 
-from imaging.vigrautils import vK1D2array
+from imaging.vigrautils import kernel2array
 
 from ephys import ephys as ephys
 from ephys.ephys import (cursors2epoch, )
@@ -966,7 +966,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     @_interpret_signal.register(vigra.filters.Kernel1D)
     def _(self, x:vigra.filters.Kernel1D, **kwargs):
-        xx, yy = vK1D2array(x)
+        xx, yy = kernel2array(x)
         ret = dict( x = xx,
                     y = yy,
                     dataAxis = 0,
@@ -1667,7 +1667,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         their wrappers in pyqtgraph
         """
         
-        pgmembers = inspect.getmembers(self, lambda x: isinstance(x, (pg.GraphicsItem, pg.GraphicsView)))
+        pgmembers = inspect.getmembers(self, lambda x: isinstance(x, (pg.GraphicsItem, pg.GraphicsView, QtWidgets.QWidget)))
         
         super().closeEvent(evt)
 
@@ -4213,7 +4213,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.signalIndex = 1
                 self.dataAxis = 0
                 self.signalChannelAxis = 1 
-                xx, yy = [vK1D2array(i) for i in y]
+                xx, yy = [kernel2array(i) for i in y]
                 
                 if x is None:
                     x = xx
@@ -4594,7 +4594,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     self._docTitle_ = self.y.name
         
         elif isinstance(y, vigra.filters.Kernel1D):
-            self.x, self.y = vK1D2array(y)
+            self.x, self.y = kernel2array(y)
             self._plotEpochs_(clear=True)
             
             self.dataAxis = 0 # data as column vectors
@@ -4802,7 +4802,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.signalIndex = 1
                 self.dataAxis = 0
                 self.signalChannelAxis = 1 
-                xx, yy = [vK1D2array(i) for i in y]
+                xx, yy = [kernel2array(i) for i in y]
                 
                 if x is None:
                     x = xx

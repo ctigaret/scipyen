@@ -645,7 +645,7 @@ class CalibrationData(object):
                     self._data_.maximum = quantity2scalar(maxval)
                     
                 elif isinstance(maxval, (complex, float, int, np.ndarray)) or maxval == np.nan:
-                    self._data_.min = quantity2scalar(maxval)
+                    self._data_.maximum = quantity2scalar(maxval)
                 
         # bring back channel calibration data if necessary and appropriate
         if self.__class__ == AxisCalibrationData:

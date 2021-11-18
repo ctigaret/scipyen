@@ -1,4 +1,5 @@
 import typing
+from functools import singledispatch
 import vigra
 import numpy as np
 import quantities as pq
@@ -290,7 +291,83 @@ def getFrameLayout(img:vigra.VigraArray,
     
     return nFrames, frameAxisInfo, widthAxisInfo, heightAxisInfo
 
-def vK1D2array(value, compact=False):
+@singledispatch
+def kernel2array(value:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D],
+                 compact:bool=True):
+    """
+    Generates a numpy array with coordinates and values for the kernel's samples
+    Parameters
+    ----------
+    value: Kernel1D or 2D
+    compact:bool, default is True
+    
+    Returns:
+    -------
+    for a 1D kernel of N samples:
+        when compact is False:
+            list [X, KRN] with:
+                X: 1D numpy array with shape (N,) containing kernel coordinates
+                    from kernel.left() to kernel.right()
+                    ATTENTION:  THE ELEMENTS ARE NOT SAMPLE INDICES!
+                
+                KRN: 1D numpy array with shape (N,) containing the kernel sample values;
+                
+        when compact is True:
+            2D numpy array with shape (N,2):
+                column 0 : coordinates from kernel.left() to kernel.right()
+                column 1 : kernel sample values
+                
+    for a 2D kernel (N x M samples):
+        when compact is False:
+            list[XY, KRN] with:
+                XY: list [X, Y] of 2D numpy arrays with size (N,M) - these are
+                    the meshgrid with the coordinates of kernel's samples, 
+                    from kernel.lowerRight() to kernel.upperLeft()
+                    
+                KRN: 2D numy array with shape (N,M)
+                
+        when compact is True:
+            3D numy array with shape (N,M,3) where
+            column 0: meshgrid X coordinates
+            column 1: meshgrid Y coordinates
+            column 2: kernel sample values
+            
+                
+    In either case, the kernel's centre is at the centre (in the middle) of the
+    the coordinate array(s).
+    
+    NOTE: To reconstruct from a compact array ('kernel_array'):
+    -----------------------------------------------------------
+    
+    Pseudo-code:
+    if kernel_array.ndim == 2 => Kernel1D, else Kernel2D
+    
+    Kernedl1D case:
+    
+    k1d         = vigra.filters.Kernel1D()
+    left        = int(kernel_array[ 0, 0])
+    right       = int(kernel_array[-1, 0])
+    contents    = kernel_array[:, 0]
+    k1d.initExplicitly(left, right, contents)
+    
+    Kernel2D case:
+    
+    k2d         = vigra.filters.Kernel2D()
+    upperLeft   = (int(kernel_array[-1, 1, 0]), int(kernel_array[-1, -1, 1]))
+    lowerRight  = (int(kernel_array[ 0, 0, 0]), int(kernel_array[ 0,  0, 1]))
+    contents    = kernel_array[:, :, 2]
+    k2d.initExplicitly(upperLeft, lowerRight, contents)
+                
+    """
+    raise NotImplementedError(f"{type(value).__name__} objects are not supported")
+    #if isinstance(value, vigra.filters.Kernel1D):
+        #return vK1D2array(value, compact)
+    
+    #elif isinstance(value, vigra.filters.Kernel2D):
+        #return vK2D2array(value, compact)
+    
+@kernel2array.register(vigra.filters.Kernel1D)
+def _(value, compact=False):
     """Returns a numpy.ndarray representation of a vigra.Kernel1D object
     Arguments: 
     "value" = vigra.Kernel1D object
@@ -303,7 +380,8 @@ def vK1D2array(value, compact=False):
     
     return x, y
 
-def vK2D2array(value, compact=False):
+@kernel2array.register(vigra.filters.Kernel2D)
+def _(value, compact=False):
     xx = np.linspace(value.lowerRight()[0], value.upperLeft()[0], value.width(), 
                      dtype=np.dtype(int))
     
@@ -322,46 +400,6 @@ def vK2D2array(value, compact=False):
         return np.concatenate([x[0][:,:,np.newaxis], x[1][:,:,np.newaxis], y[:,:,np.newaxis]], axis=2)
             
     return x, y
-    
-def kernel2array(value:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D],
-                 compact:bool=False):
-    """
-    value: Kernel1D or 2D
-    compact:bool, default is False
-    
-    Returns:
-    list [X, KRN] (when compact is False):
-        for an 1D kernel:
-            X is a 1D numpy array with the x coordinates for the kernel , from 
-                kernel.left() to kernel.right()
-                ATTENTION:  THIS IS NOT THE SAMPLE NUMBER!
-                
-            Y is a 1D numpy array with the kernel sample values;
-                
-        for a 2D kernel:
-            X is a list of two 2D numpy arrays [x, y] representing the 
-                coordinate mesh (meshgrid) for the 2D kernel samples
-                
-            KRN is a 2D numpy array with the kernel sample values;
-            
-            xx, yy and Y all have identical shapes
-            
-        In either case, the kernel's centre is at the centre (in the middle) of 
-        the X array(s).
-                
-    numy array (when compact is True)
-        When True, numpy array as follows:
-            for 1D kernels, returns a 2D numpy array with the X coordinate in 
-                column 0 and kernel saple values in column 1
-                
-            for 2D kernels: 
-                
-    """
-    if isinstance(value, vigra.filters.Kernel1D):
-        return vK1D2array(value, compact)
-    
-    elif isinstance(value, vigra.filters.Kernel2D):
-        return vK2D2array(value, compact)
     
 
 def getCalibratedAxisSize(image, axis):

@@ -166,8 +166,8 @@ class CustomEncoder(json.JSONEncoder):
         from core import prog
         from core.datatypes import is_namedtuple
         
-        if any(hasattr(obj,name) for name in ("toJSON", "to_json", "write_json", "writeJSON")):
-            raise NotImplementedError(f"The {type(obj).__name__} object appears capable to write itself to JSON and is not supported here")
+        #if any(hasattr(obj,name) for name in ("toJSON", "to_json", "write_json", "writeJSON")):
+            #raise NotImplementedError(f"The {type(obj).__name__} object appears capable to write itself to JSON and is not supported here")
         
         if isinstance(obj, complex):
             return {"__complex__", {"__value__":[obj.real, obj.imag]}}
@@ -202,7 +202,7 @@ class CustomEncoder(json.JSONEncoder):
                                         # arrays and recarrays, 
                                         # None for regular arrays
                                         
-            if fields is not None:
+            if fields is not None: # structured array or recarray
                 if obj.dtype.name.startswith("record"): # recarray
                     entry = "__recarray__"
                 else:
@@ -237,10 +237,13 @@ class CustomEncoder(json.JSONEncoder):
                                 "__axistags__":obj.axistags.toJSON(),
                                 "__order__": obj.order}}
             
+            elif isinstance(obj, vigra.AxisTags):
+                return {"__axistags__": {"__value__": obj.toJSON()}}
+            
             else:
                 return {entry: {"__value__": obj.tolist(),
                                 "__dtype__": dtype2json(obj.dtype)}}
-                
+            
         return json.JSONEncoder.default(self, obj)
     
 def dtype2json(d:np.dtype, struct:bool=False) -> typing.Union[str, dict]:
@@ -303,7 +306,7 @@ def decode_hook(dct):
         if data is None or not isinstance(data, dict):
             return dct
         #print("data", data)
-        val = data.get("__value__", None)
+        val = data.get("__value__", None) # may be a dict, see below for *array__
         
         if val is None:
             return dct
@@ -324,14 +327,16 @@ def decode_hook(dct):
         elif key.endswith("SignatureDict"):
             return prog.SignatureDict(**val)
         
-        #elif any(e.endswith("array__") for e in dct):
+        if key == "__axistags__":
+            return vigra.AxisTags.fromJSON(val)
+            
         elif key.endswith("array__"):
-            entry = list(dct.keys())[0]
-            val = dct[entry]
+            #entry = list(dct.keys())[0]
+            #val = dct[entry]
             if key in ("__structarray__", "__recarray__"):
                 value = list(tuple(x) for x in val)
             else:
-                value = val["__value__"]
+                value = val #["__value__"]
                 
             if key == "__recarray__":
                 dtype = json2dtype(dict((name, (json2dtype(value[0]), value[1])) for name, value in data["__dtype__"].items()))
@@ -351,7 +356,7 @@ def decode_hook(dct):
             if entry == "__vigraarray__":
                 return vigra.VigraArray(ret, axistags=vigra.AxisTags.fromJSON(data["__axistags__"]), 
                                     order=data.get("__order__", None))
-                
+            
             return ret
         
         elif key == "__kernel1D__":

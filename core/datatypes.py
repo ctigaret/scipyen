@@ -205,6 +205,9 @@ def isRowVector(x):
         return False
     
 def is_uniform_sequence(s):
+    """Returns True when all elements in the sequence have the same type
+    Can also be used with sets after conversion to list.
+    """
     ret = isinstance(s, collections.abc.Sequence) 
 
     if ret:
@@ -212,6 +215,20 @@ def is_uniform_sequence(s):
 
     return ret
 
+def is_uniform_collection(obj):
+    """Shorthand to apply is_uniform_sequence() to what can be converted to list.
+    For dict collections, it applied to obj.values()
+    """
+    try:
+        if isinstance(obj, dict):
+            s = list(obj.values())
+        else:
+            s = list(obj)
+            
+        return is_uniform_sequence(s)
+    except:
+        return False
+    
 def sequence_element_type(s):
     from utilities import unique
     return unique((type(e) for e in s))
