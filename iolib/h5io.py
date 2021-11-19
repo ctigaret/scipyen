@@ -637,8 +637,6 @@ ScanData
 #       nixblock is a nix Block, inherits from nix.Entity
 
 
-
-
 import os, sys, tempfile, traceback, warnings, numbers
 import types, typing, inspect, functools, itertools
 from functools import (partial, singledispatch)
@@ -680,7 +678,9 @@ from core.quantities import(arbitrary_unit,
 from core.datatypes import (TypeEnum,UnitTypes, Genotypes, 
                             is_uniform_sequence, is_uniform_collection, 
                             is_namedtuple, is_string,
-                            is_numeric_string, is_numeric, NUMPY_STRING_KINDS,
+                            is_numeric_string, is_numeric, 
+                            is_convertible_to_numpy_array,
+                            NUMPY_STRING_KINDS,
                             )
 
 from core.modelfitting import (FitModel, ModelExpression,)
@@ -721,6 +721,11 @@ from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse,
 #   (for data sets deeply nested, the intermediary groups must also be present)
 #   
 
+# NOTE: 2021-11-19 09:15:37 guard variable
+# during development: set this to True then insert print statements after
+# 'if __DEBUG__:' clause
+__DEBUG__=False
+
 
 class HDFDataError(Exception):
     pass
@@ -740,6 +745,133 @@ def __mangle_dict__(d):
 def __unmangle_dict__(d):
     return dict((__unmangle_name__(k), v) for k,v in d.items())
 
+#def store_cached_entity_old(s:dict, name:str, obj:typing.Any, 
+                        #entity:typing.Union[h5py.Group, h5py.Dataset]):
+    #if not isinstance(s, dict):
+        #return
+    
+    #if not isinstance(entity, (h5py.Group, h5py.Dataset)):
+        #return
+    
+    #if not isinstance(name, str) or len(name.strip()) == 0:
+        #warnings.warn("name must be a non-empty string")
+        #return
+    
+    #if obj is None:
+        #warnings.warn:("Cannot store None objects in the entity cache")
+        #return
+    
+    #s[name] = {"__obj__": obj,
+               #"__entity__": entity}
+
+#def store_cached_entity(s:dict, obj:typing.Any, 
+                        #entity:typing.Union[h5py.Group, h5py.Dataset]):
+    #if not isinstance(s, dict):
+        #return
+    
+    #if not isinstance(entity, (h5py.Group, h5py.Dataset)):
+        #return
+    
+    ##if not isinstance(name, str) or len(name.strip()) == 0:
+        ##warnings.warn("name must be a non-empty string")
+        ##return
+    
+    ##if obj is None:
+        ##warnings.warn:("Cannot store None objects in the entity cache")
+        ##return
+    
+    #s[entity.name] = {"__obj__": obj,
+                      #"__entity__": entity}
+    
+def store_cached_entity(s:dict, obj:typing.Any, 
+                        entity:typing.Union[h5py.Group, h5py.Dataset]):
+    if not isinstance(s, dict):
+        return
+    
+    if not isinstance(entity, (h5py.Group, h5py.Dataset)):
+        return
+    
+    #if not isinstance(name, str) or len(name.strip()) == 0:
+        #warnings.warn("name must be a non-empty string")
+        #return
+    
+    #if obj is None:
+        #warnings.warn:("Cannot store None objects in the entity cache")
+        #return
+    
+    s[id(obj)] = entity
+
+def get_cached_entity(cache:dict, obj:typing.Any):
+    if not isinstance(cache, dict) or len(cache) == 0:
+        return
+    
+    return cache.get(id(obj), None)
+    
+#def get_cached_entity(cache:dict, obj:typing.Any):
+    #if not isinstance(cache, dict) or len(cache) == 0:
+        #return
+    
+    #print(f"get_cached_entity {type(obj).__name__}")
+    
+    #if isinstance(obj, (h5py.Group, h5py.Dataset)):
+        #items  = [v["__entity_"] for v in cache.values()]
+        ##items  = [(n,v["__entity_"]) for n,v in cache.items()]
+        
+    #else:
+        #items = [v["__obj__"] for v in cache.values()]
+        ##items = [(n,v["__obj__"]) for n,v in cache.items()]
+        
+    #ret = [i for i in items if type(i) is type(obj) and i is obj]
+    ##ret = [(n,i) for i in items if i[1] is obj]
+    
+    #print("ret", ret)
+    
+    #if len(ret):
+        #return ret[0]
+    
+                
+#def get_cached_entity_old(cache:dict, obj:typing.Any, 
+                      #name:typing.Optional[str]=None, 
+                      #entity_type:typing.Optional[type]=None):
+    #if not isinstance(cache, dict) or len(cache) == 0:
+        #return
+    
+    #if isinstance(entity_type, type):
+        #if entity_type not in (h5py.Group, h5py.Dataset):
+            #raise TypeError("entity_type must be one of the types (h5py.Group, h5py.Dataset")
+        #entity_type = (entity_type, )
+    
+    #else:
+        #entity_type = (h5py.Group, h5py.Dataset)
+        
+    #if isinstance(name, str) and len(name.strip()):
+        ## lookup by entry name
+        #cached_entry = cache.get(name, None)
+        
+        #if isinstance(cached_entry, dict):
+            #if cached_entry.get("__obj__", None) is obj and type(cached_entry.get("__entity__", None)) in entity_type:
+                #return cached_entry["__entity__"]
+            
+    #else:
+        #if isinstance(obj, (h5py.Group, h5py.Dataset)):
+            ## lookup by HDF5 hierarchy objects
+            #entities = [k["__entity_"] for k in cache.values() if isinstance (k, dict) and type(k.get("__entity_", None)) in entity_type]
+            
+            #result = [k for k in entities if k.name == entity.name]
+            
+            #if len(result):
+                #return result[0]
+            
+        #else:
+            ## lookup by object reference itself - loosely
+            #objects = [k["__obj__"] for k in cache.values() if isinstance(k, dict) and type(k.get("__obj__", None)) is type(obj)]
+            
+            #if len(objects):
+                #result = [k for k in objects if k is obj]
+                
+                #if len(result):
+                    #return result[0]
+                
 def print_hdf(v):
     return v if isinstance(v, str) else v.decode() if isinstance(v, bytes) else v[()]
 
@@ -854,14 +986,17 @@ def make_attr(x:typing.Optional[typing.Union[str, list, tuple, dict, deque, np.n
     store as attrs value to a Group or Dataset.
     
     """
-    #print(f"make_attr {type(x).__name__}, dtype: {getattr(x, 'dtype', None)}")
     if x is None:
         return jsonio.dumps(x)
     
     if isinstance(x, str):
+        # because np.str_ resolves to str in later versions; but data saved with
+        # old numpy API msy still hold scalars of type np.str_
+        if isinstance(x, np.str_):
+            return str(x)
+        
         return x
-        #return string2hdf(x)
-    
+        
     if isinstance(x, (list, tuple, dict)): 
         # will raise exception if elements or values are not json-able
         # CAUTION Do not use large data objects here!
@@ -873,9 +1008,7 @@ def make_attr(x:typing.Optional[typing.Union[str, list, tuple, dict, deque, np.n
         except:
             raise HDFDataError(f"The object {x}\n with type {type(x).__name__} cannot be serialized in json")
 
-    
     if isinstance(x, np.ndarray):
-        #print("dtype", x.dtype, "kind", x.dtype.kind)
         if x.dtype.kind in NUMPY_STRING_KINDS:
             return np.array(x, dtype=h5py.string_dtype(), order="K")
         else:
@@ -903,7 +1036,7 @@ def make_attr_dict(**kwargs):
     
     for k,v in kwargs.items():
         ret[k] = make_attr(v)
-        
+            
     return ret
 
 def from_attr_dict(attrs):
@@ -939,19 +1072,10 @@ def from_attr_dict(attrs):
         
     return ret
                 
-#def make_data_type_attrs(data, prefix=""):
 def make_data_type_attrs(data):
     if not isinstance(data, type):
         data = type(data)
-        
-    #if isinstance(prefix, str) and len(prefix.strip()):
-        #if not prefix.endswith("_"):
-            #prefix += "_"
-        
-    #else:
-        #prefix = ""
-        
-    
+
     attrs = dict()
     
     attrs["__type_name__"] = data.__name__
@@ -972,30 +1096,8 @@ def make_data_type_attrs(data):
         init_dict = classify_signature(getattr(data, "__init__"))
         attrs["__python_init__"] = jsonio.dumps(init_dict)
         
-    #attrs[f"__{prefix}type_name__"] = data.__name__
-    #attrs[f"__{prefix}module_name__"] = data.__module__
-    #attrs[f"__{prefix}python_class__"] = ".".join([data.__module__, data.__name__])
-    
-    #if inspect.isfunction(data):
-        #attrs[f"__{prefix}func_name__"] = data.__name__            
-        #return attrs
-    
-    #if is_namedtuple(data_type):
-        #fields_list = list(f for f in data_type._fields)
-        #attrs[f"__{prefix}python_class_def__"] = f"{data_type.__name__} = collections.namedtuple({data.__name__}, {list(fields_list)})"
-    #else:
-        #attrs[f"__{prefix}python_class_def__"] = prog.class_def(data_type)
+    return make_attr_dict(**attrs)
         
-    #if hasattr(data_type, "__new__"):
-        #sig_dict = classify_signature(getattr(data_type, "__new__"))
-        #attrs[f"__{prefix}python_new__"] = jsonio.dumps(sig_dict)
-        
-    #if hasattr(data_type, "__init__"):
-        #init_dict = classify_signature(getattr(data_type, "__init__"))
-        #attrs[f"__{prefix}python_init__"] = jsonio.dumps(init_dict)
-        
-    return attrs
-
 def get_file_group_child(fileNameOrGroup:typing.Union[str, h5py.Group],
                        pathInFile:typing.Optional[str] = None, 
                        mode:typing.Optional[str]=None) -> typing.Tuple[typing.Optional[h5py.File], h5py.Group, typing.Optional[str]]:
@@ -1071,7 +1173,53 @@ def parse_func(f):
                           "annotation": __identify__(p.annotation),
                           }) for p_name, p in sig.parameters.items())
 
-def make_obj_attrs(obj:typing.Any, as_group:bool=False):#, parent:h5py.Group):
+def make_entry_name(obj):
+    if not isinstance(obj, str):
+        target_name = f"{type(obj).__name__}_{uuid4().hex}"
+        #target_name = f"{type(obj).__module__}.{type(obj).__name__}_{uuid4().hex}"
+    else:
+        target_name = f"obj_{uuid4().hex}"
+        
+    return target_name
+    
+
+#def make_entry_name_old(obj, 
+                    #pfx:typing.Optional[str]=None,
+                    #sfx:typing.Optional[str]=None,
+                    #unique:typing.Optional[bool]=None):
+    #if not isinstance(pfx, str) or len(pfx.strip()) == 0:
+        #pfx = ""
+        
+    #else:
+        #pfx += "_"
+        
+    #if not isinstance(sfx, str) or len(sfx.strip()) == 0:
+        #sfx = ""
+        
+    #else:
+        #sfx = "_"+sfx
+        
+    #if obj is None:
+        #return f"{pfx}None{sfx}"
+    
+    #if isinstance(obj, str):
+        #ret = str2symbol(obj)
+        #if unique is True:
+            #ret += f"_{id(obj)}"
+        #return f"{pfx}{ret}{sfx}"
+    
+    #obj_name = getattr(obj, "name", None)
+    
+    #if not isinstance(obj_name, str) or len(obj_name.strip()) == 0:
+        #obj_name = f"{type(obj).__module__}.{type(obj).__name__}"
+        
+    #if unique is True:
+        #obj_name += f"{id(obj)}"
+        
+    #return f"{pfx}{obj_name}{sfx}"
+
+def make_obj_attrs(obj:typing.Any, as_group:bool=False, 
+                   pfx:typing.Optional[str]=None):#, parent:h5py.Group):
     """Generates name and attrs dict for a HDF5 entity
     
     Parameters:
@@ -1086,21 +1234,20 @@ def make_obj_attrs(obj:typing.Any, as_group:bool=False):#, parent:h5py.Group):
         Otherwise, the returned dictionary is intended for a HDF5 Group
     """
     if isinstance(obj, prog.CALLABLES):
-        return {"__function_or_method__" : jsonio.dumps(prog.classify_signature(obj))}
+        return make_attr_dict (__function_or_method__ = jsonio.dumps(prog.classify_signature(obj)))
+    
+    if obj is None:
+        return make_entry_name(obj), {}
+        #return f"None_{uuid4().hex}", {}
     
     obj_attrs = make_data_type_attrs(obj)
     
     if not as_group:
         obj_attrs.update(make_dataset_attrs(obj))
+        
+    target_name = make_entry_name(obj)
     
-    attrs = make_attr_dict(**obj_attrs)
-    
-    if not isinstance(obj, str):
-        dset_name = f"{type(obj).__module__}.{type(obj).__name__}_{uuid4().hex}"
-    else:
-        dset_name = obj
-    
-    return dset_name, attrs
+    return target_name, obj_attrs
 
 @singledispatch
 def make_dataset_attrs(obj):
@@ -1141,11 +1288,10 @@ def make_dataset_attrs(obj):
     if isinstance(obj, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
         # NOTE: 2021-11-18 12:31:59
         # in vigranumpy all kernels are float ?
-        return {"__dtype__": jsonio.dtype2json(np.dtype(float))} 
+        #return {"__dtype__": jsonio.dtype2json(np.dtype(float))} 
+        return make_attr_dict(__dtype__ = jsonio.dtype2json(np.dtype(float)))
         
     return dict()
-    #raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
-    #return make_attr_dict(**make_data_type_attrs(obj))
 
 @make_dataset_attrs.register(np.ndarray)
 def _(obj):
@@ -1154,15 +1300,16 @@ def _(obj):
     fields = obj.dtype.fields
     if fields is not None: # structured array or recarray; type is in make_data_type_attrs
         attrs["__dtype_fields__"] = list(f for f in obj.dtype.fields)
-    return attrs
+    
+    return make_attr_dict(**attrs)
 
 @make_dataset_attrs.register(pq.Quantity)
 def _(obj):
     attrs = dict()
     attrs["__dtype__"] = jsonio.dtype2json(obj.dtype)
     attrs["__units__"] = obj.units
-    return attrs
-    #return make_attr_dict(**attrs)
+    
+    return make_attr_dict(**attrs)
 
 @make_dataset_attrs.register(neo.core.dataobject.DataObject)
 def _(obj):
@@ -1179,12 +1326,12 @@ def _(obj):
     if isinstance(obj, neo.SpikeTrain):
         ret["__unit__"] = obj.unit
     
-    return ret
+    return make_attr_dict(**ret)
 
 @make_dataset_attrs.register(vigra.VigraArray)
 def _(obj):
-   return {"__dtype__" : jsonio.dtype2json(obj.dtype),
-           "__axistags__" : obj.axistags.toJSON()}
+   return make_attr_dict(__dtype__ = jsonio.dtype2json(obj.dtype), 
+                         __axistags__ = obj.axistags.toJSON())
 
 @singledispatch
 def make_axis_dict(obj, axisindex:int):
@@ -1761,7 +1908,8 @@ def _(obj, axisindex):
         ret["__left_sweep__"] = obj.left_sweep
         #ret["__waveforms__"] = obj.waveforms
         ret["__end__"] = obj.t_stop
-        if obj.waveforms.size > 0:
+        waveforms = getattr(obj, "waveforms", None)
+        if isinstance(waveforms, np.ndarray) and waveforms.size > 0:
             ret["__sampling_rate__"] = obj.sampling_rate
         
     return ret
@@ -1849,15 +1997,14 @@ def make_axis_scale(obj,
     # this data set (see NOTE: 2021-11-12 16:05:29 and NOTE: 2021-11-12 17:35:27
     # in self.writeDataObject) 
     
-    #print(f"make_axis_scale {type(obj).__name__}, axis {dimindex}")
     axis_dict = make_axis_dict(obj, dimindex)
     
     axis_dset_name = f"axis_{dimindex}"
     
     if isinstance(obj, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal,
-                        neo.Epoch, DataZone, neo.Event, DataMark)):
+                        neo.Epoch, DataZone, neo.Event, DataMark)) and obj.size > 0:
         axis_dset = make_hdf5_entity(obj.times, axesgroup,
-                                     entity_name = axis_dset_name,
+                                     name = axis_dset_name,
                                      compression = compression, 
                                      chunks = chunks,
                                      track_order = track_order)
@@ -2329,88 +2476,181 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
             
     return data
 
-def make_hdf5_entity(obj, group:h5py.Group, 
-                    entity_name:typing.Optional[str]=None,
+@safeWrapper
+def make_hdf5_entity(obj, group:h5py.Group,
+                    name:typing.Optional[str]=None,
                     compression:typing.Optional[str]="gzip",
                     chunks:typing.Optional[bool]=None,
-                    track_order:typing.Optional[bool] = True) -> typing.Union[h5py.Group, h5py.Dataset]:
+                    track_order:typing.Optional[bool] = True, 
+                    entity_cache:typing.Optional[dict]=None) -> typing.Union[h5py.Group, h5py.Dataset]:
     from imaging import vigrautils as vu
     #from core import datatypes as dt
+    
+    #print(f"make_hdf5_entity in group {group} for {name}: {type(obj).__name__}")
+    
+    if obj is None:
+        target_name, obj_attrs = make_obj_attrs(obj, as_group=False)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+            
+        entity = group.create_dataset(target_name, data = h5py.Empty("f"))
+        
+        return entity
 
     if isinstance(obj, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
-        dataset_name, obj_attrs = make_obj_attrs(obj, False)
+        target_name, obj_attrs = make_obj_attrs(obj, as_group=False)
         
-        if isinstance(entity_name, str) and len(entity_name.strip()):
-            dataset_name = entity_name
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+            
+        cached_entity = get_cached_entity(entity_cache, obj)
+        
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
             
         data = vu.kernel2array(obj)
         
-        entity = group.create_dataset(dataset_name, data = data, 
+        entity = group.create_dataset(target_name, data = data, 
                                       compression = compression, 
                                       chunks = chunks)
         
         entity.attrs.update(obj_attrs)
         
+        store_cached_entity(entity_cache, obj, entity)
+        
+        return entity
+    
+    elif isinstance(obj, (vigra.VigraArray, neo.core.dataobject.DataObject)):
+        # NOTE: 2021-11-19 11:34:38
+        # make a sub group and place the main data set and axes data set within
+        # this is because these objects need their own group to contain the 
+        # main data set and the axes group, if any
+        target_name, obj_attrs = make_obj_attrs(obj, as_group=True)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+            
+        cached_entity = get_cached_entity(entity_cache, obj)
+        
+        if isinstance(cached_entity, h5py.Group):
+            group[target_name] = cached_entity
+            return cached_entity
+                    
+        #print("in group", group.name)
+        #print("trying to set target_name", target_name)
+        entity = group.create_group(target_name, track_order=track_order)
+        
+        sub_entity = make_hdf5_dataset(obj, entity, name=target_name, compression = compression,
+                          chunks = chunks, track_order = track_order)
+        
+        entity.attrs.update(obj_attrs)
+        
+        store_cached_entity(entity_cache, obj, entity)
+        
         return entity
     
     else:
-        if isinstance(obj, (tuple, list, deque, set)):
-            val = is_uniform_sequence(list(obj)) if isinstance(obj, set) else is_uniform_sequence(obj)
-            if val is True:
-                factory = make_hdf5_dataset
-            else:
-                factory = makde_hdf5_group
-                
-        elif isinstance(obj, (dict, neo.core.container.Container)):
+        if isinstance(obj, (tuple, list, deque, set, dict, neo.core.container.Container)):
             factory = make_hdf5_group
-        
+            
         else:
             factory = make_hdf5_dataset
             
-        return factory(obj, group, name=entity_name, compression=compression, chunks=chunks, track_order=track_order)
+        return factory(obj, group, name=name, compression=compression, 
+                       chunks=chunks, track_order=track_order, entity_cache = entity_cache)
         
 @safeWrapper
 def make_hdf5_dataset(obj, group: h5py.Group, name:typing.Optional[str]=None,
                       compression:typing.Optional[str]="gzip",
                       chunks:typing.Optional[bool] = None,
-                      track_order:typing.Optional[bool]=True) -> h5py.Dataset:
+                      track_order:typing.Optional[bool]=True,
+                      entity_cache:typing.Optional[dict] = None,
+                      ) -> h5py.Dataset:
     """Creates a HDF5 Dataset in group based on obj.
     Delegates to make_dataset to create a data set then adorns its attrs 
     with obj-specific information.
     """
-    dataset_name, obj_attrs = make_obj_attrs(obj, as_group=False)
+    target_name, obj_attrs = make_obj_attrs(obj, as_group=False)
     if isinstance(name, str) and len(name.strip()):
-        dataset_name = name
+        target_name = name
         
-    dset = make_dataset(obj, group, name, compression = compression, chunks = chunks,
+    cached_entity = get_cached_entity(entity_cache, obj)
+    
+    if isinstance(cached_entity, h5py.Dataset):
+        group[target_name] = cached_entity # make a hard link
+        return cached_entity
+        
+    dset = make_dataset(obj, group, target_name, compression = compression, chunks = chunks,
                         track_order = track_order)
     
-    print("make_hdf5_dataset,obj_attrs:")
-    for k,v in obj_attrs.items():
-        print("k:", k, "v", type(v))
-    
     dset.attrs.update(obj_attrs)
+    
+    store_cached_entity(entity_cache, obj, dset)
     
     return dset
 
 @singledispatch
-def make_dataset(obj, group:h5py.Group, name, 
+def make_dataset(obj, group:h5py.Group, name,
                  compression:typing.Optional[str]="gzip", 
                  chunks:typing.Optional[bool] = None,
                  track_order=True):
+    #print(f"make_dataset for {type(obj).__name__} with name {name} in group {group}")
     # for scalar objects only, and basic python sequences EXCEPT for strings
     # because reading back strings can be confused with stored bytes data
-    if not isinstance(obj, (numbers.Number, tuple, list, deque, bytes)):
-        raise NotImplementedError(f"make_dataset: {type(obj).__name__} objects are not supported")
-    return group.create_dataset(name, data = obj, compression=compression, chunks=chunks)
+    if not isinstance(obj, (numbers.Number, tuple, list, deque)):
+        warnings.warn(f"make_dataset: {type(obj).__name__} objects are not supported")
+        return group.create_dataset(name, data = h5py.Empty("f"))
+    #return group.create_dataset(name, data = obj, compression=compression, chunks=chunks)
+    return group.create_dataset(name, data = obj)
 
 @make_dataset.register(type(None))
 def _(obj, group, name, compression, chunks, track_order):
     return group.create_dataset(name, data = h5py.Empty("f"))
 
+@make_dataset.register(bytes)
+def _(obj, group, name, compression, chunks, track_order):
+    if obj.isascii():
+        data = np.array(obj.decode(), dtype=h5py.string_dtype())
+
+    else:
+        data = np.array(obj)
+    
+    if data.size == 0:
+        return group.create_dataset(name, data = h5py.Empty(f))
+    
+    if data.size == 1:
+        return group.create_dataset(name, data = data, compression=compression)
+    
+    return group.create_dataset(name, data = data, compression=compression,
+                                chunks = chunks)
+            
+@make_dataset.register(bytearray)
+def _(obj, group, name, compression, chunks, track_order):
+    data = np.array(obj)
+    
+    if data.size == 0:
+        return group.create_dataset(name, data = h5py.Empty(f))
+    
+    if data.size == 1:
+        return group.create_dataset(name, data = data, compression=compression)
+    
+    return group.create_dataset(name, data = data, compression=compression,
+                                chunks = chunks)
+            
 @make_dataset.register(str)
 def _(obj, group, name, compression, chunks, track_order):
+    if len(obj)==0:
+        return group.create_dataset(name, data = h5py.Empty("f"))
+    
+    #if len(obj) == 1:
+        #return group.create_dataset(name, data = np.array(obj, dtype = h5py.string_dtype()),
+                                    #compression = compression)
+    
     return group.create_dataset(name, data = np.array(obj, dtype = h5py.string_dtype()))
+    #return group.create_dataset(name, data = np.array(obj, dtype = h5py.string_dtype()),
+                                #compression = compression, chunks = chunks)
 
 @make_dataset.register(vigra.VigraArray)
 def _(obj, group:h5py.Group, name:str, compression=None, chunks=None, track_order=True):
@@ -2419,11 +2659,20 @@ def _(obj, group:h5py.Group, name:str, compression=None, chunks=None, track_orde
     
     Modified from vigra.impex.writeHDF5 (python version, (C) U.Koethe)
     """
+    dset_name = f"{name}_data"
+    axgrp_name = f"{name}_axes"
+    
+    if obj.size == 0:
+        return group.create_dataset(dset_name, data = h5py.Empty("f"))
+    
     data = obj.transposeToNumpyOrder()
     
-    dset = group.create_dataset(name, data = data, compression = compression, chunks=chunks)
+    if data.size == 1:
+        dset = group.create_dataset(dset_name, data = data, compression = compression)
+    else:
+        dset = group.create_dataset(dset_name, data = data, compression = compression, chunks=chunks)
     
-    axesgroup = group.create_group(f"{name}_axes", track_order = track_order)
+    axesgroup = group.create_group(axgrp_name, track_order = track_order)
     
     for axindex in range(obj.ndim):
         make_axis_scale(obj, dset, axesgroup, axindex, compression, chunks)
@@ -2432,8 +2681,19 @@ def _(obj, group:h5py.Group, name:str, compression=None, chunks=None, track_orde
 
 @make_dataset.register(neo.core.dataobject.DataObject)
 def _(obj, group, name, compression, chunks, track_order):
-    dset = group.create_dataset(name, data = obj.magnitude, compression = compression, chunks = chunks)
-    axgroup = group.create_group(f"{name}_axes", track_order=track_order)
+    dset_name = f"{name}_data"
+    axgrp_name = f"{name}_axes"
+    
+    if obj.size == 0:
+        return group.create_dataset(dset_name, data = h5py.Empty("f"))
+    
+    if obj.size == 1:
+        dset = group.create_dataset(dset_name, data = obj.magnitude, compression = compression)
+    else:
+        dset = group.create_dataset(dset_name, data = obj.magnitude, compression = compression, chunks = chunks)
+        
+    axgroup = group.create_group(axgrp_name, track_order=track_order)
+    
     for k in range(obj.ndim):
         make_axis_scale(obj, dset, axgroup, k, compression, chunks)
         
@@ -2441,7 +2701,7 @@ def _(obj, group, name, compression, chunks, track_order):
     
     if isinstance(labels, np.ndarray) and labels.size:
         labels_dset = make_hdf5_entity(labels, axgroup, 
-                                       entity_name =f"{name}_labels",
+                                       name =f"{name}_labels",
                                        compression = compression,
                                        chunks = chunks)
         labels_dset.make_scale(f"{name}_labels")
@@ -2451,7 +2711,7 @@ def _(obj, group, name, compression, chunks, track_order):
     
     if isinstance(waveforms, np.ndarray) and waveforms.size > 0:
         waveforms_dset = make_hdf5_entity(waveforms, axgroup, 
-                                          entity_name = f"{name}_waveforms",
+                                          name = f"{name}_waveforms",
                                           compression = compression,
                                           chunks = chunks)
         waveforms_dset.make_scale(f"{name}_waveforms")
@@ -2469,14 +2729,27 @@ def _(obj, group, name, compression, chunks, track_order):
 def _(obj, group, name, compression, chunks, track_order):
     # NOTE: 2021-11-18 14:41:47
     # units & dtype taken care of by make_obj_attrs() via make_dataset_attrs()
+    if obj.size == 0:
+        return group.create_dataset(name, data = h5py.Empty("f"))
+    
+    if obj.size == 1:
+        return group.create_dataset(name, data = obj.magnitude)
+    
     return group.create_dataset(name, data = obj.magnitude, compression = compression, chunks = chunks)
 
 @make_dataset.register(np.ndarray)
 def _(obj, group, name, compression, chunks, track_order):
+    if obj.size == 0:
+        return group.create_dataset(name, data = h5py.Empty("f"))
+    
     if obj.dtype.kind in NUMPY_STRING_KINDS:
         data = np.array(obj, dtype=h5py.string_dtype(), order="k")
     else:
         data = obj
+        
+    if obj.size == 1:
+        return group.create_dataset(name, data = obj.magnitude, compression = compression)
+    
     return group.create_dataset(name, data = data, compression = compression, 
                                 chunks = chunks)
     
@@ -2484,46 +2757,122 @@ def _(obj, group, name, compression, chunks, track_order):
 def make_hdf5_group(obj, group:h5py.Group, name:typing.Optional[str]=None,
                     compression:typing.Optional[str]="gzip", 
                     chunks:typing.Optional[bool]=None,
-                    track_order:typing.Optional[bool] = True) -> h5py.Group:
+                    track_order:typing.Optional[bool] = True,
+                    entity_cache:typing.Optional[dict] = None) -> h5py.Group:
     target_name, obj_attrs = make_obj_attrs(obj, as_group=True)
     if isinstance(name, str) and len(name.strip()):
         target_name = name
         
-    ret = make_group(obj, group, target_name, compression, chunks, track_order)
-    ret.attrs.update(obj_attrs)
+    cached_entity = get_cached_entity(entity_cache, obj)
+    
+    if isinstance(cached_entity, h5py.Group):
+        group[target_name] = cached_entity
+        return cached_entity
+        
+    entity = make_group(obj, group, target_name, compression, chunks, track_order, entity_cache)
+    entity.attrs.update(obj_attrs)
+    
+    store_cached_entity(entity_cache, obj, entity)
+    
+    return entity
     
 @singledispatch
 def make_group(obj, group:h5py.Group, name:str, 
                     compression:typing.Optional[str]="gzip",
                     chunks:typing.Optional[bool]=None,
-                    track_order:typing.Optional[bool] = True) -> h5py.Group:
+                    track_order:typing.Optional[bool] = True,
+                    entity_cache:typing.Optional[dict] = None) -> h5py.Group:
     # NOTE: 2021-11-18 14:46:12
     # reserved for generic mapping objects
-    raise NotImplementedError(f"make_group: {type(obj).__name__} objects are not supported")
+    return group.create_group(name, track_order = track_order)
+    
+    #cached_entity = get_cached_entity(entity_cache, obj)
+    
+    #if isinstance(cached_entity, h5py.Group):
+        #group[name] = cached_entity
+        #return cached_entity
+    #else:
+        #entity = group.create_group(name, track_order = track_order)
+        #store_cached_entity(entity_cache, obj, entity)
+        #return entity
+    
 
 @make_group.register(dict)
-def _(obj, group, name, compression, chunks, track_order):
+def _(obj, group, name, compression, chunks, track_order, entity_cache):
     grp = group.create_group(name, track_order = track_order)
     
     for k,v in obj.items():
-        make_hdf5_entity(v, grp, k, compression = compression, chunks = chunks,
-                         track_order = track_order)
+        cached_entity = get_cached_entity(entity_cache, obj)
+        if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
+            grp[name] = cached_entity
+            
+            #cached_entity_name = cahed_entity.name.replace("/", "_")
+            #dset = grp.create_dataset(f"{cached_entity_name}_ref", dtype=h5py.ref_dtype)
+            #dset[0] = cached_entity.ref
+        
+        else:
+            entity = make_hdf5_entity(v, grp, k, compression = compression, chunks = chunks,
+                            track_order = track_order, entity_cache = entity_cache)
+        
+            store_cached_entity(entity_cache, obj, entity)
+            
+    return grp
+
+@make_group.register(collections.abc.Iterable)
+def _(obj, group, name, compression, chunks, track_order, entity_cache):
+    grp = group.create_group(name, track_order = track_order)
+    
+    for k,v in enumerate(obj):
+        cached_entity = get_cached_entity(entity_cache, obj)
+        
+        if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
+            grp[name] = cached_entity
+            #cached_entity_name = cached_entity.name.replae("/", "_")
+            #dset = grp.create_dataset(f"{cached_entity.name}_ref", dtype=h5py.ref_dtype)
+            #dset[0] = cached_entity.ref
+        
+        else:
+            entity = make_hdf5_entity(v, grp, f"element_{k}", compression = compression, chunks = chunks,
+                            track_order = track_order, entity_cache = entity_cache)
+            
+            store_cached_entity(entity_cache, obj, entity)
         
     return grp
 
+#@make_group.register(vigra.VigraArray)
+#def _(obj, group, name, compression, chunks, track_order, entity_cache):
+    #grp = group.create_group(target_name, track_order = True)
+    #make_hdf5_dataset(obj, entity, name=target_name, compression = compression,
+                          #chunks = chunks, track_order = track_order)
+
 @make_group.register(neo.core.container.Container)
-def _(obj, group, name, compression, chunks, track_order):
+def _(obj, group, name, compression, chunks, track_order, entity_cache):
     grp = group.create_group(name, track_order = track_order)
     
-    for prop in obj._child_containers:
-        child_grp = grp.create_group(f"{name}_{prop}", track_order = track_order)
-        children = getattr(obj, prop, None)
-        if children is not None:
-            for c in children:
-                make_hdf5_entity(c, child_grp, entity_name=None, compression = compression, 
-                                 chunks = chunks, track_order = track_order)
+    children_dict = dict()
     
+    for prop in obj._child_containers:
+        child_group_name = f"{name}_{prop}"
+        print("child_group_name", child_group_name)
+        child_grp = grp.create_group(child_group_name, track_order = track_order)
         
+        children = getattr(obj, prop, None)
+        
+        #print(f"child_container {prop}: children = {type(children).__name__}", children)
+        if hasattr(children, "__len__") and len(children):
+            for k,c in enumerate(children):
+                child_entity_name = make_entry_name(obj)
+                print(f"in group {child_group_name} child entity {child_entity_name}")
+                cached_entity = get_cached_entity(entity_cache, c)
+                if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
+                    child_grp[child_entity_name] = cached_entity
+                    
+                else:
+                    entity = make_hdf5_entity(c, child_grp, name=child_entity_name, compression = compression, 
+                                        chunks = chunks, track_order = track_order, entity_cache = entity_cache)
+                    store_cached_entity(entity_cache, c, entity)
+    
+    return grp
     
     
     

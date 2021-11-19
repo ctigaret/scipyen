@@ -215,6 +215,17 @@ def is_uniform_sequence(s):
 
     return ret
 
+def is_convertible_to_numpy_array(s):
+    ret = is_uniform_sequence(s)
+    if ret:
+        try:
+            a = np.array(s)
+        except:
+            traceback_print_exc()
+            ret = False
+            
+    return ret
+
 def is_uniform_collection(obj):
     """Shorthand to apply is_uniform_sequence() to what can be converted to list.
     For dict collections, it applied to obj.values()

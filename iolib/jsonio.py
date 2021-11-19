@@ -244,6 +244,9 @@ class CustomEncoder(json.JSONEncoder):
                 return {entry: {"__value__": obj.tolist(),
                                 "__dtype__": dtype2json(obj.dtype)}}
             
+        elif isinstance(obj, np.dtype):
+            return {"__dtype__": {"__value__": str(obj)}}
+            
         return json.JSONEncoder.default(self, obj)
     
 def dtype2json(d:np.dtype, struct:bool=False) -> typing.Union[str, dict]:
@@ -327,8 +330,11 @@ def decode_hook(dct):
         elif key.endswith("SignatureDict"):
             return prog.SignatureDict(**val)
         
-        if key == "__axistags__":
+        elif key == "__axistags__":
             return vigra.AxisTags.fromJSON(val)
+        
+        elif key == "__dtype__":
+            return np.dtype(val)
             
         elif key.endswith("array__"):
             #entry = list(dct.keys())[0]
