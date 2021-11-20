@@ -1122,7 +1122,7 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     def __array_finalize__(self, obj):
         super(IrregularlySampledDataSignal, self).__array_finalize__(obj)
-        self._domain = getattr(obj, "_domain", None)
+        self._domain            = getattr(obj, "_domain", getattr(obj, "times", None))
         self.annotations        = getattr(obj, "annotations",   {})
         self.name               = getattr(obj, "name",          None)
         self.file_origin        = getattr(obj, "file_origin",   None)
@@ -1130,7 +1130,10 @@ class IrregularlySampledDataSignal(BaseSignal):
         self.segment            = getattr(obj, "segment",       None)
         #self.channel_index      = getattr(obj, "channel_index", None)
         self.array_annotations  = getattr(obj, "array_annotations", None)
-        self.__domain_name__    = name_from_unit(self._domain)
+        if isinstance(self._domain, pq.Quantity):
+            self.__domain_name__    = name_from_unit(self._domain)
+        else:
+            self.__domain_name__    = "Dimensionless"
         
     def __deepcopy__(self, memo):
         cls = self.__class__
@@ -1478,7 +1481,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         """A brief description of the domain name
         """
         if self.__domain_name__ is None:
-            self.__domain_name__ = name_from_unit(self.domain)
+            self.__domain_name__ = name_from_unit(self.domain) if isinstance(self.domain, pq.Quantity) else "Dimensionless"
             
         return self.__domain_name__
     

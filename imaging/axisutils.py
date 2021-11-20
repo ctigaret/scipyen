@@ -70,8 +70,8 @@ from core.quantities import (space_frequency_unit,
 # ft                Frequency | Time
 # fx, fy, fz, fn    Frequency | Space
 # ?                 Unknown
-# s                 NonChannel
-# l                 AllAxes
+# nc                NonChannel
+# ll                AllAxes
 
 
 """Maps vigra.AxisInfo keys (str, lower case) to vigra.AxisType flags
@@ -95,13 +95,12 @@ standardAxisTypeKeys = Bunch({
     "fy": vigra.AxisType.Frequency | vigra.AxisType.Space,
     "fz": vigra.AxisType.Frequency | vigra.AxisType.Space,
     "?": vigra.AxisType.UnknownAxisType,
-    "n": vigra.AxisType.NonChannel,
-    "l": vigra.AxisType.AllAxes,
+    "nc": vigra.AxisType.NonChannel,
+    "ll": vigra.AxisType.AllAxes,
     }
     )
 
 STANDARD_AXIS_TAGS_KEYS = tuple(k for k in standardAxisTypeKeys)
-#STANDARD_AXIS_TAGS_KEYS = ("?", "a", "c", "e", "f", "fa", "ft", "fx", "fy", "fz", "l", "n", "t", "x", "y", "z")
 
 """See docstring for axisTypeFromUnits for details.
 """
@@ -291,8 +290,9 @@ def axisTypeFromUnits(u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionali
      
     """
     if isinstance(u, pq.dimensionality.Dimensionality):
-        if len(u.simplfied) == 1:
-            u = [k for k in u.simplified][0]
+        u_simp = u.simplified
+        if len(u_simp) == 1:
+            u = [k for k in u_simp][0]
             
         else:
             u = functools.reduce(operator.mul, (i[0]**i[1] for i in u.items()))
@@ -380,10 +380,10 @@ def axisTypeFromString(s:str) -> typing.Union[vigra.AxisType, int]:
         elif s.lower() in ("unknownaxistype", "unknown axis type", "unknown type", "unknown", "size", "?", "u", "uk", "ut"):
             return vigra.AxisType.UnknownAxisType
         
-        elif s.lower() in ("nonchannel", "non channel", "n", "nc"):
+        elif s.lower() in ("nonchannel", "non channel", "nc"):
             return vigra.AxisType.NonChannel
         
-        elif s.lower() in ("allaxes", "all axes", "l", "aa"):
+        elif s.lower() in ("allaxes", "all axes", "ll", "aa"):
             return vigra.AxisType.AllAxes
         
         else:
@@ -414,10 +414,10 @@ def axisTypeFromString(s:str) -> typing.Union[vigra.AxisType, int]:
             if any(s_ in typestr for s_ in ("?", "u")):
                 vigra.AxisType.UnknownAxisType
                 
-            if "l" in typestr:
+            if "ll" in typestr:
                 return vigra.AxisType.AllAxes
                 
-            if "n" in typestr:
+            if "nc" in typestr:
                 return vigra.AxisType.NonChannel
                 
             if len(types):
@@ -591,7 +591,7 @@ def axisTypeSymbol(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int],
     CAUTION: These are recommended, and not fully enforced
     """
     if isinstance(axisinfo, vigra.AxisInfo):
-        if axisinfo.key not in ("?", "n", "l"): # force checking these types
+        if axisinfo.key not in ("?", "nc", "ll"): # force checking these types
             return axisinfo.key
         
     typeint = getAxisTypeFlagsInt(axisinfo)
@@ -600,18 +600,18 @@ def axisTypeSymbol(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int],
         if typeint == vigra.AxisType.UnknownAxisType:
             return '?'
         if typeint == vigra.AxisType.NonChannel:
-            return "n"
+            return "nc"
         if typeint == vigra.AxisType.AllAxes:
-            return "l"
+            return "ll"
         
         n = vigra.AxisType.values[typeint].name[0]
     
     else:
-        names = ['?' if s =="UnknownAxisType" else 'l' if s == "AllAxes" else "n" if s=="NonChannel" else s[0].lower() for s in reversed(axisTypeStrings(typeint))]
+        names = ['?' if s =="UnknownAxisType" else 'll' if s == "AllAxes" else "nc" if s=="NonChannel" else s[0].lower() for s in reversed(axisTypeStrings(typeint))]
         n = "".join(names)
         
     return n.upper() if upper else n.lower()
-    
+
 def hasChannelAxis(data):
     if isinstance(data, vigra.VigraArray):
         return data.axistags.channelIndex < data.ndim

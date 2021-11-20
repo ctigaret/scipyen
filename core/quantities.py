@@ -4,6 +4,8 @@ from numpy import log10
 import numpy as np
 import quantities as pq
 from traitlets import Bunch
+import operator
+from functools import (reduce, partial, cache)
 
 _pqpfx = sorted(inspect.getmembers(pq.prefixes, lambda x: isinstance(x, (float, int))) + [("deca", pq.prefixes.deka)], key = lambda x: x[1])
                             
@@ -261,87 +263,155 @@ def quantity2str(x:typing.Union[pq.Quantity, pq.UnitQuantity, pq.dimensionality.
     
     return " ".join([fmt % x.magnitude, x.units.dimensionality.string])
 
-def name_from_unit(u):
+#@cache
+def name_from_unit(u, as_key:bool=False):
     """
     FIXME make it more intelligent!
     """
-    d_name = "Quantity"
+    from core.utilities import unique, index_of
+    
+    d_name = "Quantity" if not as_key else "Qq"
     
     if not isinstance(u, (pq.UnitQuantity, pq.Quantity)):
-        return d_name
-        #raise TypeError("Expecting a Quantity or UnitQuantity; got %s instead" % type(u).__name__)
+        #return d_name
+        raise TypeError("Expecting a Quantity or UnitQuantity; got %s instead" % type(u).__name__)
         
     dim = u.dimensionality
-    #dimsim = dimsim.simplfied
     
-    unitQuantity = [k for k in dim.keys()]
+    unitQuantity = list(dim.keys()) # [k for k in dim.keys()]
+    unitQuantityPower = list(dim.items()) # [k for k in dim.keys()]
+    #unitPowers
     
-    if len(unitQuantity) == 1:
-        unitQuantity = unitQuantity[0] 
-    
-        d_name = unitQuantity.name
+    if len(unitQuantity) == 1: # irreducible
+        unitQuantity = unitQuantityPower[0][0] 
+        power = unitQuantityPower[0][1]
         
-        if "arbitrary unit" in d_name:
-            d_name = "A.U."
-        
-        if d_name in ("Celsius", "Kelvin", "Fahrenheit"):
-            d_name = "Temperature"
+        if power == 1:
+            irrdims = unique([type(u).__name__.replace("Units", "") for u in IRREDUCIBLES])
             
-        elif d_name in ("arcdegree"):
-            d_name = "Angle"
+            physQname = type(unitQuantity).__name__.replace("Unit", "")
             
-        elif "volt" in d_name:
-            d_name = "Potential"
+            if physQname in irrdims:
+                if as_key:
+                    if physQname in ("Time", "Mass" , "Length"):
+                        return physQname[0].lower()
+                    elif physQname == "Substance":
+                        return "n"
+                    else:
+                        return physQname[0]
+                    
+                return physQname
             
-        elif "ampere" in d_name:
-            d_name = "Current"
-            
-        elif "siemens" in d_name:
-            d_name = "Conductance"
-            
-        elif "ohm" in d_name:
-            d_name = "Resistance"
-            
-        elif "coulomb" in d_name:
-            d_name = "Capacitance"
-            
-        elif "hertz" in d_name:
-            d_name = "Frequency"
-        
-        elif any([v in d_name for v in ("meter", "foot", "mile", "yard")]):
-            d_name = "Length"
-            
-        elif "postnatal" in d_name:
-            d_name = "Age"
-            
-        elif "in vitro" in d_name:
-            d_name = "Age in vitro"
-            
-        elif "embryonic" in d_name:
-            d_name = "Embryonic age"
-            
-        elif any([v in d_name for v in ("second", "minute", "day","week", "month", "year")]):
-            d_name = "Time"
-            
+            else:
+                d_name = unitQuantity.name
+                
+                derdims = unique([(u._reference.dimensionality, tuple(v)) for u, v in DERIVED.items()], 
+                                key = lambda x: x[1])
+                
+                indices = index_of([d[0] for d in derdims], u._reference.dimensionality, 
+                                multiple=True, comparator = operator.eq)
+                
+                if isinstance(indices, list) and len(indices):
+                    physQuants = unique(reduce(lambda x, y: x + y, (derdims[k][1] for k in indices)))
+                    if len(physQuants):
+                        physQname = physQuants[0]
+                        if physQname == "electromagnetism":
+                            if "ampere" in d_name:
+                                return "Current" if not as_key else "I"
+                            
+                            if "coulomb" in d_name:
+                                return "Charge" if not as_key else "Q"
+                            
+                            if "farad" in d_name:
+                                return "Capacitance" if not as_key else "C"
+                            
+                            if "volt" in d_name:
+                                return "Potential" if not as_key else "Psi"
+                                
+                            if "siemens" in d_name:
+                                return "Conductance" if not as_key else "G"
+                                
+                            if "ohm" in d_name:
+                                return "Resistance" if not as_key else "R"
+                                
+                        return physQname.capitalize() if not as_key else physQname[0].upper()
+                
+                if "arbitrary unit" in d_name:
+                    return "Quantity" if not as_key else "?"
+                    #d_name = "A.U."
+                
+                if d_name in ("Celsius", "Kelvin", "Fahrenheit"):
+                    return "Temperature" if not as_key else "T"
+                    
+                if d_name in ("arcdegree"):
+                    return "Angle" if not as_key else "Theta"
+                    
+                if "volt" in d_name:
+                    return "Potential" if not as_key else "Psi"
+                    
+                if "ampere" in d_name:
+                    return "Current" if not as_key else "I"
+                    
+                if "siemens" in d_name:
+                    return "Conductance" if not as_key else "G"
+                    
+                if "ohm" in d_name:
+                    return "Resistance" if not as_key else "R"
+                    
+                if "coulomb" in d_name:
+                    return "Charge" if not as_key else "Q"
+                    
+                if "farad" in d_name:
+                    return "Capacitance" if not as_key else "C"
+                    
+                if "hertz" in d_name:
+                    return "Frequency" if not as_key else "f"
+                
+                if any([v in d_name for v in ("meter", "foot", "mile", "yard")]):
+                    return "Length" if not as_key else "L"
+                    
+                if "postnatal" in d_name:
+                    return "Age"
+                    
+                if "in vitro" in d_name:
+                    return "Age in vitro" if not as_key else "aiv"
+                    
+                if "embryonic" in d_name:
+                    return "Embryonic age" if not as_key else "ed"
+                    
+                if any([v in d_name for v in ("second", "minute", "day","week", "month", "year")]):
+                    return "Time" if not as_key else "t"
+                    
+                return "Quantity" if not as_key else "?"
+                
         else:
-            d_name = type(unitQuantity).__name__.replace("Unit", "")
-            if d_name == "Quantity":
-                mod_name = list()
-                if unitQuantity in DERIVED:
-                    mod_name = list(DERIVED[unitQuantity])
-                    
-                if len(mod_name)==1:
-                    d_name = mod_name[0].capitalize()
-                    
-                else:
-                    d_name = unitQuantity.name.capitalize()
-      
+            derdims = unique([(u._reference.dimensionality, tuple(v)) for u, v in DERIVED.items()], 
+                            key = lambda x: x[1])
+            
+            indices = index_of([d[0] for d in derdims], u._reference.dimensionality, 
+                               multiple=True, comparator = operator.eq)
+            
+            if len(indices):
+                physQuants = unique(reduce(lambda x, y: x + y, (derdims[k][1] for k in indices)))
+                
+                return physQuants[0].capitalize() if not as_key else physQuants[0][0]
+            
+            else:
+                return f"Unknown Quantity {u.dimensionality.string}" if not as_key else "?"
+            
     else:
-        d_name = f"Compound Quantity {u.dimensionality.string}"
+        derdims = [(u._reference.dimensionality, tuple(v)) for u, v in DERIVED.items()]
+
+        ndx = index_of([d[0] for d in derdims], u._reference.dimensionality, multiple=True, comparator=operator.eq)
+        
+        if len(ndx):
+            physQuants = unique(reduce(lambda x, y: x+y, (derdims[k][1] for k in ndx)))
+            if len(physQuants):
+                return physQuants[0].capitalize() if not as_key else physQuants[0][0]
+
+        else:
+            return f"Compound Quantity {u.dimensionality.string}" if not as_key else "?"
             
-    return d_name
-            
-    
 def check_time_units(value):
     if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
         raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)
@@ -378,6 +448,14 @@ def conversion_factor(x:pq.Quantity, y:pq.Quantity):
     
     else:
         return 1.0
+    
+def symbol_from_quantity(q):
+    """Symbols of the physical quantity (NOT Python quantity symbol)
+    """
+    if not isinstance(q, pq.Quantity):
+        raise TypeError(f"Expecting a python Quantity; got {type(q).__name__} instead")
+    
+    
 
 def units_convertible(x, y):
     """Checks that the units of python Quantities x and y are identical or convertible to each other.

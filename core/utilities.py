@@ -2,7 +2,7 @@
 '''
 Various utilities
 '''
-import traceback, re, itertools, functools, time, typing, warnings, operator
+import traceback, re, itertools, functools, time, typing, warnings, operator, inspect
 import random, math
 from numbers import Number
 from sys import getsizeof, stderr
@@ -2751,15 +2751,27 @@ def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True) -> typi
     else:
         return None
     
-def index_of(seq, obj, key=None):
+def index_of(seq, obj, key=None, multiple=False, comparator=None):
     """Find the index of obj in the object sequence seq.
     
     Object finding can be based on the object's identity (by default) or by the 
-    value of a specific object attribute.
+    value of a specific object attribute. 
     
-    For the latter case, 'key' must be a function - typically, a lambda function, 
-    which gives access (i.e. calls a "getter") on the object attribute; the 
-    attribute must support at least __eq__ (i.e. must be comparable)
+    In the former case, the object 'obj' must exist in 'seq'.
+    
+    In the latter case, 'key' must be a unary function - typically, a lambda
+    function with access to a property of the object (i.e. calls a 'getter'
+    method); the value of the property must support comparison operations
+    (i.e., have at least the '__eq__' member function).
+    
+    This allows retrieving the index of an object with the same property value
+    as 'obj', even if 'obj' is not in the sequence (when 'obj' is in the sequence,
+    this MAY return the index of 'obj', when 'obj' is the first element 
+    satisfying the condition in 'key')
+    
+    Functions with more than one parameter must accept an element of 'seq' as 
+    first parameter, and can be converted to unary function using 
+    functools.partial()
     
     e.g. 
     
@@ -2768,29 +2780,71 @@ def index_of(seq, obj, key=None):
     OR:
     
     index = index_of(seq, obj, key = lambda x: getattr(x, "something", None) etc
-    
-    
+        
+        This represents the index of the first object with property 'something'
+        having the same value as 'obj.something'
     
     Parameters:
     ----------
     seq: iterable
+    
     obj: any pyton object
+    
     key: function that accesses one of obj attributes; optional (default is None)
+    
+    multiple:bool, optional (default is False)
+        When False (the default) returns a list with the index of the first 
+            occurrence of 'obj' in 'seq' (that optionally satisfies 'key') - this
+            behaviour is similar to that of the list.index method.
+            
+        When True, returns a (possibly empty) list of indices for the occurrences
+            of obj in seq (that optionally also satisfy key).
+            
+    comparator: binary predicate function: a function taking two parameters
+        and returning a bool value; optional,  default is None
+        
+        When None, comparison is made using the 'is' builtin.
+        
+        For comparing data, one may use functions in the 'operator' module
+        e.g., 'operator.eq'
+        
+        Used when 'multiple' is True.
+        
+        NOTE: the 'is' builtin returns True when the two compared operands are
+            symbols of the same python object (they have the same 'id').
+            
+            When a comparison of the contents contents of otherwise DISTINCT 
+            objects is intended, then a 'comparator' binary predicate should be 
+            used.
     
     Returns:
     -------
     
-    The integer index of obj in seq, or None if either obj is not found in seq,
-    or key(obj) is not satisfied.
+    A list of indices (possibly empty)
     
     """
-    if obj in seq:# returns None if object not in seq
-        if key is None:
-            return seq.index(obj)
-        
-        elif inspect.isfunction(key):
-            lst = [key(o) for o in seq]
-            return lst.index(key(obj))
+    if key is None:
+        if obj in seq:# returns None if object not in seq
+            if multiple:
+                if comparator is None:
+                    return [k for k, o in enumerate(seq) if o is obj]
+                else:
+                    return [k for k, o in enumerate(seq) if comparator(o, obj)]
+            return [seq.index(obj)]
+        else:
+            return []
+    
+    elif inspect.isfunction(key):
+        lst = [key(o) for o in seq]
+        if multiple:
+            if comparator is None:
+                return [k for k, v in enumerate(lst) if v is key(obj)]
+            else:
+                return [k for k, v in enumerate(lst) if comparator(v, key(obj))]
+        else:
+            if key(obj) in lst:
+                return [lst.index(key(obj))]
+            return list()
     
 def yyMdd(now=None):
     import string, time
@@ -3072,10 +3126,10 @@ def unique(seq, key=None):
         raise TypeError(f"Expecting a Sequence; got {type(seq).__name__} instead")
 
     if isinstance(seq, tuple):
-        return tuple((item for item in gen_unique(seq)))
+        return tuple((item for item in gen_unique(seq, key=key)))
     
     else:
-        return [item for item in gen_unique(seq)]
+        return [item for item in gen_unique(seq, key=key)]
             
     #if not isinstance(seq, (tuple, list, range)):
         #raise TypeError("expecting an iterable sequence (i.e., a tuple, a list, or a range); got %sinstead" % type(seq).__name__)
@@ -3096,6 +3150,14 @@ def gen_unique(seq, key=None):
     seq: an iterable sequence (tuple, list, range)
     
     key: predicate for uniqueness (optional, default is None)
+        When present, it is usually a unary predicate function taking an 
+        element of the sequence as first parameter, and returning a bool.
+        
+        Predicates with more than one parameters (e.g., a comparator such as 
+        operator.ge_, etc) can be converted to unary predicates by "fixing" the 
+        second operand through functools.partial.
+        
+        
         Typically, this is an object returned by a lambda function
         
         e.g.
@@ -3126,7 +3188,12 @@ def gen_unique(seq, key=None):
         yield from (x for x in seq if x not in seen and not seen.add(x))
     
     else:
-        yield from (x for x in seq if key not in seen and not seen.add(key))
+        if inspect.isfunction(key):
+            yield from (x for x in seq if key(x) not in seen and not seen.add(key(x)))
+        else:
+            yield from (x for x in seq if key not in seen and not seen.add(key))
+            
+            
 
 
 def name_lookup(container: typing.Sequence, name:str, 

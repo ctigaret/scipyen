@@ -42,6 +42,7 @@ CHANGELOG:
 import faulthandler
 import sys, os, types, atexit, re, inspect, gc, sip, io, warnings, numbers
 import traceback, keyword, inspect, weakref, itertools, typing, functools, operator
+import json
 from pprint import pprint
 from copy import copy, deepcopy
 import collections
@@ -236,6 +237,7 @@ from core.datazone import DataZone
 #### BEGIN scipyen iolib modules
 #import iolib.pictio as pio
 from iolib import pictio as pio
+from iolib import h5io, jsonio
 #import iolib.pictio as pio
 #### END scipyen iolib modules
 
