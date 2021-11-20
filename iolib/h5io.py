@@ -2405,9 +2405,43 @@ def make_hdf5_entity(obj, group:h5py.Group,
                     
         entity = group.create_group(target_name, track_order=track_order)
         
+        # this call here WiLL NOT check for cached sub_entity/store new sub_entity !
         sub_entity = make_hdf5_dataset(obj, entity, name=target_name, compression = compression,
                           chunks = chunks, track_order = track_order)
         
+        entity.attrs.update(obj_attrs)
+        
+        store_entity_in_cache(entity_cache, obj, entity)
+        
+        return entity
+    
+    elif isinstance(obj, neo.ChannelView):
+        cached_entity = get_cached_entity(entity_cache, obj)
+        
+        if isinstance(cached_entity, h5py.Group):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        entity = group.create_group(target_name, track_order=track_order)
+        
+        # this call here WiLL NOT check for cached sub_entity/store new sub_entity !
+        sub_entity = make_hdf5_dataset(obj.index, entity, name=f"{target_name}_index",
+                                       compression = compression, chunks = chunks, 
+                                       track_order = track_order)
+        
+        signal = obj.obj
+        
+        cached_signal_entity = get_cached_entity(entity_cache, signal)
+        if isinstance(cached_entity, h5py.Dataset):
+            entity[f"{target_name}_signal"] = cached_signal_entity
+            
+            
+        else:
+            # this call here WiLL NOT check for cached entity/store new entity !
+            entity = make_hdf5_dataset(signal, entity, name = f"{target_name}_signal",
+                                       compression = compression, chunks = chunks, 
+                                       track_order = track_order)
+            
         entity.attrs.update(obj_attrs)
         
         store_entity_in_cache(entity_cache, obj, entity)
@@ -2421,7 +2455,9 @@ def make_hdf5_entity(obj, group:h5py.Group,
         else:
             factory = make_hdf5_dataset
             
-        return factory(obj, group, name=name, compression=compression, 
+        # this call here WILL check for cached entities and WILL store entity if
+        # not already in cache
+        return  factory(obj, group, name=name, compression=compression, 
                        chunks=chunks, track_order=track_order, entity_cache = entity_cache)
         
 @safeWrapper
@@ -2542,6 +2578,7 @@ def _(obj, group:h5py.Group, name:str, compression=None, chunks=None, track_orde
         make_axis_scale(obj, dset, axesgroup, axindex, compression, chunks)
         
     return dset
+
 
 @make_dataset.register(neo.core.dataobject.DataObject)
 def _(obj, group, name, compression, chunks, track_order):
