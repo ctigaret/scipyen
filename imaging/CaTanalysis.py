@@ -131,6 +131,7 @@ import datetime
 import bisect
 import inspect
 from functools import partial
+from copy import deepcopy
 #### END core python modules
 
 #### BEGIN traitlets
@@ -5498,7 +5499,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                                                      defaultButton = QtWidgets.QMessageBox.Yes)
                 
                 if btn == QtWidgets.QMessageBox.Yes:
-                    ephysData = ephys.set_relative_time_start(neoutils.neo_copy(ephysData), start_times[0])
+                    ephysData = ephys.set_relative_time_start(deepcopy(ephysData), start_times[0])
+                    #ephysData = ephys.set_relative_time_start(neoutils.neo_copy(ephysData), start_times[0])
                     
                 else:
                     return
@@ -5522,7 +5524,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                     
                     self._data_.analysisOptions["TriggerEventDetection"] = default_options["TriggerEventDetection"]
                 
-                self._data_.electrophysiology = neoutils.neo_copy(ephysData)
+                self._data_.electrophysiology = deepcopy(ephysData)
+                #self._data_.electrophysiology = neoutils.neo_copy(ephysData)
                 
                 tp, _ = parse_trigger_protocols(self._data_.electrophysiology)
                 
@@ -5787,7 +5790,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                                                      defaultButton = QtWidgets.QMessageBox.Yes)
                 
                 if btn == QtWidgets.QMessageBox.Yes:
-                    ephysData = ephys.set_relative_time_start(neoutils.neo_copy(ephysData), start_times[0])
+                    ephysData = ephys.set_relative_time_start(deepcopy(ephysData), start_times[0])
+                    #ephysData = ephys.set_relative_time_start(neoutils.neo_copy(ephysData), start_times[0])
                     
                 else:
                     ephysData = None

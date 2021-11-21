@@ -318,6 +318,12 @@ def filter_attr(iterable:typing.Iterable,
     This is an enhanced version of filter_attribute. Furthermore, it fails
     silently if no element of the iterable satisfies the predicate(s).
     
+    At least one predicate should be given in **kwargs (see below), to test for
+    the value of an attribute of the elements in 'iterable'.
+    
+    When there are several predicates, their results can be tested for truth value
+    using the logial operator specified in 'op'.
+    
     Parameters:
     ==========
     iterable: an iterable

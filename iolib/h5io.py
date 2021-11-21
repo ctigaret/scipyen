@@ -637,7 +637,7 @@ ScanData
 #       nixblock is a nix Block, inherits from nix.Entity
 
 
-import os, sys, tempfile, traceback, warnings, numbers
+import os, sys, tempfile, traceback, warnings, numbers, datetime
 import types, typing, inspect, functools, itertools
 from functools import (partial, singledispatch)
 from pprint import (pprint, pformat)
@@ -873,6 +873,9 @@ def make_attr(x:typing.Optional[typing.Union[str, list, tuple, dict, deque, np.n
             return str(x)
         
         return x
+    
+    if isinstance(x, datetime.datetime):
+        return str(x)
         
     if isinstance(x, (list, tuple, dict)): 
         # will raise exception if elements or values are not json-able
@@ -1063,11 +1066,6 @@ def make_entry_name(obj):
     
     return type(obj).__name__
     
-    #return f"{type(obj).__name__}_{obj_name}"
-    #return f"{type(obj).__name__}_{obj_name}{uuid4().hex}"
-    
-#def make_obj_attrs(obj:typing.Any, as_group:bool=False, 
-                   #oname:typing.Optional[str]=None):#, parent:h5py.Group):
 def make_obj_attrs(obj:typing.Any, 
                    oname:typing.Optional[str]=None):#, parent:h5py.Group):
     """Generates name and attrs dict for a HDF5 entity
@@ -1174,6 +1172,10 @@ def _(obj):
            "__units__":obj.units,
            "__segment__": "__ref__" if obj.segment else None
            }
+    
+    if hasattr(obj, "rec_datetime"):
+        ret["__rec_datetime__"] = str(obj.rec_datetime)
+        
     if isinstance(obj, (neo.core.basesignal.BaseSignal)):
         ret.update(
                     {"__file_origin__": obj.file_origin,
@@ -2405,10 +2407,34 @@ def make_hdf5_entity(obj, group:h5py.Group,
                     
         entity = group.create_group(target_name, track_order=track_order)
         
-        # this call here WiLL NOT check for cached sub_entity/store new sub_entity !
-        sub_entity = make_hdf5_dataset(obj, entity, name=target_name, compression = compression,
-                          chunks = chunks, track_order = track_order)
+        # this call here WiLL NOT check for cached obj_entity/store new obj_entity !
+        # NOTE: 2021-11-21 12:49:10
+        # obj_entity is a h5py.Group
+        # for vigra.VigraArray and neo.core.dataobject.DataObject objects !!!
+        obj_entity = make_hdf5_dataset(obj, entity, name=target_name, 
+                                       compression = compression,
+                                       chunks = chunks, 
+                                       track_order = track_order)
         
+        # NOTE: 2021-11-21 12:25:41
+        # neo DatObject objects also hold a reference to their parent segment
+        
+        if hasattr(obj, "segment"): 
+            # because VigraArrays don't have this attribute, yet 
+            # getattr(x,"segment", None) behaves as if they had this attribute
+            # albeit set to None
+            parent_segment = getattr(obj, "segment")
+            if isinstance(parent_segment, neo.Segment):
+                parent_segment_entity = get_cached_entity(entity_cache, parent_segment)
+            
+                if not isinstance(parent_segment_entity, (h5py.Group, h5py.Dataset)):
+                    # when a link was broken in the neo object => store parent 
+                    # segment
+                    parent_segment_entity = make_hdf5_entity(parent_segment, entity, f"{target_name}_parent_segment")
+                    store_entity_in_cache(entity_cache, parent_segment_entity)
+                    
+                entity["segment"] = parent_segment_entity
+                    
         entity.attrs.update(obj_attrs)
         
         store_entity_in_cache(entity_cache, obj, entity)
@@ -2424,11 +2450,29 @@ def make_hdf5_entity(obj, group:h5py.Group,
         
         entity = group.create_group(target_name, track_order=track_order)
         
-        # this call here WiLL NOT check for cached sub_entity/store new sub_entity !
-        sub_entity = make_hdf5_dataset(obj.index, entity, name=f"{target_name}_index",
+        # NOTE: 2021-11-21 12:50:51
+        # index_entity stores the ChannelView.index property values
+        # this call here WiLL NEITHER check for cached index_entity NOR store new index_entity !
+        index_entity = make_hdf5_dataset(obj.index, entity, name=f"{target_name}_index",
                                        compression = compression, chunks = chunks, 
                                        track_order = track_order)
+        if hasattr(obj, "segment"): 
+            # because VigraArrays don't have this attribute, yet 
+            # getattr(x,"segment", None) behaves as if they had this attribute
+            # albeit set to None
+            parent_segment = getattr(obj, "segment")
+            if isinstance(parent_segment, neo.Segment):
+                parent_segment_entity = get_cached_entity(entity_cache, parent_segment)
+            
+                if not isinstance(parent_segment_entity, (h5py.Group, h5py.Dataset)):
+                    # when a link was broken in the neo object => store parent 
+                    # segment
+                    parent_segment_entity = make_hdf5_entity(parent_segment, entity, f"{target_name}_parent_segment")
+                    store_entity_in_cache(entity_cache, parent_segment_entity)
+                    
+                entity["segment"] = parent_segment_entity
         
+        # populate the channel view with signal entities 
         signal = obj.obj
         
         cached_signal_entity = get_cached_entity(entity_cache, signal)
@@ -2438,7 +2482,7 @@ def make_hdf5_entity(obj, group:h5py.Group,
             
         else:
             # this call here WiLL NOT check for cached entity/store new entity !
-            entity = make_hdf5_dataset(signal, entity, name = f"{target_name}_signal",
+            signal_entity = make_hdf5_dataset(signal, entity, name = f"{target_name}_signal",
                                        compression = compression, chunks = chunks, 
                                        track_order = track_order)
             
@@ -2578,7 +2622,6 @@ def _(obj, group:h5py.Group, name:str, compression=None, chunks=None, track_orde
         make_axis_scale(obj, dset, axesgroup, axindex, compression, chunks)
         
     return dset
-
 
 @make_dataset.register(neo.core.dataobject.DataObject)
 def _(obj, group, name, compression, chunks, track_order):

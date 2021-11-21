@@ -1322,46 +1322,6 @@ def loadPickleFile(fileName):
         result = pickle.load(fileSrc)
         
             
-def loadPickleFile_old(fileName):
-    from unittest import mock
-    try:
-        # NOTE: try pickle first - in  python3 this is fast (via cPickle)
-        with open(fileName, mode="rb") as fileSrc:
-            result = pickle.load(fileSrc)
-            
-    except Exception as e:
-        #traceback.print_exc()
-        try:
-            result = custom_unpickle(fileName)#, exc_info=exc_info)
-            #result = custom_unpickle(fileName, exc_info=exc_info)
-            
-        except:
-            exc_info = sys.exc_info()
-            
-            possible_patch = check_neo_patch(exc_info)
-            
-            if isinstance(possible_patch, tuple) and len(possible_patch) == 2:
-                if debug_scipyen():
-                    print("\t### patching in neo ###\n")
-                try:
-                    with mock.patch(possible_patch[0], new=possible_patch[1]):
-                        result = loadPickleFile(fileName)
-                        
-                except Exception as e1:
-                    traceback.print_exc()
-                    raise e1
-            else:
-                raise e
-        
-    if type(result).__name__ in ("ScanData", "AnalysisUnit", "AxesCalibration", "PlanarGraphics"):
-        #print("loaded", type(result))
-        result._upgrade_API_()
-        
-    elif isinstance(result, (neo.Block, neo.Segment, dict)):
-        neoutils.upgrade_neo_api(result) # in-place
-        
-    return result
-
 def savePickleFile(val, fileName, protocol=None):
     #if inspect.isfunction(val): # DO NOT attempt to pickle unbound functions
         #return

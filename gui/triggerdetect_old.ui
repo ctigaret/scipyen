@@ -79,6 +79,30 @@
          </layout>
         </item>
         <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_5">
+          <item>
+           <widget class="QLabel" name="label_8">
+            <property name="text">
+             <string>Name:</string>
+            </property>
+            <property name="buddy">
+             <cstring>presynNameLineEdit</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="presynNameLineEdit">
+            <property name="text">
+             <string>pre</string>
+            </property>
+            <property name="clearButtonEnabled">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
          <layout class="QHBoxLayout" name="horizontalLayout_6">
           <item>
            <widget class="QLabel" name="label_12">
@@ -115,30 +139,6 @@
            <widget class="QDoubleSpinBox" name="presynStopDoubleSpinBox">
             <property name="suffix">
              <string> s</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-        <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_5">
-          <item>
-           <widget class="QLabel" name="label_8">
-            <property name="text">
-             <string>Name:</string>
-            </property>
-            <property name="buddy">
-             <cstring>presynNameLineEdit</cstring>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLineEdit" name="presynNameLineEdit">
-            <property name="text">
-             <string>pre</string>
-            </property>
-            <property name="clearButtonEnabled">
-             <bool>true</bool>
             </property>
            </widget>
           </item>
@@ -201,6 +201,30 @@
          </layout>
         </item>
         <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_9">
+          <item>
+           <widget class="QLabel" name="label_9">
+            <property name="text">
+             <string>Name:</string>
+            </property>
+            <property name="buddy">
+             <cstring>postsynNameLineEdit</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="postsynNameLineEdit">
+            <property name="text">
+             <string>post</string>
+            </property>
+            <property name="clearButtonEnabled">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
          <layout class="QHBoxLayout" name="horizontalLayout_10">
           <item>
            <widget class="QLabel" name="label_14">
@@ -237,30 +261,6 @@
            <widget class="QDoubleSpinBox" name="postsynStopDoubleSpinBox">
             <property name="suffix">
              <string> s</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-        <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_9">
-          <item>
-           <widget class="QLabel" name="label_9">
-            <property name="text">
-             <string>Name:</string>
-            </property>
-            <property name="buddy">
-             <cstring>postsynNameLineEdit</cstring>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLineEdit" name="postsynNameLineEdit">
-            <property name="text">
-             <string>post</string>
-            </property>
-            <property name="clearButtonEnabled">
-             <bool>true</bool>
             </property>
            </widget>
           </item>
@@ -323,6 +323,30 @@
          </layout>
         </item>
         <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_13">
+          <item>
+           <widget class="QLabel" name="label_10">
+            <property name="text">
+             <string>Name:</string>
+            </property>
+            <property name="buddy">
+             <cstring>photoNameLineEdit</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="photoNameLineEdit">
+            <property name="text">
+             <string>photo</string>
+            </property>
+            <property name="clearButtonEnabled">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
          <layout class="QHBoxLayout" name="horizontalLayout_14">
           <item>
            <widget class="QLabel" name="label_16">
@@ -359,30 +383,6 @@
            <widget class="QDoubleSpinBox" name="photoStopDoubleSpinBox">
             <property name="suffix">
              <string> s</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-        <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_13">
-          <item>
-           <widget class="QLabel" name="label_10">
-            <property name="text">
-             <string>Name:</string>
-            </property>
-            <property name="buddy">
-             <cstring>photoNameLineEdit</cstring>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLineEdit" name="photoNameLineEdit">
-            <property name="text">
-             <string>photo</string>
-            </property>
-            <property name="clearButtonEnabled">
-             <bool>true</bool>
             </property>
            </widget>
           </item>
@@ -445,6 +445,30 @@
          </layout>
         </item>
         <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_17">
+          <item>
+           <widget class="QLabel" name="label_11">
+            <property name="text">
+             <string>Name:</string>
+            </property>
+            <property name="buddy">
+             <cstring>imagingNameLineEdit</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="imagingNameLineEdit">
+            <property name="text">
+             <string>frame</string>
+            </property>
+            <property name="clearButtonEnabled">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
          <layout class="QHBoxLayout" name="horizontalLayout_18">
           <item>
            <widget class="QLabel" name="label_18">
@@ -486,30 +510,6 @@
           </item>
          </layout>
         </item>
-        <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_17">
-          <item>
-           <widget class="QLabel" name="label_11">
-            <property name="text">
-             <string>Name:</string>
-            </property>
-            <property name="buddy">
-             <cstring>imagingNameLineEdit</cstring>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLineEdit" name="imagingNameLineEdit">
-            <property name="text">
-             <string>frame</string>
-            </property>
-            <property name="clearButtonEnabled">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
        </layout>
       </widget>
      </item>
@@ -517,28 +517,6 @@
    </item>
   </layout>
  </widget>
- <tabstops>
-  <tabstop>presynGroupBox</tabstop>
-  <tabstop>presynChannelSpinBox</tabstop>
-  <tabstop>presynStartDoubleSpinBox</tabstop>
-  <tabstop>presynStopDoubleSpinBox</tabstop>
-  <tabstop>presynNameLineEdit</tabstop>
-  <tabstop>postsynGroupBox</tabstop>
-  <tabstop>postsynChannelSpinBox</tabstop>
-  <tabstop>postsynStartDoubleSpinBox</tabstop>
-  <tabstop>postsynStopDoubleSpinBox</tabstop>
-  <tabstop>postsynNameLineEdit</tabstop>
-  <tabstop>photoGroupBox</tabstop>
-  <tabstop>photoChannelSpinBox</tabstop>
-  <tabstop>photoStartDoubleSpinBox</tabstop>
-  <tabstop>photoStopDoubleSpinBox</tabstop>
-  <tabstop>photoNameLineEdit</tabstop>
-  <tabstop>imagingGroupBox</tabstop>
-  <tabstop>imagingChannelSpinBox</tabstop>
-  <tabstop>imagingStartDoubleSpinBox</tabstop>
-  <tabstop>imagingStopDoubleSpinBox</tabstop>
-  <tabstop>imagingNameLineEdit</tabstop>
- </tabstops>
  <resources/>
  <connections/>
 </ui>

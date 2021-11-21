@@ -118,6 +118,8 @@ class DataMark(DataObject):
     _necessary_attrs = (('places', pq.Quantity, 1), 
                         ('times', pq.Quantity, 1),
                         ('labels', np.ndarray, 1, np.dtype('U')))
+    
+    _parent_attrs = ("segment", )
 
     #@staticmethod
     @classmethod

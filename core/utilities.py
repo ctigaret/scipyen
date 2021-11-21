@@ -18,6 +18,7 @@ from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
 from functools import (partial, partialmethod,)
 from itertools import chain
 import collections
+import collections.abc
 from collections import deque, OrderedDict
 import numpy as np
 from neo.core.dataobject import DataObject as NeoDataObject
@@ -33,7 +34,7 @@ try:
 except:
     from operator import eq
 
-
+from core import prog
 from .prog import safeWrapper, deprecation
 
 from .strutils import get_int_sfx
@@ -3217,46 +3218,71 @@ def name_lookup(container: typing.Sequence, name:str,
         
     return names.index(name)
 
-def normalized_index(data: typing.Optional[typing.Union[typing.Sequence, int]],
-                     index: typing.Optional[typing.Union[str, int, tuple, list, np.ndarray, range, slice]] = None,
-                     multiple:bool = True,
-                     flat:bool = True) -> typing.Union[range, tuple]:
+def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int]],
+                     index: typing.Optional[typing.Union[str, int, collections.abc.Sequence, np.ndarray, range, slice]] = None) -> typing.Union[range, tuple]:
     """Transform various indexing objects to a range or iterable of int indices.
     
     Also checks the validity of the index for an iterable of data_len samples.
     
     Parameters:
     -----------
-    data: sequence, or int; 
-        When a sequence, the indexing object the index will be verified against
-            the sequence length.
+    data: Sequence or int; 
+        When a Sequence, the index will be verified against len(data).
         
-        When an int, data is the length of a putative sequence
+        When an int, 'data' is the length of a putative Sequence (hence 
+        data >= 0)
+    
+    index: int, iterable, np.ndarray, range, slice, str, or None (default).
+    
+        When 'index' is None, the function returns range(0, len(data)) with 
+            'data' is a Sequence, else range(, data) when 'data' is an int.
+            
+        Otherwise, the function behaves as below:
         
-    
-    index: int, tuple, list, np.ndarray, range, slice, None (default).
-        When not None, it is the index to be normalized
-    
+        Index type 
+        -----------
+        range                       It is returned, provided max(index) < len(data)
+                                    (or max(index) < data when 'data' is an int)
+        
+        slice                       Returns slice.indices(len(data))
+                                    (or slice.indices(data) when 'data' is an int)
+        
+        collections.abc.Sequence    Each element must be in range(-len(data), len(data))
+        with int elements           (or range(-data, data) when 'data' is an int)
+        
+                                    Returns 'index'
+                                    
+        str                         'data' must be a Sequence containing elements 
+                                    that MAY have an attribute named 'name' (those
+                                    without a 'name' attribute are ignored and 
+                                    their indices in the Sequence will be skipped).
+                                    
+        collections.abc.Sequence    'data' must be a Sequence, as above;
+        with str elements           
+                                    Returns the indices of those elements in 'data'
+                                    having 'name' attribute with value in index.
+                                    
+        1D np.ndarray with
+        integer dtype               Returns a list of array's values (after validation)
+        (e.g. np.dtype(int))
+        
+        logical dtype               Used as a 'mask': returns the indices of the 
+        (e.g., np.dtype(bool))      True values; 'index' must satisfy:
+                                    len(index) == len(data) (with 'data' a Sequence)
+                                    len(index) == data (whith 'data' an int)
+        
         CAUTION: negative integral indices are valid and perform the reverse 
             indexing (going "backwards" in the iterable).
             
-    multiple:bool, optional, default is False:
-        When False, the function behaves like in the standard Python way, where
-        the 'index' method of list and tuple objects returns the first index of 
-        value.
-        When several container elements have a 'name' attribute with the same
-        value all their indices will be returned. This is contrary to the 
-        standard behavour of the 'index' method of Python lists and tuples
-        where the index of the first element that satisfies the criterio is 
-        returned.
-        
-    flat: bool, optional, default is False
-        
-    
     Returns:
     --------
-    ret - an iterable index (range or list of integer indices) that can be
-        used with list comprehension
+    ret - an iterable object (range, or tuple of integer indices) that can be 
+        used in list comprehensions using 'data' (when 'data' is a Sequence) or
+        any sequence with same length as 'data' (when 'data' is an int).
+        
+    See also:
+    
+    prog.filter_attr
     
     """
     from core.datatypes import is_vector
@@ -3268,7 +3294,7 @@ def normalized_index(data: typing.Optional[typing.Union[typing.Sequence, int]],
         data_len = data
         data = None
         
-    elif isinstance(data, (tuple, list, deque)):
+    elif isinstance(data, collections.abc.Sequence):
         data_len = len(data)
         
     else:
@@ -3277,80 +3303,52 @@ def normalized_index(data: typing.Optional[typing.Union[typing.Sequence, int]],
     if index is None:
         return range(data_len)
     
-    elif isinstance(index, int):
+    if isinstance(index, int):
         # NOTE: 2020-03-12 22:40:31
         # negative values ARE supported: they simply go backwards from the end of
         # the sequence
-        if index >= data_len:
+        #if index >= data_len:
+        if index not in range(-data_len,data_len):
             raise ValueError("Index %s is invalid for %d elements" % (index, len(data)))
         
-        if flat:
+        return (index,)
+    
+    if isinstance(index, str):
+        if not isinstance(data, (tuple, list)):
+            raise TypeError("Name index requires 'data' to be a sequence of objects")
+        
+        return tuple(prog.filter_attr(data, name=lambda x: x==index, indices_only=True))
+        
+    elif isinstance(index, collections.abc.Iterable):
+        if all(isinstance(v, int) and v in range(-data_len, data_len) for v in index):
             return index
         
-        return tuple([index]) # -> (index,)
-    
-    elif isinstance(index, str):
-        if not isinstance(data, (tuple, list)):
-            raise TypeError("Name lookup requires a sequence")
+        elif all(isinstance(v, str) for v in index):
+            if not isinstance(data, collections.abc.Iterable):
+                raise TypeError("When indexing by name attribute (str), data must be an iterable")
+            return tuple(prog.filter_attr(data, name=lambda x: x in index, indices_only=True))
         
-        ret = name_lookup(data, index, multiple=multiple)
-        
-        if isinstance(ret, numbers.Number):
-            return tuple([ret])
-        
-        elif isinstance(ret, (tuple, list)):
-            if len(ret) > 1:
-                return tuple(ret)
-            
-            else:
-                return tuple([ret[0]])
-            
         else:
-            return tuple()
-            
-    elif isinstance(index, (tuple,  list)):
-        if not all([isinstance(v, (int, str)) for v in index]):
-            raise TypeError("Index sequence %s is expected to contain int only" % index)
+            raise IndexError(f"Invalid 'index' specification {index}")
         
-        if any([isinstance(v, str) for v in index]):
-            if not isinstance(data, (tuple, list)):
-                raise TypeError("Name lookup requires a sequence")
-            
-            return tuple([v if isinstance(v, int) and v < data_len else name_lookup(data, v, multiple=multiple) for v in index])
-            
-        else:
-            if not all([v < data_len for v in index]):
-                raise ValueError("Index sequence %s contains invalid values for %d elements" % (index, data_len))
-            
-            return tuple(index) # -> index as a tuple
-    
     elif isinstance(index, range):
-        if index.start < 0 or index.stop < 0:
-            warnings.warn("Range %s will produce reverse indexing" % index)
-            
         if max(index) >= data_len:
-            raise ValueError("Index %s out of range for %d elements" % (index, data_len))
+            raise IndexError("Index %s out of range for %d elements" % (index, data_len))
         
         return index # -> index IS a range
     
     elif isinstance(index, slice):
-        if index.start < 0 or index.stop < 0:
-            warnings.warn("Index %s will produce reverse indexing or an empty indexing list" % index)
-            
-        if max(index) >= data_len:
-            raise ValueError("Index %s out of range for %d elements" % (index, data_len))
-        
         ndx = index.indices(data_len)
-        
-        if len(ndx) == 0:
-            raise ValueError("Indexing %s results in an empty indexing list" % index)
-        
-        if any(ndx) >= data_len:
-            raise ValueError("Slice %s generates out of range indices (%s) for %d elements" % (index, ndx, data_len))
-        
-        if any(ndx) < 0:
-            warnings.warn("Index %s will produce reverse indexing" % index)
             
+        if len(ndx) == 0:
+            raise IndexError("Indexing %s results in an empty indexing list" % index)
+        
+        if max(ndx) >= data_len:
+            raise IndexError("Index %s out of range for %d elements" % (index, data_len))
+        
+        if min(ndx) < -data_len:
+            raise IndexError("Index %s out of range for %d elements" % (index, data_len))
+        
         return ndx # -> ndx IS a tuple
     
     elif isinstance(index, np.ndarray):
@@ -3358,13 +3356,14 @@ def normalized_index(data: typing.Optional[typing.Union[typing.Sequence, int]],
             raise TypeError("Indexing array must be a vector; instead its shape is %s" % index.shape)
             
         if index.dtype.kind == "i": # index is an array of int
-            return tuple([k for k in index])
+            return tuple(index)
         
         elif index.dtype.kind == "b": # index is an array of bool
             if len(index) != data_len:
                 raise TypeError("Boolean indexing vector must have the same length as the iterable against it will be normalized (%d); got %d instead" % (data_len, len(index)))
             
-            return tuple([k for k in range(data_len) if index[k]])
+            return tuple(np.arange(data_len)[index])
+            #return tuple([k for k in range(data_len) if index[k]])
             
     else:
         raise TypeError("Unsupported data type for index: %s" % type(index).__name__)

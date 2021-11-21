@@ -8,6 +8,7 @@ import os, pickle
 import collections
 import itertools
 import math
+from copy import deepcopy
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -7530,7 +7531,8 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
     Ioff = list()
     
     for b in data_blocks:
-        bb = ephys.neo_copy(b)
+        bb = deepcopy(b)
+        #bb = ephys.neo_copy(b)
         
         ephys.set_relative_time_start(bb)
         
