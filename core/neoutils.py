@@ -46,434 +46,99 @@ normalized_signal_index
 normalized_segment_index
 
 
-IV. Generic indexing for the neo framework (provisional)
+IV. neo objects hierarchy
+
+BaseNeo
+    |
+    |
+DataObject ------------------------------------------------------- ChannelView
+    |                                                        |
+    |                                                    Container
+    |                                                        |
+    |              _______________|___________           ____|____
+    |              |              |          |           |   |   |
+    |            Epoch            |      SpikeTrain      |   |   |
+BaseSignal    DataZone (Scipyen)  |                    Block | Group 
+    |                             |                          |
+    |                           Event                     Segment
+    |                         DataMark (Scipyen)
+    |
+    |________________________________________
+    |                   |                   |
+    |                   |                   |
+    |                   |                   |
+    |                   |                   |
+AnalogSignal            |           ImageSequence
+DataSignal (Scipyen)    |
+                        |
+                        |
+                IrregularlySampledSignal
+                IrregularlySampledDataSignal (Scipyen)
+DataObject:
+    BaseSignal
+
+    neo.AnalogSignal:
+
+    (neo.core.analogsignal.AnalogSignal,
+    neo.core.basesignal.BaseSignal,
+    neo.core.dataobject.DataObject,
+    neo.core.baseneo.BaseNeo,
+    quantities.quantity.Quantity,
+    numpy.ndarray,
+    object)
+
+    neo.IrregularlySampledSignal:
+
+    (neo.core.irregularlysampledsignal.IrregularlySampledSignal,
+    neo.core.basesignal.BaseSignal,
+    neo.core.dataobject.DataObject,
+    neo.core.baseneo.BaseNeo,
+    quantities.quantity.Quantity,
+    numpy.ndarray,
+    object)
+
+    neo.ImageSequence:
+
+    (neo.core.imagesequence.ImageSequence,
+    neo.core.basesignal.BaseSignal,
+    neo.core.dataobject.DataObject,
+    neo.core.baseneo.BaseNeo,
+    quantities.quantity.Quantity,
+    numpy.ndarray,
+    object)
+
+neo.SpikeTrain:
+
+(neo.core.spiketrain.SpikeTrain,
+ neo.core.dataobject.DataObject,
+ neo.core.baseneo.BaseNeo,
+ quantities.quantity.Quantity,
+ numpy.ndarray,
+ object)
+
+neo.Event:
+
+(neo.core.event.Event,
+ neo.core.dataobject.DataObject,
+ neo.core.baseneo.BaseNeo,
+ quantities.quantity.Quantity,
+ numpy.ndarray,
+ object)
+
+neo.Epoch:
+
+(neo.core.epoch.Epoch,
+ neo.core.dataobject.DataObject,
+ neo.core.baseneo.BaseNeo,
+ quantities.quantity.Quantity,
+ numpy.ndarray,
+ object)
+
+
+
+
+V. Generic indexing for the neo framework (provisional)
 ========================================================
-    Structured indices:
-    
-    child_collection_name is obtained by calling neo_child_container_name(...)
-    
-        it can be a 
-        
-        data_child_collection_name (sequence of data objects), 
-        
-        or a
-        
-        container_child_collection_name (sequence of container objects)
-        
-        In both cases these are prescribed attribute names of 
-        neo.container.Container objects.
-    
-    indices = an iterable of int (i.e., tuple, list or range), NOT a slice
-    
-    root container: a top level neo container object (neo.container.Container)
-    
-    subcontainer: a neo container object that is contained in another neo container.
-    
-    containment of neo objects can be:
-    
-    a) direct containment: the neo object is an element of a sequence of neo 
-        objects of the same type, and this sequence is a member (attribute) of 
-        a neo.container.Container object. 
-        
-        For example, a neo.AnalogSignal object is an element of "analogsignals", 
-        which is a member of a neo.Segment object: the Segment object contains 
-        the AnalogSignal object "directly"; the AnalogSignal object is contained
-        "directly" by the Segment object.
-        
-        The Segment object is the "root" container; the search for the neo 
-        object starts with the root.
-        
-    b) indirect containment: a neo object is contained in a neo container which
-        itself is directly contained by a root neo container.
-        
-        For example:
-        
-        A neo.AnalogSignal object is directly contained by a neo.Segment object,
-        and the Segment object is directly contained by a neo.Block object.
-        
-        Therefore the AnalogSignal object is contained indirectly by the Block.
-        
-        The Block object is the "root" (top level) container, and the Segment 
-        object is a sub container. 
-        
-        There can be more than one level of indirect containment (see the 
-        composition hierarchy schematics below).
-    
-    Below, child_collection_name is specific for the type of neo object that
-    if looked up _for_
-    
-    
-    
-    NOTATION:
-    ========
-    container: a neo.Container
-    
-    contained type: a type that is an element of a member collection
-    
-    member: an attribute of a type instance (gettable by calling getattr)
-    
-    member collection  = sequence (list or tuple) of objects, that is
-    a member of a neo.Container
-    
-    COMPOSITION HIERARCHIES for neo 0.8.0
-    =====================================
-    Data object containers are specialized on the types of data object they
-    may contain. The neo library allows for a data object type to be
-    simultaneously contained in different types of container objects.
-    
-    The top-level container in neo library is a Block. However, data
-    objects are never direcly contained in a block. Instead, a Block
-    instance is composed of iterable collections of container objects. In 
-    turn, each container object in the collection is composed of collections
-    of data objects.
-    
-    In short, objects in the neo library are never directly contained. Instead,
-    tey are stored in appropriate collection of objects with the same type.
-    
-    For example, neo.AnalogSignal objects are contained in a list which can
-    be a member of a neo.Container instance, either a Segment, or a
-    ChannelIndex (or both).
-    
-    Therefore, analog signals have two types of parents: Segment and 
-    ChannelIndex, and both of these are in turn contained in collection members
-    of a Block instance. The composition hierarchy looks like a diamond:
-    
-                         AnalogSignal                                    
-                    IrregularlySampledSignal                                    
-                         DataSignal                                    
-                  IrregularlySampledDataSignal                                    
-                        /               \                                     
-                       /                 \                                     
-                      /                   \                                     
-                     /                     \                                    
-                    /                       \                                    
-    Segment.analogsignals             ChannelIndex.analogsignals                                    
-    Segment.irregularlysampledsignals ChannelIndex.irregularlysampledsignals                                    
-                    \                        /                                    
-                     \                      /                                    
-                      \                    /                                    
-                       \                  /                                    
-                        \                /                                    
-                Block.segments        Block.channel_indexes                                    
-                           \           /                                    
-                            \         /                                    
-                               Block                                    
-        
-    
-    Likewise, neo.SpikeTrain objects can only be found in th member list of
-    of a Segment (Segment.spiketrains) or a Unit. Unit is a Container which 
-    is only contained in a ChannelIndex (although it can be also accessed in
-    read-only mode from a Block). The composition hierarchy looks like this:
-        
-                      SpikeTrain    
-                    /            \ 
-                   /              \ 
-                  /                \ 
-                 /                  \
-                /                    \
-        Segment.spiketrains         Unit.spiketrains
-                \                     |            \
-                 \                    |             \   
-                  \            ChannelIndex.units    \
-                   \                 /                \
-                    \               /                 |
-              Block.segments  Block.channel_indexes   |
-                      \           /                   |
-                       \         /                    |
-                          Block  - - - - - Block.list_units
-                          
-        
-    For all other BaseSignal types there a direct (linear) composition 
-    hierarchy:
-        
-              ImageSequence, Epoch, Event
-                            |
-                            |
-                            |
-             Segment member colection name: 
-             imagesequences, epochs, events
-                            |
-                            |
-                            |
-                          Block
-        
-    And also for other neo object types:
-        
-                     RegionOfInterest
-                            |
-                            |
-                            |
-                  Block.regionsofinterest
-                            |
-                            |
-                            |
-                          Block
-        
-        
-    As a design decision, when the container is a Block and we lookup a
-    neo.AnalogSignal, we traverse the container's Segments.
-    When the container if another container (which for a signal can 
-    only be a ChannelIndex) when then get directly to its analogsignals
-    member collection.
-    
-    For information, these are the INHERITANCE HIERARCHIES in neo:
-    ==============================================================
-         object
-           |
-           V
-        BaseNeo
-           |                    pq.Quantity
-           |\                       |
-           | \                      V
-           |  ----------------> DataObject -------> BaseSignal
-           |                        |                   |        
-           V                        V                   V    
-        Container               Epoch               AnalogSignal    
-           |                    Event               IrregularlySampledSignal
-           V                    SpikeTrain          ImageSequence
-        Block                                       
-        Segment                                     
-        Unit                                        outside neo, in scipyen:
-        ChannelIndex                                dataypes.DataSignal
-                                                    datatypes.IrregularlySampledDataSignal
-
-        object --> RegionOfInterest ------> RectangularRegionOfInterest,
-                                            CircularRegionOfInterest,
-                                            PolygonRegionOfInterest
-
-    Case 1: index of neo objects in a generic python sequence of object of the
-    same type:
-    ============================================================================
-    returns:
-        indices
-    
-    code:
-    
-        utilities.normalized_index(seq, index_obj) => tuple or range
-    
-    checks: 
-    
-    1) when index_obj is a str, or a sequence where at least one element is a
-        str, check if the neo objects have a "name" attribute,  that "name" is
-        not empty, and equals the value(s) in index_obj.
-        
-        if silent, return None for each str index_obj value that does not find
-        a neo object with that name, and issue a warning
-        
-        otherwise, raise IndexError
-    
-    2) when index_obj is an int or a sequence where at least one element is an
-        int, check the int values in index_obj are <= len(seq)
-        
-        if silent, return None for each of the invalid int values and issue a
-        warning
-        
-        otherwise raise IndexError
-        
-    3) when index_obj is a range, check that 0 < len(index_obj) <= len(seq)
-    
-        if silent, return (None,) otherwise raise IndexError
-    
-    4) when index_obj is a slice, check that len(index_obj.indices(len(seq))) > 0
-        is silent return (None,) otherwise raise IndexError.
-    
-    
-    Case 2: index of neo objects contained directly in a neo.Container 
-    ("root container" can be a Block, a Segment, a ChannelIndex, or a Unit):
-    ============================================================================
-    
-    returns:
-        {child_collection_name0: indices, 
-         child_collection_name1: indices,
-         etc...}
-    
-    child_collection_name can refer to a data child, or a container child.
-    
-    There is one child_collection_name for each type of object that is being
-    looked up
-    
-    Root container type:    data child collection:     container child collection:
-    -----------------------------------------------------------------------------
-    Segment                 "analogsignals", 
-                            "irregularlysampledsignals", 
-                            "imagesequences", 
-                            "spiketrains", 
-                            "epochs", 
-                            "events"
-                                    
-    ChannelIndex            "analogsignals"             "units"
-    
-    Unit                    "spiketrains"
-    
-    Block                                               "segments"
-                                                        "channel_indexes"
-                                                        "list_units" - read-only!
-    
-    code :
-        for each object type call silently
-            setup child_collection_name
-            execute Case 1 for getattr(container, child_collection_name)
-                                       
-            if child_collection_name is appropriate and call was successful then
-                map child_collection_name (key) to the return from the call (value)
-                               
-    checks:
-    
-        in addition to case 1: data_child_collection_name is an attribute of container.
-    
-    
-    Case 3: index of neo objects in a generic python sequence of containers 
-    (each container contains the objects directly)
-    ============================================================================
-    
-    returns:
-        {index0: {child_collection_name0: indices, 
-                  child_collection_name1:indices,
-                  etc...}, 
-         index1: {...},
-         etc...}
-     
-    index0, index1, etc: indices of the container in the sequence where the 
-            lookup was successful
-     
-    These indices are not necessarily the same as Segment.index or ChannelIndex
-    value! Instead they are the indices of said objects in the collection where
-    the lookup takes place.
-    
-    code:
-        for each container in seq enumeration:
-            execute Case 2 => "inner" dict
-                    
-            if result not empty:
-                map container index in enumeration (key) to result (value)
-                
-    checks:
-        all checks of Case 2, for each member of seq
-    
-    
-    Case 4: search objects contained indirectly in root container (nested search)
-    ============================================================================
-    
-    returns:
-    
-    {container_collection_name0: {index0 : {child_collection_name0: indices,
-                                            child_collection_name1: indices,
-                                            etc...},
-                                  index1 : {...},
-                                  etc...},
-     container_collection_name0: {...},
-     etc...}
-     
-    NOTE: there can be more than one container child collection in case of 
-    "diamond" composition hierarchy.
-     
-     
-    code:
-        for each obj_type:
-            if hasattr(container, neo_child_container_name(obj_type)):
-                # find out if object type is contained directly in this container
-                # we use our own function which covers more possibilities than
-                # neo.container.Container._data_child_containers and
-                # neo.container.Container._container_child_containers
-                #
-                # first, these two functions would have to be called separately
-                # (or distinctly) for neo data objects and neo container objects
-                #
-                # second, neo_child_container_name also takes into account
-                # RegionOfInterest objects (currently only neo.Block can have these)
-                
-                execute Case 2 on getattr(container, neo_child_container_name(obj_type)
-                
-                map key = neo_child_container_name(obj_type) to
-                    value = result
-                
-            else: 
-                if hasattr(container, neo_child_property_name(obj_type)):
-                    # find out if object type is contained child_properties
-                    # (currently only Block has "Units" among its child_properties,
-                    # referenced as "list_units"; for all other container types 
-                    # _child_properties is an empty tuple, but this may change)
-                    # also we use neo_child_property_name for a more generic coverage
-                    # (see comments above)
-                    
-                    execute Case 2 on getattr(container, neo_child_property_name(obj_type))
-                    
-                    map key = neo_child_property_name(obj_type) to
-                        value = result
-                    
-                else:
-                    # obj_type not found in either child containers or in child
-                    # properties - we need to descend one level into the current 
-                    # chid containers & properties of container
-                    
-                    for each container_type in obj_type._single_parent_objects:
-                    
-                        if hasattr(container, neo_child_container_name(container_type)):
-                            execute Case 2 on getattr(container, neo_child_container_name(container_type))
-                            map key = neo_child_container_name(container_type) to
-                                value = result
-                            
-                        elif hasattr(container, neo_child_property_name(container_type)):
-                            execute Case 2
-                            map key = neo_child_property_name(container_type) to
-                                value = result
-                                
-                        else:
-                            continue
-                
-                for each discovered container collection name:
-                    execute Case 3 on getattr(container, container_collection_name)
-                    
-                    map contained_collection_name (key) to result (value)
-        
-            
-    checks:
-        
-    
-    
-    Case 5: Case 3 with indirect containment
-    ========================================
-    
-    For spike trains in a sequence of ChannelIndex, one may also select the units:
-    
-    {index0: {container_child_collection_name: {nested_index0:{data_child_collection_name: indices}}},
-     index1: {...},
-     etc...}
-     
-     Here index0/1/etc: indices of the channel index in the sequence
-          nested_index0/1/etc: indices of the Units
-
-        
-    Example 5: nested index of signal in a Block
-    =============================================
-    {container_child_collection_name: {index0: {data_child_collection_name: indices},
-                                      index1: {...},
-                                      etc... },
-                                        
-    for analog signals, should indicate preference between "segments" and "channel_indexes"
-        default is "segments"
-    
-    for spike trains, should indicate preference between "segments" and "units"
-        default is "segments"
-        if "units", this implies traversing "channel_indexes" if looking up in
-        a Block
-    
-
-    Example 6: nested index of signal in a sequence of blocks
-    =========================================================
-    {index1:    {"segments": {index1: {child_collection_name: indices},
-                              index2: {...},
-                              etc... },
-                 "channel_indexes": {index: {child_collection_name: indices}, 
-                                     etc... }},
-     index2:    {"segments": {index1: {child_collection_name: indices},
-                              index2: {...},
-                              etc... },
-                 "channel_indexes": {index: {child_collection_name: indices}, 
-                                     etc... }},
-     etc...}
-    
-
 
 
 """
@@ -505,7 +170,7 @@ import pyqtgraph as pg
 from .prog import (safeWrapper, deprecation, 
                    filter_attr, filterfalse_attr,
                    filter_type, filterfalse_type,
-                   iter_attribute)
+                   iter_attribute, classify_signature)
 
 from .datatypes import (is_string, is_vector,
                         RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
@@ -569,43 +234,6 @@ type_to_container_member_name = {
         },
     }
 
-#type_to_container_member_name = {
-    #neo.Segment: {
-        #DataSignal: "analogsignals",
-        #IrregularlySampledDataSignal: "irregularlysampledsignals",
-        #neo.AnalogSignal: "analogsignals",
-        #neo.IrregularlySampledSignal: "irregularlysampledsignals",
-        #neo.SpikeTrain: "spiketrains",
-        #neo.Event: "events",
-        #neo.Epoch: "epochs",
-        #neo.ImageSequence: "imagesequences",
-        #},
-    #neo.Block: {
-        #neo.RectangularRegionOfInterest: "regionsofinterest",
-        #neo.CircularRegionOfInterest: "regionofinterest",
-        #neo.PolygonRegionOfInterest: "regionsofinterest",
-        #neo.Segment: "segments",
-        #neo.ChannelIndex: "channel_indexes",
-        #neo.Group: "groups",
-        #neo.Unit: "list_units",
-        #},
-    #neo.Unit: {
-        #neo.SpikeTrain: "spiketrains",
-        #},
-    #neo.Group: {
-        #neo.Segment: "segments",
-        #DataSignal: "analogsignals",
-        #IrregularlySampledDataSignal: "irregularlysampledsignals",
-        #neo.AnalogSignal: "analogsignals",
-        #neo.IrregularlySampledSignal: "irregularlysampledsignals",
-        #neo.SpikeTrain: "spiketrains",
-        #neo.Event: "events",
-        #neo.Epoch: "epochs",
-        #neo.ImageSequence: "imagesequences",
-        #},
-    #}
-
-
 if __debug__:
     global __debug_count__
 
@@ -665,6 +293,19 @@ def merge_array_annotations(a0:ArrayDict, a1:ArrayDict):
     
     return ret
     
+@singledispatch
+def neo_copy_ctr(obj):
+    raise NotImplementedError
+
+@neo_copy_ctor.register(neo.core.basesignal.BaseSignal)
+def _(obj)
+    init_params = dict((x[0], getattr(obj, x[0])) for x in obj._necessary_attrs + obj._recommended_attrs if hasattr(obj, x[0]))
+    
+    signature = classify_signature(insperct.signature(type(obj), "__new__"))
+    
+    
+    
+    
     
 def combine_time_ranges(time_ranges):
     """This is neo.AnalogSignal._concatenate_time_ranges()
@@ -692,8 +333,6 @@ def invert_time_ranges(time_ranges):
         i += 1
         
     return new_ranges
-    
-    
     
 def get_member_collections(container:typing.Union[type, neo.core.container.Container],
                            membertype:typing.Union[type, tuple, list]) -> list:
@@ -2631,6 +2270,10 @@ def copy_with_data_subset(obj, **kwargs) -> typing.Union[neo.Block, neo.Segment]
     equality (or simlarity, when appropriate) of the numerical data and of
     the metadata between two neo data objects.
     
+    Parameters:
+    -----------
+    obj: neo.Block or neo.Segment
+    
     """
     raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
 
@@ -2650,7 +2293,8 @@ def _(obj, **kwargs) -> neo.Block:
                         (i.e. only one segment from each block will be retained 
                         in the concatenated data)
                         
-        analog:         int, str, range, slice, typing.Sequence
+        analogsignals:  
+                        int, str, range, slice, typing.Sequence
                         Indexing of analog signal(s) into each of the segments, that
                         will be retained in the concatenated data. These include
                         neo.AnalogSignal and datatypes.DataSignal
@@ -2659,14 +2303,20 @@ def _(obj, **kwargs) -> neo.Block:
                         int, str (signal name), sequence of int or str, a range,
                         a slice, or a numpy array of int or booleans.
                         
-        irregular:      as analog, for irregularly sampled signals. These 
+        irregularlysampledsignals:
+                        as analog, for irregularly sampled signals. These 
                         include neo.IrregularlySampledSignal and 
                         datatypes.IrregularlySampledDataSignal
         
-        images:         as analog, for neo.ImageSequence objects (for neo version
+        imagesequences:
+                        as analog, for neo.ImageSequence objects (for neo version
                         from 0.8.0 onwards)
                     
         spiketrains:    as analog, for the spiketrains in the block's segments
+        
+        epochs:         as above for Epoch objects
+        
+        events:         as above for Event objects
         
     """     
     segment_index = kwargs.get("segments", None)
@@ -2746,6 +2396,10 @@ def _(obj, **kwargs) -> neo.Block:
 @copy_with_data_subset.register(neo.Segment)
 def _(obj, **kwargs) -> neo.Segment:
     from neo.core.spiketrainlist import SpikeTrainList
+    
+    indexing = dict((_container_name(s), kwargs.get(_container_name(s), None)) for s in obj._data_child_objects)
+        
+    
     analog_index = kwargs.get("analog", None)
     irregular_index = kwargs.get("irregular", None)
     image_index = kwargs.get("images", None)
@@ -2756,6 +2410,8 @@ def _(obj, **kwargs) -> neo.Segment:
     #ret = deepcopy(obj)
     # NOTE: 2021-11-22 18:44:58
     # constructing anew is faster
+    #init_params = dict((x[0], getattr(obj, x[0])  for x in type(obj)._recommended_attrs)
+    
     ret = type(obj)(name=obj.name, 
                     description=obj.description,
                     file_origin=obj.file_origin, 
