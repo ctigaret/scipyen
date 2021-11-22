@@ -484,15 +484,17 @@ import collections.abc
 import operator
 from itertools import chain, filterfalse
 from functools import (partial, reduce, singledispatch)
-from copy import deepcopy
+from copy import (copy, deepcopy)
 from enum import (Enum, IntEnum,)
 #### END core python modules
 
 #### BEGIN 3rd party modules
+from IPython.lib.pretty import pprint as prp
 import numpy as np
 import quantities as pq
 import neo
-from neo.core.baseneo import (MergeError, merge_annotations, intersect_annotations)
+from neo.core.baseneo import (MergeError, merge_annotations, intersect_annotations,
+                              _reference_name, _container_name)
 from neo.core.dataobject import (DataObject, ArrayDict)
 import matplotlib as mpl
 import pyqtgraph as pg
@@ -517,7 +519,8 @@ from .triggerevent import (TriggerEvent, TriggerEventType,)
 from . import workspacefunctions
 from . import signalprocessing as sigp
 from . import utilities
-from core.utilities import (normalized_index, name_lookup, elements_types, index_of)
+from core.utilities import (normalized_index, name_lookup,
+                            elements_types, index_of, isclose)
 
 #from .patchneo import neo
 
@@ -608,84 +611,6 @@ if __debug__:
 
     __debug_count__ = 0
     
-##@singledispatch
-#def get_container_elements(container:neo.core.container.Container, 
-                           #index:typing.Union[int, str, tuple, list, range, slice, collections.abc.Iterable],
-                           #) -> typing.Sequence:
-    #if isinstance(index, (int, slice)):
-        #ret = container[index]
-        
-        #if isinstance(index, int):
-            #return [ret]
-        #return ret
-    
-    #if isinstance(index, range):
-        #return [container[k] for k in index]
-    
-    #if isinstance(index, str):
-        #indices = index_of([obj.name for obj in container], index, 
-                           #multiple=True, comparator = operator.eq)
-        
-        #return [container[k] for k in indices]
-    
-    #if isinstance(index, (tuple, list)):
-        #if all(isinstance(v, int) for v in index):
-            #return [container[v] for v in index]
-        
-        #elif all(isinstance(v, str) for v in index):
-            #return list(chain.from_iterable([[container[k] for k in index_of([o.name for o in container], name, multiple=True, comparator=operator.eq)] for name in index]))
-    
-        #else:
-            #raise TypeError("When 'index' is a sequence it must contain str or int elements")
-    #else:
-        #raise TypeError("'index' expected to be an int, str, tuple, list, range, slice, or a sequence of int or str")
-    
-#def normalize_index_to_container(container:neo.core.container.Container, 
-                           #index:typing.Union[int, str, tuple, list, range, slice, types.Iterable],
-                           #) -> typing.Sequence:
-    #if isinstance(index, int):
-        #if index < -len(container) or index >= len(container):
-            #raise IndexError(f"{type(index).__name__} 'index' {index} out of range for {type(container).__name__} 'container' with {len(container)} elements")
-        
-        #return index
-    
-    #if isinstance(index, slice):
-        #return range(index.indices(len(container)))
-    
-    #if isinstanc
-    
-    #if isinstance(index, str):
-        #return index_of([o.name for o in container], index,
-                        #multiple=True, comparator=operator.eq)
-    
-        #ret = container[index]
-        
-        #if isinstance(index, int):
-            #return [ret]
-        #return ret
-    
-    #if isinstance(index, range):
-        #return [container[k] for k in index]
-    
-    #if isinstance(index, str):
-        #indices = index_of([obj.name for obj in container], index, 
-                           #multiple=True, comparator = operator.eq)
-        
-        #return [container[k] for k in indices]
-    
-    #if isinstance(index, (tuple, list)):
-        #if all(isinstance(v, int) for v in index):
-            #return [container[v] for v in index]
-        
-        #elif all(isinstance(v, str) for v in index):
-            #return list(chain.from_iterable([[container[k] for k in index_of([o.name for o in container], name, multiple=True, comparator=operator.eq)] for name in index]))
-    
-        #else:
-            #raise TypeError("When 'index' is a sequence it must contain str or int elements")
-    #else:
-        #raise TypeError("'index' expected to be an int, str, tuple, list, range, slice, or a sequence of int or str")
-    
-
 def copy_to_segment(obj:neo.core.dataobject.DataObject, new_seg:neo.Segment):
     new_obj = obj.copy()
     new_obj.segment = new_seg
@@ -2672,40 +2597,213 @@ def concatenate_signals(*args, axis:int = 1,
     else:
         raise TypeError("Expecting a sequence of neo.AnalogSignal or datatypes.DataSignal objects")
                 
-def block_data_subset(block, **kwargs) -> neo.Block:
-"""
-    Parameters:
-    ----------
-    block: neo.Block
+@singledispatch
+def copy_with_data_subset(obj, **kwargs) -> typing.Union[neo.Block, neo.Segment]:
+    """Copy (possibly a subset of the) container's data to another container of the same typee
     
-    Var-keyword parameters:
-    ----------------------
+    The problem is that even if np.all(x==y) reports True, this does NOT test
+    for the equality (or similarity) between the individual metadata values
+    between two deepcopy-ed neo objects.
     
-    segment:    int or None; 
-                when None, all segments in each block will be used;
-                when int then only segments with given index will be used
-                (i.e. only one segment from each block will be retained in 
-                the concatenated data)
+    This is important when the intention is to store a subset of a container's
+    data to another container of the same type as the source. Typical example
+    is to store a subset of segments from a block into another (new) block, with
+    each of the retained segments possibly retaining the same subsets of data object
+    types (analogsignals, irregularlysamledsignals, spiketrains, etc.) selected 
+    by name, or by their indices in the corresponding sub-containers of the original
+    segment.
+    
+    Such situations arise when a concatenation of selected block segments as 
+    another block is intended, while retaining a subset of the segment's data obejcts.
+    
+    In these cases one cannot simply work on regular (shallow) copies of a
+    container and manipulate its contents later: changes to these shallow copies
+    (e.g, leaving segments out, or leaving analogsignals out from each segment) 
+    will be reflected on the originals as well.
+    
+    To avoid this, data subset exctraction employs deep copies (with the penalty
+    that the "copy-by-value" strategy brings on memory resources and code execution
+    speed) which creates the problem of comparing deep copies of the same object 
+    (albeit containing numerically identical data).
+    
+    The functions in the 'is_same_as' family in this module address this issue by
+    performing a "deep" comparison of neo data objects through testing for the
+    equality (or simlarity, when appropriate) of the numerical data and of
+    the metadata between two neo data objects.
+    
+    """
+    raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
+
+@copy_with_data_subset.register(neo.Block)
+def _(obj, **kwargs) -> neo.Block:
+    """Deep copy for a subset of data & containers in Block.
+        Parameters:
+        ----------
+        block: neo.Block
+        
+        Var-keyword parameters:
+        ----------------------
+        
+        segments:       int or None; 
+                        when None, all segments in each block will be used;
+                        when int then only segments with given index will be used
+                        (i.e. only one segment from each block will be retained 
+                        in the concatenated data)
+                        
+        analog:         int, str, range, slice, typing.Sequence
+                        Indexing of analog signal(s) into each of the segments, that
+                        will be retained in the concatenated data. These include
+                        neo.AnalogSignal and datatypes.DataSignal
                     
-    analog:     int, str, range, slice, typing.Sequence
-                Indexing of analog signal(s) into each of the segments, that
-                will be retained in the concatenated data. These include
-                neo.AnalogSignal and datatypes.DataSignal
-                
-                This index can be (see neo_use_lookup_index):
-                int, str (signal name), sequence of int or str, a range, a
-                slice, or a numpy array of int or booleans.
+                        This index can be (see neo_use_lookup_index):
+                        int, str (signal name), sequence of int or str, a range,
+                        a slice, or a numpy array of int or booleans.
+                        
+        irregular:      as analog, for irregularly sampled signals. These 
+                        include neo.IrregularlySampledSignal and 
+                        datatypes.IrregularlySampledDataSignal
+        
+        images:         as analog, for neo.ImageSequence objects (for neo version
+                        from 0.8.0 onwards)
                     
-    irregular:  as analog, for irregularly sampled signals. These 
-                include neo.IrregularlySampledSignal and 
-                datatypes.IrregularlySampledDataSignal
+        spiketrains:    as analog, for the spiketrains in the block's segments
+        
+    """     
+    segment_index = kwargs.get("segments", None)
+    analog_index = kwargs.get("analog", None)
+    irregular_index = kwargs.get("irregular", None)
+    image_index = kwargs.get("images", None)
+    spiketrain_index = kwargs.get("spiketrains", None)
+    events_index = kwargs.get("events", None)
+    epochs_index = kwargs.get("epochs", None)
+    #group_index = kwargs.get("groups", None) # groups need to be recreated below?
+    #channel_index = kwargs.get("channels", None)
     
-    image:      as analog, for neo.ImageSequence objects (for neo version
-                from 0.8.0 onwards)
+    # NOTE: 2021-11-22 10:23:43
+    # avoid deep copy here (obj is a container); we deepcopy data objects
+    # in the specialization for neo.Segment
+    #ret = deepcopy(obj) 
+    # NOTE: 2021-11-22 18:42:40
+    # constructing anew is faster than 'deepcopy'-ing
+    # NOTE: 2021-11-22 18:48:02 
+    # for neo.Block, rec_datetime is in the annotations
+    annotations = dict()
+    annotations.update(obj.annotations)
+    rec_datetime = annotations.pop("rec_datetime", None)
+    
+    ret = type(obj)(name=obj.name, 
+                    description=obj.description,
+                    file_origin=obj.file_origin,
+                    file_datetime=obj.file_datetime, 
+                    rec_datetime=obj.rec_datetime,
+                    index = obj.index, 
+                    **annotations)
+    
+    keep_segs_ndx = normalized_index(obj.segments, segment_index)
+    
+    new_groups = list()
+    
+    new_segments = list()
+    
+    new_segs = list(copy_with_data_subset(obj.segments[k], 
+                                           analog = analog_index, 
+                                           irregular = irregular_index,
+                                           images = image_index,
+                                           spiketrains = spiketrain_index) 
+                    for k in keep_segs_ndx)
+    
+    ret.segments[:] = new_segs
+    
+    new_groups = list()
+    
+    if len(obj.groups):
+        for k, group in enumerate(obj.groups):
+            #print(f"old group {k}:")
+            #prp(group)
+            new_group = neo.Group(name=group.name, allowed_types = group.allowed_types)
+            
+            objects = list()
+            
+            for child_class_name, child_container in group._container_lookup.items():
+                data = list(chain(*[s.list_children_by_class(child_class_name) for s in new_segs]))
+                #print(f"\t{child_class_name}",len(child_container))
                 
-    spikes:     as analog, for the spiketrains in the block's segments
+                objects.extend([o for o in child_container if any(is_same_as(o, o_) for o_ in data)])
+            
+                #print(f"\t--> {len(objects)} objects")
+                
+            if len(objects):
+                new_group.add(*objects)
+                #print(f"\tappending")
+                #prp(new_group)
+                new_groups.append(new_group)
+                
+        ret.groups[:] = new_groups
+        
+        
+    return ret
     
-"""             
+@copy_with_data_subset.register(neo.Segment)
+def _(obj, **kwargs) -> neo.Segment:
+    from neo.core.spiketrainlist import SpikeTrainList
+    analog_index = kwargs.get("analog", None)
+    irregular_index = kwargs.get("irregular", None)
+    image_index = kwargs.get("images", None)
+    spiketrain_index = kwargs.get("spiketrains", None)
+    events_index = kwargs.get("events", None)
+    epochs_index = kwargs.get("epochs", None)
+    
+    #ret = deepcopy(obj)
+    # NOTE: 2021-11-22 18:44:58
+    # constructing anew is faster
+    ret = type(obj)(name=obj.name, 
+                    description=obj.description,
+                    file_origin=obj.file_origin, 
+                    file_datetime=obj.file_datetime,
+                    rec_datetime=obj.rec_datetime,
+                    index=obj.index,**obj.annotations)
+    # TODO: 2021-11-22 10:21:03
+    # use prog.filter_attr directly, without creating an intermediary list of
+    # indices
+    # NOTE: 2021-11-22 10:20:03
+    # if any of the indices is None we'll get all elements in the sequence anyway
+    # if analog_index is not None: 
+    # TODO: 2021-11-22 18:50:38
+    # use 'clever' constructor based on obj :class: and reqs attributes
+    # then adorn new obj with additional :class:-specific metadata
+    # FIXME: 2021-11-22 18:51:41 
+    # 'deepcopy' if the LAZY way to do it...
+    keep_ndx = normalized_index(obj.analogsignals, analog_index)
+    #keep_data = list(obj.analogsignals[k] for k in keep_ndx)
+    keep_data = list(deepcopy(obj.analogsignals[k]) for k in keep_ndx)
+    ret.analogsignals[:] = keep_data
+        
+    keep_ndx = normalized_index(obj.irregularlysampledsignals, irregular_index)
+    #keep_data = list(obj.irregularlysampledsignals[k] for k in keep_ndx)
+    keep_data = list(deepcopy(obj.irregularlysampledsignals[k]) for k in keep_ndx)
+    ret.irregularlysampledsignals[:] = keep_data
+    
+    keep_ndx = normalized_index(obj.imagesequences, irregular_index)
+    #keep_data = list(obj.imagesequences[k] for k in keep_ndx)
+    keep_data = list(deepcopy(obj.imagesequences[k]) for k in keep_ndx)
+    ret.imagesequences[:] = keep_data
+        
+    keep_ndx = normalized_index(list(obj.spiketrains), irregular_index) # because SpikeTrainList is Iterable but not Sequence
+    #keep_data = list(obj.spiketrains[k] for k in keep_ndx)
+    keep_data = list(deepcopy(obj.spiketrains[k]) for k in keep_ndx)
+    ret.spiketrains = SpikeTrainList(items = keep_data)
+        
+    keep_ndx = normalized_index(list(obj.events), events_index) # because SpikeTrainList is Iterable but not Sequence
+    #keep_data = list(obj.events[k] for k in keep_ndx)
+    keep_data = list(deepcopy(obj.events[k]) for k in keep_ndx)
+    ret.events[:] = keep_data
+        
+    keep_ndx = normalized_index(list(obj.epochs), epochs_index) # because SpikeTrainList is Iterable but not Sequence
+    #keep_data = list(obj.epochs[k] for k in keep_ndx)
+    keep_data = list(deepcopy(obj.epochs[k]) for k in keep_ndx)
+    ret.epochs[:] = keep_data
+        
+    return ret
 
 @safeWrapper
 def concatenate_blocks(*args, **kwargs):
@@ -4187,75 +4285,104 @@ def remove_events(event, segment, byLabel=True):
     else:
         raise TypeError("event expected to be a neo.Event, an int, a str or a datatypes.TriggerEventType; got %s instead" % type(event).__name__)
     
+@singledispatch
+def is_same_as(a, b, rtol = 1e-4, atol =  1e-4, 
+               equal_nan = True, use_math=False, comparator=operator.eq):
+    raise NotImplementedError(f"{type(a).__name__} objects are not supported")
+
+@is_same_as.register(neo.core.dataobject.DataObject)
+def _(a, b, rtol = 1e-4, atol =  1e-4, 
+      equal_nan = True, use_math=False, comparator=operator.eq):
+    if comparator not in (operator.eq, isclose):
+        raise TypeError(f"'comparator' expected to be operator.eq or utilties.isclose; got {comparator} instead")
+
+    sim_func = partial(utilities.is_same_as, rtol=rtol, atol=atol, 
+                       use_math=use_math, equal_nan=equal_nan,
+                       comparator=comparator)
         
-def is_same_as(e1, e2, rtol = 1e-4, atol =  1e-4, equal_nan = True):
-    """Returns True if the neo.Events e1 and e2 have identical time stamps, units, labels and names.
     
-    In addition, if e1 and e2 are datatype.TriggerEvents, checks if they have the 
-    same type.
+    ret = type(a) == type(b)
     
-    Time stamps are compared within a relative and absolute tolerances by
-    calling numpy.isclose()
+    if ret:
+        ret &= sim_func(a, b) # dispatches to pq.Quantity
+        
+    if ret:
+        ret &= sim_func(a.times, b.times)
     
-    Parameters:
-    ==========
     
-    e1, e2: neo.Event objects (including datatypes.TriggerEvent)
     
-    Keyword parameters:
-    ==================
+    if ret:
+        ret &= units_convertible(a.units, b.units)
+
+    if ret:
+        ret &= units_convertible(a.times.units, b.times.units)
     
-    rtol, atol: float values, default for both is 1e-4 (see numpy.isclose())
+    if ret:
+        ret &= sim_func(a,b)
+        
+    if ret:
+        data_attrs = a._necessary_attrs + a._recommended_attrs
+        ret &= reduce(operator.and_, (sim_func(x_, y_) for x_, y_ in ((getattr(a, attr[0]), getattr(b, attr[0])) for attr in data_attrs if hasattr(a, attr[0]))))
+        
+    return ret
+       
+@is_same_as.register(neo.core.container.Container)
+def _(a, b, rtol = 1e-4, atol =  1e-4, 
+      equal_nan = True, use_math=False, comparator=operator.eq):
     
-    equal_nan: boolean default is True (see numpy.isclose())
+    sim_func = partial(utilities.is_same_as, rtol=rtol, atol=atol, 
+                       use_math=use_math, equal_nan=equal_nan,
+                       comparator=comparator)
+        
+    neo_sim_func = partial(is_same_as, rtol=rtol, atol=atol, 
+                       use_math=use_math, equal_nan=equal_nan,
+                       comparator=comparator)
+    
+    ret = type(a) == type(b)
+    
+    if ret:
+        data_attrs = a._necessary_attrs + a._recommended_attrs
+        ret &= reduce(operator.and_, (sim_func(x_, y_) for x_, y_ in ((getattr(a, attr[0]), getattr(b, attr[0])) for attr in data_attrs)))
+        
+    if ret:
+        ret &= len(a.data_children) == len(b.data_children)
+        
+    if ret and len(a.data_children):
+        ret &= reduce(operator.and_, (neo_sim_func(x_, y_) for x_, y_ in zip(a.data_children, b.data_children)))
+        
+    if ret:
+        ret &= len(a.container_children) == len(b.container_children)
+        
+    if ret and len(a.container_children):
+        ret &= reduce(operator.and_, (neo_sim_func(x_, y_) for x_, y_ in zip(a.container_children, b.container_children)))
+        
+    return ret
+
+def is_in(x:neo.core.dataobject.DataObject, 
+          container:collections.abc.Sequence):
+    """Testing for the existence of a neo DataObject in a Python Sequence.
+    
+    Calls is_same_as using operator.eq as comparator
     
     """
-    if any([not isinstance(e, (neo.Event, TriggerEvent)) or "Event" not in type(e).__name__ for e in (e1,e2)]):
-        return False
+    if not isinstance(x, neo.core.dataobject.DataObject):
+        raise TypeError(f"Expecting a DataObject; got {type(x).__name__} instead")
     
-    if all([isinstance(e, TriggerEvent) for e in (e1,e2)]):
-        return e1.is_same_as(e2)
+    if not isinstance(container, collections.abc.Sequence):
+        raise TypeError(f"Expecting a Python sequence; got {type(container).__name__} instead")
     
-    compatible_units = e1.units == e2.units
+    return all((is_same_as(x,y) for y in container))
+
+def is_likely_in(x:neo.core.dataobject.DataObject, 
+          container:collections.abc.Sequence):
+    if not isinstance(x, neo.core.dataobject.DataObject):
+        raise TypeError(f"Expecting a DataObject; got {type(x).__name__} instead")
     
-    if not compatible_units:
-        e1_dim    = pq.quantity.validate_dimensionality(e1.units)
-        
-        e2_dim   = pq.quantity.validate_dimensionality(e2.units)
-        
-        if e1_dim != e2_dim:
-            try:
-                cf = pq.quantity.get_conversion_factor(e2_dim, e1_dim)
-                compatible_units = True
-                
-            except AssertionError:
-                compatible_units = False
-            
-    result = compatible_units
+    if not isinstance(container, collections.abc.Sequence):
+        raise TypeError(f"Expecting a Python sequence; got {type(container).__name__} instead")
     
-    if result:
-        result &= e2.times.flatten().size == e1.times.flatten().size
-    
-    if result:
-        result &= np.all(np.isclose(e2.times.magnitude, e1.times.magnitude,
-                                    rtol=rtol, atol=atol,equal_nan=equal_nan))
-    
-    if result: 
-        result &= np.all(np.isclose(e2.magnitude, e1.magnitude, 
-                                    rtol=rtol, atol=atol, equal_nan=equal_nan))
-        
-    if result:
-        result &= e2.labels.flatten().size == e1.labels.flatten().size
-        
-    if result:
-        result &= np.all(e2.labels.flatten() == e2.labels.flatten)
-        
-    if result:
-        result &= e1.name == e2.name
-        
-    return result
-    
-        
+    return all((is_same_as(x,y, comparator = isclose) for y in container))
+
     
 def lookup(signal, value, channel=0, rtol=1e-05, atol=1e-08, equal_nan = False, right=False):
     """Lookup signal values for given domain value(s).

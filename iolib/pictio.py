@@ -1151,7 +1151,7 @@ def loadAxonFile(fileName:str, create_group_across_segment:typing.Union[bool, di
     fileName : str; a fully qualified path & file name
     
     create_group_across_segment: bool or dict (optional, default is False)
-        Controls grouping like signal types.
+        Controls grouping of signal types.
         
         Propagated to neo 0.9.0 neo.io.axonio.AxonIO
         

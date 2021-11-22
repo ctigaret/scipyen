@@ -2697,7 +2697,6 @@ def _(obj, group, name, compression, chunks, track_order):
         
     if obj.size == 1:
         return group.create_dataset(name, data = data, compression = compression)
-        #return group.create_dataset(name, data = obj.magnitude, compression = compression)
     
     return group.create_dataset(name, data = data, compression = compression, 
                                 chunks = chunks)
@@ -2716,7 +2715,6 @@ def make_hdf5_group(obj, group:h5py.Group, name:typing.Optional[str]=None,
     
     if isinstance(cached_entity, h5py.Group):
         group[target_name] = cached_entity
-        #group.attrs.update({"__link__": cached_entity.name})
         return cached_entity
         
     entity = make_group(obj, group, target_name, compression, chunks, track_order, entity_cache)
@@ -2735,15 +2733,11 @@ def make_group(obj, group:h5py.Group, name:str,
     # NOTE: 2021-11-18 14:46:12
     # reserved for generic mapping objects
     grp = group.create_group(name, track_order = track_order)
-    #_, obj_attrs = make_obj_attrs(obj) # updated in the caller
-    #grp.attrs.update(obj_attrs)
     return grp
     
 @make_group.register(dict)
 def _(obj, group, name, compression, chunks, track_order, entity_cache):
     grp = group.create_group(name, track_order = track_order)
-    #_, obj_attrs = make_obj_attrs(obj) # updated in the caller
-    #grp.attrs.update(obj_attrs)
     
     for k, element in obj.items():
         cached_entity = get_cached_entity(entity_cache, element)
@@ -2754,8 +2748,6 @@ def _(obj, group, name, compression, chunks, track_order, entity_cache):
             element_entity = make_hdf5_entity(element, grp, k, compression = compression, chunks = chunks,
                             track_order = track_order, entity_cache = entity_cache)
         
-            #store_entity_in_cache(entity_cache, element, element_entity) # done in make_hdf5_entity
-            
     return grp
 
 @make_group.register(collections.abc.Iterable)
@@ -2768,29 +2760,17 @@ def _(obj, group, name, compression, chunks, track_order, entity_cache):
         cached_entity = get_cached_entity(entity_cache, element)
         element_name = getattr(element, "name", type(element).__name__)
         element_entry_name = f"{k}_{element_name}"
-        #element_entry_name = f"{k}_{make_entry_name(element)}"
         if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
             grp[element_entry_name] = cached_entity
-            #grp.attrs.update({"__link__": cached_entity.name})
         else:
             element_entity = make_hdf5_entity(element, grp, element_entry_name, compression = compression, chunks = chunks,
                             track_order = track_order, entity_cache = entity_cache)
             
-            #store_entity_in_cache(entity_cache, element, element_entity) # done in make_hdf5_entity
-        
     return grp
-
-#@make_group.register(vigra.VigraArray)
-#def _(obj, group, name, compression, chunks, track_order, entity_cache):
-    #grp = group.create_group(target_name, track_order = True)
-    #make_hdf5_dataset(obj, entity, name=target_name, compression = compression,
-                          #chunks = chunks, track_order = track_order)
 
 @make_group.register(neo.core.container.Container)
 def _(obj, group, name, compression, chunks, track_order, entity_cache):
     grp = group.create_group(name, track_order = track_order)
-    #_, obj_attrs = make_obj_attrs(obj) # updated in the caller
-    #grp.attrs.update(obj_attrs)
     
     children_dict = dict()
     
@@ -2806,25 +2786,6 @@ def _(obj, group, name, compression, chunks, track_order, entity_cache):
                                                 compression = compression, chunks = chunks,
                                                 track_order = track_order,
                                                 entity_cache = entity_cache)
-        #container_grp = grp.create_group(container_group_name, track_order = track_order)
-        #_, container_attrs = make_obj_attrs(container, True)
-        #container_grp.attrs.update(container_attrs)
-        
-        #if hasattr(container, "__len__") and len(container):
-            #for k, element in enumerate(container):
-                #entry_name = f"{k}"
-                #element_entry_name = make_entry_name(element)
-                #cached_entity = get_cached_entity(entity_cache, element)
-                #if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
-                    ##print("cached entity found:", type(cached_entity).__name__, cached_entity.name)
-                    #container_grp[entry_name] = cached_entity
-                    #container_grp.attrs.update({"__link__": cached_entity.name})
-                    
-                #else:
-                    #element_entity = make_hdf5_entity(element, container_grp, name=element_entry_name, compression = compression, 
-                                        #chunks = chunks, track_order = track_order, entity_cache = entity_cache)
-                    #store_entity_in_cache(entity_cache, element, element_entity)
-    
     return grp
     
     

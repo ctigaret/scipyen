@@ -15,7 +15,7 @@ from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
                      isgetsetdescriptor, ismemberdescriptor,
                      signature,
                      )
-from functools import (partial, partialmethod,)
+from functools import (partial, partialmethod, reduce, singledispatch)
 from itertools import chain
 import collections
 import collections.abc
@@ -149,6 +149,180 @@ class SafeComparator(object):
             #print("y:", y)
             return False
         
+def __check_isclose_args__(rtol:typing.Optional[Number]=None, 
+      atol:typing.Optional[Number]=None, 
+      use_math:bool=True) -> tuple: # (func, rtol, atol)
+    
+    if not isinstance(rtol, Number):
+        rtol = inspect.signature(math.isclose).parameters["rel_tol"].default if use_math else inspect.signature(np.isclose).parameters["rtol"].default
+        
+    if not isinstance(atol, Number):
+        atol = inspect.signature(math.isclose).parameters["abs_tol"].default if use_math else inspect.signature(np.isclose).parameters["atol"].default
+        
+    f_isclose = partial(math.isclose, rel_tol=rtol, abs_tol=atol) if use_math else partial(np.isclose, rtol=rtol, atol=atol, equal_nan=equal_nan)
+    
+    return f_isclose, rtol, atol
+        
+@singledispatch
+def is_same_as(x, y, 
+               rtol:typing.Optional[Number]=None, 
+               atol:typing.Optional[Number]=None, 
+               use_math:bool=True, 
+               equal_nan:bool=False,
+               comparator = operator.eq):
+    """Compares two objects.
+    
+    Parameters:
+    ----------
+    x,y: comparands; supported types are str, numeric scalar, complex, and
+        numpy arrays (including python Quantity).
+        
+        NOTE: when numpy arrays, they MUST have the same dtypeand identical
+        shapes, unless one of them has size 1 (one)
+        
+    comparator: either operator.eq (the default) or isclose (defined in this module)
+        
+    use_math:bool - used only when comparator is utilities.isclose, and passed on
+        to that function.
+        
+        When True, utilities.isclose uses use math.isclose; else, use numpy.isclose
+    
+        NOTE: when x,y are numpy arrays, thre function uses numpy.isclose automatically.
+        
+    equal_nan: used only when comparator is utilities.isclose, and is passed on
+    to that function
+        
+    rtol, atol: used when comparator is isclose and are passed on to that function
+    
+    """
+    return operator.eq(x,y)
+
+@is_same_as.register(str)
+def _(x, y, rtol:typing.Optional[Number]=None, 
+            atol:typing.Optional[Number]=None, 
+            use_math:bool=True, 
+            equal_nan:bool=False,
+            comparator = operator.eq):
+    return comparator(x,y)
+
+@is_same_as.register(np.ndarray)
+def _(x,y,  rtol:typing.Optional[Number]=None, 
+            atol:typing.Optional[Number]=None, 
+            use_math:bool=True, 
+            equal_nan:bool=False,
+            comparator = operator.eq):
+    
+    if comparator not in (operator.eq, isclose):
+        raise TypeError(f"'comparator' expected one of operator.eq or isclose;; got {comparator} instead")
+    
+    use_math = False
+    
+    _array_attrs_ = ("dtype", "size", "shape", "ndim")
+    
+    if comparator is isclose:
+        comparator = partial(comparator, 
+                             rtol=rtol, atol=atol, 
+                             use_math=use_math, equal_nan=equal_nan)
+    
+    if isinstance(y, pq.Quantity):
+        y = y.magnitude
+        
+    ret = reduce(operator.and_, (operator.eq(x_,y_) for x_, y_ in ((getattr(x, name, None), getattr(y, name, None)) for name in _array_attrs_)))
+    
+    if ret:
+        ret &= np.all(comparator(x,y))
+    
+    return ret
+
+@is_same_as.register(pq.Quantity)
+def _(x,y,  rtol:typing.Optional[Number]=None, 
+            atol:typing.Optional[Number]=None, 
+            use_math:bool=True, 
+            equal_nan:bool=False,
+            comparator = operator.eq):
+    
+    if comparator not in (operator.eq, isclose):
+        raise TypeError(f"'comparator' expected one of operator.eq or isclose; got {comparator} instead")
+    
+    use_math = False
+    
+    _array_attrs_ = ("dtype", "size", "shape", "ndim")
+    
+    if comparator is isclose:
+        comparator = partial(comparator, 
+                             rtol=rtol, atol=atol, 
+                             use_math=use_math, equal_nan=equal_nan)
+    
+    if not isinstance(y, pq.Quantity):
+        x = x.magnitude
+        
+    else:
+        if not units_convertible(x,y):
+            return False
+        
+        elif x.units != y.units:
+            y = y.rescale(x.units)
+            
+        x=x.magnitude
+        y=y.magnitude
+        
+    ret = reduce(operator.and_, (operator.eq(x_,y_) for x_, y_ in ((getattr(x, name, None), getattr(x, name, None)) for name in _array_attrs_)))
+    
+    if ret:
+        ret &= np.all(comparator(x,y))
+    
+    return ret
+
+@is_same_as.register(collections.abc.Sequence)
+def _(x,y,
+            rtol:typing.Optional[Number]=None, 
+            atol:typing.Optional[Number]=None, 
+            use_math:bool=True, 
+            equal_nan:bool=False,
+            comparator = operator.eq):
+    
+    if comparator is isclose:
+        comparator = partial(comparator, 
+                             rtol=rtol, atol=atol, 
+                             use_math=use_math, equal_nan=equal_nan)
+    
+    ret = len(x) == len(y)
+    
+    if ret:
+        ret &= reduce(operator.and_, (comparator(x_, y_) for (x,y) in zip(x,y)))
+        
+    return ret
+
+@is_same_as.register(collections.abc.Mapping)
+def _(x,y,
+            rtol:typing.Optional[Number]=None, 
+            atol:typing.Optional[Number]=None, 
+            use_math:bool=True, 
+            equal_nan:bool=False,
+            comparator = operator.eq):
+    
+    # use for comparisons between mapping values
+    simp_fun = partial(is_same_as, rtol=rtol, atol=atol, 
+                       use_math=use_math, equal_nan=eual_nan,
+                       comparator = comparator)
+        
+    if comparator is isclose:
+        comparator = partial(comparator, 
+                             rtol=rtol, atol=atol, 
+                             use_math=use_math, equal_nan=equal_nan)
+    ret = len(x) == len(y)
+    if ret: # check for equality of mapping keys
+        ret &= reduce(operator.and_, (operator.eq(k1, k2) for (k1, k2) in zip(x.keys(), y.keys())))
+        
+    if ret: # not compare the values
+        ret &= reduce(operator.and_, (simp_fun(a,b) for (a,b) in zip(x.values(), y.values())))
+        
+    return ret
+
+def ideq(x,y):
+    return id(x) == id(y)
+
+@singledispatch
 def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarray, pq.Quantity], 
             rtol:typing.Optional[Number]=None, 
             atol:typing.Optional[Number]=None, 
@@ -158,7 +332,7 @@ def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarra
     
     Parameters:
     ==========
-    x, y: numeric scalars or numpy arrays with identical shapes of where one of
+    x, y: numeric scalars or numpy arrays with identical shapes or where one of
         them has size 1; 
     
     use_math:bool, default is True
@@ -216,41 +390,94 @@ def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarra
     only close to themselves.
     
     """
+    raise NotImplementedError(f"{type(x).__name__} objects are not supported")
+
+@isclose.register(str)
+def _(x,y,
+      rtol:typing.Optional[Number]=None, 
+      atol:typing.Optional[Number]=None, 
+      use_math:bool=True, 
+      equal_nan:bool=False):
+    return x.lower() == y.lower()
+
+@isclose.register(np.ndarray)
+def _(x,y,
+      rtol:typing.Optional[Number]=None, 
+      atol:typing.Optional[Number]=None, 
+      use_math:bool=True, 
+      equal_nan:bool=False):
     
-    if any(isinstance(v, np.ndarray) and v.size > 1 for v in (x,y)):
+    if any(v.size > 1 for v in (x,y)):
         use_math = False
-        
-    f_isclose = math.isclose if use_math else partial(np.isclose)
     
-    if not isinstance(rtol, Number):
-        rtol = inspect.signature(f_close).parameters["rel_tol"].default if use_math else inspect.signature(f_isclose).parameters["rtol"].default
-        
-    if not isinstance(atol, Number):
-        atol = inspect.signature(f_close).parameters["abs_tol"].default if use_math else inspect.signature(f_isclose).parameters["atol"].default
-        
-    f_isclose = partial(math.isclose, rel_tol=rtol, abs_tol=atol) if use_math else partial(np.isclose, rtol=rtol, atol=atol, equal_nan=equal_nan)
+    f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
     
-    if isinstance(x, pq.Quantity):
-        if isinstance(y, pq.Quantity):
-            if not units_convertible(x,y):
-                return False
-            elif x.units != y.units:
-                y = y.rescale(x.units)
-                
-            y = y.magnitude
-            
-        x = x.magnitude
-            
-    elif isinstance(y, pq.Quantity):
-        # on this branch x is definitely NOT a quantity
+    if isinstance(y, pq.Quantity):
         y = y.magnitude
-        
+    
     # emulate equal_nan for math.isclose
     if use_math:
         if all(v is math.nan or v is np.nan for v in (x,y)):
             return True
         
+        return False
+    
     return f_isclose(x,y)
+
+@isclose.register(pq.Quantity)
+def _(x,y,
+      rtol:typing.Optional[Number]=None, 
+      atol:typing.Optional[Number]=None, 
+      use_math:bool=True, 
+      equal_nan:bool=False):
+    
+    if any(v.size > 1 for v in (x,y)):
+        use_math = False
+    
+    f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
+    
+    if not isinstance(y, pq.Quantity):
+        x = x.magnitude
+        
+    else:
+        if not units_convertible(x,y):
+            return False
+        
+        elif x.units != y.units:
+            y = y.rescale(x.units)
+            
+        x = x.magnitude
+        y = y.magnitude
+    
+    # emulate equal_nan for math.isclose
+    if use_math:
+        if all(v is math.nan or v is np.nan for v in (x,y)):
+            return True
+        
+        return False
+    
+    return f_isclose(x,y)
+
+@isclose.register(Number)
+def _(x,y,
+      rtol:typing.Optional[Number]=None, 
+      atol:typing.Optional[Number]=None, 
+      use_math:bool=True, 
+      equal_nan:bool=False):
+    
+    f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
+    
+    return f_isclose(x,y)
+
+@isclose.register(complex)
+def _(x,y, rtol:typing.Optional[Number]=None, 
+            atol:typing.Optional[Number]=None, 
+            use_math:bool=True, 
+            equal_nan:bool=False):
+    
+    f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
+    
+    return reduce(operator.and_, (f_isclose(x_, y_) for x_, y_ in ((getattr(x, name), getattr(y, name)) for name in ("real", "imag"))))
 
 def all_or_not_all(*args):
     """Returns True when elements in args are either all True or all False.
