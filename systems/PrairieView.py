@@ -33,8 +33,7 @@ from core.triggerprotocols import (TriggerProtocol,
                                    remove_trigger_protocol,
                                    parse_trigger_protocols)
 
-from core.neoutils import (concatenate_blocks, concatenate_blocks2, 
-                           concatenate_signals,)
+from core.neoutils import (concatenate_blocks, concatenate_signals,)
 
 import core.xmlutils as xmlutils
 import core.strutils as strutils

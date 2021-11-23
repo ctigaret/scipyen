@@ -113,8 +113,6 @@ def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None,
     var_type: a type, a sequence of types, or None (default)
         When a type, only select the variables of the indicated type
         
-        Only used when "sel" parameter is nto a type or sequence of types
-    
     """
     from fnmatch import translate
     
@@ -144,8 +142,9 @@ def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None,
             
             if isinstance(var_type, type) or (isinstance(var_type, (tuple, list)) and all([isinstance(v, type) for v in var_type])):
                 ret = [s for s in vlist if isinstance(ws[s], var_type)]
-            
-            ret =  vlist # return a list of variable names
+                
+            else:
+                ret =  vlist # return a list of variable names
         
         elif isinstance(sel, type) or (isinstance(sel, (list, tuple)) and all([isinstance(k, type) for k in sel])):
             # select by variable type (or types)
@@ -168,10 +167,10 @@ def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None,
                     vlist = [k for k in var_names_filter] 
                     
                     if isinstance(var_type, type) or (isinstance(var_type, (tuple, list)) and all([isinstance(v, type) for v in var_type])):
-                        ret += [s for s in vlist if isinstance(ws[s], var_type)]
+                        ret.expand([s for s in vlist if isinstance(ws[s], var_type)])
                         
                     else:
-                        ret += vlist # return a list of variable names
+                        ret.expand(vlist) # return a list of variable names
                     
                 #if len(ret) == 0:
                     #return ws.keys()
@@ -203,25 +202,18 @@ def getvarsbytype(vartype, ws=None):
         if not all([isinstance(v, type) for v in vartype]):
             raise TypeError("Sequence in the first argument must contain only types")
         
-    else:
-        vartype = [vartype]
-    
+        if isinstance(vartype, list):
+            vatrtype = tuple(vartype)
+        
     if ws is None:
         ws = user_workspace()
     if ws is None:
         raise ValueError("No valid workspace has been specified or found")
         
-        #frame_records = inspect.getouterframes(inspect.currentframe())
-        
-        #for (n,f) in enumerate(frame_records):
-            #if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within the IPython console
-                #ws = f[0].f_globals["mainWindow"].workspace
-                ##ws = f[0].f_globals
-                #break
-        
-    lst=[(name, val) for (name, val) in ws.items() if (any([isinstance(val, v_type) for v_type in vartype]) and not name.startswith("_"))]
+    return dict((name, val) for (name, val) in ws.items() if isinstance(val, vartype) and not name.startswith("_"))
+    #lst=[(name, val) for (name, val) in ws.items() if (any([isinstance(val, v_type) for v_type in vartype]) and not name.startswith("_"))]
     
-    return dict(lst)
+    #return dict(lst)
         
 def getvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, 
             var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None,
@@ -408,7 +400,7 @@ def assignin(variable, varname, ws=None):
 assign = assignin # syntactic sugar
 
 def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None) -> list:
-    """Returns a list of symbols to which 'x' is bound in the 'ws' namespace
+    """Returns a list of symbols to which 'x' is bound in the namespace 'ws'
     
     The  list is empty when the variable 'x' does not exist in ws (e.g when it is
     dynamically created by an expression).

@@ -151,7 +151,8 @@ class SafeComparator(object):
         
 def __check_isclose_args__(rtol:typing.Optional[Number]=None, 
       atol:typing.Optional[Number]=None, 
-      use_math:bool=True) -> tuple: # (func, rtol, atol)
+      use_math:bool=True,
+      equal_nan:bool=True) -> tuple: # (func, rtol, atol)
     
     if not isinstance(rtol, Number):
         rtol = inspect.signature(math.isclose).parameters["rel_tol"].default if use_math else inspect.signature(np.isclose).parameters["rtol"].default
@@ -432,9 +433,10 @@ def _(x,y,
       equal_nan:bool=False):
     
     if any(v.size > 1 for v in (x,y)):
+        # use math only on scalars
         use_math = False
     
-    f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
+    f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math, equal_nan)
     
     if not isinstance(y, pq.Quantity):
         x = x.magnitude
@@ -449,12 +451,13 @@ def _(x,y,
         x = x.magnitude
         y = y.magnitude
     
-    # emulate equal_nan for math.isclose
     if use_math:
-        if all(v is math.nan or v is np.nan for v in (x,y)):
-            return True
-        
-        return False
+        # emulate equal_nan for math.isclose
+        # NOTE: math.isclose operates only on scalars x and y
+        if all(v in (math.nan, np.nan) for v in (x,y)):
+            if equal_nan:
+                return True
+            return False
     
     return f_isclose(x,y)
 
