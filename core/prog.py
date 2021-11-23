@@ -81,9 +81,61 @@ class Timer(object):
         
 # ### BEGIN module functions
 
-def classify_signature(sig, 
-                       funcname:typing.Optional[str]=None,
+def classify_signature(sig, funcname:typing.Optional[str]=None,
                        modname:typing.Optional[str]=None) -> SignatureDict:
+    """A dictionary-like presentation of an inspect.Signature object.
+    
+    Useful especially in generic initialization of objects based 
+    on the signatures of their `__init__` or `__new__` methods, but also
+    to store the signature of user-defined callables in a human-readable
+    way (e.g. using json - see iolib.jsonio - etc.)
+    
+    For details on Signature objects see the documentation for Python's
+    'inspect' module.
+    
+    Parameters:
+    -----------
+    sig: a callable (preferably), or an inspect.Signature object
+    
+    funcname: str, optional, default None; 
+        This should be the callable's __name__ attribute and should be 
+        passed to this function when 'sig' is a Signature object
+        
+    modname: str, optional, default is None
+        This shoudl be the name of the module where the function is 
+        defined (callable's __module__ attribute) and should be
+        passed to thsi function when 'sig' is a Signature object.
+        
+    Returns:
+    --------
+    
+    a types.SimpleNamespace object with the following attributes:
+    
+    'name': str - the name of the callable or None
+    
+    'qualname': str - the qualified name of the callable or None
+    
+    'module': str - the module name where the callable was defined, 
+            or None
+    
+    'positional': dict - mapping name: type for positional-only 
+        parameters of the callable
+    
+    'named': dict - mapping name: (default, type) for named or positional
+        parameters of the callable
+        
+    'varpos': duct - mapping name: None, with the name of the var-positional
+        parameter of the callable (e.g. 'args' when the callable signature
+        includes `*args`)
+        
+    'varkw': dict - mapping of name: None, with the name of the var-kweyword
+        parametert if the callable (e.g. 'kwargs' when the callable signature
+        includes `**kwargs`)
+        
+    'returns': type, if the callable signature has an annotated return, 
+        or `inspect._empty` otherwise
+    
+    """
     from inspect import Parameter
     
     qualname = funcname

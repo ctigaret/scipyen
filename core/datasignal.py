@@ -86,10 +86,12 @@ class DataSignal(BaseSignal):
     # by analogy, we need to define the following grouping objects:
     #
     #
-    _single_parent_objects = ("Segment", "ChannelIndex") 
+    #_single_parent_objects = ("Segment", "ChannelIndex") 
     
+    _parent_objects = ('Segment',)
+    _parent_attrs = ('segment',)
     _quantity_attr = 'signal'
-    
+
     _necessary_attrs = (('signal', pq.Quantity, 2),
                         ('sampling_period', pq.Quantity, 0),
                         ('origin', pq.Quantity, 0))
@@ -1038,14 +1040,11 @@ class DataSignal(BaseSignal):
 class IrregularlySampledDataSignal(BaseSignal):
     """Almost literal copy of the neo.IrregularlySampledSignal, accepting a domain other than time
     """
-    _single_parent_objects = ("Segment", "ChannelIndex") 
-    
+    _parent_objects = ('Segment',)
+    _parent_attrs = ('segment',)
     _quantity_attr = 'signal'
-    
-    _necessary_attrs = (('signal', pq.Quantity, 2),
-                        ('sampling_period', pq.Quantity, 0),
-                        ('origin', pq.Quantity, 0))
-    
+    _necessary_attrs = (('domain', pq.Quantity, 1), ('signal', pq.Quantity, 2))
+
     _recommended_attrs = neo.baseneo.BaseNeo._recommended_attrs
 
     def __new__(cls, domain, signal, units=None, domain_units=None, time_units=None,

@@ -2717,6 +2717,9 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         clsname = objcls.__name__
         
         tt = abbreviated_type_names.get(clsname, clsname)
+
+    if objtype is type:
+        tt += f" <{obj.__name__}>"
         
     ttip = tt
         
