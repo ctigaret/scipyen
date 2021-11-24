@@ -1183,13 +1183,22 @@ class TriggerProtocol(object):
         elif isinstance(self.__segment_index__, (int, tuple, list)):
             return self.__segment_index__
         
-    def make_hdf5_entity(self, group, name, oname, compression, chunks, track_order,entity_cache):
+    def make_hdf5_entity(self, group, name, oname, compression, chunks, track_order, entity_cache):
         import h5py
         from iolib import h5io
         
-        target_name, obj_attrs, entity_cache = h5io.__check_make_entity_args__ (self, oname, entity_cache)
+        cached_entity = get_cached_entity(entity_cache, self)
+        
+        if isinstance(cached_entity, h5py.Group):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        target_name, obj_attrs = h5io.make_obj_attrs(obj, oname=oname)
+        #target_name, obj_attrs, entity_cache = h5io.__check_make_entity_args__ (self, oname, entity_cache)
             
-        obj_group = group.create_group(target_name)
+        entity = group.create_group(target_name)
+        entity.attrs.update(obj_attrs)
+        h5io.store_entity_in_cache(entity_cache, self, entity)
         
         for name in ("presynaptic", "postsynaptic", "photostimulation", "acquisition", "imagingDelay" ,"segmentIndex"):
             # since these are (deep) copies - see NOTE: 2021-11-24 12:43:27
@@ -1200,14 +1209,14 @@ class TriggerProtocol(object):
                 oname = trigger.name
             else:
                 oname = name
-            h5io.make_hdf5_entity(trigger, obj_group,
+                
+            h5io.make_hdf5_entity(trigger, entity,
                                   name=name, oname=oname, 
                                   compression=compression, chunks=chunks, 
                                   track_order = track_order, entity_cache=entity_cache)
             
-        obj_group.attrs.update(obj_attrs)
         
-        return obj_group
+        return entity
     
     def from_hdf5_entity(self, group):
         import h5py
