@@ -637,7 +637,7 @@ ScanData
 #       nixblock is a nix Block, inherits from nix.Entity
 
 
-import os, sys, tempfile, traceback, warnings, numbers, datetime
+import os, sys, tempfile, traceback, warnings, numbers, datetime, enum
 import types, typing, inspect, functools, itertools
 from functools import (partial, singledispatch)
 from pprint import (pprint, pformat)
@@ -744,6 +744,17 @@ def __mangle_dict__(d):
 
 def __unmangle_dict__(d):
     return dict((__unmangle_name__(k), v) for k,v in d.items())
+
+def __check_make_entity_args__(obj, oname, entity_cache):
+    target_name, obj_attrs = make_obj_attrs(obj, oname=oname)
+    
+    if isinstance(oname, str) and len(oname.strip()):
+        target_name = oname
+        
+    if not isinstance(entity_cache, dict):
+        entity_cache = dict()
+    
+    return target_name, obj_attrs, entity_cache
 
 def store_entity_in_cache(s:dict, obj:typing.Any, 
                         entity:typing.Union[h5py.Group, h5py.Dataset]):
@@ -2349,13 +2360,36 @@ def from_dataset(dset:typing.Union[str, h5py.Dataset],
     return data
 
 @safeWrapper
+#@singledispatch
 def make_hdf5_entity(obj, group:h5py.Group,
                     name:typing.Optional[str]=None,
                     oname:typing.Optional[str]=None,
                     compression:typing.Optional[str]="gzip",
                     chunks:typing.Optional[bool]=None,
                     track_order:typing.Optional[bool] = True, 
-                    entity_cache:typing.Optional[dict]=None) -> typing.Union[h5py.Group, h5py.Dataset]:
+                    entity_cache:typing.Optional[dict]=None,
+                    **kwargs) -> typing.Union[h5py.Group, h5py.Dataset]:
+    """
+    kwargs:
+    parent_neo_container: None or a neo Container.
+    When present, it should be the container
+    """
+    if hasattr(obj, "make_HDF5_entity"):
+        target_name, obj_attrs = make_obj_attrs(obj, oname=oname)
+            
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+            
+        cached_entity = get_cached_entity(entity_cache, obj)
+        
+        if isinstance(cached_entity, h5py.Group):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        return obj.make_hdf5_entity(group, name, oname, compression,chunks,track_order,entity_cache)
+
+    #raise NotImplementedError(f"{type(obj).__name__} objects are not yet supported")
+    
     from imaging import vigrautils as vu
 
     if not isinstance(group, h5py.Group):
@@ -2425,16 +2459,27 @@ def make_hdf5_entity(obj, group:h5py.Group,
             # albeit set to None
             parent_segment = getattr(obj, "segment")
             if isinstance(parent_segment, neo.Segment):
+                # this almost surely will fail: when we execute this code, the 
+                # parent segment's entity is not there yet?
                 parent_segment_entity = get_cached_entity(entity_cache, parent_segment)
+                if isinstance(parent_segment_entity, (h5py.Group, h5py.Dataset)):
+                    entity["segment"] = parent_segment_entity
+                    
+                else:
+                    parent_neo_container_entity = kwargs.get("parent_neo_container_entity", None)
+                    if isinstance(parent_neo_container_entity, tuple) and len(parent_neo_container_entity)==2:
+                        parent_neo_container = parent_neo_container_entity[0]
+                        if parent_neo_container is parent_segment:
+                            parent_container_entity = parent_neo_container_entity[1]
+                        
+                            if isinstance(parent_container_entity, h5py.Group):
+                                entity["segment"] = parent_container_entity
+                                
+                # NOTE: 2021-11-24 14:35:03
+                # Since segment if a reference to the containing segment it is OK
+                # if it doesn't show up in here; we just want to store a reference
+                # to it, if possible
             
-                if not isinstance(parent_segment_entity, (h5py.Group, h5py.Dataset)):
-                    # when a link was broken in the neo object => store parent 
-                    # segment
-                    parent_segment_entity = make_hdf5_entity(parent_segment, entity, f"{target_name}_parent_segment")
-                    store_entity_in_cache(entity_cache, parent_segment_entity)
-                    
-                entity["segment"] = parent_segment_entity
-                    
         entity.attrs.update(obj_attrs)
         
         store_entity_in_cache(entity_cache, obj, entity)
@@ -2456,35 +2501,68 @@ def make_hdf5_entity(obj, group:h5py.Group,
         index_entity = make_hdf5_dataset(obj.index, entity, name=f"{target_name}_index",
                                        compression = compression, chunks = chunks, 
                                        track_order = track_order)
-        if hasattr(obj, "segment"): 
-            # because VigraArrays don't have this attribute, yet 
-            # getattr(x,"segment", None) behaves as if they had this attribute
-            # albeit set to None
-            parent_segment = getattr(obj, "segment")
-            if isinstance(parent_segment, neo.Segment):
-                parent_segment_entity = get_cached_entity(entity_cache, parent_segment)
+        
+        #if hasattr(obj, "segment"): 
+            ## because VigraArrays don't have this attribute, yet 
+            ## getattr(x,"segment", None) behaves as if they had this attribute
+            ## albeit set to None
+            #parent_segment = getattr(obj, "segment")
+            #if isinstance(parent_segment, neo.Segment):
+                #parent_segment_entity = get_cached_entity(entity_cache, parent_segment)
             
-                if not isinstance(parent_segment_entity, (h5py.Group, h5py.Dataset)):
-                    # when a link was broken in the neo object => store parent 
-                    # segment
-                    parent_segment_entity = make_hdf5_entity(parent_segment, entity, f"{target_name}_parent_segment")
-                    store_entity_in_cache(entity_cache, parent_segment_entity)
+                #if not isinstance(parent_segment_entity, (h5py.Group, h5py.Dataset)):
+                    ## when a link was broken in the neo object => store parent 
+                    ## segment
+                    #parent_segment_entity = make_hdf5_entity(parent_segment, entity, f"{target_name}_parent_segment")
+                    #store_entity_in_cache(entity_cache, parent_segment_entity)
                     
-                entity["segment"] = parent_segment_entity
+                #entity["segment"] = parent_segment_entity
         
         # populate the channel view with signal entities 
-        signal = obj.obj
-        
-        cached_signal_entity = get_cached_entity(entity_cache, signal)
+        cached_signal_entity = get_cached_entity(entity_cache, obj.obj)
         if isinstance(cached_entity, h5py.Dataset):
-            entity[f"{target_name}_signal"] = cached_signal_entity
+            entity[f"{target_name}_obj"] = cached_signal_entity
             
             
         else:
             # this call here WiLL NOT check for cached entity/store new entity !
-            signal_entity = make_hdf5_dataset(signal, entity, name = f"{target_name}_signal",
-                                       compression = compression, chunks = chunks, 
-                                       track_order = track_order)
+            if isinstance(obj.obj, neo.core.basesignal.BaseSignal):
+                signal_entity = make_hdf5_dataset(obj.obj, entity, name = f"{target_name}_obj",
+                                        compression = compression, chunks = chunks, 
+                                        track_order = track_order)
+            
+        entity.attrs.update(obj_attrs)
+        
+        store_entity_in_cache(entity_cache, obj, entity)
+        
+        return entity
+    
+    elif isinstance(obj, enum.Enum):
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        # NOTE: 2021-11-24 12:00:41
+        # The type of an Enum MEMBER is Enum itself
+        # The type of any Enum :class: is enum.EnumMeta
+        # ATTENTION: HOWEVER, issubclass(Enum, EnumMeta) is ALWAYS False 
+        # because metaclasses ARE NOT included in the mro !!!
+        if type(obj) is enum.EnumMeta:
+            isenummeta=True
+            dt = h5py.enum_dtype(dict((member.name, member.value) for member in obj), basetype="i")
+            shape = (1, len(obj))
+        else:
+            isenummeta=False
+            dt = h5py.enum_dtype({obj.name: obj.value}, basetype="i")
+            shape = (1,1)
+            
+        entity = group.create_dataset(target_name, shape, dtype=dt)
+        
+        if isenummeta:
+            for k,member in enumerate(obj):
+                entity[0,k] = member.value
+        else:
+            entity[0,0] = obj.value
             
         entity.attrs.update(obj_attrs)
         
@@ -2504,6 +2582,293 @@ def make_hdf5_entity(obj, group:h5py.Group,
         return  factory(obj, group, name=name, compression=compression, 
                        chunks=chunks, track_order=track_order, entity_cache = entity_cache)
         
+
+#@make_hdf5_entity.register(type(None))
+#def _(obj, group:h5py.Group,
+                    #name:typing.Optional[str]=None,
+                    #oname:typing.Optional[str]=None,
+                    #compression:typing.Optional[str]="gzip",
+                    #chunks:typing.Optional[bool]=None,
+                    #track_order:typing.Optional[bool] = True, 
+                    #entity_cache:typing.Optional[dict]=None):
+    #target_name, obj_attrs = make_obj_attrs(obj, oname=oname)
+    
+    #if isinstance(name, str) and len(name.strip()):
+        #target_name = name
+        
+    #return group.create_dataset(target_name, data = h5py.Empty("f"))
+
+#@make_hdf5_entity.register(neo.ChannelView)
+#def _(obj, group:h5py.Group,
+                    #name:typing.Optional[str]=None,
+                    #oname:typing.Optional[str]=None,
+                    #compression:typing.Optional[str]="gzip",
+                    #chunks:typing.Optional[bool]=None,
+                    #track_order:typing.Optional[bool] = True, 
+                    #entity_cache:typing.Optional[dict]=None):
+    #if not isinstance(group, h5py.Group):
+        #raise TypeError(f"'group' expected to be a h5py.Group (or h5py.File); got {type(group).__name__} instead")
+
+    #target_name, obj_attrs = make_obj_attrs(obj, oname=oname)
+        
+    #if isinstance(name, str) and len(name.strip()):
+        #target_name = name
+        
+    #cached_entity = get_cached_entity(entity_cache, obj)
+    
+    #if isinstance(cached_entity, h5py.Group):
+        #group[target_name] = cached_entity
+        #return cached_entity
+    
+    #entity = group.create_group(target_name, track_order=track_order)
+    
+    ## NOTE: 2021-11-21 12:50:51
+    ## index_entity stores the ChannelView.index property values
+    ## this call here WiLL NEITHER check for cached index_entity NOR store new index_entity !
+    #index_entity = make_hdf5_dataset(obj.index, entity, name=f"{target_name}_index",
+                                    #compression = compression, chunks = chunks, 
+                                    #track_order = track_order)
+    #if hasattr(obj, "segment"): 
+        ## because VigraArrays don't have this attribute, yet 
+        ## getattr(x,"segment", None) behaves as if they had this attribute
+        ## albeit set to None
+        #parent_segment = getattr(obj, "segment")
+        #if isinstance(parent_segment, neo.Segment):
+            #parent_segment_entity = get_cached_entity(entity_cache, parent_segment)
+        
+            #if not isinstance(parent_segment_entity, (h5py.Group, h5py.Dataset)):
+                ## when a link was broken in the neo object => store parent 
+                ## segment
+                #parent_segment_entity = make_hdf5_entity(parent_segment, entity, f"{target_name}_parent_segment")
+                #store_entity_in_cache(entity_cache, parent_segment_entity)
+                
+            #entity["segment"] = parent_segment_entity
+    
+    ## populate the channel view with signal entities 
+    #signal = obj.obj
+    
+    #cached_signal_entity = get_cached_entity(entity_cache, signal)
+    #if isinstance(cached_entity, h5py.Dataset):
+        #entity[f"{target_name}_signal"] = cached_signal_entity
+        
+        
+    #else:
+        ## this call here WiLL NOT check for cached entity/store new entity !
+        #signal_entity = make_hdf5_dataset(signal, entity, name = f"{target_name}_signal",
+                                    #compression = compression, chunks = chunks, 
+                                    #track_order = track_order)
+        
+    #entity.attrs.update(obj_attrs)
+    
+    #store_entity_in_cache(entity_cache, obj, entity)
+    
+    #return entity
+
+#@make_hdf5_entity.register(vigra.VigraArray)
+#@make_hdf5_entity.register(neo.core.dataobject.DataObject)
+#def _(obj, group:h5py.Group,
+                    #name:typing.Optional[str]=None,
+                    #oname:typing.Optional[str]=None,
+                    #compression:typing.Optional[str]="gzip",
+                    #chunks:typing.Optional[bool]=None,
+                    #track_order:typing.Optional[bool] = True, 
+                    #entity_cache:typing.Optional[dict]=None):
+    #if not isinstance(group, h5py.Group):
+        #raise TypeError(f"'group' expected to be a h5py.Group (or h5py.File); got {type(group).__name__} instead")
+
+    #target_name, obj_attrs = make_obj_attrs(obj, oname=oname)
+        
+    #if isinstance(name, str) and len(name.strip()):
+        #target_name = name
+        
+    ## NOTE: 2021-11-19 11:34:38
+    ## make a sub group and place the main data set and axes data set within
+    ## this is because these objects need their own group to contain the 
+    ## main data set and the axes group, if any
+    #cached_entity = get_cached_entity(entity_cache, obj)
+    
+    #if isinstance(cached_entity, h5py.Group):
+        #group[target_name] = cached_entity
+        #return cached_entity
+                
+    #entity = group.create_group(target_name, track_order=track_order)
+    
+    ## this call here WiLL NOT check for cached obj_entity/store new obj_entity !
+    ## NOTE: 2021-11-21 12:49:10
+    ## obj_entity is a h5py.Group
+    ## for vigra.VigraArray and neo.core.dataobject.DataObject objects !!!
+    #obj_entity = make_hdf5_dataset(obj, entity, name=target_name, 
+                                    #compression = compression,
+                                    #chunks = chunks, 
+                                    #track_order = track_order)
+    
+    ## NOTE: 2021-11-21 12:25:41
+    ## neo DatObject objects also hold a reference to their parent segment
+    
+    #if hasattr(obj, "segment"): 
+        ## because VigraArrays don't have this attribute, yet 
+        ## getattr(x,"segment", None) behaves as if they had this attribute
+        ## albeit set to None
+        #parent_segment = getattr(obj, "segment")
+        #if isinstance(parent_segment, neo.Segment):
+            #parent_segment_entity = get_cached_entity(entity_cache, parent_segment)
+        
+            #if not isinstance(parent_segment_entity, (h5py.Group, h5py.Dataset)):
+                ## when a link was broken in the neo object => store parent 
+                ## segment
+                #parent_segment_entity = make_hdf5_entity(parent_segment, entity, f"{target_name}_parent_segment")
+                #store_entity_in_cache(entity_cache, parent_segment_entity)
+                
+            #entity["segment"] = parent_segment_entity
+                
+    #entity.attrs.update(obj_attrs)
+    
+    #store_entity_in_cache(entity_cache, obj, entity)
+    
+    #return entity
+    
+#@make_hdf5_entity.register(vigra.filters.Kernel1D)
+#@make_hdf5_entity.register(vigra.filters.Kernel2D)
+#def _(obj, group:h5py.Group,
+                    #name:typing.Optional[str]=None,
+                    #oname:typing.Optional[str]=None,
+                    #compression:typing.Optional[str]="gzip",
+                    #chunks:typing.Optional[bool]=None,
+                    #track_order:typing.Optional[bool] = True, 
+                    #entity_cache:typing.Optional[dict]=None):
+    #from imaging import vigrautils as vu
+    #if not isinstance(group, h5py.Group):
+        #raise TypeError(f"'group' expected to be a h5py.Group (or h5py.File); got {type(group).__name__} instead")
+
+    #target_name, obj_attrs = make_obj_attrs(obj, oname=oname)
+    
+    #if isinstance(name, str) and len(name.strip()):
+        #target_name = name
+
+    #cached_entity = get_cached_entity(entity_cache, obj)
+    
+    #if isinstance(cached_entity, h5py.Dataset):
+        #group[target_name] = cached_entity
+        #return cached_entity
+        
+    #data = vu.kernel2array(obj)
+    
+    #entity = group.create_dataset(target_name, data = data, 
+                                    #compression = compression, 
+                                    #chunks = chunks)
+    
+    #entity.attrs.update(obj_attrs)
+    
+    #store_entity_in_cache(entity_cache, obj, entity)
+    
+    #return entity
+
+#@make_hdf5_entity.register(int)
+#@make_hdf5_entity.register(float)
+#@make_hdf5_entity.register(complex)
+#@make_hdf5_entity.register(str)
+#@make_hdf5_entity.register(bytes)
+#@make_hdf5_entity.register(bytearray)
+#@make_hdf5_entity.register(numbers.Number)
+#@make_hdf5_entity.register(np.ndarray)
+#def _(obj, group:h5py.Group,
+                    #name:typing.Optional[str]=None,
+                    #oname:typing.Optional[str]=None,
+                    #compression:typing.Optional[str]="gzip",
+                    #chunks:typing.Optional[bool]=None,
+                    #track_order:typing.Optional[bool] = True, 
+                    #entity_cache:typing.Optional[dict]=None):
+    #if not isinstance(group, h5py.Group):
+        #raise TypeError(f"'group' expected to be a h5py.Group (or h5py.File); got {type(group).__name__} instead")
+
+    #if not isinstance(entity_cache, dict):
+        #entity_cache = dict()
+        
+    #cached_entity = get_cached_entity(entity_cache, obj)
+    
+    #if isinstance(cached_entity, h5py.Dataset):
+        #group[target_name] = cached_entity
+        ##group.attrs.update({"__link__": cached_entity.name})
+        #return cached_entity
+        
+    #return make_hdf5_dataset(obj, group, name=name, compression=compression, 
+                       #chunks=chunks, track_order=track_order, entity_cache = entity_cache)
+    
+#@make_hdf5_entity.register(collections.abc.Iterable)
+#@make_hdf5_entity.register(neo.core.container.Container)
+#def _(obj, group:h5py.Group,
+                    #name:typing.Optional[str]=None,
+                    #oname:typing.Optional[str]=None,
+                    #compression:typing.Optional[str]="gzip",
+                    #chunks:typing.Optional[bool]=None,
+                    #track_order:typing.Optional[bool] = True, 
+                    #entity_cache:typing.Optional[dict]=None):
+    #if not isinstance(group, h5py.Group):
+        #raise TypeError(f"'group' expected to be a h5py.Group (or h5py.File); got {type(group).__name__} instead")
+
+    #if not isinstance(entity_cache, dict):
+        #entity_cache = dict()
+
+    #cached_entity = get_cached_entity(entity_cache, obj)
+    
+    #if isinstance(cached_entity, h5py.Group):
+        #group[target_name] = cached_entity
+        ##group.attrs.update({"__link__": cached_entity.name})
+        #return cached_entity
+        
+    #return make_hdf5_group(obj, group, name=name, compression=compression, 
+                       #chunks=chunks, track_order=track_order, entity_cache = entity_cache)
+
+#@make_hdf5_entity.register(enum.Enum)
+#def _(obj, group:h5py.Group,
+                    #name:typing.Optional[str]=None,
+                    #oname:typing.Optional[str]=None,
+                    #compression:typing.Optional[str]="gzip",
+                    #chunks:typing.Optional[bool]=None,
+                    #track_order:typing.Optional[bool] = True, 
+                    #entity_cache:typing.Optional[dict]=None):
+    #if not isinstance(group, h5py.Group):
+        #raise TypeError(f"'group' expected to be a h5py.Group (or h5py.File); got {type(group).__name__} instead")
+
+    #target_name, obj_attrs = make_obj_attrs(obj, oname=oname)
+    
+    #if isinstance(name, str) and len(name.strip()):
+        #target_name = name
+    
+    #cached_entity = get_cached_entity(entity_cache, obj)
+    
+    #if isinstance(cached_entity, h5py.Dataset):
+        #group[target_name] = cached_entity
+        #return cached_entity
+    
+    ## NOTE: 2021-11-24 12:00:41
+    ## The type of an Enum MEMBER is Enum itself
+    ## The type of any Enum :class: is enum.EnumMeta
+    ## ATTENTION: HOWEVER, issubclass(Enum, EnumMeta) is ALWAYS False 
+    ## because metaclasses ARE NOT included in the mro !!!
+    #if type(obj) is enum.EnumMeta:
+        #isenummeta=True
+        #dt = h5py.enum_dtype(dict((member.name, member.value) for member in obj), basetype="i")
+        #shape = (1, len(obj))
+    #else:
+        #isenummeta=False
+        #dt = h5py.enum_dtype({obj.name: obj.value}, basetype="i")
+        #shape = (1,1)
+        
+    #entity = group.create_dataset(target_name, shape, dtype=dt)
+    
+    #if isenummeta:
+        #for k,member in enumerate(obj):
+            #entity[0,k] = member.value
+    #else:
+        #entity[0,0] = obj.value
+        
+    #entity.attrs.update(obj_attrs)
+    
+    #store_entity_in_cache(entity_cache, obj, entity)
+    
+    #return entity
+    
 @safeWrapper
 def make_hdf5_dataset(obj, group: h5py.Group, name:typing.Optional[str]=None,
                       compression:typing.Optional[str]="gzip",
@@ -2518,12 +2883,11 @@ def make_hdf5_dataset(obj, group: h5py.Group, name:typing.Optional[str]=None,
     target_name, obj_attrs = make_obj_attrs(obj)
     if isinstance(name, str) and len(name.strip()):
         target_name = name
-        
+
     cached_entity = get_cached_entity(entity_cache, obj)
     
     if isinstance(cached_entity, h5py.Dataset):
         group[target_name] = cached_entity # make a hard link
-        #group.attrs.update({"__link__": cached_entity.name})
         return cached_entity
         
     dset = make_dataset(obj, group, target_name, compression = compression, chunks = chunks,
@@ -2546,7 +2910,6 @@ def make_dataset(obj, group:h5py.Group, name,
     if not isinstance(obj, (numbers.Number, tuple, list, deque)):
         warnings.warn(f"make_dataset: {type(obj).__name__} objects are not supported")
         return group.create_dataset(name, data = h5py.Empty("f"))
-    #return group.create_dataset(name, data = obj, compression=compression, chunks=chunks)
     return group.create_dataset(name, data = obj)
 
 @make_dataset.register(type(None))
@@ -2588,13 +2951,7 @@ def _(obj, group, name, compression, chunks, track_order):
     if len(obj)==0:
         return group.create_dataset(name, data = h5py.Empty("f"))
     
-    #if len(obj) == 1:
-        #return group.create_dataset(name, data = np.array(obj, dtype = h5py.string_dtype()),
-                                    #compression = compression)
-    
     return group.create_dataset(name, data = np.array(obj, dtype = h5py.string_dtype()))
-    #return group.create_dataset(name, data = np.array(obj, dtype = h5py.string_dtype()),
-                                #compression = compression, chunks = chunks)
 
 @make_dataset.register(vigra.VigraArray)
 def _(obj, group:h5py.Group, name:str, compression=None, chunks=None, track_order=True):
@@ -2775,17 +3132,18 @@ def _(obj, group, name, compression, chunks, track_order, entity_cache):
     children_dict = dict()
     
     for container_name in obj._child_containers:
-        container = getattr(obj, container_name, None)
-        container_group_name = container_name
-        #container_group_name = f"{name}_{container_name}"
-        cached_entity = get_cached_entity(entity_cache, container)
+        collection = getattr(obj, container_name, None)
+        collection_group_name = container_name
+        cached_entity = get_cached_entity(entity_cache, collection)
         if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
-            grp[container_group_name] = cached_entity
+            grp[collection_group_name] = cached_entity
         else:
-            container_entity = make_hdf5_entity(container, grp, container_group_name, 
-                                                compression = compression, chunks = chunks,
-                                                track_order = track_order,
-                                                entity_cache = entity_cache)
+            collection_entity = make_hdf5_entity(collection, grp, collection_group_name, 
+                                                 compression = compression, 
+                                                 chunks = chunks,
+                                                 track_order = track_order,
+                                                 entity_cache = entity_cache,
+                                                 parent_neo_container_entity = (obj,grp))
     return grp
     
     

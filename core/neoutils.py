@@ -547,7 +547,6 @@ def assign_to_signal(dest:neo.AnalogSignal, src:[neo.AnalogSignal, pq.Quantity],
             
     else:
         raise TypeError("source expected to be an AnalogSignal or a scalar python quantity of same units as destination")
-    
         
 @safeWrapper
 def assign_to_signal_in_epoch(dest:neo.AnalogSignal, 
@@ -2469,57 +2468,56 @@ def _(obj, **kwargs) -> neo.Block:
     ret.annotations.update(annotations)
     ret.annotate(original_file = obj.file_origin, original_block = obj.name, original_datetime = obj.rec_datetime, original_file_recording = obj.file_datetime)
     
-    new_groups = list()
+    # NOTE: 2021-11-23 12:06:31
+    # Sicne the number of segments and the sizes of their signal containers MAY 
+    # have changed, we need to re-create the orthogonal organization in Group
+    # objects and possible ChannelView objects.
     
     if len(obj.groups):
         if keep_groups_ndx is None: 
-            # NOTE: 2021-11-23 12:06:31
-            # this always happens when retaining a subset of segments
-            # Nevertheless, the contents of the data containers in those segments
-            # may have changed!
-            # We check against this here and is the new group is empty we leave
-            # it out
-            #
-            #for k, group in enumerate(obj.groups):
-            for group in obj.groups:
-                new_group = neo.Group(name=group.name, allowed_types = group.allowed_types)
-                
-                objects = list()
-                
-                for child_class_name, child_container in group._container_lookup.items():
-                    data = list(chain(*[s.list_children_by_class(child_class_name) for s in new_segments]))
-                    objects.extend([o for o in child_container if any(is_same_as(o, o_) for o_ in data)])
-                
-                if len(objects):
-                    new_group.add(*objects)
-                    new_groups.append(new_group)
+            groups = obj.groups
                     
         else: 
-            # NOTE: 2021-11-23 12:04:47
-            # WE retain the same number of segments, BUT the contents of the
-            # segments' children containers may have changed!
-            # We check against this here and if the new group is empty we leave
-            # it out.
-            #
-            for k in keep_groups_ndx:
-                original_group = obj.groups[k]
-                new_group = neo.Group(name=original_group.name, 
-                                      allowed_types = original_group.allowed_types)
-                
-                objects = list()
-                
-                for child_class_name, child_container in original_group._container_lookup.items():
+            groups = [obj.groups[k] for k in keep_groups_ndx]
+                    
+        new_groups = list()
+        
+        for group in groups:
+            new_group = neo.Group(name=group.name, allowed_types = group.allowed_types)
+            
+            objects = list()
+            
+            for child_class_name, child_container in group._container_lookup.items():
+                # NOTE: 2021-11-24 09:12:32
+                # skip "channelviews" because segments do NOT "store" ChannelView 
+                # objects; we recreate channelviews below ONLY if new group is OK
+                if child_class_name != "ChannelView":
                     data = list(chain(*[s.list_children_by_class(child_class_name) for s in new_segments]))
                     objects.extend([o for o in child_container if any(is_same_as(o, o_) for o_ in data)])
                 
-                if len(objects):
-                    new_group.add(*objects)
-                    new_groups.append(new_group)
-                    
+            if len(objects):
+                new_group.add(*objects)
+                # recreate channel views
+                if hasattr(group, "channelviews") and len(group.channelviews):
+                    for channelview in group.channelviews:
+                        if isinstance(channelview.obj, neo.core.basesignal.BaseSignal):
+                            data = list(chain(*[s.list_children_by_class(type(channelview.obj).__name__) for s in new_segments]))
+                            if any(is_same_as(channelview.obj, o_) for o_ in data):
+                                new_channelview = neo.ChannelView(channelview.obj,
+                                                                index = channelview.index, 
+                                                                name = channelview.name, 
+                                                                description = channelview.description,
+                                                                file_origin = channelview.file_origin,
+                                                                array_annotations = channelview.array_annotations,
+                                                                **channelview.annotations)
+                                
+                                new_group.channelviews.append(newchannel_view)
+                
+                new_groups.append(new_group)
+                
         ret.groups[:] = new_groups
         
     ret.create_relationship()
-    
         
     return ret
     
@@ -2549,7 +2547,6 @@ def _(obj, **kwargs) -> neo.Segment:
             
         setattr(ret, container_name, keep_data)
         
-    #ret.annotate(origin=obj.file_origin, original_segment=obj.name)
     ret.annotate(original_file = obj.file_origin, original_segment = obj.name, 
                  original_datetime = obj.rec_datetime, 
                  original_file_recording = obj.file_datetime)
@@ -2706,7 +2703,11 @@ def concatenate_blocks(*args, **kwargs):
         return ret
             
     if isinstance(args, collections.abc.Sequence) and all(isinstance(a, (neo.Block, neo.Segment)) for a in args):
+        # NOTE: 2021-11-24 09:55:15
+        # this branch deals with a sequence of Blocks and/or Segments
         # make a new Block, append segments
+        # when Blocks, we need ot take into account the existence of Groups and
+        # ChannelViews
         ret = neo.core.Block(name=name, description=description, file_origin=file_origin,
                             file_datetime=file_datetime, rec_datetime=rec_datetime, 
                             **annotations)
@@ -2721,29 +2722,55 @@ def concatenate_blocks(*args, **kwargs):
                 
                 if len(new_block.groups):
                     for group in new_block.groups:
-                        
                         existing_groups = [g for g in ret.groups if g.name == group.name]
                         
                         if len(existing_groups):
-                            target_group = existing_groups[0]
+                            existing_group = existing_groups[0]
                             new_group = None
                         else:
-                            target_group = None
+                            existing_group = None
                             new_group = neo.Group(name=group.name, allowed_types = group.allowed_types)
                         
                         objects = list()
                         
                         for child_class_name, child_container in group._container_lookup.items():
-                            data = list(chain(*[s.list_children_by_class(child_class_name) for s in new_block.segments]))
-                            objects.extend([o for o in child_container if any(is_same_as(o, o_) for o_ in data)])
+                            # NOTE 2021-11-24 09:56:33
+                            # see also NOTE: 2021-11-24 09:12:32
+                            if child_class_name != "ChannelView":
+                                data = list(chain(*[s.list_children_by_class(child_class_name) for s in new_block.segments]))
+                                objects.extend([o for o in child_container if any(is_same_as(o, o_) for o_ in data)])
                         
                         if len(objects):
+                            # NOTE: 2021-11-24 10:02:28 Below:
+                            # * new_group is a completely new group, NOT added to the new block
+                            # * existing_group if a group that  has been added to the new block in prev iterations
+                            # * target_group is a reference to the new_group or existing_group in the current iteration
+                            # We operate on channel views in the target_group further down.
                             if isinstance(new_group, neo.Group):
                                 new_group.add(*objects)
                                 ret.groups.append(new_group)
-                            elif isinstance(target_group,neo.Group):
-                                target_group.add(*objects)
-                        
+                                target_group = new_group 
+                            elif isinstance(existing_group,neo.Group):
+                                existing_group.add(*objects)
+                                target_group = existing_group
+                                
+                            # NOTE: 2021-11-24 09:59:42 Now, add channel views
+                            # to the target group (see NOTE: 2021-11-24 10:02:28 for what this means)
+                            if hasattr(group, "channelviews") and len(group.channelviews):
+                                for channelview in group.channelviews:
+                                    if isinstance(channelview.obj, neo.core.basesignal.BaseSignal):
+                                        data = list(chain(*[s.list_children_by_class(type(channelview.obj).__name__) for s in new_block.segments]))
+                                        if any(is_same_as(channelview.obj, o_) for o_ in data):
+                                            new_channelview = neo.ChannelView(channelview.obj,
+                                                                            index = channelview.index, 
+                                                                            name = channelview.name, 
+                                                                            description = channelview.description,
+                                                                            file_origin = channelview.file_origin,
+                                                                            array_annotations = channelview.array_annotations,
+                                                                            **channelview.annotations)
+                                            
+                                            target_group.channelviews.append(newchannel_view)
+                                            
                 
             elif isinstance(arg, neo.core.Segment):
                 kw = dict((n,v) for n,v in kwargs if n != "segments")
@@ -3720,6 +3747,31 @@ def _(a, b, rtol = 1e-4, atol =  1e-4,
     if ret and len(a.container_children):
         ret &= reduce(operator.and_, (neo_sim_func(x_, y_) for x_, y_ in zip(a.container_children, b.container_children)))
         
+    return ret
+
+@is_same_as.register(neo.ChannelView)
+def _(a, b, rtol = 1e-4, atol =  1e-4, 
+      equal_nan = True, use_math=False, comparator=operator.eq):
+    
+    sim_func = partial(utilities.is_same_as, rtol=rtol, atol=atol, 
+                       use_math=use_math, equal_nan=equal_nan,
+                       comparator=comparator)
+        
+    neo_sim_func = partial(is_same_as, rtol=rtol, atol=atol, 
+                       use_math=use_math, equal_nan=equal_nan,
+                       comparator=comparator)
+    
+    ret = type(a) == type(b)
+    
+    if ret:
+        ret &= neo_sim_func(a.obj, b.obj)
+    
+    if ret:
+        ret &= sim_func(a.index, b.index)
+    
+    if ret:
+        ret &= reduce(operator.and_, (sim_func(x_, y_) for x_, y_ in ((getattr(a, attr[0]), getattr(b, attr[0])) for attr in a._recommended_attrs)))
+
     return ret
 
 def is_in(x:neo.core.dataobject.DataObject, 

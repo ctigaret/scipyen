@@ -15,7 +15,7 @@ from neo.core.dataobject import DataObject, ArrayDict
 from core.quantities import (units_convertible, name_from_unit)
 
 
-def _new_DataSignal(cls, signal, units=None, dtype=None, copy=True,
+def _new_DataSignal(cls, signal, units=None, domain_units=None, dtype=None, copy=True,
                     t_start=0*pq.dimensionless, sampling_period=None,
                     sampling_rate=None, name=None, file_origin=None,
                     description=None, array_annotations=None, annotations=None,
@@ -35,7 +35,8 @@ def _new_DataSignal(cls, signal, units=None, dtype=None, copy=True,
     return obj
 
 def _new_IrregularlySampledDataSignal(cls, domain, signal, units=None, 
-                                      domain_units=None, dtype=None, copy=True, 
+                                      domain_units=None, dtype=None, 
+                                      domain_dtype=None, copy=True, 
                                       name=None,file_origin=None,
                                       description=None,annotations=None,
                                       array_annotations=None,
@@ -98,7 +99,8 @@ class DataSignal(BaseSignal):
     
     _recommended_attrs = neo.baseneo.BaseNeo._recommended_attrs
 
-    def __new__(cls, signal, units=None, dtype=None, copy=True, 
+    def __new__(cls, signal, units=None,  domain_units=None, time_units=None,
+                dtype=np.dtype("float64"), copy=True, 
                 t_start=0*pq.dimensionless, origin=0*pq.dimensionless, 
                 sampling_period=None, sampling_rate=None, 
                 name=None, file_origin=None, description=None, 
@@ -112,25 +114,46 @@ class DataSignal(BaseSignal):
             if units != signal.units:
                 signal = signal.rescale(units)
                 
+        if domain_units is None:
+            domain_units = time_units if isinstance(time_units, pq.Quantity) else origin.units if isinstance(origin, pq.Quantity) else t_start.units if isinstance(t_start, pq.Quantity) else None
+                
         obj = pq.Quantity(signal, units=units, dtype=dtype, copy=copy).view(cls)
+        
+        origin = origin if origin is not None else t_start
+        
+        if not isinstance(origin, np.ndarray):
+            if not isinstance(origin, numbers.Number):
+                raise TypeError("origin or t_start must be scalar numbers or scalar arrays")
+            
+            try:
+                origin = np.array(origin) # will raise 
+            except:
+                raise TypeError("origin or t_start must be scalar numbers or scalar arrays")
+            
+        if origin.size > 1:
+            raise TypeError("origin or t_start must be scalars arrays or numbers")
+        
+        if isinstance(obj, neo.core.basesignal.BaseSignal):
+            if domain_units is None:
+                domain_units = obj.times.units
+
+        if isinstance(origin, pq.Quantity):
+            if isinstance(domain_units, pq.Quantity):
+                if not units_convertible(origin, domain_units):
+                    raise TypeError(f"origin units {origin.units} are incompatible with domain units {domain_units}")
+                
+            else:
+                domain_units = origin.units
+                
+        else:
+            if isinstance(domain_units, pq.Quantity):
+                obj._origin = origin * domain_units
+            else:
+                obj._origin = origin * pq.diemnsionless
 
         if obj.ndim == 1:
             obj.shape = (-1,1)
             
-        obj._origin = 0 * pq.dimensionless
-        
-        if isinstance(origin, pq.Quantity):
-            t_start = origin
-        
-        elif t_start is not None:
-            if not isinstance(t_start, pq.Quantity):
-                raise TypeError("Expecting a Quantity for origin; got %s instead" % (type(origin).__name__))
-            
-            elif t_start.size > 1:
-                raise TypeError("origin must be a scalar quantity; got %s instead" % origin)
-            
-        obj._origin = t_start
-        
         if sampling_period is None:
             # sampling period not given
             if sampling_rate is None:
@@ -229,6 +252,7 @@ class DataSignal(BaseSignal):
         return _new_DataSignal, (self.__class__, 
                                  np.array(self),
                                  self.units, 
+                                 self.domain.units,
                                  self.dtype, 
                                  True,
                                  self.origin, 
@@ -247,6 +271,7 @@ class DataSignal(BaseSignal):
         
         new_DS = cls(np.array(self), 
                      units=self.units, 
+                     domain_units = self.domain.units,
                      dtype=self.dtype,
                      origin=self._origin, 
                      sampling_period=self._sampling_period,
@@ -1048,9 +1073,9 @@ class IrregularlySampledDataSignal(BaseSignal):
     _recommended_attrs = neo.baseneo.BaseNeo._recommended_attrs
 
     def __new__(cls, domain, signal, units=None, domain_units=None, time_units=None,
-                dtype=np.dtype("float64"), 
-                copy=True, name=None, file_origin=None, description=None, 
-                array_annotations=None, **annotations):
+                dtype=np.dtype("float64"), domain_dtype = np.dtype("float64"),
+                copy=True, name=None, file_origin=None, 
+                description=None, array_annotations=None, **annotations):
         
         if units is None:
             if not hasattr(signal, "units"):
@@ -1065,7 +1090,6 @@ class IrregularlySampledDataSignal(BaseSignal):
         if obj.ndim == 1:
             obj.shape = (-1,1)
 
-            
         if domain_units is None:
             if isinstance(time_units, pq.Quantity):
                 domain_units = time_units
@@ -1109,6 +1133,7 @@ class IrregularlySampledDataSignal(BaseSignal):
                                                    self.units,
                                                    self.domain.units,
                                                    self.dtype,
+                                                   self.domain.dtype,
                                                    True,
                                                    self.name,
                                                    self.file_origin,
@@ -1138,6 +1163,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         cls = self.__class__
         new_signal = cls(self.domain, np.array(self), units=self.units,
                          domain_units=self.domain.units, dtype=self.dtype,
+                         domain_dtype=self.domain.dtype,
                          name=self.name, file_origin=self.file_origin, 
                          description=self.description,
                          array_annotations=self.array_annotations,

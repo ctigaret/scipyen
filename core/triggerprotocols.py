@@ -165,7 +165,9 @@ class TriggerProtocol(object):
         Named parameters:
         =================
         
-        pre, post, photo: a SynapticEvent or None
+        pre, post, photo: a TriggerEvent or None
+            In addition, 'pre' may be a TriggerProtocol object; in this case, 
+            all other parameters are ignored ('copy constructor'-like)
         
         events: a sequence of TriggerEvent objects, or None
         
@@ -212,10 +214,29 @@ class TriggerProtocol(object):
                 manually)
                 
                 
-        Passing a non-empty events parameters trumps the other parameters        
-                    
+        Passing a non-empty events parameters overwrites the other parameters        
         
         """
+        # TODO: 2021-11-24 12:33:57
+        # Consider dumping copy semantics for member events to avoid data 
+        # duplication - events should only be copied when concatenating segments 
+        # or signals (such that the domain base has changed).
+        
+        # HOWEVER, a strong(?) counter-argument I can think of is when a trigger 
+        # protocol refers to semantically identical triggers in signals that 
+        # otherwise have distinct domain base.
+        #
+        # Typical example is that of electrophysiology and 1D signals generated
+        # from linescan data, when there usually is a delay between the acquisition 
+        # of the two types of data sets. This delay is almost guaranteed to
+        # exist when the acquisition of one is triggered by a TTL signal emitted
+        # during the acquisition of the other (see imaging-delay).
+        #
+        # In such cases, one msth trake into account time diffrerences between
+        # events of the same type but with different time stamps in each data set.
+        # Too complicated and prone to errors. See also NOTE: 2021-11-24 12:43:27
+        # below.
+        
         super(TriggerProtocol, self).__init__()
         
         self.__presynaptic__        = None
@@ -228,6 +249,19 @@ class TriggerProtocol(object):
         self.__protocol_name__      = "protocol"
         
         if isinstance(events, (tuple, list)) and 1 <= len(events) <= 3 and all([isinstance(e, TriggerEvent) for e in events]):
+            # NOTE: 2021-11-24 12:43:27
+            # We ALWAYS use copy semantics, with the (small?) price of some data 
+            # duplication. The protocol collects trigger events semantically. By
+            # embedding it into a neo objects hierarchy we inherently create 
+            # duplicate events such that the event times fall "where they need
+            # to be", in relation to the signals' time base, after taking into 
+            # account possible delays between data sets.
+            #
+            # NOT doing so would complicate the time keeping for the embedded 
+            # events. So I take this 'lazy' approach (for now, it works!)
+            #
+            # see also TODO: 2021-11-24 12:33:57
+            #
             # contructs from a list of TriggerEvent objects passed as "events" argument
             for e in events:
                 if e.event_type == TriggerEventType.presynaptic:
@@ -257,7 +291,6 @@ class TriggerProtocol(object):
                 elif e.event_type & TriggerEventType.acquisition:
                     e_ = e.copy()
                     e_.labels = e.labels
-                    #self.__acquisition__.append(e_)
                     self.__acquisition__ = e_ # NOTE: ONE acquisition event only!
                     
             overwrite = False
@@ -306,7 +339,7 @@ class TriggerProtocol(object):
                 
             self.__protocol_name__ = pre.name
             
-            return
+            return # stop here when first parameter is a TriggerProtocol
         
         elif isinstance(pre, TriggerEvent):
             if self.__presynaptic__ is None:
@@ -355,16 +388,13 @@ class TriggerProtocol(object):
         
         if isinstance(acquisition, TriggerEvent) and acquisition.event_type & TriggerEventType.acquisition:
             self.__acquisition__ = acquisition
-            #self.__acquisition__.append(acquisition)
             
         elif isinstance(acquisition, (tuple, list)) and \
             all([isinstance(a, TriggerEvent) and a.event_type & TriggerEventType.acquisition for a in acquisition]):
                 self.__acquisition__ = acquisition[0]
-                #self.__acquisition__ += list(acquisition)
                 
         else:
             self.__acquisition__ = None
-            #self.__acquisition__ = []
 
         if isinstance(segment_index, int):
             self.__segment_index__ = [segment_index]
@@ -842,6 +872,16 @@ class TriggerProtocol(object):
         self.setEvent(TriggerEventType.photostimulation, value)
         
     @property
+    def imaging_delay(self):
+        """Alias to self.imagingDelay
+        """
+        return self.imagingDelay
+    
+    @imaging_delay.setter
+    def imaging_delay(self, value):
+        self.imagingDelay = value
+        
+    @property
     def imagingDelay(self):
         """
         This is the delay between the start of an electrophysiology segment and 
@@ -1142,6 +1182,33 @@ class TriggerProtocol(object):
         
         elif isinstance(self.__segment_index__, (int, tuple, list)):
             return self.__segment_index__
+        
+    def make_hdf5_entity(self, group, name, oname, compression, chunks, track_order,entity_cache):
+        import h5py
+        from iolib import h5io
+        
+        target_name, obj_attrs, entity_cache = h5io.__check_make_entity_args__ (obj, oname, entity_cache)
+            
+        obj_group = group.create_dataset(target_name)
+        
+        for name in ("presynaptic", "postsynaptic", "photostimulation", "acquisition", "imagingDelay" ,"segmentIndex"):
+            # since these are (deep) copies - see NOTE: 2021-11-24 12:43:27
+            # and TODO: 2021-11-24 12:33:57 - there are very good chances their
+            # entities are NOT already in the cache
+            h5io.make_hdf5_entity(getattr(self, name, None), name=name, oname=name, 
+                                  compression=compression, chunks=chunks, 
+                                  track_order = track_order, entity_cache=entity_cache)
+            
+        obj_group.attrs.update(obj_attrs)
+        
+        return obj_group
+    
+    def from_hdf5_entity(self, group):
+        import h5py
+        if not isinstance(group, h5py.Group):
+            raise TypeError(f"Expecting a HDF5 Group; got {type(gtroup)._name__} instead")
+        
+        # TODO 2021-11-24 13:15:13 implement me!
         
 #### BEGIN Module-level functions
 
