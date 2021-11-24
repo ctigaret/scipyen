@@ -1187,15 +1187,21 @@ class TriggerProtocol(object):
         import h5py
         from iolib import h5io
         
-        target_name, obj_attrs, entity_cache = h5io.__check_make_entity_args__ (obj, oname, entity_cache)
+        target_name, obj_attrs, entity_cache = h5io.__check_make_entity_args__ (self, oname, entity_cache)
             
-        obj_group = group.create_dataset(target_name)
+        obj_group = group.create_group(target_name)
         
         for name in ("presynaptic", "postsynaptic", "photostimulation", "acquisition", "imagingDelay" ,"segmentIndex"):
             # since these are (deep) copies - see NOTE: 2021-11-24 12:43:27
             # and TODO: 2021-11-24 12:33:57 - there are very good chances their
             # entities are NOT already in the cache
-            h5io.make_hdf5_entity(getattr(self, name, None), name=name, oname=name, 
+            trigger = getattr(self, name, None)
+            if isinstance(trigger, TriggerEvent):
+                oname = trigger.name
+            else:
+                oname = name
+            h5io.make_hdf5_entity(trigger, obj_group,
+                                  name=name, oname=oname, 
                                   compression=compression, chunks=chunks, 
                                   track_order = track_order, entity_cache=entity_cache)
             

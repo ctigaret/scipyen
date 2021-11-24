@@ -2374,7 +2374,8 @@ def make_hdf5_entity(obj, group:h5py.Group,
     parent_neo_container: None or a neo Container.
     When present, it should be the container
     """
-    if hasattr(obj, "make_HDF5_entity"):
+    #print("make_hdf5_entity:", type(obj))
+    if hasattr(obj, "make_hdf5_entity"):
         target_name, obj_attrs = make_obj_attrs(obj, oname=oname)
             
         if isinstance(name, str) and len(name.strip()):
