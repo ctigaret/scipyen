@@ -4,6 +4,7 @@ import functools
 import quantities as pq
 import neo
 from core import quantities as cq
+from core.triggerprotocols import TriggerProtocol
 
 def getter(obj, name:str):
     return getattr(obj, f"_{name}_")
@@ -113,17 +114,19 @@ class BaseBioData(neo.core.baseneo.BaseNeo):
     
     def __init__(self, name=None, description=None, file_origin=None, **kwargs):
         for attr in self._needed_attributes_:
-            if isinstance(attr[1], type):
-                val_type = attr[1]
-                val = None
-            else:
-                val = attr[1]
-                val_type = type(attr[1])
-                
-            setattr(self, f"_{attr[0]}_", kwargs.pop(attr[0], val))
-            setattr(type(self), f"get_{attr[0]}", functools.partial(getter, name=attr[0]))
-            setattr(type(self), f"set_{attr[0]}", functools.partial(setter, name=attr[0], val_type=val_type))
-            setattr(type(self), attr[0], property(getattr(type(self), f"get_{attr[0]}"), getattr(type(self), f"set_{attr[0]}")))
+            if attr[0] == "protocols":
+                self._protocols_ = 
+                if isinstance(attr[1], type):
+                    val_type = attr[1]
+                    val = None
+                else:
+                    val = attr[1]
+                    val_type = type(attr[1])
+                    
+                setattr(self, f"_{attr[0]}_", kwargs.pop(attr[0], val))
+                setattr(type(self), f"get_{attr[0]}", functools.partial(getter, name=attr[0]))
+                setattr(type(self), f"set_{attr[0]}", functools.partial(setter, name=attr[0], val_type=val_type))
+                setattr(type(self), attr[0], property(getattr(type(self), f"get_{attr[0]}"), getattr(type(self), f"set_{attr[0]}")))
             
         #self._descriptors_ = DataBag(mutable_types=True, allow_none=True)
         #self._descriptors_.update(kwargs)
@@ -144,4 +147,39 @@ class BaseBioData(neo.core.baseneo.BaseNeo):
         super().__init__(name, description, file_origin, **kwargs)
     
         
+    def __attr_str__(self):
+        for a in self._needed_attributes_:
+            result.append(f"{a[0]}: {getattr(self, a[0], None)}")
+            
+        return "\n".join(result)
+
+
+    @property
+    def protocols(self):
+        """A list of TriggerProtocol objects (references)
+        """
+        if not hasattr(self, "_protocols_"):
+            self._protocols_  = list()
+            
+        if hasattr(self, "_protocols"):
+            self._protocols_ = self._protocols
+            del self._protocols
+            
+        return self._protocols_
     
+    @protocols.setter
+    def protocols(self, value):
+        if isinstance(value, TriggerProtocol):
+            self._protocols_ = [value]
+            
+        elif isinstance(value, (tuple, list)) and all([isinstance(p, TriggerProtocol) for p in value]):
+            self._protocols_[:] = value #  a reference !
+            
+            self._protocols_.sort(key=lambda x: x.segmentIndices()[0])
+            
+        else:
+            raise TypeError("Expecting a TriggerProtocol, or a sequence of TriggerProtocol objects; got %s instead" % type(value).__name__)
+        
+        if hasattr(self, "_protocols"):
+            del self._protocols_
+            

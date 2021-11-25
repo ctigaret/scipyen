@@ -462,9 +462,6 @@ class AnalysisUnit(BaseBioData):
                            ("field", "NA"),
                            ("inscene", False)) + BaseBioData._needed_attributes_
     
-    #def __init__(self, parent, landmark=None, protocols=None, 
-                 #unit_type=None, cell=None, field=None, scene=False, name=None, **kwargs):
-        
     def __init__(self, parent, name=None, description=None, file_origin=None, **kwargs):
         
         """AnalysisUnit constructor.
@@ -472,10 +469,12 @@ class AnalysisUnit(BaseBioData):
         Positional parameters:
         ======================
         
-        parent - a ScanData object; the AnalysisUnit object stores a reference.
+        parent - a ScanData object; the AnalysisUnit object stores a reference
+                    to it.
         
         Named parameters:
         =================
+        name deacriptoin, file_origin - see BaseBioData
         
         landmark: a pictgui.PlanarGraphics object or None
         
@@ -519,22 +518,6 @@ class AnalysisUnit(BaseBioData):
         if not isinstance(parent, ScanData):
             raise TypeError("parent is expected to be a ScanData object; got %s instead" % type(parent).__name__)
         
-        # NOTE: 2018-03-10 16:24:50 
-        # weak references cannot be pickled
-        #self._parent_ = weakref.ref(parent) 
-        
-        #self._parent_ = parent
-        
-        #self._inscene_ = scene
-        
-        #self._unit_type_ = "unknown"
-        
-        #self._cell_ = "NA"
-        
-        #self._field_ = "NA"
-        
-        #self._unit_name_ = None
-        
         # NOTE:2019-01-14 21:08:02
         # a string identifying the source of the sample (animal ID, patient ID, 
         # culture ID, etc) as per experiment
@@ -554,10 +537,10 @@ class AnalysisUnit(BaseBioData):
         #self._descriptors_ = DataBag(mutable_types=True, allow_none=True)
         #self._descriptors_.mutable_types = True
         
-        if not isinstance(landmark, (PlanarGraphics, type(None))):
-            raise TypeError("landmark expected to be a pictgui.PlanarGraphics; got %s instead" % type(landmark).__name__)
+        #if not isinstance(landmark, (PlanarGraphics, type(None))):
+            #raise TypeError("landmark expected to be a pictgui.PlanarGraphics; got %s instead" % type(landmark).__name__)
         
-        self._landmark_ = landmark
+        #self._landmark_ = landmark
         
         # self._frames_ is a list of frame indices where the landmark is defined
         # Whe landmark is None, self._frames_ is the range object for all frames 
@@ -583,107 +566,109 @@ class AnalysisUnit(BaseBioData):
             # is defined in scene or scans
             self._frames_ = landmark.frameIndices
         
-        if isinstance(protocols, TriggerProtocol):
+        if isinstance(self._protocols_, TriggerProtocol):
             self._protocols_ = [protocols]
             
-        elif isinstance(protocols, (tuple, list)) and all([isinstance(t, TriggerProtocol) for t in protocols]):
-            names = [t.name for t in protocols]
+        elif isinstance(self._protocols_, (tuple, list)) and all([isinstance(t, TriggerProtocol) for t in self._protocols_]):
+            names = [t.name for t in self._protocols_]
             
             if any([names.count(n)>1 for n in names]):
                 raise ValueError("Protocols must have unique names")
             
-            self._protocols_ = protocols # a reference!
+            #self._protocols_ = protocols # a reference!
             
-        elif protocols is None:
-            self._protocols_ = list()
+        #elif protocols is None:
+            #self._protocols_ = list()
             
         else:
             raise TypeError("protocol expected to be a TriggerProtocol object or a sequence of TriggerProtocol objects; got %s instead" % type(protocol).__name__)
         
-        if isinstance(unit_type, str):
-            if len(unit_type.strip()) == 0:
-                raise ValueError("unit_type cannot be an empty string and cannot contain only blanks")
+        #if isinstance(unit_type, str):
+            #if len(unit_type.strip()) == 0:
+                #raise ValueError("unit_type cannot be an empty string and cannot contain only blanks")
             
-            if unit_type not in ("unknown", "NA"):
-                self._unit_type_ = strutils.str2symbol(unit_type)
-                #self._unit_type_ = strutils.str2R(unit_type)
+            #if unit_type not in ("unknown", "NA"):
+                #self._unit_type_ = strutils.str2symbol(unit_type)
+                ##self._unit_type_ = strutils.str2R(unit_type)
                 
-            else:
-                self._unit_type_  = unit_type
+            #else:
+                #self._unit_type_  = unit_type
                 
-        elif unit_type is None:
-            if self._landmark_ is None:
-                self._unit_type_ = "unknown"
+        #elif unit_type is None:
+            #if self._landmark_ is None:
+                #self._unit_type_ = "unknown"
                 
-            else:
-                # UnitTypes is a defaultdict object, therefore the line below
-                # automatically sets unit_type to unknown if gthe first character
-                # in the landmark name is not found in UnitTypes keys
-                # FIXME come up with a better lookup criterion
-                self._unit_type_ = UnitTypes[self._landmark_.name[0]] 
+            #else:
+                ## UnitTypes is a defaultdict object, therefore the line below
+                ## automatically sets unit_type to unknown if gthe first character
+                ## in the landmark name is not found in UnitTypes keys
+                ## FIXME come up with a better lookup criterion
+                #self._unit_type_ = UnitTypes[self._landmark_.name[0]] 
                 
-        else:
-            raise TypeError("unit_type expected to be a string, or None; got %s instead" % type(unit_type).__name__)
+        #else:
+            #raise TypeError("unit_type expected to be a string, or None; got %s instead" % type(unit_type).__name__)
         
-        if cell is None:
-            self._cell_ = "NA"
+        #if cell is None:
+            #self._cell_ = "NA"
         
-        elif isinstance(cell, str):
-            self._cell_ = strutils.str2symbol(cell)
-            #self._cell_ = strutils.str2R(cell)
+        #elif isinstance(cell, str):
+            #self._cell_ = strutils.str2symbol(cell)
+            ##self._cell_ = strutils.str2R(cell)
             
-        else:
-            raise TypeError("cell expected to be a str or None; got %s instead" % type(cell).__name__)
+        #else:
+            #raise TypeError("cell expected to be a str or None; got %s instead" % type(cell).__name__)
         
-        if field is None:
-            self._field_ = "NA"
+        #if field is None:
+            #self._field_ = "NA"
                 
-        elif isinstance(field, str):
-            self._field_ = strutils.str2symbol(field)
+        #elif isinstance(field, str):
+            #self._field_ = strutils.str2symbol(field)
             
-        else:
-            raise TypeError("field expected to be a str or None; got %s instead" % type(field).__name__)
+        #else:
+            #raise TypeError("field expected to be a str or None; got %s instead" % type(field).__name__)
         
-        if isinstance(name, str) and len(name.strip()) > 0:
-            self._unit_name_ = name
+        #if isinstance(name, str) and len(name.strip()) > 0:
+            #self._unit_name_ = name
             
-        elif name is not None:
-            raise TypeError("name expected to be a str or None; got %s instead" % type(name).__name__)
+        #elif name is not None:
+            #raise TypeError("name expected to be a str or None; got %s instead" % type(name).__name__)
             
         #self._descriptors_.update(kwargs)
         
     def __str__(self):
         result = list()
         result.append("\n%s:" % self.__class__.__name__)
-        result.append("Name: %s" % self.name)
-        result.append("Cell: %s" % self.cell)
-        result.append("Field: %s" % self.field)
-        result.append("Unit Type: %s" % self.type)
-        result.append("Landmark: %s" % str(self.landmark))
+        result.append(self.__attr_str__())
+
+        #result.append("Name: %s" % self.name)
+        #result.append("Cell: %s" % self.cell)
+        #result.append("Field: %s" % self.field)
+        #result.append("Unit Type: %s" % self.type)
+        #result.append("Landmark: %s" % str(self.landmark))
         
-        result.append("Protocol(s):")
-        p_list = list()
-        for p in self.protocols:
-            p_list.append("\t%s on frames %s" % (p.name, str(p.segmentIndices())))
+        #result.append("Protocol(s):")
+        #p_list = list()
+        #for p in self.protocols:
+            #p_list.append("\t%s on frames %s" % (p.name, str(p.segmentIndices())))
             
-        if len(p_list)>1:
-            result.append(", ".join(p_list))
-        else:
-            result.append("".join(p_list))
+        #if len(p_list)>1:
+            #result.append(", ".join(p_list))
+        #else:
+            #result.append("".join(p_list))
             
-        result.append("Frames:")
-        result.append(str(self.frames))
+        #result.append("Frames:")
+        #result.append(str(self.frames))
             
-        result.append("Descriptors:")
-        d_list = list()
-        for key in self._descriptors_.sortedkeys():
-            d_list.append("\t%s: %s" % (key, self._descriptors_[key]))
+        #result.append("Descriptors:")
+        #d_list = list()
+        #for key in self._descriptors_.sortedkeys():
+            #d_list.append("\t%s: %s" % (key, self._descriptors_[key]))
             
-        if len(d_list)>1:
-            result.append("\n".join(d_list))
-        else:
-            result.append("".join(d_list))
-            result.append("\n")
+        #if len(d_list)>1:
+            #result.append("\n".join(d_list))
+        #else:
+            #result.append("".join(d_list))
+            #result.append("\n")
             
         return "\n".join(result)
     
@@ -933,371 +918,210 @@ class AnalysisUnit(BaseBioData):
         
         self._parent_ = obj
             
-    @property
-    def landmark(self):
-        if not hasattr(self, "_landmark_"):
-            self._landmark_ = None
+    #@property
+    #def landmark(self):
+        #if not hasattr(self, "_landmark_"):
+            #self._landmark_ = None
             
-        if hasattr(self, "_landmark"):
-            self._landmark_ = self._landmark
-            del self._landmark
+        #if hasattr(self, "_landmark"):
+            #self._landmark_ = self._landmark
+            #del self._landmark
             
-        return self._landmark_
+        #return self._landmark_
     
-    @landmark.setter
-    def landmark(self, obj):
-        if not isinstance(obj, PlanarGraphics):
-            raise TypeError("Expecting a pictgui.PlanarGraphics object; got %s instead" % type(obj).__name__)
+    #@landmark.setter
+    #def landmark(self, obj):
+        #if not isinstance(obj, PlanarGraphics):
+            #raise TypeError("Expecting a pictgui.PlanarGraphics object; got %s instead" % type(obj).__name__)
         
-        if hasattr(self, "_landmark"):
-            self._landmark_ = self._landmark
-            del self._landmark
+        #if hasattr(self, "_landmark"):
+            #self._landmark_ = self._landmark
+            #del self._landmark
             
-        self._landmark_ = obj
+        #self._landmark_ = obj
     
-    @property
-    def name(self):
-        """
-        This is the name of the landmark used to define this unit, or of the 
-        "parent" ScanData when landmark is None
-        """
-        if not hasattr(self, "_landmark_"):
-            self._landmark_ = None
+    #@property
+    #def name(self):
+        #"""
+        #This is the name of the landmark used to define this unit, or of the 
+        #"parent" ScanData when landmark is None
+        #"""
+        #if not hasattr(self, "_landmark_"):
+            #self._landmark_ = None
             
-        if not hasattr(self, "_unit_name_"):
-            self._unit_name_ = None
+        #if not hasattr(self, "_unit_name_"):
+            #self._unit_name_ = None
             
-        if hasattr(self, "_landmark"):
-            self._landmark_ = self._landmark
-            del self._landmark
+        #if hasattr(self, "_landmark"):
+            #self._landmark_ = self._landmark
+            #del self._landmark
             
-        if not hasattr(self, "_parent_"):
-            self._parent_ = None
+        #if not hasattr(self, "_parent_"):
+            #self._parent_ = None
             
-        if hasattr(self, "_parent"):
-            self._parent_ = self._parent
-            del self._parent
+        #if hasattr(self, "_parent"):
+            #self._parent_ = self._parent
+            #del self._parent
         
-        if not hasattr(self, "_unit_name_") or self._unit_name_ is None:
-            if self._landmark_ is None:
-                if self._parent_ is not None:
-                    self._unit_name_ = self._parent_.name
+        #if not hasattr(self, "_unit_name_") or self._unit_name_ is None:
+            #if self._landmark_ is None:
+                #if self._parent_ is not None:
+                    #self._unit_name_ = self._parent_.name
                     
-                else:
-                    self._unit_name_ = "NA"
+                #else:
+                    #self._unit_name_ = "NA"
 
-            else:
-                self._unit_name_ = self._landmark_.name
+            #else:
+                #self._unit_name_ = self._landmark_.name
                 
-        return self._unit_name_
+        #return self._unit_name_
     
-    @name.setter
-    def name(self, value):
-        """Assigns a custom landmark name.
+    #@name.setter
+    #def name(self, value):
+        #"""Assigns a custom landmark name.
         
-        Parameters:
-        ===========
-        value: a str or None
+        #Parameters:
+        #===========
+        #value: a str or None
         
-        When value is None, a string containing blanks only, or an empty string,
-        the name is reset to the default, i.e. the name of self.landmark, or the
-        name of the parent ScanData if self.landmark is None.
+        #When value is None, a string containing blanks only, or an empty string,
+        #the name is reset to the default, i.e. the name of self.landmark, or the
+        #name of the parent ScanData if self.landmark is None.
         
         
-        """
-        if not hasattr(self, "_unit_name_"):
-            self._unit_name_ = None
+        #"""
+        #if not hasattr(self, "_unit_name_"):
+            #self._unit_name_ = None
             
-        if not hasattr(self, "_parent_"):
-            self._parent_ = None
+        #if not hasattr(self, "_parent_"):
+            #self._parent_ = None
             
-        if hasattr(self, "_parent"):
-            self._parent_ = self._parent
-            del self._parent
+        #if hasattr(self, "_parent"):
+            #self._parent_ = self._parent
+            #del self._parent
         
-        if isinstance(value, str):
-            if len(value.strip()) == 0: # empty string passed
-                # reset name to the landmark name or scandata
-                if self._landmark_ is None:
-                    if self._parent_ is not None:
-                        self._unit_name_ = self._parent_.name
+        #if isinstance(value, str):
+            #if len(value.strip()) == 0: # empty string passed
+                ## reset name to the landmark name or scandata
+                #if self._landmark_ is None:
+                    #if self._parent_ is not None:
+                        #self._unit_name_ = self._parent_.name
                         
-                    else:
-                        self._unit_name_ = "NA"
+                    #else:
+                        #self._unit_name_ = "NA"
                     
-                else:
-                    self._unit_name_ = self._landmark_.name
+                #else:
+                    #self._unit_name_ = self._landmark_.name
                     
-            else:
-                self._unit_name_ = value
+            #else:
+                #self._unit_name_ = value
             
-        elif name is None:
-            # reset name to the landmark name or scandata
-            if self._landmark_ is None:
-                if self._parent_ is not None:
-                    self._unit_name_ = self._parent_.name
+        #elif name is None:
+            ## reset name to the landmark name or scandata
+            #if self._landmark_ is None:
+                #if self._parent_ is not None:
+                    #self._unit_name_ = self._parent_.name
                     
-                else:
-                    self._unit_name_ = "NA"
+                #else:
+                    #self._unit_name_ = "NA"
                 
-            else:
-                self._unit_name_ = self._landmark_.name
+            #else:
+                #self._unit_name_ = self._landmark_.name
             
-        else:
-            raise TypeError("expecting a string or None; got %s instead" % type(value).__name__)
+        #else:
+            #raise TypeError("expecting a string or None; got %s instead" % type(value).__name__)
         
-    @property
-    def type(self):
-        if not hasattr(self, "_unit_type_"):
-            self._unit_type_ = "unknown"
+    #@property
+    #def type(self):
+        #if not hasattr(self, "_unit_type_"):
+            #self._unit_type_ = "unknown"
             
-        if hasattr(self, "_type"):
-            self._unit_type_ = self._type
-            del self._type
+        #if hasattr(self, "_type"):
+            #self._unit_type_ = self._type
+            #del self._type
             
-        return self._unit_type_
+        #return self._unit_type_
     
-    @type.setter
-    def type(self, value):
-        """Allow user-defined unit type names.
-        """
-        if not hasattr(self, "_unit_type_"):
-            self._unit_type_ = "unknown"
+    #@type.setter
+    #def type(self, value):
+        #"""Allow user-defined unit type names.
+        #"""
+        #if not hasattr(self, "_unit_type_"):
+            #self._unit_type_ = "unknown"
             
-        if hasattr(self, "_type"):
-            self._unit_type_ = self._type
-            del self._type
+        #if hasattr(self, "_type"):
+            #self._unit_type_ = self._type
+            #del self._type
             
-        if isinstance(value, str):
-            if len(value.strip()) == 0:
-                raise ValueError("type cannot be empty or contain only blank characters")
+        #if isinstance(value, str):
+            #if len(value.strip()) == 0:
+                #raise ValueError("type cannot be empty or contain only blank characters")
             
-            if value.strip().lower() == "default":
-                self._unit_type_ = UnitTypes[self._landmark_.name]
+            #if value.strip().lower() == "default":
+                #self._unit_type_ = UnitTypes[self._landmark_.name]
             
-            else:
-                self._unit_type_ = value
+            #else:
+                #self._unit_type_ = value
             
-        elif value is None:
-            self._unit_type_ = UnitTypes[self._landmark_.name]
+        #elif value is None:
+            #self._unit_type_ = UnitTypes[self._landmark_.name]
             
-        else:
-            raise TypeError("Expecting a str or None; got %s instead" % type(value).__name__)
+        #else:
+            #raise TypeError("Expecting a str or None; got %s instead" % type(value).__name__)
         
-    @property
-    def age(self):
-        if not hasattr(self, "_age_"):
-            self._age_ = "NA"
+    #@property
+    #def age(self):
+        #if not hasattr(self, "_age_"):
+            #self._age_ = "NA"
             
-        return self._age_
+        #return self._age_
     
-    @age.setter
-    def age(self, value):
-        """str ('NA'), datetime.timedelta or pq.day, pq.month, or any custom age units in this module
-        NOTE that timedelta objects hold up to days (for 'date'), 
-        """
-        if isinstance(value, str):
-            if value.strip().lower() != "na":
-                raise ValueError("When a str, age must be 'NA'; got %s instead" % valur)
+    #@age.setter
+    #def age(self, value):
+        #"""str ('NA'), datetime.timedelta or pq.day, pq.month, or any custom age units in this module
+        #NOTE that timedelta objects hold up to days (for 'date'), 
+        #"""
+        #if isinstance(value, str):
+            #if value.strip().lower() != "na":
+                #raise ValueError("When a str, age must be 'NA'; got %s instead" % valur)
             
-            self._age_ = "NA"
+            #self._age_ = "NA"
             
-        elif value is None:
-            self._age_ = "NA"
+        #elif value is None:
+            #self._age_ = "NA"
             
-        elif isinstance(value, datetime.timedelta):
-            days = value.days
-            seconds = value.seconds
-            musecs = value.microseconds
+        #elif isinstance(value, datetime.timedelta):
+            #days = value.days
+            #seconds = value.seconds
+            #musecs = value.microseconds
             
-            # NOTE: round up to the largest time unit
+            ## NOTE: round up to the largest time unit
             
-            if days == 0:
-                # maybe seconds
-                if seconds == 0:
-                    self._age_ = musecs * pq.us
+            #if days == 0:
+                ## maybe seconds
+                #if seconds == 0:
+                    #self._age_ = musecs * pq.us
                 
-                else:
-                    if musecs == 0:
-                        self._age_ = seconds * pq.s
+                #else:
+                    #if musecs == 0:
+                        #self._age_ = seconds * pq.s
                         
-                    else:
-                        self._age_ = value.total_seconds() * pq.s
+                    #else:
+                        #self._age_ = value.total_seconds() * pq.s
                         
-            else:
-                # just report age as days
-                self._age_ = days * pq.day
+            #else:
+                ## just report age as days
+                #self._age_ = days * pq.day
                 
-        elif isinstance(value, pq.Quantity):
-            if not check_time_units(value):
-                raise TypeError("Expecting a time quantity; got %s instead" % type(value).__name__)
+        #elif isinstance(value, pq.Quantity):
+            #if not check_time_units(value):
+                #raise TypeError("Expecting a time quantity; got %s instead" % type(value).__name__)
             
-            self._age_ = value
+            #self._age_ = value
             
-        else:
-            raise TypeError("Expecting a str ('NA'), a datetime.timedelta, a python time quantity, or None; got %s instead" % type(value).__name__)
+        #else:
+            #raise TypeError("Expecting a str ('NA'), a datetime.timedelta, a python time quantity, or None; got %s instead" % type(value).__name__)
         
-    @property
-    def gender(self):
-        if not hasattr(self, "_gender_"):
-            self._gender_ = "NA"
-            
-        return self._gender_
-    
-    @gender.setter
-    def gender(self, value):
-        if isinstance(value, str):
-            if len(value.strip()) == 0:
-                value = "NA"
-                
-            else:
-                if value.lower().strip() not in ("na", "f", "m"):
-                    value = "NA"
-                    
-                else:
-                    value = value.strip().upper()
-                    
-                self._gender_ = value
-            
-        else:
-            raise TypeError("Expecting a string, one of 'NA', 'F', 'M' (case-insensitive); got %s instead" % type(value).__name__)
-        
-        
-    @property
-    def genotype(self):
-        """Genotype: 
-        String, typically one of "na", "wt", "het", "hom", but not restricted to these
-        """
-        if not hasattr(self, "_genotype_"):
-            self._genotype_ = "NA"
-            
-        return self._genotype_
-    
-    @genotype.setter
-    def genotype(self, value):
-        if isinstance(value, str):
-            if len(value.strip()) == 0:
-                value = "NA"
-                
-            else:
-                self._genotype_ = value
-            
-        elif value is None:
-            self.__genotyope__ = "NA"
-            
-        else:
-            raise TypeError("Expecting a string; got %s instead" % type(value).__name__)
-        
-    @property
-    def sourceID(self):
-        if not hasattr(self, "_sample_source_"):
-            self._sample_source_ = "NA"
-            
-        return self._sample_source_
-    
-    @sourceID.setter
-    def sourceID(self, value):
-        if not hasattr(self, "_sample_source_"):
-            self._sample_source_ = "NA"
-            
-        if isinstance(value, str):
-            if len(value.strip()) == 0:
-                self._sample_source_ = "NA"
-                
-            else:
-                self._sample_source_ = value
-            
-        elif value is None:
-            self._sample_source_ = "NA"
-            
-        else:
-            raise TypeError("Expecting a str or None; got %s instead" % type(value).__name__)
-        
-    @property
-    def cell(self):
-        if not hasattr(self, "_cell_"):
-            self._cell_ = "NA"
-            
-        if hasattr(self, "_cell"):
-            # API upgrade
-            self._cell_ = self._cell
-            del self._cell
-            
-        return self._cell_
-    
-    @cell.setter
-    def cell(self, value):
-        if hasattr(self, "_cell"):
-            self._cell_ = self._cell
-            del self._cell
-        
-        if isinstance(value, str):
-            if len(value.strip()) == 0:
-                self._cell_ = "NA"
-                
-            else:
-                self._cell_ = value
-            
-        elif value is None:
-            self._cell_ = "NA"
-            
-        else:
-            raise TypeError("Expecting a str or None; got %s instead" % type(value).__name__)
-        
-    @property
-    def inScene(self):
-        if not hasattr(self, "_inscene_"):
-            self._inscene_ = False
-            
-        if hasattr(self, "_inscene"):
-            # API upgrade
-            self._inscene_ = self._inscene
-            del self._inscene
-            
-        else:
-            self._inscene_ = False
-        
-        return self._inscene_
-    
-    @inScene.setter
-    def inScene(self, value):
-        if not isinstance(value, bool):
-            raise TypeError("Expecting a bool; got %s instead" % type(value).__name__)
-        self._inscene_ = value
-        
-        if hasattr(self, "_inscene"):
-            del self._inscene
-    
-    @property
-    def field(self):
-        if not hasattr(self, "_field_"):
-            self._field_ = "NA"
-            
-        if hasattr(self, "_field"):
-            self._field_ = self._field
-            del self._field
-            
-        return self._field_
-    
-    @field.setter
-    def field(self, value):
-        if isinstance(value, str):
-            if len(value.strip()) == 0:
-                self._field_ = "NA"
-                
-            else:
-                self._field_ = strutils.str2symbol(value)
-                #self._field_ = strutils.str2R(value)
-            
-        elif value is None:
-            self._field_ = "NA"
-            
-        else:
-            raise TypeError("Expecting a str; got %s instead" % type(value).__name__)
-        
-        if hasattr(self, "_field"):
-            del self._field
-            
     @safeWrapper
     def protocol(self, index):
         """Returns a trigger protocol specified by "index".
@@ -1401,7 +1225,7 @@ class AnalysisUnit(BaseBioData):
             raise TypeError("Expecting a TriggerProtocol, or a sequence of TriggerProtocol objects; got %s instead" % type(value).__name__)
         
         if hasattr(self, "_protocols"):
-            del self._protocols
+            del self._protocols_
             
     @property
     def frames(self):
