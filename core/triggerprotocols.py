@@ -1183,7 +1183,7 @@ class TriggerProtocol(object):
         elif isinstance(self.__segment_index__, (int, tuple, list)):
             return self.__segment_index__
         
-    def make_hdf5_entity(self, group, name, oname, compression, chunks, track_order, entity_cache):
+    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order, entity_cache):
         import h5py
         from iolib import h5io
         
@@ -1194,11 +1194,12 @@ class TriggerProtocol(object):
             return cached_entity
         
         target_name, obj_attrs = h5io.make_obj_attrs(obj, oname=oname)
-        #target_name, obj_attrs, entity_cache = h5io.__check_make_entity_args__ (self, oname, entity_cache)
-            
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
         entity = group.create_group(target_name)
-        entity.attrs.update(obj_attrs)
         h5io.store_entity_in_cache(entity_cache, self, entity)
+        entity.attrs.update(obj_attrs)
         
         for name in ("presynaptic", "postsynaptic", "photostimulation", "acquisition", "imagingDelay" ,"segmentIndex"):
             # since these are (deep) copies - see NOTE: 2021-11-24 12:43:27

@@ -1059,12 +1059,12 @@ def parse_func(f):
             return x.__name__
         
         else:
-            return {"type": type(x).__name__, "value": x}
+            return {"__type__": type(x).__name__, "__value__": x}
         
     
-    return dict((p_name, {"kind":p.kind.name, 
-                          "default": __identify__(p.default),
-                          "annotation": __identify__(p.annotation),
+    return dict((p_name, {"__kind__":p.kind.name, 
+                          "__default__": __identify__(p.default),
+                          "__annotation__": __identify__(p.annotation),
                           }) for p_name, p in sig.parameters.items())
 
 def make_entry_name(obj):
@@ -2421,7 +2421,11 @@ def make_hdf5_entity(obj, group:h5py.Group,
         
     """
     #print("make_hdf5_entity:", type(obj))
-    if hasattr(obj, "make_hdf5_entity"):
+    entity_factory_method = getattr(obj, "make_hdf5_entity", None)
+    if entity_factory_method is None:
+        entity_factory_method = getattr(obj, "makeHDF5Entity", None)
+        
+    if inspect.ismethod(entity_factory_method):
         target_name, obj_attrs = make_obj_attrs(obj, oname=oname)
             
         if isinstance(name, str) and len(name.strip()):
@@ -2433,7 +2437,8 @@ def make_hdf5_entity(obj, group:h5py.Group,
             group[target_name] = cached_entity
             return cached_entity
         
-        return obj.make_hdf5_entity(group, name, oname, compression,chunks,track_order,entity_cache)
+        return entity_factory_method(group, name, oname, compression,chunks,track_order,entity_cache)
+        #return obj.make_hdf5_entity(group, name, oname, compression,chunks,track_order,entity_cache)
 
     #raise NotImplementedError(f"{type(obj).__name__} objects are not yet supported")
     

@@ -439,51 +439,52 @@ class PlanarGraphics():
     concrete values of their planar descriptors are allowed to vary from frame 
     to frame by collecting them in so-called planar graphics "states".
     
-    The "state" is an object with attributes named after the planar descriptors 
-    specific for the actual shape or cursor. They can be accessed and their values 
-    can be changed directly using attribute access ('dot' syntax), or "indexed"
-    access (item access syntax).
+    The 'state' is an object with attributes named after the planar descriptors 
+    specific for the actual shape (or cursor). They can be accessed and their 
+    values modified using either attribute access ('dot' syntax), or "indexed" 
+    access:
     
     For example,
     
-                state.x = 10
+                state.x = 10        # attribute access
     
     or
-                state["x"] = 10
+                state["x"] = 10     # indexed access
                 
-    In addition, a state contains a 'z_frame' attribute which is the frame index
-    (if any) where the state's concrete values of planar descriptors apply (and
-    therefore, the index of the frame where the PlanarGraphics is going to be 
-    painted):
+    In addition, a state object contains a 'z_frame' attribute indicating the
+    index of the frame, if any, where that specific 'state' is visible, as per
+    the following rules:
     
-    * when z_frame is None, the state applies to all available frames in the
+    * when z_frame is None, the state is visible in all frames avaliable in the
       data
     
-    * when z_frame is an int: 
-        if z_frame >= 0 the state applies to the frame with index z_frame, if it
-            exists; this implies that data has at least z_frame + 1 frames
+    * when z_frame is an int (or a float): 
+        if z_frame >= 0 the state is visible ONLY in the frame with 
+            index == z_frame, if that frame exists; for example, if z_frame == 3 
+            and data has only three frames then the state will not be visible at
+            all!
             
-        if z_frame  < 0 the state applies to ALL frames EXCEPT the frame with
-            index -1 * z_frame - 1
+            Therefore, unless the data contains at least z_frame + 1 frames, the
+            state will not be visible.
+            
+        if z_frame  < 0 the state applies to all frames EXCEPT the frame with
+            index ==  -1 * z_frame - 1
     
-    It follows that a PlanarGraphics state can be:
+    It follows that a PlanarGraphics 'state' object can be:
     
-    (a) ubiquitous state: 
-        ---------------------
-        * its z_frame attribute is None and the state is drawn (i.e. is visible)
-            in any data frame
+    (a) ubiquitous: 
+        -----------
+        * z_frame is None, and the state is visible in any data frame
         
-    (b) frame-avoiding state: 
-        ---------------------
-        * the z_frame attribute is an int and is < 0
-        * the state should be drawn in any frame EXCEPT the one which has
-            index equal to -1 * z_frame - 1 (if it exists)
+    (b) frame-avoiding: 
+        ---------------
+        * z_frame < 0: the state is visible in all frames EXCEPT the one which
+            has index equal to -1 * z_frame - 1 (if it exists)
         
-    (c) single-frame state: 
-        --------------------
-        * the z_frame is an int >= 0
-        * the state is drawn ONLY in the frame with index == z_frame
-            (if it exists)
+    (c) single-frame: 
+        -------------
+        * z_frame >= 0: the state is visible ONLY in the frame which has
+            index == z_frame (if it exists)
         
     The co-existence of states in a PlanarGraphics object is governed by the
     rules:
@@ -493,14 +494,15 @@ class PlanarGraphics():
     Any frame can associate AT MOST one state.
      
     Rule II. Ubiquitous states
-    -----------------------------
+    --------------------------
     An ubiquitous state is the ONLY state of a PlanarGraphics object.
     
         Corollaries:
         
         * the PlanarGraphics object can have only one ubiquitous state, and
         
-        * no other states co-exist with an ubiquitous state
+        * the PlanarGraphics object can have only one state when that state is
+            ubiquitous
         
     Rule III. Frame-avoiding states
     -------------------------------
@@ -509,9 +511,16 @@ class PlanarGraphics():
     
         fa_state.z_frame == -1 * sf_state.z_frame - 1
         
+        i.e., the frame where the fa_state is invisible is the same frame as
+        the one where the singl-frame state is visible.
+        
+        This situation allows the PlanarGraphics object to have one state visible
+        everywhere EXCEPT the frame which associates a specific 'state' object,
+        possibly with distinct descriptor values.
+        
         Corollaries:
     
-        * there can be only one frame-avoiding state;
+        * there can be only one frame-avoiding state in a PlanarGraphics object;
         
         * a PlanarGraphics with a frame-avoding state can have at most two
             states, with the other state being a single-frame state;
@@ -530,9 +539,6 @@ class PlanarGraphics():
             
         * By Rule I, all single_frame states have unique z_frame values
     
-    When used with 3D volumes, these parameters may vary from one data frame to 
-    another. Furthermore, the shape needs not be visible in all frames.
-    
     By associating a "state" with data frames, a PlanarGraphics object can take
     different values of its planar descriptors in distinct data frames (this is
     somewhat similar to the "ROIs" in Image/J).
@@ -544,7 +550,7 @@ class PlanarGraphics():
         list-like Path object, which supports iterable API.
     
     Frontends
-    ========
+    =========
     
         A PlanarGraphics object can have more than one frontend, when the same
         shape is intended to be painted synchronously in several GUI viewers.
@@ -803,8 +809,6 @@ class PlanarGraphics():
     # ### END :class: methods
     
     # ### BEGIN static methods
-    
-        
     @staticmethod
     def findStateWithZFrame(states, frame):
         cs = [s for s in states if s.z_frame == frame]
@@ -813,65 +817,65 @@ class PlanarGraphics():
         
     # ### END static methods
     
-    def _upgrade_API_(self):
-        # NOTE: 2019-03-19 13:49:51
-        # see TODO - make code more efficient 19c19.py
+    #def _upgrade_API_(self):
+        ## NOTE: 2019-03-19 13:49:51
+        ## see TODO - make code more efficient 19c19.py
         
-        def __upgrade_attribute__(old_name, new_name, attr_type, default):
-            needs_must = False
-            if not hasattr(self, new_name):
-                needs_must = True
+        #def __upgrade_attribute__(old_name, new_name, attr_type, default):
+            #needs_must = False
+            #if not hasattr(self, new_name):
+                #needs_must = True
                 
-            else:
-                attribute = getattr(self, new_name)
+            #else:
+                #attribute = getattr(self, new_name)
                 
-                if not isinstance(attribute, attr_type):
-                    needs_must = True
+                #if not isinstance(attribute, attr_type):
+                    #needs_must = True
                     
-            if needs_must:
-                if hasattr(self, old_name):
-                    old_attribute = getattr(self, old_name)
+            #if needs_must:
+                #if hasattr(self, old_name):
+                    #old_attribute = getattr(self, old_name)
                     
-                    if isinstance(old_attribute, attr_type):
-                        setattr(self, new_name, old_attribute)
-                        delattr(self, old_name)
+                    #if isinstance(old_attribute, attr_type):
+                        #setattr(self, new_name, old_attribute)
+                        #delattr(self, old_name)
                         
-                    else:
-                        setattr(self, new_name, default)
-                        delattr(self, old_name)
+                    #else:
+                        #setattr(self, new_name, default)
+                        #delattr(self, old_name)
                         
-                else:
-                    setattr(self, new_name, default)
+                #else:
+                    #setattr(self, new_name, default)
                     
-        if hasattr(self, "apiversion") and isinstance(self.apiversion, tuple) and len(self.apiversion)>=2 and all(isinstance(v, numbers.Number) for v in self.apiversion):
-            vernum = self.apiversion[0] + self.apiversion[1]/10
+        #if hasattr(self, "apiversion") and isinstance(self.apiversion, tuple) and len(self.apiversion)>=2 and all(isinstance(v, numbers.Number) for v in self.apiversion):
+            #vernum = self.apiversion[0] + self.apiversion[1]/10
             
-            if vernum >= 0.2:
-                return
+            #if vernum >= 0.2:
+                #return
             
-        __upgrade_attribute__("__states__", "_states_", list, list())
-        __upgrade_attribute__("__frontends__", "_frontends_", list, list())
-        __upgrade_attribute__("__ID__", "_ID_", type(None), None)
+        #__upgrade_attribute__("__states__", "_states_", list, list())
+        #__upgrade_attribute__("__frontends__", "_frontends_", list, list())
+        #__upgrade_attribute__("__ID__", "_ID_", type(None), None)
         
-        if not hasattr(self, "_currentstates_"):
-            if hasattr(self, "__currentstate__"):
-                setattr(self, _currentstates_, [self.__currentstate__])
-                delattr(self, "__currentstate__")
+        #if not hasattr(self, "_currentstates_"):
+            #if hasattr(self, "__currentstate__"):
+                #setattr(self, _currentstates_, [self.__currentstate__])
+                #delattr(self, "__currentstate__")
                 
-            elif hasattr(self, "_currentstate_"):
-                setattr(self, "_currentstates_", [self._currentstate_])
-                delattr(self, "_currentstate_")
+            #elif hasattr(self, "_currentstate_"):
+                #setattr(self, "_currentstates_", [self._currentstate_])
+                #delattr(self, "_currentstate_")
         
-        if isinstance(self, Path):
-            __upgrade_attribute__("__objects__", "_objects_", list, list())
-            __upgrade_attribute__("__position__", "_position_", tuple, (float(), float()))
+        #if isinstance(self, Path):
+            #__upgrade_attribute__("__objects__", "_objects_", list, list())
+            #__upgrade_attribute__("__position__", "_position_", tuple, (float(), float()))
             
-        __upgrade_attribute__("__closed__", "_closed_", bool, False)
-        __upgrade_attribute__("__linked_objects__", "_linked_objects_", dict, dict())
-        __upgrade_attribute__("__currentframe__", "_currentframe_", int, 0)
+        #__upgrade_attribute__("__closed__", "_closed_", bool, False)
+        #__upgrade_attribute__("__linked_objects__", "_linked_objects_", dict, dict())
+        #__upgrade_attribute__("__currentframe__", "_currentframe_", int, 0)
         
         
-        self.apiversion = (0,3)
+        #self.apiversion = (0,3)
         
     def __init_from_descriptors__(self, *args, frameindex:typing.Optional[typing.Iterable]=[],
                                   currentframe:int=0) -> None:
@@ -4447,6 +4451,57 @@ class PlanarGraphics():
             #if value._backend_ == self:
                 #self._frontend=value
                 
+    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache):
+        import h5py
+        from iolib import h5io, jsonio
+        
+        cached_entity = get_cached_entity(entity_cache, self)
+        
+        if isinstance(cached_entity, h5py.Group):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        target_name, obj_attrs = h5io.make_obj_attrs(obj, oname=oname)
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity = group.create_group(target_name)
+        h5io.store_entity_in_cache(entity_cache, self, entity)
+        entity.attrs.update(obj_attrs)
+        entity.attrs.update({"__graphics_type_name__": self.type_name})
+                
+        if isinstance(self, Path):
+            for k, o in enumerate(self):
+                o_name = f"{k}_{type(o).__name__}"
+                o.makeHDF5Entity(entity, o_name, o.name, compression, chunks, track_order, entity_cache)
+                
+            return entity
+                
+        entity.attr.update({"__graphics_descriptors__": h5io.make_attr(self.descriptors)})
+        
+        # NOTE: 2021-11-25 09:59:42
+        # do NOT use the generic h5io.make_hdf5_entity here, although states is
+        # a list; thisns because we don't want to deeply nest the states' databags
+        # as HDF5 Group objects; see NOTE: 2021-11-25 10:04:00 below
+        #states_group = h5io.make_hdf5_entity(self.states, "states", self.name,
+                                             #compression, chunbks, track_order,
+                                             #entity_cache)
+        
+        # NOTE: 2021-11-25 10:04:00
+        # make a HDF5 Group for the states list, then
+        # for each state in the states list create an empty HDF5 Dataset, then
+        # store the descriptor name/value pairs of the state as Dataset attrs
+        states_group = entity.create_group("states")
+        #h5io.store_entity_in_cache(entity_cache, self.states, states_group)
+        
+        for k, state in enumerate(self.states):
+            state_dset = states_group.create_dataset(f"state_{k}")
+            state_dset.attrs.update(h5io.make_attr_dict(**state))
+            
+        return entity
+        
+        
 class Cursor(PlanarGraphics):
     """Encapsulates the coordinates of a cursor:
     
@@ -6101,7 +6156,6 @@ class Path(PlanarGraphics):
                                 linked_objects = linked_objects)
         
         if len(args):
-            #print("Path.__init__ *args", args, " %d elements" % len(args))
             if len(args) == 1: # construct Path from one argument in *args, which may be:
                 if isinstance(args[0], Path): # a Path => copy constructor
                     # NOTE: 2021-04-26 11:52:53
@@ -6250,16 +6304,10 @@ class Path(PlanarGraphics):
                                                      frameindex = frameindex, 
                                                      currentframe=currentframe))
                         
-                    #print("Path.__init__ from coord sequence: self._objects_", self._objects_)
-                    
-                    #for o in self._objects_:
-                        #print("Path.__init__ from coord sequence", o._states_)
-                    
                     self._planar_graphics_type_ = PlanarGraphicsType.path
                     
         if len(self):
             for o in self._objects_:
-                #print(o.type, ": x=", o.x, "y=",o.y)
                 o._currentframe_ = currentframe
             
             
@@ -6282,12 +6330,6 @@ class Path(PlanarGraphics):
     def __repr__(self):
         ss = super(PlanarGraphics, self).__repr__()
         return ss
-        #s = [super(PlanarGraphics, self).__repr__(), ":\n"]
-        #s += ["["]
-        #s += [", ".join([o.__repr__() for o in self])]
-        #s += ["]"]
-        
-        #return "".join(s)
         
     def __str__(self):
         s = "\n ".join(["%d: %s" % (k, e.__str__()) for k,e in enumerate(self._objects_)])

@@ -10,6 +10,7 @@ import h5py
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
 from core.prog import safeWrapper
+from core.basescipyen import BaseBioData
 from core.traitcontainers import DataBag
 from core import quantities as cq
 from core.quantities import(arbitrary_unit, 
@@ -49,7 +50,7 @@ from imaging.axiscalibration import (AxesCalibration,
 
 from imaging.imageprocessing import concatenateImages
 from gui import pictgui as pgui
-from gui.pictgui import PlanarGraphics
+from gui.planargraphics import PlanarGraphics
 
 DEFAULTS = DataBag()
 DEFAULTS["Name"] = "ScanDataOptions"
@@ -59,6 +60,10 @@ DEFAULTS["Channels"]["Indicator"] = "ind"
 DEFAULTS["Channels"]["Bleed"] = DataBag()
 DEFAULTS["Channels"]["Bleed"]["Ref2Ind"] = 0.
 DEFAULTS["Channels"]["Bleed"]["Ind2Ref"] = 0.
+
+class ScanData(BaseBioData):
+    """Dummy for AnalysisUnit; clobbered below
+    """
 
 class FrameLookup(object):
     """Heuristic for frame synchronization between scans, scene and ephys data.
@@ -104,9 +109,6 @@ class FrameLookup(object):
         def __getitem__(self, key:int):
             return self._map_[key]
         
-    
-        
-
 class ScanDataOptions(DataBag):
     """Do not use
     """
@@ -413,7 +415,7 @@ class ScanDataOptions(DataBag):
         
         return ret
 
-class AnalysisUnit(object):
+class AnalysisUnit(BaseBioData):
     """ Encapsulates a ScanData analysis unit.
     
     An AnalysisUnit object semantically links together landmarks and attributes of
@@ -454,11 +456,16 @@ class AnalysisUnit(object):
     """
     from gui import pictgui as pgui
     
-    #"def" __init__(self, parent, source = "scans", landmark=None, protocols=None, 
-                 #unit_type=None, cell=None, field=None, **kwargs):
+    _needed_attributes_ = (("landmark", PlanarGraphics),
+                           ("unit_type", "NA"),
+                           ("unit_name", "NA"),
+                           ("field", "NA"),
+                           ("inscene", False)) + BaseBioData._needed_attributes_
+    
+    #def __init__(self, parent, landmark=None, protocols=None, 
+                 #unit_type=None, cell=None, field=None, scene=False, name=None, **kwargs):
         
-    def __init__(self, parent, landmark=None, protocols=None, 
-                 unit_type=None, cell=None, field=None, scene=False, name=None, **kwargs):
+    def __init__(self, parent, name=None, description=None, file_origin=None, **kwargs):
         
         """AnalysisUnit constructor.
         
@@ -503,11 +510,9 @@ class AnalysisUnit(object):
         """
         import gui.pictgui as pgui
         
-        self.apiversion = (0,2)
+        super().__init__(name, description, file_origin, **kwargs)
         
-        super().__init__()
-        
-        if isinstance(parent, AnalysisUnit):
+        if isinstance(self.parent, AnalysisUnit):
             self = parent.copy()
             return
         
@@ -518,35 +523,35 @@ class AnalysisUnit(object):
         # weak references cannot be pickled
         #self._parent_ = weakref.ref(parent) 
         
-        self._parent_ = parent
+        #self._parent_ = parent
         
-        self._inscene_ = scene
+        #self._inscene_ = scene
         
-        self._unit_type_ = "unknown"
+        #self._unit_type_ = "unknown"
         
-        self._cell_ = "NA"
+        #self._cell_ = "NA"
         
-        self._field_ = "NA"
+        #self._field_ = "NA"
         
-        self._unit_name_ = None
+        #self._unit_name_ = None
         
         # NOTE:2019-01-14 21:08:02
         # a string identifying the source of the sample (animal ID, patient ID, 
         # culture ID, etc) as per experiment
-        self._sample_source_ = "NA"
+        #self._sample_source_ = "NA"
         
         # NOTE: 2019-01-16 14:05:10
         # a string for genotype: one of "wt", "het", "hom", or "na" (not available/unknown)
-        self._genotype_ = "NA"
+        #self._genotype_ = "NA"
         
-        self._gender_ = "NA"
+        #self._gender_ = "NA"
         
-        self._age_ = "NA" # str ("NA") or python time quantity
+        #self._age_ = "NA" # str ("NA") or python time quantity
                             # (so that we can report it using custom age units in this module)
         
-        self._protocols_ = list() #  holds REFERENCES to TriggerProtocols in the parent
+        #self._protocols_ = list() #  holds REFERENCES to TriggerProtocols in the parent
         
-        self._descriptors_ = DataBag(mutable_types=True, allow_none=True)
+        #self._descriptors_ = DataBag(mutable_types=True, allow_none=True)
         #self._descriptors_.mutable_types = True
         
         if not isinstance(landmark, (PlanarGraphics, type(None))):
@@ -635,7 +640,6 @@ class AnalysisUnit(object):
                 
         elif isinstance(field, str):
             self._field_ = strutils.str2symbol(field)
-            #self._field_ = strutils.str2R(field)
             
         else:
             raise TypeError("field expected to be a str or None; got %s instead" % type(field).__name__)
@@ -646,86 +650,8 @@ class AnalysisUnit(object):
         elif name is not None:
             raise TypeError("name expected to be a str or None; got %s instead" % type(name).__name__)
             
-        self._descriptors_.update(kwargs)
+        #self._descriptors_.update(kwargs)
         
-    #def _upgrade_API_(self):
-        #from gui import pictgui as pgui
-        
-        #def _upgrade_attribute_(old_name, new_name, attr_type, default):
-            #needs_must = False
-            #if not hasattr(self, new_name):
-                #needs_must = True
-                
-            #else:
-                #attribute = getattr(self, new_name)
-                
-                #if not isinstance(attribute, attr_type):
-                    #needs_must = True
-                    
-            #if needs_must:
-                #if hasattr(self, old_name):
-                    #old_attribute = getattr(self, old_name)
-                    
-                    #if isinstance(old_attribute, attr_type):
-                        #setattr(self, new_name, old_attribute)
-                        #delattr(self, old_name)
-                        
-                    #else:
-                        #setattr(self, new_name, default)
-                        #delattr(self, old_name)
-                        
-                #else:
-                    #setattr(self, new_name, default)
-                    
-        #if hasattr(self, "apiversion") and isinstance(self.apiversion, tuple) and len(self.apiversion)>=2 and all(isinstance(v, numbers.Number) for v in self.apiversion):
-            #vernum = self.apiversion[0] + self.apiversion[1]/10
-            
-            #if vernum >= 0.2:
-                #return
-            
-        #_upgrade_attribute_("__parent__", "_parent_", ScanData, ScanData())
-        #_upgrade_attribute_("__inscene__", "_inscene_", bool, False)
-        #_upgrade_attribute_("__unit_type__", "_unit_type_", str, "unknown")
-        #_upgrade_attribute_("__cell__", "_cell_", str, "NA")
-        #_upgrade_attribute_("__field__", "_field_", str, "NA")
-        #_upgrade_attribute_("__genotype__", "_genotype_", str, "NA")
-        #_upgrade_attribute_("__gender__", "_gender_", str, "NA")
-        #_upgrade_attribute_("__age__", "_age_", str, "NA")
-        #_upgrade_attribute_("__sample_source__", "_sample_source_", str, "NA")
-        #_upgrade_attribute_("__unit_name__", "_unit_name_", (str, type(None)), None)
-        #_upgrade_attribute_("__protocols__", "_protocols_", list, list())
-        #_upgrade_attribute_("__descriptors__", "_descriptors_", DataBag, DataBag(mutable_types=True, allow_none=True))
-        #_upgrade_attribute_("__landmark__", "_landmark_", (PlanarGraphics, type(None)), None)
-        
-        #if isinstance(self._landmark_, PlanarGraphics):
-            #self._landmark_._upgrade_API_()
-            
-        #self.apiversion = (0, 2)
-        
-    #"def" __eq__(self, other):
-        #if not isinstance(other, AnalysisUnit):
-            #return False
-        
-        #sameName = self.name == other.name
-        
-        #sameParent = self._parent_ == other._parent
-        
-        #sameSource = self._source == other._source
-        
-        #sameLandmark = self._landmark_ == other._landmark
-        
-        #sameProtocols = all([p in other._protocols for p in self._protocols_])
-        
-        #sameType = self._unit_type_ == other._type
-        
-        #sameCell = self._cell_ == other._cell_
-        
-        #sameField = self._field_ == other._field_
-        
-        #sameDescriptors = self._descriptors_ == other._descriptors_
-        
-        #return sameParent and sameName and sameSource and sameLandmark and sameProtocols and sameType and sameCell and sameField and sameDescriptors
-    
     def __str__(self):
         result = list()
         result.append("\n%s:" % self.__class__.__name__)
@@ -1606,6 +1532,11 @@ class AnalysisUnit(object):
             del self._descriptors
             
         self._descriptors_[name] = value
+        
+    def getScanData(self, average=True):
+        """Alias ot asScanData
+        """
+        return self.asScanData(average=average)
             
     def asScanData(self, average=None):
         """Returns a ScanData object representing this AnalysisUnit only.
@@ -1713,7 +1644,7 @@ class AnalysisUnit(object):
         
         return result
         
-class ScanData(object):
+class ScanData(BaseBioData):
     """An almost direct translation of matlab LSData data structure.
     Work in progress.
     
@@ -10086,18 +10017,26 @@ class ScanData(object):
     def sceneBlock(self):
         return self._scene_block_
     
-    def writeHDF5(self, fileNameOrGroup:typing.Union[str, h5py.Group],
-                  pathInfile:typing.Optional[str]=None) -> None:
-        from iolib.h5io import get_file_group_child
+    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache):
         
-        if isinstance(fileNameOrGroup, h5py.File):
-            if not fileNameOrGroup:
-                raise ValueError(f"HDF5 file {fileNameOrGroup} is closed; cannot continue")
-            
-            if fileNameOrGroup.mode != "r+":
-                raise ValueError("Cannot write to a read-only file")
-            
-        file, group, childname = get_file_group_child(fileNameOrGroup, pathInfile, "a")
+        import h5py
+        from iolib import h5io, jsonio
+        
+        cached_entity = get_cached_entity(entity_cache, self)
+        
+        if isinstance(cached_entity, h5py.Group):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        target_name, obj_attrs = h5io.make_obj_attrs(obj, oname=oname)
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity = group.create_group(target_name)
+        h5io.store_entity_in_cache(entity_cache, self, entity)
+        entity.attrs.update(obj_attrs)
+
         
         # TODO: write the following as datasets in subgroups
         # scans
