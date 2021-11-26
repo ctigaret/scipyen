@@ -133,6 +133,9 @@
      <verstretch>0</verstretch>
     </sizepolicy>
    </property>
+   <property name="windowIcon">
+    <iconset theme="user-home"/>
+   </property>
    <property name="features">
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
@@ -249,6 +252,9 @@ NOTE: you can click anywhere in the row to select</string>
      <verstretch>0</verstretch>
     </sizepolicy>
    </property>
+   <property name="windowIcon">
+    <iconset theme="folder-recent"/>
+   </property>
    <property name="features">
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
@@ -362,6 +368,9 @@ NOTE: you can click anywhere in the row to select</string>
      <horstretch>0</horstretch>
      <verstretch>0</verstretch>
     </sizepolicy>
+   </property>
+   <property name="windowIcon">
+    <iconset theme="folder"/>
    </property>
    <property name="features">
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
