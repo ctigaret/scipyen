@@ -1581,6 +1581,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self._recentlyRunScripts         = collections.deque()
         self._recent_scripts_dict_      = dict()
         self._showFilesFilter           = False
+        self._console_docked_           = False
         # ### END configurables
         
         self.navPrevDir                 = collections.deque()
@@ -1776,6 +1777,15 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     def scipyenSettings(self, value):
         self._scipyen_settings_ = value
         self.workspace["scipyen_settings"] = self._scipyen_settings_
+        
+    @property
+    def consoleDocked(self):
+        return self._console_docked_
+    
+    @markConfigurable("ConsoleDocked", "Qt")
+    @consoleDocked.setter
+    def consoleDocked(self, value):
+        self._console_docked_ = value is True
         
         
     @property
@@ -3929,6 +3939,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         #### END command history filters
         
+        #### BEGIN console dock
+        self.consoleDockWidget = QtWidgets.QDockWidget("Console", self, objectName="consoleDockWidget")
+        self.consoleDockWidget.setAllowedAreas(QtCore.Qt.AllDockWidgetAreas)
+        self.consoleDockWidget.setFeatures(QtWidgets.QDockWidget.AllDockWidgetFeatures)
+        self.consoleDockWidget.setVisible(False)
+        #### END console dock
+        #### END Dock widgets management
     @pyqtSlot()
     @safeWrapper
     def slot_keyDeleteStuff(self):
@@ -5358,6 +5375,25 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 
         self._refreshRecentScriptsMenu_()
         
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_dockConsole(self):
+        if self.console is not None:
+            self.consoleDockWidget.setWidget(self.console)
+            self.console.show()
+            self.consoleDockWidget.setVisible(True)
+            self._console_docked_ = True
+            
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_undockConsole(self):
+        # FIXME 2021-11-26 18:37:40
+        if self.console is not None:
+            self.consoleDockWidget.layout().removeWidget(self.console)
+            self.console.setVisible(True)
+            self.consoleDockWidget.setVisible(False)
+            self._console_docked_ = False
+            
     @pyqtSlot()
     @safeWrapper
     def _slot_importPythonModule(self):
