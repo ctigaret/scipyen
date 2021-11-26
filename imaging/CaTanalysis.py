@@ -349,7 +349,6 @@ def vCursor2ScanlineProjection(v, path, span=None):
         # by the vertical cursor "v"
         # as workaround, we introduce span as an optional parameter
         span = v.width
-        
     
     if v.x < 0:
         v_pos = 0
@@ -10966,7 +10965,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             self.unitTypeComboBox.clear()
             self.unitTypeComboBox.addItems(self._data_.availableUnitTypes)
             
-            unit_type = self._data_.analysisUnit().type
+            unit_type = self._data_.analysisUnit().unit_type
 
             unit_type_index = self.unitTypeComboBox.findText(self._data_.unitType)
                 

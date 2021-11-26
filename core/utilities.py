@@ -674,9 +674,9 @@ def gethash(x:typing.Any) -> Number:
         #return HASHRANDSEED + hash(type(x))
         
 def get_index_for_seq(index:int, 
-                        test:typing.Sequence[typing.Any], 
-                        target:typing.Sequence[typing.Any], 
-                        mapping:typing.Optional[dict]=None) -> int:
+                      test:typing.Sequence[typing.Any], 
+                      target:typing.Sequence[typing.Any], 
+                      mapping:typing.Optional[dict]=None) -> int:
     """Heuristic for computing an index into the target sequence.
     
     Returns an index into the `target` sequence given `index`:int index into
@@ -990,80 +990,6 @@ def safe_identity_test(x, y, idcheck=False):
     
     return ret ## good fallback, though potentially expensive
 
-    #try:
-        #ret = True
-        
-        #if idcheck:
-            #ret &= id(x) == id(y)
-            
-            #if not ret:
-                #return ret
-        
-        #ret &= type(x) == type(y)
-        
-        #if not ret:
-            #return ret
-        
-        #if isfunction(x):
-            #return x == y
-        
-        #if isinstance(x, partial):
-            #return x.func == y.func and x.args == y.args and x.keywords == y.keywords
-            
-        #if hasattr(x, "size"):
-            #ret &= x.size == y.size
-
-            #if not ret:
-                #return ret
-        
-        #elif hasattr(x, "__len__") or hasattr(x, "__iter__"):
-            #ret &= len(x) == len(y)
-
-            #if not ret:
-                #return ret
-            
-            #ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
-            
-            #if not ret:
-                #return ret
-            
-        #if hasattr(x, "shape"):
-            #ret &= x.shape == y.shape
-                
-            #if not ret:
-                #return ret
-        
-        ## NOTE: 2018-11-09 21:46:52
-        ## isn't this redundant after checking for shape?
-        ## unless an object could have shape attribte but not ndim
-        #if hasattr(x, "ndim"):
-            #ret &= x.ndim == y.ndim
-        
-            #if not ret:
-                #return ret
-        
-        #if hasattr(x, "dtype"):
-            #ret &= x.dtype == y.dtype
-        
-            #if not ret:
-                #return ret
-        
-        #if isinstance(x, (np.ndarray, str, Number, pd.DataFrame, pd.Series, pd.Index)):
-            #ret &= np.all(x==y)
-        
-            #if not ret:
-                #return ret
-        
-        #ret &= eq(x,y)
-        
-        #return ret ## good fallback, though potentially expensive
-    
-    #except Exception as e:
-        #traceback.print_exc()
-        ##print("x:", x)
-        ##print("y:", y)
-        #return False
-
 class NestedFinder(object):
     """Provides searching in nesting (hierarchical) data structures.
     
@@ -1122,7 +1048,6 @@ class NestedFinder(object):
         self._result_ = deque()
         self._values_ = deque()
         self._visited_ = deque() # visited nesting types - to avoid infinite recursion
-        #self._visited_ = set()
         self._data_ = src
         self._item_as_index_ = None
         self._item_as_value_ = None

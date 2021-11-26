@@ -1,4 +1,4 @@
-import enum, collections, numbers, configparser, itertools, inspect
+import enum, collections, numbers, configparser, itertools, inspect, warnings
 import types, typing
 from traitlets import Bunch
 import numpy as np
@@ -10,7 +10,7 @@ import h5py
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
 from core.prog import safeWrapper
-from core.basescipyen import BaseBioData
+from core.basescipyen import BaseScipyenData
 from core.traitcontainers import DataBag
 from core import quantities as cq
 from core.quantities import(arbitrary_unit, 
@@ -30,6 +30,8 @@ from core.datatypes import (UnitTypes, Genotypes, )
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 
 from core.datazone import DataZone
+
+from core.multiframeindex import MultiFrameIndex
 
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType,)
 
@@ -61,53 +63,96 @@ DEFAULTS["Channels"]["Bleed"] = DataBag()
 DEFAULTS["Channels"]["Bleed"]["Ref2Ind"] = 0.
 DEFAULTS["Channels"]["Bleed"]["Ind2Ref"] = 0.
 
-class ScanData(BaseBioData):
+class ScanData(BaseScipyenData):
     """Dummy for AnalysisUnit; clobbered below
     """
+class ScanDataFrameIndex(MultiFrameIndex):
+    def __init__(self, scene = None, scans = None, electrophysiology = None):
+        super().__init__(scene=scene, scans=scans, electrophysiology=electrophysiology)
 
-class FrameLookup(object):
-    """Heuristic for frame synchronization between scans, scene and ephys data.
+class FrameIndexLookup(object):
+    """Tools for frame synchronization between scans, scene and ephys data.
+    
+    Behaves like a dict with int keys mapped to dicts of three key/value pairs:
+        scene -> int
+        scans -> int
+        electrophysiology -> int
+        
+        
+    FrameIndexLookup maps a ScanData frame to a frame index into each of its
+    'scene', 'scans' and 'electrophysiology' data sets.
+    
+    
     """
-    # virtual_frame_index: dict{"scene":int, "scans":int, "ephys":int}
+    # virtual_frame_index: MultiFrameIndex(scene:int, scans:int, electrophysiology:int)
             
     def __init__(self, *args):
         """
-        *args: (virtual_frame_index, {data_component: data_frame_index}) ... where:
-            virtual_frame_index: int >= 0
-            data_component: str, one of 'scans','scene','ephys'
-            data_frame_index: int >= 0
-            
-        
+        *args: one or more dict with the following structure:
+            int: MultiFrameIndex, or None
+                When a MultiFrameIndex this is expected to have the following 
+                fields: 'scene', 'scans', 'electrophysiology', mapped to int or
+                None
         """
-        if len(args) == 1:
-            if isinstance(args[0], dict):
-                self._map_ = dict(args[0])
-            elif isinstance(args[0], (map, tuple, list, collections.deque)) or inspect.isgenerator(args[0]):
-                self._map_ = dict(*args[0])
-            else:
-                raise TypeError(f"I don't know what to do with {args}")
-        else:
-            self._map_ = dict(args)
         
-        if not all(isinstance(k, int) for k in self._map_.keys()):
-            raise TypeError("FrameLookup can have only int keys")
+        self._map_ = dict()
         
-        if any(k < 0 for k in self._map_keys()):
-            raise ValueError("A FrameLookup object cannot have negative keys")
+        for arg in args:
+            fields = list()
+            if not isinstance(arg, dict) or len(arg) == 0 or not all(isinstance(k, int) for k in arg) or not all(isinstance(v, (ScanDataFrameIndex, type(None))) for v in arg.values()):
+                raise TypeError("Expecting a mapping of int to ScanDataFrameIndex objects or None")
+            
+            self._map_.update(arg)
         
-        if not all(isinstance(v, dict) for v in self._map_.values()):
-            raise TypeError("In a FrameLookup, int keys must be mapped to dict objects")
+    @property
+    def map(self):
+        return self._map_
         
-        if not all(itertools.chain(*((k in ("scene", "scans", "ephys") for k in v.keys()) for v in self._map_values()))):
-            raise TypeError("All keys in the mapping values must be one of 'scene', 'scans', 'ephys'")
+    def __getitem__(self, key:int):
+        return self._map_.get(key, None)
+    
+    def __setitem__(self, key:int, value:typing.Optional[ScanDataFrameIndex] = None):
+        if not isinstance(value, (ScanDataFrameIndex, type(None))):
+            raise TypeError(f"Expecting a ScanDataFrameIndex or None; got {type(value).__name__} instead")
         
-        if not all(itertools.chain(*((isinstance(v, int) and d >= 0 for v in d.keys()) for d in self._map_values()))):
-            raise TypeError("All the mapped frames must be int values >= 0")
+        self._map_[key] = value
         
-        print("self._map_:", self._map_)
+    def scene(self, frame:int):
+        if frame in self._map_:
+            return self._map_[frame].scene if isinstance(self._map_, ScanDataFrameIndex) else None
         
-        def __getitem__(self, key:int):
-            return self._map_[key]
+    def setScene(self, frame:int, value:typing.Optional[int] = None):
+        frameindex = self._map_.get(frame, None)
+        if isinstance(frameindex, ScanDataFrameIndex):
+            frameindex.scene = value
+            
+        elif isinstance(value, int):
+            # create frame index of it doesn't exist and value is an int
+            self._map_[frame] = ScanDataFrameIndex(scene=value)
+            
+    def scans(self, frame:int):
+        if frame in self._map_:
+            return self._map_[frame].scans if isinstance(self._map_, ScanDataFrameIndex) else None
+        
+    def setScans(self, frame:int, value:typing.Optional[int]):
+        frameindex = self._map_.get(frame, None)
+        if isinstance(frameindex, ScanDataFrameIndex):
+            frameindex.scene = value
+            
+        elif isinstance(value, int):
+            self._map_[frame] = ScanDataFrameIndex(scans=value)
+        
+    def electrophysiology(self, frame:int):
+        if frame in self._map_:
+            return self._map_[frame].electrophysiology if isinstance(self._map_, ScanDataFrameIndex) else None
+        
+    def setElectrophysiology(self, frame:int, value:typing.Optional[int]):
+        frameindex = self._map_.get(frame, None)
+        if isinstance(frameindex, ScanDataFrameIndex):
+            frameindex.electrophysiology = value
+            
+        elif isinstance(value, int):
+            self._map_[frame] = ScanDataFrameIndex(electrophysiology = value)
         
 class ScanDataOptions(DataBag):
     """Do not use
@@ -415,7 +460,7 @@ class ScanDataOptions(DataBag):
         
         return ret
 
-class AnalysisUnit(BaseBioData):
+class AnalysisUnit(BaseScipyenData):
     """ Encapsulates a ScanData analysis unit.
     
     An AnalysisUnit object semantically links together landmarks and attributes of
@@ -460,7 +505,7 @@ class AnalysisUnit(BaseBioData):
                            ("unit_type", "NA"),
                            ("unit_name", "NA"),
                            ("field", "NA"),
-                           ("inscene", False)) + BaseBioData._needed_attributes_
+                           ("inscene", False)) + BaseScipyenData._needed_attributes_
     
     def __init__(self, parent, name=None, description=None, file_origin=None, **kwargs):
         
@@ -474,7 +519,7 @@ class AnalysisUnit(BaseBioData):
         
         Named parameters:
         =================
-        name deacriptoin, file_origin - see BaseBioData
+        name deacriptoin, file_origin - see BaseScipyenData
         
         landmark: a pictgui.PlanarGraphics object or None
         
@@ -518,36 +563,8 @@ class AnalysisUnit(BaseBioData):
         if not isinstance(parent, ScanData):
             raise TypeError("parent is expected to be a ScanData object; got %s instead" % type(parent).__name__)
         
-        # NOTE:2019-01-14 21:08:02
-        # a string identifying the source of the sample (animal ID, patient ID, 
-        # culture ID, etc) as per experiment
-        #self._sample_source_ = "NA"
-        
-        # NOTE: 2019-01-16 14:05:10
-        # a string for genotype: one of "wt", "het", "hom", or "na" (not available/unknown)
-        #self._genotype_ = "NA"
-        
-        #self._gender_ = "NA"
-        
-        #self._age_ = "NA" # str ("NA") or python time quantity
-                            # (so that we can report it using custom age units in this module)
-        
-        #self._protocols_ = list() #  holds REFERENCES to TriggerProtocols in the parent
-        
-        #self._descriptors_ = DataBag(mutable_types=True, allow_none=True)
-        #self._descriptors_.mutable_types = True
-        
-        #if not isinstance(landmark, (PlanarGraphics, type(None))):
-            #raise TypeError("landmark expected to be a pictgui.PlanarGraphics; got %s instead" % type(landmark).__name__)
-        
-        #self._landmark_ = landmark
-        
-        # self._frames_ is a list of frame indices where the landmark is defined
-        # Whe landmark is None, self._frames_ is the range object for all frames 
-        # in the parent scene or scans, depending on the source
-        #
         # NOTE that these frames are not necessarily identical to the frames
-        # in the protocols, but there should be an overlap between protocol(s)
+        # in the protocols, but there should be an overlap between protocol
         # frame indices and landmark frame indices, otherwise the analysis unit 
         # will be pointless
         #
@@ -562,114 +579,38 @@ class AnalysisUnit(BaseBioData):
                 self._frames_ = range(parent.scansFrames)
                 
         else:
-            # get the frames with ladnark states, irrespective of whether this
-            # is defined in scene or scans
-            self._frames_ = landmark.frameIndices
+            # get the frames with ladmark states, irrespective of whether this
+            # units is defined in scene or scans
+            self._frames_ = self._landmark_.frameIndices
         
         if isinstance(self._protocols_, TriggerProtocol):
-            self._protocols_ = [protocols]
+            self._protocols_ = [self._protocols_]
             
-        elif isinstance(self._protocols_, (tuple, list)) and all([isinstance(t, TriggerProtocol) for t in self._protocols_]):
+        elif isinstance(self._protocols_, (tuple, list)):
+            if not all([isinstance(t, TriggerProtocol) for t in self._protocols_]):
+                warnings.warn("'protocols' must be a sequence of TriggerProtocol objects")
+                self._protocols_.clear()
+                #raise ValueError("'protocols' must be a sequence of TriggerProtocol objects")
             names = [t.name for t in self._protocols_]
             
             if any([names.count(n)>1 for n in names]):
-                raise ValueError("Protocols must have unique names")
-            
-            #self._protocols_ = protocols # a reference!
-            
-        #elif protocols is None:
-            #self._protocols_ = list()
+                warnings.warn("TriggerProtocol objects must have unique, distinct names; they will be renamed!")
+                for k,p in enumerate(self._protocols_):
+                    p.name = f"protocol_{k}_{p.name}"
+                #raise ValueError("TriggerProtocol objects must have unique, distinct names")
             
         else:
-            raise TypeError("protocol expected to be a TriggerProtocol object or a sequence of TriggerProtocol objects; got %s instead" % type(protocol).__name__)
-        
-        #if isinstance(unit_type, str):
-            #if len(unit_type.strip()) == 0:
-                #raise ValueError("unit_type cannot be an empty string and cannot contain only blanks")
+            warnings.warn("'protocols' expected to be a TriggerProtocol object or a sequence of TriggerProtocol objects; got %s instead" % type(self._protocols_).__name__)
             
-            #if unit_type not in ("unknown", "NA"):
-                #self._unit_type_ = strutils.str2symbol(unit_type)
-                ##self._unit_type_ = strutils.str2R(unit_type)
-                
-            #else:
-                #self._unit_type_  = unit_type
-                
-        #elif unit_type is None:
-            #if self._landmark_ is None:
-                #self._unit_type_ = "unknown"
-                
-            #else:
-                ## UnitTypes is a defaultdict object, therefore the line below
-                ## automatically sets unit_type to unknown if gthe first character
-                ## in the landmark name is not found in UnitTypes keys
-                ## FIXME come up with a better lookup criterion
-                #self._unit_type_ = UnitTypes[self._landmark_.name[0]] 
-                
-        #else:
-            #raise TypeError("unit_type expected to be a string, or None; got %s instead" % type(unit_type).__name__)
+            self._protocols_ = list()
+            #raise TypeError("'protocols' expected to be a TriggerProtocol object or a sequence of TriggerProtocol objects; got %s instead" % type(self._protocols_).__name__)
         
-        #if cell is None:
-            #self._cell_ = "NA"
-        
-        #elif isinstance(cell, str):
-            #self._cell_ = strutils.str2symbol(cell)
-            ##self._cell_ = strutils.str2R(cell)
-            
-        #else:
-            #raise TypeError("cell expected to be a str or None; got %s instead" % type(cell).__name__)
-        
-        #if field is None:
-            #self._field_ = "NA"
-                
-        #elif isinstance(field, str):
-            #self._field_ = strutils.str2symbol(field)
-            
-        #else:
-            #raise TypeError("field expected to be a str or None; got %s instead" % type(field).__name__)
-        
-        #if isinstance(name, str) and len(name.strip()) > 0:
-            #self._unit_name_ = name
-            
-        #elif name is not None:
-            #raise TypeError("name expected to be a str or None; got %s instead" % type(name).__name__)
-            
-        #self._descriptors_.update(kwargs)
         
     def __str__(self):
         result = list()
         result.append("\n%s:" % self.__class__.__name__)
         result.append(self.__attr_str__())
 
-        #result.append("Name: %s" % self.name)
-        #result.append("Cell: %s" % self.cell)
-        #result.append("Field: %s" % self.field)
-        #result.append("Unit Type: %s" % self.type)
-        #result.append("Landmark: %s" % str(self.landmark))
-        
-        #result.append("Protocol(s):")
-        #p_list = list()
-        #for p in self.protocols:
-            #p_list.append("\t%s on frames %s" % (p.name, str(p.segmentIndices())))
-            
-        #if len(p_list)>1:
-            #result.append(", ".join(p_list))
-        #else:
-            #result.append("".join(p_list))
-            
-        #result.append("Frames:")
-        #result.append(str(self.frames))
-            
-        #result.append("Descriptors:")
-        #d_list = list()
-        #for key in self._descriptors_.sortedkeys():
-            #d_list.append("\t%s: %s" % (key, self._descriptors_[key]))
-            
-        #if len(d_list)>1:
-            #result.append("\n".join(d_list))
-        #else:
-            #result.append("".join(d_list))
-            #result.append("\n")
-            
         return "\n".join(result)
     
     def __repr__(self):
@@ -737,7 +678,6 @@ class AnalysisUnit(BaseBioData):
                     name in [sig.name for sig in self.parent.scansBlock.segments[f].analogsignals] \
                     for f in test_frames])
             
-        
     @property
     def frameEventDetection(self):
         """Returns a nested dict of protocols and frame indices and their associated 
@@ -913,238 +853,36 @@ class AnalysisUnit(BaseBioData):
     @parent.setter
     def parent(self, obj):
         if not isinstance(obj, ScanData):
-            raise TypeError("Expecting a ScanData object; got %s instead" % type(ob).__name__)
+            warnings.warn("Expecting a ScanData object; got %s instead" % type(ob).__name__)
         
         
         self._parent_ = obj
             
-    #@property
-    #def landmark(self):
-        #if not hasattr(self, "_landmark_"):
-            #self._landmark_ = None
-            
-        #if hasattr(self, "_landmark"):
-            #self._landmark_ = self._landmark
-            #del self._landmark
-            
-        #return self._landmark_
-    
-    #@landmark.setter
-    #def landmark(self, obj):
-        #if not isinstance(obj, PlanarGraphics):
-            #raise TypeError("Expecting a pictgui.PlanarGraphics object; got %s instead" % type(obj).__name__)
-        
-        #if hasattr(self, "_landmark"):
-            #self._landmark_ = self._landmark
-            #del self._landmark
-            
-        #self._landmark_ = obj
-    
-    #@property
-    #def name(self):
-        #"""
-        #This is the name of the landmark used to define this unit, or of the 
-        #"parent" ScanData when landmark is None
-        #"""
-        #if not hasattr(self, "_landmark_"):
-            #self._landmark_ = None
-            
-        #if not hasattr(self, "_unit_name_"):
-            #self._unit_name_ = None
-            
-        #if hasattr(self, "_landmark"):
-            #self._landmark_ = self._landmark
-            #del self._landmark
-            
-        #if not hasattr(self, "_parent_"):
-            #self._parent_ = None
-            
-        #if hasattr(self, "_parent"):
-            #self._parent_ = self._parent
-            #del self._parent
-        
-        #if not hasattr(self, "_unit_name_") or self._unit_name_ is None:
-            #if self._landmark_ is None:
-                #if self._parent_ is not None:
-                    #self._unit_name_ = self._parent_.name
-                    
-                #else:
-                    #self._unit_name_ = "NA"
-
-            #else:
-                #self._unit_name_ = self._landmark_.name
-                
-        #return self._unit_name_
-    
-    #@name.setter
-    #def name(self, value):
-        #"""Assigns a custom landmark name.
-        
-        #Parameters:
-        #===========
-        #value: a str or None
-        
-        #When value is None, a string containing blanks only, or an empty string,
-        #the name is reset to the default, i.e. the name of self.landmark, or the
-        #name of the parent ScanData if self.landmark is None.
-        
-        
-        #"""
-        #if not hasattr(self, "_unit_name_"):
-            #self._unit_name_ = None
-            
-        #if not hasattr(self, "_parent_"):
-            #self._parent_ = None
-            
-        #if hasattr(self, "_parent"):
-            #self._parent_ = self._parent
-            #del self._parent
-        
-        #if isinstance(value, str):
-            #if len(value.strip()) == 0: # empty string passed
-                ## reset name to the landmark name or scandata
-                #if self._landmark_ is None:
-                    #if self._parent_ is not None:
-                        #self._unit_name_ = self._parent_.name
-                        
-                    #else:
-                        #self._unit_name_ = "NA"
-                    
-                #else:
-                    #self._unit_name_ = self._landmark_.name
-                    
-            #else:
-                #self._unit_name_ = value
-            
-        #elif name is None:
-            ## reset name to the landmark name or scandata
-            #if self._landmark_ is None:
-                #if self._parent_ is not None:
-                    #self._unit_name_ = self._parent_.name
-                    
-                #else:
-                    #self._unit_name_ = "NA"
-                
-            #else:
-                #self._unit_name_ = self._landmark_.name
-            
-        #else:
-            #raise TypeError("expecting a string or None; got %s instead" % type(value).__name__)
-        
-    #@property
-    #def type(self):
-        #if not hasattr(self, "_unit_type_"):
-            #self._unit_type_ = "unknown"
-            
-        #if hasattr(self, "_type"):
-            #self._unit_type_ = self._type
-            #del self._type
-            
-        #return self._unit_type_
-    
-    #@type.setter
-    #def type(self, value):
-        #"""Allow user-defined unit type names.
-        #"""
-        #if not hasattr(self, "_unit_type_"):
-            #self._unit_type_ = "unknown"
-            
-        #if hasattr(self, "_type"):
-            #self._unit_type_ = self._type
-            #del self._type
-            
-        #if isinstance(value, str):
-            #if len(value.strip()) == 0:
-                #raise ValueError("type cannot be empty or contain only blank characters")
-            
-            #if value.strip().lower() == "default":
-                #self._unit_type_ = UnitTypes[self._landmark_.name]
-            
-            #else:
-                #self._unit_type_ = value
-            
-        #elif value is None:
-            #self._unit_type_ = UnitTypes[self._landmark_.name]
-            
-        #else:
-            #raise TypeError("Expecting a str or None; got %s instead" % type(value).__name__)
-        
-    #@property
-    #def age(self):
-        #if not hasattr(self, "_age_"):
-            #self._age_ = "NA"
-            
-        #return self._age_
-    
-    #@age.setter
-    #def age(self, value):
-        #"""str ('NA'), datetime.timedelta or pq.day, pq.month, or any custom age units in this module
-        #NOTE that timedelta objects hold up to days (for 'date'), 
-        #"""
-        #if isinstance(value, str):
-            #if value.strip().lower() != "na":
-                #raise ValueError("When a str, age must be 'NA'; got %s instead" % valur)
-            
-            #self._age_ = "NA"
-            
-        #elif value is None:
-            #self._age_ = "NA"
-            
-        #elif isinstance(value, datetime.timedelta):
-            #days = value.days
-            #seconds = value.seconds
-            #musecs = value.microseconds
-            
-            ## NOTE: round up to the largest time unit
-            
-            #if days == 0:
-                ## maybe seconds
-                #if seconds == 0:
-                    #self._age_ = musecs * pq.us
-                
-                #else:
-                    #if musecs == 0:
-                        #self._age_ = seconds * pq.s
-                        
-                    #else:
-                        #self._age_ = value.total_seconds() * pq.s
-                        
-            #else:
-                ## just report age as days
-                #self._age_ = days * pq.day
-                
-        #elif isinstance(value, pq.Quantity):
-            #if not check_time_units(value):
-                #raise TypeError("Expecting a time quantity; got %s instead" % type(value).__name__)
-            
-            #self._age_ = value
-            
-        #else:
-            #raise TypeError("Expecting a str ('NA'), a datetime.timedelta, a python time quantity, or None; got %s instead" % type(value).__name__)
-        
     @safeWrapper
-    def protocol(self, index):
+    def protocol(self, index:typing.Union[str, int]):
         """Returns a trigger protocol specified by "index".
         
         Parameters:
         ==========
-        "index" : a str or an int
+        "index" : a str (protocol name) or an int (index of data frame)
         
-        When index is a str, it must be the name of a protocol associated with this unit
-        and that protocol is returned.
+        When index is a str, it must be the name of a protocol associated with 
+            this unit and that protocol, if found, is returned.
         
-        When index is an int, it must be a frame index present in the "frames" property
-        of this analysis unit object.
+        When index is an int, it must be a frame index present in the 
+            "frames" property of this analysis unit object. If found, it will
+            return the protocol associatd with that frame (if any).
         
         Returns:
         ========
         
-        The trigger protocol named as specified by "index", or associated
-        with the frame specified by "index", depending on whether "index" is a 
-        string or an integer.
+        TriggerProtocol: The trigger protocol named as specified by "index", or 
+            associated with the frame specified by "index", depending on whether
+            "index" is a string or an integer.
         
-        If there are no protocols, or the specified frame index does not 
-        associate a protocol, the function returns None.
+        None, when there is no trigger protocol with the name specified by 
+            'index' (when 'index' is a str), or when the specified frame index 
+            does not associate a protocol (when 'index' is an int).
         
         """
         if len(self.protocols) == 0:
@@ -1156,12 +894,13 @@ class AnalysisUnit(BaseBioData):
                 protocols = [p for p in self.protocols if p.name == index]
                 
                 if len(protocols) > 1:
-                    raise RuntimeError("There appears to be %d protocols named '%s'" % (len(protocols), index))
+                    warnings.warn("There appears to be %d protocols named '%s'" % (len(protocols), index), RuntimeWarning)
                 
                 return protocols[0]
             
             else:
-                raise ValueError("AnalysisUnit %s does not associate a protocol named %s" % (self.name, index))
+                return
+                #raise ValueError("AnalysisUnit %s does not associate a protocol named %s" % (self.name, index))
             
         elif isinstance(index, int):
             if index not in self.frames:
@@ -1284,85 +1023,8 @@ class AnalysisUnit(BaseBioData):
             result = [f for f in self._frames_]
                 
         return result
-        
-    @property
-    def descriptors(self):
-        """The descriptors dictionary (a DataBag object)
-        """
-        if not hasattr(self, "_descriptors_"):
-            self._descriptors_ = DataBag(mutable_types=True, allow_none=True)
-            
-        if hasattr(self, "_descriptors"):
-            self._descriptors_ = self._descriptors
-            del self._descriptors
-            
-        return self._descriptors_
     
-    @descriptors.setter
-    def descriptors(self, value):
-        if isinstance(value, (DataBag, dict)):
-            self._descriptors_.clear()
-            
-            v = DataBag(mutable_types=True, allow_none=True)
-            for item in value.items():
-                if not isinstance(item[0], str):
-                    raise TypeError("Expecting a dict or a DataBag with string keys only")
-                
-                v[strutils.str2symbol(item[0])] = item[0]
-                
-            self._descriptors_ = v
-            
-        else:
-            raise TypeError("Expecting a dict or a DataBag; got %s instead" % type(value).__name__)
-    
-    @property
-    def descriptorsList(self):
-        """List of key/value tuples.
-        For convenience.
-        """
-        if not hasattr(self, "_descriptors_"):
-            self._descriptors_ = DataBag(mutable_types=True, allow_none=True)
-            
-        if hasattr(self, "_descriptors"):
-            self._descriptors_ = self._descriptors
-            del self._descriptors
-            
-        ##print(self._descriptors_)
-        descr = sorted([d for d in self._descriptors_.keys()])
-        return [(k, self._descriptors_[k]) for k in descr]
-    
-    def getDescriptor(self, name):
-        """Returns None if descriptor name does not exist.
-        """
-        if not hasattr(self, "_descriptors_"):
-            self._descriptors_ = DataBag(mutable_types=True, allow_none=True)
-            
-        if hasattr(self, "_descriptors"):
-            self._descriptors_ = self._descriptors
-            del self._descriptors
-            
-        if name in self._descriptors_.keys():
-            return self._descriptors_[name]
-        
-    
-    def setDescriptor(self, name, value):
-        """Sets/adds a descriptor.
-        """
-        if not hasattr(self, "_descriptors_"):
-            self._descriptors_ = DataBag(mutable_types=True, allow_none=True)
-            
-        if hasattr(self, "_descriptors"):
-            self._descriptors_ = self._descriptors
-            del self._descriptors
-            
-        self._descriptors_[name] = value
-        
-    def getScanData(self, average=True):
-        """Alias ot asScanData
-        """
-        return self.asScanData(average=average)
-            
-    def asScanData(self, average=None):
+    def scanData(self, average=None):
         """Returns a ScanData object representing this AnalysisUnit only.
         This requires the parent ScanData object to be alive.
         
@@ -1384,15 +1046,10 @@ class AnalysisUnit(BaseBioData):
             
         """
         if average is None:
-            if self.getDescriptor("averaged") is None:
-                average = False
-                
-            else:
-                average = self.getDescriptor("averaged")
-            
+            average = True if self.annotations.get("averaged", None) is True else False
         
-        result = self._parent_.extractAnalysisUnit(self._landmark_, 
-                                                   protocol=self._protocols_,
+        result = self._parent_.extractAnalysisUnit(self.landmark, 
+                                                   protocol=self.protocols,
                                                    average=average)
         
         return result
@@ -1411,7 +1068,7 @@ class AnalysisUnit(BaseBioData):
         
         sameProtocols = all([p in other.protocols for p in self.protocols])
         
-        sameType = self.type == other.type
+        sameType = self.unit_type == other.unit_type
         
         sameCell = self.cell == other.cell
         
@@ -1425,50 +1082,26 @@ class AnalysisUnit(BaseBioData):
         return self.isSameAs(other)
     
     def copy(self):
-        """Returns a shallow copy of this object.
+        """Returns a copy of this object.
         
-        The result's landmark and protocol(s) are references to the landmark and
-        protocol(s) of this unit.
+        The result's landmark is a references to the landmark and of this unit.
+        The result's protocols are deep copies of those in this unit.
         
         """
-        descriptors = dict([i for i in self._descriptors_.sorteditems()])
+        # NOTE: 2021-11-26 08:42:21
+        # use copy constructor strategy for trigger protocols so that the new 
+        # AnalysisUnit objact is detached from the original data protocols; yet
+        # it retains the reference to the 'parent'
         
-        # the advantage of copying protocols is that when an analysis unit is 
-        # copied and its protocol frames are adjusted, the original protocol 
-        # frames will also be adjusted breaking the original data
-        #
-        # the disadvantage is that by copying the protocol here one effectively
-        # creates a new TriggerProtocol object which brakes its ownershiop
-        # by the parent data
-        #result = AnalysisUnit(self.parent, landmark=self.landmark,
-                           #protocols = [p.copy() for p in self.protocols], 
-                           #unit_type = self.type, cell = self.cell, field = self.field, 
-                           #scene=self.inScene, name=self.name, **descriptors)
+        kwargs = dict((attr[0], getattr(self, attr[0], None)) for attr in self._needed_attributes_ )
+        kwargs["protocols"] = [p.copy() for p in self.protocols]
+        kwargs.update(self.annotations)
         
-        #result = AnalysisUnit(self.parent, self.dataSource, landmark=self.landmark,
-                           #protocols = self.protocols, unit_type = self.type, 
-                           #cell = self.cell, field = self.field, **descriptor)
-                           
-        # on balance, when extracting analysis unit data, best is to create
-        # new analysis_units rather than just copying this one, after creating
-        # new landmarks and new protocols to suit
-        result = AnalysisUnit(self.parent, landmark=self.landmark,
-                           protocols = [p for p in self.protocols], 
-                           unit_type = self.type, cell = self.cell, field = self.field, 
-                           scene=self.inScene, name=self.name, **descriptors)
-        
-        result.age = self.age
-        #result.cell = self.cell
-        result.gender = self.gender
-        result.genotype = self.genotype
-        result.sourceID = self.sourceID
-        #result.inScene = self.inScene
-        #result.parent = None
-
+        result = AnalysisUnit(self.parent, **kwargs)
         
         return result
         
-class ScanData(BaseBioData):
+class ScanData(BaseScipyenData):
     """An almost direct translation of matlab LSData data structure.
     Work in progress.
     
@@ -1589,21 +1222,26 @@ class ScanData(BaseBioData):
     apiversion = (0,3)
     
     _data_attributes_ = (
-        ("ephys", neo.Block),
-        ("scans", list),
-        ("scansBlock", neo.Block),
-        ("scansProfiles", neo.Block),
-        ("scene", list),
-        ("sceneBlock", neo.Block),
-        ("sceneProfiles", neo.Block),
+        ("electrophysiology",               neo.Block(name="Electrophysiology")),
+        ("scans",                           (list, tuple)),
+        ("scansBlock",                      neo.Block(name="Scans")),
+        ("scansProfiles",                   neo.Block(name="Scan region scans profiles")),
+        ("scene",                           (list, tuple)),
+        ("sceneBlock",                      neo.Block(name="Scene")),
+        ("sceneProfiles",                   neo.Block(name="Scan region scene profiles")),
+        ("sceneAxesCalibrations",           list),
+        ("scansAxesCalibrations",           list),
+        ("sceneFrameAxis",                  vigra.AxisInfo),
+        ("scansFrameAxis",                  vigra.AxisInfo),
+        ("framesMap",                       FrameIndexLookup),
         )
     
-    _graphics_attributes = (
-        ("scansCursors", list),
-        ("scansRois", list),
+    _graphics_attributes_ = (
+        ("scansCursors", dict),
+        ("scansRois", dict),
         ("scanTrajectory", PlanarGraphics),
-        ("sceneCursors", list),
-        ("sceneRois", list),
+        ("sceneCursors", dict),
+        ("sceneRois", dict),
         )
     
     _metadata_attributes_ = (
@@ -1616,6 +1254,8 @@ class ScanData(BaseBioData):
         ("analysisMode", ScanDataAnalysisMode),
         ("type", ScanDataType),
         )
+    
+    _needed_attributes_= _data_attributes_ + _graphics_attributes_ + _option_attributes_ + BaseScipyenData._needed_attributes_
     
     def _get_data_frame_index_(self, index:int) -> Bunch:
         """Returns a Bunch mapping str keys (data attribute) to int frame indices.
@@ -1670,24 +1310,23 @@ class ScanData(BaseBioData):
             "electrophysiology" "ephys", "scansProfiles", "sceneProfiles", 
             "scansBlock", "sceneBlock", "scans", "scene"
         """
-        if component in ("electrophysiology", "ephys"):
-            component = ephys
+        #if component in ("electrophysiology", "ephys"):
+            #component = ephys
             
-        if component not in self._data_attributes_:
-            raise ValueError(f"Unknown data component: {component}")
+        #if component not in self._data_attributes_:
+            #raise ValueError(f"Unknown data component: {component}")
         
-        data = getattr(self, component, None)
+        return getattr(self, component, None)
         
-        if data is None:
-            return
-        
-    def __init__(self, scene:typing.Optional[typing.Union[vigra.VigraArray, tuple, list]] = None,
+    @safeWrapper
+    def __init__(self, 
+                 scene:typing.Optional[typing.Union[vigra.VigraArray, tuple, list]] = None,
                  scans:typing.Optional[typing.Union[vigra.VigraArray, tuple, list]] = None, 
+                 electrophysiology:typing.Optional[neo.Block] = None, 
                  metadata:typing.Optional[typing.Union[DataBag]] = None,
                  sceneFrameAxis:typing.Optional[vigra.AxisInfo] = None, 
                  scansFrameAxis:typing.Optional[vigra.AxisInfo] = None,
                  name:typing.Optional[str] = "ScanData", 
-                 electrophysiology:typing.Optional[neo.Block] = None, 
                  triggers:typing.Optional[typing.Union[str, tuple, list]] = None,
                  analysisOptions:typing.Optional[DataBag] = DataBag(),
                  scene_mapping:typing.Optional[dict] = None,
@@ -2008,7 +1647,7 @@ class ScanData(BaseBioData):
         #self.apiversion = (0,3) # MAJOR, MINOR
         #print("ScanData.__init__ start")
         # user-defined (meta) data
-        self._annotations_ = dict()
+        #self._annotations_ = dict()
         self._metadata_ = None
         
         # NOTE: 2019-01-16 15:16:17
@@ -2019,42 +1658,44 @@ class ScanData(BaseBioData):
         self._available_unit_types_ = [s for s in UnitTypes.values()]
         self._available_unit_types_.insert(0, "unknown")
         
-        
-        self._scans_axes_calibrations_ = []
-        self._scene_axes_calibrations_ = []
+        # NOTE: 2021-11-26 13:32:58 
+        # _needed_attributes_
+        # see BaseScipyenData
+        #self._scans_axes_calibrations_ = []
+        #self._scene_axes_calibrations_ = []
         
         # what does this hold? -- Answer: 1D signals derived from the scene
         # -- the scene equivalent of _scans_block_
         # NOTE: 2018-05-19 08:16:40 - not sure how useful this is 
         # even for ZSeries stacks, the relevant data is contained in the 
         # scans attribute (scene attribute is empty)
-        self._scene_block_                        = neo.Block(name="Scene")
+        #self._scene_block_                        = neo.Block(name="Scene")
         
         # NOTE: 2017-12-06 10:39:24
         # especially for linescan mode, these require special treatment
         #self.__scanline_profiles_scene__            = neo.Block(name="Scanline_profiles_scene")
-        self._scan_region_scene_profiles_         = neo.Block(name="Scan region scene profiles")
+        #self._scan_region_scene_profiles_         = neo.Block(name="Scan region scene profiles")
         
         # NOTE: 2017-12-06 10:37:30
         # hold data signals from scans, frame-wise 
         # e.g. EPSCaTs
-        self._scans_block_                        = neo.Block(name="Scans")
+        #self._scans_block_                        = neo.Block(name="Scans")
 
         # NOTE: 2017-12-06 10:39:24
         # especially for linescan mode, these require special treatment
         #self.__scanline_profiles_scans__            = neo.Block(name="Scanline_profiles_scans")
-        self._scan_region_scans_profiles_         = neo.Block(name="Scan region scans profiles")
+        #self._scan_region_scans_profiles_         = neo.Block(name="Scan region scans profiles")
         
         # NOTE: 2017-12-06 10:40:13
         # when not empty, must have as many segments as scans frames
-        self._electrophysiology_                  = neo.Block(name="Electrophysiology")
+        #self._electrophysiology_                  = neo.Block(name="Electrophysiology")
         
-        self._scene_ = list()
-        self._scene_frame_axis_ = None
+        #self._scene_ = list()
+        #self._scene_frame_axis_ = None
         #self._scene_frames_ = 0
     
-        self._scans_ = list()
-        self._scans_frame_axis_ = None
+        #self._scans_ = list()
+        #self._scans_frame_axis_ = None
         #self._scans_frames_ = 0
         
         # NOTE: 2021-10-29 23:31:41
@@ -2179,14 +1820,14 @@ class ScanData(BaseBioData):
         # NOTE: 2018-06-16 18:37:07
         # these are now ordered dictionaries
         #self._scansrois_ = collections.OrderedDict()   # use for general analysis
-        self._scansrois_ = dict()   # use for general analysis
+        #self._scansrois_ = dict()   # use for general analysis
             
-        #self._scenerois_ = collections.OrderedDict()
-        self._scenerois_ = dict()
+        ##self._scenerois_ = collections.OrderedDict()
+        #self._scenerois_ = dict()
         
-        self._scanscursors_ = dict()
+        #self._scanscursors_ = dict()
         
-        self._scenecursors_ = dict()
+        #self._scenecursors_ = dict()
         
         # NOTE: 2018-04-13 10:22:10
         # A PlanarGraphics object in the scene data set, defining the scanning 
@@ -2220,7 +1861,7 @@ class ScanData(BaseBioData):
         self._parse_metadata_(metadata) # will also set up channel names for scene & scans, separately
         
         if isinstance(electrophysiology, neo.Block):
-            self._parse_electrophysiology_(electrophysiology)
+            self.parse_electrophysiology(electrophysiology)
             
         elif isinstance(triggers, (tuple, list)) and all([isinstance(t, TriggerProtocol) for t in triggers]):
             self._trigger_protocols_[:] = triggers
@@ -2451,7 +2092,7 @@ class ScanData(BaseBioData):
                     embed_trigger_protocol(rev_p, self._scene_block_)
                 
     @safeWrapper
-    def _parse_electrophysiology_(self, value):
+    def parse_electrophysiology(self, value):
         """Checks for consistency between frames and segments, then assigns
         value to self._electrophysiology_.
         
@@ -2906,7 +2547,7 @@ class ScanData(BaseBioData):
             if landmark is not None:
                 analysis_unit = AnalysisUnit(result, landmark=landmark,
                                              protocols = unit.protocols,
-                                             unit_type = unit.type,
+                                             unit_type = unit.unit_type,
                                              cell = unit.cell,
                                              field = unit.field,
                                              scene = unit.inScene,
@@ -3957,9 +3598,9 @@ class ScanData(BaseBioData):
                     unit = a[0]
                     
                     # check unit identity:
-                    if unit.type != src_unit.type:
+                    if unit.unit_type != src_unit.unit_type:
                         raise RuntimeError("Type mismatch for analysis unit %s: unit has type %s in source (%s) and type %s in the target (%s)" % \
-                            (src_unit.name, src_unit.type, source_name, unit.type, self_name) )
+                            (src_unit.name, src_unit.unit_type, source_name, unit.unit_type, self_name) )
                     
                     if unit.landmark.type != src_unit.landmark.type:
                         raise RuntimeError("Landmark type mismatch for analysis unit %s: landmark is %s in source and %s in target (%s)" % \
@@ -5688,7 +5329,7 @@ class ScanData(BaseBioData):
                     
             result._analysis_units_ = set([u.copy() for u in self.analysisUnits])
             
-            result._analysis_unit_.type = self.analysisUnit().type
+            result._analysis_unit_.unit_type = self.analysisUnit().unit_type
         
         elif unit_landmark.type == pgui.GraphicsObjectType.vertical_cursor:
             # extracted data should be devoid of the landmark used to define the 
@@ -5755,7 +5396,7 @@ class ScanData(BaseBioData):
             # copy landmark-defined analysis unit as the default analysis_unit
             result.analysisUnit().name = analysis_unit.name
 
-            result.analysisUnit().type = analysis_unit.type
+            result.analysisUnit().unit_type = analysis_unit.unit_type
             
             #print("ScanData.extractAnalysisUnit analysis unit name %s" % analysis_unit.name)
             for f in analysis_unit.descriptors.items():
@@ -5988,7 +5629,7 @@ class ScanData(BaseBioData):
                     result._analysis_units_.add(new_unit)
                         
         if analysis_unit.landmark is not None:
-            ret_unit.type = UnitTypes[landmark_name[0]]
+            ret_unit.unit_type = UnitTypes[landmark_name[0]]
         
         for d in analysis_unit.descriptors.items():
             ret_unit.setDescriptor(d[0], d[1])
@@ -8625,266 +8266,266 @@ class ScanData(BaseBioData):
     # properties
     # ###
     
-    @property
-    def scene_mapping(self) -> typing.Optional[dict]:
-        return self._scene_frame_mapping_
+    #@property
+    #def scene_mapping(self) -> typing.Optional[dict]:
+        #return self._scene_frame_mapping_
     
-    @scene_mapping.setter
-    def scene_mapping(self, val:typing.Optional[dict] = None) -> None:
-        if isinstance(val, dict):
-            if not all(isinstance(k, (int, range, tuple)) for k in val):
-                raise TypeError("Expecting a mapping with keys of type int, range, tuple")
+    #@scene_mapping.setter
+    #def scene_mapping(self, val:typing.Optional[dict] = None) -> None:
+        #if isinstance(val, dict):
+            #if not all(isinstance(k, (int, range, tuple)) for k in val):
+                #raise TypeError("Expecting a mapping with keys of type int, range, tuple")
             
-            if not all(isinstance(v, int) for v in val.values()):
-                raise TypeError("Expecting a mapping with values of type int")
+            #if not all(isinstance(v, int) for v in val.values()):
+                #raise TypeError("Expecting a mapping with values of type int")
             
             
-        elif val is not None:
-            raise TypeError(f"Expecting a mapping or None; for {type(val).__name__} instead")
+        #elif val is not None:
+            #raise TypeError(f"Expecting a mapping or None; for {type(val).__name__} instead")
     
-        self._scene_frame_mapping_ = val
+        #self._scene_frame_mapping_ = val
         
-    @property
-    def ephys_mapping(self) -> typing.Optional[dict]:
-        return self._ephys_frame_mapping_
+    #@property
+    #def ephys_mapping(self) -> typing.Optional[dict]:
+        #return self._ephys_frame_mapping_
     
-    @ephys_mapping.setter
-    def ephys_mapping(self, val:typing.Optional[dict] = None) -> None:
-        if isinstance(val, dict):
-            if not all(isinstance(k, (int, range, tuple)) for k in val):
-                raise TypeError("Expecting a mapping with keys of type int, range, tuple")
+    #@ephys_mapping.setter
+    #def ephys_mapping(self, val:typing.Optional[dict] = None) -> None:
+        #if isinstance(val, dict):
+            #if not all(isinstance(k, (int, range, tuple)) for k in val):
+                #raise TypeError("Expecting a mapping with keys of type int, range, tuple")
             
-            if not all(isinstance(v, int) for v in val.values()):
-                raise TypeError("Expecting a mapping with values of type int")
+            #if not all(isinstance(v, int) for v in val.values()):
+                #raise TypeError("Expecting a mapping with values of type int")
             
             
-        elif val is not None:
-            raise TypeError(f"Expecting a mapping or None; for {type(val).__name__} instead")
+        #elif val is not None:
+            #raise TypeError(f"Expecting a mapping or None; for {type(val).__name__} instead")
     
-        self._ephys_frame_mapping_ = val
+        #self._ephys_frame_mapping_ = val
         
-    @property
-    def genotype(self):
-        if not hasattr(self, "_analysis_unit_"):
-            self._analysis_unit_ = AnalysisUnit(self)
+    #@property
+    #def genotype(self):
+        #if not hasattr(self, "_analysis_unit_"):
+            #self._analysis_unit_ = AnalysisUnit(self)
             
-        return self._analysis_unit_.genotype
+        #return self._analysis_unit_.genotype
     
-    @genotype.setter
-    def genotype(self, value):
-        if isinstance(value, str):
-            if len(value.strip()) == 0:
-                genotype = "NA"
+    #@genotype.setter
+    #def genotype(self, value):
+        #if isinstance(value, str):
+            #if len(value.strip()) == 0:
+                #genotype = "NA"
                 
-            else:
-                genotype = strutils.str2symbol(value)
-                #genotype = strutils.str2R(value)
+            #else:
+                #genotype = strutils.str2symbol(value)
+                ##genotype = strutils.str2R(value)
                 
-        elif value is None:
-            genotype = "NA"
+        #elif value is None:
+            #genotype = "NA"
     
-        else:
-            raise TypeError("value expected to be a string or None; got %s instead" % type(value).__name__)
+        #else:
+            #raise TypeError("value expected to be a string or None; got %s instead" % type(value).__name__)
         
-        if not hasattr(self, "_analysis_unit_"):
-            self._analysis_unit_ = AnalysisUnit(self)
+        #if not hasattr(self, "_analysis_unit_"):
+            #self._analysis_unit_ = AnalysisUnit(self)
             
-        self._analysis_unit_.genotype = genotype
+        #self._analysis_unit_.genotype = genotype
         
-        if hasattr(self, "_analysis_units_") and len(self._analysis_units_):
-            for unit in self._analysis_units_:
-                unit.sourceID = genotype
+        #if hasattr(self, "_analysis_units_") and len(self._analysis_units_):
+            #for unit in self._analysis_units_:
+                #unit.sourceID = genotype
                 
-    @property
-    def gender(self):
-        if not hasattr(self, "_analysis_unit_"):
-            self._analysis_unit_ = AnalysisUnit(self)
+    #@property
+    #def gender(self):
+        #if not hasattr(self, "_analysis_unit_"):
+            #self._analysis_unit_ = AnalysisUnit(self)
             
             
-        return self._analysis_unit_.gender
+        #return self._analysis_unit_.gender
     
-    @gender.setter
-    def gender(self, value):
-        if not hasattr(self, "_analysis_unit_"):
-            self._analysis_unit_ = AnalysisUnit(self)
+    #@gender.setter
+    #def gender(self, value):
+        #if not hasattr(self, "_analysis_unit_"):
+            #self._analysis_unit_ = AnalysisUnit(self)
             
-        self._analysis_unit_.gender = value
+        #self._analysis_unit_.gender = value
         
-        if hasattr(self, "_analysis_units_") and len(self._analysis_units_):
-            for unit in self._analysis_units_:
-                unit.gender = value
+        #if hasattr(self, "_analysis_units_") and len(self._analysis_units_):
+            #for unit in self._analysis_units_:
+                #unit.gender = value
                 
         
-    @property
-    def age(self):
-        """Age property of the underlying analysis unit source
-        """
-        if not hasattr(self, "_analysis_unit_"):
-            self._analysis_unit_ = AnalysisUnit(self)
+    #@property
+    #def age(self):
+        #"""Age property of the underlying analysis unit source
+        #"""
+        #if not hasattr(self, "_analysis_unit_"):
+            #self._analysis_unit_ = AnalysisUnit(self)
             
-        return self._analysis_unit_.age
+        #return self._analysis_unit_.age
     
-    @age.setter
-    def age(self, value):
-        """See AnalysisUnit.age property for details.
-        Type checks are done in AnalysisUnit code
-        """
-        if not hasattr(self, "_analysis_unit_"):
-            self._analysis_unit_ = AnalysisUnit(self)
+    #@age.setter
+    #def age(self, value):
+        #"""See AnalysisUnit.age property for details.
+        #Type checks are done in AnalysisUnit code
+        #"""
+        #if not hasattr(self, "_analysis_unit_"):
+            #self._analysis_unit_ = AnalysisUnit(self)
             
-        self._analysis_unit_.age = value
+        #self._analysis_unit_.age = value
         
-        if hasattr(self, "_analysis_units_") and len(self._analysis_units_):
-            for unit in self._analysis_units_:
-                unit.age = value
+        #if hasattr(self, "_analysis_units_") and len(self._analysis_units_):
+            #for unit in self._analysis_units_:
+                #unit.age = value
                 
-    @property
-    def sourceID(self):
-        """Source property for the underlying analysis unit(s)
-        """
-        if not hasattr(self, "_analysis_unit_"):
-            self._analysis_unit_ = AnalysisUnit(self)
+    #@property
+    #def sourceID(self):
+        #"""Source property for the underlying analysis unit(s)
+        #"""
+        #if not hasattr(self, "_analysis_unit_"):
+            #self._analysis_unit_ = AnalysisUnit(self)
             
-        return self._analysis_unit_.sourceID
+        #return self._analysis_unit_.sourceID
     
-    @sourceID.setter
-    def sourceID(self, value):
-        if isinstance(value, str):
-            if len(value.strip()) == 0:
-                sourceID = "NA"
+    #@sourceID.setter
+    #def sourceID(self, value):
+        #if isinstance(value, str):
+            #if len(value.strip()) == 0:
+                #sourceID = "NA"
                 
-            else:
-                sourceID = strutils.str2symbol(value)
-                #sourceID = strutils.str2R(value)
+            #else:
+                #sourceID = strutils.str2symbol(value)
+                ##sourceID = strutils.str2R(value)
                 
-        elif value is None:
-            sourceID = "NA"
+        #elif value is None:
+            #sourceID = "NA"
     
-        else:
-            raise TypeError("value expected to be a string or None; got %s instead" % type(value).__name__)
+        #else:
+            #raise TypeError("value expected to be a string or None; got %s instead" % type(value).__name__)
         
-        if not hasattr(self, "_analysis_unit_"):
-            self._analysis_unit_ = AnalysisUnit(self)
+        #if not hasattr(self, "_analysis_unit_"):
+            #self._analysis_unit_ = AnalysisUnit(self)
             
-        self._analysis_unit_.sourceID = sourceID
+        #self._analysis_unit_.sourceID = sourceID
         
-        if hasattr(self, "_analysis_units_") and len(self._analysis_units_):
-            for unit in self._analysis_units_:
-                unit.sourceID = sourceID
+        #if hasattr(self, "_analysis_units_") and len(self._analysis_units_):
+            #for unit in self._analysis_units_:
+                #unit.sourceID = sourceID
                 
-    @property
-    def availableUnitTypes(self):
-        return self._available_unit_types_
+    #@property
+    #def availableUnitTypes(self):
+        #return self._available_unit_types_
     
-    @property
-    def availableGenotypes(self):
-        return self._available_genotypes_
+    #@property
+    #def availableGenotypes(self):
+        #return self._available_genotypes_
         
-    @property
-    def cell(self):
-        """Returns/sets the value of the cell attribute of THIS ScanData object's analysis unit.
-        """
-        if not hasattr(self, "_analysis_unit_"):
-            self._analysis_unit_ = AnalysisUnit(self)
+    #@property
+    #def cell(self):
+        #"""Returns/sets the value of the cell attribute of THIS ScanData object's analysis unit.
+        #"""
+        #if not hasattr(self, "_analysis_unit_"):
+            #self._analysis_unit_ = AnalysisUnit(self)
 
-        return self._analysis_unit_.cell
+        #return self._analysis_unit_.cell
             
-    @cell.setter
-    def cell(self, value):
-        if isinstance(value, str):
-            if len(value.strip()) == 0:
-                cell = "NA"
+    #@cell.setter
+    #def cell(self, value):
+        #if isinstance(value, str):
+            #if len(value.strip()) == 0:
+                #cell = "NA"
                 
-            else:
-                cell = strutils.str2symbol(value)
-                #cell = strutils.str2R(value)
+            #else:
+                #cell = strutils.str2symbol(value)
+                ##cell = strutils.str2R(value)
                 
-        elif value is None:
-            cell = "NA"
+        #elif value is None:
+            #cell = "NA"
             
-        else:
-            raise TypeError("value expected to be a string or None; got %s instead" % type(value).__name__)
+        #else:
+            #raise TypeError("value expected to be a string or None; got %s instead" % type(value).__name__)
         
-        if not hasattr(self, "_analysis_unit_"):
-            self._analysis_unit_ = AnalysisUnit(self)
+        #if not hasattr(self, "_analysis_unit_"):
+            #self._analysis_unit_ = AnalysisUnit(self)
             
-        self._analysis_unit_.cell = cell
+        #self._analysis_unit_.cell = cell
         
-        if len(self._analysis_units_):
-            for unit in self._analysis_units_:
-                unit.cell = cell
+        #if len(self._analysis_units_):
+            #for unit in self._analysis_units_:
+                #unit.cell = cell
         
-    @property
-    def field(self):
-        """Returns/sets the value of the "field" attribute of THIS ScanData 
-        object's analysis unit.
-        NOTE: there actually is an instance member called "field" (i.e. 
-        microscope field) -- the name does not have the meaning of a generic 
-        python class instance field
-        """
-        return self._analysis_unit_.field
+    #@property
+    #def field(self):
+        #"""Returns/sets the value of the "field" attribute of THIS ScanData 
+        #object's analysis unit.
+        #NOTE: there actually is an instance member called "field" (i.e. 
+        #microscope field) -- the name does not have the meaning of a generic 
+        #python class instance field
+        #"""
+        #return self._analysis_unit_.field
     
-        if len(self._analysis_units_):
-            for unit in self._analysis_units_:
-                unit.field = field
+        #if len(self._analysis_units_):
+            #for unit in self._analysis_units_:
+                #unit.field = field
         
-    @field.setter
-    def field(self, value):
-        if isinstance(value, str):
-            if len(value.strip()) == 0:
-                field = "NA"
+    #@field.setter
+    #def field(self, value):
+        #if isinstance(value, str):
+            #if len(value.strip()) == 0:
+                #field = "NA"
                 
-            else:
-                field = strutils.str2symbol(value)
-                #field = strutils.str2R(value)
+            #else:
+                #field = strutils.str2symbol(value)
+                ##field = strutils.str2R(value)
                 
-        elif value is None:
-            field = "NA"
+        #elif value is None:
+            #field = "NA"
             
-        else:
-            raise TypeError("value expected to be a string or None; got %s instead" % type(value).__name__)
+        #else:
+            #raise TypeError("value expected to be a string or None; got %s instead" % type(value).__name__)
         
-        if not hasattr(self, "_analysis_unit_"):
-            self._analysis_unit_ = AnalysisUnit(self)
+        #if not hasattr(self, "_analysis_unit_"):
+            #self._analysis_unit_ = AnalysisUnit(self)
             
-        self._analysis_unit_.field = field
+        #self._analysis_unit_.field = field
         
-        if len(self._analysis_units_):
-            for unit in self._analysis_units_:
-                unit.field = field
+        #if len(self._analysis_units_):
+            #for unit in self._analysis_units_:
+                #unit.field = field
     
-    @property
-    def unitType(self):
-        """Returns/sets the value of the type attribute of THIS ScanData object's analysis unit.
-        """
-        return self._analysis_unit_.type
+    #@property
+    #def unitType(self):
+        #"""Returns/sets the value of the type attribute of THIS ScanData object's analysis unit.
+        #"""
+        #return self._analysis_unit_.unit_type
     
-    @unitType.setter
-    def unitType(self, value):
-        if isinstance(value, str):
-            if len(value.strip()) == 0:
-                self._analysis_unit_.type = "unknown"
+    #@unitType.setter
+    #def unitType(self, value):
+        #if isinstance(value, str):
+            #if len(value.strip()) == 0:
+                #self._analysis_unit_.unit_type = "unknown"
                 
-                if len(self._analysis_units_):
-                    for unit in self._analysis_units_:
-                        unit.type = None # reverts to the default
+                #if len(self._analysis_units_):
+                    #for unit in self._analysis_units_:
+                        #unit.unit_type = None # reverts to the default
                 
-            else:
-                self._analysis_unit_.type = value
+            #else:
+                #self._analysis_unit_.unit_type = value
                 
-                if len(self._analysis_units_):
-                    for units in self._analysis_units_:
-                        unit.type = value
+                #if len(self._analysis_units_):
+                    #for units in self._analysis_units_:
+                        #unit.unit_type = value
                 
-        elif value is None:
-            self._analysis_unit_.type = "unknown"
+        #elif value is None:
+            #self._analysis_unit_.unit_type = "unknown"
             
-            if len(self._analysis_unit_):
-                for unit in self._analysis_units_:
-                    unit.type = None # reverts to the default
+            #if len(self._analysis_unit_):
+                #for unit in self._analysis_units_:
+                    #unit.unit_type = None # reverts to the default
             
-        else:
-            raise TypeError("value expected to be a string or None; got %s instead" % type(value).__name__)
+        #else:
+            #raise TypeError("value expected to be a string or None; got %s instead" % type(value).__name__)
     
     @property
     def analysisUnits(self):
@@ -8915,127 +8556,127 @@ class ScanData(BaseBioData):
         """
         return [u.name for u in self.analysisUnits]
         
-    @property
-    def annotations(self):
-        """Accesses the _annotations_ dictionary with user-defined data.
-        """
-        return self._annotations_
+    #@property
+    #def annotations(self):
+        #"""Accesses the _annotations_ dictionary with user-defined data.
+        #"""
+        #return self._annotations_
     
-    @annotations.setter
-    def annotations(self, value):
-        """Updates the used-defined data dictionary ("_annotations_").
-        To replace its contents completely, call self.annotations.clear()
-        then self.annotations = some_new_dictionary
-        """
-        if isinstance(value, dict):
-            self._annotations_.update(value)
+    #@annotations.setter
+    #def annotations(self, value):
+        #"""Updates the used-defined data dictionary ("_annotations_").
+        #To replace its contents completely, call self.annotations.clear()
+        #then self.annotations = some_new_dictionary
+        #"""
+        #if isinstance(value, dict):
+            #self._annotations_.update(value)
     
-    @property
-    def triggerProtocols(self):
-        """A list of TriggerProtocol objects.
-        """
-        return self._trigger_protocols_
+    #@property
+    #def triggerProtocols(self):
+        #"""A list of TriggerProtocol objects.
+        #"""
+        #return self._trigger_protocols_
     
-    @triggerProtocols.setter
-    def triggerProtocols(self, value):
-        """Sets a list of trigger protocols.
+    #@triggerProtocols.setter
+    #def triggerProtocols(self, value):
+        #"""Sets a list of trigger protocols.
         
-        CAUTION: Clears the existing list of trigger protocols
+        #CAUTION: Clears the existing list of trigger protocols
         
-        ATTENTION: For each protocol in the list, this also updates the list of 
-        TriggerEvents in the segments of self._electrophysiology_
+        #ATTENTION: For each protocol in the list, this also updates the list of 
+        #TriggerEvents in the segments of self._electrophysiology_
         
-        ATTENTION: It is possible to use the getter form of this property, in 
-            order to change its contents: self.triggerProtocols[:] = ...
-            but this is not recommended as it would not update all data signal
-            blocks.
+        #ATTENTION: It is possible to use the getter form of this property, in 
+            #order to change its contents: self.triggerProtocols[:] = ...
+            #but this is not recommended as it would not update all data signal
+            #blocks.
             
         
-        WARNING: when copying data manually, this property must be set last!
+        #WARNING: when copying data manually, this property must be set last!
         
-        Parameters:
-        ==========
+        #Parameters:
+        #==========
         
-        value: a sequence of TriggerProtocol objects.
-            The events in the protocol and the imaging delay are considered to
-            be set in the electrophysiology time domain.
+        #value: a sequence of TriggerProtocol objects.
+            #The events in the protocol and the imaging delay are considered to
+            #be set in the electrophysiology time domain.
         
-        Prerequisite: len(object) > 0 for all objects in the list.
+        #Prerequisite: len(object) > 0 for all objects in the list.
         
-        """
-        if isinstance(value, (tuple, list)):
-            if len(value) == 0:
-                self._trigger_protocols_.clear()
+        #"""
+        #if isinstance(value, (tuple, list)):
+            #if len(value) == 0:
+                #self._trigger_protocols_.clear()
                 
-            if all([isinstance(v, TriggerProtocol) and len(v) > 0 for v in value]):
-                self._trigger_protocols_.clear()
-                self._trigger_protocols_[:] = sorted(value, key=lambda x: x.segmentIndices()[0])
+            #if all([isinstance(v, TriggerProtocol) and len(v) > 0 for v in value]):
+                #self._trigger_protocols_.clear()
+                #self._trigger_protocols_[:] = sorted(value, key=lambda x: x.segmentIndices()[0])
                 
-                # do it one by one instead of simply broadcasting into the list
-                # so that events lists in self._electrophysiology_ are also updated
-                # tge following popul;ates self._trigger_protocols_
-                # NOTE: 2021-10-11 18:20:17
-                # not point in doing the same thing twice!
-                #for v in value:
-                    #self.addTriggerProtocol(v.copy()) # by default this will NOT sort
+                ## do it one by one instead of simply broadcasting into the list
+                ## so that events lists in self._electrophysiology_ are also updated
+                ## tge following popul;ates self._trigger_protocols_
+                ## NOTE: 2021-10-11 18:20:17
+                ## not point in doing the same thing twice!
+                ##for v in value:
+                    ##self.addTriggerProtocol(v.copy()) # by default this will NOT sort
                     
-                #self._trigger_protocols_.sort(key=lambda x: x.segmentIndices()[0])
+                ##self._trigger_protocols_.sort(key=lambda x: x.segmentIndices()[0])
                 
-                # now embed the new protocols in the data
-                for p in self._trigger_protocols_:
-                    rev_p = p.reverseAcquisition(copy=True)
+                ## now embed the new protocols in the data
+                #for p in self._trigger_protocols_:
+                    #rev_p = p.reverseAcquisition(copy=True)
                     
-                    if not is_empty(self._electrophysiology_):
-                        embed_trigger_protocol(p, self._electrophysiology_,
-                                                    clearEvents=False)
-                    if not is_empty(self._scans_block_.segments):
-                        embed_trigger_protocol(rev_p, self._scans_block_,
-                                                    clearEvents=False)
+                    #if not is_empty(self._electrophysiology_):
+                        #embed_trigger_protocol(p, self._electrophysiology_,
+                                                    #clearEvents=False)
+                    #if not is_empty(self._scans_block_.segments):
+                        #embed_trigger_protocol(rev_p, self._scans_block_,
+                                                    #clearEvents=False)
                     
-                    if not is_empty(self._scene_block_):
-                        embed_trigger_protocol(rev_p, self._scene_block_,
-                                                    clearEvents=False)
-                # a reference to this data's trigger protocols
-                self._analysis_unit_.protocols[:] = self._trigger_protocols_
+                    #if not is_empty(self._scene_block_):
+                        #embed_trigger_protocol(rev_p, self._scene_block_,
+                                                    #clearEvents=False)
+                ## a reference to this data's trigger protocols
+                #self._analysis_unit_.protocols[:] = self._trigger_protocols_
                 
-                # FIXME: also update trigger protocols in landmark-based units
-                for u in self.analysisUnits:
-                    u.protocols[:] = self._trigger_protocols_
-                    # FIXME select protocols according to which frame the unit is defined in!
+                ## FIXME: also update trigger protocols in landmark-based units
+                #for u in self.analysisUnits:
+                    #u.protocols[:] = self._trigger_protocols_
+                    ## FIXME select protocols according to which frame the unit is defined in!
             
             
-    @property
-    def protocols(self):
-        """Alias to triggerProtocols
-        """
-        return self.triggerProtocols
+    #@property
+    #def protocols(self):
+        #"""Alias to triggerProtocols
+        #"""
+        #return self.triggerProtocols
     
-    @protocols.setter
-    def protocols(self, value):
-        self.triggerProtocols = value
+    #@protocols.setter
+    #def protocols(self, value):
+        #self.triggerProtocols = value
                 
-    @property
-    def ephys(self):
-        """Alias for self.electrophysiology property
-        """
-        return self.electrophysiology
+    #@property
+    #def ephys(self):
+        #"""Alias for self.electrophysiology property
+        #"""
+        #return self.electrophysiology
     
-    @ephys.setter
-    def ephys(self, value):
-        if not isinstance(value, neo.Block):
-            raise TypeError("Expecting a neo.Block object; got %s instead" % type(value).__name__)
+    #@ephys.setter
+    #def ephys(self, value):
+        #if not isinstance(value, neo.Block):
+            #raise TypeError("Expecting a neo.Block object; got %s instead" % type(value).__name__)
         
-        self.electrophysiology = value
+        #self.electrophysiology = value
     
-    @property
-    def electrophysiology(self):
-        """A neo.Block object
-        """
-        return self._electrophysiology_
+    #@property
+    #def electrophysiology(self):
+        #"""A neo.Block object
+        #"""
+        #return self._electrophysiology_
     
-    @electrophysiology.setter
-    def electrophysiology(self, value):
-        self._parse_electrophysiology_(value)
+    #@electrophysiology.setter
+    #def electrophysiology(self, value):
+        #self.parse_electrophysiology(value)
     
     @property
     def name(self):
@@ -9061,77 +8702,77 @@ class ScanData(BaseBioData):
         
         self._modified_ = True
         
-    @property
-    def sceneCursors(self):
-        """Dictionary with str keys (cursor name) mapped to pictgui.Cursor objects
+    #@property
+    #def sceneCursors(self):
+        #"""Dictionary with str keys (cursor name) mapped to pictgui.Cursor objects
         
         
-        e.g.:
+        #e.g.:
         
-        {"spine01": <pictgui.Cursor object at xxxx>}
-        """   
-        if not hasattr(self, "_scenecursors_"):
-            if hasattr(self, "__scenecursors__"):
-                self._scenecursors_ = self.__scenecursors__
-                delattr(self, "__scenecursors__")
+        #{"spine01": <pictgui.Cursor object at xxxx>}
+        #"""   
+        #if not hasattr(self, "_scenecursors_"):
+            #if hasattr(self, "__scenecursors__"):
+                #self._scenecursors_ = self.__scenecursors__
+                #delattr(self, "__scenecursors__")
                 
-            else:
-                self._scenecursors_ = collections.OrderedDict()
+            #else:
+                #self._scenecursors_ = collections.OrderedDict()
                 
-        return self._scenecursors_
+        #return self._scenecursors_
     
-    @property
-    def scansCursors(self):
-        """Dictionary with str keys (cursor name) mapped to pictgui.Cursor objects
+    #@property
+    #def scansCursors(self):
+        #"""Dictionary with str keys (cursor name) mapped to pictgui.Cursor objects
         
         
-        e.g.:
+        #e.g.:
         
-        {"spine01": <pictgui.Cursor object at xxxx>}
-        """   
+        #{"spine01": <pictgui.Cursor object at xxxx>}
+        #"""   
         
-        return self._scanscursors_
+        #return self._scanscursors_
     
-    @property
-    def scanCursors(self):
-        """Same as scansCursors
-        """
-        return self._scanscursors_
+    #@property
+    #def scanCursors(self):
+        #"""Same as scansCursors
+        #"""
+        #return self._scanscursors_
         
         
-    @property
-    def sceneRois(self):
-        """ A mapping of roi names to non-cursor PlanarGraphics
+    #@property
+    #def sceneRois(self):
+        #""" A mapping of roi names to non-cursor PlanarGraphics
         
-        e.g.:
+        #e.g.:
         
-        {"scanline":<pgui.Path object at xxx>}
+        #{"scanline":<pgui.Path object at xxx>}
         
-        Read-only; to adjust a roi access it via self.sceneRoi(name, frame) then 
-        adjust its values.
+        #Read-only; to adjust a roi access it via self.sceneRoi(name, frame) then 
+        #adjust its values.
         
-        """
-        return self._scenerois_
+        #"""
+        #return self._scenerois_
     
-    @property
-    def scansRois(self):
-        """Read-only
+    #@property
+    #def scansRois(self):
+        #"""Read-only
         
-        scansRois is a dict with str keys (roi name) mapped to
-        pictgui.Path or pictgui.PathElements object
-        e.g.:
+        #scansRois is a dict with str keys (roi name) mapped to
+        #pictgui.Path or pictgui.PathElements object
+        #e.g.:
         
-        {"scanline":<pgui.Path object at xxx>}
+        #{"scanline":<pgui.Path object at xxx>}
         
-        Use direct access to scansRois members to adjust their values
-        """
-        return self._scansrois_
+        #Use direct access to scansRois members to adjust their values
+        #"""
+        #return self._scansrois_
     
-    @property
-    def scanRois(self):
-        """Same as scansRois
-        """
-        return self._scansrois_
+    #@property
+    #def scanRois(self):
+        #"""Same as scansRois
+        #"""
+        #return self._scansrois_
     
     @property
     def scansLandmarks(self):
@@ -9242,53 +8883,53 @@ class ScanData(BaseBioData):
             raise TypeError("Expecting a str or a PlanarGraphics object; got %s instead" % type(obj).__name__)
         
         
-    @property
-    def scanningLandmark(self):
-        """Alias to self.scanRegion
-        """
-        return self.scanRegion
+    #@property
+    #def scanningLandmark(self):
+        #"""Alias to self.scanRegion
+        #"""
+        #return self.scanRegion
     
-    @scanningLandmark.setter
-    def scanningLandmark(self, obj):
-        self.scanRegion=obj
+    #@scanningLandmark.setter
+    #def scanningLandmark(self, obj):
+        #self.scanRegion=obj
         
-    @property
-    def scanTrajectory(self):
-        """Alias to self.scanRegion
-        """
-        return self.scanRegion
+    #@property
+    #def scanTrajectory(self):
+        #"""Alias to self.scanRegion
+        #"""
+        #return self.scanRegion
     
-    @scanTrajectory.setter
-    def scanTrajectory(self, obj):
-        self.scanRegion = obj
+    #@scanTrajectory.setter
+    #def scanTrajectory(self, obj):
+        #self.scanRegion = obj
     
-    @property
-    def scanType(self):
-        """Read-only
-        """
-        return self._scandatatype_
+    #@property
+    #def scanType(self):
+        #"""Read-only
+        #"""
+        #return self._scandatatype_
     
-    @property
-    def scanTypeName(self):
-        return self._scandatatype_.name
+    #@property
+    #def scanTypeName(self):
+        #return self._scandatatype_.name
     
-    @property
-    def scanTypeValue(self):
-        return self._scandatatype_.value
+    #@property
+    #def scanTypeValue(self):
+        #return self._scandatatype_.value
     
-    @property
-    def analysisMode(self):
-        """Analysis mode (read-only)
-        """
-        return self._analysismode_
+    #@property
+    #def analysisMode(self):
+        #"""Analysis mode (read-only)
+        #"""
+        #return self._analysismode_
     
-    @property
-    def analysisModeName(self):
-        return self._analysismode_.name
+    #@property
+    #def analysisModeName(self):
+        #return self._analysismode_.name
     
-    @property
-    def analysisModeValue(self):
-        return self._analysismode_.value
+    #@property
+    #def analysisModeValue(self):
+        #return self._analysismode_.value
     
     @property
     def analysisOptions(self):

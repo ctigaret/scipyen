@@ -171,7 +171,7 @@ from jupyter_client.session import Message
 #import core.prog as prog
 import core.quantities as cq
 from core.prog import (timefunc, timeblock, processtimefunc, processtimeblock,
-                       Timer, safeWrapper, warn_with_traceback,)
+                       Timer, safeWrapper, warn_with_traceback, get_properties)
 
 from core.scipyenmagics import ScipyenMagics
 # NOTE: 2017-04-16 09:48:15 
@@ -1243,6 +1243,16 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
     
     _instance = None
     
+    # TODO: 2021-11-26 17:23:45 To add:
+    # saveFile, runScript, showObj, sysOpen, editor
+    # 
+    _export_methods_ = (("slot_importPrairieView", "importPrairieView"),
+                        ("openFile", "openFile"),
+                        ("openFile", "openFile"),
+                        ("slot_selectWorkDir", "selectWorkingDirectory"),
+                        ("slot_showScriptsManagerWindow", "scritpsManager"),
+                        )
+    
     @classmethod
     def initialized(cls):
         return hasattr(cls, "_instance" and isinstance(cls._instance, cls))
@@ -1667,7 +1677,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         
         # NOTE: 2018-10-07 21:12:14
         # (re)initialize self.workspace, self._nonInteractiveVars_, 
-        # self.ipkernel, self.console and self.shell
+        # self.ipkernel, self.console and self.shell so it must be called before
+        # setting the workspace model
         self._init_QtConsole_() 
         
         self.fileSystemModel            = QtWidgets.QFileSystemModel(parent=self)
@@ -1698,8 +1709,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         #  (a QMainWindow instance)
         #
         self.loadSettings()
-        
-        
         
         self.activeDockWidget = self.dockWidgetWorkspace
         
@@ -1738,7 +1747,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         ##print("ScipyenWindow initialized")
         
         # NOTE: 2018-02-22 13:36:17
-        # FIXME: 2021-08-17 12:41:57 TODO Sund contrived - check is really needed
+        # FIXME: 2021-08-17 12:41:57 TODO Sounds contrived - check is really needed
         # and, if not, then remove
         # finally, inject self into relevant modules:
         #for m in (ltp, ivramp, membrane, epsignal, CaTanalysis, pgui, sigp, imgp, crvf, plots):
@@ -2399,7 +2408,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             self.workspace["_quit_kernel_"] = self.workspace["quit"]
             self.workspace.pop("quit", None)
             
-            
+            for method in self._export_methods_:
+                func = getattr(self, method[0], None)
+                name = method[1]
+                if func is not None:
+                    self.workspace[name] = func
             
             # TODO/FIXME 2019-08-04 11:06:16
             # this does not override ipython's exit: 

@@ -22,7 +22,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 Ui_ProtocolEditorDialog, QDialog = loadUiType(os.path.join(__module_path__, "protocoleditordialog.ui"), from_imports=True, import_from="gui")
 
-class TriggerProtocolsModel(QtCore.QAbstractTableModel):
+class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
     model_columns = ["Name", "Presynaptic", "Postsynaptic", "Photostimulation", "Imaging delay", "Frames"]
     
     editCompleted = pyqtSignal(str, name="editCompleted")
@@ -253,7 +253,7 @@ class TriggerProtocolsModel(QtCore.QAbstractTableModel):
     
     @modelData.setter
     def modelData(self, value):
-        #print("\tTriggerProtocolsModel.modelData.setter\n", value)
+        #print("\tTriggerProtocolsTableModel.modelData.setter\n", value)
         if isinstance(value, list) and all([isinstance(p, TriggerProtocol) for p in value]):
             self.beginResetModel()
             self._data_ = value
@@ -289,7 +289,7 @@ class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
     
     def __init__(self, parent=None, title="Protocol Editor"):
         super().__init__(parent)
-        self._dataModel_ = TriggerProtocolsModel(parent=self)
+        self._dataModel_ = TriggerProtocolsTableModel(parent=self)
         self._configureUI_()
         if isinstance(title, str) and len(title.strip()):
             self.setWindowTitle(title)

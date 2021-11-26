@@ -48,7 +48,7 @@
      <x>0</x>
      <y>0</y>
      <width>1115</width>
-     <height>28</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -60,9 +60,6 @@
       <string>&amp;Import</string>
      </property>
      <addaction name="actionImport_PrairieView_data"/>
-     <addaction name="actionImport_XY_Raster_Scan_File"/>
-     <addaction name="actionImport_Electrophysiology_File"/>
-     <addaction name="actionImport_Protocol_File"/>
     </widget>
     <addaction name="actionOpen"/>
     <addaction name="menuImport"/>

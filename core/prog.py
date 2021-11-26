@@ -654,8 +654,13 @@ def get_properties(obj):
     if not isinstance(obj, type):
         obj = type(obj)
         
-    #return [i[0] for i in inspect.getmembers(obj, lambda x: inspect.isdatadescriptor(x) and isinstance(x), property)]
     return [i[0] for i in inspect.getmembers(obj, lambda x: isinstance(x, property))]
+
+def get_methods(obj):
+    if not isinstance(obj, type):
+        obj = type(obj)
+        
+    return [i[0] for i in inspect.getmembers(obj, lambda x: inspect.isfunction(x, property))]
     
 def full_class_name(data):
     if not isinstance(data, type):
@@ -802,7 +807,22 @@ def no_sip_autoconversion(klass):
         return wrapper
     return decorator
         
+#def cli_export(name:str):
+    #def wrapper(f):
+        #if inspect.isfunction(f):
+            #fname = f.__name__
+            #if fname.startswith("slot_"):
+                #exname = fname.replace("slot_", "")
+                
+            #elif fname.startswith("slot"):
+                #exname = fname.replace("slot", ""))
 
+            #else:
+                #exname = fname
+                
+        #return f
+    #return wrapper
+            
 # ### END Decorators
 
 # ### BEGIN Context managers

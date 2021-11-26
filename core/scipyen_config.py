@@ -362,6 +362,8 @@ def markConfigurable(confname:str, conftype:str="",
     defined in this module to set up a mapping of configuraiton options.
     
     """
+    # FIXME? 2021-11-26 16:47:11
+    # cannot check 'f' here !?
     if not isinstance(confname, str) or len(confname.strip()) == 0:
         return f # fail silently
     
