@@ -1229,30 +1229,31 @@ class ScanData(BaseScipyenData):
         ("scene",                           (list, tuple)),
         ("sceneBlock",                      neo.Block(name="Scene")),
         ("sceneProfiles",                   neo.Block(name="Scan region scene profiles")),
-        ("sceneAxesCalibrations",           list),
-        ("scansAxesCalibrations",           list),
+        ("sceneAxesCalibration",            list),
+        ("scansAxesCalibration",            list),
         ("sceneFrameAxis",                  vigra.AxisInfo),
         ("scansFrameAxis",                  vigra.AxisInfo),
         ("framesMap",                       FrameIndexLookup),
         )
     
     _graphics_attributes_ = (
-        ("scansCursors", dict),
-        ("scansRois", dict),
-        ("scanTrajectory", PlanarGraphics),
-        ("sceneCursors", dict),
-        ("sceneRois", dict),
+        ("scansCursors",                    dict),
+        ("scansRois",                       dict),
+        ("scanTrajectory",                  PlanarGraphics),
+        ("sceneCursors",                    dict),
+        ("sceneRois",                       dict),
         )
     
     _metadata_attributes_ = (
-        ("analysisUnits",list),
-        ("triggerProtocols", list),
+        ("analysisUnits",                   set),
+        ("analysisUnit",                    AnalysisUnit),
+        ("triggerProtocols",                list),
         )
     
     _option_attributes_ = (
-        ("analysisOptions", dict),
-        ("analysisMode", ScanDataAnalysisMode),
-        ("type", ScanDataType),
+        ("analysisOptions",                 dict),
+        ("analysisMode",                    ScanDataAnalysisMode.frame),
+        ("type",                            ScanDataType.linescan),
         )
     
     _needed_attributes_= _data_attributes_ + _graphics_attributes_ + _option_attributes_ + BaseScipyenData._needed_attributes_
@@ -1318,19 +1319,20 @@ class ScanData(BaseScipyenData):
         
         return getattr(self, component, None)
         
+    #def __init__(self, 
+                 #scene:typing.Optional[typing.Union[vigra.VigraArray, tuple, list]] = None,
+                 #scans:typing.Optional[typing.Union[vigra.VigraArray, tuple, list]] = None, 
+                 #electrophysiology:typing.Optional[neo.Block] = None, 
+                 #metadata:typing.Optional[typing.Union[DataBag]] = None,
+                 #sceneFrameAxis:typing.Optional[vigra.AxisInfo] = None, 
+                 #scansFrameAxis:typing.Optional[vigra.AxisInfo] = None,
+                 #name:typing.Optional[str] = "ScanData", 
+                 #triggers:typing.Optional[typing.Union[str, tuple, list]] = None,
+                 #analysisOptions:typing.Optional[DataBag] = DataBag(),
+                 #scene_mapping:typing.Optional[dict] = None,
+                 #ephys_mapping: typing.Optional[dict] = None):
     @safeWrapper
-    def __init__(self, 
-                 scene:typing.Optional[typing.Union[vigra.VigraArray, tuple, list]] = None,
-                 scans:typing.Optional[typing.Union[vigra.VigraArray, tuple, list]] = None, 
-                 electrophysiology:typing.Optional[neo.Block] = None, 
-                 metadata:typing.Optional[typing.Union[DataBag]] = None,
-                 sceneFrameAxis:typing.Optional[vigra.AxisInfo] = None, 
-                 scansFrameAxis:typing.Optional[vigra.AxisInfo] = None,
-                 name:typing.Optional[str] = "ScanData", 
-                 triggers:typing.Optional[typing.Union[str, tuple, list]] = None,
-                 analysisOptions:typing.Optional[DataBag] = DataBag(),
-                 scene_mapping:typing.Optional[dict] = None,
-                 ephys_mapping: typing.Optional[dict] = None):
+    def __init__(self, **kwargs):
         """Constructs a ScanData object.
         
         The object contains only raw (unfiltered) data as given by
@@ -1385,7 +1387,7 @@ class ScanData(BaseScipyenData):
             TODO elaborate documentation here.
             
             
-        ephys: a neo.Block containing associated electrophysiology data. It should
+        electrophysiology: a neo.Block containing associated electrophysiology data. It should
             contain as many segments as there are frames in "scans".
             
         sceneFrameAxis, scansFrameAxis: vigra.AxisInfo objects along which slices 
@@ -1639,25 +1641,15 @@ class ScanData(BaseScipyenData):
         #
         
         # END comments
-        
-        if isinstance(scene, ScanData):
-            self = scene.copy()
-            return
-        
         #self.apiversion = (0,3) # MAJOR, MINOR
         #print("ScanData.__init__ start")
         # user-defined (meta) data
         #self._annotations_ = dict()
-        self._metadata_ = None
         
         # NOTE: 2019-01-16 15:16:17
         # enable storage of custom unit type and genotype with ScanData
         
         #self._available_genotypes_ = ["NA", "wt", "het", "hom"]
-        self._available_genotypes_ = [s for s in Genotypes]
-        self._available_unit_types_ = [s for s in UnitTypes.values()]
-        self._available_unit_types_.insert(0, "unknown")
-        
         # NOTE: 2021-11-26 13:32:58 
         # _needed_attributes_
         # see BaseScipyenData
@@ -1702,20 +1694,20 @@ class ScanData(BaseScipyenData):
         # mapping of primary data frame indices to scene frame indices
         # maps scans frame indices (if scans exist) to scene frame indices
         # not used if neither scans nor scene exist
-        self._scene_frame_mapping_ = scene_mapping
+        #self._scene_frame_mapping_ = scene_mapping
         # mapping of primary data frame indices to electrophysiology segment indices
         # maps scans frame indices to ephys segment indices, if scans exist, else
         # maps scene frame indcies to ephys segent indices, if scene exists
         # not used when electrophysiology data is absent
-        self._ephys_frame_mapping_ = ephys_mapping
+        #self._ephys_frame_mapping_ = ephys_mapping
             
         # CAUTION: the contents of _analysis_options_ are problem-dependent
         # and typically will be changed at application level
-        if isinstance(analysisOptions, dict):
-            self._analysis_options_ = analysisOptions
+        #if isinstance(analysisOptions, dict):
+            #self._analysis_options_ = analysisOptions
             
-        else:
-            self._analysis_options_ = dict()
+        #else:
+            #self._analysis_options_ = dict()
             
         # NOTE: 2017-12-03 21:14:10
         # BEGIN comment on filters
@@ -1813,9 +1805,9 @@ class ScanData(BaseScipyenData):
         
         # NOTE: 2019-07-20 23:27:10
         # these are just some sensible (?) defaults
-        self._analysismode_ = ScanData.ScanDataAnalysisMode.frame 
+        #self._analysismode_ = ScanData.ScanDataAnalysisMode.frame 
         
-        self._scandatatype_ = ScanData.ScanDataType.linescan # to be assigned by self._parse_metadata_()
+        #self._scandatatype_ = ScanData.ScanDataType.linescan # to be assigned by self._parse_metadata_()
         
         # NOTE: 2018-06-16 18:37:07
         # these are now ordered dictionaries
@@ -1834,29 +1826,58 @@ class ScanData(BaseScipyenData):
         # trajectory or sub-region in the scene; might be a line, polyline, 
         # rectangle, a disjoint set of rois, etc.
         # For linescan data, this is usually called "scanline"
-        self._scan_region_ = None
+        #self._scan_region_ = None
         
-        self._trigger_protocols_ = list() # of TriggerProtocol objects
+        #self._trigger_protocols_ = list() # of TriggerProtocol objects
         
         # the entire ScanData as an AnalysisUnit object -- this must always be
         # present by default, event if there are no nested analysis units in the
         # data
-        self._analysis_unit_ = AnalysisUnit(self)
-        self._analysis_unit_.protocols = self._trigger_protocols_ # reference !
+        #self._analysis_unit_ = AnalysisUnit(self)
+        #self._analysis_unit_.protocols = self._trigger_protocols_ # reference !
         
         # a set of nested analysis units defined within the data -- all analysis units
         # in this set are landmark-based and thus are different from self._analysis_unit_
-        self._analysis_units_ = set() 
+        #self._analysis_units_ = set() 
         
-        self._name_ = name
+        #self._name_ = name
         
+        self._available_genotypes_ = [s for s in Genotypes]
+        self._available_unit_types_ = [s for s in UnitTypes.values()]
+        self._available_unit_types_.insert(0, "unknown")
+        
+        self._metadata_ = None
         self._modified_ = False
         
         self._processed_ = False
         
+        scene = kwargs.get("scene", None)
+        if isinstance(scene, ScanData):
+            self = scene.copy() # make a deep copy
+            return
+        
+        scans = kwargs.get("scans", None)
+        sceneFrameAxis = kwargs.get("sceneFrameAxis", None)
+        sceneAxesCalibration = kwargs.get("sceneAxesCalibration", None)
+        scansFrameAxis = kwargs.get("scansFrameAxis", None)
+        scansAxesCalibration = kwargs.get("scansAxesCalibration", None)
+        
+        scene, scene_frame_axis, scene_axses_cal = self.parse_image_data(scene, sceneFrameAxis, sceneAxesCalibration)
+        scans, scans_frame_axis, scans_axses_cal = self.parse_image_data(scans, scansFrameAxis, scansAxesCalibration)
+        
+        kwargs["scene"] = scene
+        kwargs["sceneFrameAxis"] = scene_frame_axis
+        kwargs["sceneAxesCalibration"] = scene_axes_cal
+        
+        kwargs["scans"] = scans
+        kwargs["scansFrameAxis"] = scans_frame_axis
+        kwargs["scansAxesCalibration"] = scans_axes_cal
+        
+        super().__init__(**kwargs)
+        
         # NOTE: 2021-10-28 18:36:14
         # also set up self._scans_axes_calibrations_ and self._scene_axes_calibrations_
-        self._parse_image_arrays_(scene, scans, sceneFrameAxis, scansFrameAxis)
+        #self._parse_image_arrays_(scene, scans, sceneFrameAxis, scansFrameAxis)
         
         self._parse_metadata_(metadata) # will also set up channel names for scene & scans, separately
         
@@ -1918,16 +1939,24 @@ class ScanData(BaseScipyenData):
                 
                 if chindex == data:
                     pass
-                
-    def _parse_img_arr_(self, data, frameAxis=None):
+               
+    @staticmethod
+    def parse_image_data(data, 
+                         frameAxis:typing.Optional[vigra.AxisInfo]=None, 
+                         axescal:typing.Optional[AxesCalibration]=None):
+        """Checks whether the image data parameters are OK
+        """
         if not isinstance(data, (vigra.VigraArray, tuple, list)):
             raise TypeError(f"Expecting a VigraArray, or a sequence; got {type(data).__name__} instead")
         
         if isinstance(data, vigra.VigraArray):
             nframes, frame_axis, width_axis, height_axis = getFrameLayout(data, frameAxis)
-            axes_cal = [AxesCalibration(data)]
-            return ([data],frame_axis, axes_cal)
+            if isinstance(axescal, AxesCalibration) and all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(axescal.axiskeys, data.axistags)):
+                axes_cal = [axscal]
+            else:
+                axes_cal = [AxesCalibration(data)]
             
+            return ([data],frame_axis, axes_cal)
             
         elif isinstance(data, (tuple, list)):
             if len(data):
@@ -1944,7 +1973,21 @@ class ScanData(BaseScipyenData):
                     raise TypeError("Image arrays in a sequence must have the same number of channels")
 
                 nframes, frame_axis, width_axis, height_axis = getFrameLayout(data[0], frameAxis)
-                axes_cal = [AxesCalibration(img) for img in data]
+
+                if isinstance(axescal, (tuple, list)):
+                    if len(axescal) != len(data):
+                        raise ValueError(f"Axes calibration expected to be a sequence with as many elements as 'data' ({len(data)}; got {len(axescal)} instead)")
+                    
+                    if not all(isinstance(ac, AxesCalibration) for ac in axescal):
+                        raise TypeError("Expecting a tuple of AxesCalibration objects")
+                    
+                    if all(all(axcal.typeFlags(key) == x.typeFlags for (key, x) in zip(axcal.axiskeys, img.axistags)) for axcal,img in zip(axescal,data)):
+                        axes_cal = [axcal for axcal in axescal]
+                    else:
+                        axes_cal = [AxesCalibration(img) for img in data]
+                else:
+                    axes_cal = [AxesCalibration(img) for img in data]
+                
                 return (data, frame_axis, axes_cal)
 
             return (list(), None, None)
@@ -1965,30 +2008,48 @@ class ScanData(BaseScipyenData):
         This is because assigning new image data will invalidate all derived/
         associated data based on original image data.
         
-        FIXME/TODO adapt to a new scenario where all scene image data is a single
-        multi-channel VigraArray
+        FIXME/TODO 
+        0) but don't do that in the initializer - it will clear cursors, etc set
+        # by __init__
+        1) adapt to a new scenario where all scene image data is a single  multi-channel VigraArray
 
         """
-        new_scene, scene_frame_axis, scene_axes_calibrations = self._parse_img_arr_(scene, frameAxis=sceneFrameAxis)
+        new_scene, scene_frame_axis, scene_axes_calibrations = self.parse_image_data(scene, frameAxis=sceneFrameAxis)
         
         #print(new_scene)
-        new_scans, scans_frame_axis, scans_axes_calibrations = self._parse_img_arr_(scans, frameAxis=scansFrameAxis)
+        new_scans, scans_frame_axis, scans_axes_calibrations = self.parse_image_data(scans, frameAxis=scansFrameAxis)
 
         if new_scene is not None:
-            self._scenecursors_.clear()
-            self._scenerois_.clear()
-            self._scan_region_ = None
-            self._scene_ = new_scene
-            self._scene_frame_axis_ = scene_frame_axis
-            self._scene_axes_calibrations_ = scene_axes_calibrations
+            self.sceneCursors.clear()
+            self.sceneRois.clear()
+            self.scanTrajectory = None
+            self.scene = new_scene
+            self.sceneFrameAxis = scene_frame_axis
+            self.sceneAxesCalibrations = scene_axes_calibrations
 
         if new_scans is not None:
-            self._scanscursors_.clear()
-            self._scansrois_.clear()
-            self._analysis_units_.clear()
-            self._scans_ = new_scans
-            self._scans_frame_axis_ = scans_frame_axis
-            self._scans_axes_calibrations_ = scans_axes_calibrations
+            self.scansCursors.clear()
+            self.scanCursors.clear()
+            self.analysisUnits.clear()
+            self.scans = new_scans
+            self.scansFrameAxis = scans_frame_axis
+            self.scansAxesCalibrations = scans_axes_calibrations
+            
+        #if new_scene is not None:
+            #self._scenecursors_.clear()
+            #self._scenerois_.clear()
+            #self._scan_region_ = None
+            #self._scene_ = new_scene
+            #self._scene_frame_axis_ = scene_frame_axis
+            #self._scene_axes_calibrations_ = scene_axes_calibrations
+
+        #if new_scans is not None:
+            #self._scanscursors_.clear()
+            #self._scansrois_.clear()
+            #self._analysis_units_.clear()
+            #self._scans_ = new_scans
+            #self._scans_frame_axis_ = scans_frame_axis
+            #self._scans_axes_calibrations_ = scans_axes_calibrations
         
     @safeWrapper
     def _parse_metadata_(self, value):

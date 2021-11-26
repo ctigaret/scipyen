@@ -2426,10 +2426,10 @@ class AxesCalibration(object):
         if isinstance(key, vigra.AxisInfo):
             key = key.key
         
-        if key not in self.keys or key not in self._axistags_:
+        if key not in self.keys() or key not in self._axistags_:
             raise KeyError("Axis with key %s is not calibrated by this object" % key)
         
-        return self[key]["axistype"]
+        return self[key]["type"]
     
     def addAxis(self, axisInfo, index = None):
         """Register a new axis with this AxesCalibration object.

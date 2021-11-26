@@ -27,6 +27,9 @@ CALLABLES = (types.FunctionType, types.MethodType,
              types.BuiltinFunctionType, types.BuiltinMethodType,
              types.MethodDescriptorType, types.ClassMethodDescriptorType)
 
+class ArgumentError(Exception):
+    pass
+
 class SignatureDict(types.SimpleNamespace):
     def __init__(self, / , *args, **kwargs):
         #self.__signature__ = None

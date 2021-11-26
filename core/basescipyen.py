@@ -1,6 +1,6 @@
 """Base ancestor of Scipyen's data objects: AnalysisUnit, ScanData
 """
-import functools
+import functools, typing
 import numpy as np
 import quantities as pq
 import neo
@@ -8,50 +8,99 @@ from traitlets.utils.importstring import import_item
 from core import quantities as cq
 from core.triggerprotocols import TriggerProtocol
 from core.quantities import units_convertible
+from core.prog import ArgumentError
 
 def __getter__(obj, name:str):
     return getattr(obj, name)
     #return object.__getattribute__(obj, f"_{name}_")
 
-def __setter__(obj, value, name, checks, value_type, value_ndim, value_dtype, value_units):# , reference = None):
+#def __setter_old__(obj, value, name, checks, value_type, value_ndim, value_dtype, value_units):# , reference = None):
+    #if checks is False: # no checks
+        #setattr(obj, name, value)
+        ##setattr(obj, name, value)
+        #return
+        
+    ##TODO: refine for type, ndim, units, dtype (when checks is True)
+    #if checks is True:
+        #old_value = getattr(obj,name)
+        
+        #expected_value_type = value_type if isinstance(value_type, type) or (isinstance(value_type, tuple) and all(isinstance(x_, type) for x_ in value_type))  else type(old_value)
+        
+        #if not isinstance(value, expected_value_type):
+            #raise TypeError(f"Expecting a {expected_value_type} type; got {type(value).__name__} instead")
+
+        #if isinstance(old_value, np.ndarray):
+            #expected_ndim = value_ndim if isnstance(value_ndim, int) else old_value.ndim
+            
+            #expected_dtype = value_dtype if isinstance(value_dtype, np.dtype) else old_value.dtype
+            
+            #if value.dtype != expected_dtype:
+                #raise TypeError(f"Expecting an array with dtype {expected_value_dtype}; got {value.dtype} instead")
+            
+            #if isinstance(value_ndim, int):
+                #if value.ndim != value_ndim:
+                    #raise TypeError(f"Expecting an array with {value_ndim} dimensions; got {value.ndim} instead")
+            
+            #if isinstance(old_value, pq.Quantity):
+                #expected_units = value_units.units if isinstance(value_units, pq.Quantity) else old_value.units
+                #if not units_convertible(value, expected_units):
+                    #raise TypeError("Incompatible units")
+                
+        #setattr(obj, name, value)
+    
+def __setter__(obj, value, name, checks:typing.Optional[dict]=None):
     if checks is False: # no checks
         setattr(obj, name, value)
         #setattr(obj, name, value)
         return
         
     #TODO: refine for type, ndim, units, dtype (when checks is True)
-    if checks is True:
-        old_value = getattr(obj,name)
-        
-        expected_value_type = value_type if isinstance(value_type, type) or (isinstance(value_type, tuple) and all(isinstance(x_, type) for x_ in value_type))  else type(old_value)
-        
-        if not isinstance(value, expected_value_type):
-            raise TypeError(f"Expecting a {expected_value_type} type; got {type(value).__name__} instead")
-
-        if isinstance(old_value, np.ndarray):
-            expected_ndim = value_ndim if isnstance(value_ndim, int) else old_value.ndim
+    if isinstance(checks, dict):
+        if len(checks) > 0:
+            old_value = getattr(obj,name)
             
-            expected_dtype = value_dtype if isinstance(value_dtype, np.dtype) else old_value.dtype
-            
-            if value.dtype != expected_dtype:
-                raise TypeError(f"Expecting an array with dtype {expected_value_dtype}; got {value.dtype} instead")
-            
-            if isinstance(value_ndim, int):
-                if value.ndim != value_ndim:
-                    raise TypeError(f"Expecting an array with {value_ndim} dimensions; got {value.ndim} instead")
-            
-            if isinstance(old_value, pq.Quantity):
-                expected_units = value_units.units if isinstance(value_units, pq.Quantity) else old_value.units
-                if not units_convertible(value, expected_units):
-                    raise TypeError("Incompatible units")
+            if "value_type" in checks:
+                value_type = checks["value_type"]
+                expected_value_type = value_type if isinstance(value_type, type) or (isinstance(value_type, tuple) and all(isinstance(x_, type) for x_ in value_type))  else type(old_value)
+                if not isinstance(value, expected_value_type):
+                    raise TypeError(f"Expecting a {expected_value_type} type; got {type(value).__name__} instead")
+                
+            if isinstance(old_value, np.ndarray):
+                if "value_ndim" in checks:
+                    value_ndim = checks["value_ndim"]
+                    expected_ndim = value_ndim if isinstance(value_ndim, int) else old_value.ndim
+                    if value.ndim != expected_ndim:
+                        raise TypeError(f"Expecting an array with {expected_ndim} dimensions; got {value.ndim} instead")
+                    
+                if "value_dtype" in checks:
+                    value_dtype = checks["value_dtype"]
+                    expected_dtype = value_dtype if isinstance(value_dtype, np.dtype) else old_value.dtype
+                    if value.dtype != expected_dtype:
+                        raise TypeError(f"Expecting an array with dtype {expected_value_dtype}; got {value.dtype} instead")
+                    
+                
+                if isinstance(old_value, pq.Quantity):
+                    if "value_units" in checks:
+                        value_units = checks["value_units"]
+                        expected_units = value_units.units if isinstance(value_units, pq.Quantity) else old_value.units
+                        if not units_convertible(value, expected_units):
+                            raise TypeError("Incompatible units")
+                        
+            if "predicate" in checks:
+                predicate = checks["predicate"]
+                
+                if inspect.isfunction(predicate):
+                    if not predicate(value):
+                        raise ArgumentError(f"Cannot set {name} to {value}")
                 
         setattr(obj, name, value)
     
-def __parse_attribute_specification__(x:tuple) -> dict:
+def __parse_attribute_specification__(x:tuple, checks:typing.Optional[dict] = None) -> dict:
     """
-    x: tuple with 1 - 5 elements:
-        0: str, name of the attribute
-        1: str, type, tuple of types or anyhing else
+    x: tuple with 1 to 6 elements:
+        x[0]: str, name of the attribute
+        
+        x[1]: str, type, tuple of types or anyhing else
             when a :str: is if first tested for a dotted type name ; if this 
                 fails, it is taken as the default value of a str attribute
                 
@@ -62,12 +111,12 @@ def __parse_attribute_specification__(x:tuple) -> dict:
             antyhing else: this is the default value of the attribute, with
                 type being set to type(x[1])
                 
-        2: type or tuple of types, or int: 
+        x[2]: type or tuple of types, or int: 
             When a type or tuple of types, this is the explicit attribute type.
             When an int, and the type as parsed from x[1] is a numpy array, it
             is the number of dimensions;
             
-        3: int: the expected dimensionality of the attribute, when attribute is
+        x[3]: int: the expected dimensionality of the attribute, when attribute is
             a numpy array (this includes VigarArray, python Quantity, neo data 
             objects)
             
@@ -78,12 +127,12 @@ def __parse_attribute_specification__(x:tuple) -> dict:
             b.ndim
             --> 0
             
-        4: numpy.dtype or python Quantity
+        x[4]: numpy.dtype or python Quantity
             When a dtype, it is the expected dtype of the array attribute
             
             When a Quantity it is the expected quantity of the attribute
             
-        5: python Quantity:
+        x[5]: python Quantity:
             The expected quantity of the attribute
             
         When the attribute is a numpy array, the default dtype is numpy.dtype(float)
@@ -91,6 +140,26 @@ def __parse_attribute_specification__(x:tuple) -> dict:
         
         When the attribute is a Python Quantity, the quantity must be specified
         as the last element of 'x'
+
+        NOTE: The specification for the first three elemens of 'x' is intended 
+            to cover the case of attribute definitions in BaseNeo objects.
+            
+        
+    checks: dict, optional default is None
+        When a, the following keys, when present, are used (and consequently
+        overide some of the results from parsing of 'x' elements - please refer
+        to the text above for their meaning):
+        
+        value_type - see x[1], x[2] above
+        
+        value_ndim - see x[3]
+
+        value_dtype - see x[4], x[5]
+        
+        value_units - see x[5]
+        
+        predicate - an optional function that performs extensive checks on an
+            attribute value, and returns a boolean.
             
     Returns:
     --------
@@ -101,7 +170,7 @@ def __parse_attribute_specification__(x:tuple) -> dict:
         default_value_type: Python type or tuple of types
         default_value_ndim: int or None,
         default_value_dtype: numpy dtype object or None,
-        default_value_units = Python Quantity object or None
+        default_value_units: Python Quantity object or None
         
     NOTE: 
     default_value is None when either:
@@ -164,7 +233,6 @@ def __parse_attribute_specification__(x:tuple) -> dict:
                 
             else:
                 raise ValueError("The dimensions of an array attribute must be specified")
-                
         
     if isinstance(ret["default_value_type"], type) and issubclass(ret["default_value_type"], np.ndarray):
         if len(x) > 3:
@@ -286,15 +354,9 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo):
                 
             
             setattr(self, obj_attr_name, kwargs.pop(attr_name, attr_val))
-            #getter_name = f"get_{attr[0]}"
             getter_func = functools.partial(__getter__, name=obj_attr_name)
-            #setter_name = f"set_{attr[0]}"
             setter_func = functools.partial(__setter__, name=obj_attr_name, 
-                                            checks = False,
-                                            value_type=attr_type,
-                                            value_ndim=attr_ndim,
-                                            value_dtype=attr_dtype,
-                                            value_units=attr_units)
+                                            checks = None)
             setattr(type(self), attr_name, property(getter_func, setter_func))
     
         # NOTE by this time, kwargs should contain only annotations
