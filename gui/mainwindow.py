@@ -282,7 +282,7 @@ from systems import *
 #### BEGIN scipyen imaging modules
 if has_vigra:
     from imaging import (imageprocessing as imgp, imgsim,)
-    from imaging import axisutils
+    from imaging import axisutils, vigrautils
     from imaging.axisutils import (axisTypeFromString, 
                                    axisTypeName,
                                    axisTypeStrings,

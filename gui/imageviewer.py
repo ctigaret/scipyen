@@ -3360,28 +3360,18 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             return False
         
         try:
-            (nFrames, frameAxisInfo, widthAxisInfo, heightAxisInfo) = vu.getFrameLayout(img, userFrameAxis = self.userFrameAxisInfo)
+            (nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo) = vu.getAxesLayout(img, userFrameAxis = self.userFrameAxisInfo)
             
         except Exception as e:
             s = io.StringIO()
             sei = sys.exc_info()
             traceback.print_exception(file=s, *sei)
             self.errorMessage(type(e).__name__, "\n".join([sei[0].__class__.__name__, s.getvalue()]))
-            #msgbox = QtWidgets.QMessageBox()
-            #msgbox.setSizeGripEnabled(True)
-            #msgbox.setIcon(QtWidgets.QMessageBox.Critical)
-            ##msgbox.setWindowTitle(sei[0].__class__.__name__)
-            #msgbox.setWindowTitle(type(e).__name__)
-            #msgbox.setText(sei[0].__class__.__name__)
-            #msgbox.setDetailedText(s.getvalue())
-            #msgbox.exec()
             return False
             
         if np.any(np.iscomplex(img)):
             self.criticalMessage("Error", "ImageViewer cannot yet display complex-valued data")
-            #QtWidgets.QMessageBox.critical(self, "Error", "ImageViewer cannot display complex-valued data")
             return False
-            #raise ValueError("Cannot display complex-valued data")
             
         try:
             # there may be a previous image stored here
@@ -3390,19 +3380,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 if self._data_.shape[self._data_.axistags.index(self.widthAxisInfo.key)] != img.shape[img.axistags.index(widthAxisInfo.key)] or \
                     self._data_.shape[self._data_.axistags.index(self.heightAxisInfo.key)] != img.shape[img.axistags.index(heightAxisInfo.key)]:
                     self.questionMessage("Imageviewer:", "New image frame geometry will invalidate existing cursors.\nLoad image and bring all cursors to center?")
-                    #msgBox = QtWidgets.QMessageBox()
-                    #msgBox.setText("New image frame geometry will invalidate existing cursors.")
-                    #msgBox.setInformativeText("Load image and bring all cursors to center?")
-                    #msgBox.setStandardButtons(QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel)
-                    #msgBox.setDefaultButton(QtWidgets.QMessageBox.Cancel)
-                    #msgBox.setIcon(QtWidgets.QMessageBox.Warning)
                     
                     ret = msgBox.exec()
                     
                     if ret == QtWidgets.QMessageBox.Cancel:
                         return False
                     
-                    #for c in self.viewerWidget.cursors.values():
                     for c in self.cursors:
                         widthAxisNdx = img.axistags.index(widthAxisInfo.key)
                         heightAxisNdx = img.axistags.index(heightAxisInfo.key)

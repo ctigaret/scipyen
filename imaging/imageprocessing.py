@@ -1084,7 +1084,7 @@ def insertAxis(img, axinfo, axdim):
         raise TypeError("Expecting 'img' as a VigraArray; got %s instead" % type(img).__name__)
     
     if isinstance(axinfo, str):
-        axinfo = vigra.AxisInfo(key=axinfo, typeFlags = axisTypeFromString(axinfo), 
+        axinfo = vigra.AxisInfo(key=axinfo, typeFlags = vigra.AxisType(axisTypeFromString(axinfo)), 
                                 resolution = 1.0, 
                                 description = axisTypeName(axinfo))
         
@@ -1236,7 +1236,7 @@ def imageIndexTuple(img, slicing=None, newAxis=None, newAxisDim=None):
         
         if isinstance(newAxis, str):
             newAxis = vigra.AxisInfo(key=newAxis, 
-                                     typeFlags=axisTypeFromString(newAxis),
+                                     typeFlags=vigra.AxisType(axisTypeFromString(newAxis)),
                                      resolution=1.0,
                                      description=axisTypeName(newAxis))
             
@@ -1415,7 +1415,6 @@ Arrays are concatenated in two ways, explained here by examples:
         ignore      = kwargs.pop("ignore", None)
         
     # 1) check the "images" parameter:
-    #print("concatenateImages: %d images" % len(images))
     
     if len(images) == 1: # this is OK
         # trivial case of only one image; 
@@ -1507,9 +1506,9 @@ Arrays are concatenated in two ways, explained here by examples:
             
             catAxisNdx = min_dims
             
-            newaxis = vigra.AxisInfo(key = catAxis, typeFlags = axisTypeFromString(catAxis),
+            newaxis = vigra.AxisInfo(key = catAxis, typeFlags = vigra.AxisType(axisTypeFromString(catAxis)),
                                      resolution=1.0,
-                                     description = axisTypeFromString(catAxis))
+                                     description = axisTypeName(catAxis))
             
             new_images = [insertAxis(img, newaxis, catAxisNdx) for img in images]
                 

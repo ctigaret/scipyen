@@ -208,8 +208,8 @@ def axisTypeUnits(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int]) ->
     
     return pq.dimensionless
 
-def axisTypeFromUnits(u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]) -> typing.Union[vigra.AxisType, int]:
-    """Return a vigra.AxisType flag given dimensionality units
+def axisTypeFromUnits(u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]) -> vigra.AxisType:
+    """Return a vigra.AxisType flag given dimensionality units 'u'
     
     BY CONVENTION:
     
@@ -289,6 +289,9 @@ def axisTypeFromUnits(u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionali
      for the pixel intensities.
      
     """
+    # NOTE: 2021-11-27 17:13:56
+    # casting of int to vigra.AxisType required to conform to what the C++
+    # signature of vigra.AxisInfo.__init__ expects.
     if isinstance(u, pq.dimensionality.Dimensionality):
         u_simp = u.simplified
         if len(u_simp) == 1:
@@ -316,29 +319,51 @@ def axisTypeFromUnits(u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionali
         elif units_convertible(u.units, pq.Hz):
             # this can/should be further distinguished to either Frequency, or 
             # Frequency | Time, in the caller code.
-            return vigra.AxisType.Frequency | vigra.AxisType.Time
+            # see  NOTE: 2021-11-27 17:13:56 for why we cast to vigra.AxisType
+            return vigra.AxisType(vigra.AxisType.Frequency | vigra.AxisType.Time)
         
         elif units_convertible(u.units, 1/pq.m):
-            return vigra.AxisType.Frequency | vigra.AxisType.Space
+            return vigra.AxisType(vigra.AxisType.Frequency | vigra.AxisType.Space)
         
         elif units_convertible(u.units, 1/pq.radian):
-            return vigra.AxisType.Frequency | vigra.AxisType.Angle
+            return vigra.AxisType(vigra.AxisType.Frequency | vigra.AxisType.Angle)
         
         elif units_convertible(u.units, 1/pixel_unit):
-            return vigra.AxisType.Frequency | vigra.AxisType.Edge
+            return vigra.AxisType(vigra.AxisType.Frequency | vigra.AxisType.Edge)
         
         else: # anything else including chanel_unit
             # this needs to be further verifined in calling code
             return vigra.AxisType.Channels
         
+    return vigra.AxisType.UnknownAxisType
+        
     
-def axisTypeFromString(s:str) -> typing.Union[vigra.AxisType, int]:
+#def axisTypeFromString(s:str) -> typing.Union[vigra.AxisType, int]:
+def axisTypeFromString(s:str) -> vigra.AxisType:
     """Inverse lookup of axis type flags from descriptive string or axis info key.
     Performs the reverse of axisTypeName and the reverse mapping of standardAxisTypeKeys.
     
     CAUTION: These are recommended, and not fully enforced
     
+    Parameters:
+    -----------
+    s:str Axis type key, name or description string that can be meaningfully 
+        interpreted into an axis type flag
+        
+    Returns:
+    --------
+    vigra.AxisType flag 
+    
     """
+    # NOTE: 2021-11-27 17:25:14
+    # Needs explicit cast of the result of OR-ed AxisType flags to vigra.AxisType
+    # 
+    # In Python, the OR operation casts the AxisType flag operands to int and 
+    # the result is an int. This is not what the C++ signature of vigra.AxisInfo
+    # constructor ('vigra.AxisInfo.__init__') expects. Not sure why Boost.Python
+    # doesn't seem to take care of this, but to be safe we explicitly perform 
+    # the cast back to AxisType
+    # see also NOTE: 2021-11-27 17:13:56
     try:
         return evalAxisTypeExpression(s)
     
@@ -421,7 +446,7 @@ def axisTypeFromString(s:str) -> typing.Union[vigra.AxisType, int]:
                 return vigra.AxisType.NonChannel
                 
             if len(types):
-                return reduce(operator.or_, types)
+                return vigra.AxisType(reduce(operator.or_, types))
                 
             return vigra.AxisType.UnknownAxisType
     
@@ -504,7 +529,7 @@ def axisTypeStrings(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int, s
     # NOTE: below, exclude AllAxes and NonChannels because they will always map
     return "|".join(list(primitives)[2:]) if as_expr else  " ".join(list(primitives[2:])) if single else list(primitives)[2:]
 
-def evalAxisTypeExpression(x:str) -> typing.Union[vigra.AxisType, int]:
+def evalAxisTypeExpression(x:str) -> vigra.AxisType:
     """Evaluates a string representation  of vigra.AxisType type flags.
     
     Parameters:
@@ -516,10 +541,11 @@ def evalAxisTypeExpression(x:str) -> typing.Union[vigra.AxisType, int]:
     WARNING: Although numerically possible, not all combinations of primitive
     AxisType flags is meaningful!
     
-    Returns a type flag (int)
+    Returns:
+    vigra.AxisType flag
     
     """
-    return eval("|".join([f"vigra.AxisType.{s}" for s in x.split("|")]))
+    return vigra.AxisType(eval("|".join([f"vigra.AxisType.{s}" for s in x.split("|")])))
     
 def axisTypeName(axisinfo:typing.Union[vigra.AxisInfo, vigra.AxisType, int, str]) -> str:
     """Generates an axis name based on the axis info or axis type flag.

@@ -1264,9 +1264,10 @@ class PVSequence (object):
 
                     framePeriod = float(diffTimes.mean())# * pq.s
                 
-                    newAxisInfo = vigra.AxisInfo(key="t", typeFlags=vigra.AxisType.Time, \
-                                                resolution=framePeriod, \
-                                                description=axisTypeName(axisTypeFromString["t"]))
+                    newAxisInfo = vigra.AxisInfo(key="t", 
+                                                 typeFlags=vigra.AxisType.Time, 
+                                                 resolution=framePeriod, 
+                                                 description=axisTypeName(axisTypeFromString["t"]))
                     
                     newAxisCal = AxisCalibrationData(newAxisInfo)
                     newAxisCal.units = pq.s,
@@ -1362,9 +1363,10 @@ class PVSequence (object):
 
                     framePeriod = float(diffTimes.mean())#framePeriods[0]
                 
-                    newAxisInfo = vigra.AxisInfo(key="t", typeFlags = vigra.AxisType.Time, \
-                                                resolution=framePeriod, \
-                                                description=axisTypeName(axisTypeFromString["t"]))
+                    newAxisInfo = vigra.AxisInfo(key="t", 
+                                                 typeFlags = vigra.AxisType.Time,
+                                                 resolution=framePeriod,
+                                                 description=axisTypeName(axisTypeFromString["t"]))
                     
                     newAxisCal = AxisCalibrationData(units = pq.s, 
                                                      origin = float(self.frames[0].attributes["absoluteTime"]), 
@@ -1380,9 +1382,10 @@ class PVSequence (object):
 
                     zres = abs(z_steps[0])
                     
-                    newAxisInfo = vigra.AxisInfo(key="z", typeFlags=vigra.AxisType.Space, \
-                                                resolution=zres, \
-                                                description=axisTypeName(axisTypeFromString["z"]))
+                    newAxisInfo = vigra.AxisInfo(key="z", 
+                                                 typeFlags=vigra.AxisType.Space,
+                                                 resolution=zres,
+                                                 description=axisTypeName(axisTypeFromString["z"]))
                     
                     newAxisCal = AxisCalibrationData(newAxisInfo)
                     newAxisCal.units=pq.um

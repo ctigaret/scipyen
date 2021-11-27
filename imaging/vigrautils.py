@@ -9,41 +9,87 @@ from .axiscalibration import (AxesCalibration,
 from imaging import axisutils
 from imaging.axisutils import STANDARD_AXIS_TAGS_KEYS
 
-def getFrameLayout(img:vigra.VigraArray, 
+def getAxesLayout(img:vigra.VigraArray, 
                    userFrameAxis:typing.Optional[typing.Union[str, vigra.AxisInfo, int, 
-                                                              typing.Sequence[typing.Union[str, vigra.AxisInfo, int]]]]=None) -> typing.Tuple[int, typing.Optional[typing.Union[vigra.AxisInfo, typing.List[vigra.AxisInfo]]], vigra.AxisInfo, vigra.AxisInfo, vigra.AxisInfo]:
-    """Parses a vigra array to identify a reasonable axis defining "frames".
+                                                              typing.Sequence[typing.Union[str, vigra.AxisInfo, int]]]]=None,
+                   timeVertical:bool = True,
+                   ) -> typing.Tuple[int, typing.Optional[typing.Union[vigra.AxisInfo, typing.List[vigra.AxisInfo]]], vigra.AxisInfo, vigra.AxisInfo, vigra.AxisInfo]:
+    """Proposes a layout for frame-by-frame display and analysis of a VigraArray.
     
-    A frame is a 2D array or array view.
-    
+    Based on user-soecified hints, suggests which array axes may be used:
+        * to slice the array into meaningful 2D array views (data 'frames')
+        * for the definition of a frame's width and height
+        
+    and proposes the number of frames in the array (array size along the 'frames'
+    axis).
+        
     Parameters:
     ===========
-    img: VigraArray
+    img: N-dimensional VigraArray
+    
     userFrameAxis: str, int, AxisInfo, or tuple/list of any of these
+        This hints the possible axis or set of axes that may be used for slicing
+        the array into meaningful 2D views ('frames')
+        
+    timeVertical: bool, default is True
+        Whe True, the time dimension (when present) is to be shown vertically
     
     Returns:
     ========
     A tuple with the following elements:
      
-    nFrames:int = the number of putative frames along the "frame" axis
+    nFrames:int = the number of frames along the proposed "frame" axis
     
     All the others are vigra.AxisInfo objects, None, or tuple of vigra.AxisInfo
      
-    frameAxisInfo:vigra.AxisInfo = the AxisInfo along which the array will can
-        be "sliced" into frames to be displayed individually
+    horizontalAxisInfo:vigra.AxisInfo = the axis proposed for the frame 'width'.
+    
+        BY CONVENTION this is the first non-channel axis (usually, the 1st array
+        dimension), which is also the innermost non-channel axis given by 
+        img.innerNonChannelIndex property
         
-        NOTE: this may be None, a vigra.AxisInfo or a sequence of vigra.AxisInfo 
-        objects for arrays with more than 3 dimensions (to enable iteration across
-        'nested' frames)
-     
-    widthAxisInfo:vigra.AxisInfo = the axis for the image "width" : the first 
-        non-channel axis (which is also the innermost non-channel axis given by 
-        img.innerNonChannelIndex property)
+    verticalAxisInfo:vigra.AxisInfo = the axis proposed for the frame 'height'.
+    
+    BY CONVENTION this is the 2nd non-channel axis (usually, the 2nd dimension)
         
-    heightAxisInfo:vigra.AxisInfo = the axis of the image "height" : the 2nd 
-        dimension (second non-channel axis)
+    channelAxisInfo:vigra.AxisInfo or None = the channel axis
+    
+        This is either the AxisInfo with type flags of Channels, when it exists
+        in img 'axistags' property, or None.
         
-    channelAxisInfo:vigra.AxisInfo = the channel axis
+        BY CONVENTION this is the axis of the highest dimension of the array 
+        (possibly absent in 2D arrays, and missing in 1D arrays, where the data
+        inherently represents a single 'channel').
+        
+        In VigraArray objects, the channel axis represents channels in a 'color'
+        space (RGB, Luv, etc.) for the so-called 'multi-channel' or 'multi-band'
+        images - this relates to the data type of the pixels. 
+        
+        NOTE: In Scipyen, a 'channel' can also represent a distinct recording
+        channel of data from the same source (e.g. a fluorescence channel, DIC, 
+        etc.), or the real or imaginary part of complex numbers (e.g., the
+        result of a Fourier transform).
+        
+        BY CONVENTION, a single data recording channel is interpreted as being
+        stored in a 'grayscale' image (a.k.a, a 'single-channel' or 'single-band'
+        image or volume). 
+        
+        In Scipyen, data containing several 'data channels' defined as above 
+        is stored in a sequence of grayscale VigraArray with the same shape and 
+        similar axis tags. For display purposes, there is nothing to prevent 
+        'merging' these channels into a single VigraArray, although it does not 
+        always make good sense to do so (especially whenn there are more than
+        four distinct data channels).
+        
+    frameAxisInfo:vigra.AxisInfo or None
+    
+        When given, this is the AxisInfo along which the array can be 'sliced'
+        in 'frames' defined for the purpose of display and/or analysis.
+        
+        BY CONVENTION for 3D arrays this is the 3rd non-channel axis (usually, 
+        the 3rd dimension); for arrays with more than 4 dimensions and without a
+        channels axis this is a tuple of axes (in increasing order).
+        
      
      NOTE the last two values need not be along the first and second axis, as this
      depends on which axis is the channel axis (if it exists); by default, in vigra 
@@ -68,7 +114,7 @@ def getFrameLayout(img:vigra.VigraArray,
         raise TypeError("Expecting a VigraArray; got %s instead" % (type(img).__name__))
     
     if not hasattr(img, "axistags"):
-        raise TypeError("Argument does not have axis information")
+        raise TypeError("'img' does not contain axis information")
     
     if img.ndim == 0:
         raise TypeError("Expecting a VigraArray with at least 1 dimension")
@@ -82,6 +128,9 @@ def getFrameLayout(img:vigra.VigraArray,
         
         if isinstance(userFrameAxis, str):
             userFrameAxis = img.axistags[userFrameAxis]
+            
+        if userFrameAxis.typeFlags & vigra.AxisType.Channels:
+            raise TypeError("Channels axes cannot be used as frame axes")
         
     elif isinstance(userFrameAxis, int):
         if userFrameAxis < 0 or userFrameAxis >= ndim:
@@ -89,10 +138,13 @@ def getFrameLayout(img:vigra.VigraArray,
         
         userFrameAxis = img.axistags[userFrameAxis]
         
+        if userFrameAxis.typeFlags & vigra.AxisType.Channels:
+            raise TypeError("Channels axes cannot be used as frame axes")
+        
     elif isinstance(userFrameAxis, (tuple, list)):
         if all([isinstance(ax, (vigra.AxisInfo, str, int)) for ax in userFrameAxis]):
             try:
-                frax = [img.axistags[ax] if isinstance(ax, str, int) else ax for ax in userFrameAxis]
+                frax = tuple(img.axistags[ax] if isinstance(ax, str, int) else ax for ax in userFrameAxis)
                 
             except Exception as e:
                 raise RuntimeError("Invalid frame axis specified") from e
@@ -102,194 +154,228 @@ def getFrameLayout(img:vigra.VigraArray,
         else:
             raise TypeError("user frame axis sequence expected to contain vigra.AxisInfo objects, str or int elements")
         
-        if any ([ax.typeFlags & vigra.AxisType.Channels for ax in userFrameAxis]):
+        if any (ax.typeFlags & vigra.AxisType.Channels for ax in userFrameAxis):
             raise TypeError("Channels axes cannot be used as frame axes")
         
     elif userFrameAxis is not None:
-        warnings.warn("Invalid user frame axes specification; will set it to None", RuntimeWarning)
+        #warnings.warn("Invalid user frame axes specification; will set it to None", RuntimeWarning)
         userFrameAxis = None
         
     xIndex = img.axistags.index("x")
+    if xIndex == img.ndim:
+        # try by axis typeflags
+        spaceAxes = tuple(ax for ax in img.axistags if ax.typeflags & vigra.AxisType.Space)
     yIndex = img.axistags.index("y")
     zIndex = img.axistags.index("z")
     tIndex = img.axistags.index("t")
-    #cIndex = img.axistags.index("c")
     cIndex = img.channelIndex
     
+    frameAxisInfo       = None
+    channelAxisInfo     = None
+    horizontalAxisInfo  = None
+    verticalAxisInfo    = None
+    nFrames             = 0
+    
     if img.ndim == 1:
-        frameAxisInfo = None
         nFrames = 1
 
         if img.order == "C":
-            heightAxisInfo = img.axistags[0]
-            widthAxisInfo = None
-            channelAxisInfo = None
+            verticalAxisInfo = img.axistags[0] # 'column' vector
             
         elif img.order  ==  "F":
-            widthAxisInfo = img.axistags[0]
-            heightAxisInfo = None
-            channelAxisInfo = None
+            horizontalAxisInfo = img.axistags[0] # 'row' vector
             
-        else:
-            widthAxisInfo = img.axistags[0]
-            heightAxisInfo = None
-            channelAxisInfo = img.axistags[0]
+        else: # "V"
+            horizontalAxisInfo = img.axistags[0] # 'row' vector
         
     elif img.ndim == 2: # trivial case; the check above passed means that there is no channel axis
-        if userFrameAxis is not None:
-            warnings.warn("Ignoring userFrameAxis for a 2D array", RuntimeWarning)
-            
-        frameAxisInfo = None
+        # this has a 'virtual', singleton channel axis;
+        #if userFrameAxis is not None:
+            #warnings.warn("Ignoring userFrameAxis for a 2D array", RuntimeWarning)
+
+        # NOTE: the interpretation of the axes is is dependent on the img 'order'
+        # attribute; we use the axistags 'x' and 'y' or 't' to determine the 
+        # horizontal ('x') and vertical ('y' or 't') dimensions; when neither of 
+        # thesee axistags exist (their index equals img.ndim) we fallback on the 
+        # generic heuristic of horizontal on 1st dimension and vertical on 2nd
+        # 
         nFrames = 1
-        # NOTE: 2019-11-26 10:31:55
-        # "x" or "y" may not be present e.g. in a Fourier transform so by default
-        # we take:
-        widthAxisInfo = img.axistags[0] 
-        heightAxisInfo = img.axistags[1]
+        
+        horizontalAxisInfo  = img.axistags["x"] if xIndex < img.ndim else \
+                              imt.axistags["t"] if tIndex < img.ndim and timeVertical is False else img.axistags[0]
+        
+        verticalAxisInfo    = img.axistags["y"] if xIndex < img.ndim else \
+                              img.axistags["t"] if tIndex < img.ndim and timeVertical is True else img.axistags[1]
+        
         
     elif img.ndim == 3:
-        if cIndex == img.ndim: 
-            # no channel axis:
+        if cIndex == img.ndim: # no channel axis:
             if userFrameAxis is None:
-                frameAxisInfo = img.axistags[-1] # choose the outermost axis as frame axis
-                widthAxisInfo = img.axistags[0]
-                heightAxisInfo = img.axistags[1]
-                
-                
-            else:
+                # first try AxisInfo with key "z", or a third AxisInfo with typeFlags & Space,
+                # then AxisInfo with key "t", or an axisInfo with typeFlags & Time
+                if zIndex < img.ndim:
+                    frameAxisInfo = img.axistags[zIndex]
+                    
+                else:
+                    spaceAxes = [ax for ax in img.axistags if ax.typeFlags & Space]
+                    if len(spaceAxes) > 2:
+                        frameAxisInfo = spaceAxes[2] 
+                        
+                    else:
+                        if tIndex < img.ndim:
+                            frameAxisInfo = img.axistags[tIndex]
+                            
+                        else:
+                            frameAxisInfo = img.axistags[-1] # fall back to choosing the outermost axis as frame axis
+                    
+            else: # user-specified frameAxis - just check we're OK with it
                 if isinstance(userFrameAxis, (list, tuple)):
-                    if len(userFrameAxis) != 1:
-                        raise TypeError("for 3D arrays the user frame axis sequence must contain only one element; got %d instead" % len(userFrameAxis))
+                    if len(userFrameAxis) == 0:
+                        raise TypeError("userFrameAxis sequence is empty")
                     
                     if any([not isinstance(ax, vigra.AxisInfo) for ax in userFrameAxis]):
                         raise TypeError("user frame axis sequence must contain only vigra.AxisInfo objects")
                     
-                    userFrameAxis = userFrameAxis[0]
+                    frameAxisInfo = userFrameAxis[0]
                     
                 elif not isinstance(userFrameAxis, vigra.AxisInfo):
                     raise TypeError("user frame axis must be either None, a vigra.AxisInfo, or a sequence of AxisInfo objects; got %s instead" % type(userFrameAxis).__name__)
 
-                frameAxisInfo = userFrameAxis
+                    frameAxisInfo = userFrameAxis
                 
-                # skip frame axis for width and height
-                nonFrameAxes = [ax for ax in img.axistags if ax != frameAxisInfo and ax.typeFlags & vigra.AxisType.Channels == 0]
-                
-                if len(nonFrameAxes) != 2:
-                    raise RuntimeError("Cannot figure out which axes make a displayable frame")
-                    
-                widthAxisInfo = nonFrameAxes[0]
-                heightAxisInfo = nonFrameAxes[1]
+            # skip frame axis for width and height
+            availableAxes = tuple(ax for ax in img.axistags if ax != frameAxisInfo and ax.typeFlags & vigra.AxisType.Channels == 0)
+            
+            horizontalAxisInfo  = img.axistags["x"] if xIndex < img.ndim and img.axistags["x"] in availableAxes else \
+                                  img.axistags["t"] if tIndex < img.ndim and img.axistags["t"] in availableAxes and timeVertical is False else \
+                                  availableAxes[0]
+                              
+            verticalAxisInfo    = img.axistags["y"] if xIndex < img.ndim and img.axistags["y"] in availableAxes else \
+                                  img.axistags["t"] if tIndex < img.ndim and img.axistags["t"] in availableAxes and timeVertical is True else \
+                                  availableAxes[1]
                 
             nFrames = img.shape[img.axistags.index(frameAxisInfo.key)]
             
         else:
-            # there is a channel axis therefore this is a 2D image hence 
-            # a single displayable frame
+            # there is a channel axis therefore this is really a 2D data array
+            # (even though, numerically it is represented by a 3D array);
+            # hence it contains a single displayable frame
+            channelAxisInfo = img.axistags[cIndex]
             
-            if userFrameAxis is not None:
-                warnings.warn("Ignoring userFrameAxis for a 3D array with channel axis (effectively a 2D image, possibly multi-band)", RuntimeWarning)
+            #if userFrameAxis is not None:
+                #warnings.warn("Ignoring userFrameAxis for a 3D array with channel axis (effectively a 2D image, possibly multi-band)", RuntimeWarning)
             
-            frameAxisInfo = None     # then set this as frameAxis; override parameter to view(...)
             nFrames = 1
             
-            nonChannelAxes = [ax for ax in img.axistags if (ax.typeFlags & vigra.AxisType.Channels == 0)]
+            availableAxes = tuple(ax for ax in img.axistags if (ax.typeFlags & vigra.AxisType.Channels == 0))
             
-            widthAxisInfo = img.axistags[nonChannelAxes[0].key]
-            heightAxisInfo = img.axistags[nonChannelAxes[1].key]
+            horizontalAxisInfo  = img.axistags["x"] if xIndex < img.ndim and img.axistags["x"] in availableAxes else \
+                                  imt.axistags["t"] if tIndex < img.ndim and img.axistags["t"] in availableAxes and timeVertical is False else \
+                                  availableAxes[0]
+                              
+            verticalAxisInfo    = img.axistags["y"] if xIndex < img.ndim and img.axistags["y"] in availableAxes else \
+                                  img.axistags["t"] if tIndex < img.ndim and img.axistags["t"] in availableAxes and timeVertical is True else \
+                                  availableAxes[1]
+            
                 
     elif img.ndim > 3:
         if cIndex == img.ndim:
-            # no channel axis => "flatten" the two outermost axes
+            # no channel axis
+                
             if userFrameAxis is None:
-                frameAxisInfo = [img.axistags[k] for k in range(2,img.ndim)]
+                spaceAxes = tuple(ax for ax in img.axistags if ax.typeFlags & Space)
+                if len(spaceAxes) > 2:
+                    putativeZaxes = tuple(ax for ax in spaceAxes if "z" in ax.key.lower())
+                else:
+                    putativeZaxes = tuple()
+                    
+                timeAxes  = tuple(ax for ax in img.axistags if ax.typeFlags & Time)
                 
-                widthAxisInfo = img.axistags[0]
-                heightAxisInfo = img.axistags[1]
+                framesAxisInfo = tuple(sorted(list(putativeZaxes + timeAxes),ley = lambda x: img.axistags.index(x)))
                 
-            else:
+                # TODO 2021-11-27 22:08:30
+                # figure out if there is an x, t, t1, ... or t, t1, t2, ... etc
+                
+                if len(frameAxisInfo) == 0:
+                    # consider the first two axes as horiz/vert
+                    frameAxisInfo = tuple(img.axistags[k] for k in range(2,img.ndim))
+                
+            else: # user-specified frame axes - must be a tuple for >3D
                 if not isinstance(userFrameAxis, (list, tuple)):
                     raise TypeError("For arrays with more than three dimensions the frame axis must be a sequence of axis info objects")
                 
                 if any([not isinstance(ax, vigra.AxisInfo) for ax in userFrameAxis]):
                     raise TypeError("For arrays with more than three dimensions the frame axis must be a sequence of axis info objects")
                 
-                if img.ndim == 4:
-                    if len(userFrameAxis) != 2:
-                        raise TypeError("for a 4D array with no channel axis, user frame axis sequence must contain two AxisInfo objects; got %d instead" % len(userFrameAxis))
+                if len(userFrameAxis) != img.ndim-2:
+                    raise TypeError(f"For a {img.ndim}-D array with no channel axis, the user frame axis sequence must contain {img.dim-2} AxisInfo objects; got {len(userFrameAxis)} instead")
                     
-                elif img.ndim == 5:
-                    if len(userFrameAxis) != 3:
-                        raise TypeError("for a 5D array with no channel axis, user frame axis sequence must contain two AxisInfo objects; got %d instead" % len(userFrameAxis))
-                
                 frameAxisInfo = userFrameAxis
                 
-                nonFrameAxes = [ax for ax in img.axistags if ax not in frameAxisInfo and ax.typeFlags & vigra.AxisType.Channels == 0]
-                
-                if len(nonFrameAxes) != 2:
-                    raise RuntimeError("Cannot figure out which axes make a displayable frame")
-                
-                widthAxisInfo = nonFrameAxes[0]
-                heightAxisInfo = nonFrameAxes[1]
+            availableAxes = tuple(ax for ax in img.axistags if ax not in frameAxisInfo and ax.typeFlags & vigra.AxisType.Channels == 0)
             
+            horizontalAxisInfo  = img.axistags["x"] if xIndex < img.ndim and img.axistags["x"] in availableAxes else \
+                                  img.axistags["t"] if tIndex < img.ndim and img.axistags["t"] in availableAxes and timeVertical is False else \
+                                  availableAxes[0]
+            verticalAxisInfo    = img.axistags["y"] if xIndex < img.ndim and img.axistags["y"] in availableAxes else \
+                                  img.axistags["t"] if tIndex < img.ndim and img.axistags["t"] in availableAxes and timeVertical is True else \
+                                  availableAxes[1]
+                              
         else:
-            # there is a channel axis => a 4D array becomes a 3D image with channel axis
-            # => userFrameAxis CAN be a single AxisInfo object or a sequence with one element
-            # and a 5D array becomes a 4D image with channel axis
-            # => userFrameAxis MUST be a sequence with two elements
+            channelAxisInfo = img.axistags[cIndex]
+            # there is a channel axis => an N-D array becomes an (N-1)-D data 'block'
+            # with a channel axis
+            nonChannelAxes = [ax for ax in img.axistags if (ax.typeFlags & vigra.AxisType.Channels == 0)]
+            
             if userFrameAxis is None:
-                nonChannelAxes = [ax for ax in img.axistags if (ax.typeFlags & vigra.AxisType.Channels == 0)]
-                
-                frameAxisInfo = [nonChannelAxes[k] for k in range(2, len(nonChannelAxes))]
-                
-                widthAxisInfo = nonChannelAxes[0]
-                heightAxisInfo = nonChannelAxes[1]
+                # consider first two axes as horiz/vert
+                frameAxisInfo = tuple(nonChannelAxes[k] for k in range(2, len(nonChannelAxes)))
                 
             else:
-                if isinstance(userFrameAxis, (list, tuple)):
+                if isinstance(userFrameAxis, vigra.AxisInfo):
+                    if img.ndim  > 4:
+                        raise TypeError(f"For arrays with more than four dimensions useFrameAxis must be a sequence with at least {img.ndim-3} elements")
+                    
+                    userFrameAxis = [userFrameAxis]
+                    
+                elif isinstance(userFrameAxis, (list, tuple)):
                     if any([not isinstance(ax, vigra.AxisInfo) for ax in userFrameAxis]):
                         raise TypeError("user frame axis sequence must contain only axis info objects")
                     
-                    if img.ndim == 4:
-                        if len(userFrameAxis) == 1:
-                            userFrameAxis = userFrameAxis[0]
-                            
-                        else:
-                            raise TypeError("for a 4D array with channel axis, user frame axis must be a sequence with one AxisInfo object or just an AxisInfo object; got a sequence with %d AxisInfo objects" % len(userFrameAxis))
-                        
-                    elif img.ndim == 5:
-                        if len(userFrameAxis) != 2:
-                            raise TypeError("for a 5D array with channel axis, user frame axis must be a sequence of TWO AxisInfo object; got %d instead" % len(userFrameAxis))
-                        
-                elif isinstance(userFrameAxis, vigra.AxisInfo):
-                    if img.ndim == 5:
-                        raise TypeError("for a 5D array with channel axis, user frame axis must be a sequence of TWO AxisInfo object; got %d instead" % len(userFrameAxis))
-
-                if not isinstance(userFrameAxis, (list, tuple)):
-                    raise TypeError("For arrays with more than three dimensions the frame axis must be a sequence of axis info objects")
-                
+                    if len(userFrameAxis) != img.ndim-3:
+                        raise TypeError(f"For a {img.ndim}-D array with channel axis, the user frame axis sequence must contain {img.dim-3} AxisInfo objects; got {len(userFrameAxis)} instead")
+                    
                 frameAxisInfo = userFrameAxis
-                
-                nonFrameAxes = [ax for ax in img.axistags if ax not in frameAxisInfo and ax.typeFlags & vigra.AxisType.Channels == 0]
+
+            availableAxes = [ax for ax in img.axistags if ax not in frameAxisInfo and ax.typeFlags & vigra.AxisType.Channels == 0]
             
-                if len(nonFrameAxes) != 2:
-                    raise RuntimeError("Cannot figure out which axes make a displayable frame")
-                
-                widthAxisInfo = nonFrameAxes[0]
-                heightAxisInfo = nonFrameAxes[1]
-                
-        # NOTE:țhis is WRONG
+            horizontalAxisInfo  = img.axistags["x"] if xIndex < img.ndim and img.axistags["x"] in availableAxes else \
+                                  img.axistags["t"] if tIndex < img.ndim and img.axistags["t"] in availableAxes and timeVertical is False else \
+                                  availableAxes[0]
+            verticalAxisInfo    = img.axistags["y"] if xIndex < img.ndim and img.axistags["y"] in availableAxes else \
+                                  img.axistags["t"] if tIndex < img.ndim and img.axistags["t"] in availableAxes and timeVertical is True else \
+                                  availableAxes[1]
+                              
+            
+        # NOTE:this is WRONG
         #nFrames = sum([img.shape[img.axistags.index(ax.key)] for ax in frameAxisInfo])
         
-        # NOTE: this is OK
-        nFrames = np.prod([img.shape[img.axistags.index(ax.key)] for ax in frameAxisInfo])
+        # NOTE: 2021-11-27 21:55:14 
+        # this is OK but we don't use this anymore; return a tuple of frames along
+        # each of the frame axes info
+        #nFrames = np.prod([img.shape[img.axistags.index(ax.key)] for ax in frameAxisInfo])
+        nFrames = tuple(img.shape[img.axistags.index(ax.key)] for ax in frameAxisInfo)
             
-    else:
-        raise TypeError("Expecting a vigra array with dimensionality in the closed interval [2 .. 5]")
+    nFrames = tuple(img.shape[img.axistags.index(ax.key)] for ax in frameAxisInfo)
     
     if isinstance(frameAxisInfo, (tuple, list)) and len(frameAxisInfo) == 1:
         frameAxisInfo = frameAxisInfo[0]
+        
+    if isinstance(nFrames, (tuple, list)) and len(nFrames) == 1:
+        nFrames = nFrames[0]
+        
     
-    return nFrames, frameAxisInfo, widthAxisInfo, heightAxisInfo
+    return nFrames, horizontalAxisInfo, verticalAxisInfo, channelAxisInfo, frameAxisInfo
 
 @singledispatch
 def kernel2array(value:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D],
@@ -571,7 +657,7 @@ def specifyAxisTags(image, newtags, newshape=None, in_place=False):
             raise ValueError("Cannot specify more than 5 axis tags")
             
         if all([isinstance(tag, str) for tag in newtags]):
-            tagslist = [vigra.AxisInfo(s, axisTypeFromString[s]) for s in newtags]
+            tagslist = [vigra.AxisInfo(s, vigra.AxisType(axisTypeFromString[s])) for s in newtags]
             newTags = vigra.AxisTags(*tagslist)
             
         elif all([isinstance(tag, vigra.AxisInfo)]):
@@ -598,7 +684,7 @@ def specifyAxisTags(image, newtags, newshape=None, in_place=False):
             if c not in STANDARD_AXIS_TAGS_KEYS:
                 raise ValueError("Invalid AxisInfo key: %s" % c)
             
-        tagslist = [vigra.AxisInfo(c, axisTypeFromString[c]) for c in a]
+        tagslist = [vigra.AxisInfo(c, vigra.AxisType(axisTypeFromString[c])) for c in a]
         newTags = vigra.AxisTags(*tagslist)
         
     else:

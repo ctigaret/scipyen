@@ -1313,7 +1313,7 @@ class AxisCalibrationData(CalibrationData):
         """Dynamically generated vigra.AxisInfo object
         """
         
-        return vigra.AxisInfo(key = self.key, typeFlags = self.type, resolution=self.resolution, description=self.calibrationString)
+        return vigra.AxisInfo(key = vigra.AxisType(self.key), typeFlags = self.type, resolution=self.resolution, description=self.calibrationString)
         
     
     def addChannelCalibration(self, val:ChannelCalibrationData, name:str=None):
@@ -1738,7 +1738,7 @@ class AxisCalibrationData(CalibrationData):
             raise TypeError(f"'axinfo' expected to be a vigra.AxisInfo object; got {type(axinfo).__name__} instead")
         
         if axinfo.typeFlags != self.type or axinfo.key != self.key:
-            return vigra.AxisInfo(key = self.key, typeFlags = self.type, resolution=self.resolution, description=self.calibrationString)
+            return vigra.AxisInfo(key = self.key, typeFlags = vigra.AxisType(self.type), resolution=self.resolution, description=self.calibrationString)
             
         axinfo = self._embedCalibrationString_(self.calibrationString, axinfo)
         axinfo.resolution = self.resolution
