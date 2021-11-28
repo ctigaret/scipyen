@@ -2857,6 +2857,8 @@ def calibrateAxis(axInfo, cal, channel=None, channelname=None):
                                 key = axInfo.key, axisname = axisTypeName(axInfo),
                                 channel = channel, channelname=channelname)
             
+            
+
     elif isinstance(cal, str):
         axcal = AxesCalibration(axisinfo=cal, channel=channel, channelname=channelname) # will raise ValueError if cal not conformant
         
@@ -2868,3 +2870,27 @@ def calibrateAxis(axInfo, cal, channel=None, channelname=None):
         
     return axInfo, axcal
 
+def getAxisResolution(axisinfo):
+    """Returns the resolution of the axisinfo object as a Python Quantity.
+    """
+    if not isinstance(axisinfo, vigra.AxisInfo):
+        raise TypeError("Expecting a vigra.AxisInfo object; got %s instead" % type(axisinfo).__name__)
+    
+    axcal = AxesCalibration(axisinfo)
+    
+    # FIXME what to do when there are several channels?
+    
+    return axcal.getResolution(axisinfo.key)
+    
+def getAxisOrigin(axisinfo):
+    """Returns the axis origin as a Python Quantity
+    """
+    if not isinstance(axisinfo. vigra.AxisInfo):
+        raise TypeError("Expecting a vigra.AxisInfo object; got %s instead" % type(axisinfo).__name__)
+    
+    # FIXME what to do when there are several channels?
+    
+    axcal = AxesCalibration(axisinfo)
+    
+    return axcal.getOrigin(axisinfo.key)
+    

@@ -46,7 +46,6 @@ from . import xmlutils
 from . import strutils
 from .prog import safeWrapper
 
-#from imaging.imageprocessing import *
 #### END pict.core.modules
 
 # CHANGELOG (most recent first)

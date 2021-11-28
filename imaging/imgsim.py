@@ -37,7 +37,9 @@ from neo.core import container
 
 from ephys import ephys
 
+from . import vigrautils as vu
 from . import imageprocessing as imgp
+from imaging.vigrautils import concatenateImages
 #### END pict.core modules
 
 
@@ -332,7 +334,7 @@ def synthetic_EPSCaT_linescan(field_width, duration,
     if twoChannels:
         spine2D = vigra.VigraArray(np.outer(spine, np.ones_like(epscat)), axistags = axistags)
         
-        result = imgp.concatenateImages(spine2D, linescan, axis = "c") 
+        result = concatenateImages(spine2D, linescan, axis = "c") 
         
     else:
         result = linescan

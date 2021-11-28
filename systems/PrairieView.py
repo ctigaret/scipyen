@@ -52,8 +52,11 @@ import gui.signalviewer as sv
 from imaging import (imageprocessing as imgp, axisutils, axiscalibration,)
 from imaging.scandata import (ScanData, ScanDataOptions, scanDataOptions,)
 
+from imaging.vigrautils import (concatenateImages, insertAxis)
+
 from imaging.axisutils import (axisTypeFromString, axisTypeName, 
                                axisTypeSymbol, axisTypeUnits,)
+
 from imaging.axiscalibration import (AxesCalibration, 
                                      CalibrationData, 
                                      ChannelCalibrationData, 
@@ -961,7 +964,7 @@ class PVFrame(object):
                 channels = [int(self.files[k]["channel"]) for k in range(len(self.files))]
                 channel_names = [self.files[k]["channelName"] for k in range(len(self.files))]
                 
-                mergedFrameData = imgp.concatenateImages(*frameData, axis="c", allowConcatenationFor=("origin", "resolution"))
+                mergedFrameData = concatenateImages(*frameData, axis="c", allowConcatenationFor=("origin", "resolution"))
                 
                 merged_channels_axinfo = mergedFrameData.axistags["c"]
                 
@@ -976,7 +979,7 @@ class PVFrame(object):
                 merged_channels_axinfo = merged_channels_axcal.calibrateAxis(merged_channels_axinfo)
                         
                 if sourceData is not None:
-                    mergedSourceData = imgp.concatenateImages(*sourceData, axis="c")
+                    mergedSourceData = concatenateImages(*sourceData, axis="c")
                     
                     merged_source_channel_axinfo = mergedSourceData.axistags["c"]
                     
@@ -1171,7 +1174,7 @@ class PVSequence (object):
         # Point: not implemented
         
         # NOTE: 2017-10-23 10:46:11
-        # axistags management taken care of by imgp.concatenateImages
+        # axistags management taken care of by concatenateImages
         
         if self.sequencetype == PVSequenceType.Linescan:
             if self.definition.mode in (PVLinescanMode.straightLine, \
@@ -1313,7 +1316,7 @@ class PVSequence (object):
             
                 # NOTE: 2017-10-25 00:51:06 source data is None here
                 # so we just return None for it
-                return imgp.concatenateImages(images, axis=newAxisInfo), None
+                return concatenateImages(images, axis=newAxisInfo), None
             
             else: # separate channels
                 data = [f(filepath=filepath) for f in self.frames] # for each frame: a tuple of frame data & src data if linescan
@@ -1404,7 +1407,7 @@ class PVSequence (object):
                 else:
                     newAxisDim = data[0][0].ndim
                     
-                return [imgp.concatenateImages([imgp.insertAxis(data[frame][channel], newAxisInfo, newAxisDim) 
+                return [concatenateImages([insertAxis(data[frame][channel], newAxisInfo, newAxisDim) 
                                                         for frame in range(len(self.frames))], 
                                                         axis=newAxisInfo) 
                                                     for channel in range(len(data[0]))], None
@@ -1856,7 +1859,7 @@ class PVScan(object):
                     
                     # NOTE: 2017-10-25 00:46:27
                     # returns tuple of multi-band frame & source data
-                    fdata = imgp.concatenateImages([imgp.insertAxis(img, newAxisInfo, newAxisDim) \
+                    fdata = concatenateImages([insertAxis(img, newAxisInfo, newAxisDim) \
                                                         for img in frmdata], axis=newAxisInfo)
                     
                     channelAxisDim = srcdata[0].axistags.channelIndex
@@ -1867,7 +1870,7 @@ class PVScan(object):
                     else:
                         newAxisDim = srcdata[0].ndim
                     
-                    sdata = imgp.concatenateImages([imgp.insertAxis(img, newAxisInfo, newAxisDim) \
+                    sdata = concatenateImages([insertAxis(img, newAxisInfo, newAxisDim) \
                                                         for img in srcdata], axis=newAxisInfo)
                     
                     
@@ -1909,12 +1912,12 @@ class PVScan(object):
                         
                     # NOTE: 2017-10-25 00:46:39
                     # returns a tuple of single-band frame data channels & single-band source data channels 
-                    fdata = [imgp.concatenateImages(*[imgp.insertAxis(frmdata[sequence][channel], 
+                    fdata = [concatenateImages(*[insertAxis(frmdata[sequence][channel], 
                                                                       newAxisInfo, 
                                                                       newAxisDim) for sequence in range(len(self.sequences))],
                                                         axis=newAxisInfo) for channel in range(len(frmdata[0]))]
                     
-                    sdata = [imgp.concatenateImages(*[imgp.insertAxis(srcdata[sequence][channel],
+                    sdata = [concatenateImages(*[insertAxis(srcdata[sequence][channel],
                                                                       newAxisInfo, 
                                                                       newAxisDim) for sequence in range(len(self.sequences))],
                                                         axis=newAxisInfo) for channel in range(len(srcdata[0]))]

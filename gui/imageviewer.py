@@ -2283,9 +2283,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.widthAxisInfo              = None # this is "visual" width which may not be on a spatial axis "x"
         self.heightAxisInfo             = None # this is "visual" height which may not be on a spatial axis "y"
         #self.frameIterator              = None # ??? FIXME what's this for ???
-        self._currentZoom_            = 0
+        self._currentZoom_              = 0
         #self.complexDisplay            = ComplexDisplay.real # one of "real", "imag", "dual" "abs", "phase" (cmath.phase), "arg"
-        self._currentFrameData_       = None
+        self._currentFrameData_         = None
         
         # QGraphicsLineItems -- outside the roi/cursor GraphicsObject framework!
         self._scaleBarColor_             = QtGui.QColor(255, 255, 255)
@@ -2304,6 +2304,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self._display_horizontal_scalebar_ = True
         self._display_vertical_scalebar_   = True
+        
+        self._display_time_vertical_           = True
         
         self._showsScaleBars_            = True
         
@@ -2400,6 +2402,17 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.displayFrame()
         
     @property
+    def frameIndexing(self):
+        if isinstance(self._number_of_frames_, int):
+            return tuple((self.frameAxisInfo, k) for k in range(self._number_of_frames_))
+        
+        else:
+            traversal = tuple(tuple((ax,i) for i in range(axSize)) for ax, axSize in zip(reversed(self.frameAxisInfo), reversed(self._number_of_frames_)))
+            #traversal = tuple(tuple((ax,i) for i in range(axSize)) for ax, axSize in zip(self.frameAxisInfo, self._number_of_frames_))
+            return tuple(itertools.product(*traversal))
+            
+        
+    @property
     def temporaryColorMap(self)->str:
         """Name of a temporary colormap or None.
         A temporary colormap is to be used for displaying 'channel' images (e.g.,
@@ -2447,7 +2460,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         """
         Emits self.frameChanged signal
         """
-        if not isinstance(val, int) or val >= self._number_of_frames_ or val < 0: 
+        totalFrames = self._number_of_frames_ if isinstance(self._number_of_frames_, int) else \
+                    np.prod(self._number_of_frames_)
+        
+        if not isinstance(val, int) or val >= totalFrames or val < 0: 
             return
         
         # NOTE: 2018-09-25 23:06:55
@@ -2458,9 +2474,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in \
             (self.framesQSpinBox, self.framesQSlider)]
         
-        #self.framesQSpinBox.valueChanged[int].disconnect()
-        #self.framesQSlider.valueChanged[int].disconnect()
-
         self.framesQSpinBox.setValue(val)
         self.framesQSlider.setValue(val)
 
@@ -3359,18 +3372,20 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if img is None:
             return False
         
+        if np.any(np.iscomplex(img)):
+            self.criticalMessage("Error", "ImageViewer cannot yet display complex-valued data")
+            return False
+            
         try:
-            (nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo) = vu.getAxesLayout(img, userFrameAxis = self.userFrameAxisInfo)
+            (nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo) = vu.proposeLayout(img, 
+                                                                                                        userFrameAxis = self.userFrameAxisInfo,
+                                                                                                        timeVertical = self._display_time_vertical_)
             
         except Exception as e:
             s = io.StringIO()
             sei = sys.exc_info()
             traceback.print_exception(file=s, *sei)
             self.errorMessage(type(e).__name__, "\n".join([sei[0].__class__.__name__, s.getvalue()]))
-            return False
-            
-        if np.any(np.iscomplex(img)):
-            self.criticalMessage("Error", "ImageViewer cannot yet display complex-valued data")
             return False
             
         try:
@@ -3393,22 +3408,40 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                         c.rangeY = img.shape[heightAxisNdx]
                         c.setPos(img.shape[widthAxisNdx]/2, img.shape[heightAxisNdx]/2)
             
-            self._number_of_frames_        = nFrames
+            self._number_of_frames_ = nFrames # if isinstance(nFrames, int) else np.prod(nFrames) if isinstance(nFrames, tuple) and all(isinstance(v, int) for v in nFrames) else None
+
+            if self._number_of_frames_ is None:
+                self.criticalMessage("Error", "Cannot determine the number of frames in the data")
+                return False
+        
             self.frameAxisInfo  = frameAxisInfo
+            
             self.widthAxisInfo  = widthAxisInfo
             self.heightAxisInfo = heightAxisInfo
+            
+            #if isinstance(self._number_of_frames_, (tuple, list)):
+                #self.frameIndices = tuple(itertools.product(*tuple(tuple((ax,i) for i in range(axSize)) for ax , axSize in zip(self.frameAxisInfo, self._number_of_frames_))))
+            #else:
+                #self.frameIndices = list(range)
+            
+            totalFrames = self._number_of_frames_ if isinstance(self._number_of_frames_, int) else \
+                        np.prod(self._number_of_frames_)
         
-            self.framesQSlider.setMaximum(self._number_of_frames_-1)
+            self.framesQSlider.setMaximum(totalFrames-1)
             self.framesQSlider.setToolTip("Select frame.")
             
-            self.framesQSpinBox.setMaximum(self._number_of_frames_-1)
-            self.framesQSpinBox.setToolTip("Select frame .")
-            self.nFramesLabel.setText("of %d" % self._number_of_frames_)
+            self.framesQSpinBox.setMaximum(totalFrames-1)
+            self.framesQSpinBox.setToolTip("Select frame.")
+            self.nFramesLabel.setText("of %d" % totalFrames)
             
             return True
                 
         except Exception as e:
-            traceback.print_exc()
+            s = io.StringIO()
+            sei = sys.exc_info()
+            traceback.print_exception(file=s, *sei)
+            self.errorMessage(type(e).__name__, "\n".join([sei[0].__class__.__name__, s.getvalue()]))
+            #traceback.print_exc()
             return False
         
     def _applyColorTable_(self, image: vigra.VigraArray, 
@@ -3495,36 +3528,18 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if self.frameAxisInfo is not None:
             # NOTE: 2019-11-13 13:52:46
             # frameAxisInfo is None only for 2D data arrays
-            if isinstance(self.frameAxisInfo, (tuple, list)):
-                dimindices = list()
-                
-                frameAxisDims = [self._data_.shape[self._data_.axistags.index[ax.key]] for ax in self.frameAxisInfo]
-                
-                premultipliers = [1]
-                
-                premultipliers += list(np.cumprod([self._data_.shape[self._data_.axistags.index[ax.key]] for ax in self.frameAxisInfo])[:-1])
-                
-                frame = self._current_frame_index_
-                
-                for k in range(len(premultipliers)-1, -1, -1):
-                    ndx = frame // premultipliers[k]
-                    
-                    frame = frame % premultipliers[k]
-                    
-                    dimindices.append(ndx)
-                
-                dimindices.reverse()
-                
-                # get a 2D slice view of the data
-                img_view = self._data_.bindAxis(self.frameAxisInfo[0].key, dimindices[0])
-                
-                for k in range(1, len(dimindices)):
-                    img_view = img_view.bindAxis(self.frameAxisInfo[k].key, dimindices[k])
+            
+            index = self.frameIndexing[self._current_frame_index_]
+            dimindices = [index]
+            
+            img_view = self._data_
+            if all(isinstance(ndx, tuple) for ndx in index):
+                for ndx in index:
+                    img_view = img_view.bindAxis(img_view.axistags.index(ndx[0].key), ndx[1])
                     
             else:
-                img_view = self._data_.bindAxis(self.frameAxisInfo.key, self._current_frame_index_)
-                dimindices = [self._current_frame_index_]
-                
+                img_view = img_view.bindAxis(img_view.axistags.index(index[0].key), index[1])
+            
         else:
             img_view = self._data_
             dimindices = []
@@ -3666,6 +3681,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             return # shouldn't really get here
         
         self.viewerWidget.setTopLabelText(shapeTxt)
+        
+        z_coord_str = self._display_Z_coordinate()
+        if len(z_coord_str.strip()):
+            self.statusBar().showMessage(z_coord_str)
         
     def _configureUI_(self):
         self.setupUi(self)
@@ -3976,6 +3995,31 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.colorMap = self._prevColorMap
             self.displayFrame()
 
+    @pyqtSlot(int)
+    @safeWrapper
+    def slot_setFrameNumber(self, value:int):
+        """Drives frame navigation from the GUI.
+        
+        The valueChanged signal of the widget used to select the index of the 
+        displayed data frame should be connected to this slot in _configureUI_()
+        
+        NOTE: Overrides ScipyenFrameViewer.slot_setFrameNumber
+        """
+        if isinstance(self._number_of_frames_, int):
+            if value >= self._number_of_frames_:
+                return
+            
+        elif value >= np.prod(self._number_of_frames_):
+            return
+        
+        # NOTE: 2021-01-07 14:36:54
+        # subclasses should override this setter to emit frameChanged(int) signal
+        self.currentFrame = value
+        
+        for viewer in self.linkedViewers:
+            viewer.currentFrame = value
+            
+        
     def _editImageBrightness(self):
         dlg = pgui.ImageBrightnessDialog(self)
         dlg.show()
@@ -4038,7 +4082,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             # below, img is a view NOT a copy !
             #
             
-            img, dimindices = self._frameView_(self._displayedChannel_)
+            img, _ = self._frameView_(self._displayedChannel_)
             
             viewWidthAxisIndex = img.axistags.index(self.widthAxisInfo.key)
             viewHeightAxisIndex = img.axistags.index(self.heightAxisInfo.key)
@@ -4140,12 +4184,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                     self._current_frame_index_, zAxisKey, scz,
                                     sval)
                             
-                            else: # self.frameAxisInfo is a tuple - FiXME: when does THIS happen ?!?
-                                # FIXME 2021-10-26 00:06:22
+                            else: # self.frameAxisInfo is a tuple
                                 if self._axes_calibration_:
-                                    sz_cz = ", ".join(["%s: %s" % (ax.key, quantity2str(self._axes_calibration_[ax.key].calibratedDistance(self._current_frame_index_))) for ax in self.frameAxisInfo])
+                                    sz_cz = ", ".join([f"{ndx[0].key}: {ndx[1]} ({quantity2str(self._axes_calibration_[ndx[0].key].calibratedDistance(ndx[1]))})" for ndx in reversed(self.frameIndexing[self._current_frame_index_])])
                                 else:
-                                    sz_cz = ", ".join(["%s: %s" % (ax.key, self._current_frame_index_) for ax in self.frameAxisInfo])
+                                    sz_cz = ", ".join([f"{ndx[0].key}: {ndx[1]}" for ndx in reversed(self.frameIndexing[self._current_frame_index_])])
                                 
                                 coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s)> %s" % \
                                     (crstxt, \
@@ -4204,11 +4247,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                         scx = quantity2str(cx)
                     else:
                         scx = ""
-                    #cx = axiscalibration.AxesCalibration(img.axistags[viewWidthAxisIndex]).getCalibratedAxisCoordinate(x, img.axistags[viewWidthAxisIndex])
-                        
+
                     widthAxisKey = img.axistags[viewWidthAxisIndex].key
-                    
-                    #scx = "%.2f %s" % (cx.magnitude, cx.units.dimensionality.string)
                     
                     c_list.append("%s<X: %d (%s: %s)%s" % ((crstxt, x, widthAxisKey, scx, swx)))
                     
@@ -4218,11 +4258,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                         scy = quantity2str(cy)
                     else:
                         scy = ""
-                    #cy = axiscalibration.AxesCalibration(img.axistags[viewHeightAxisIndex]).getCalibratedAxisCoordinate(y, img.axistags[viewHeightAxisIndex])
-                        
+
                     heightAxisKey = img.axistags[viewHeightAxisIndex].key
-                    
-                    #scy = "%.2f %s" % (cy.magnitude, cy.units.dimensionality.string)
                     
                     c_list.append("%s<Y: %d (%s: %s)%s" % ((crstxt, y, heightAxisKey, scy, swy)))
                 
@@ -4236,7 +4273,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                 cz = quantity2str(self._axes_calibration_[self.frameAxisInfo.key].calibratedMeasure(self._current_frame_index_))
                             else:
                                 cz = ""
-                            #cz = axiscalibration.AxesCalibration(self.frameAxisInfo).getCalibratedAxisCoordinate(self._current_frame_index_, self.frameAxisInfo)
                         
                             sz = self.frameAxisInfo.key
                         
@@ -4313,6 +4349,26 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         else:
             return # shouldn't really get here
+        
+    def _display_Z_coordinate(self) -> str:
+        ret = f"Z: {self._current_frame_index_}"
+        if self.frameAxisInfo is not None:
+            index = self.frameIndexing[self._current_frame_index_]
+            if all(isinstance(ndx, tuple) for ndx in index):
+                if self._axes_calibration_:
+                    z = ", ".join([f"{ndx[0].key}: {ndx[1]} ({quantity2str(self._axes_calibration_[ndx[0].key].calibratedDistance(ndx[1]))})" for ndx in reversed(index)])
+                else:
+                    z = ", ".join([f"{ndx[0].key}: {ndx[1]}" for ndx in reversed(index)])
+                    
+            else:
+                if self._axes_calibration_:
+                    z = f"{index[0].key}: {index[1]} ({quantity2str(self._axes_calibration_[index[0].key].calibratedDistance(index[1]))})"
+                else:
+                    z = f"{index[0].key}: {index[1]}"
+                
+            ret += f": {z}"
+            
+        return ret
         
     ####
     # public methods
@@ -4468,7 +4524,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     def view(self, image, doc_title=None, normalize=True, colormap=None, gamma=None,
              frameAxis=None, displayChannel=None, asAlphaChannel=False, frameIndex=None, get_focus=True):
         # NOTE: 2020-09-24 14:19:57
-        # this calls ancestor instance method ScipyenFrameViewer.setData(...)
+        # this calls ancestor's instance method ScipyenFrameViewer.setData(...)
+        # which then delegates back to _set_data() here.
         self.setData(image, doc_title=doc_title, normalize=normalize, colormap=colormap, gamma=gamma,
                      frameAxis=frameAxis, frameIndex=None, displayChannel=displayChannel, 
                      asAlphaChannel=asAlphaChannel,get_focus=get_focus)
@@ -4598,6 +4655,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.zStride                    = 0
         self.frameAxisInfo              = None
         self.userFrameAxisInfo          = None
+        self._display_time_vertical_        = True
         self.widthAxisInfo              = None # this is "visual" width which may not be on a spatial axis "x"
         self.heightAxisInfo             = None # this is "visual" height which may not be on a spatial axis "y"
         self._currentZoom_               = 0

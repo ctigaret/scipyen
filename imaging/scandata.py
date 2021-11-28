@@ -45,12 +45,14 @@ from core.neoutils import (clear_events, get_index_of_named_signal, is_empty,)
 #from core.neoutils import (clear_events, get_index_of_named_signal, neo_copy, is_empty,)
 from ephys.ephys import (average_segments, )
 
-from imaging.vigrautils import getAxesLayout
+from imaging.vigrautils import (proposeLayout, concatenateImages, croppedView, 
+                                imageIndexTuple, resampleImage, resampleImageAxis,
+                                removeSlice, padToShape, padAxis)
+
 from imaging.axiscalibration import (AxesCalibration, 
                                      AxisCalibrationData,
                                      ChannelCalibrationData)
 
-from imaging.imageprocessing import concatenateImages
 from gui import pictgui as pgui
 from gui.planargraphics import PlanarGraphics
 
@@ -1884,8 +1886,8 @@ class ScanData(BaseScipyenData):
         scansFrameAxis = kwargs.pop("scansFrameAxis", None)
         scansAxesCalibration = kwargs.pop("scansAxesCalibration", None)
         
-        scene, scene_frame_axis, scene_axes_cal = self.getAxesLayoutAndCalibration(scene, sceneFrameAxis, sceneAxesCalibration)
-        scans, scans_frame_axis, scans_axes_cal = self.getAxesLayoutAndCalibration(scans, scansFrameAxis, scansAxesCalibration)
+        scene, scene_frame_axis, scene_axes_cal = self.proposeLayoutAndCalibration(scene, sceneFrameAxis, sceneAxesCalibration)
+        scans, scans_frame_axis, scans_axes_cal = self.proposeLayoutAndCalibration(scans, scansFrameAxis, scansAxesCalibration)
         
         kwargs["scene"] = scene
         kwargs["sceneFrameAxis"] = scene_frame_axis
@@ -1955,7 +1957,7 @@ class ScanData(BaseScipyenData):
             self._scene_ = None
             
         elif isinstance(data, vigra.VigraArray):
-            (nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo) = vu.getAxesLayout(img, userFrameAxis = sceneFrameAxis)
+            (nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo) = proposeLayout(img, userFrameAxis = sceneFrameAxis)
             self._scene_ = data
             self._scene_axes_calibrations_ = [AxesCalibration(data)]
             
@@ -1966,7 +1968,7 @@ class ScanData(BaseScipyenData):
                     pass
                
     @staticmethod
-    def getAxesLayoutAndCalibration(data, 
+    def proposeLayoutAndCalibration(data, 
                          frameAxis:typing.Optional[vigra.AxisInfo]=None, 
                          horizontalAxis:typing.Optional[vigra.AxisInfo]=None, 
                          verticalAxis:typing.Optional[vigra.AxisInfo]=None, 
@@ -2001,7 +2003,7 @@ class ScanData(BaseScipyenData):
             return (None, None, None)
         
         if isinstance(data, vigra.VigraArray):
-            nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo = vu.getAxesLayout(data, userFrameAxis = frameAxis)
+            nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo = proposeLayout(data, userFrameAxis = frameAxis)
             if isinstance(axescal, AxesCalibration) and all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(axescal.axiskeys, data.axistags)):
                 axes_cal = [axscal]
             else:
@@ -2023,7 +2025,7 @@ class ScanData(BaseScipyenData):
                 if not all([s.channels == data[0].channels for s in data[1:]]):
                     raise TypeError("Image arrays in a sequence must have the same number of channels")
 
-                nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo = vu.getAxesLayout(data[0], userFrameAxis = frameAxis)
+                nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo = proposeLayout(data[0], userFrameAxis = frameAxis)
 
                 if isinstance(axescal, (tuple, list)):
                     if len(axescal) != len(data):
@@ -2065,10 +2067,10 @@ class ScanData(BaseScipyenData):
         1) adapt to a new scenario where all scene image data is a single  multi-channel VigraArray
 
         """
-        new_scene, scene_frame_axis, scene_axes_calibrations = self.getAxesLayoutAndCalibration(scene, frameAxis=sceneFrameAxis)
+        new_scene, scene_frame_axis, scene_axes_calibrations = self.proposeLayoutAndCalibration(scene, frameAxis=sceneFrameAxis)
         
         #print(new_scene)
-        new_scans, scans_frame_axis, scans_axes_calibrations = self.getAxesLayoutAndCalibration(scans, frameAxis=scansFrameAxis)
+        new_scans, scans_frame_axis, scans_axes_calibrations = self.proposeLayoutAndCalibration(scans, frameAxis=scansFrameAxis)
 
         if new_scene is not None:
             self.sceneCursors.clear()

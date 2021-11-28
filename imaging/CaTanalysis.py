@@ -205,6 +205,7 @@ from gui.workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowS
 
 #### BEGIN imaging modules
 from . import vigrautils as vu
+from imaging.vigrautils import (imageIndexTuple, proposeLayout)
 from . import imageprocessing as imgp
 from .imageprocessing import *
 from . import scandata
@@ -215,7 +216,7 @@ from .axiscalibration import (AxesCalibration,
                               AxisCalibrationData, 
                               ChannelCalibrationData,
                               CalibrationData,  
-                              calibration, axisChannelName,)
+                              calibration, axisChannelName, getAxisResolution)
 #### END imaging modules
 
 #### BEGIN pict.iolib modules
@@ -11791,7 +11792,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                     # len(profiles) == number of frames >>> True
                     # len(profiles[k]) == number of channels for k in range(number of frames) >>> all True
                     profiles = [[DataSignal(getProfile(img, self._data_.scanRegion.objectForFrame(k)), \
-                                                sampling_period=vu.getAxisResolution(img.axistags["x"]), \
+                                                sampling_period=getAxisResolution(img.axistags["x"]), \
                                                 name="%s" % axisChannelName(subarray.axistags["c"], j), \
                                                 index = j) \
                                             for j, img in dimEnum(subarray, "c")] \
@@ -11819,7 +11820,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                     profiles = list()
                     
                     profiles = [[DataSignal(getProfile(subarray.bindAxis(self._data_.sceneFrameAxis, k), self._data_.scanRegion.objectForFrame(k)), \
-                                                sampling_period=vu.getAxisResolution(subarray.bindAxis(self._data_.sceneFrameAxis, k).axistags["x"]), \
+                                                sampling_period=getAxisResolution(subarray.bindAxis(self._data_.sceneFrameAxis, k).axistags["x"]), \
                                                 name="%s" % axisChannelName(subarray.axistags["c"], 0), index = j) \
                                             for j, subarray in enumerate(data)] \
                                     for k in range(self._data_.sceneFrames)]
@@ -11869,7 +11870,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 # single array, either single-band or multi-band
                 # SEE ALSO comments in self.generateScanRegionProfilesFromScene()
                 profiles = [[DataSignal(np.array(img.mean(axis=1)), \
-                                        sampling_period = vu.getAxisResolution(img.axistags["x"]), \
+                                        sampling_period = getAxisResolution(img.axistags["x"]), \
                                         name="%s" % axisChannelName(subarray.axistags["c"], j), \
                                         index = j) \
                                     for j, img in dimEnum(subarray, "c")] \
@@ -11891,15 +11892,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 
                 chNdx = self._data_.scansChannelNames.index(self._data_.analysisOptions["Channels"]["Reference"])
                 
-                #profiles = [[DataSignal(np.array(subarray.bindAxis(self.scansFrameAxis, k).mean(axis=1)), \
-                                        #sampling_period = self.getAxisResolution(subarray.bindAxis(self.scansFrameAxis, k).axistags["x"]), \
-                                        #name="%s" % axisChannelName(subarray.axistags["c"],0), \
-                                        #index = j) \
-                                    #for j, subarray in enumerate(data)] \
-                                #for k in range(data[chNdx].shape[data[chNdx].axistags.index(self.scansFrameAxis)])]
-                
                 profiles = [[DataSignal(np.array(subarray.bindAxis(self._data_.scansFrameAxis, k).mean(axis=1)), \
-                                        sampling_period = vu.getAxisResolution(subarray.bindAxis(self._data_.scansFrameAxis, k).axistags["x"]), \
+                                        sampling_period = getAxisResolution(subarray.bindAxis(self._data_.scansFrameAxis, k).axistags["x"]), \
                                         name="%s" % axisChannelName(subarray.axistags["c"],0), \
                                         index = j) \
                                     for j, subarray in enumerate(data)] \
@@ -13873,7 +13867,7 @@ def blankUncageArtifactInLineScans(data, time, width, bgstart, bgend, frame=0):
                 if img.ndim > 2:
                     slicing[img.axistags[2].key] = slice(frame, frame+1)
                     
-                imgIndex = imgp.imageIndexTuple(img, slicing)
+                imgIndex = imageIndexTuple(img, slicing)
                 #print("background index", imgIndex)
                 val = img[imgIndex].mean()
                 
@@ -13881,7 +13875,7 @@ def blankUncageArtifactInLineScans(data, time, width, bgstart, bgend, frame=0):
             slicing["t"] = range(start, end)
             
             #print("blanking slicing", slicing)
-            imgIndex = imgp.imageIndexTuple(img, slicing)
+            imgIndex = imageIndexTuple(img, slicing)
             #print("blanking index", imgIndex)
             img[imgIndex] = val
         
