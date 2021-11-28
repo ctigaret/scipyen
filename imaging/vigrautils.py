@@ -204,7 +204,7 @@ def getAxesLayout(img:vigra.VigraArray,
         horizontalAxisInfo  = img.axistags["x"] if xIndex < img.ndim else \
                               imt.axistags["t"] if tIndex < img.ndim and timeVertical is False else img.axistags[0]
         
-        verticalAxisInfo    = img.axistags["y"] if xIndex < img.ndim else \
+        verticalAxisInfo    = img.axistags["y"] if yIndex < img.ndim else \
                               img.axistags["t"] if tIndex < img.ndim and timeVertical is True else img.axistags[1]
         
         
@@ -250,7 +250,7 @@ def getAxesLayout(img:vigra.VigraArray,
                                   img.axistags["t"] if tIndex < img.ndim and img.axistags["t"] in availableAxes and timeVertical is False else \
                                   availableAxes[0]
                               
-            verticalAxisInfo    = img.axistags["y"] if xIndex < img.ndim and img.axistags["y"] in availableAxes else \
+            verticalAxisInfo    = img.axistags["y"] if yIndex < img.ndim and img.axistags["y"] in availableAxes else \
                                   img.axistags["t"] if tIndex < img.ndim and img.axistags["t"] in availableAxes and timeVertical is True else \
                                   availableAxes[1]
                 
@@ -273,7 +273,7 @@ def getAxesLayout(img:vigra.VigraArray,
                                   imt.axistags["t"] if tIndex < img.ndim and img.axistags["t"] in availableAxes and timeVertical is False else \
                                   availableAxes[0]
                               
-            verticalAxisInfo    = img.axistags["y"] if xIndex < img.ndim and img.axistags["y"] in availableAxes else \
+            verticalAxisInfo    = img.axistags["y"] if yIndex < img.ndim and img.axistags["y"] in availableAxes else \
                                   img.axistags["t"] if tIndex < img.ndim and img.axistags["t"] in availableAxes and timeVertical is True else \
                                   availableAxes[1]
             
@@ -317,7 +317,8 @@ def getAxesLayout(img:vigra.VigraArray,
             horizontalAxisInfo  = img.axistags["x"] if xIndex < img.ndim and img.axistags["x"] in availableAxes else \
                                   img.axistags["t"] if tIndex < img.ndim and img.axistags["t"] in availableAxes and timeVertical is False else \
                                   availableAxes[0]
-            verticalAxisInfo    = img.axistags["y"] if xIndex < img.ndim and img.axistags["y"] in availableAxes else \
+                              
+            verticalAxisInfo    = img.axistags["y"] if yIndex < img.ndim and img.axistags["y"] in availableAxes else \
                                   img.axistags["t"] if tIndex < img.ndim and img.axistags["t"] in availableAxes and timeVertical is True else \
                                   availableAxes[1]
                               
@@ -352,7 +353,8 @@ def getAxesLayout(img:vigra.VigraArray,
             horizontalAxisInfo  = img.axistags["x"] if xIndex < img.ndim and img.axistags["x"] in availableAxes else \
                                   img.axistags["t"] if tIndex < img.ndim and img.axistags["t"] in availableAxes and timeVertical is False else \
                                   availableAxes[0]
-            verticalAxisInfo    = img.axistags["y"] if xIndex < img.ndim and img.axistags["y"] in availableAxes else \
+                              
+            verticalAxisInfo    = img.axistags["y"] if yIndex < img.ndim and img.axistags["y"] in availableAxes else \
                                   img.axistags["t"] if tIndex < img.ndim and img.axistags["t"] in availableAxes and timeVertical is True else \
                                   availableAxes[1]
                               
@@ -366,7 +368,7 @@ def getAxesLayout(img:vigra.VigraArray,
         #nFrames = np.prod([img.shape[img.axistags.index(ax.key)] for ax in frameAxisInfo])
         nFrames = tuple(img.shape[img.axistags.index(ax.key)] for ax in frameAxisInfo)
             
-    nFrames = tuple(img.shape[img.axistags.index(ax.key)] for ax in frameAxisInfo)
+    #nFrames = tuple(img.shape[img.axistags.index(ax.key)] for ax in frameAxisInfo)
     
     if isinstance(frameAxisInfo, (tuple, list)) and len(frameAxisInfo) == 1:
         frameAxisInfo = frameAxisInfo[0]
