@@ -2929,6 +2929,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             if len(self.dataName):
                 self._scandata_.name = self.dataName
                 
+            #print("ephys", type(self._ephys_))
             if isinstance(self._ephys_, neo.Block):
                 self._scandata_.electrophysiology = self._ephys_
                 

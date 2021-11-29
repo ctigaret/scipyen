@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 '''
-Decorators, context managers, and helper functions & classes for programming
+Helper functions and classes for programming, including:
+decorators, context managers, and descriptor validators
 '''
 
 #print("{}: {}".format(__file__, __name__))
 
 from pprint import pprint
 
-import enum, io, os, re, itertools, sys, time, traceback, types, typing, collections
+from abc import ABC, abstractmethod
+import enum, io, os, re, itertools, sys, time, traceback, types, typing
+import collections
 import importlib, inspect, pathlib, warnings, operator, functools
 from functools import singledispatch, update_wrapper, wraps
 from contextlib import (contextmanager, ContextDecorator,)
@@ -29,6 +32,276 @@ CALLABLES = (types.FunctionType, types.MethodType,
 
 class ArgumentError(Exception):
     pass
+
+class BaseValidator(ABC):
+    def __set_name__(self, owner, name:str):
+        self.private_name = f"_{name}_"
+        self.public_name = name
+        
+    def __get__(self, obj, objtype=None):
+        return getattr(obj, self.private_name)
+    
+    def __set__(self, obj, value):
+        self.validate(value)
+        setattr(obj, self.private_name, value)
+        
+    @abstractmethod
+    def validate(self, value):
+        pass
+    
+class OneOf(BaseValidator):
+    def __init__(self, *options):
+        self.options = set(options)
+
+    def validate(self, value):
+        if value not in self.options:
+            raise ValueError(f'Expected {value!r} to be one of {self.options!r}')
+
+class TypeValidator(BaseValidator):
+    def __init__(self, *types):
+        self.types = set(t for t in types if isinstance(t, type))
+        
+    def validate(self, value):
+        #if type(value) not in self.types:
+        if not isinstance(value, tuple(self.types)):
+            raise TypeError(f"For {self.private_name} one of {self.types} was expected; got {type(value).__name__} instead")
+        
+class GenericValidator(BaseValidator):
+    def __init__(self, *args, **kwargs):
+        """
+        args: sequence of objects or unary predicates;
+            objects can be:
+            regular instances
+            types
+            
+            NOTE: unary predicates are functions that expect a Python object as 
+                the first (only) argument and return a bool.
+                
+                Functions which expect additional arguments can be 'reduced' to
+                unary predicates by using either:
+                
+                a) functools.partial (for unbound functions such as those defined
+                outside classes)
+                
+                b) functools.partialmethod (for methods)
+            
+            Except the special cases below, all other elements of args will be 
+            added to a set of hashables, if the element is hashable, or its 
+            'id' will be added to the set of non_hashables, otherwise.
+            
+            Special cases:
+                dotted names (str) - The validator will first try to import it
+                    as a 'dotted name' to resolve a type by its fully qualified 
+                    name; when that fails, the str will be added to the set of
+                    hashables.
+                    
+                numpy arrays: these are not hashable, hence they will always be
+                    compared against their id() which may fail. 
+                    
+                    To compare a numpy array value against a 'template', 
+                    use **kwargs as detailed below.
+                    
+                dict: these are not hashable, hence they will always be
+                    compared against their id() which may fail. ;
+                    
+                    To compare the STRUCTURE of a dict value agains a 'template',
+                    use **kwargs as detailed below.
+                    
+        kwargs: maps Python types to additional criteria (NOTE: a Python type is 
+            a hashable Python object).
+            
+                The additional criteria are ALWAYS dicts, with keys (str) mapped
+                to values of the type indicated in the table below. These mappings
+                are designed to probe additional specific properties of the value.
+                However, these keys as detailed below need not be all present in
+                the criterion dictionary; when absent they will simply be ignored.
+                
+                NOTE: The table below lists the expected criteria for maximal
+                stringency; the last entry in the table sets the most generic case
+            
+            Key:                    Value:
+            ------------------------------------------------------------------
+                                     
+            numpy.ndarray           {"ndim": int,
+                                     "shape": tuple,
+                                     "dtype": numpy.dtype,
+                                     "kind": numpy.dtype.kind}
+                                     
+            pytyhon.Quantity        as for numpy.ndarray, plus:
+                                    {"units": python.Quantity}
+                                    
+            vigra.VigraArray        as for numpy.ndarray, plus:
+                                    {"axistags": vigra.AxisTags,
+                                     "order": str}
+                                     
+            vigra.AxisInfo          {"key": str,
+                                     "typeFlags": vigral.AxisType
+                                     "resolution": float,
+                                     "description": str}
+                                     
+            dict                    { (key_name: value_type,)* }
+                        Where 'value_type' is a type
+                        
+            <any other type>        dict maping property name to type of 
+                                property value, or to a dict as in this table
+            
+            ------------------------------------------------------------------
+                                     
+        NOTE: Validation is performed in the following order:
+        
+        1) if args contains types or str elements that can be resolved to types, 
+            validation fails when either:
+            
+                a) value is NOT an instance of any of the specified types 
+                    (checked using 'isinstance' builtin)
+                    
+                b) value is a type and is NOT a subclass of any of the specified
+                    types (checked using the 'issubclass' builtin)
+                    
+        2) if args contains predicate functions, the validation fails when either
+            predicate return False
+            
+            
+        3) if value is hashable, validation fails if it is not among the hashable
+        elements in args
+        
+        4) if value is not hashable, validation fails if id(value) is not among
+        the id() of the non-hashable elements in args
+        
+        5) if additional criteria are given in kwargs:
+        
+            validation fails when:
+            
+            a) type(value) is not among the keys of kwargs, OR
+            
+            b) properties of value are distinct from those specified in the 
+            additional criteria (see table above)
+            
+        An exception is raised when the validation fails.
+        
+        To bypass any of (1-4) simply omit those elements in *args;
+        
+        To bypass (5) simply omit any kwargs.
+        
+        To check for a type regardless of any additional property, one can:
+        
+        a) pass the type as argument
+        
+        e.g. GenericValidator(np.ndarray)
+        
+        b) pass a dict with the type name as key, mapped to an empty dict
+        
+        e.g. GenericValidator({"np.ndarray": {}})
+        
+        CAUTION: passing the type as a named argument is a syntax error:
+        
+        GenericValidator(np.ndarray = {})
+        --> SyntaxError: expression cannot contain assignment, perhaps you meant "=="?
+        
+            
+        """
+        #from core.datatypes import (is_hashable, is_type_or_subclass)
+       # NOTE: predicates must be unary predicates; 
+        # will raise exceptions when called, otherwise
+        self.predicates = set()
+        self.types = set()
+        self.hashables = set()
+        self.non_hashables = set()
+        self.dcriteria = dict()
+        
+        for a in args:
+            if inspect.isfunction(a):
+                self.predicates.add(a)
+                
+            elif isinstance(a,type):
+                self.types.add(a)
+                
+            elif isinstance(a, dict):
+                if all(isinstance(k, type) for k in a.keys()):
+                    self.dcriteria.update(a)
+                    
+                else:
+                    self.non_hashables.add(id(a))
+                
+            elif isinstance(a, collections.abc.Sequence):
+                if all(isinstance(v, type) for v in a):
+                    self.types |= set(a)
+                    
+                else:
+                    if is_hashable(a):
+                        self.hashables.add(a)
+                    else:
+                        self.non_hashables.add(a)
+                
+            elif isinstance(a, str):
+                try:
+                    self.types.add(import_str(a))
+                except:
+                    self.hashables.add(a)
+                    
+            elif is_hashable(a):
+                self.hashables.add(a)
+                
+            else:
+                self.non_hashables.add(id(a))
+                
+        # NOTE: more complex predicates, where a function or method expecting
+        # an instance also takes aditinoal argument (although these can be 
+        # supplied as partial functions to *args)
+        for key, val in kwargs:
+            if isinstance(val, dict) and all(isinstance(k, str) for k in val):
+                try:
+                    typ = import_name(key)
+                    self.dcriteria[typ] = val
+                except:
+                    continue
+        
+    def validate(self, value):
+        if len(self.types):
+            if isinstance(value, type):
+                if not issubclass(value, tuple(self.types)):
+                    raise AttributeError(f"For {self.private_name} a subclass of: {self.types} was expected; got {value.__name__} instead")
+            
+            if not isinstance(value, tuple(self.types)):
+                raise AttributeError(f"For {self.private_name} one of the types: {self.types} was expected; got {type(value).__name__} instead")
+            
+        if len(self.predicates):
+            if not functools.reduce(operator.and_, self.predicates, True):
+                raise AttributeError(f"Unexpected value for {self.private_name}: {value}")
+            
+        if is_hashable(value) and len(self.hashables):
+            if value not in self.hashables:
+                raise AttributeError(f"Unexpected value for {self.private_name}: {value}")
+                
+        if not is_hashable(value) and len(self.non_hashables):
+            if id(value) not in self.non_hashables:
+                raise AttributeError(f"Unexpected value for {self.private_name}: {value}")
+            
+        if len(self.dcriteria):
+            values = tuple(v for k, v in self.dcriteria.items() if is_type_or_subclass(value, k))
+
+            if len(values) == 0:
+                raise AttributeError(f"For {self.private_name} a type or subclass of {list(self.dcriteria.keys())} was expected; got {value.__name__ if isinstance(value, type) else type(value).__name__}) instead")
+
+            for val in values:
+                if isinstance(val, dict):
+                    for k, v in val.items():
+                        if isinstance(value, dict):
+                            if k not in value:
+                                raise KeyError(f"Key {k} not found in value")
+                            vval = value.get(k)
+                        else:
+                            if not hasattr(value, k):
+                                raise AttributeError(f"Attribute {k} not found in value")
+                            
+                            vval = getattr(value, k)
+                            
+                        if isinstance(v, type) or isinstance(v, collections.abc.Sequence) and all(isinstance(v_, type) for v_ in v):
+                            if not is_type_or_subclass(vval, v):
+                                raise AttributeError(f"{self.private_name} expected to have {k} with type {v}; got {vval} instead")
+                        
+                        if vval != v:
+                            raise AttributeError(f"{self.private_name} expected to have {k} with value {v}; got {vval} instead")
 
 class SignatureDict(types.SimpleNamespace):
     def __init__(self, / , *args, **kwargs):
@@ -855,4 +1128,21 @@ def processtimeblock(label):
         print("{} : {}".format(label, end-start))
 
 # ### END Context managers
+
+def is_hashable(x):
+    ret = bool(getattr(x, "__hash__", None) is not None)
+    if ret:
+        try:
+            # because some 3rd party packages 'get smart' and override __hash__()
+            # to raise Exception 
+            hash(x) 
+            return True
+        except:
+            return False
+
+def is_type_or_subclass(x, y):
+    if isinstance(x, type):
+        return issubclass(x, y)
+    
+    return isinstance(x, y)
 

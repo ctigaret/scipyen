@@ -156,10 +156,17 @@ class ScipyenTableWidget(TableWidget): # TableWidget imported from pyqtgraph
                 yield data[i]
 
 class InteractiveTreeWidget(DataTreeWidget):
-    """Extends pyqtgraph.widgets.DataTreeWidget with the following:
+    """Extends pyqtgraph.widgets.DataTreeWidget.
+    
+    Enables the following:
+    
     1. Support for custom context menu to pyqtgraph.DataTreeWidget.
-    2. Use Scipyen gui.tableeditor.TableEditorWidget instead of pyqtgraph.TableWidget
-    3. Support for dict data with a mixture of key types (any hashable object)
+    
+    2. Use Scipyen gui.tableeditor.TableEditorWidget instead of 
+        pyqtgraph.TableWidget
+    
+    3. Support for any key type, as long as it is hashable.
+    
     4. Support for circular references to hierarchical data objects (subsequent
         references ot the same object are NOT traversed; instead, a path to the 
         first encountered reference - in depth-first order - is displayed)
@@ -181,13 +188,9 @@ class InteractiveTreeWidget(DataTreeWidget):
         else:
             self.top_title = top_title
         super().setData(data)
-        #print(self.topLevelItemCount())
-        #if self.topLevelItemCount() > 1 or len(top_title.strip()) == 0:
-            #top_title = "/"
         self.topLevelItem(0).setText(0, self.top_title)
-        #self.top_title = top_title
     
-    def parse(self, data):#, visited=False):
+    def parse(self, data):
         """
         Given any python object, return:
         * type
@@ -231,12 +234,9 @@ class InteractiveTreeWidget(DataTreeWidget):
         desc = ""
         children = {}
         
-        #print("typeStr", typeStr, "typeTip", typeTip)
-        
         # type-specific changes
         if isinstance(data, NestedFinder.nesting_types):
             if id(data) in self._visited_.keys():
-                #print(self._visited_[id(data)])
                 objtype = self._visited_[id(data)][0]
                 path = "/".join(list(self._visited_[id(data)][1]))
                 if len(path.strip()) == 0:
@@ -254,7 +254,6 @@ class InteractiveTreeWidget(DataTreeWidget):
                         children = data
                         
                     else:
-                        #children = OrderedDict(sorted(data.items())) # does not support mixed key types!
                         # NOTE: 2021-07-20 09:52:34
                         # dict objects with mixed key types cannot be sorted
                         # therefore we resort to an indexing vector
@@ -279,9 +278,6 @@ class InteractiveTreeWidget(DataTreeWidget):
             
         elif isinstance(data, pd.DataFrame):
             desc = "length=%d, columns=%d" % (len(data), len(data.columns))
-            #model = TabularDataModel()
-            #table = TableEditorWidget(model, self)
-            #widget = table
             widget = TableEditorWidget(parent=self)
             signalBlocker = QtCore.QSignalBlocker(widget.tableView)
             widget.tableView.model().setModelData(data)
@@ -290,13 +286,9 @@ class InteractiveTreeWidget(DataTreeWidget):
             
         elif isinstance(data, pd.Series):
             desc = "length=%d, dtype=%s" % (len(data), data.dtype)
-            #model = TabularDataModel()
-            #table = TableEditorWidget(model, self)
-            #widget = table
             widget = TableEditorWidget(parent=self)
             signalBlocker = QtCore.QSignalBlocker(widget.tableView)
             widget.setData(data)
-            #widget.tableView.model().setModelData(data)
             widget.setMaximumHeight(200)
             widget.readOnly=True
             
@@ -308,16 +300,10 @@ class InteractiveTreeWidget(DataTreeWidget):
             widget.setMaximumHeight(200)
             widget.readOnly=True
             
-            #widget = QtWidgets.QPlainTextEdit(asUnicode(data))
-            ##widget = QtWidgets.QPlainTextEdit(asUnicode(data))
-            #widget.setMaximumHeight(200)
-            #widget.setReadOnly(True)
-            
         elif isinstance(data, neo.core.dataobject.DataObject):
             desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
             if data.size == 1:
                 widget = QtWidgets.QLabel(str(data))
-                #widget = QtWidgets.QLabel(asUnicode(data))
             else:
                 widget = TableEditorWidget(parent=self)
                 signalBlocker = QtCore.QSignalBlocker(widget.tableView)
@@ -329,7 +315,6 @@ class InteractiveTreeWidget(DataTreeWidget):
             desc = "shape=%s dtype=%s" % (data.shape, data.dtype)
             if data.size == 1:
                 widget = QtWidgets.QLabel(str(data))
-                #widget = QtWidgets.QLabel(asUnicode(data))
             else:
                 widget = TableEditorWidget(parent=self)
                 signalBlocker = QtCore.QSignalBlocker(widget.tableView)
@@ -342,25 +327,17 @@ class InteractiveTreeWidget(DataTreeWidget):
             widget = TableEditorWidget(parent=self)
             signalBlocker = QtCore.QSignalBlocker(widget.tableView)
             widget.setData(data)
-            #widget.tableView.model().setModelData(data)
             widget.setMaximumHeight(200)
             widget.readOnly=True
-            
-            #table = ScipyenTableWidget()
-            #table.setData(data)
-            #table.setMaximumHeight(200)
-            #widget = table
             
         elif isinstance(data, types.TracebackType):  ## convert traceback to a list of strings
             frames = list(map(str.strip, traceback.format_list(traceback.extract_tb(data))))
             widget = QtWidgets.QPlainTextEdit(str('\n'.join(frames)))
-            #widget = QtWidgets.QPlainTextEdit(asUnicode('\n'.join(frames)))
             widget.setMaximumHeight(200)
             widget.setReadOnly(True)
             
         else:
             desc = str(data)
-            #desc = asUnicode(data)
         
         return typeStr, desc, children, widget, typeTip
     
@@ -436,7 +413,6 @@ class InteractiveTreeWidget(DataTreeWidget):
             desc = desc[:97] + '...'
             if widget is None:
                 widget = QtWidgets.QPlainTextEdit(str(data))
-                #widget = QtWidgets.QPlainTextEdit(asUnicode(data))
                 widget.setMaximumHeight(200)
                 widget.setReadOnly(True)
         
@@ -467,7 +443,6 @@ class InteractiveTreeWidget(DataTreeWidget):
                 
             keyTypeTip = "key / index type: %s" % keytip
             self.buildTree(data, node, keyrepr, keyTypeTip, path=path+(keyrepr,))
-            #self.buildTree(data, node, keyrepr, keyTypeTip, path=path+(key,))
 
         
 class DataViewer(ScipyenViewer):
@@ -499,15 +474,10 @@ class DataViewer(ScipyenViewer):
     
     view_action_name = "Object"
     
-    #def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
-                 #pWin: (QtWidgets.QMainWindow, type(None))= None, ID:(int, type(None)) = None,
-                 #win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
-                 #*args, **kwargs) -> None:
     def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
                  ID:(int, type(None)) = None,  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
                  *args, **kwargs) -> None:
         super().__init__(data=data, parent=parent, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs)
-        #super().__init__(data=data, parent=parent, pWin=pWin, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs)
         
     def _configureUI_(self):
         self.treeWidget = InteractiveTreeWidget(parent = self)
@@ -527,7 +497,6 @@ class DataViewer(ScipyenViewer):
         self.toolBar = QtWidgets.QToolBar("Main", self)
         self.toolBar.setObjectName("%s_Main_Toolbar" % self.__class__.__name__)
         
-        #refreshAction = self.toolBar.addAction(QtGui.QIcon(":/images/view-refresh.svg"), "Refresh")
         refreshAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh")
         refreshAction.triggered.connect(self.slot_refreshDataDisplay)
         
@@ -709,10 +678,8 @@ class DataViewer(ScipyenViewer):
         if len(item_paths) > 1:
             if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier):
                 self._scipyenWindow_.app.clipboard().setText(",\n".join(["""%s""" % i for i in item_paths]))
-                #self._scipyenWindow_.app.clipboard().setText(",\n".join(item_paths))
             else:
                 self._scipyenWindow_.app.clipboard().setText(", ".join(["""%s""" % i for i in item_paths]))
-                #self._scipyenWindow_.app.clipboard().setText(", ".join(item_paths))
                 
         elif len(item_paths) == 1:
             self._scipyenWindow_.app.clipboard().setText(item_paths[0])
@@ -722,7 +689,6 @@ class DataViewer(ScipyenViewer):
     def slot_collapseAll(self):
         for k in range(self.treeWidget.topLevelItemCount()):
             self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
-            #self._collapseRecursive_(self.treeWidget.topLevelItem(k), collapseCurrent=False)
 
     
     @pyqtSlot()
@@ -1042,4 +1008,17 @@ class DataViewer(ScipyenViewer):
             
         if current:
             fn(item)
+        
+    #def _collapse_leaves(self, item, expand=False, current=True):
+        #if expand:
+            #fn = self.treeWidget.expandItem
+        #else:
+            #fn = self.treeWidget.collapseItem
+            
+        #for k in range(item.childCount()):
+            #if item.child(k).childCount() > 0:
+                #self._collapse_expand_Recursive(item.child(k), expand=expand)
+            
+        #if current:
+            #fn(item)
         

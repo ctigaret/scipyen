@@ -1909,7 +1909,7 @@ class ScanData(BaseScipyenData):
         #self._parse_metadata_(metadata) # will also set up channel names for scene & scans, separately
         
         #if isinstance(electrophysiology, neo.Block):
-            #self.parse_electrophysiology(electrophysiology)
+            #self.validateElectrophysiology(electrophysiology)
             
         #elif isinstance(triggers, (tuple, list)) and all([isinstance(t, TriggerProtocol) for t in triggers]):
             #self._trigger_protocols_[:] = triggers
@@ -1973,13 +1973,15 @@ class ScanData(BaseScipyenData):
                          horizontalAxis:typing.Optional[vigra.AxisInfo]=None, 
                          verticalAxis:typing.Optional[vigra.AxisInfo]=None, 
                          axescal:typing.Optional[AxesCalibration]=None):
-        """ Checks and returns the axes layout and calibration for the data.
+        """ Proposes an axes layout and axes calibration for the data.
+        
+        See also imaging.vigrautils.proposeLayout()
         
         Returns
         --------
         
         A tuple:
-            (images, frameAxis, horizontalAxis, verticalAxis, axesCalibration), where:
+            (images, horizontalAxis, verticalAxis, axesCalibration, frameAxis), where:
         
         images: list of VigraArrays with at least one element
         
@@ -2008,8 +2010,8 @@ class ScanData(BaseScipyenData):
                 axes_cal = [axscal]
             else:
                 axes_cal = [AxesCalibration(data)]
-            
-            return ([data], frame_axis, axes_cal)
+                
+            return ([data], frameAxisInfo, axes_cal)
             
         elif isinstance(data, (tuple, list)):
             if len(data):
@@ -2041,7 +2043,7 @@ class ScanData(BaseScipyenData):
                 else:
                     axes_cal = [AxesCalibration(img) for img in data]
                 
-                return (data, frame_axis, axes_cal)
+                return (data, frameAxisInfo, axes_cal)
 
             return (list(), None, None)
                 
@@ -2206,9 +2208,8 @@ class ScanData(BaseScipyenData):
                     embed_trigger_protocol(rev_p, self._scene_block_)
                 
     @safeWrapper
-    def parse_electrophysiology(self, value):
-        """Checks for consistency between frames and segments, then assigns
-        value to self._electrophysiology_.
+    def validateElectrophysiology(self, value):
+        """Validates new electrophysiology data and proposes frames lookup.
         
         Use case 1: When value is a neo.Block, the assignment is by reference.
         
@@ -2227,14 +2228,10 @@ class ScanData(BaseScipyenData):
         ATTENTION Does NOT read trigger events from value. These are handled
         separately.
         
-        NOTE: 2017-12-15 22:51:41
-        Trigger events handled by ephys protocol and separate member functions
-        in ScanData
         """
+        # NOTE: 2017-12-15 22:51:41
+        # Trigger events handled elsewhere
         
-        #if self._scans_frames_ == 0:
-            #return
-            
         if isinstance(value, neo.Block): 
             if len(value.segments) != self.scansFrames:
                 if len(value.segments) == 1:
@@ -8790,7 +8787,7 @@ class ScanData(BaseScipyenData):
     
     #@electrophysiology.setter
     #def electrophysiology(self, value):
-        #self.parse_electrophysiology(value)
+        #self.validateElectrophysiology(value)
     
     @property
     def name(self):

@@ -1,17 +1,19 @@
 """Base ancestor of Scipyen's data objects: AnalysisUnit, ScanData
 """
 import functools, typing
+import collections
 import numpy as np
 import quantities as pq
 import neo
+import vigra
 from traitlets.utils.importstring import import_item
 from core import quantities as cq
 from core.triggerprotocols import TriggerProtocol
 from core.quantities import units_convertible
-from core.prog import ArgumentError
+from core.prog import ArgumentError, OneOf, TypeValidator, GenericValidator
 
-def __getter__(obj, name:str):
-    return getattr(obj, name)
+#def __getter__(obj, name:str):
+    #return getattr(obj, name)
     #return object.__getattribute__(obj, f"_{name}_")
 
 #def __setter_old__(obj, value, name, checks, value_type, value_ndim, value_dtype, value_units):# , reference = None):
@@ -48,61 +50,64 @@ def __getter__(obj, name:str):
                 
         #setattr(obj, name, value)
     
-def __setter__(obj, value, name, checks:typing.Optional[dict]=None):
-    if checks is False: # no checks
-        setattr(obj, name, value)
+#def __setter__(obj, value, name, checks:typing.Optional[typing.Union[dict, bool]]=None):
+    #print(f"__setter__ obj:  {type(obj).__name__}, name: {name}, value: {type(value).__name__}")
+    #if checks is False: # no checks
         #setattr(obj, name, value)
-        return
+        ##setattr(obj, name, value)
+        #return
         
-    #TODO: refine for type, ndim, units, dtype (when checks is True)
-    if isinstance(checks, dict):
-        if len(checks) > 0:
-            old_value = getattr(obj,name)
+    ##TODO: refine for type, ndim, units, dtype (when checks is True)
+    #if isinstance(checks, dict):
+        #if len(checks) > 0:
+            #old_value = getattr(obj,name)
             
-            if "value_type" in checks:
-                value_type = checks["value_type"]
-                expected_value_type = value_type if isinstance(value_type, type) or (isinstance(value_type, tuple) and all(isinstance(x_, type) for x_ in value_type))  else type(old_value)
-                if not isinstance(value, expected_value_type):
-                    raise TypeError(f"Expecting a {expected_value_type} type; got {type(value).__name__} instead")
+            #if "value_type" in checks:
+                #value_type = checks["value_type"]
+                #expected_value_type = value_type if isinstance(value_type, type) or (isinstance(value_type, tuple) and all(isinstance(x_, type) for x_ in value_type))  else type(old_value)
+                #if not isinstance(value, expected_value_type):
+                    #raise TypeError(f"Expecting a {expected_value_type} type; got {type(value).__name__} instead")
                 
-            if isinstance(old_value, np.ndarray):
-                if "value_ndim" in checks:
-                    value_ndim = checks["value_ndim"]
-                    expected_ndim = value_ndim if isinstance(value_ndim, int) else old_value.ndim
-                    if value.ndim != expected_ndim:
-                        raise TypeError(f"Expecting an array with {expected_ndim} dimensions; got {value.ndim} instead")
+            #if isinstance(old_value, np.ndarray):
+                #if "value_ndim" in checks:
+                    #value_ndim = checks["value_ndim"]
+                    #expected_ndim = value_ndim if isinstance(value_ndim, int) else old_value.ndim
+                    #if value.ndim != expected_ndim:
+                        #raise TypeError(f"Expecting an array with {expected_ndim} dimensions; got {value.ndim} instead")
                     
-                if "value_dtype" in checks:
-                    value_dtype = checks["value_dtype"]
-                    expected_dtype = value_dtype if isinstance(value_dtype, np.dtype) else old_value.dtype
-                    if value.dtype != expected_dtype:
-                        raise TypeError(f"Expecting an array with dtype {expected_value_dtype}; got {value.dtype} instead")
+                #if "value_dtype" in checks:
+                    #value_dtype = checks["value_dtype"]
+                    #expected_dtype = value_dtype if isinstance(value_dtype, np.dtype) else old_value.dtype
+                    #if value.dtype != expected_dtype:
+                        #raise TypeError(f"Expecting an array with dtype {expected_value_dtype}; got {value.dtype} instead")
                     
                 
-                if isinstance(old_value, pq.Quantity):
-                    if "value_units" in checks:
-                        value_units = checks["value_units"]
-                        expected_units = value_units.units if isinstance(value_units, pq.Quantity) else old_value.units
-                        if not units_convertible(value, expected_units):
-                            raise TypeError("Incompatible units")
+                #if isinstance(old_value, pq.Quantity):
+                    #if "value_units" in checks:
+                        #value_units = checks["value_units"]
+                        #expected_units = value_units.units if isinstance(value_units, pq.Quantity) else old_value.units
+                        #if not units_convertible(value, expected_units):
+                            #raise TypeError("Incompatible units")
                         
-            if "predicate" in checks:
-                predicate = checks["predicate"]
+            #if "predicate" in checks:
+                #predicate = checks["predicate"]
                 
-                if inspect.isfunction(predicate):
-                    if not predicate(value):
-                        raise ArgumentError(f"Cannot set {name} to {value}")
+                #if inspect.isfunction(predicate):
+                    #if not predicate(value):
+                        #raise ArgumentError(f"Cannot set {name} to {value}")
                 
-        setattr(obj, name, value)
+        #setattr(obj, name, value)
     
-def __parse_attribute_specification__(x:tuple, checks:typing.Optional[dict] = None) -> dict:
+def __parse_attribute_specification__(x:tuple) -> dict:
     """
     x: tuple with 1 to 6 elements:
         x[0]: str, name of the attribute
         
         x[1]: str, type, tuple of types or anyhing else
-            when a :str: is if first tested for a dotted type name ; if this 
-                fails, it is taken as the default value of a str attribute
+            when a :str: is if first tested for a dotted type name ; if a dotted
+                type name this is interpreted as the type of the attribute's
+                value; otherwise it is taken as the default value of a str-type 
+                attribute;
                 
             when a type or tuple of types: this is the default value type of the
                 attribute, and the default value is the default constructor if 
@@ -189,7 +194,7 @@ def __parse_attribute_specification__(x:tuple, checks:typing.Optional[dict] = No
         default_value_dtype = None,
         default_value_units = None,
         )
-            
+    
     if len(x):
         ret["name"] = x[0]
         
@@ -199,7 +204,7 @@ def __parse_attribute_specification__(x:tuple, checks:typing.Optional[dict] = No
                 val_type = import_item(x[1])
             except:
                 ret["default_value"] = x[1]
-                ret["defaval_value_type"] = str
+                ret["default_value_type"] = str
                 
         elif isinstance(x[1], type):
             ret["default_value_type"] = x[1]
@@ -225,14 +230,14 @@ def __parse_attribute_specification__(x:tuple, checks:typing.Optional[dict] = No
                 if not isinstance(ret["default_value"], x[2]):
                     raise ValueError(f"Type of the default value type {type(ret['default_value']).__name__} is different from the specified default value type {x[2]}")
             
-            ret["default_value_type"] = x[2]
+            ret["default_value_type"] = tuple(set(x[2])) # make it unique
                 
         elif issubclass(ret["default_value_type"],np.ndarray):
             if isinstance(x[2], int) and x[2] >= 0:
                 ret["default_value_ndim"] = x[2]
                 
-            else:
-                raise ValueError("The dimensions of an array attribute must be specified")
+            #else:
+                #raise ValueError("The dimensions of an array attribute must be specified")
         
     if isinstance(ret["default_value_type"], type) and issubclass(ret["default_value_type"], np.ndarray):
         if len(x) > 3:
@@ -246,16 +251,42 @@ def __parse_attribute_specification__(x:tuple, checks:typing.Optional[dict] = No
                 ret["default_value_dtype"] = np.dtype(float)
                 ret["default_value_units"] = x[3]
                 
-        if isinstance(ret["default_value_type"], pq.Quantity):
+        if isinstance(ret["default_value"], pq.Quantity):
             if len(x) > 4:
                 if isinstance(x[4], pq.Quantity):
                     ret["default_value_units"] = x[4]
                 else:
                     ret["default_value_units"] = pq.dimensionless
                     
-    return ret
-        
+    # NOTE: 2021-11-29 17:27:07
+    # generate arguments for a GenericValidator
+    type_dict = dict()
+    args = list()
+    kwargs = dict()
     
+    if isinstance(ret["default_value_type"], type) and all(ret[k] is None for k in ("default_value_ndim", "default_value_dtype", "default_value_units")) or \
+        (isinstance(ret["default_value_type"], collections.abc.Sequence) and all(isinstance(v_, type) for v_ in ret["default_value_type"])):
+        
+        args.append(ret["default_value_type"])
+    
+    else:
+        type_dict = dict()
+        if ret["default_value_ndim"] is not None:
+            type_dict["ndim"] = ret["default_value_ndim"]
+            
+        if isinstance(ret["default_value_dtype"], np.dtype):
+            type_dict["dtype"] = ret["default_value_dtype"]
+            
+        if isinstance(ret["default_value_units"], pq.Quantity):
+            type_dict["units"] = ret["default_value_units"]
+            
+        args.append(type_dict)
+            
+    result = {"name":ret["name"], "value": ret["default_value"], "args":tuple(args), "kwargs": kwargs}
+    
+    return result
+
+        
 class BaseScipyenData(neo.core.baseneo.BaseNeo):
     """Simple repository for the minimally-required, common attributes.
     
@@ -320,68 +351,68 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo):
                             ("genotype",    "NA"),
                             ("gender",      "NA"),
                             ("age",         0*pq.s),
-                            ("biometric",   {"weight": 0*pq.g, 
-                                             "height": 0*pq.m}),
-                            ("procedure",   {"type": "NA",
-                                             "name": "NA",
-                                             "dose": 0*pq.g,
-                                             "route": "NA",
-                                             "schedule": neo.Epoch()}),
+                            ("biometric_weight", 0*pq.g), 
+                            ("biometric_height", 0*pq.m),
+                            ("procedure_type", "NA"),
+                            ("procedure_name", "NA"),
+                            ("procedure_dose", 0*pq.g),
+                            ("procedure_route", "NA"),
+                            ("procedure_schedule", neo.Epoch()),
                             ("protocols",   list()),
                         )
     # NOTE: 2021-11-26 08:47:50 in the above:
     # subclasses MAY need to treat some of these attributes differently
     # (e.g., 'protocols' in AnalysisUnit and ScanData)
     
-    def __init__(self, name=None, description=None, file_origin=None, **kwargs):
-        for attr in self._needed_attributes_:
-            attr_dict   = __parse_attribute_specification__(attr)
-            attr_name   = attr_dict["name"]
-            attr_val    = attr_dict["default_value"]
-            attr_type   = attr_dict["default_value_type"]
-            attr_ndim   = attr_dict["default_value_ndim"]
-            attr_dtype  = attr_dict["default_value_dtype"]
-            attr_units  = attr_dict["default_value_units"]
+    @classmethod
+    def _setup_descriptors_(cls):
+        for attr in cls._needed_attributes_:
+            attr_dict = __parse_attribute_specification__(attr)
+            descriptor = GenericValidator(*attr_dict["args"], **attr_dict["kwargs"])
+            descriptor.__set_name__(cls, attr_dict["name"])
+            setattr(cls, attr_dict["name"], descriptor)
             
-            obj_attr_name = f"_{attr_name}_"
-            
-            if isinstance(attr[1], type):
-                val_type = attr[1]
-                val = None
-            else:
-                val = attr[1]
-                val_type = type(attr[1])
-                
-            
-            setattr(self, obj_attr_name, kwargs.pop(attr_name, attr_val))
-            getter_func = functools.partial(__getter__, name=obj_attr_name)
-            setter_func = functools.partial(__setter__, name=obj_attr_name, 
-                                            checks = None)
-            setattr(type(self), attr_name, property(getter_func, setter_func))
-    
-        # NOTE by this time, kwargs should contain only annotations
-        super().__init__(name, description, file_origin, **kwargs)
-    
+    @classmethod
+    def _setup_descriptor_(cls, descr):
+        descriptor = GenericValidator(*descr["args"], **descr["kwargs"])
+        descriptor.__set_name__(cls, descr["name"])
+        setattr(cls, descr["name"], descriptor)
         
-    def __attr_str__(self):
-        for a in self._needed_attributes_:
-            result.append(f"{a[0]}: {getattr(self, a[0], None)}")
+    def __init__(self, name=None, description=None, file_origin=None, **kwargs):
+        #type(self)._setup_descriptors_()
+        for attr in self._needed_attributes_:
+            attr_dict = __parse_attribute_specification__(attr)
+            proposed_value = kwargs.pop(attr[0], attr_dict["value"])
+            type(self)._setup_descriptor_(attr_dict)
+            setattr(self, attr_dict["name"], proposed_value)
             
-        return "\n".join(result)
-
-
+        super().__init__(name=name, description=description, file_origin=file_origin, **kwargs)
+        
+    @property
+    def sourceID(self) -> str:
+        return self._sourceID_
+    
+    @sourceID.getter
+    def sourceID(self, value:str):
+        if not isinstance(value, str) or len(value.strip()) == 0:
+            value = "NA"
+        self._sourceID_ = value
+    
+    @property
+    def genotype(self) -> str:
+        return self._genotype_
+    
+    @genotype.getter
+    def genotype(self, value:str):
+        if not isinstance(value, str) or len(value.strip()) == 0:
+            value = "NA"
+        self._genotype_ = value
+    
     @property
     def protocols(self):
         """A list of TriggerProtocol objects (references)
         """
-        if not hasattr(self, "_protocols_"):
-            self._protocols_  = list()
-            
-        if hasattr(self, "_protocols"):
-            self._protocols_ = self._protocols
-            del self._protocols_
-            
-        return self._protocols_
+        return getattr(self, "_protocols_", list())
     
     @protocols.setter
     def protocols(self, value):
@@ -396,6 +427,11 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo):
         else:
             raise TypeError("Expecting a TriggerProtocol, or a sequence of TriggerProtocol objects; got %s instead" % type(value).__name__)
         
-        if hasattr(self, "_protocols"):
-            del self._protocols_
+        
+    def __attr_str__(self):
+        for a in self._needed_attributes_:
+            result.append(f"{a[0]}: {getattr(self, a[0], None)}")
             
+        return "\n".join(result)
+
+

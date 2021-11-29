@@ -44,7 +44,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 from core import quantities as cq
 from . import xmlutils
 from . import strutils
-from .prog import safeWrapper
+from .prog import safeWrapper, is_hashable, is_type_or_subclass
 
 #### END pict.core.modules
 
@@ -354,18 +354,23 @@ def array_slice(data:np.ndarray, slicing:(dict, type(None))):
     
     return tuple(indexobj)
 
-def is_hashable(x):
-    ret = bool(getattr(x, "__hash__", None) is not None)
-    if ret:
-        try:
-            # because some 3rd party packages 'get smart' and override __hash__()
-            # to raise Exception 
-            hash(x) 
-            return True
-        except:
-            return False
+#def is_hashable(x):
+    #ret = bool(getattr(x, "__hash__", None) is not None)
+    #if ret:
+        #try:
+            ## because some 3rd party packages 'get smart' and override __hash__()
+            ## to raise Exception 
+            #hash(x) 
+            #return True
+        #except:
+            #return False
         
-
+#def is_type_or_subclass(x, y):
+    #if isinstance(x, type):
+        #return issubclass(x, y)
+    
+    #return isinstance(x, y)
+    
 def is_dotted_name(s):
     return isinstance(s, str) and '.' in s
 

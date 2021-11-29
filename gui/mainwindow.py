@@ -207,6 +207,8 @@ from core.prog import (safeWrapper, deprecation, iter_attribute,
                        filter_type, filterfalse_type, 
                        filter_attribute, filterfalse_attribute)
 
+from core import prog
+
 # NOTE: 2020-09-28 11:37:25
 # ### BEGIN expose important data types
 # The following data types, introduced by Scipyen, are important and therefore 
