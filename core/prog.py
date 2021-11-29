@@ -208,6 +208,7 @@ class GenericValidator(BaseValidator):
         self.hashables = set()
         self.non_hashables = set()
         self.dcriteria = dict()
+        self._allow_none_ = False
         
         for a in args:
             if inspect.isfunction(a):
@@ -255,15 +256,27 @@ class GenericValidator(BaseValidator):
                     self.dcriteria[typ] = val
                 except:
                     continue
+                
+    @property
+    def allow_none(self):
+        return self._allow_none_
+    
+    @allow_none.setter
+    def allow_none(self, val:bool):
+        self._allow_none_ = val is True
         
     def validate(self, value):
         if len(self.types):
+            comparand = tuple(self.types)
+            if self.allow_none:
+                comparand = comparand + (type(None),)
+                
             if isinstance(value, type):
-                if not issubclass(value, tuple(self.types)):
-                    raise AttributeError(f"For {self.private_name} a subclass of: {self.types} was expected; got {value.__name__} instead")
+                if not issubclass(value, comparand):
+                    raise AttributeError(f"For {self.private_name} a subclass of: {comparand} was expected; got {value.__name__} instead")
             
-            if not isinstance(value, tuple(self.types)):
-                raise AttributeError(f"For {self.private_name} one of the types: {self.types} was expected; got {type(value).__name__} instead")
+            if not isinstance(value, comparand):
+                raise AttributeError(f"For {self.private_name} one of the types: {comparand} was expected; got {type(value).__name__} instead")
             
         if len(self.predicates):
             if not functools.reduce(operator.and_, self.predicates, True):

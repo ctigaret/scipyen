@@ -2,6 +2,7 @@
 """
 import functools, typing
 import collections
+from datetime import datetime, date, time, timedelta
 import numpy as np
 import quantities as pq
 import neo
@@ -12,92 +13,6 @@ from core.triggerprotocols import TriggerProtocol
 from core.quantities import units_convertible
 from core.prog import ArgumentError, OneOf, TypeValidator, GenericValidator
 
-#def __getter__(obj, name:str):
-    #return getattr(obj, name)
-    #return object.__getattribute__(obj, f"_{name}_")
-
-#def __setter_old__(obj, value, name, checks, value_type, value_ndim, value_dtype, value_units):# , reference = None):
-    #if checks is False: # no checks
-        #setattr(obj, name, value)
-        ##setattr(obj, name, value)
-        #return
-        
-    ##TODO: refine for type, ndim, units, dtype (when checks is True)
-    #if checks is True:
-        #old_value = getattr(obj,name)
-        
-        #expected_value_type = value_type if isinstance(value_type, type) or (isinstance(value_type, tuple) and all(isinstance(x_, type) for x_ in value_type))  else type(old_value)
-        
-        #if not isinstance(value, expected_value_type):
-            #raise TypeError(f"Expecting a {expected_value_type} type; got {type(value).__name__} instead")
-
-        #if isinstance(old_value, np.ndarray):
-            #expected_ndim = value_ndim if isnstance(value_ndim, int) else old_value.ndim
-            
-            #expected_dtype = value_dtype if isinstance(value_dtype, np.dtype) else old_value.dtype
-            
-            #if value.dtype != expected_dtype:
-                #raise TypeError(f"Expecting an array with dtype {expected_value_dtype}; got {value.dtype} instead")
-            
-            #if isinstance(value_ndim, int):
-                #if value.ndim != value_ndim:
-                    #raise TypeError(f"Expecting an array with {value_ndim} dimensions; got {value.ndim} instead")
-            
-            #if isinstance(old_value, pq.Quantity):
-                #expected_units = value_units.units if isinstance(value_units, pq.Quantity) else old_value.units
-                #if not units_convertible(value, expected_units):
-                    #raise TypeError("Incompatible units")
-                
-        #setattr(obj, name, value)
-    
-#def __setter__(obj, value, name, checks:typing.Optional[typing.Union[dict, bool]]=None):
-    #print(f"__setter__ obj:  {type(obj).__name__}, name: {name}, value: {type(value).__name__}")
-    #if checks is False: # no checks
-        #setattr(obj, name, value)
-        ##setattr(obj, name, value)
-        #return
-        
-    ##TODO: refine for type, ndim, units, dtype (when checks is True)
-    #if isinstance(checks, dict):
-        #if len(checks) > 0:
-            #old_value = getattr(obj,name)
-            
-            #if "value_type" in checks:
-                #value_type = checks["value_type"]
-                #expected_value_type = value_type if isinstance(value_type, type) or (isinstance(value_type, tuple) and all(isinstance(x_, type) for x_ in value_type))  else type(old_value)
-                #if not isinstance(value, expected_value_type):
-                    #raise TypeError(f"Expecting a {expected_value_type} type; got {type(value).__name__} instead")
-                
-            #if isinstance(old_value, np.ndarray):
-                #if "value_ndim" in checks:
-                    #value_ndim = checks["value_ndim"]
-                    #expected_ndim = value_ndim if isinstance(value_ndim, int) else old_value.ndim
-                    #if value.ndim != expected_ndim:
-                        #raise TypeError(f"Expecting an array with {expected_ndim} dimensions; got {value.ndim} instead")
-                    
-                #if "value_dtype" in checks:
-                    #value_dtype = checks["value_dtype"]
-                    #expected_dtype = value_dtype if isinstance(value_dtype, np.dtype) else old_value.dtype
-                    #if value.dtype != expected_dtype:
-                        #raise TypeError(f"Expecting an array with dtype {expected_value_dtype}; got {value.dtype} instead")
-                    
-                
-                #if isinstance(old_value, pq.Quantity):
-                    #if "value_units" in checks:
-                        #value_units = checks["value_units"]
-                        #expected_units = value_units.units if isinstance(value_units, pq.Quantity) else old_value.units
-                        #if not units_convertible(value, expected_units):
-                            #raise TypeError("Incompatible units")
-                        
-            #if "predicate" in checks:
-                #predicate = checks["predicate"]
-                
-                #if inspect.isfunction(predicate):
-                    #if not predicate(value):
-                        #raise ArgumentError(f"Cannot set {name} to {value}")
-                
-        #setattr(obj, name, value)
-    
 def __parse_attribute_specification__(x:tuple) -> dict:
     """
     x: tuple with 1 to 6 elements:
@@ -113,59 +28,47 @@ def __parse_attribute_specification__(x:tuple) -> dict:
                 attribute, and the default value is the default constructor if 
                 it takes no parameters, else None
                 
-            antyhing else: this is the default value of the attribute, with
-                type being set to type(x[1])
+            when a tuple:
+                this can be a tuple of types, or objects; in the former case, 
+                these are acceptable type of the of the attribute; in the latter,
+                the type of objects indicate the acceotabke types of the 
+                attribute, AND the fuirst of the obejcts in the tuple also 
+                represent the default value of the attribute
                 
-        x[2]: type or tuple of types, or int: 
-            When a type or tuple of types, this is the explicit attribute type.
-            When an int, and the type as parsed from x[1] is a numpy array, it
-            is the number of dimensions;
-            
-        x[3]: int: the expected dimensionality of the attribute, when attribute is
-            a numpy array (this includes VigarArray, python Quantity, neo data 
-            objects)
-            
-            This MAY be 0, when the attribute is a numpy scalar, i.e. an array
-            with ndim == 0, as in the following example:
-            
-            b = np.array([0.])[0]
-            b.ndim
-            --> 0
-            
-        x[4]: numpy.dtype or python Quantity
-            When a dtype, it is the expected dtype of the array attribute
-            
-            When a Quantity it is the expected quantity of the attribute
-            
-        x[5]: python Quantity:
-            The expected quantity of the attribute
-            
-        When the attribute is a numpy array, the default dtype is numpy.dtype(float)
-        unless specified by the 4th element of 'x'
+            antyhing else: this is the default value of the attribute, and its
+                type is the acceptable type of the attribute
+                
+        x[2]: type or tuple of types
+            When a type or tuple of types, this is the explicit type expected
+            for the attribute.
         
-        When the attribute is a Python Quantity, the quantity must be specified
-        as the last element of 'x'
+            When attribute type as determined from x[1] is numpy ndarray, 
+            Python Quantity or VigraArray:
+            x[2] can be:
+            tuple of np.dtype objects: allowed array dtypes
+            tuple of int:   allowed shape (number of dimensions is deduced)
+            int:            allowed number of dimensions
+            dtype:          allowed array dtype
+            pq.Quantity:    allowed units (when type is python Quantity)
+                            NOTE: this is not strict: unit matching is based on
+                            the convertibility between attribute' value and the
+                            specified units
+            str:            array order (for VigraArrays)
+            
+            NOTE: to avoid further confusions, dtypes must be specified directly    
+                and a str will not be interpreted as dtype 'kind'
+            
+        x[3]-x[7]: as x[2] for numpy arrays
+            NOTE: duplicate specifications will be ignored
+            
+        NOTE: For objects of any type OTHER than numpy ndarray, only the first
+        three elements are sufficient
+        
 
-        NOTE: The specification for the first three elemens of 'x' is intended 
+        NOTE: The specification for the first three elements of 'x' is intended 
             to cover the case of attribute definitions in BaseNeo objects.
             
         
-    checks: dict, optional default is None
-        When a, the following keys, when present, are used (and consequently
-        overide some of the results from parsing of 'x' elements - please refer
-        to the text above for their meaning):
-        
-        value_type - see x[1], x[2] above
-        
-        value_ndim - see x[3]
-
-        value_dtype - see x[4], x[5]
-        
-        value_units - see x[5]
-        
-        predicate - an optional function that performs extensive checks on an
-            attribute value, and returns a boolean.
-            
     Returns:
     --------
     dict with the following key/values:
@@ -184,7 +87,76 @@ def __parse_attribute_specification__(x:tuple) -> dict:
             arguments
         * default_value_type is a tuple of types
     """
+    def __check_array_attribute__(rt, param):
+        if rt["default_value"] is not None:
+            if not isinstance(rt["default_value"], np.ndarray):
+                raise ValueError(f"Type of the default value type {type(rt['default_value']).__name__} is not a numpy ndarray")
+            
+        if isinstance(param, collections.abc.Sequence):
+            if all(isinstance(x_, np.dtype) for x_ in param):
+                if rt["default_value_dtype"] is None:
+                    if isinstance(rt["default_value"], np.ndarray):
+                        if rt["default_value"].dtype not in tuple(param):
+                            raise ValueError(f"dtype of the default value type ({type(rt['default_value']).dtype}) is not in {param}")
+                            
+                    rt["default_value_dtype"] = tuple(param)
     
+            elif all(isinstance(x_, int) for x_ in param):
+                if rt["default_value_shape"] is None or rt["default_value_ndim"] is None:
+                    if isinstance(rt["default_value"], np.ndarray):
+                        if rt["default_value"].shape != tuple(param):
+                            raise ValueError(f"Default value has wrong shape ({rt['default_value'].shape}); expecting {param}")
+
+                rt["default_value_shape"] = tuple(param)
+                rt["default_value_ndim"] = len( rt["default_value_shape"])
+                
+        elif isinstance(param, np.dtype):
+            if rt["default_value_dtype"] is None:
+                if isinstance(rt["default_value"], np.ndarray):
+                    if rt["default_value"].dtype != param and rt["default_value"].dtype.kind != param.kind:
+                        raise ValueError(f"Wrong dtype of the default value ({rt['default_value'].dtype}); expecting {param}")
+                rt["default_value_dtype"] = param
+    
+        elif isinstance(param, int):
+            if rt["default_value_ndim"] is None:
+                if isinstance(rt["default_value"], np.ndarray):
+                    if rt["default_value"].ndim != param:
+                        raise ValueError(f"Wrong dimensions for the default value ({rt['default_value'].ndim}); expecting {param}")
+                
+                rt["default_value_ndim"] = param
+
+        if issubclass(rt["default_value_type"], vigra.VigraArray):
+            if rt["default_value"] is not None and not isinstance(rt["default_value"], vigra.VigraArray):
+                raise TypeError(f"Wrong default value type ({type(rt['default_value']).__name__}; expecting a vigra.VigraArray")
+                                
+            if isinstance(param, str):
+                if rt["default_array_order"] is None:
+                    if isinstance(rt["default_value"], vigra.VigraArray):
+                        if rt["default_value"].order != param:
+                            raise ValueError(f"Default value has wrong array order ({rt['default_value'].order}); expecting {param} ")
+                        
+                    rt["default_array_order"] = param
+                                        
+            elif isinstance(param, vigra.AxisTags):
+                if rt["default_axistags"] is None:
+                    if isinstance(rt["default_value"], vigra.VigraArray):
+                        if rt["default_value"].axistags != param:
+                            raise ValueError(f"Default value has wrong axistags ({rt['default_value'].axistags}); expecting {param} ")
+                        
+                    rt["default_axistags"] = param
+                
+        if issubclass(rt["default_value_type"], pq.Quantity):
+            if rt["default_value"] is not None and not isinstance(rt["default_value"], pq.Quantity):
+                raise TypeError(f"Wrong default value type ({type(rt['default_value']).__name__}; expecting a Python Quantity")
+                            
+            if isinstance(param, pq.Quantity):
+                if rt["default_value_ndim"] is None:
+                    if not units_convertible(rt["default_value"].units, param.units):
+                        raise ValueError(f"Default value has wrong units ({rt['default_value'].units}); expecting {param} ")
+                    
+                rt["default_value_units"] = param
+                
+        
     # (name, value or type, type or ndims, ndims or units, units)
     ret = dict(
         name = None,
@@ -192,7 +164,10 @@ def __parse_attribute_specification__(x:tuple) -> dict:
         default_value_type = None,
         default_value_ndim = None,
         default_value_dtype = None,
+        default_value_shape = None,
         default_value_units = None,
+        default_array_order = None,
+        default_axistags    = None,
         )
     
     if len(x):
@@ -213,50 +188,40 @@ def __parse_attribute_specification__(x:tuple) -> dict:
             except:
                 pass
                 
-        elif isinstance(x[1], tuple) and all(isinstance(x_, type) for x_ in x[1]):
-            ret["default_value_type"] = x[1]
+        elif isinstance(x[1], tuple):
+            if all(isinstance(x_, type) for x_ in x[1]):
+                ret["default_value_type"] = x[1]
+            else:
+                ret["default_value_type"] = tuple(type(x_) for x_ in x[1])
+                ret["default_value"] = x[0]
             
         else:
             ret["default_value"] = x[1]
             ret["default_value_type"] = type(x[1])
-            
-    if isinstance(ret["default_value_type"], type) and issubclass(ret["default_value_type"],np.ndarray):
-        if len(x) < 2:
-            raise ValueError("The dimensions of an array attribute must be specified")
-        
-    if len(x) > 2:
-        if isinstance(x[2], type) or (isinstance(x[2], tuple) and all(isinstance(x_, type) for x in x[2])):
-            if ret["default_value"] is not None:
-                if not isinstance(ret["default_value"], x[2]):
-                    raise ValueError(f"Type of the default value type {type(ret['default_value']).__name__} is different from the specified default value type {x[2]}")
-            
-            ret["default_value_type"] = tuple(set(x[2])) # make it unique
+      
+    if len(x) > 2: # by now, the default_value_type should be established, if it is None (or type(None))
+        if ret["default_value_type"] in (None, type(None)) or not issubclass(ret["default_value_type"], np.ndarray):
+            if isinstance(x[2], collections.abc.Sequence):
+                if all(isinstance(x_, type) for x_ in x[2]):
+                    if ret["default_value"] is not None:
+                        if not isinstance(ret["default_value"], tuple(set(x[2]))):
+                            raise ValueError(f"Type of the default value type {type(ret['default_value']).__name__} is different from the specified default value type {x[2]}")
+                    
+                    ret["default_value_type"] = tuple(set(x[2])) # make it unique
+                    
+            elif isinstance(x[2], type):
+                if ret["default_value"] is not None:
+                    if not isinstance(ret["default_value"], x[2]):
+                        raise ValueError(f"Type of the default value type {type(ret['default_value']).__name__} is different from the specified default value type {x[2]}")
+
+                ret["default_value_type"] = x[2]
                 
-        elif issubclass(ret["default_value_type"],np.ndarray):
-            if isinstance(x[2], int) and x[2] >= 0:
-                ret["default_value_ndim"] = x[2]
-                
-            #else:
-                #raise ValueError("The dimensions of an array attribute must be specified")
-        
-    if isinstance(ret["default_value_type"], type) and issubclass(ret["default_value_type"], np.ndarray):
+        else:
+            __check_array_attribute__(ret, x[2])
+            
         if len(x) > 3:
-            if not isinstance(x[3], (np.dtype, pq.Quantity)):
-                raise TypeError(f"4th element must be a dtype or Python Quantity; got {x[3]} instead")
-    
-            if not instance(x[3], np.dtype):
-                ret["default_value_dtype"] = x[3]
-                
-            else:
-                ret["default_value_dtype"] = np.dtype(float)
-                ret["default_value_units"] = x[3]
-                
-        if isinstance(ret["default_value"], pq.Quantity):
-            if len(x) > 4:
-                if isinstance(x[4], pq.Quantity):
-                    ret["default_value_units"] = x[4]
-                else:
-                    ret["default_value_units"] = pq.dimensionless
+            for x_ in x[3:]:
+                __check_array_attribute__(ret, x_)
                     
     # NOTE: 2021-11-29 17:27:07
     # generate arguments for a GenericValidator
@@ -359,22 +324,26 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo):
                             ("procedure_route", "NA"),
                             ("procedure_schedule", neo.Epoch()),
                             ("protocols",   list()),
+                            ("file_datetime", datetime),
+                            ("rec_datetime", datetime),
                         )
     # NOTE: 2021-11-26 08:47:50 in the above:
     # subclasses MAY need to treat some of these attributes differently
     # (e.g., 'protocols' in AnalysisUnit and ScanData)
     
-    @classmethod
-    def _setup_descriptors_(cls):
-        for attr in cls._needed_attributes_:
-            attr_dict = __parse_attribute_specification__(attr)
-            descriptor = GenericValidator(*attr_dict["args"], **attr_dict["kwargs"])
-            descriptor.__set_name__(cls, attr_dict["name"])
-            setattr(cls, attr_dict["name"], descriptor)
+    #@classmethod
+    #def _setup_descriptors_(cls):
+        #for attr in cls._needed_attributes_:
+            #attr_dict = __parse_attribute_specification__(attr)
+            #descriptor = GenericValidator(*attr_dict["args"], **attr_dict["kwargs"])
+            #descriptor.allow_none = True
+            #descriptor.__set_name__(cls, attr_dict["name"])
+            #setattr(cls, attr_dict["name"], descriptor)
             
     @classmethod
     def _setup_descriptor_(cls, descr):
         descriptor = GenericValidator(*descr["args"], **descr["kwargs"])
+        descriptor.allow_none = True
         descriptor.__set_name__(cls, descr["name"])
         setattr(cls, descr["name"], descriptor)
         

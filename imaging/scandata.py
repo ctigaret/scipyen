@@ -1224,7 +1224,7 @@ class ScanData(BaseScipyenData):
     apiversion = (0,3)
     
     _data_attributes_ = (
-        ("electrophysiology",               neo.Block(name="Electrophysiology")),
+        ("electrophysiology",               (neo.Block(name="Electrophysiology"), None)),
         ("scans",                           (list, tuple)),
         ("scansBlock",                      neo.Block(name="Scans")),
         ("scansProfiles",                   neo.Block(name="Scan region scans profiles")),
