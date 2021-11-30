@@ -128,20 +128,22 @@ plt.ion()
 import quantities as pq
 import xarray as xa
 
-has_hdf5=False
-try:
-    import h5py
-    has_hdf5=True
-except ImporError as e:
-    pass
+import h5py
+#has_hdf5=False
+#try:
+    #import h5py
+    #has_hdf5=True
+#except ImporError as e:
+    #pass
 
-has_vigra=False
-try:
-    import vigra
-    #import vagra # simulate lack of vigra
-    has_vigra=True
-except ImportError:
-    pass
+import vigra
+#has_vigra=False
+#try:
+    #import vigra
+    ##import vagra # simulate lack of vigra
+    #has_vigra=True
+#except ImportError:
+    #pass
 
 import neo
 #### END numerics & data visualization
@@ -245,8 +247,7 @@ from iolib import h5io, jsonio
 
 #### BEGIN scipyen gui modules
 from . import dictviewer as dv
-if has_vigra:
-    from . import imageviewer as iv
+from . import imageviewer as iv
 from . import matrixviewer as matview
 from . import signalviewer as sv
 from . import tableeditor as te
@@ -282,31 +283,55 @@ from systems import *
 #### END scipyen systems modules
 
 #### BEGIN scipyen imaging modules
-if has_vigra:
-    from imaging import (imageprocessing as imgp, imgsim,)
-    from imaging import axisutils, vigrautils
-    from imaging.axisutils import (axisTypeFromString, 
-                                   axisTypeName,
-                                   axisTypeStrings,
-                                   axisTypeSymbol, 
-                                   axisTypeUnits,
-                                   dimEnum,
-                                   dimIter,
-                                   evalAxisTypeExpression,
-                                   getAxisTypeFlagsInt,
-                                   getNonChannelDimensions,
-                                   hasChannelAxis,
-                                   )
-    from imaging.axiscalibration import (AxesCalibration,
-                                         AxisCalibrationData, 
-                                         ChannelCalibrationData, 
-                                         CalibrationData)
-    
-    from imaging.scandata import (AnalysisUnit, ScanData,)
+from imaging import (imageprocessing as imgp, imgsim,)
+from imaging import axisutils, vigrautils
+from imaging.axisutils import (axisTypeFromString, 
+                                axisTypeName,
+                                axisTypeStrings,
+                                axisTypeSymbol, 
+                                axisTypeUnits,
+                                dimEnum,
+                                dimIter,
+                                evalAxisTypeExpression,
+                                getAxisTypeFlagsInt,
+                                getNonChannelDimensions,
+                                hasChannelAxis,
+                                )
+from imaging.axiscalibration import (AxesCalibration,
+                                        AxisCalibrationData, 
+                                        ChannelCalibrationData, 
+                                        CalibrationData)
 
-    import imaging.CaTanalysis as CaTanalysis 
-    if CaTanalysis.LSCaTWindow not in gui_viewers:
-        gui_viewers += [CaTanalysis.LSCaTWindow]
+from imaging.scandata import (AnalysisUnit, ScanData,)
+
+import imaging.CaTanalysis as CaTanalysis 
+if CaTanalysis.LSCaTWindow not in gui_viewers:
+    gui_viewers += [CaTanalysis.LSCaTWindow]
+#if has_vigra:
+    #from imaging import (imageprocessing as imgp, imgsim,)
+    #from imaging import axisutils, vigrautils
+    #from imaging.axisutils import (axisTypeFromString, 
+                                   #axisTypeName,
+                                   #axisTypeStrings,
+                                   #axisTypeSymbol, 
+                                   #axisTypeUnits,
+                                   #dimEnum,
+                                   #dimIter,
+                                   #evalAxisTypeExpression,
+                                   #getAxisTypeFlagsInt,
+                                   #getNonChannelDimensions,
+                                   #hasChannelAxis,
+                                   #)
+    #from imaging.axiscalibration import (AxesCalibration,
+                                         #AxisCalibrationData, 
+                                         #ChannelCalibrationData, 
+                                         #CalibrationData)
+    
+    #from imaging.scandata import (AnalysisUnit, ScanData,)
+
+    #import imaging.CaTanalysis as CaTanalysis 
+    #if CaTanalysis.LSCaTWindow not in gui_viewers:
+        #gui_viewers += [CaTanalysis.LSCaTWindow]
 #### END scipyen imaging modules
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -1754,10 +1779,11 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         # and, if not, then remove
         # finally, inject self into relevant modules:
         #for m in (ltp, ivramp, membrane, epsignal, CaTanalysis, pgui, sigp, imgp, crvf, plots):
-        if has_vigra:
-            self_aware_modules = (ltp, ivramp, membrane, CaTanalysis, pgui, sigp, imgp, crvf, plots)
-        else:
-            self_aware_modules = (ltp, ivramp, membrane, pgui, sigp, crvf, plots)
+        self_aware_modules = (ltp, ivramp, membrane, CaTanalysis, pgui, sigp, imgp, crvf, plots)
+        #if has_vigra:
+            #self_aware_modules = (ltp, ivramp, membrane, CaTanalysis, pgui, sigp, imgp, crvf, plots)
+        #else:
+            #self_aware_modules = (ltp, ivramp, membrane, pgui, sigp, crvf, plots)
             
         for m in self_aware_modules:
             m.__dict__["mainWindow"] = self
@@ -2438,8 +2464,9 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
             self.ipkernel.shell.run_cell(impcmd)
             
-            if has_hdf5:
-                self.ipkernel.shell.run_cell("h5py.enable_ipython_completer()")
+            self.ipkernel.shell.run_cell("h5py.enable_ipython_completer()")
+            #if has_hdf5:
+                #self.ipkernel.shell.run_cell("h5py.enable_ipython_completer()")
             
             # hide the variables added to the workspace so far (e.g., ipkernel,
             # console, shell, and imported modules) so that they don't show in 

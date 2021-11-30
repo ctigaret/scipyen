@@ -1316,7 +1316,7 @@ class PlanarGraphics():
             
     
     def __repr__(self):
-        return " ".join([self.__class__.__name__, ", type:", self._planar_graphics_type_.name, ", name:", self._ID_])
+        return " ".join([self.__class__.__name__, ", type:", getattr(self._planar_graphics_type_, "name", "None"), ", name:", self._ID_])
     #"def" __eq__(self, other):
         ## TODO
         

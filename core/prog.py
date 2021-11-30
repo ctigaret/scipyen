@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 '''
 Helper functions and classes for programming, including:
-decorators, context managers, and descriptor validators
+decorators, context managers, and descriptor validators.
+
+
 '''
 
 #print("{}: {}".format(__file__, __name__))
@@ -15,7 +17,9 @@ import importlib, inspect, pathlib, warnings, operator, functools
 from functools import singledispatch, update_wrapper, wraps
 from contextlib import (contextmanager, ContextDecorator,)
 
-import neo
+import numpy as np
+import neo, vigra
+import quantities as pq
 from . import patchneo
 from . import workspacefunctions
 from .workspacefunctions import debug_scipyen
@@ -33,7 +37,64 @@ CALLABLES = (types.FunctionType, types.MethodType,
 class ArgumentError(Exception):
     pass
 
+class WithDescriptors(object):
+    """ Base for classes that create their own descriptors.
+    
+    These are usually derived from core.basescipyen.BaseScipyenData and follow
+    the template defined there, where a descriptor is specified in the :class:
+    definition through tuples (see BaseScipyenData in module core.basescipyen
+    and parse_descriptor_specification defined in this module)
+    
+    Together with the validator classes defined here this forms a trimmed down
+    framework implementation of the Python's descriptors protocol mostly useful
+    for code factoring.
+    
+    These descriptors DO NOT implement trait observer protocol an therefore 
+    are NOT a replacement for HasDescriptors in the traitlet package!
+    
+    """
+    @classmethod
+    def setup_descriptor(cls, descr_params):
+        args = descr_params.get("args", tuple())
+        kwargs = descr_params.get("kwargs", {})
+        name = descr_params.get("name", "")
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            return
+        descriptor = GenericValidator(*args, **kwargs)
+        descriptor.allow_none = True
+        descriptor.__set_name__(cls, name)
+        setattr(cls, name, descriptor)
+        
+    @classmethod
+    def remove_descriptor(cls, name):
+        if hasattr(cls, name):
+            delattr(cls, name)
+            
+    def _repr_pretty_(self, p, cycle):
+        p.text(self.__class__.__name__)
+        p.breakable()
+        properties = tuple(d for d in get_descriptors(type(self)) if not d.startswith("_"))
+        first = True
+        for pr in properties:
+            if hasattr(self, pr):
+                value = getattr(self, pr)
+                if first:
+                    first = False
+                else:
+                    p.breakable()
+                    
+                with p.group(indent=-1):
+                    p.text(f"{pr}:")
+                    p.pretty(value)
+                
+        
+setup_descriptor = WithDescriptors.setup_descriptor
+remove_descriptor= WithDescriptors.remove_descriptor
+    
 class BaseValidator(ABC):
+    """Abstract superclass implementing a Python descriptor with validation.
+    
+    """
     def __set_name__(self, owner, name:str):
         self.private_name = f"_{name}_"
         self.public_name = name
@@ -44,6 +105,14 @@ class BaseValidator(ABC):
     def __set__(self, obj, value):
         self.validate(value)
         setattr(obj, self.private_name, value)
+        
+    def __delete__(self, obj):
+        if hasattr(obj, self.private_name):
+            delattr(obj, self.private_name)
+            
+        # complete wipe-out
+        if hasattr(obj.__class__, self.public_name):
+            delattr(obj.__class__, self.public_name)
         
     @abstractmethod
     def validate(self, value):
@@ -278,43 +347,55 @@ class GenericValidator(BaseValidator):
             if not isinstance(value, comparand):
                 raise AttributeError(f"For {self.private_name} one of the types: {comparand} was expected; got {type(value).__name__} instead")
             
-        if len(self.predicates):
-            if not functools.reduce(operator.and_, self.predicates, True):
-                raise AttributeError(f"Unexpected value for {self.private_name}: {value}")
-            
-        if is_hashable(value) and len(self.hashables):
-            if value not in self.hashables:
-                raise AttributeError(f"Unexpected value for {self.private_name}: {value}")
+        if not self.allow_none:
+            # NOTE: 2021-11-30 10:42:08
+            # it makes sense to validate further, only when allow_none is False
+            if len(self.predicates):
+                if not functools.reduce(operator.and_, self.predicates, True):
+                    raise AttributeError(f"Unexpected value for {self.private_name}: {value}")
                 
-        if not is_hashable(value) and len(self.non_hashables):
-            if id(value) not in self.non_hashables:
-                raise AttributeError(f"Unexpected value for {self.private_name}: {value}")
-            
-        if len(self.dcriteria):
-            values = tuple(v for k, v in self.dcriteria.items() if is_type_or_subclass(value, k))
+            if is_hashable(value) and len(self.hashables):
+                if value not in self.hashables:
+                    raise AttributeError(f"Unexpected value for {self.private_name}: {value}")
+                    
+            if not is_hashable(value) and len(self.non_hashables):
+                if id(value) not in self.non_hashables:
+                    raise AttributeError(f"Unexpected value for {self.private_name}: {value}")
+                
+            if len(self.dcriteria):
+                values = tuple(v for k, v in self.dcriteria.items() if is_type_or_subclass(value, k))
 
-            if len(values) == 0:
-                raise AttributeError(f"For {self.private_name} a type or subclass of {list(self.dcriteria.keys())} was expected; got {value.__name__ if isinstance(value, type) else type(value).__name__}) instead")
+                if len(values) == 0:
+                    raise AttributeError(f"For {self.private_name} a type or subclass of {list(self.dcriteria.keys())} was expected; got {value.__name__ if isinstance(value, type) else type(value).__name__}) instead")
 
-            for val in values:
-                if isinstance(val, dict):
-                    for k, v in val.items():
-                        if isinstance(value, dict):
-                            if k not in value:
-                                raise KeyError(f"Key {k} not found in value")
-                            vval = value.get(k)
-                        else:
-                            if not hasattr(value, k):
-                                raise AttributeError(f"Attribute {k} not found in value")
-                            
-                            vval = getattr(value, k)
-                            
-                        if isinstance(v, type) or isinstance(v, collections.abc.Sequence) and all(isinstance(v_, type) for v_ in v):
-                            if not is_type_or_subclass(vval, v):
-                                raise AttributeError(f"{self.private_name} expected to have {k} with type {v}; got {vval} instead")
-                        
-                        if vval != v:
-                            raise AttributeError(f"{self.private_name} expected to have {k} with value {v}; got {vval} instead")
+                for val in values:
+                    if isinstance(val, dict):
+                        for k, v in val.items():
+                            if k == "element_types":
+                                if isinstance(value, (collections.abc.Sequence, collections.abc.Set)):
+                                    if not all(isinstance(v_, v) for v_ in value):
+                                        raise AttributeError(f"Expecting a sequence with {(v_.__name__ for v_ in v)} elements")
+                                    
+                                elif isinstance(value, collections.abc.Mapping):
+                                    if not all(isinstance(v_, v) for v_ in value.values()):
+                                        raise AttributeError(f"Expecting a mapping with {(v_.__name__ for v_ in v)} items")
+                            else:
+                                if isinstance(value, dict):
+                                    if k not in value:
+                                        raise KeyError(f"Key {k} not found in value")
+                                    vval = value.get(k)
+                                else:
+                                    if not hasattr(value, k):
+                                        raise AttributeError(f"Attribute {k} not found in value")
+                                    
+                                    vval = getattr(value, k)
+                                    
+                                if isinstance(v, type) or isinstance(v, collections.abc.Sequence) and all(isinstance(v_, type) for v_ in v):
+                                    if not is_type_or_subclass(vval, v):
+                                        raise AttributeError(f"{self.private_name} expected to have {k} with type {v}; got {vval} instead")
+                                
+                                if vval != v:
+                                    raise AttributeError(f"{self.private_name} expected to have {k} with value {v}; got {vval} instead")
 
 class SignatureDict(types.SimpleNamespace):
     def __init__(self, / , *args, **kwargs):
@@ -945,6 +1026,14 @@ def get_properties(obj):
         
     return [i[0] for i in inspect.getmembers(obj, lambda x: isinstance(x, property))]
 
+def get_descriptors(obj, with_properties:bool=True):
+    if not isinstance(obj, type):
+        obj = type(obj)
+    if with_properties:
+        return [i[0] for i in inspect.getmembers(obj, lambda x: inspect.isdatadescriptor(x) or isinstance(x, property))]
+    else:
+        return [i[0] for i in inspect.getmembers(obj, lambda x: inspect.isdatadescriptor(x))]
+
 def get_methods(obj):
     if not isinstance(obj, type):
         obj = type(obj)
@@ -1159,3 +1248,375 @@ def is_type_or_subclass(x, y):
     
     return isinstance(x, y)
 
+def parse_descriptor_specification(x:tuple) -> dict:
+    """
+    x: tuple with 1 to 6 elements:
+        x[0]: str, name of the attribute
+        
+        x[1]: str, type, tuple of types or anyhing else
+            when a :str: is if first tested for a dotted type name ; if a dotted
+                type name this is interpreted as the type of the attribute's
+                value; otherwise it is taken as the default value of a str-type 
+                attribute;
+                
+            when a type or tuple of types: this is the default value type of the
+                attribute, and the default value is the default constructor if 
+                it takes no parameters, else None
+                
+            when a tuple:
+                this can be a tuple of types, or objects; in the former case, 
+                these are acceptable type of the of the attribute; in the latter,
+                the type of objects indicate the acceotabke types of the 
+                attribute, AND the fuirst of the obejcts in the tuple also 
+                represent the default value of the attribute
+                
+            antyhing else: this is the default value of the attribute, and its
+                type is the acceptable type of the attribute
+                
+            NOTE: x[1] is meant to specify the attribute type and/or its default
+            value. 
+            
+            When x[1] is a single type object, a default value will be 
+            instantiated with zero arguments, if possible. This attempt will 
+            fail when either:
+            
+            a) the intializer of the specified type requires at leat one
+            positional-only parameter (which in this case is absent)
+            
+            b) the specified type is an abstract :class: (see for example, 
+            the module 'collections.abc')
+            
+            These initialization failures are ignored, and the "default" 
+            attribute value will NOT be set (i.e. it is left as it is, which is 
+            None by default).
+            
+            This may impact on attribute validators (see prog.BaseValidator and 
+            derived subclasses) used to build dynamic descriptors, UNLESS the
+            validator's property 'allow_none' is set to True.
+                
+        x[2]: type or tuple of types
+            a) When a type or tuple of types, this is either:
+                a.1) the explicit type(s) expected for the attribute, when the
+                expected type of the attribut had not been determined yet, from x[1].
+                
+                a.2) the explicit type(s) of elements of a sequence or set 
+                elements when the attribute type determined from x[1] is a
+                sequence (e.g., tuple, list, or deque) or a set.
+                
+                a.3) the explicit type(s) of the values of a dict, when the 
+                attribute type determined from x[1] is a dict.
+        
+            b) When attribute type as determined from x[1] is a numpy ndarray, 
+            or a subclass of numpy array (e.g., Python Quantity, VigraArray, 
+            neo DataObect) x[2] may also be:
+            
+            tuple of np.dtype objects:  allowed array dtypes
+            
+            tuple of int:               allowed shape (number of dimensions is 
+                                        deduced)
+            int:                        allowed number of dimensions
+            
+            dtype:                      allowed array dtype
+            
+            pq.Quantity:                allowed units (when attribute type is 
+                                        python Quantity)
+                    NOTE: unit matching is based on the convertibility between 
+                        the expected attribute 'units' property value and the
+                        specified units
+                            
+            str:                        array order (for VigraArrays)
+            
+            NOTE: to avoid further confusions, dtypes must be specified directly    
+                and a str will not be interpreted as dtype 'kind'
+                
+            NOTE: the size of sequence attributes is NOT checked (i.e., they can
+            be empty) but, if given in x[2], they can only accept elements of the
+            specified type
+            
+        x[3]-x[7]: as x[2] for numpy arrays
+            NOTE: duplicate specifications will be ignored
+            
+        NOTE: For objects of any type OTHER than numpy ndarray, only the first
+        three elements are sufficient
+        
+
+        NOTE: The specification for the first three elements of 'x' is intended 
+            to cover the case of attribute definitions in BaseNeo objects.
+            
+        
+    Returns:
+    --------
+    dict with the following key/values:
+    
+        name:str,
+        default_value: Python object,
+        default_value_type: Python type or tuple of types
+        default_value_ndim: int or None,
+        default_value_dtype: numpy dtype object or None,
+        default_value_units: Python Quantity object or None
+        
+    NOTE: 
+    default_value is None when either:
+        * it was specified as None (in x[1])
+        * default_value_type is a type that cannot be instantiated without 
+            arguments
+        * default_value_type is a tuple of types
+    """
+    from core.quantities import units_convertible
+    def __check_attr_type__(attr_type, specs):
+        if isinstance(specs, type):
+            specs = (specs,)
+            
+        elif not isinstance(specs, collections.abc.Sequence) or not all(isinstance(v_, type, ) for v_ in specs if v_ is not None ):
+            raise TypeError("__check_attr_type__ expecting a type or sequence of types as second parameter")
+        
+        else:
+            specs = tuple(s for s in specs if s is not None)
+        
+        if isinstance(attr_type, collections.abc.Sequence):
+            return all(isinstance(v_, type) and issubclass(v_, specs) for v_ in attr_type if v_ is not None )
+        
+        return isinstance(attr_type, type) and issubclass(attr_type, specs)
+                
+                
+    
+    def __check_array_attribute__(rt, param):
+        if rt["default_value"] is not None:
+            if not isinstance(rt["default_value"], np.ndarray):
+                raise ValueError(f"Type of the default value type {type(rt['default_value']).__name__} is not a numpy ndarray")
+            
+        if isinstance(param, collections.abc.Sequence):
+            if all(isinstance(x_, np.dtype) for x_ in param):
+                if rt["default_value_dtype"] is None:
+                    if isinstance(rt["default_value"], np.ndarray):
+                        if rt["default_value"].dtype not in tuple(param):
+                            raise ValueError(f"dtype of the default value type ({type(rt['default_value']).dtype}) is not in {param}")
+                            
+                    rt["default_value_dtype"] = tuple(param)
+    
+            elif all(isinstance(x_, int) for x_ in param):
+                if rt["default_value_shape"] is None or rt["default_value_ndim"] is None:
+                    if isinstance(rt["default_value"], np.ndarray):
+                        if rt["default_value"].shape != tuple(param):
+                            raise ValueError(f"Default value has wrong shape ({rt['default_value'].shape}); expecting {param}")
+
+                rt["default_value_shape"] = tuple(param)
+                rt["default_value_ndim"] = len( rt["default_value_shape"])
+                
+        elif isinstance(param, np.dtype):
+            if rt["default_value_dtype"] is None:
+                if isinstance(rt["default_value"], np.ndarray):
+                    if rt["default_value"].dtype != param and rt["default_value"].dtype.kind != param.kind:
+                        raise ValueError(f"Wrong dtype of the default value ({rt['default_value'].dtype}); expecting {param}")
+                rt["default_value_dtype"] = param
+    
+        elif isinstance(param, int):
+            if rt["default_value_ndim"] is None:
+                if isinstance(rt["default_value"], np.ndarray):
+                    if rt["default_value"].ndim != param:
+                        raise ValueError(f"Wrong dimensions for the default value ({rt['default_value'].ndim}); expecting {param}")
+                
+                rt["default_value_ndim"] = param
+
+        if issubclass(rt["default_value_type"], vigra.VigraArray):
+            if rt["default_value"] is not None and not isinstance(rt["default_value"], vigra.VigraArray):
+                raise TypeError(f"Wrong default value type ({type(rt['default_value']).__name__}; expecting a vigra.VigraArray")
+                                
+            if isinstance(param, str):
+                if rt["default_array_order"] is None:
+                    if isinstance(rt["default_value"], vigra.VigraArray):
+                        if rt["default_value"].order != param:
+                            raise ValueError(f"Default value has wrong array order ({rt['default_value'].order}); expecting {param} ")
+                        
+                    rt["default_array_order"] = param
+                                        
+            elif isinstance(param, vigra.AxisTags):
+                if rt["default_axistags"] is None:
+                    if isinstance(rt["default_value"], vigra.VigraArray):
+                        if rt["default_value"].axistags != param:
+                            raise ValueError(f"Default value has wrong axistags ({rt['default_value'].axistags}); expecting {param} ")
+                        
+                    rt["default_axistags"] = param
+                
+        if issubclass(rt["default_value_type"], pq.Quantity):
+            if rt["default_value"] is not None and not isinstance(rt["default_value"], pq.Quantity):
+                raise TypeError(f"Wrong default value type ({type(rt['default_value']).__name__}; expecting a Python Quantity")
+                            
+            if isinstance(param, pq.Quantity):
+                if rt["default_value_ndim"] is None:
+                    if not units_convertible(rt["default_value"].units, param.units):
+                        raise ValueError(f"Default value has wrong units ({rt['default_value'].units}); expecting {param} ")
+                    
+                rt["default_value_units"] = param
+                
+        
+    # (name, value or type, type or ndims, ndims or units, units)
+    ret = dict(
+        name = None,
+        default_value = None,
+        default_value_type = None,
+        default_element_types = None,
+        default_item_types = None,
+        default_value_ndim = None,
+        default_value_dtype = None,
+        default_value_shape = None,
+        default_value_units = None,
+        default_array_order = None,
+        default_axistags    = None,
+        
+        )
+    
+    if len(x):
+        ret["name"] = x[0]
+        
+    if len(x) > 1:
+        if isinstance(x[1], str):
+            try:
+                val_type = import_item(x[1])
+            except:
+                ret["default_value"] = x[1]
+                ret["default_value_type"] = str
+                
+        elif isinstance(x[1], type):
+            ret["default_value_type"] = x[1]
+            try:
+                ret["default_value"] = x[1]()
+            except:
+                pass
+                
+        elif isinstance(x[1], tuple):
+            if all(isinstance(x_, type) for x_ in x[1]):
+                ret["default_value_type"] = x[1]
+            else:
+                ret["default_value_type"] = tuple(type(x_) for x_ in x[1])
+                ret["default_value"] = x[0]
+            
+        else:
+            ret["default_value"] = x[1]
+            ret["default_value_type"] = type(x[1])
+            
+    if len(x) > 2: 
+        # by now, the expected type of the attribute should be established,
+        # whether it is None, type(None), or anything else
+        
+        if __check_attr_type__(ret["default_value_type"], (None, type(None))) or not __check_attr_type__(ret["default_value_type"], np.ndarray):
+            if isinstance(x[2], collections.abc.Sequence):
+                if all(isinstance(x_, type) for x_ in x[2]):
+                    if __check_attr_type__(ret["default_value_type"], (collections.abc.Sequence, collections.abc.Set)):
+                        ret["default_element_types"] = tuple(x[2])
+                        if ret["default_value"] is not None:
+                            if not isinstance(ret["default_value"], ret["default_value_type"]):
+                                raise ValueError(f"Default value expected to be a {type(ret['default_value_type'].__name__)}; got {type(ret['default_value']).__name__} instead")
+                            
+                            if not all(isinstance(v_, tuple(x[2])) for v_ in ret["default_value"]):
+                                raise ValueError(f"Default value expected to be contain {x[2]} elements; got {set((type(v_).__name__ for v_ in ret['default_value']))} instead")
+                        
+                    elif __check_attr_type__(ret["default_value_type"], collections.abc.Mapping):
+                        ret["default_item_types"] = tuple(x[2])
+                        if ret["default_value"] is not None:
+                            if not isinstance(ret["default_value"], collections.abc.Mapping):
+                                raise ValueError(f"Default value expected to be a mapping; got {type(ret['default_value']).__name__} instead")
+                            
+                            if not all(isinstance(v_, tuple(x[2])) for v_ in ret["default_value"].values()):
+                                raise ValueError(f"Default value expected to be contain {x[2]} items; got {set((type(v_).__name__ for v_ in ret['default_value'].values()))} instead")
+                        
+                    else:
+                        if ret["default_value"] is not None:
+                            if not isinstance(ret["default_value"], tuple(set(x[2]))):
+                                raise ValueError(f"Type of the default value type {type(ret['default_value']).__name__} is different from the specified default value type {x[2]}")
+                        
+                        ret["default_value_type"] = tuple(set(x[2])) # make it unique
+                    
+            elif isinstance(x[2], type):
+                if __check_attr_type__(ret["default_value_type"], (collections.abc.Sequence, collections.abc.Set)):
+                    if isinstance(ret["default_value"], ret["default_value_type"]):
+                        if len(ret["default_value"]) > 0:
+                            if not all(isinstance(v_, x[2]) for v_ in ret["default_value"]):
+                                raise TypeError(f"Default value was expected to have {x[2].__name__} elements; got {(type(v_).__name__ for v_ in ret['default_value'])} instead")
+                            
+                    elif ret["default_value"] is not None or (isinstance(ret["default_value"], type) and not issubclass(ret["default_value"], type(None))):
+                        raise TypeError(f"Default value was expected to be a sequence or None; got {type(ret['default-value']).__name__} instead")
+                        
+                    if ret["default_element_types"] is None:
+                        ret["default_element_types"] = x[2]
+                        
+                elif __check_attr_type__(ret["default_value_type"], collections.abc.Mapping):
+                    if isinstance(ret["default_value"], collections.abc.Mapping):
+                        if len(ret["default_value"]) > 0:
+                            if not all(isinstance(v_, x[2]) for v_ in ret["default_value"].values()):
+                                raise TypeError(f"Default value was expected to have {x[2].__name__} items; got {(type(v_).__name__ for v_ in ret['default_value'].values())} instead")
+                            
+                    elif ret["default_value"] is not None or (isinstance(ret["default_value"], type) and not issubclass(ret["default_value"], type(None))):
+                        raise TypeError(f"Default value was expected to be a mapping or None; got {type(ret['default-value']).__name__} instead")
+                        
+                    if ret["default_item_types"] is None:
+                        ret["default_item_types"] = x[2]
+                        
+                else:
+                    if ret["default_value"] is not None:
+                        if not isinstance(ret["default_value"], x[2]):
+                            raise ValueError(f"Type of the default value type {type(ret['default_value']).__name__} is different from the specified default value type {x[2]}")
+
+                    ret["default_value_type"] = x[2]
+                
+        else:
+            __check_array_attribute__(ret, x[2])
+            
+        if len(x) > 3:
+            for x_ in x[3:]:
+                __check_array_attribute__(ret, x_)
+                    
+    # NOTE: 2021-11-29 17:27:07
+    # generate arguments for a GenericValidator
+    type_dict = dict()
+    args = list()
+    kwargs = dict()
+    
+    # NOTE: 2021-11-30 10:26:04
+    # the following are set only for numpy ndarray objects and optionally some of
+    # their subclasses:
+    #
+    array_params = ("default_value_ndim", "default_value_dtype", 
+                    "default_value_units", "default_value_shape", 
+                    "default_array_order", "default_axistags")
+    
+    sequence_params = ("default_element_types", )
+    
+    dict_params = ("default_item_types", )
+    
+    if isinstance(ret["default_value_type"], type) and all(ret[k] is None for k in array_params + sequence_params + dict_params) or \
+        (isinstance(ret["default_value_type"], collections.abc.Sequence) and all(isinstance(v_, type) for v_ in ret["default_value_type"])):
+        
+        args.append(ret["default_value_type"])
+    
+    else:
+        type_dict = dict()
+        
+        if ret["default_value_ndim"] is not None:
+            type_dict["ndim"] = ret["default_value_ndim"]
+            
+        if isinstance(ret["default_value_dtype"], np.dtype):
+            type_dict["dtype"] = ret["default_value_dtype"]
+            
+        if isinstance(ret["default_value_units"], pq.Quantity):
+            type_dict["units"] = ret["default_value_units"]
+            
+        if isinstance(ret["default_value_type"], vigra.VigraArray):
+            type_dict["axistags"] = ret["default_axistags"]
+            type_dict["order"] = ret["default_array_order"]
+            
+        if isinstance(ret["default_value_type"], (collections.abc.Sequence, collections.abc.Mapping, collections.abc.Set)):
+            type_dict["element_types"] = ret["default_element_types"]
+            
+        args.append(type_dict)
+        
+    # NOTE: keys in kwargs can only be str; however, type_dict is mapped to
+    # a type or tuple of types, therefore we include the dict enclosing
+    # type_dict into the args sequence; the prog.GenericValidator will take care
+    # of it...
+            
+    result = {"name":ret["name"], "value": ret["default_value"], "args":tuple(args), "kwargs": kwargs}
+    
+    return result
+
+        

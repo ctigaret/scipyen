@@ -47,14 +47,14 @@ from ephys.ephys import (average_segments, )
 
 from imaging.vigrautils import (proposeLayout, concatenateImages, croppedView, 
                                 imageIndexTuple, resampleImage, resampleImageAxis,
-                                removeSlice, padToShape, padAxis)
+                                removeSlice, padToShape, padAxis, nFrames)
 
 from imaging.axiscalibration import (AxesCalibration, 
                                      AxisCalibrationData,
                                      ChannelCalibrationData)
 
 from gui import pictgui as pgui
-from gui.planargraphics import PlanarGraphics
+from gui.planargraphics import (PlanarGraphics, Cursor)
 
 DEFAULTS = DataBag()
 DEFAULTS["Name"] = "ScanDataOptions"
@@ -68,25 +68,23 @@ DEFAULTS["Channels"]["Bleed"]["Ind2Ref"] = 0.
 class ScanData(BaseScipyenData):
     """Dummy for AnalysisUnit; clobbered below
     """
-class ScanDataFrameIndex(MultiFrameIndex):
-    def __init__(self, scene = None, scans = None, electrophysiology = None):
-        super().__init__(scene=scene, scans=scans, electrophysiology=electrophysiology)
-
 class FrameIndexLookup(object):
     """Tools for frame synchronization between scans, scene and ephys data.
     
     Behaves like a dict with int keys mapped to dicts of three key/value pairs:
-        scene -> int
-        scans -> int
-        electrophysiology -> int
+        scene -> int/None
+        scans -> int/None
+        electrophysiology -> int/None
         
         
     FrameIndexLookup maps a ScanData frame to a frame index into each of its
-    'scene', 'scans' and 'electrophysiology' data sets.
+    data child components 'scene', 'scans' and 'electrophysiology'.
     
     
     """
-    # virtual_frame_index: MultiFrameIndex(scene:int, scans:int, electrophysiology:int)
+    # virtual_frame_index: MultiFrameIndex(scene:int, None 
+    #                                      scans:int, None,
+    #                                      electrophysiology:int, None)
             
     def __init__(self, *args):
         """
@@ -94,7 +92,7 @@ class FrameIndexLookup(object):
             int: MultiFrameIndex, or None
                 When a MultiFrameIndex this is expected to have the following 
                 fields: 'scene', 'scans', 'electrophysiology', mapped to int or
-                None
+                a sequence of int, or a range, or a slice
         """
         
         self._map_ = dict()
@@ -102,13 +100,16 @@ class FrameIndexLookup(object):
         for arg in args:
             fields = list()
             if not isinstance(arg, dict) or len(arg) == 0 or not all(isinstance(k, int) for k in arg) or not all(isinstance(v, (ScanDataFrameIndex, type(None))) for v in arg.values()):
-                raise TypeError("Expecting a mapping of int to ScanDataFrameIndex objects or None")
+                raise TypeError("Expecting a mapping of int to MultiFrameIndex objects or None")
             
             self._map_.update(arg)
         
     @property
     def map(self):
         return self._map_
+    
+    def __len__(self):
+        return len(self._map_)
         
     def __getitem__(self, key:int):
         return self._map_.get(key, None)
@@ -1223,33 +1224,41 @@ class ScanData(BaseScipyenData):
         
     apiversion = (0,3)
     
-    _data_attributes_ = (
+    # NOTE: 2021-11-30 16:07:40
+    # 'triggers' is inheritd from BaseScipyenData along with others
+    _data_children_ = (
+        ("scans",                           (list, tuple),   vigra.VigraArray),
+        ("scene",                           (list, tuple),   vigra.VigraArray),
         ("electrophysiology",               (neo.Block(name="Electrophysiology"), None)),
-        ("scans",                           (list, tuple)),
+        )
+    
+    _derived_data_children_ = (
         ("scansBlock",                      neo.Block(name="Scans")),
         ("scansProfiles",                   neo.Block(name="Scan region scans profiles")),
-        ("scene",                           (list, tuple)),
         ("sceneBlock",                      neo.Block(name="Scene")),
         ("sceneProfiles",                   neo.Block(name="Scan region scene profiles")),
-        ("sceneAxesCalibration",            list),
-        ("scansAxesCalibration",            list),
-        ("sceneFrameAxis",                  vigra.AxisInfo),
-        ("scansFrameAxis",                  vigra.AxisInfo),
+        )
+    
+    _data_attributes_ = (
+        ("sceneAxesCalibration",            list,   AxesCalibration),
+        ("scansAxesCalibration",            list,   AxesCalibration),
+        ("sceneFrameAxis",                  (vigra.AxisInfo, tuple)),
+        ("scansFrameAxis",                  (vigra.AxisInfo, tuple)),
         ("framesMap",                       FrameIndexLookup),
         )
     
     _graphics_attributes_ = (
-        ("scansCursors",                    dict),
-        ("scansRois",                       dict),
+        ("scansCursors",                    dict, Cursor),
+        ("scansRois",                       dict, PlanarGraphics),
         ("scanTrajectory",                  PlanarGraphics),
-        ("sceneCursors",                    dict),
-        ("sceneRois",                       dict),
+        ("sceneCursors",                    dict, Cursor),
+        ("sceneRois",                       dict, PlanarGraphics),
         )
     
     _metadata_attributes_ = (
-        ("analysisUnits",                   set),
+        ("analysisUnits",                   set, AnalysisUnit),
         ("analysisUnit",                    AnalysisUnit),
-        ("triggerProtocols",                list),
+        ("metadata",                        dict),
         )
     
     _option_attributes_ = (
@@ -1258,7 +1267,7 @@ class ScanData(BaseScipyenData):
         ("type",                            ScanDataType.linescan),
         )
     
-    _needed_attributes_= _data_attributes_ + _graphics_attributes_ + _option_attributes_ + BaseScipyenData._needed_attributes_
+    _needed_attributes_= _data_children_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ + BaseScipyenData._needed_attributes_
     
     def _get_data_frame_index_(self, index:int) -> Bunch:
         """Returns a Bunch mapping str keys (data attribute) to int frame indices.
@@ -1305,7 +1314,7 @@ class ScanData(BaseScipyenData):
                                                         self.electrophysiology.segments,
                                                         self.ephys_mapping)
         
-    def _get_data_component_(self, component):
+    def _get_data_child_component_(self, component):
         """
         Parameters:
         ==========
@@ -1316,23 +1325,11 @@ class ScanData(BaseScipyenData):
         #if component in ("electrophysiology", "ephys"):
             #component = ephys
             
-        #if component not in self._data_attributes_:
-            #raise ValueError(f"Unknown data component: {component}")
+        if component not in (a[0] for a in self._data_children_):
+            raise ValueError(f"Unknown data child component: {component}")
         
         return getattr(self, component, None)
         
-    #def __init__(self, 
-                 #scene:typing.Optional[typing.Union[vigra.VigraArray, tuple, list]] = None,
-                 #scans:typing.Optional[typing.Union[vigra.VigraArray, tuple, list]] = None, 
-                 #electrophysiology:typing.Optional[neo.Block] = None, 
-                 #metadata:typing.Optional[typing.Union[DataBag]] = None,
-                 #sceneFrameAxis:typing.Optional[vigra.AxisInfo] = None, 
-                 #scansFrameAxis:typing.Optional[vigra.AxisInfo] = None,
-                 #name:typing.Optional[str] = "ScanData", 
-                 #triggers:typing.Optional[typing.Union[str, tuple, list]] = None,
-                 #analysisOptions:typing.Optional[DataBag] = DataBag(),
-                 #scene_mapping:typing.Optional[dict] = None,
-                 #ephys_mapping: typing.Optional[dict] = None):
     @safeWrapper
     def __init__(self, scans=None, scene=None, electrophysiology=None, metadata=None, **kwargs):
         """Constructs a ScanData object.
@@ -1900,7 +1897,7 @@ class ScanData(BaseScipyenData):
         kwargs["electrophysiology"] = electrophysiology
         kwargs["metadata"] = metadata
         
-        super().__init__(**kwargs)
+        super().__init__(**kwargs) # BaseScipyenData/WithDescriptors
         
         # NOTE: 2021-10-28 18:36:14
         # also set up self._scans_axes_calibrations_ and self._scene_axes_calibrations_
@@ -8668,150 +8665,28 @@ class ScanData(BaseScipyenData):
         return [u.name for u in self.analysisUnits]
         
     #@property
-    #def annotations(self):
-        #"""Accesses the _annotations_ dictionary with user-defined data.
-        #"""
-        #return self._annotations_
-    
-    #@annotations.setter
-    #def annotations(self, value):
-        #"""Updates the used-defined data dictionary ("_annotations_").
-        #To replace its contents completely, call self.annotations.clear()
-        #then self.annotations = some_new_dictionary
-        #"""
-        #if isinstance(value, dict):
-            #self._annotations_.update(value)
-    
-    #@property
-    #def triggerProtocols(self):
-        #"""A list of TriggerProtocol objects.
-        #"""
-        #return self._trigger_protocols_
-    
-    #@triggerProtocols.setter
-    #def triggerProtocols(self, value):
-        #"""Sets a list of trigger protocols.
-        
-        #CAUTION: Clears the existing list of trigger protocols
-        
-        #ATTENTION: For each protocol in the list, this also updates the list of 
-        #TriggerEvents in the segments of self._electrophysiology_
-        
-        #ATTENTION: It is possible to use the getter form of this property, in 
-            #order to change its contents: self.triggerProtocols[:] = ...
-            #but this is not recommended as it would not update all data signal
-            #blocks.
-            
-        
-        #WARNING: when copying data manually, this property must be set last!
-        
-        #Parameters:
-        #==========
-        
-        #value: a sequence of TriggerProtocol objects.
-            #The events in the protocol and the imaging delay are considered to
-            #be set in the electrophysiology time domain.
-        
-        #Prerequisite: len(object) > 0 for all objects in the list.
-        
-        #"""
-        #if isinstance(value, (tuple, list)):
-            #if len(value) == 0:
-                #self._trigger_protocols_.clear()
+    #def name(self):
+        #if not hasattr(self, "_name_"):
+            #if hasattr(self, "__name__"):
+                #self._name_ = self.__name__
+                #delattr(self, "__name__")
                 
-            #if all([isinstance(v, TriggerProtocol) and len(v) > 0 for v in value]):
-                #self._trigger_protocols_.clear()
-                #self._trigger_protocols_[:] = sorted(value, key=lambda x: x.segmentIndices()[0])
-                
-                ## do it one by one instead of simply broadcasting into the list
-                ## so that events lists in self._electrophysiology_ are also updated
-                ## tge following popul;ates self._trigger_protocols_
-                ## NOTE: 2021-10-11 18:20:17
-                ## not point in doing the same thing twice!
-                ##for v in value:
-                    ##self.addTriggerProtocol(v.copy()) # by default this will NOT sort
-                    
-                ##self._trigger_protocols_.sort(key=lambda x: x.segmentIndices()[0])
-                
-                ## now embed the new protocols in the data
-                #for p in self._trigger_protocols_:
-                    #rev_p = p.reverseAcquisition(copy=True)
-                    
-                    #if not is_empty(self._electrophysiology_):
-                        #embed_trigger_protocol(p, self._electrophysiology_,
-                                                    #clearEvents=False)
-                    #if not is_empty(self._scans_block_.segments):
-                        #embed_trigger_protocol(rev_p, self._scans_block_,
-                                                    #clearEvents=False)
-                    
-                    #if not is_empty(self._scene_block_):
-                        #embed_trigger_protocol(rev_p, self._scene_block_,
-                                                    #clearEvents=False)
-                ## a reference to this data's trigger protocols
-                #self._analysis_unit_.protocols[:] = self._trigger_protocols_
-                
-                ## FIXME: also update trigger protocols in landmark-based units
-                #for u in self.analysisUnits:
-                    #u.protocols[:] = self._trigger_protocols_
-                    ## FIXME select protocols according to which frame the unit is defined in!
-            
-            
-    #@property
-    #def protocols(self):
-        #"""Alias to triggerProtocols
-        #"""
-        #return self.triggerProtocols
-    
-    #@protocols.setter
-    #def protocols(self, value):
-        #self.triggerProtocols = value
-                
-    #@property
-    #def ephys(self):
-        #"""Alias for self.electrophysiology property
-        #"""
-        #return self.electrophysiology
-    
-    #@ephys.setter
-    #def ephys(self, value):
-        #if not isinstance(value, neo.Block):
-            #raise TypeError("Expecting a neo.Block object; got %s instead" % type(value).__name__)
+            #else:
+                #self._name_ = ""
         
-        #self.electrophysiology = value
+        #return self._name_
     
-    #@property
-    #def electrophysiology(self):
-        #"""A neo.Block object
-        #"""
-        #return self._electrophysiology_
-    
-    #@electrophysiology.setter
-    #def electrophysiology(self, value):
-        #self.validateElectrophysiology(value)
-    
-    @property
-    def name(self):
-        if not hasattr(self, "_name_"):
-            if hasattr(self, "__name__"):
-                self._name_ = self.__name__
-                delattr(self, "__name__")
-                
-            else:
-                self._name_ = ""
+    #@name.setter
+    #def name(self, value):
+        #if not isinstance(value, (str, type(None))):
+            #raise TypeError("Expecting a str or None; got %s instead" % type(value).__name__)
         
-        return self._name_
-    
-    @name.setter
-    def name(self, value):
-        if not isinstance(value, (str, type(None))):
-            raise TypeError("Expecting a str or None; got %s instead" % type(value).__name__)
+        #self._name_ = value
         
-        self._name_ = value
+        #if hasattr(self, "__name__"):
+            #delattr(self, "__name__")
         
-        if hasattr(self, "__name__"):
-            delattr(self, "__name__")
-        
-        self._modified_ = True
+        #self._modified_ = True
         
     #@property
     #def sceneCursors(self):
@@ -8951,150 +8826,6 @@ class ScanData(BaseScipyenData):
                 "scanscursors":self.scansCursors, "scansrois":self.scansRois}
     
     @property
-    def scanRegion(self):
-        if not hasattr(self, "_scan_region_"):
-            if "scanline" in self.sceneRois.keys():
-                self._scan_region_ = self.sceneRoi("scanline")
-                self._scenerois_.pop("scanline")
-                
-            else:
-                self._scan_region_ = None
-            
-        return self._scan_region_
-    
-    @scanRegion.setter
-    def scanRegion(self, obj):
-        """Sets up an existing scene ROI as scan trajectory
-        """
-        if not hasattr(self, "_scan_region_"):
-            if "scanline" in self.sceneRois.keys():
-                self._scan_region_ = self.sceneRoi("scanline")
-                self._scenerois_.pop("scanline")
-                
-            else:
-                self._scan_region_ = None
-        
-        if isinstance(obj, str):
-            if obj not in self.sceneRois.keys():
-                raise KeyError("Graphics object named %s does not exist in the scene data set" % name)
-        
-            self._scan_region_ = self.sceneRois[name]
-            self._scenerois_.pop(name)
-            
-        elif isinstance(obj, PlanarGraphics):
-            if obj.name in self.sceneRois.keys():
-                self.sceneRois.pop(obj.name)
-                
-            if obj.name in self.sceneCursors.keys():
-                self.sceneCursors.pop(obj.name)
-                
-            self._scan_region_= obj
-            
-        else:
-            raise TypeError("Expecting a str or a PlanarGraphics object; got %s instead" % type(obj).__name__)
-        
-        
-    #@property
-    #def scanningLandmark(self):
-        #"""Alias to self.scanRegion
-        #"""
-        #return self.scanRegion
-    
-    #@scanningLandmark.setter
-    #def scanningLandmark(self, obj):
-        #self.scanRegion=obj
-        
-    #@property
-    #def scanTrajectory(self):
-        #"""Alias to self.scanRegion
-        #"""
-        #return self.scanRegion
-    
-    #@scanTrajectory.setter
-    #def scanTrajectory(self, obj):
-        #self.scanRegion = obj
-    
-    #@property
-    #def scanType(self):
-        #"""Read-only
-        #"""
-        #return self._scandatatype_
-    
-    #@property
-    #def scanTypeName(self):
-        #return self._scandatatype_.name
-    
-    #@property
-    #def scanTypeValue(self):
-        #return self._scandatatype_.value
-    
-    #@property
-    #def analysisMode(self):
-        #"""Analysis mode (read-only)
-        #"""
-        #return self._analysismode_
-    
-    #@property
-    #def analysisModeName(self):
-        #return self._analysismode_.name
-    
-    #@property
-    #def analysisModeValue(self):
-        #return self._analysismode_.value
-    
-    @property
-    def analysisOptions(self):
-        if "Discrimination" in self._analysis_options_.keys() and isinstance(self._analysis_options_["Discrimination"], dict):
-            if "MinimumR2" not in self._analysis_options_["Discrimination"].keys():
-                self._analysis_options_["Discrimination"]["MinimumR2"] = 0.5
-        
-        return self._analysis_options_
-    
-    @analysisOptions.setter
-    def analysisOptions(self, value):
-        """Set everything for linescan CaT analysis, for now.
-        TODO Expand this in the future for other types of analysis.
-        NOTE: This is application-dependent;
-        """
-        
-        from copy import deepcopy
-        
-        if not isinstance(value, dict):
-            raise TypeError("Expecting a python dictionary; got %s instead" % type(value).__name__)
-        
-        #if "MinimumR2" not in value["Discrimination"].keys():
-            #value["Discrimination"]["MinimumR2"] = 0.5
-            
-        if isinstance(value, dict):
-            self._analysis_options_ = deepcopy(value)
-            
-        
-    @property
-    def metadata_keys(self):
-        """A list of str: the information fields in metadata.
-        
-        Short-hand for [k for k in self.metadata]
-        """
-        return sorted([k for k in self._metadata_.keys()])
-    
-    @property
-    def metadata(self):
-        """A python dict object with metadata information.
-        
-        This is free-form.
-        """
-        return self._metadata_
-    
-    @metadata.setter
-    def metadata(self, value):
-        if isinstance(value, (DataBag, type(None))):
-            self._parse_metadata_(value)
-            #self._metadata_ = value
-            
-        else:
-            raise TypeError("Expecting a DataBag or None; got %s instead" % type(value).__name__)
-            
-    @property
     def modified(self):
         return self._modified_
     
@@ -9115,60 +8846,6 @@ class ScanData(BaseScipyenData):
         if not isinstance(value, bool):
             raise TypeError("expecting a bool; fgot %s instead" % type(value).__name__)
         self._processed_ = value
-    
-    @property
-    def scene(self) -> list:
-        """Direct access to the scene data.
-        
-        FIXME/TODO adapt to a new scenario where all scene image data is a single
-        multi-channel VigraArray
-        
-        """
-        return self._scene_
-    
-    @property
-    def sceneFrameAxis(self):
-        """
-        FIXME/TODO adapt to a new scenario where all scene image data is a single
-        multi-channel VigraArray
-        """
-        # NOTE: 2021-10-16 14:51:27
-        # this is ALWAYS a viga.AxisInfo!
-        
-        return self._scene_frame_axis_
-    
-    @sceneFrameAxis.setter
-    def sceneFrameAxis(self, value):
-        """ Will also update the sceneFrames property
-
-        FIXME/TODO adapt to a new scenario where all scene image data is a single
-        multi-channel VigraArray
-        """
-        if len(self.scene) == 0:
-            return
-        
-        if not isinstance(value, str):
-            raise TypeError("Expecting a str; got %s instead" % type(value).__name__)
-        
-        if value not in self.scene[0].axistags:
-            raise ValueError("Axis %s not found in scans." % value)
-        
-        self._scene_frame_axis_ = value
-        self._scene_frames_ = self.scene[0].shape[self.scene[0].axistags.index(value)]
-     
-    @property
-    def sceneFrameAxisIndex(self):
-        """Read-only.
-        It can only be modified implicitly by setting sceneFrameAxis property
-        
-        This property is None when sceneFrameAxis is None or there is no scene data.
-
-        FIXME/TODO adapt to a new scenario where all scene image data is a single
-        multi-channel VigraArray
-        """
-        if self.sceneFrameAxis is not None:
-            if len(self.scene):
-                return self.scene[0].axistags.index(self.sceneFrameAxis.key)
     
     @property
     def sceneFrames(self):
@@ -9251,20 +8928,7 @@ class ScanData(BaseScipyenData):
         else:
             raise ValueError("Expecting a str list with as many elements as channels (%d); got %d elements instead" % (self.sceneChannels, len(value)))
         
-    @property
-    def scans(self) -> list:
-        """Access to the linescan data.
-        
-        Although this property is read-only, the linescan data can be altered, because
-        it is just a reference to a VigraArray!
-
-        FIXME/TODO adapt to a new scenario where all scene image data is a single
-        multi-channel VigraArray
-        
-        """
-        return self._scans_
-    
-    def nFrames(self, component:str) -> int:
+    def nFrames(self, component:typing.Optional[str] = None) -> int:
         """Returns the number of image frames(1) or data sweeps(2)
         
         NOTE:
@@ -9272,211 +8936,49 @@ class ScanData(BaseScipyenData):
         2) For electrophysiology and 1D-data _derived_ from the scene and scans.
         The latter contains data computed along one of the axes of an image frame,
         such as pixel intensity along a line, etc.
+        
         Parameters:
         ==========
         component: str, one of: 
-            "scans", "scene",
-            "electrophysiology" "ephys", 
-            "scansProfiles", "sceneProfiles", 
-            "scansBlock", "sceneBlock", 
+            "scans", 
+            "scene",
+            "electrophysiology", 
+            "scansProfiles", 
+            "sceneProfiles", 
+            "scansBlock", 
+            "sceneBlock", 
         """
-        
-        #data = self._get_data_component_(component)
-        
-        if component.lower().strip() in ("scans", "scene"):
-            return self.nImageFrames(component)
-        
-        elif component.lower().strip() in ("ephys", "electrophysiology"):
-            return self.nEphysSweeps
-        
-        elif component.lower().strip().endswith("profiles"):
-            return self.nProfileSweeps(component)
-        
-        elif component.lower().strip().endswith("block"):
-            return self.nDataSweeps(component)
-        
-        return 0
-    
-    @property
-    def nEphysSweeps(self):
-        if isinstance(self.ephys, neo.Block) and not neoutils.is_empty(self.ephys, ignore=(TriggerEvent, neo.Event, neo.Epoch)):
-            return len(self.ephys.segments)
-        
-        return 0
-    
-    def nDataSweeps(self, component:str = "scansBlock"):
-        if component.lower().strip() == "scansblock":
-            return self.nScansDataSweeps
-        elif component.lower().strip() == "sceneblock":
-            return self.nSceneDataSweeps
-        else:
-            raise ValueError(f"Wrong component {component}")
-    
-    @property
-    def nScansDataSweeps(self):
-        if isinstance(self.scansBlock, neo.Block) and not neoutils.is_empty(self.scansBlock, ignore=(TriggerEvent, neo.Event, neo.Epoch)):
-            return len(self.scansBlock.segments)
-        
-        return 0
-    
-    @property
-    def nSceneDataSweeps(self):
-        if isinstance(self.sceneBlock, neo.Block) and not neoutils.is_empty(self.sceneBlock, ignore=(TriggerEvent, neo.Event, neo.Epoch)):
-            return len(self.sceneBlock.segments)
-        
-        return 0
-    
-    def nProfileSweeps(self, component:str="scansProfiles"):
-        if component.lower().strip() =="scansprofiles":
-            return self.nScansProfileSweeps
-        
-        elif component.lower().strip() =="sceneprofiles":
-            return self.nSceneProfileSweeps
-        
-        else:
-            raise ValueError(f"Wrong component {component}")
-        
-        return 0
-    
-    @property
-    def nSceneProfileSweeps(self):
-        if isinstance(self.sceneProfiles, neo.Block) and not neoutils.is_empty(self.sceneProfiles, ignore=(TriggerEvent, neo.Event, neo.Epoch)):
-            return len(self.sceneProfiles.segments)
-        
-        return 0
-    
-    @property
-    def nScansProfileSweeps(self):
-        if isinstance(self.scansProfiles, neo.Block) and not neoutils.is_empty(self.scansProfiles, ignore=(TriggerEvent, neo.Event, neo.Epoch)):
-            return len(self.scansProfiles.segments)
-        
-        return 0
-    
-    def nImageFrames(self, data_component:str="scans"):
-        if data_component.lower().strip()=="scans":
-            return self.nScansFrames
-        
-        elif data_component.lower().strip()=="scene":
-            return self.nSceneFrames
-        
-        else:
-            raise ValueError(f"Component {data_component} does not contain images")
-        
-        return 0
-        
-    @property
-    def nScansFrames(self):
-        # NOTE: 2021-09-25 15:27:14
-        # self.scans is ALWAYS a list!
-        # For multichannel images, scans can have ONE multi-channel VigraArray, OR
-        # several single-channel VigraArrays !!!
-        if len(self.scans):
-            #return self.scans[0].shape[self.scans[0].axistags.index(self.scansFrameAxis)]
-            if isinstance(self.scansFrameAxis, int):
-                return self.scans[0].shape(self.scansFrameAxis)
-            else:
-                key = None
-                if isinstance(self.scansFrameAxis, vigra.AxisInfo):
-                    key = self.scansFrameAxis.key
-                elif isinstance(self.scansFrameAxis, str):
-                    key = self.scansFrameAxis
-                    
-                if key is not None:
-                    return self.scans[0].shape[self.scans[0].axistags.index(key)]
-        
-        return 0
-    
-    @property
-    def nSceneFrames(self):
-        # NOTE: 2021-09-25 15:27:24
-        # self.scene is ALWAYS a list!
-        # For multichannel images, scene can have ONE multi-channel VigraArray, OR
-        # several single-channel VigraArrays !!!
-        if len(self.scene):
-            #return self.scene[0].shape[self.scene[0].axistags.index(self.sceneFrameAxis)]
-            if isinstance(self.sceneFrameAxis, int):
-                return self.scans[0].shape(self.sceneFrameAxis)
-            else:
-                key = None
-                if isinstance(self.sceneFrameAxis, vigra.AxisInfo):
-                    key = self.sceneFrameAxis.key
-                elif isinstance(self.sceneFrameAxis, str):
-                    key = self.sceneFrameAxis
-                    
-                if key is not None:
-                    return self.scans[0].shape[self.scans[0].axistags.index(key)]
-        
-        return 0
-    
-    @property
-    def scansFrameAxis(self):
-        """
-        FIXME/TODO adapt to a new scenario where all scene image data is a single
-        multi-channel VigraArray
-        
-        """
-        # NOTE: 2021-10-16 14:51:27
-        # this is ALWAYS a viga.AxisInfo!
-        
-        return self._scans_frame_axis_
-        
-    @scansFrameAxis.setter
-    def scansFrameAxis(self, value):
-        """Setting this value will also update the scansFrames
-        FIXME/TODO adapt to a new scenario where all scene image data is a single
-        multi-channel VigraArray
-        
-        """
-        if len(self.scans) == 0:
-            return
-        
-        if not isinstance(value, str):
-            raise TypeError("Expecting a str; got %s instead" % type(value).__name__)
-        
-        # NOTE: 2021-09-25 15:20:41
-        # self.scans is ALWAYS a list!
-        # For multichannel images, scans can have ONE multi-channel VigraArray, OR
-        # several single-channel VigraArrays !!!
-        if value not in self.scans[0].axistags:
-            raise ValueError("Axis %s not found in scans." % value)
-        
-        self._scans_frame_axis_ = value
-        #self._scans_frames_ = self.scans[0].shape[self.scans[0].axistags.index(value)]
-        
-    @property
-    def scansFrameAxisIndex(self):
-        """Read-only.
-        
-        It can only be modified implicitly by changing the scansFrameAxis property
-        
-        This property is None when scansFrameAxis is None or there is no scans data.
-        
-        FIXME/TODO adapt to a new scenario where all scene image data is a single
-        multi-channel VigraArray
-        
-        """
-        if self.scansFrameAxis is not None:
-            if len(self._scans_):
-                return self._scans_[0].axistags.index(self.scansFrameAxis.key)
-            else:
-                return 0
+        if isinstance(component, str) and len(component.strip()):
+            data = self._get_data_child_component_(component)
             
+            if isinstance(data, neo.Block):
+                return len(data.segments)
+            
+            else:
+                if isinstance(data, (tuple, list)): # scene or scans
+                    if len(data) == 0:
+                        return 0
+                    framesAxes = self.sceneFrameAxis if component == "scene" else self.scansFrameAxis
+                    return nFrames(data[0], framesAxes) # from vigrautils
+                
         else:
-            return 0
+            return len(self.framesMap)
+            #pass # prode the framesMap descriptor!
+                
     
-    @property
-    def scansFrames(self):
-        """Read-only. Aslias to nScansFrames
+    #@property
+    #def nScansFrames(self):
+        #"""Read-only.
         
-        Can only be modifier indirectly by either:
-        1) changing selfFrameAxis
-        2) appending/removing scans frames
+        #Can only be modifier indirectly by either:
+        #1) changing selfFrameAxis
+        #2) appending/removing scans frames
         
-        FIXME/TODO adapt to a new scenario where all scene image data is a single
-        multi-channel VigraArray
+        #FIXME/TODO adapt to a new scenario where all scene image data is a single
+        #multi-channel VigraArray
         
-        """
-        return self.nScansFrames
+        #"""
+        #return self.nFrames("scans")
 
     @property
     def scansChannels(self):
@@ -9545,54 +9047,6 @@ class ScanData(BaseScipyenData):
         else:
             raise ValueError("Expecting a str list with as many elements as channels (%d); got %d elements instead" % (self.scansChannels, len(value)))
         
-    @property
-    def scanRegionSceneProfiles(self):
-        """Read-only neo.Block
-        Use generateScanRegionProfilesFromScene(filtered=False) to re-create
-
-        FIXME/TODO adapt to a new scenario where all scene image data is a single
-        multi-channel VigraArray
-        
-        """
-        if len(self.scans) == 0:
-            return
-        
-        return self._scan_region_scene_profiles_
-        #return self.__scanline_profiles_scene__
-    
-    @property
-    def scanRegionScansProfiles(self):
-        """Read-only neo.Block
-        Use generateScanRregionProfilesFromScans(filtered=False) to re-create
-
-        FIXME/TODO adapt to a new scenario where all scene image data is a single
-        multi-channel VigraArray
-        
-        """
-        if len(self.scans) == 0:
-            return
-        
-        return self._scan_region_scans_profiles_
-        ##return self.__scanline_profiles_scans__
-        
-    @property
-    def scansProfiles(self):
-        return self.scanRegionScansProfiles
-    
-    @property
-    def sceneProfiles(self):
-        return self.scanRegionSceneProfiles
-    
-    @property
-    def scansBlock(self):
-        """Contains data derived from analysis of cursors and/or rois in scans frames
-        """
-        return self._scans_block_
-    
-    @property
-    def sceneBlock(self):
-        return self._scene_block_
-    
     def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
                        entity_cache):
         

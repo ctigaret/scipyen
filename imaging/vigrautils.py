@@ -1,4 +1,5 @@
 import typing
+import collections.abc
 from functools import singledispatch
 import vigra
 import numpy as np
@@ -1339,10 +1340,6 @@ def removeSlice(img, axis, ndx):
     
     return ret
 
-#def getNFramesForAxesLayout(x):
-    #return x if isinstance(x, int) else np.prod(x) if (isinstance(x, (tuple, list)) and all(isinstance(v, int) for v in x)) \
-        #else 0
-    
 def proposeLayout(img:vigra.VigraArray, 
                    userFrameAxis:typing.Optional[typing.Union[str, vigra.AxisInfo, int, 
                                                               typing.Sequence[typing.Union[str, vigra.AxisInfo, int]]]]=None,
@@ -1861,6 +1858,42 @@ def getCalibratedAxisSize(image, axis):
     # FIXME what to do when there are several channels?
     
     return axcal.calibratedDistance(axsize)
+
+def nFrames(x:vigra.VigraArray, 
+            frameAxis:typing.Optional[typing.Union[vigra.AxisInfo, str, int, collections.abc.Sequence[typing.Union[vigra.AxisInfo, str, int]]]]=None):
+    if not isinstance(x, vigra.VigraArray):
+        raise TypeError(f"Expecting a Vigra Array, got {type(x).__name__} instead")
+    
+    if frameAxis is None:
+        nFrames = proposeLayout(x)[0]
+        if isinstance(nFrames, int):
+            return nFrames
+        
+        elif isinstance(nFrames, collections.abc.Sequence):
+            return np.prod(nFrames)
+    
+    if isinstance(frameAxis, vigra.AxisInfo):
+        ndx = x.axistags.index(frameAxis.key)
+        
+    elif isinstance(frameAxis, (str, int)):
+        ndx = x.axistags.index(frameAxis)
+        
+    elif isinstance(frameAxis, collections.abc.Sequence) and all(isinstance(v, (vigra.AxisInfo, str, int)) for v in frameAxis):
+        ndx = tuple(x.axistags.index(v.key) if isinstance(v, vigra.AxisInfo) else x.axistags(v) for v in frameAxis )
+        
+    else:
+        raise TypeError(f"frameAxis expected to be None, AxisInfo, str, int, or a sequence of these; got {typr(frameAxis).__name__} instead")
+    
+    if isinstance(ndx, int):
+        return 1 if ndx == x.ndim else x.shape[ndx]
+    
+    elif isinstance(ndx, collections.abc.Sequence) and all(isinstance(i, int) for i in ndx):
+        return np.prod(ndx)
+    
+    else:
+        raise RuntimeError(f"Cannot determine the number of frames")
+    
+    
 
 def specifyAxisTags(image, newtags, newshape=None, in_place=False):
     """Assigns a new AxisTags object to a VigraArray.

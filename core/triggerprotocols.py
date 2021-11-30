@@ -1226,6 +1226,7 @@ class TriggerProtocol(object):
         
         # TODO 2021-11-24 13:15:13 implement me!
         
+
 #### BEGIN Module-level functions
 
 @safeWrapper
@@ -1929,7 +1930,7 @@ def embed_trigger_protocol(protocol:TriggerProtocol,
 
 
 @safeWrapper
-def parse_trigger_protocols(src):
+def parse_trigger_protocols(src, return_source:typing.Optional[bool]=False):
     """Constructs a list of TriggerProtocol objects from embeded TriggerEvent objects.
     
     "src" may be a neo.Segment, neo.Block, a sequence of neo.Segment, or a
@@ -1941,10 +1942,19 @@ def parse_trigger_protocols(src):
            neo.Segment, or
            sequence (tuple, list) of neo.Block
            sequence (sutple, list) of neo.Segment
+           
+    return_source:bool, optional, default is False
+    
+        When true, returns a list of TriggerProtocols, _AND_ a reference to 'src'
         
     Returns:
     =======
-    Tuple (protocols_list, src)
+    When return_source is True:
+        tuple (list, src)
+        
+    Otherwise, a list
+    
+    In both cases the list containes TriggerProtocol objects or is empty.
         
     ATTENTION: this constructs TriggerProtocol objects with default names.
     Usually this is NOT what you want but their names can be changed to a more 
@@ -2156,7 +2166,10 @@ def parse_trigger_protocols(src):
     else:
         raise TypeError("src expected to be a neo.Block, neo.Segment, or a sequence of neo.Segment objects; got %s instead" % type(src).__name__)
             
-    return protocols, src
+    if return_source is True:
+        return protocols, src
+    
+    return protocols
 
 def auto_detect_trigger_protocols(data: neo.Block, 
                                presynaptic:tuple=(), 
@@ -2341,7 +2354,7 @@ def auto_detect_trigger_protocols(data: neo.Block,
                 pfun(data)
                 
     if protocols:
-        tp, _ = parse_trigger_protocols(data)
+        tp = parse_trigger_protocols(data)
         return tp
     
 

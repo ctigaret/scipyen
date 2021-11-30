@@ -13,6 +13,7 @@ Add signature annotations to file loaders to help file data handling
 from __future__ import print_function
 
 import inspect, keyword, os, sys, traceback, typing, warnings, io, importlib
+import contextlib
 # import  threading
 import pickle, pickletools, copyreg, csv, numbers, mimetypes
 import concurrent.futures
@@ -446,7 +447,8 @@ def __ndArray2csv__(data, writer):
 # BioFormats dumped mid 2017 because there are no good python ports to it
 # (it uses javabridge which is suboptimal)
 #def loadImageFile(fileName:str, asVolume:bool=False, axisspec:[collections.OrderedDict, None]=None) -> ([vigra.VigraArray, np.ndarray],):
-def loadImageFile(fileName:str, asVolume:bool=False) -> vigra.VigraArray:
+def loadImageFile(fileName:str, asVolume:bool=False, 
+                  suppress_cpp_warnings=False) -> vigra.VigraArray:
     ''' Reads pixel data from a raster image file
     Uses the vigra impex library.
     
@@ -461,15 +463,18 @@ def loadImageFile(fileName:str, asVolume:bool=False) -> vigra.VigraArray:
         by the "fileName" argument. If this is not what is wanted, then pass
         "asVolume = True" in the call.
         
-    
-    axisspec: a collections.OrderedDict with valid keys (x, y, z, c, t) and integer values,
-                with the constraint that the product of the values MUST equal the
-                numbr of pixels in the data
-    
-    TODO: come up with  smart way of "guessing" which of the xyzct dimensions are actually used in the TIFF
-            this could be very hard, because TIFF specification does not mandate this, 
-            and therefore TIFF writers do no necessarily include this information either.
-            
+        
+    suppress_cpp_warnings:bool, default False
+        When True, it will suppress warnings issued by the vigra impex library
+        (C++ side)
+        
+        WARNING: this is a hack: while it successfully suppresses warning #
+        messages issued by vigra impex library, it will also "mute" the 
+        error messages subsewuenly raised in Python code
+        I guess this is because of code in the io.redirections module.
+        
+        Until that is fixed, keep this parameter to False/
+        
     NOTE: Things to be aware of:
     
     If fileName is the first in what looks like an image series, asVolume=True 
@@ -479,39 +484,35 @@ def loadImageFile(fileName:str, asVolume:bool=False) -> vigra.VigraArray:
     form within a scan object (e.g. a PVScan object) and stop after the first cycle.
     
     '''    
-    #else:
-    
-    # NOTE: 2018-02-20 12:56:02
-    # coerce reading a volume as a volume!
-    nFrames = vigra.impex.numberImages(fileName)
-    
-    if nFrames > 1:
-        asVolume = True
-    
-    if asVolume:
-        ret = vigra.readVolume(fileName)
-        
+    # NOTE: 2021-11-30 11:46:12
+    # suppress warnings from vigra impex
+    from . import redirections
+    #f = io.StringIO()
+    #with warnings.catch_warnings():
+    #with contextlib.redirect_stderr(f):
+    #with redirections.output_stream_redirector(f, "stderr"):
+    if suppress_cpp_warnings:
+        cman = redirections.stderr_redirector(io.StringIO())
     else:
-        ret = vigra.readImage(fileName)
+        cman = contextlib.nullcontext()
         
-    #mdata = readImageMetadata(fileName)
-    
-    #if axisspec is not None:# TODO FIXME we're not using this kind of axisspec anymore, are we?
-        #if type(axisspec) is collections.OrderedDict:
-            #parsedAxisspec = collections.OrderedDict(zip(ret.axistags.keys(), ret.shape))
+    with cman:
+        #if not sys.warnoptions:
+            #warnings.simplefilter("ignore")
             
-            #axisspec = verifyAxisSpecs(axisspec, parsedAxisspec)
-            
-            ## by now, all tags given in axisspec should have values different than None
-            ##print("axisspec: ", axisspec)
-            
-            #ret.shape = axisspec.values()
-            #ret.axistags = vigra.VigraArray.defaultAxistags(tagKeysAsString(axisspec))
-                    
-        #else:
-            #raise ValueError('axisspec must be a collections.OrderedDict, or None')
+        # NOTE: 2018-02-20 12:56:02
+        # coerce reading a volume as a volume!
+        nFrames = vigra.impex.numberImages(fileName)
         
-    #return (ret, mdata)
+        if nFrames > 1:
+            asVolume = True
+        
+        if asVolume:
+            ret = vigra.readVolume(fileName)
+            
+        else:
+            ret = vigra.readImage(fileName)
+        
     return ret
         
 # TODO: diverge onto HDF5, and bioformats handling
