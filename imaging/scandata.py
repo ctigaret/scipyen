@@ -31,7 +31,7 @@ from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 
 from core.datazone import DataZone
 
-from core.multiframeindex import MultiFrameIndex
+from core.multiframeindex import (MultiFrameIndex, FrameIndexLookup)
 
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType,)
 
@@ -68,94 +68,31 @@ DEFAULTS["Channels"]["Bleed"]["Ind2Ref"] = 0.
 class ScanData(BaseScipyenData):
     """Dummy for AnalysisUnit; clobbered below
     """
-class FrameIndexLookup(object):
-    """Tools for frame synchronization between scans, scene and ephys data.
     
-    Behaves like a dict with int keys mapped to dicts of three key/value pairs:
-        scene -> int/None
-        scans -> int/None
-        electrophysiology -> int/None
-        
-        
-    FrameIndexLookup maps a ScanData frame to a frame index into each of its
-    data child components 'scene', 'scans' and 'electrophysiology'.
-    
-    
-    """
-    # virtual_frame_index: MultiFrameIndex(scene:int, None 
-    #                                      scans:int, None,
-    #                                      electrophysiology:int, None)
-            
-    def __init__(self, *args):
+class ScanDataFrameIndex(MultiFrameIndex):
+    def __init__(self, scans:int, scene:int, electrophysiology:int,/):
+        super().__init__(scans=scans, scene=scene, electrophysiology=electrophysiology)
+    @classmethod
+    def remove_descriptor(cls, name):
+        """Clobbers removal of descriptors
         """
-        *args: one or more dict with the following structure:
-            int: MultiFrameIndex, or None
-                When a MultiFrameIndex this is expected to have the following 
-                fields: 'scene', 'scans', 'electrophysiology', mapped to int or
-                a sequence of int, or a range, or a slice
+        pass
+    
+    # NOTE: 2021-12-01 14:43:47
+    # interesing pogramming hack:
+    # if this is clobbered, the fields are visible in dir and __dict__, yet not 
+    # captured by prog.get_descriptors it behaves a bit like an opaque object
+    @classmethod
+    def setup_descriptor(cls, params):
+        """Clobbers further addition of descriptors
         """
-        
-        self._map_ = dict()
-        
-        for arg in args:
-            fields = list()
-            if not isinstance(arg, dict) or len(arg) == 0 or not all(isinstance(k, int) for k in arg) or not all(isinstance(v, (ScanDataFrameIndex, type(None))) for v in arg.values()):
-                raise TypeError("Expecting a mapping of int to MultiFrameIndex objects or None")
-            
-            self._map_.update(arg)
-        
-    @property
-    def map(self):
-        return self._map_
+        pass
     
-    def __len__(self):
-        return len(self._map_)
-        
-    def __getitem__(self, key:int):
-        return self._map_.get(key, None)
-    
-    def __setitem__(self, key:int, value:typing.Optional[ScanDataFrameIndex] = None):
-        if not isinstance(value, (ScanDataFrameIndex, type(None))):
-            raise TypeError(f"Expecting a ScanDataFrameIndex or None; got {type(value).__name__} instead")
-        
-        self._map_[key] = value
-        
-    def scene(self, frame:int):
-        if frame in self._map_:
-            return self._map_[frame].scene if isinstance(self._map_, ScanDataFrameIndex) else None
-        
-    def setScene(self, frame:int, value:typing.Optional[int] = None):
-        frameindex = self._map_.get(frame, None)
-        if isinstance(frameindex, ScanDataFrameIndex):
-            frameindex.scene = value
-            
-        elif isinstance(value, int):
-            # create frame index of it doesn't exist and value is an int
-            self._map_[frame] = ScanDataFrameIndex(scene=value)
-            
-    def scans(self, frame:int):
-        if frame in self._map_:
-            return self._map_[frame].scans if isinstance(self._map_, ScanDataFrameIndex) else None
-        
-    def setScans(self, frame:int, value:typing.Optional[int]):
-        frameindex = self._map_.get(frame, None)
-        if isinstance(frameindex, ScanDataFrameIndex):
-            frameindex.scene = value
-            
-        elif isinstance(value, int):
-            self._map_[frame] = ScanDataFrameIndex(scans=value)
-        
-    def electrophysiology(self, frame:int):
-        if frame in self._map_:
-            return self._map_[frame].electrophysiology if isinstance(self._map_, ScanDataFrameIndex) else None
-        
-    def setElectrophysiology(self, frame:int, value:typing.Optional[int]):
-        frameindex = self._map_.get(frame, None)
-        if isinstance(frameindex, ScanDataFrameIndex):
-            frameindex.electrophysiology = value
-            
-        elif isinstance(value, int):
-            self._map_[frame] = ScanDataFrameIndex(electrophysiology = value)
+    def addField(self, name, value):
+        """Clobbers the addField inherited from MultiFrameIndex.
+        Prevents adding more fields to the index.
+        """
+        pass
         
 class ScanDataOptions(DataBag):
     """Do not use

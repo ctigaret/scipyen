@@ -40,17 +40,18 @@ class ArgumentError(Exception):
 class WithDescriptors(object):
     """ Base for classes that create their own descriptors.
     
-    These are usually derived from core.basescipyen.BaseScipyenData and follow
-    the template defined there, where a descriptor is specified in the :class:
-    definition through tuples (see BaseScipyenData in module core.basescipyen
-    and parse_descriptor_specification defined in this module)
+    A descriptor is specified in the :class: definition as tuples 
+    (see 'BaseScipyenData' in module core.basescipyen and the function
+    'parse_descriptor_specification', defined in this module)
     
-    Together with the validator classes defined here this forms a trimmed down
-    framework implementation of the Python's descriptors protocol mostly useful
-    for code factoring.
+    Together with the validator classes (Python descriptors) defined in this
+    module, this forms a trimmed down framework for the implementation of the 
+    Python's descriptors protocol, mostly useful for code factoring.
     
-    These descriptors DO NOT implement trait observer protocol an therefore 
-    are NOT a replacement for HasDescriptors in the traitlet package!
+    These descriptors DO NOT implement trait observer design pattern as found in 
+    the 'traitlets' package (used throughout jupyter/IPython, and in Scipyen) and
+    therefore they ARE NOT a replacement, nor are they intended for use with, 
+    'HasDescriptors' classes in the traitlet package.
     
     """
     @classmethod
@@ -74,6 +75,8 @@ class WithDescriptors(object):
         p.text(self.__class__.__name__)
         p.breakable()
         properties = tuple(d for d in get_descriptors(type(self)) if not d.startswith("_"))
+        if len(properties)==0:
+            properties = sorted(tuple(k for k in self.__dict__ if not k.startswith("_")))
         first = True
         for pr in properties:
             if hasattr(self, pr):
