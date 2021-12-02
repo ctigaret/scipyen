@@ -9,6 +9,7 @@ from .axiscalibration import (AxesCalibration,
                               ChannelCalibrationData,)
 from imaging import axisutils
 from imaging.axisutils import STANDARD_AXIS_TAGS_KEYS
+from traitlets import Bunch
 
 def imageIndexTuple(img, slicing=None, newAxis=None, newAxisDim=None):
     """Idiom for introducing a new axis in an image.
@@ -1344,10 +1345,11 @@ def proposeLayout(img:vigra.VigraArray,
                    userFrameAxis:typing.Optional[typing.Union[str, vigra.AxisInfo, int, 
                                                               typing.Sequence[typing.Union[str, vigra.AxisInfo, int]]]]=None,
                    timeVertical:bool = True,
+                   indices:bool=False,
                    ) -> typing.Tuple[int, typing.Optional[typing.Union[vigra.AxisInfo, typing.List[vigra.AxisInfo]]], vigra.AxisInfo, vigra.AxisInfo, vigra.AxisInfo]:
     """Proposes a layout for frame-by-frame display and analysis of a VigraArray.
     
-    Based on user-soecified hints, suggests which array axes may be used:
+    Based on user-specified hints, suggests which array axes may be used:
         * to slice the array into meaningful 2D array views (data 'frames')
         * for the definition of a frame's width and height
         
@@ -1362,31 +1364,43 @@ def proposeLayout(img:vigra.VigraArray,
         This hints the possible axis or set of axes that may be used for slicing
         the array into meaningful 2D views ('frames')
         
-    timeVertical: bool, default is True
-        Whe True, the time dimension (when present) is to be shown vertically
+    timeVertical: bool, optional, default is True
+        When True, the time dimension (when present) is to be shown vertically
+        
+    indice:bool, optional, default is False
+        When True, returns the index of the axes for the 'horizontal', 'vertical'
+        and 'frames'.
+        
+        By default (False) the function returns vigra.AxisInfo objects for the
+        above.
     
     Returns:
     ========
-    A tuple with the following elements:
+    A traitlets.Bunch with the following key/value pairs:
      
-    nFrames:int = the number of frames along the proposed "frame" axis
+    nFrames:int -> the number of frames along the proposed "frame" axis
     
     All the others are vigra.AxisInfo objects, None, or tuple of vigra.AxisInfo
      
-    horizontalAxisInfo:vigra.AxisInfo = the axis proposed for the frame 'width'.
+    horizontal:vigra.AxisInfo or int = the axis (or axis index) proposed
+        for the frame 'width'.
     
         BY CONVENTION this is the first non-channel axis (usually, the 1st array
         dimension), which is also the innermost non-channel axis given by 
         img.innerNonChannelIndex property
         
-    verticalAxisInfo:vigra.AxisInfo = the axis proposed for the frame 'height'.
+    vertical:vigra.AxisInfo or int = the axis (or axis index) proposed
+        for the frame 'height'.
     
     BY CONVENTION this is the 2nd non-channel axis (usually, the 2nd dimension)
         
-    channelAxisInfo:vigra.AxisInfo or None = the channel axis
+    channels:vigra.AxisInfo or None, or int: as above, for the 'channels' 
+        axis.
     
-        This is either the AxisInfo with type flags of Channels, when it exists
-        in img 'axistags' property, or None.
+        The 'channels' axis is either the AxisInfo with type flags of 
+        Channels, when it exists in img 'axistags' property, or None. When 
+        returned as an int, the value equals the number of dimension in the array
+        if there is no Channel axis.
         
         BY CONVENTION this is the axis of the highest dimension of the array 
         (possibly absent in 2D arrays, and missing in 1D arrays, where the data
@@ -1396,7 +1410,7 @@ def proposeLayout(img:vigra.VigraArray,
         space (RGB, Luv, etc.) for the so-called 'multi-channel' or 'multi-band'
         images - this relates to the data type of the pixels. 
         
-        NOTE: In Scipyen, a 'channel' can also represent a distinct recording
+        NOTE 1: In Scipyen, a 'channel' can also represent a distinct recording
         channel of data from the same source (e.g. a fluorescence channel, DIC, 
         etc.), or the real or imaginary part of complex numbers (e.g., the
         result of a Fourier transform).
@@ -1412,7 +1426,7 @@ def proposeLayout(img:vigra.VigraArray,
         always make good sense to do so (especially whenn there are more than
         four distinct data channels).
         
-    frameAxisInfo:vigra.AxisInfo or None
+    frames: vigra.AxisInfo, None, tuple of AxisInfo or tuple of int
     
         When given, this is the AxisInfo along which the array can be 'sliced'
         in 'frames' defined for the purpose of display and/or analysis.
@@ -1422,11 +1436,81 @@ def proposeLayout(img:vigra.VigraArray,
         channels axis this is a tuple of axes (in increasing order).
         
      
-     NOTE the last two values need not be along the first and second axis, as this
-     depends on which axis is the channel axis (if it exists); by default, in vigra 
-     library the channel axis is typically the outermost one, but that depends on
-     the internal storage order (order of axes) for the pixel data in the array
+    NOTE 2: the last two values need not be along the first and second axis, as 
+    this depends on which axis is the channel axis (if it exists); by default, 
+    in the VIGRA library the channel axis is typically on the outermost (highest)
+    dimension, but that depends on the internal storage order for the pixel data
+    in the array (a.k.a the VIGRA array's 'order' property).
     
+    NOTE 3: Here 'width' and 'height' are loosely defined in relation to how
+    image data should be displayed, and does not necessarily imply the 
+    existence of a space domain for the data.
+    
+    For example, in an image containing a series of linescans, the horizontal
+    axis usually corresponds to the space domain (a line scan'sweep') whereas 
+    the vertical axis corresponds to sequence of successive linescan sweeps 
+    (hence, the time domain). In this case, 'width' is defined in the spatial 
+    domain, and 'height' is defined in the temporal domain (and therefore it
+    would be more appropriately called 'duration'). Notwithstanding, I adopt the 
+    more colloquial term 'height' to convey the meaning of a 'vertical' axis on 
+    a 2D display.
+    
+    The semantics depends on the value of 'timeVertical' parameter which enables
+    the display of the time domain vertically or horizontally, on a 2D display. 
+    In the latter case, the 'horizontal' axis represents time (hence colloquially,
+    the duration is 'width') whereas the 'vertical' axis represents space 
+    (a.k.a 'height').
+        
+    NOTE 4: For a series of line scan sweeps acquired with a laser scanning 
+    system, each sweep actually contains pixel data defined BOTH in space AND 
+    time (the laser spot cannot illuminate several places at the same time!). 
+    
+    However, the duration of a single sweep (or line) is usually several orders
+    of magnitude smaller than the duration of the entire sequence of lines
+    (e.g., acquiring at 1000 lines/s  makes the duration of a single line scan
+    roughly 1000 x smaller, taking into account the laser flyback time and the 
+    settling time for the galvos at the end of the sweep).
+    
+    Furthermore, a single line scan sweep usually covers a wider (linear)
+    region of the field of view, such that the measurement of the time-varying
+    fluorescence signal of interest is restricted to one or several sub-regions
+    of the line scan trajectory, corresponding to the structures of interest
+    (e.g., spines on a dendrite).
+    
+    This means that the laser dwell time on these structures of interest is even
+    smaller than the duration of the entire line scan sweep.
+    
+    For this reasons, the analysis of time-varying fluorescence (e.g. Ca2+
+    transients) usually assumes that the pixel data in a single line scan sweep 
+    through the structure of interest has been acquired instantaneously. This
+    assumption allows the collapsing of the pixel intensities in a linescan
+    sequence along its spatial dimension, to yield a 1D signal where each data 
+    point is the collapsed fluorescence data acquired during a single line
+    scan through the structure. The derived 1D signals are then analyzed
+    taking the line frequency as the sampling frequency of the signal.
+    
+    This approach is generally acceptable for time-varying fluorescence 
+    signals with time constants orders of magnitude longer than the laser 
+    dwell time on the structure of interest.
+    
+    The assumption above breaks down when laser dwell time on the structure
+    is significantly increased (e.g. to allow more photons to be collected). 
+    In this case collapsing the pixel intensity data along the spatial domain
+    may result in undersampling the signal in the time domain. Therefore one 
+    may consider analysing the data recorded from the structure on a 
+    pixel-by-pixel basis, in both space and time domains. The decision depends
+    really on how close the laser dwell time on the structure is to the time 
+    constant of the signal representing the underlying physical measure 
+    (e.g., a change in Ca2+ concentration), and on the rate constants of the 
+    fluorescence indicator itself.
+    
+    NOTE 5: A traitlets.Bunch is a dictionary taking str keys, which accepts
+    attribute access to its members:
+    
+    The expression `bunch.item` has the same effect as the expression 
+    `bunch["item"]` and both return the value mapped to 'item' in the bunch.
+    
+
     Code logic:
     ==========
     
@@ -1434,11 +1518,6 @@ def proposeLayout(img:vigra.VigraArray,
     any axis, including a channel axis. This function attempts to "guess"
     a reasonable axis along which the array can be sliced into meaningful 2D 
     frames.
-    
-    NOTE: 2018-09-14 23:14:38
-    give up on "separateChannels" thing -- useless; for arrays with > 4 dimensions
-    we "flatten" the outermost nonchannel axes, thus setting the frames on the first 
-    two axes
     
     """
     if not isinstance(img, vigra.VigraArray):
@@ -1451,6 +1530,7 @@ def proposeLayout(img:vigra.VigraArray,
         raise TypeError("Expecting a VigraArray with at least 1 dimension")
     
     #bring userFrameAxis to a common denominator: an AxisInfo object, or None
+    # this helps with checking if it is a Channel axis or not
     if isinstance(userFrameAxis, (vigra.AxisInfo, str)):
         if userFrameAxis not in img.axistags:
             # CAUTION equality testing for AxisInfo objects ONLY takes into
@@ -1501,6 +1581,10 @@ def proposeLayout(img:vigra.VigraArray,
     tIndex = img.axistags.index("t")
     cIndex = img.channelIndex
     
+    # NOTE: 2021-12-02 10:20:07
+    # It is easier (semantically, also) to work below with AxisInfo objects.
+    # When indices is True, there will be additional function calls to
+    # axistags.index() before returning, but I suppose the penalty is small ...
     frameAxisInfo       = None
     channelAxisInfo     = None
     horizontalAxisInfo  = None
@@ -1707,8 +1791,26 @@ def proposeLayout(img:vigra.VigraArray,
     if isinstance(nFrames, (tuple, list)) and len(nFrames) == 1:
         nFrames = nFrames[0]
         
+    horizontal = img.axistags.index(horizontalAxisInfo.key) if indices else horizontalAxisInfo
+    vertical   = img.axistags.index(verticalAxisInfo.key) if indices else verticalAxisInfo
+    channels   = img.ndim if channelAxisInfo is None else img.axistags.index(channelAxisInfo.key) if indices else channelAxisInfo
     
-    return nFrames, horizontalAxisInfo, verticalAxisInfo, channelAxisInfo, frameAxisInfo
+    if frameAxisInfo is None:
+        frames = img.ndim if indices else None
+        
+    elif isinstance(frameAxisInfo, tuple):
+        frames = tuple(img.axistags.index(ax.key) if indices else ax for ax in frameAxisInfo)
+        
+    else:
+        frames = img.axistags.index(frameAxisInfo.key) if indices else frameAxisInfo
+    
+        
+    
+    return Bunch({"nFrames":nFrames, 
+                  "horizontal":horizontal, 
+                  "vertical":vertical, 
+                  "channels":channels,
+                  "frames":frameAxisInfo})
 
 @singledispatch
 def kernel2array(value:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D],

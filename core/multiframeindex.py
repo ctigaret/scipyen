@@ -268,7 +268,7 @@ class FrameIndexLookup(object):
                         
             self._map_.update(arg)
             
-        self._field_names_ = field_names # for reference
+        self._field_names_ = field_names if len(field_names) else set() # for reference
         
         for field in self._field_names_:
             setattr(type(self), field, self.__IndexProxy__(field))
@@ -281,7 +281,10 @@ class FrameIndexLookup(object):
         return len(self._map_)
         
     def __getitem__(self, key:int):
-        return self._map_.get(key, None)
+        # NOTE: return the ke when nothing is mapped to it
+        return self._map_.get(key, key)
+    
+        #return self._map_.get(key, None)
     
     def __delitem__(self, key:int):
         if key in self._map_:

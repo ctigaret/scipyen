@@ -2278,10 +2278,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         #self._number_of_frames_         = 1
         self.tStride                    = 0
         self.zStride                    = 0
-        self.frameAxisInfo              = None
         self.userFrameAxisInfo          = None
-        self.widthAxisInfo              = None # this is "visual" width which may not be on a spatial axis "x"
-        self.heightAxisInfo             = None # this is "visual" height which may not be on a spatial axis "y"
+        # NOTE: 2021-12-02 10:50:17
+        # the 3 beow are int see NOTE: 2021-12-02 10:39:54
+        self.frameAxis                  = None
+        self.widthAxis                  = None # this is "visual" width which may not be on a spatial axis "x"
+        self.heightAxis                 = None # this is "visual" height which may not be on a spatial axis "y"
         #self.frameIterator              = None # ??? FIXME what's this for ???
         self._currentZoom_              = 0
         #self.complexDisplay            = ComplexDisplay.real # one of "real", "imag", "dual" "abs", "phase" (cmath.phase), "arg"
@@ -2404,11 +2406,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     @property
     def frameIndexing(self):
         if isinstance(self._number_of_frames_, int):
-            return tuple((self.frameAxisInfo, k) for k in range(self._number_of_frames_))
+            return tuple((self.frameAxis, k) for k in range(self._number_of_frames_))
         
         else:
-            traversal = tuple(tuple((ax,i) for i in range(axSize)) for ax, axSize in zip(reversed(self.frameAxisInfo), reversed(self._number_of_frames_)))
-            #traversal = tuple(tuple((ax,i) for i in range(axSize)) for ax, axSize in zip(self.frameAxisInfo, self._number_of_frames_))
+            traversal = tuple(tuple((ax,i) for i in range(axSize)) for ax, axSize in zip(reversed(self.frameAxis), reversed(self._number_of_frames_)))
+            #traversal = tuple(tuple((ax,i) for i in range(axSize)) for ax, axSize in zip(self.frameAxis, self._number_of_frames_))
             return tuple(itertools.product(*traversal))
             
         
@@ -3112,15 +3114,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 w = self._data_.shape[0]
                 h = self._data_.shape[1]
                 
-                if self.frameAxisInfo is not None:
-                    if isinstance(self.frameAxisInfo, tuple) and len(self.frameAxisInfo) == 2:
-                        ndx1 = self._current_frame_index_ // self._data_.shape[self._data_.axistags.index(self.frameAxisInfo[0].key)]
-                        ndx0 = self._current_frame_index_ - ndx1 * self._data_.shape[self._data_.axistags.index(self.frameAxisInfo[0].key)]
+                if self.frameAxis is not None:
+                    if isinstance(self.frameAxis, tuple) and len(self.frameAxis) == 2:
+                        ndx1 = self._current_frame_index_ // self._data_.shape[self._data_.axistags.index(self.frameAxis[0].key)]
+                        ndx0 = self._current_frame_index_ - ndx1 * self._data_.shape[self._data_.axistags.index(self.frameAxis[0].key)]
                         
-                        img = self._data_.bindAxis(self.frameAxisInfo[0].key,ndx0).bindAxis(self.frameAxisInfo[1].key,ndx1)
+                        img = self._data_.bindAxis(self.frameAxis[0].key,ndx0).bindAxis(self.frameAxis[1].key,ndx1)
                         
                     else:
-                        img = self._data_.bindAxis(self.frameAxisInfo.key, self._current_frame_index_)
+                        img = self._data_.bindAxis(self.frameAxis.key, self._current_frame_index_)
                         
                 else:
                     img = self._data_
@@ -3367,6 +3369,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         img is a vigra.VigraArray object
         
         """
+        # NOTE: 2021-12-02 10:39:54
+        # use axis indices instead of AxisInfo, in proposeLayout
         import io
         
         if img is None:
@@ -3377,9 +3381,17 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             return False
             
         try:
-            (nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo) = vu.proposeLayout(img, 
-                                                                                                        userFrameAxis = self.userFrameAxisInfo,
-                                                                                                        timeVertical = self._display_time_vertical_)
+            #(nFrames, widthAxis, heightAxis, channelAxisInfo, frameAxis) = vu.proposeLayout(img, 
+                                                                                                        #userFrameAxis = self.userFrameAxisInfo,
+                                                                                                        #timeVertical = self._display_time_vertical_)
+            
+            #layout = vu.proposeLayout(img, userFrameAxis = self.userFrameAxisInfo,
+                                      #timeVertical = self._display_time_vertical_)
+            
+            layout = vu.proposeLayout(img, userFrameAxis = self.userFrameAxisInfo,
+                                      timeVertical = self._display_time_vertical_,
+                                      indices=True)
+            
             
         except Exception as e:
             s = io.StringIO()
@@ -3392,8 +3404,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             # there may be a previous image stored here
             if self._data_ is not None and len(self.dataCursors) > 0: # parse width/height of previos image if any, to check against existing cursors
                 #if self._data_.width != img.width or self._data_.height != img.height:
-                if self._data_.shape[self._data_.axistags.index(self.widthAxisInfo.key)] != img.shape[img.axistags.index(widthAxisInfo.key)] or \
-                    self._data_.shape[self._data_.axistags.index(self.heightAxisInfo.key)] != img.shape[img.axistags.index(heightAxisInfo.key)]:
+                if self._data_.shape[layout.horizontal] != img.shape[layout.horizontal] or \
+                    self._data_.shape[layout.vertical] != img.shape[layout.vertical]:
                     self.questionMessage("Imageviewer:", "New image frame geometry will invalidate existing cursors.\nLoad image and bring all cursors to center?")
                     
                     ret = msgBox.exec()
@@ -3402,25 +3414,30 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                         return False
                     
                     for c in self.cursors:
-                        widthAxisNdx = img.axistags.index(widthAxisInfo.key)
-                        heightAxisNdx = img.axistags.index(heightAxisInfo.key)
-                        c.rangeX = img.shape[widthAxisNdx]
-                        c.rangeY = img.shape[heightAxisNdx]
-                        c.setPos(img.shape[widthAxisNdx]/2, img.shape[heightAxisNdx]/2)
+                        #widthAxisNdx = img.axistags.index(widthAxis.key)
+                        #heightAxisNdx = img.axistags.index(heightAxis.key)
+                        c.rangeX = img.shape[layout.horizontal]
+                        c.rangeY = img.shape[layout.vertical]
+                        c.setPos(img.shape[layout.horizontal]/2, img.shape[layout.vertical]/2)
             
-            self._number_of_frames_ = nFrames # if isinstance(nFrames, int) else np.prod(nFrames) if isinstance(nFrames, tuple) and all(isinstance(v, int) for v in nFrames) else None
+            self._number_of_frames_ = layout.nFrames 
 
             if self._number_of_frames_ is None:
                 self.criticalMessage("Error", "Cannot determine the number of frames in the data")
                 return False
         
-            self.frameAxisInfo  = frameAxisInfo
+            self.frameAxis  = layout.frames
             
-            self.widthAxisInfo  = widthAxisInfo
-            self.heightAxisInfo = heightAxisInfo
+            self.widthAxis  = layout.horizontal
+            self.heightAxis = layout.vertical
+            
+            #self.frameAxis  = frameAxis
+            
+            #self.widthAxis  = widthAxis
+            #self.heightAxis = heightAxis
             
             #if isinstance(self._number_of_frames_, (tuple, list)):
-                #self.frameIndices = tuple(itertools.product(*tuple(tuple((ax,i) for i in range(axSize)) for ax , axSize in zip(self.frameAxisInfo, self._number_of_frames_))))
+                #self.frameIndices = tuple(itertools.product(*tuple(tuple((ax,i) for i in range(axSize)) for ax , axSize in zip(self.frameAxis, self._number_of_frames_))))
             #else:
                 #self.frameIndices = list(range)
             
@@ -3525,9 +3542,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if not isinstance(self._data_, vigra.VigraArray):
             raise RuntimeError("Wrong function call for a non-vigra array image")
         
-        if self.frameAxisInfo is not None:
+        if self.frameAxis is not None:
             # NOTE: 2019-11-13 13:52:46
-            # frameAxisInfo is None only for 2D data arrays
+            # frameAxis is None only for 2D data arrays
             
             index = self.frameIndexing[self._current_frame_index_]
             dimindices = [index]
@@ -3535,10 +3552,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             img_view = self._data_
             if all(isinstance(ndx, tuple) for ndx in index):
                 for ndx in index:
-                    img_view = img_view.bindAxis(img_view.axistags.index(ndx[0].key), ndx[1])
+                    # NOTE: 2021-12-02 10:40:17
+                    # axis infos are now axis indices (ints)
+                    # see  NOTE: 2021-12-02 10:39:54
+                    img_view = img_view.bindAxis(ndx[0], ndx[1])
+                    #img_view = img_view.bindAxis(img_view.axistags.index(ndx[0].key), ndx[1])
                     
             else:
-                img_view = img_view.bindAxis(img_view.axistags.index(index[0].key), index[1])
+                img_view = img_view.bindAxis(index[0], index[1])
+                #img_view = img_view.bindAxis(img_view.axistags.index(index[0].key), index[1])
             
         else:
             img_view = self._data_
@@ -3639,10 +3661,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 
             # TODO FIXME: what if we view a transposed array ???? (e.g. viewing it on
             # Y or X axis instead of the Z or T axis?)
-            width_axis_ndx = self._data_.axistags.index(self.widthAxisInfo.key)
-            height_axis_ndx = self._data_.axistags.index(self.heightAxisInfo.key)
-            w = self._data_.shape[width_axis_ndx] # this is not neccessarily space!
-            h = self._data_.shape[height_axis_ndx] # this is not neccessarily space!
+            #width_axis_ndx = self._data_.axistags.index(self.widthAxis.key)
+            #height_axis_ndx = self._data_.axistags.index(self.heightAxis.key)
+            w = self._data_.shape[self.widthAxis] # this is not neccessarily space!
+            h = self._data_.shape[self.heightAxis] # this is not neccessarily space!
             
             self._image_width_ = w
             self._image_height_= h
@@ -3650,16 +3672,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             # NOTE: 2017-07-26 22:18:14
             # get calibrates axes sizes
             if self._axes_calibration_ is not None:
-                cals = "(%s x %s)" % (self._axes_calibration_.calibrations[width_axis_ndx].calibratedDistance(w),
-                                      self._axes_calibration_.calibrations[height_axis_ndx].calibratedDistance(h))
+                cals = "(%s x %s)" % (self._axes_calibration_.calibrations[self.widthAxis].calibratedDistance(w),
+                                      self._axes_calibration_.calibrations[self.heightAxis].calibratedDistance(h))
             else:
                 cals = "(%s x %s)" % \
-                    (quantity2str(vu.getCalibratedAxisSize(self._data_, self.widthAxisInfo.key)), \
-                        quantity2str(vu.getCalibratedAxisSize(self._data_, self.heightAxisInfo.key)))
+                    (quantity2str(vu.getCalibratedAxisSize(self._data_, self.widthAxis)), \
+                        quantity2str(vu.getCalibratedAxisSize(self._data_, self.heightAxis)))
     
             shapeTxt = "%s x %s: %d x %d %s" % \
-                (axisTypeName(self.widthAxisInfo), \
-                    axisTypeName(self.heightAxisInfo), \
+                (axisTypeName(self._data_.axistags[self.widthAxis]), \
+                    axisTypeName(self._data_.axistags[self.heightAxis]), \
                     w, h, cals)
             
             self.slot_displayColorBar(self.displayColorBarAction.isChecked())
@@ -4072,11 +4094,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             #w = self._data_.shape[0]
             #h = self._data_.shape[1]
             
-            widthAxisIndex = self._data_.axistags.index(self.widthAxisInfo.key)
-            heightAxisIndex = self._data_.axistags.index(self.heightAxisInfo.key)
+            #widthAxisIndex = self._data_.axistags.index(self.widthAxis.key)
+            #heightAxisIndex = self._data_.axistags.index(self.heightAxis.key)
             
-            w = self._data_.shape[widthAxisIndex]
-            h = self._data_.shape[heightAxisIndex]
+            w = self._data_.shape[self.widthAxis]
+            h = self._data_.shape[self.heightAxis]
+            
+            # NOTE: 2021-12-02 10:57:24
+            # this is now requires because of NOTE: 2021-12-02 10:39:54
+            wAxInfo = self._data_.axistags[self.widthAxis]
+            hAxInfo = self._data_.axistags[self.heightAxis]
             
             #
             # below, img is a view NOT a copy !
@@ -4084,8 +4111,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             img, _ = self._frameView_(self._displayedChannel_)
             
-            viewWidthAxisIndex = img.axistags.index(self.widthAxisInfo.key)
-            viewHeightAxisIndex = img.axistags.index(self.heightAxisInfo.key)
+            viewWidthAxisIndex = img.axistags.index(wAxInfo.key)
+            viewHeightAxisIndex = img.axistags.index(hAxInfo.key)
             
             viewW = img.shape[viewWidthAxisIndex]
             viewH = img.shape[viewHeightAxisIndex]
@@ -4163,16 +4190,19 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                             else:
                                 sval = "(%.2f)" % val
                             
-                        if self.frameAxisInfo is not None:
-                            if isinstance(self.frameAxisInfo, vigra.AxisInfo):
-                                if self.frameAxisInfo not in self._data_.axistags:
-                                    raise RuntimeError("frame axis %s not found in the image" % self.frameAxisInfo.key)
+                        if self.frameAxis is not None:
+                            #if isinstance(self.frameAxis, vigra.AxisInfo):
+                            if isinstance(self.frameAxis, int):
+                                if self.frameAxis >= self._data_.ndim:
+                                    raise RuntimeError(f"frame axis {self.frameAxis} not found in the image")
+                                #if self.frameAxis not in self._data_.axistags:
+                                    #raise RuntimeError("frame axis %s not found in the image" % self.frameAxis.key)
                                 
-                                zAxisKey = self.frameAxisInfo.key
-                                frameAxisIndex = self._data_.axistags.index(zAxisKey)
+                                #zAxisKey = self.frameAxis.key
+                                #frameAxisIndex = self._data_.axistags.index(zAxisKey)
                                 
                                 if self._axes_calibration_:
-                                    cz = self._axes_calibration_[frameAxisIndex].calibratedMeasure(self._current_frame_index_)
+                                    cz = self._axes_calibration_[self.frameAxis].calibratedMeasure(self._current_frame_index_)
                                     scz = quantity2str(cz)
                                 else:
                                     scz = ""
@@ -4184,11 +4214,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                     self._current_frame_index_, zAxisKey, scz,
                                     sval)
                             
-                            else: # self.frameAxisInfo is a tuple
+                            else: # self.frameAxis is a tuple
                                 if self._axes_calibration_:
-                                    sz_cz = ", ".join([f"{ndx[0].key}: {ndx[1]} ({quantity2str(self._axes_calibration_[ndx[0].key].calibratedDistance(ndx[1]))})" for ndx in reversed(self.frameIndexing[self._current_frame_index_])])
+                                    sz_cz = ", ".join([f"{ndx[0]}: {ndx[1]} ({quantity2str(self._axes_calibration_[self._data_.axistags[ndx[0]]].calibratedDistance(ndx[1]))})" for ndx in reversed(self.frameIndexing[self._current_frame_index_])])
                                 else:
-                                    sz_cz = ", ".join([f"{ndx[0].key}: {ndx[1]}" for ndx in reversed(self.frameIndexing[self._current_frame_index_])])
+                                    sz_cz = ", ".join([f"{ndx[0]}: {ndx[1]}" for ndx in reversed(self.frameIndexing[self._current_frame_index_])])
+                                
+                                #if self._axes_calibration_:
+                                    #sz_cz = ", ".join([f"{ndx[0].key}: {ndx[1]} ({quantity2str(self._axes_calibration_[ndx[0].key].calibratedDistance(ndx[1]))})" for ndx in reversed(self.frameIndexing[self._current_frame_index_])])
+                                #else:
+                                    #sz_cz = ", ".join([f"{ndx[0].key}: {ndx[1]}" for ndx in reversed(self.frameIndexing[self._current_frame_index_])])
                                 
                                 coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s)> %s" % \
                                     (crstxt, \
@@ -4264,26 +4299,26 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     c_list.append("%s<Y: %d (%s: %s)%s" % ((crstxt, y, heightAxisKey, scy, swy)))
                 
                 if img.ndim > 2:
-                    if self.frameAxisInfo is not None:
-                        if isinstance(self.frameAxisInfo, vigra.AxisInfo):
-                            if self.frameAxisInfo not in self._data_.axistags:
-                                raise RuntimeError("frame axis intfo %s not found in the image" % self.frameAxisInfo.key)
+                    if self.frameAxis is not None:
+                        if isinstance(self.frameAxis, vigra.AxisInfo):
+                            if self.frameAxis not in self._data_.axistags:
+                                raise RuntimeError("frame axis intfo %s not found in the image" % self.frameAxis.key)
                         
                             if self._axes_calibration_:
-                                cz = quantity2str(self._axes_calibration_[self.frameAxisInfo.key].calibratedMeasure(self._current_frame_index_))
+                                cz = quantity2str(self._axes_calibration_[self.frameAxis.key].calibratedMeasure(self._current_frame_index_))
                             else:
                                 cz = ""
                         
-                            sz = self.frameAxisInfo.key
+                            sz = self.frameAxis.key
                         
                             c_list.append(", Z: %d (%s: %s)>" % (self._current_frame_index_, sz, cz))
                             
                         else:
                             if self._axes_calibration_:
-                                sz_cz = ", ".join(["%s: %s" % (ax.key, quantity2str(self._axes_calibration_[ax.key].calibratedMeasure(self._current_frame_index_))) for ax in self.frameAxisInfo])
+                                sz_cz = ", ".join(["%s: %s" % (ax.key, quantity2str(self._axes_calibration_[ax.key].calibratedMeasure(self._current_frame_index_))) for ax in self.frameAxis])
                                 
                             else:
-                                sz_cz = ", ".join(["%s: %s" % (ax.key, self._current_frame_index_) for ax in self.frameAxisInfo])
+                                sz_cz = ", ".join(["%s: %s" % (ax.key, self._current_frame_index_) for ax in self.frameAxis])
                                 
                             c_list.append("(%s)" % sz_cz)
     
@@ -4352,7 +4387,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
     def _display_Z_coordinate(self) -> str:
         ret = f"Z: {self._current_frame_index_}"
-        if self.frameAxisInfo is not None:
+        if self.frameAxis is not None:
             index = self.frameIndexing[self._current_frame_index_]
             if all(isinstance(ndx, tuple) for ndx in index):
                 if self._axes_calibration_:
@@ -4653,11 +4688,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._separateChannels           = False
         self.tStride                    = 0
         self.zStride                    = 0
-        self.frameAxisInfo              = None
+        self.frameAxis              = None
         self.userFrameAxisInfo          = None
         self._display_time_vertical_        = True
-        self.widthAxisInfo              = None # this is "visual" width which may not be on a spatial axis "x"
-        self.heightAxisInfo             = None # this is "visual" height which may not be on a spatial axis "y"
+        self.widthAxis              = None # this is "visual" width which may not be on a spatial axis "x"
+        self.heightAxis             = None # this is "visual" height which may not be on a spatial axis "y"
         self._currentZoom_               = 0
         self._currentFrameData_          = None
         self._xScaleBar_                 = None

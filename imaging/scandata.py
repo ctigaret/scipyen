@@ -81,7 +81,7 @@ class ScanDataFrameIndex(MultiFrameIndex):
     # NOTE: 2021-12-01 14:43:47
     # interesing pogramming hack:
     # if this is clobbered, the fields are visible in dir and __dict__, yet not 
-    # captured by prog.get_descriptors it behaves a bit like an opaque object
+    # captured by prog.get_descriptors: it behaves a bit like an opaque object
     @classmethod
     def setup_descriptor(cls, params):
         """Clobbers further addition of descriptors
@@ -1179,6 +1179,8 @@ class ScanData(BaseScipyenData):
     _data_attributes_ = (
         ("sceneAxesCalibration",            list,   AxesCalibration),
         ("scansAxesCalibration",            list,   AxesCalibration),
+        ("sceneLayout",                     dict),
+        ("scansLayout",                     dict),
         ("sceneFrameAxis",                  (vigra.AxisInfo, tuple)),
         ("scansFrameAxis",                  (vigra.AxisInfo, tuple)),
         ("framesMap",                       FrameIndexLookup),
@@ -1580,6 +1582,7 @@ class ScanData(BaseScipyenData):
         #
         
         # END comments
+       
         #self.apiversion = (0,3) # MAJOR, MINOR
         #print("ScanData.__init__ start")
         # user-defined (meta) data
@@ -1815,24 +1818,47 @@ class ScanData(BaseScipyenData):
             metadata = kwmeta
 
         sceneFrameAxis = kwargs.pop("sceneFrameAxis", None)
+        sceneLayout = kwargs.pop("sceneLayout", None)
         sceneAxesCalibration = kwargs.pop("sceneAxesCalibration", None)
         
         scansFrameAxis = kwargs.pop("scansFrameAxis", None)
+        scansLayout = kwargs.pop("scansLayout", None)
         scansAxesCalibration = kwargs.pop("scansAxesCalibration", None)
         
-        scene, scene_frame_axis, scene_axes_cal = self.proposeLayoutAndCalibration(scene, sceneFrameAxis, sceneAxesCalibration)
-        scans, scans_frame_axis, scans_axes_cal = self.proposeLayoutAndCalibration(scans, scansFrameAxis, scansAxesCalibration)
+        scene, scene_layout, scene_axes_cal = self.dataLayout(scene, sceneFrameAxis, sceneAxesCalibration)
+        scans, scans_layout, scans_axes_cal = self.dataLayout(scans, scansFrameAxis, scansAxesCalibration)
         
         kwargs["scene"] = scene
-        kwargs["sceneFrameAxis"] = scene_frame_axis
-        kwargs["sceneAxesCalibration"] = scene_axes_cal
+        kwargs["sceneLayout"] = scene_layout if sceneLayout is None else sceneLayout
+        kwargs["sceneFrameAxis"] = kwargs["sceneLayout"]
+        kwargs["sceneAxesCalibration"] = scene_axes_cal if sceneAxesCalibration is None else sceneAxesCalibration
         
         kwargs["scans"] = scans
-        kwargs["scansFrameAxis"] = scans_frame_axis
-        kwargs["scansAxesCalibration"] = scans_axes_cal
+        kwargs["scansLayout"] = scans_layout if scansLayout is None else scansLayout
+        kwargs["scansFrameAxis"] = kwargs["scansLayout"]
+        kwargs["scansAxesCalibration"] = scans_axes_cal if scansAxesCalibration is None else scansAxesCalibration
         
         kwargs["electrophysiology"] = electrophysiology
         kwargs["metadata"] = metadata
+        
+        # NOTE: 2021-12-02 15:52:30
+        # set up the framesMap
+        #
+        # 1) by default scans drive frame index lookup:
+        #   we map all frames in scene and electrophysiology against scans frames
+        #
+        # 2) if scans are empty, then scene becomes the main driver, and we map
+        #   electrophysiology frames against scene
+        #
+        # 3) if only electorphysiology si given that becomes the driver, etc
+        #
+        # 4 wit no data at all we get a generic frameMap ()
+        
+        #if kwargs["scansLayout"] if not None:
+            #if kwargs["scansLayout"].nFrames > 0:
+            #if sceneLayout.nFrames == 1:
+                 #if len(electrophysiology.segments) == 0:
+                     #for k in range()
         
         super().__init__(**kwargs) # BaseScipyenData/WithDescriptors
         
@@ -1902,11 +1928,12 @@ class ScanData(BaseScipyenData):
                     pass
                
     @staticmethod
-    def proposeLayoutAndCalibration(data, 
-                         frameAxis:typing.Optional[vigra.AxisInfo]=None, 
-                         horizontalAxis:typing.Optional[vigra.AxisInfo]=None, 
-                         verticalAxis:typing.Optional[vigra.AxisInfo]=None, 
-                         axescal:typing.Optional[AxesCalibration]=None):
+    def dataLayout(data, 
+                    frameAxis:typing.Optional[vigra.AxisInfo]=None, 
+                    horizontalAxis:typing.Optional[vigra.AxisInfo]=None, 
+                    verticalAxis:typing.Optional[vigra.AxisInfo]=None, 
+                    axescal:typing.Optional[AxesCalibration]=None,
+                    electrophysiology:typing.Optional[neo.Block]=None):
         """ Proposes an axes layout and axes calibration for the data.
         
         See also imaging.vigrautils.proposeLayout()
@@ -1914,38 +1941,39 @@ class ScanData(BaseScipyenData):
         Returns
         --------
         
-        A tuple:
-            (images, horizontalAxis, verticalAxis, axesCalibration, frameAxis), where:
+        A dict with the following key/value pairs:
         
-        images: list of VigraArrays with at least one element
+        'images': list containing at least one VigraArray objects.
+            The arrays have identical shapes and axistag keys.
+            
+        'horizontal': int: the index of the array axis corresponding to the 
+            'horizontal' dimension of the arrays in 'images' (for display
+            purposes)
         
-        frameAxis: index (int) of the axis along which data "frames" are defined
-            (a 'frame' is defined according to the analysis purpose of ScanData)
+        'vertical': int: the index of the array axis corresponding to the 
+            'vertical' dimension of the arrays in 'image' (for display purposes)
             
-        horizontalAxis, verticalAxis: indices (int) of the axes for the dimensions 
-            along which the 'width' and 'height' of the image data are defined.
+        'frames': int, or tuple of int: the index, or indices, of the array axis
+            (or axes) along which data 'frames' are defined (NOTE arrays with more
+            than 3 dimensions may have mode than one 'frame' axis, see 
+            gui.imageviewer.ImageViewer and imaging.vigrautils.proposeLayout()
+            for details)
             
-        NOTE: 'width' and 'height' are loosely defined in relation to the display
-            of the image data, and not necessarily to the space domain.
-            
-            For example, in an image containing a series of linescans, the
-            horizontal axis usually corresponds to the space domain (on line scan
-            'sweep') whereas the vertical axis corresponds to the time domain
-            (time series of successive linescan sweeps).
-        
         
         """
         if not isinstance(data, (vigra.VigraArray, tuple, list)):
             return (None, None, None)
         
         if isinstance(data, vigra.VigraArray):
-            nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo = proposeLayout(data, userFrameAxis = frameAxis)
+            layout = proposeLayout(data, userFrameAxis = frameAxis)
+            #nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo = proposeLayout(data, userFrameAxis = frameAxis)
+            
             if isinstance(axescal, AxesCalibration) and all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(axescal.axiskeys, data.axistags)):
                 axes_cal = [axscal]
             else:
                 axes_cal = [AxesCalibration(data)]
                 
-            return ([data], frameAxisInfo, axes_cal)
+            return ([data], layout, axes_cal)
             
         elif isinstance(data, (tuple, list)):
             if len(data):
@@ -1961,7 +1989,7 @@ class ScanData(BaseScipyenData):
                 if not all([s.channels == data[0].channels for s in data[1:]]):
                     raise TypeError("Image arrays in a sequence must have the same number of channels")
 
-                nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo = proposeLayout(data[0], userFrameAxis = frameAxis)
+                layout = proposeLayout(data[0], userFrameAxis = frameAxis)
 
                 if isinstance(axescal, (tuple, list)):
                     if len(axescal) != len(data):
@@ -1977,7 +2005,7 @@ class ScanData(BaseScipyenData):
                 else:
                     axes_cal = [AxesCalibration(img) for img in data]
                 
-                return (data, frameAxisInfo, axes_cal)
+                return (data, layout, axes_cal)
 
             return (list(), None, None)
                 
@@ -2003,10 +2031,10 @@ class ScanData(BaseScipyenData):
         1) adapt to a new scenario where all scene image data is a single  multi-channel VigraArray
 
         """
-        new_scene, scene_frame_axis, scene_axes_calibrations = self.proposeLayoutAndCalibration(scene, frameAxis=sceneFrameAxis)
+        new_scene, scene_frame_axis, scene_axes_calibrations = self.dataLayout(scene, frameAxis=sceneFrameAxis)
         
         #print(new_scene)
-        new_scans, scans_frame_axis, scans_axes_calibrations = self.proposeLayoutAndCalibration(scans, frameAxis=scansFrameAxis)
+        new_scans, scans_frame_axis, scans_axes_calibrations = self.dataLayout(scans, frameAxis=scansFrameAxis)
 
         if new_scene is not None:
             self.sceneCursors.clear()

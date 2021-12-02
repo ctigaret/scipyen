@@ -134,7 +134,8 @@ def stderr_redirector(stream):
 
     # The original fd stdout points to. Usually 1 on POSIX systems.
     original_stderr_fd = sys.stderr.fileno()
-    system_stderr_fd = sys.stderr.fileno() # also save this
+    print("original", original_stderr_fd)
+    #system_stderr_fd = sys.stderr.fileno() # also save this
 
     def _redirect_(to_fd):
         """Redirect stderr to the given file descriptor."""
@@ -144,13 +145,22 @@ def stderr_redirector(stream):
         sys.stderr.close()
         # Make original_stderr_fd point to the same file as to_fd:
         # duplicate to_fd to original_stderr_fd;
+        print(f"in _redirect_ before dup2: to_fd: {to_fd}, original_stderr_fd, {original_stderr_fd}")
         os.dup2(to_fd, original_stderr_fd)
+        print(f"in _redirect_ after dup2: to_fd: {to_fd}, original_stderr_fd, {original_stderr_fd}")
         # now 'original_stderr_fd' is a duplicate of 'to_fd'
         # Create a new sys.stderr that points to the redirected fd
         sys.stderr = io.TextIOWrapper(os.fdopen(original_stderr_fd, 'wb'))
+        #original_stderr= os.fdopen(original_stderr_fd, 'wb')
+        #print(type(original_stderr))
+        #sys.stderr = io.TextIOWrapper(original_stderr)
+        #original_stderr.flush()
+        #print(type(original_stderr.fileno()))
+        #os.fsync(original_stderr_fd)
 
     # Save a copy of the original stderr fd in saved_stderr_fd
     saved_stderr_fd = os.dup(original_stderr_fd)
+    print("saved", saved_stderr_fd)
     try:
         # Create a temporary file and redirect stderr to it
         tfile = tempfile.TemporaryFile(mode='w+b')
@@ -176,11 +186,12 @@ def stderr_redirector(stream):
         #sys.stderr.write(tfile.read().decode())
         ##stream.write(tfile.read().decode())
     finally:
-        #tfile.flush()
-        #tfile.seek(0, io.SEEK_SET)
-        #sys.stderr.write(tfile.read().decode())
+        print("finally: saved", saved_stderr_fd)
+        print("finally: original", original_stderr_fd)
+        #print(saved_stderr_fd is original_stderr_fd)
         tfile.close()
         os.close(saved_stderr_fd)
+        #os.fsync(original_stderr_fd) # invalid argument!
         #original_stderr_fd = os.dup(saved_stderr_fd)
         #sys.stderr = io.TextIOWrapper(os.fdopen(system_stderr_fd, 'wb'))
         
