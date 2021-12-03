@@ -2404,9 +2404,17 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.displayFrame()
         
     @property
-    def frameIndexing(self):
+    def frameIndexBinding(self):
+        if not isinstance(self._data_, vigra.VigraArray):
+            return (None, 0)
+        
+        # NOTE when a frame axis index equals data.ndim this means there is no
+        # frame axis there!
+        
+        #print("in frameIndexBinding: self.frameAxis", self.frameAxis)
+        #print("in frameIndexBinding: self._number_of_frames_", self._number_of_frames_)
         if isinstance(self._number_of_frames_, int):
-            return tuple((self.frameAxis, k) for k in range(self._number_of_frames_))
+            return tuple((self.frameAxis if self.frameAxis < self._data_.ndim else None, k) for k in range(self._number_of_frames_))
         
         else:
             traversal = tuple(tuple((ax,i) for i in range(axSize)) for ax, axSize in zip(reversed(self.frameAxis), reversed(self._number_of_frames_)))
@@ -3115,7 +3123,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 h = self._data_.shape[1]
                 
                 if self.frameAxis is not None:
-                    if isinstance(self.frameAxis, tuple) and len(self.frameAxis) == 2:
+                    if isinstance(self.frameAxis, tuple):# and len(self.frameAxis) == 2:
                         ndx1 = self._current_frame_index_ // self._data_.shape[self._data_.axistags.index(self.frameAxis[0].key)]
                         ndx0 = self._current_frame_index_ - ndx1 * self._data_.shape[self._data_.axistags.index(self.frameAxis[0].key)]
                         
@@ -3542,14 +3550,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if not isinstance(self._data_, vigra.VigraArray):
             raise RuntimeError("Wrong function call for a non-vigra array image")
         
+        img_view = self._data_
+        dimindices = []
+        
         if self.frameAxis is not None:
             # NOTE: 2019-11-13 13:52:46
-            # frameAxis is None only for 2D data arrays
-            
-            index = self.frameIndexing[self._current_frame_index_]
+            # frameAxis is None only for 2D data arrays or 3D arrays with channel axis
+            index = self.frameIndexBinding[self._current_frame_index_]
             dimindices = [index]
-            
-            img_view = self._data_
+        
             if all(isinstance(ndx, tuple) for ndx in index):
                 for ndx in index:
                     # NOTE: 2021-12-02 10:40:17
@@ -3559,12 +3568,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     #img_view = img_view.bindAxis(img_view.axistags.index(ndx[0].key), ndx[1])
                     
             else:
+                #print("in self._frameView_: index", index)
                 img_view = img_view.bindAxis(index[0], index[1])
                 #img_view = img_view.bindAxis(img_view.axistags.index(index[0].key), index[1])
             
-        else:
-            img_view = self._data_
-            dimindices = []
+        #else:
+            #img_view = self._data_
             
         # up to now, img_view is a 2D slice view of self._data_, will _ALL_ available channels
             
@@ -4065,6 +4074,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         #if self._currentFrameData_ is None:
             #return
+            
+        # NOTE: 2021-12-03 09:40:11 because self.frameAxis is now an int or a 
+        # tuple of ints we need tpo convert these back to axisinfo
         
         if coords[0] is not None:
             x = int(coords[0])
@@ -4193,7 +4205,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                         if self.frameAxis is not None:
                             #if isinstance(self.frameAxis, vigra.AxisInfo):
                             if isinstance(self.frameAxis, int):
-                                if self.frameAxis >= self._data_.ndim:
+                                frameAxis = self._data_axistags.index(self.frameAxis)
+                                if frameAxis >= self._data_.ndim:
                                     raise RuntimeError(f"frame axis {self.frameAxis} not found in the image")
                                 #if self.frameAxis not in self._data_.axistags:
                                     #raise RuntimeError("frame axis %s not found in the image" % self.frameAxis.key)
@@ -4202,7 +4215,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                 #frameAxisIndex = self._data_.axistags.index(zAxisKey)
                                 
                                 if self._axes_calibration_:
-                                    cz = self._axes_calibration_[self.frameAxis].calibratedMeasure(self._current_frame_index_)
+                                    cz = self._axes_calibration_[frameAxis.key].calibratedMeasure(self._current_frame_index_)
                                     scz = quantity2str(cz)
                                 else:
                                     scz = ""
@@ -4215,15 +4228,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                     sval)
                             
                             else: # self.frameAxis is a tuple
+                                #frameAxis = tuple(self._data_.axistags.index(ax) for ax in self.frameAxis)
                                 if self._axes_calibration_:
-                                    sz_cz = ", ".join([f"{ndx[0]}: {ndx[1]} ({quantity2str(self._axes_calibration_[self._data_.axistags[ndx[0]]].calibratedDistance(ndx[1]))})" for ndx in reversed(self.frameIndexing[self._current_frame_index_])])
+                                    sz_cz = ", ".join([f"{ndx[0]}: {ndx[1]} ({quantity2str(self._axes_calibration_[self._data_.axistags[ndx[0]]].calibratedDistance(ndx[1]))})" for ndx in reversed(self.frameIndexBinding[self._current_frame_index_])])
                                 else:
-                                    sz_cz = ", ".join([f"{ndx[0]}: {ndx[1]}" for ndx in reversed(self.frameIndexing[self._current_frame_index_])])
+                                    sz_cz = ", ".join([f"{ndx[0]}: {ndx[1]}" for ndx in reversed(self.frameIndexBinding[self._current_frame_index_])])
                                 
                                 #if self._axes_calibration_:
-                                    #sz_cz = ", ".join([f"{ndx[0].key}: {ndx[1]} ({quantity2str(self._axes_calibration_[ndx[0].key].calibratedDistance(ndx[1]))})" for ndx in reversed(self.frameIndexing[self._current_frame_index_])])
+                                    #sz_cz = ", ".join([f"{ndx[0].key}: {ndx[1]} ({quantity2str(self._axes_calibration_[ndx[0].key].calibratedDistance(ndx[1]))})" for ndx in reversed(self.frameIndexBinding[self._current_frame_index_])])
                                 #else:
-                                    #sz_cz = ", ".join([f"{ndx[0].key}: {ndx[1]}" for ndx in reversed(self.frameIndexing[self._current_frame_index_])])
+                                    #sz_cz = ", ".join([f"{ndx[0].key}: {ndx[1]}" for ndx in reversed(self.frameIndexBinding[self._current_frame_index_])])
                                 
                                 coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s)> %s" % \
                                     (crstxt, \
@@ -4301,11 +4315,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 if img.ndim > 2:
                     if self.frameAxis is not None:
                         if isinstance(self.frameAxis, vigra.AxisInfo):
-                            if self.frameAxis not in self._data_.axistags:
-                                raise RuntimeError("frame axis intfo %s not found in the image" % self.frameAxis.key)
+                            #if self.frameAxis not in self._data_.axistags:
+                            if self.frameAxis >= img.ndim:
+                                raise RuntimeError(f"frame axis {self.frameAxis} %s not found in the image")
+                                #raise RuntimeError("frame axis  %s not found in the image" % self.frameAxis.key)
                         
                             if self._axes_calibration_:
-                                cz = quantity2str(self._axes_calibration_[self.frameAxis.key].calibratedMeasure(self._current_frame_index_))
+                                cz = quantity2str(self._axes_calibration_[self._data_.axistags[self.frameAxis].key].calibratedMeasure(self._current_frame_index_))
                             else:
                                 cz = ""
                         
@@ -4315,10 +4331,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                             
                         else:
                             if self._axes_calibration_:
-                                sz_cz = ", ".join(["%s: %s" % (ax.key, quantity2str(self._axes_calibration_[ax.key].calibratedMeasure(self._current_frame_index_))) for ax in self.frameAxis])
+                                sz_cz = ", ".join(["%s: %s" % (self._data_.axistags[ax].key, quantity2str(self._axes_calibration_[self._data_.axistags[ax].key].calibratedMeasure(self._current_frame_index_))) for ax in self.frameAxis])
                                 
                             else:
-                                sz_cz = ", ".join(["%s: %s" % (ax.key, self._current_frame_index_) for ax in self.frameAxis])
+                                sz_cz = ", ".join(["%s: %s" % (sedlf._data_.axistags[ax].key, self._current_frame_index_) for ax in self.frameAxis])
                                 
                             c_list.append("(%s)" % sz_cz)
     
@@ -4388,18 +4404,18 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     def _display_Z_coordinate(self) -> str:
         ret = f"Z: {self._current_frame_index_}"
         if self.frameAxis is not None:
-            index = self.frameIndexing[self._current_frame_index_]
+            index = self.frameIndexBinding[self._current_frame_index_]
             if all(isinstance(ndx, tuple) for ndx in index):
                 if self._axes_calibration_:
-                    z = ", ".join([f"{ndx[0].key}: {ndx[1]} ({quantity2str(self._axes_calibration_[ndx[0].key].calibratedDistance(ndx[1]))})" for ndx in reversed(index)])
+                    z = ", ".join([f"{self._data_.axistags[ndx[0]].key}: {ndx[1]} ({quantity2str(self._axes_calibration_[self._data_.axistags[ndx[0]].key].calibratedDistance(ndx[1]))})" for ndx in reversed(index)])
                 else:
-                    z = ", ".join([f"{ndx[0].key}: {ndx[1]}" for ndx in reversed(index)])
+                    z = ", ".join([f"{self._data_.axistags[ndx[0]].key}: {ndx[1]}" for ndx in reversed(index)])
                     
             else:
                 if self._axes_calibration_:
-                    z = f"{index[0].key}: {index[1]} ({quantity2str(self._axes_calibration_[index[0].key].calibratedDistance(index[1]))})"
+                    z = f"{self._data_.axistags[index[0]].key}: {index[1]} ({quantity2str(self._axes_calibration_[self._data_.axistags[index[0]].key].calibratedDistance(index[1]))})"
                 else:
-                    z = f"{index[0].key}: {index[1]}"
+                    z = f"{self._data_.axistags[index[0]].key}: {index[1]}"
                 
             ret += f": {z}"
             
@@ -4651,6 +4667,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         elif isinstance(data, (QtGui.QImage, QtGui.QPixmap)):
             self._number_of_frames_ = 1
             self._data_  = data
+            self.frameAxis = None
             self.displayFrame()
             
         elif isinstance(data, np.ndarray):
@@ -4671,8 +4688,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             # For display purposes only, we construct a VigraArray on the numpy
             # ndarray passed as 'image'
             
-            self._data_ = vigra.VigraArray(data, axistags=arrayAxes)
-            self._axes_calibration_ = AxesCalibration(self._data_)
+            array_data = vigra.VigraArray(data, axistags=arrayAxes)
+            if self._parseVigraArrayData_(array_data):
+                self._data_  = array_data
+                self._axes_calibration_ = AxesCalibration(array_data)
+                self._setup_channels_display_actions_()
+                self.displayFrame(asAlphaChannel=asAlphaChannel)
             
         else:
             raise TypeError("First argument must be a VigraArray, a numpy.ndarray, a QtGui.QImage or a QtGui.QPixmap")

@@ -5,6 +5,7 @@ import collections.abc
 from inspect import (getmembers, getattr_static)
 from core.prog import (ArgumentError,  WithDescriptors, 
                        get_descriptors, classify_signature)
+from core.utilities import nth
 from core.basescipyen import BaseScipyenData
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -152,10 +153,48 @@ class FrameIndexLookup(object):
         def __set__(self, obj, value=None):
             # NOTE: 2021-12-01 22:44:11 reference needed in __get/setitem__
             self._obj_ = obj
+            
+        def __get_nth__(self, field, ndx, default):
+            #nFramesForField = getattr(self._obj_, f"{self._field_}_nFrames", None)
+            nFramesForField = self._obj_._n_child_frames_.get(self._field_, None)
+            print(f"__get_nth__: nFrames for {self._field_}: {nFramesForField}")
+            if isinstance(nFramesForField, int):
+                return nth(range(nFramesForField), ndx, default)
+            
         
         def __getitem__(self, key:int):
-            return getattr(self._obj_._map_[key], self._field_, key)
-        
+            index = self._obj_[key]
+            print(f"{key} -> {type(index).__name__}")
+            if isinstance(index, MultiFrameIndex):
+                # check for field in MultiFrameIndex
+                if hasattr(index, self._field_):
+                    val = getattr(index, self._field_)
+                    #print(f"for index {index} of {self._field_} got {val}")
+                    # CAUTION: 2021-12-03 16:19:05
+                    # the one-liner:
+                    # `return val if isinstance(val, int)`
+                    # is NOT the same as the `if` clause below:
+                    # the 1-liner ALWAYS returns (including None when 'val' is
+                    # not an int)
+                    # in contrast, the `if` clause below ONLY returns 'val' when
+                    # 'val' is an int
+                    if isinstance(val, int):
+                        return val
+                    
+                    # from here on, val is explicitly None for given field in
+                    # the MultiFrameIndex, or MFI doesn't have field, or key is
+                    # NOT mapped to an MFI
+                    #
+
+            # try to use nth here (default on the last available frame)
+            val = self.__get_nth__(self._field_, key, -1)
+            # NOTE: see CAUTION: 2021-12-03 16:19:05
+            if isinstance(val, int):
+                return val
+            
+            # finally, return key when all of the above failed
+            return key
+                        
         def __setitem__(self, key:int, value:int):
             if key in self._obj_._map_:
                 if self._field_ in self._obj_._map_[key]:
@@ -205,31 +244,51 @@ class FrameIndexLookup(object):
                 self._obj_._field_names_.add(field) # NOOP if field exists
         
     
-    def __init__(self, data:typing.Optional[BaseScipyenData]=None, *args):
+    #def __init__(self, data:typing.Optional[BaseScipyenData]=None, *args):
+    def __init__(self, *args, **kwargs):
         """
-        data: python object where data is stored framewise in a '_data_children_'
-        :class: attribute; optional, default is None
-            
         *args: one or more dict with the following structure:
             int key : MultiFrameIndex object or None
                 When a MultiFrameIndex this is expected to have the following 
                 fields: 'scene', 'scans', 'electrophysiology', mapped to either
                 an int value, or to None.
-        """
-        if len(args) == 0:
-            if isinstance(data, dict) and all(isinstance(k, int) and isinstance(v, (type(None), MultiFrameIndex)) for k,v in data.items()):
-                args = (data,)
-                data = None
                 
-            elif not isinstance(data, (type(None), BaseScipyenData)):
-                raise TypeError(f"'data expected to be a BaseScipyenData object or None; got {type(data).__name__} instead")
+        *kwargs:
+        -----------
+        'data_children': tuple of strings, with the name of the data children attributes
+            Each data child stores data frame-wise, and MAY NOT have the same 
+            number of frames as the other data children;
             
-        data_children = getattr(data, "_data_children_", tuple())
-        field_names = set(c[0] for c in data_children if isinstance(c[0], str) and len(c[0].strip()))
+            Empty tuple, by default
+            
+        'maxFrames': int >=0 or None. When given this represents the maximum 
+            number of frames allowed in the lookup
+            
+        '*_nFrames': int >= 0 where * is str matching the field names of the 
+            MultiFrameIndex passed via *args
+            
+        """
+        #data_children = kwargs.pop("data_children", tuple())
+        
+        #if not isinstance(data_children, tuple)) or (len(data_children) > 0 and not all(isinstance(d, str) and len(d.strip())>0 for d in data_children)):
+            #raise TypeError(f"'data expected to be a tuple of non-empty strings, or an empty tuple; got {data_children} instead")
+        
+        maxFrames = kwargs.pop("maxFrames", None)
+        
+        if isinstance(maxFrames, int):
+            if maxFrames < 0:
+                raise ValueError(f"'maxFrames' cannot be negative")
+            
+        elif maxFrames is not None:
+            raise TypeError(f"'maxFrames' expected an int or None; got {type(maxFrames).__name__} instead")
+            
+        self._maxFrames_ = maxFrames
         
         self._map_ = dict()
         
         self._index_type_ = None
+        
+        field_names = set()
         
         for arg in args:
             if not isinstance(arg, dict) or len(arg) == 0 or not all(isinstance(k, int) for k in arg) or not all(isinstance(v, (MultiFrameIndex, type(None))) for v in arg.values()):
@@ -269,22 +328,43 @@ class FrameIndexLookup(object):
             self._map_.update(arg)
             
         self._field_names_ = field_names if len(field_names) else set() # for reference
-        
+        self._n_child_frames_ = dict()
         for field in self._field_names_:
+            self._n_child_frames_[field] = kwargs.pop(f"{field}_nFrames", None)
             setattr(type(self), field, self.__IndexProxy__(field))
              
     @property
     def map(self):
         return self._map_
     
+    @property
+    def maxFrames(self):
+        return self._maxFrames_
+    
+    @maxFrames.setter
+    def maxFrames(self, val):
+        if isinstance(val, int):
+            if val < 0:
+                raise ValueError(f"maxFrames cannot be negative; got {val} instead")
+            
+            self._maxFrames_ = val
+            
+        elif val is not None:
+            raise TypeError(f"Expecting an int or None; got {val} instead")
+        
+        else:
+            self._maxFrames_ = None
+    
     def __len__(self):
         return len(self._map_)
         
     def __getitem__(self, key:int):
-        # NOTE: return the ke when nothing is mapped to it
+        if isinstance(self._maxFrames_, int):
+            if (key >=0 and key >= self._maxFrames_) or (key < 0 and key < -self._maxFrames_):
+                raise KeyError(f"Frame index{key}  out of range {(-self._maxFrames_, self._maxFrames_-1)}")
+        
+        # NOTE: return the key when nothing is mapped to it
         return self._map_.get(key, key)
-    
-        #return self._map_.get(key, None)
     
     def __delitem__(self, key:int):
         if key in self._map_:
@@ -303,43 +383,4 @@ class FrameIndexLookup(object):
                 self._field_names_ = v_fields
                 
         self._map_[key] = value
-        
-    
-        
-    #def scene(self, frame:int):
-        #if frame in self._map_:
-            #return self._map_[frame].scene if isinstance(self._map_, MultiFrameIndex) else None
-        
-    #def setScene(self, frame:int, value:typing.Optional[int] = None):
-        #frameindex = self._map_.get(frame, None)
-        #if isinstance(frameindex, MultiFrameIndex):
-            #frameindex.scene = value
-            
-        #elif isinstance(value, int):
-            ## create frame index of it doesn't exist and value is an int
-            #self._map_[frame] = MultiFrameIndex(scene=value)
-            
-    #def scans(self, frame:int):
-        #if frame in self._map_:
-            #return self._map_[frame].scans if isinstance(self._map_, MultiFrameIndex) else None
-        
-    #def setScans(self, frame:int, value:typing.Optional[int]):
-        #frameindex = self._map_.get(frame, None)
-        #if isinstance(frameindex, MultiFrameIndex):
-            #frameindex.scene = value
-            
-        #elif isinstance(value, int):
-            #self._map_[frame] = MultiFrameIndex(scans=value)
-        
-    #def electrophysiology(self, frame:int):
-        #if frame in self._map_:
-            #return self._map_[frame].electrophysiology if isinstance(self._map_, MultiFrameIndex) else None
-        
-    #def setElectrophysiology(self, frame:int, value:typing.Optional[int]):
-        #frameindex = self._map_.get(frame, None)
-        #if isinstance(frameindex, MultiFrameIndex):
-            #frameindex.electrophysiology = value
-            
-        #elif isinstance(value, int):
-            #self._map_[frame] = MultiFrameIndex(electrophysiology = value)
         

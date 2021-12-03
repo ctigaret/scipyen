@@ -3032,6 +3032,8 @@ def make_file_filter_string(extList, genericName):
     return (fileFilterString, individualFilterStrings)
 
 def elements_types(s):
+    """Returns the unique types in a sequence
+    """
     return gen_unique(map(lambda x: type(x).__name__, s))
 
 

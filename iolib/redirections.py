@@ -11,9 +11,9 @@ import io
 import os, sys
 import tempfile
 
-#libc = ctypes.CDLL(None)
-#c_stdout = ctypes.c_void_p.in_dll(libc, 'stdout')
-#c_stderr = ctypes.c_void_p.in_dll(libc, 'stderr')
+libc = ctypes.CDLL(None)
+c_stdout = ctypes.c_void_p.in_dll(libc, 'stdout')
+c_stderr = ctypes.c_void_p.in_dll(libc, 'stderr')
 
 #@contextmanager
 #def output_stream_redirector(stream, 
@@ -128,29 +128,34 @@ def stdout_redirector(stream):
         
 @contextmanager
 def stderr_redirector(stream):
-    libc = ctypes.CDLL(None)
+    #libc = ctypes.CDLL(None)
     #c_stdout = ctypes.c_void_p.in_dll(libc, 'stdout')
-    c_stderr = ctypes.c_void_p.in_dll(libc, 'stderr')
+    #c_stderr = ctypes.c_void_p.in_dll(libc, 'stderr')
 
+    print(type(sys.stderr))
     # The original fd stdout points to. Usually 1 on POSIX systems.
     original_stderr_fd = sys.stderr.fileno()
-    print("original", original_stderr_fd)
+    #print("original", original_stderr_fd)
     #system_stderr_fd = sys.stderr.fileno() # also save this
 
     def _redirect_(to_fd):
         """Redirect stderr to the given file descriptor."""
         # Flush the C-level buffer stderr
         libc.fflush(c_stderr)
+        
         # Flush and close sys.stderr - also closes the file descriptor (fd)
         sys.stderr.close()
+        
         # Make original_stderr_fd point to the same file as to_fd:
         # duplicate to_fd to original_stderr_fd;
-        print(f"in _redirect_ before dup2: to_fd: {to_fd}, original_stderr_fd, {original_stderr_fd}")
+        #print(f"in _redirect_ before dup2: to_fd: {to_fd}, original_stderr_fd, {original_stderr_fd}")
         os.dup2(to_fd, original_stderr_fd)
-        print(f"in _redirect_ after dup2: to_fd: {to_fd}, original_stderr_fd, {original_stderr_fd}")
+        #print(f"in _redirect_ after dup2: to_fd: {to_fd}, original_stderr_fd, {original_stderr_fd}")
         # now 'original_stderr_fd' is a duplicate of 'to_fd'
+        
         # Create a new sys.stderr that points to the redirected fd
         sys.stderr = io.TextIOWrapper(os.fdopen(original_stderr_fd, 'wb'))
+        
         #original_stderr= os.fdopen(original_stderr_fd, 'wb')
         #print(type(original_stderr))
         #sys.stderr = io.TextIOWrapper(original_stderr)
@@ -160,7 +165,7 @@ def stderr_redirector(stream):
 
     # Save a copy of the original stderr fd in saved_stderr_fd
     saved_stderr_fd = os.dup(original_stderr_fd)
-    print("saved", saved_stderr_fd)
+    #print("saved", saved_stderr_fd)
     try:
         # Create a temporary file and redirect stderr to it
         tfile = tempfile.TemporaryFile(mode='w+b')
@@ -186,8 +191,8 @@ def stderr_redirector(stream):
         #sys.stderr.write(tfile.read().decode())
         ##stream.write(tfile.read().decode())
     finally:
-        print("finally: saved", saved_stderr_fd)
-        print("finally: original", original_stderr_fd)
+        #print("finally: saved", saved_stderr_fd)
+        #print("finally: original", original_stderr_fd)
         #print(saved_stderr_fd is original_stderr_fd)
         tfile.close()
         os.close(saved_stderr_fd)

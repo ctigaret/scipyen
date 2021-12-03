@@ -1796,7 +1796,8 @@ def proposeLayout(img:vigra.VigraArray,
     channels   = img.ndim if channelAxisInfo is None else img.axistags.index(channelAxisInfo.key) if indices else channelAxisInfo
     
     if frameAxisInfo is None:
-        frames = img.ndim if indices else None
+        frames = None
+        #frames = img.ndim if indices else None
         
     elif isinstance(frameAxisInfo, tuple):
         frames = tuple(img.axistags.index(ax.key) if indices else ax for ax in frameAxisInfo)
@@ -1810,7 +1811,7 @@ def proposeLayout(img:vigra.VigraArray,
                   "horizontal":horizontal, 
                   "vertical":vertical, 
                   "channels":channels,
-                  "frames":frameAxisInfo})
+                  "frames":frames})
 
 @singledispatch
 def kernel2array(value:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D],
@@ -1954,7 +1955,6 @@ def getCalibratedAxisSize(image, axis):
     else:
         raise TypeError("axis expected to be an int, str or vigra.AxisInfo; got %s instead" % type(axis).__name__)
     
-    #axcal = AxesCalibration(axisinfo)
     axcal = AxisCalibrationData(axisinfo)
     
     # FIXME what to do when there are several channels?
@@ -1967,21 +1967,23 @@ def nFrames(x:vigra.VigraArray,
         raise TypeError(f"Expecting a Vigra Array, got {type(x).__name__} instead")
     
     if frameAxis is None:
-        nFrames = proposeLayout(x)[0]
+        #nFrames = proposeLayout(x)[0]
+        nFrames = proposeLayout(x).nFrames
         if isinstance(nFrames, int):
             return nFrames
         
         elif isinstance(nFrames, collections.abc.Sequence):
             return np.prod(nFrames)
     
-    if isinstance(frameAxis, vigra.AxisInfo):
+    if isinstance(frameAxis, (vigra.AxisInfo, str)):
         ndx = x.axistags.index(frameAxis.key)
         
-    elif isinstance(frameAxis, (str, int)):
-        ndx = x.axistags.index(frameAxis)
+    elif isinstance(frameAxis, int):
+        ndx = frameAxis
+        #ndx = x.axistags.index(frameAxis)
         
     elif isinstance(frameAxis, collections.abc.Sequence) and all(isinstance(v, (vigra.AxisInfo, str, int)) for v in frameAxis):
-        ndx = tuple(x.axistags.index(v.key) if isinstance(v, vigra.AxisInfo) else x.axistags(v) for v in frameAxis )
+        ndx = tuple(x.axistags.index(v.key) if isinstance(v, vigra.AxisInfo) else x.axistags(v) if isinstance(v, str) else v for v in frameAxis )
         
     else:
         raise TypeError(f"frameAxis expected to be None, AxisInfo, str, int, or a sequence of these; got {typr(frameAxis).__name__} instead")
@@ -1990,7 +1992,7 @@ def nFrames(x:vigra.VigraArray,
         return 1 if ndx == x.ndim else x.shape[ndx]
     
     elif isinstance(ndx, collections.abc.Sequence) and all(isinstance(i, int) for i in ndx):
-        return np.prod(ndx)
+        return np.prod(tuple(1 if idx == x.ndim else x.shape[idx] for idx in ndx))
     
     else:
         raise RuntimeError(f"Cannot determine the number of frames")

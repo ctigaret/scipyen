@@ -47,7 +47,7 @@ from ephys.ephys import (average_segments, )
 
 from imaging.vigrautils import (proposeLayout, concatenateImages, croppedView, 
                                 imageIndexTuple, resampleImage, resampleImageAxis,
-                                removeSlice, padToShape, padAxis, nFrames)
+                                removeSlice, padToShape, padAxis,)# nFrames)
 
 from imaging.axiscalibration import (AxesCalibration, 
                                      AxisCalibrationData,
@@ -1799,7 +1799,7 @@ class ScanData(BaseScipyenData):
         kwscans = kwargs.pop("scans", None)
         kwscene = kwargs.pop("scene", None)
         kwephys = kwargs.pop("electrophysiology", None)
-        kwmeta = kwargs.pop("metadata", None)
+        kwmeta  = kwargs.pop("metadata", None)
         
         if scans is None:
             scans = kwscans
@@ -1830,16 +1830,47 @@ class ScanData(BaseScipyenData):
         
         kwargs["scene"] = scene
         kwargs["sceneLayout"] = scene_layout if sceneLayout is None else sceneLayout
-        kwargs["sceneFrameAxis"] = kwargs["sceneLayout"]
+        kwargs["sceneFrameAxis"] = kwargs["sceneLayout"].frames
         kwargs["sceneAxesCalibration"] = scene_axes_cal if sceneAxesCalibration is None else sceneAxesCalibration
         
         kwargs["scans"] = scans
         kwargs["scansLayout"] = scans_layout if scansLayout is None else scansLayout
-        kwargs["scansFrameAxis"] = kwargs["scansLayout"]
+        kwargs["scansFrameAxis"] = kwargs["scansLayout"].frames
         kwargs["scansAxesCalibration"] = scans_axes_cal if scansAxesCalibration is None else scansAxesCalibration
         
         kwargs["electrophysiology"] = electrophysiology
         kwargs["metadata"] = metadata
+        
+        #scansFrames = 0 if kwargs["scansLayout"] is None else kwargs["scansLayout"].nFrames if isinstance(kwargs["scansLayout"].nFrames, int) else.np.prod(kwargs["scansLayout"].nFrames)
+        #sceneFrames = 0 if kwargs["sceneLayout"] is None else kwargs["sceneLayout"].nFrames if isinstance(kwargs["sceneLayout"].nFrames, int) else.np.prod(kwargs["sceneLayout"].nFrames)
+        #ephysFrames = len(kwargs["electrophysiology"].segments) if isinstance(kwargs["electrophysiology"], neo.Block) else 0
+        
+        dnames = tuple(c[0] for c in self._data_children_)
+        frameNos = list()
+        for c in dname:
+            if c in ("scene","scans"):
+                f = f"{c}Layout"
+                val = 0 if kwargs[f] is None else kwargs[f].nFrames if isinstance(kwargs[f].nFrames, int) else np.prod(kwargs[f].nFrames)
+                frameNos.append(val)
+                
+            else:
+                val = len(kwargs[c].segments) if isinstance(kwargs[c], neo.Block) else np.nan
+                frameNos.append(val)
+                
+        smaxlen = max(len(s) for s in dnames)
+        maxFrames = max(frameNos)
+        
+        dtype = np.dtype([("field", f"U{smaxlen}"), ("nFrames", int)])
+        
+        dframes = np.array([zip(dname, frameNos)], dtype = dtype).view(np.recarray)
+        
+        shortFalls = np.where(dframes < maxFrames)[0]
+        if len(shortFalls):
+            pass
+            
+        
+        
+            
         
         # NOTE: 2021-12-02 15:52:30
         # set up the framesMap
@@ -1965,6 +1996,8 @@ class ScanData(BaseScipyenData):
             return (None, None, None)
         
         if isinstance(data, vigra.VigraArray):
+            # CAUTION 2021-12-03 10:21:58
+            # this layout has axisInfo objects, not indices
             layout = proposeLayout(data, userFrameAxis = frameAxis)
             #nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo = proposeLayout(data, userFrameAxis = frameAxis)
             
@@ -8923,27 +8956,29 @@ class ScanData(BaseScipyenData):
                 if isinstance(data, (tuple, list)): # scene or scans
                     if len(data) == 0:
                         return 0
-                    framesAxes = self.sceneFrameAxis if component == "scene" else self.scansFrameAxis
-                    return nFrames(data[0], framesAxes) # from vigrautils
+                    nFrames = self.scansLayout.nFrames if compoennt == "scans" else self.sceneLayout.nFrames
+                    return nFrames if isinstance(nFrames, int) else np.prod(nFrames)
+                    #framesAxes = self.sceneFrameAxis if component == "scene" else self.scansFrameAxis
+                    #return nFrames(data[0], framesAxes) # from vigrautils
                 
         else:
             return len(self.framesMap)
             #pass # prode the framesMap descriptor!
                 
     
-    #@property
-    #def nScansFrames(self):
-        #"""Read-only.
+    @property
+    def nScansFrames(self):
+        """Read-only.
         
-        #Can only be modifier indirectly by either:
-        #1) changing selfFrameAxis
-        #2) appending/removing scans frames
+        Can only be modifier indirectly by either:
+        1) changing self.scansFrameAxis
+        2) appending/removing scans frames
         
-        #FIXME/TODO adapt to a new scenario where all scene image data is a single
-        #multi-channel VigraArray
+        FIXME/TODO adapt to a new scenario where all scene image data is a single
+        multi-channel VigraArray
         
-        #"""
-        #return self.nFrames("scans")
+        """
+        return self.nFrames("scans")
 
     @property
     def scansChannels(self):
