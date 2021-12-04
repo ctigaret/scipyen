@@ -3607,3 +3607,82 @@ def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)) -> i
         raise ValueError
     
     return axis
+
+def sp_loc(df, index, columns, val):
+    """Assign values to pandas.SparseArray
+    
+    See Answer 1 at
+    https://stackoverflow.com/questions/49032856/assign-values-to-sparsearray-in-pandas
+    
+    Insert data in a DataFrame with SparseDtype format
+
+    Only applicable for pandas version > 0.25
+
+    Parameters:
+    -----------
+    df : DataFrame with series formatted with pd.SparseDtype
+    
+    index: str, or list, or slice object
+        Same as one would use as first argument of .loc[]
+        
+    columns: str, list, or slice
+        Same one would normally use as second argument of .loc[]
+        
+    val: insert values
+
+    Returns
+    -------
+    df: DataFrame
+        Modified DataFrame
+        
+    NOTE: using mask data frames with sparse data frames (sp_df) - e.g. to 
+    replace all pd.NAs in sp_df with a value (-1 in this example):
+    
+    sp_df
+    scans  scene  electrophysiology
+    0      0      0               <NA>
+    1      1   <NA>                  1
+    2      2   <NA>               <NA>
+    
+    
+    # generate a mask
+    df_mask = ~sp_df.isna() # False in place of NA, True everywhere else
+    
+    df_mask
+    scans  scene  electrophysiology
+    0   True   True              False
+    1   True  False               True
+    2   True  False              False
+    
+    # replace ps.Na with -1, using the mask
+    sp+df = sp_df.where(df_mask, -1)
+    
+    sp_df
+    scans scene electrophysiology
+    0      0     0                -1
+    1      1    -1                 1
+    2      2    -1                -1
+
+    
+    etc.
+        
+    """
+    # Save the original sparse format for reuse later
+    spdtypes = df.dtypes[columns]
+
+    # Convert concerned Series to dense format
+    if np.any(df[columns].isna):
+        # NOTE: see NOTE: 2021-12-04 20:06:50
+        df[columns] = np.asarray(df[columns], dtype = np.dtype(object), order = "K")
+    else:
+        # NOTE: 2021-12-04 20:06:50
+        # this fails when the sparse array has pd.NA as fill_value
+        df[columns] = df[columns].sparse.to_dense() # original code
+
+    # Do a normal insertion with .loc[]
+    df.loc[index, columns] = val
+
+    # Back to the original sparse format
+    df[columns] = df[columns].astype(spdtypes)
+    
+    return df    

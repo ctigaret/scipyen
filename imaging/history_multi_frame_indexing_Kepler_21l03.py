@@ -107,14 +107,33 @@ A: you have the option to replicate the scene frames for each cycle BEFORE
     generate a FrameIndexLookup
     
 Q5.8:OK so how would this work?
-A. asuming scans has N frames and scene only has one frame:
+A. assuming scans has N frames and scene only has one frame :
         map every frame in scans to the only scene frame
         
+        
+        
 Q5.9: how to do that?
-A. use FrameIndexLookup with MultiFrameIndex (ScanDataFrameIndex):
+A. you have several options:
+    1) assign a correspondence from scene frame 0 to the sequence of frames in 
+        scans - the problem with this approach is that if scene has more than 
+        one frame (yet still fewers than scans) there is a risk that one or 
+        more scene frames 'ppint' to the same frame in scans, so this needs to be
+        managed carefully
+        
+    2) use FrameIndexLookup with MultiFrameIndex (ScanDataFrameIndex):
     {k: MFI(scans: k, scene: 0)} for k in range(scans frames)
     
-    I agree it is probably better to use a numpy recarray instead of FLI & MFIs:
+    3) for a more compact representation use a Pandas data objects instead:
+        
+    3.1) figure out the max number of available frames:
+        max_frames = max(scans_frames, scene_frame, ephys_frames)
+        
+        then create a pandas DataFrame:
+            
+        frames = pd.DataFrame(dict((field, pd.Series(range(max_frames), name=fiele, dtype=pd.SparseDtype("int", pd.NA)))
+                                   for field, sz in zip(field_names, (scans_frames, scene_frame, ephys_frames)))
+            
+        
     
     indices = np.full((maxFrames, 3), np.nan)
     
@@ -125,7 +144,7 @@ A. use FrameIndexLookup with MultiFrameIndex (ScanDataFrameIndex):
     to numpy NaN or math NaN (both ich the latter are floats)
 
     field_names = ("scans", "scene", "electrophysiology")
-    idxdtype = np.dtype([(("Component", 'name'), f"U{max(len(s) for s in field_names)}"), (('Frame', 'index'), pd.Int64Dtype())])
+    idxdtype = np.dtype([(("Component", 'name'), f"U{max(len(s) for s in field_names)}"), (('Frame', 'index'), pd.Int64Dtype)])
     
     
     

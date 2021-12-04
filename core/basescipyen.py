@@ -82,9 +82,11 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
     # when 2nd is a type, the default value is set to None
     #
     # see documentation for prog.parse_descriptor_specification for details on how
-    # each sequence in the _needed_attributes_ tuple is interpreted.
+    # each sequence in the _descriptor_attributes_ tuple is interpreted.
     #
-    _needed_attributes_ = (
+    
+    _data_children_     = ()
+    _data_attributes_ = (
                             ("sourceID",            "NA"),
                             ("cell",                "NA"),
                             ("genotype",            "NA"),
@@ -101,6 +103,8 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
                             ("file_datetime",       datetime),
                             ("rec_datetime",        datetime),
                         )
+    
+    _descriptor_attributes_ = _data_children_ + _data_attributes_
     #@classmethod
     #def setup_descriptor(cls, descr_params):
         #args = descr_params.get("args", tuple())
@@ -114,7 +118,7 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
         #setattr(cls, name, descriptor)
         
     def __init__(self, name=None, description=None, file_origin=None, **kwargs):
-        for attr in self._needed_attributes_:
+        for attr in self._descriptor_attributes_:
             attr_dict = parse_descriptor_specification(attr)
             proposed_value = kwargs.pop(attr[0], attr_dict["value"])
             type(self).setup_descriptor(attr_dict)
@@ -123,14 +127,14 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
         super().__init__(name=name, description=description, file_origin=file_origin, **kwargs)
         
     def __attr_str__(self):
-        for a in self._needed_attributes_:
+        for a in self._descriptor_attributes_:
             result.append(f"{a[0]}: {getattr(self, a[0], None)}")
             
         return "\n".join(result)
     
     @property
     def needed_descriptors(self):
-        return dict((a[0], getattr(self, a[0], None)) for a in self._needed_attributes_)
+        return dict((a[0], getattr(self, a[0], None)) for a in self._descriptor_attributes_)
     
 
     @property

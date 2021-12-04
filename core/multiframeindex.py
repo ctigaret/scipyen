@@ -5,7 +5,7 @@ import collections.abc
 from inspect import (getmembers, getattr_static)
 from core.prog import (ArgumentError,  WithDescriptors, 
                        get_descriptors, classify_signature)
-from core.utilities import (nth, normalized_index)
+from core.utilities import (nth, normalized_index, sp_loc)
 from core.basescipyen import BaseScipyenData
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -73,7 +73,7 @@ class MultiFrameIndex(WithDescriptors):
         setattr(self, name, value) 
         
     
-class FrameIndexLookup(object):
+class MultiFrameIndexLookup(object):
     """Tools for frame synchronization between scans, scene and ephys data.
     
     FrameIndexLookup is used with objects containing distinct data sets organized 
@@ -382,3 +382,350 @@ class FrameIndexLookup(object):
                 
         self._map_[key] = value
         
+class FrameIndexLookup(object):
+    """Wrapper around multi-frame indexing using sparse pandas DataFrames
+    """
+    class __IndexProxy__(object):
+        def __init__(self, field:str):
+            if not isinstance(field, str) or len(field.strip()) == 0:
+                raise ArgumentError(f"Expecting a non-empty str; got {field} instead")
+            self._obj_ = None
+            self._field_ = field
+            
+        def __get__(self, obj, objtype=None):
+            # NOTE: 2021-12-01 22:44:11 reference needed in __get/setitem__
+            self._obj_ = obj 
+            # NOTE: 2021-12-01 22:08:48 
+            # returns self so that setitem and getitem can be called upon it
+            return self
+        
+        def __set__(self, obj, value=None):
+            # NOTE: 2021-12-01 22:44:11 reference needed in __get/setitem__
+            self._obj_ = obj
+            
+        def __get_ndx__(self, field, ndx, default):
+            return self._obj_._map_.loc[ndx, field]
+            ##nFramesForField = getattr(self._obj_, f"{self._field_}_nFrames", None)
+            #nFramesForField = self._obj_._n_child_frames_.get(self._field_, None)
+            ##print(f"proxy, in __get_ndx__: nFrames for {self._field_}: {nFramesForField}; ndx: {ndx}")
+            #if isinstance(nFramesForField, int):
+                #return normalized_index(range(nFramesForField), ndx, silent=True)
+        
+        def __getitem__(self, key:int):
+            index = self._obj_[key]
+            #print(f"proxy, in getitem: {key} -> {type(index).__name__}")
+            if isinstance(index, MultiFrameIndex):
+                # check for field in MultiFrameIndex
+                if hasattr(index, self._field_):
+                    val = getattr(index, self._field_)
+                    #print(f"for index {index} of {self._field_} got {val}")
+                    # CAUTION: 2021-12-03 16:19:05
+                    # the one-liner:
+                    # `return val if isinstance(val, int)`
+                    # is NOT the same as the `if` clause below:
+                    # the 1-liner ALWAYS returns (including None when 'val' is
+                    # not an int)
+                    # in contrast, the `if` clause below ONLY returns 'val' when
+                    # 'val' is an int
+                    if isinstance(val, int):
+                        return val
+                    
+                    # from here on, val is explicitly None for given field in
+                    # the MultiFrameIndex, or MFI doesn't have field, or key is
+                    # NOT mapped to an MFI
+                    #
+
+            # try to use nth here (default on the last available frame)
+            val = self.__get_ndx__(self._field_, key, -1)
+            # NOTE: see CAUTION: 2021-12-03 16:19:05
+            if isinstance(val, int):
+                return val
+            
+            # finally, return key when all of the above failed
+            return key
+                        
+        def __setitem__(self, key:int, value:int):
+            if key in self._obj_._map_:
+                if self._field_ in self._obj_._map_[key]:
+                    setattr(self._obj_._map_[key], self._field_, value)
+                else: # CAUTION: subclasses of MultiFrameIndex MAY be immutable
+                    try:
+                        self._obj_._map_[key].addField(field, value)
+                        self._obj_._field_names_.add(field) # NOOP if field exists
+                    except:
+                        pass
+            else:# add a new frame
+                if not isinstance(key, int):
+                    raise TypeError(f"Expecting an int for master 'index'; got {type(key).__name__} ")
+                # CAUTION: subclasses of MultiFrameIndex MAY expect specific arguments
+                # NOTE: no checking on value's attributes here ... this MAY be done
+                # by the MultiFrameIndex initializer (self._index_type_ SHOULD inherit
+                # from this)
+                init_sig = classify_signature(self._obj_._index_type_.__init__)
+                pos_named = init_sig.positional | init_sig.named
+                
+                kwargs = dict()
+                
+                if len(init_sig.varkw) == 0:
+                    if field not in pos_named:
+                        raise ArgumentError(f"{field} is an unexpected argument for {self._index_type_.__name__}")
+                    
+                elif field in init_sig.kwargs:
+                    kwargs[field] = value
+                
+                if field in init_sig.positional:
+                    pos_only = tuple(value if k == field else None for k in init_sig.positional if k != "self")
+                    
+                    if field in init_sig.named:
+                        raise ArgumentError(f"duplicate specification for {field}")
+                    
+                else:
+                    pos_only = tuple()
+                    
+                if field in init_sig.named:
+                    # add it to kwargs!
+                    if field not in kwargs:
+                        kwargs[field] = value
+                    else:
+                        raise ArgumentError(f"duplicate specification for {field}")
+                    
+                self._obj_._map_[key] = self._obj_._index_type_(*pos_only, **kwargs)
+                self._obj_._field_names_.add(field) # NOOP if field exists
+        
+    def __init__(self, field_frames:dict, field_missing=pd.NA, frame_missing = -1,
+                 **kwargs):
+        """
+        Parameters:
+        ------------
+        field_frames: dict 
+            
+            This maps a str (field name) to an int (>=0, the number of available 
+            data frames in that named field), or to None, if the named field is 
+            absent from the owner of this FrameIndexLookup instance.
+            
+            NOTE 1: Named fields are attributes, properties or data descriptors 
+            defined in the owner's :class:, accessing data objects that are
+            stored in the owner's instance and can be viewed/sliced in 'frames'
+            (more specifically, in Scipyen, such are VigraArray which can be
+            sliced in 2D views, and the segments of neo.Block objects).
+            
+            The named fields may be advertised by the owner's :class: (see, for
+            example, BaseScipyenData._data_attributes_) and are accessed by the
+            field's name as a regular attribute, property (getter, setter) or 
+            via the data descriptor protocol.
+            
+            A named field is 'absent' when an attempt to access it in the owner 
+            returns None (as opposed to raising AttributeError or a similar
+            exception which happens when the object ddoesn't know anything about
+            the field's name).
+            
+            When present, the named field may be unable for provide any 'frames'
+            (2D views, or segments). In this case, the number of frames of the 
+            data in the field is 0 (zero).
+            
+        field_missing: int or pd.NA. Optional, default is pd.NA
+        
+            The frame index value standing in for a named field that is missing
+            in the owner (see above)
+            
+            Ooptional, default is pd.NA
+            
+        frame_missing: int or pd.NA. Optional, default is -1
+        
+            The frame index value standing for a missing frame in the named field
+            (i.e., when the named field has fewer frames than the highest number 
+            of frames across all the named fields in 'field_frames')
+            
+        Var-keyword parameters:
+        ------------------------
+        When given, their names must be present in field_frames keys (otherwise
+        are ignored) and their values are tuples of the form
+            (master index:int, field frame index:int),
+            
+        or a sequence of such tuples
+            
+            These contain specific associations of frames in the named field 
+            with a master field index in the owner.
+            
+            When a master field index in these tuples points to a frame index
+            outside the current range of master frames of the owner, will raise
+            an IndexError exception.
+            
+            (This is to keep the initialization code simple, although it is
+            possible to 'add' new master frames to the object, but not at
+            initialization time)
+            
+        Examples:
+        ---------
+        
+        1) The trivial case of an owner (a ScanData) with scans and scene, each
+        with 3 frames, and with electrophysiology a neo.Block with three segments.
+        
+        If there is a biunivocal correspondence of frame indices between ALL three
+        fields ('scans', 'scene' and 'electrophysiology'), the owner does NOT need
+        a FrameIndexLookup object. When present, the FrameIndexLookup object 
+        exposes a DataFrame with the following structure:
+        
+                scans scene electrophysiology
+        0       0     0      0
+        1       1     1      1
+        2       2     2      2
+        
+        where the index (left most column of numbers) if the master frame index 
+        of the owner.
+        
+        2) The case where the ScanData owner object has only one scene frame.
+        
+        The frames map DataFrame MAY look like this (using frame_missing  = -1):
+        
+                scans  scene  electrophysiology
+        0       0      0        0
+        1       1     -1        1
+        2       2     -1        2
+        
+        3) The case where the ScanData owner object has only one scene frame, 
+        ans no electrophysiology
+                scans  scene  electrophysiology
+        0       0      0        <NA>
+        1       1     -1        <NA>
+        2       2     -1        <NA>
+        
+        NOTE 2: the field_missing and frame_missing values have no meaning for 
+        the FrameLookupIndex object: they are just placeholders for the missing 
+        field frames when the field is missing altogether, or when only some 
+        frames are missing. In Examples 2 and 3 above, acessing master frame
+        with index 1 in the owner will attempt to access the last available 
+        frame in scene (-1); in example 3, accessing master frame 1 will 
+        associate <NA> for electrophysilogy. It is up to the owner to decide
+        what to do with these values.
+        
+        """
+        # filter out missing fields, to figure out the maximum number of frames 
+        # available to the owner of the FrameLookupIndex instance. Field that
+        # ARE present but without frames have 0 frames
+        
+        if isinstance(field_frames, dict) and len(field_frames):
+            field_nframes = dict((k,v) for k,v in field_frames.items() if k in field_names and isinstance(v, int))
+            
+        else:
+            field_nframes = dict()
+            
+        maxFrames = max(v for v in field_nframes.values()) if len(field_nframes) else None
+        
+        self._map_ = pd.DataFrame(dict((field, pd.Series(range(maxFrames) if isinstance(maxFrames, int) else field_missing, 
+                                                         name=field, dtype=pd.SparseDtype("int", field_missing)))
+                                        for field in field_nframes))
+        
+        # now adjust field frame index values according to each field's number of
+        # frames using frame_missing value
+        
+        for field, nframes in field_frames.items():
+            if isinstance(nframes, int) and nframes < maxFrames:
+                index = slice(nframes, maxFrames)
+                self._map_ = sp_loc(self._map_, index, field, frame_missing)
+                
+        # finally, apply specific frame relationships in kwargs
+        
+        for k, v in kwargs:
+            if k in field_frames: # only for named field we already know about
+                if isinstance(v, tuple):
+                    if len(v) == 2 and all(isinstance(v_, int) for v_ in v):
+                        # master_index, field frame index
+                        
+                        # check speficied master index and field frame index are
+                        # in their respective ranges, if possible
+                        if isinstance(maxFrames, int) and v[0] not in range(-maxFrames, maxFrames): # allow negative indices
+                            raise ValueError(f"master index {v[0]} out of range {(-maxFrames, maxFrames-1)}")
+                        
+                        if isinstance(field_frames[k], int):
+                            if v[1] not in range(-field_frames[k], field_frames[k]):
+                                raise ValueError(f"frame index {v[1]} for {k} out of range {(-field_frames[k], field_frames[k]-1)}")
+                        
+                        self._map_ = sp_loc(self._map_, v[0], k, v[1])
+                        
+                    elif all(isinstance(v_, tuple) and len(v_) == 2 and all(isinstance(_v_, int) for _v_ in v_) for v_ in v):
+                        for v_ in v:
+                            if isinstance(maxFrames, int) and v_[0] not in range(-maxFrames, maxFrames): # allow negative indices
+                                raise ValueError(f"master index {v_[0]} out of range {(-maxFrames, maxFrames-1)}")
+                            
+                            if isinstance(field_frames[k], int):
+                                if v_[1] not in range(-field_frames[k], field_frames[k]):
+                                    raise ValueError(f"frame index {v_[1]} for {k} out of range {(-field_frames[k], field_frames[k]-1)}")
+                            
+                            self._map_ = sp_loc(self._map_, v_[0], k, v_[1])
+                            
+        self._frame_missing_ = frame_missing
+        self._field_missing_ = field_missing
+                            
+    def __len__(self):
+        return len(self._map_)
+        
+    def __getitem__(self, key:typing.Union[int, slice, range, collections.abc.Sequence]):
+        """Returns the frame mapping for the master frame index given in 'key'.
+        Parameters:
+        ----------
+        key: int, slice, range, sequence - anything that can be used to index 
+            into a DataFrame's index
+            
+        Returns: a DataFrame view into the currenr frame mappings.
+        
+        """
+        
+        # treat index as a sequence, allow key in range(-len(map.index, map.index))
+        # we can do that because index is a range index (ints from 0 to max master
+        # frames -1) and we want to emulate Python API enabling the use of 
+        # negative indices,slices and ranges (the latter are OK with 1D arrays
+        # what the map.index is)
+        
+        ndx = self._map_.index[key]  # Pandas will raise exception here as needed
+        return self._map_.loc[ndx, :]
+        # NOTE: return the key when nothing is mapped to it
+        
+    def __setitem__(self, key:int, value:typing.Optional[pd.DataFrame] = None):
+        raise NotImplementedError("FIXME: TODO 2021-12-04 23:40:02")
+        if not isinstance(value, (pd.DataFrame, type(None))):
+            raise TypeError(f"Expecting a pandas DataFrame or None; got {type(value).__name__} instead")
+        
+        if isinstance(value, pd.DataFrame):
+            v_fields = set(value.columns)
+            field_names = set(self._map_.columns)
+            if len(self._field_names_):
+                if self._field_names_.isdisjoint(v_fields):
+                    raise TypeError(f"Argument has incorrect field names {v_fields}; expected {self._field_names_}")
+
+            for column in value.columns:
+                pass
+        #self._map_[key] = value
+        
+    def fieldFrames(self, field:str):
+        if field in self._map_.columns:
+            frames = self._map_.loc[~self._map_.loc[:,field].isna(), field]
+            if len(frames):
+                return max(frames) + 1
+            return self._field_missing_
+        
+    @property
+    def map(self):
+        return self._map_
+    
+    @property
+    def missingFrameIndex(self):
+        return self._frame_missing_
+    
+    @missingFrameIndex.setter
+    def missingFrameIndex(self, val:typing.Union[int, type(pd.NA)]):
+        if not isinstance(val, (int, type(pd.NA))):
+            raise ArgumentError(f"'val' expectd an int or pd.NA; got {val} instead")
+        self._frame_missing_ = val
+        
+    @property
+    def missingFieldFrameIndex(self):
+        return self._field_missing_
+    
+    @missingFieldFrameIndex.setter
+    def missingFieldFrameIndex(self, val:typing.Union[int, type(pd.NA)]):
+        if not isinstance(val, (int, type(pd.NA))):
+            raise ArgumentError(f"'val' expectd an int or pd.NA; got {val} instead")
+        self._field_missing_ = val
+        
+    

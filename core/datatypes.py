@@ -742,4 +742,4 @@ class TypeEnum(IntEnum):
         """
         return self.strand(self.name, name)
         
-        
+    

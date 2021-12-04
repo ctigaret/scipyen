@@ -6,6 +6,7 @@ import quantities as pq
 import neo
 import vigra
 import h5py
+import pandas as pd
 
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
@@ -23,7 +24,7 @@ from core.quantities import(arbitrary_unit,
                             unit_quantity_from_name_or_symbol,
                             check_time_units)
 
-from core.utilities import (get_index_for_seq, )
+from core.utilities import (get_index_for_seq, sp_loc )
 
 from core.datatypes import (UnitTypes, Genotypes, )
 
@@ -69,30 +70,30 @@ class ScanData(BaseScipyenData):
     """Dummy for AnalysisUnit; clobbered below
     """
     
-class ScanDataFrameIndex(MultiFrameIndex):
-    def __init__(self, scans:int, scene:int, electrophysiology:int,/):
-        super().__init__(scans=scans, scene=scene, electrophysiology=electrophysiology)
-    @classmethod
-    def remove_descriptor(cls, name):
-        """Clobbers removal of descriptors
-        """
-        pass
+#class ScanDataFrameIndex(MultiFrameIndex):
+    #def __init__(self, scans:int, scene:int, electrophysiology:int,/):
+        #super().__init__(scans=scans, scene=scene, electrophysiology=electrophysiology)
+    #@classmethod
+    #def remove_descriptor(cls, name):
+        #"""Clobbers removal of descriptors
+        #"""
+        #pass
     
-    # NOTE: 2021-12-01 14:43:47
-    # interesing pogramming hack:
-    # if this is clobbered, the fields are visible in dir and __dict__, yet not 
-    # captured by prog.get_descriptors: it behaves a bit like an opaque object
-    @classmethod
-    def setup_descriptor(cls, params):
-        """Clobbers further addition of descriptors
-        """
-        pass
+    ## NOTE: 2021-12-01 14:43:47
+    ## interesing pogramming hack:
+    ## if this is clobbered, the fields are visible in dir and __dict__, yet not 
+    ## captured by prog.get_descriptors: it behaves a bit like an opaque object
+    #@classmethod
+    #def setup_descriptor(cls, params):
+        #"""Clobbers further addition of descriptors
+        #"""
+        #pass
     
-    def addField(self, name, value):
-        """Clobbers the addField inherited from MultiFrameIndex.
-        Prevents adding more fields to the index.
-        """
-        pass
+    #def addField(self, name, value):
+        #"""Clobbers the addField inherited from MultiFrameIndex.
+        #Prevents adding more fields to the index.
+        #"""
+        #pass
         
 class ScanDataOptions(DataBag):
     """Do not use
@@ -441,11 +442,11 @@ class AnalysisUnit(BaseScipyenData):
     """
     from gui import pictgui as pgui
     
-    _needed_attributes_ = (("landmark", PlanarGraphics),
+    _descriptor_attributes_ = (("landmark", PlanarGraphics),
                            ("unit_type", "NA"),
                            ("unit_name", "NA"),
                            ("field", "NA"),
-                           ("inscene", False)) + BaseScipyenData._needed_attributes_
+                           ("inscene", False)) + BaseScipyenData._descriptor_attributes_
     
     def __init__(self, parent, name=None, description=None, file_origin=None, **kwargs):
         
@@ -1033,7 +1034,7 @@ class AnalysisUnit(BaseScipyenData):
         # AnalysisUnit objact is detached from the original data protocols; yet
         # it retains the reference to the 'parent'
         
-        kwargs = dict((attr[0], getattr(self, attr[0], None)) for attr in self._needed_attributes_ )
+        kwargs = dict((attr[0], getattr(self, attr[0], None)) for attr in self._descriptor_attributes_ )
         kwargs["protocols"] = [p.copy() for p in self.protocols]
         kwargs.update(self.annotations)
         
@@ -1183,7 +1184,7 @@ class ScanData(BaseScipyenData):
         ("scansLayout",                     dict),
         ("sceneFrameAxis",                  (vigra.AxisInfo, tuple)),
         ("scansFrameAxis",                  (vigra.AxisInfo, tuple)),
-        ("framesMap",                       FrameIndexLookup),
+        ("framesMap",                       pd.DataFrame),
         )
     
     _graphics_attributes_ = (
@@ -1206,7 +1207,7 @@ class ScanData(BaseScipyenData):
         ("type",                            ScanDataType.linescan),
         )
     
-    _needed_attributes_= _data_children_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ + BaseScipyenData._needed_attributes_
+    _descriptor_attributes_= _data_children_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ + BaseScipyenData._descriptor_attributes_
     
     def _get_data_frame_index_(self, index:int) -> Bunch:
         """Returns a Bunch mapping str keys (data attribute) to int frame indices.
@@ -1277,7 +1278,7 @@ class ScanData(BaseScipyenData):
         =================
         
         For the name and value type of the expected parameters, see
-        ScanData._needed_attributes_
+        ScanData._descriptor_attributes_
         
         The description of the more important ones is given below.
         
@@ -1593,7 +1594,7 @@ class ScanData(BaseScipyenData):
         
         #self._available_genotypes_ = ["NA", "wt", "het", "hom"]
         # NOTE: 2021-11-26 13:32:58 
-        # _needed_attributes_
+        # _descriptor_attributes_
         # see BaseScipyenData
         #self._scans_axes_calibrations_ = []
         #self._scene_axes_calibrations_ = []
@@ -1845,52 +1846,32 @@ class ScanData(BaseScipyenData):
         #sceneFrames = 0 if kwargs["sceneLayout"] is None else kwargs["sceneLayout"].nFrames if isinstance(kwargs["sceneLayout"].nFrames, int) else.np.prod(kwargs["sceneLayout"].nFrames)
         #ephysFrames = len(kwargs["electrophysiology"].segments) if isinstance(kwargs["electrophysiology"], neo.Block) else 0
         
-        dnames = tuple(c[0] for c in self._data_children_)
-        frameNos = list()
-        for c in dname:
+        field_frames = dict((c[0], None) for c in self._data_children_)
+        for c in field_frames:
             if c in ("scene","scans"):
                 f = f"{c}Layout"
-                val = 0 if kwargs[f] is None else kwargs[f].nFrames if isinstance(kwargs[f].nFrames, int) else np.prod(kwargs[f].nFrames)
-                frameNos.append(val)
+                val = None if kwargs[f] is None else kwargs[f].nFrames if isinstance(kwargs[f].nFrames, (int, type(None))) else np.prod(kwargs[f].nFrames)
                 
             else:
-                val = len(kwargs[c].segments) if isinstance(kwargs[c], neo.Block) else np.nan
-                frameNos.append(val)
+                val = len(kwargs[c].segments) if isinstance(kwargs[c], neo.Block) else None
                 
-        smaxlen = max(len(s) for s in dnames)
-        maxFrames = max(frameNos)
-        
-        dtype = np.dtype([("field", f"U{smaxlen}"), ("nFrames", int)])
-        
-        dframes = np.array([zip(dname, frameNos)], dtype = dtype).view(np.recarray)
-        
-        shortFalls = np.where(dframes < maxFrames)[0]
-        if len(shortFalls):
-            pass
+            field_frames[c] = val
             
+        # check if we need to bother with a FrameIndexLookup
+        # if all data children return same number of frames we assume all have 
+        # biunivocal relationship so we do NOT use a FrameIndexLookup
         
-        
+        sub_nframes = tuple(v for v in field_frames.values())
+        if all(v == sub_nframes[0] for v in sub_nframes[1:]):
+            framesLookup = None
+        else:
+            framesLookup = FrameIndexLookup(field_frames)
             
+        # the user may have supplied a frame index lookup to the initializer
+        framesMap = kwargs.pop("framesMap", framesLookup)
         
-        # NOTE: 2021-12-02 15:52:30
-        # set up the framesMap
-        #
-        # 1) by default scans drive frame index lookup:
-        #   we map all frames in scene and electrophysiology against scans frames
-        #
-        # 2) if scans are empty, then scene becomes the main driver, and we map
-        #   electrophysiology frames against scene
-        #
-        # 3) if only electorphysiology si given that becomes the driver, etc
-        #
-        # 4 wit no data at all we get a generic frameMap ()
-        
-        #if kwargs["scansLayout"] if not None:
-            #if kwargs["scansLayout"].nFrames > 0:
-            #if sceneLayout.nFrames == 1:
-                 #if len(electrophysiology.segments) == 0:
-                     #for k in range()
-        
+        kwargs["framesMap"] = framesMap
+            
         super().__init__(**kwargs) # BaseScipyenData/WithDescriptors
         
         # NOTE: 2021-10-28 18:36:14
