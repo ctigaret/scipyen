@@ -5,7 +5,7 @@ import collections.abc
 from inspect import (getmembers, getattr_static)
 from core.prog import (ArgumentError,  WithDescriptors, 
                        get_descriptors, classify_signature)
-from core.utilities import nth
+from core.utilities import (nth, normalized_index)
 from core.basescipyen import BaseScipyenData
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -154,17 +154,16 @@ class FrameIndexLookup(object):
             # NOTE: 2021-12-01 22:44:11 reference needed in __get/setitem__
             self._obj_ = obj
             
-        def __get_nth__(self, field, ndx, default):
+        def __get_ndx__(self, field, ndx, default):
             #nFramesForField = getattr(self._obj_, f"{self._field_}_nFrames", None)
             nFramesForField = self._obj_._n_child_frames_.get(self._field_, None)
-            print(f"__get_nth__: nFrames for {self._field_}: {nFramesForField}")
+            print(f"proxy, in __get_ndx__: nFrames for {self._field_}: {nFramesForField}; ndx: {ndx}")
             if isinstance(nFramesForField, int):
-                return nth(range(nFramesForField), ndx, default)
-            
+                return normalized_index(range(nFramesForField), ndx, silent=True)
         
         def __getitem__(self, key:int):
             index = self._obj_[key]
-            print(f"{key} -> {type(index).__name__}")
+            print(f"proxy, in getitem: {key} -> {type(index).__name__}")
             if isinstance(index, MultiFrameIndex):
                 # check for field in MultiFrameIndex
                 if hasattr(index, self._field_):
@@ -187,7 +186,7 @@ class FrameIndexLookup(object):
                     #
 
             # try to use nth here (default on the last available frame)
-            val = self.__get_nth__(self._field_, key, -1)
+            val = self.__get_ndx__(self._field_, key, -1)
             # NOTE: see CAUTION: 2021-12-03 16:19:05
             if isinstance(val, int):
                 return val
@@ -244,7 +243,6 @@ class FrameIndexLookup(object):
                 self._obj_._field_names_.add(field) # NOOP if field exists
         
     
-    #def __init__(self, data:typing.Optional[BaseScipyenData]=None, *args):
     def __init__(self, *args, **kwargs):
         """
         *args: one or more dict with the following structure:
@@ -360,7 +358,7 @@ class FrameIndexLookup(object):
         
     def __getitem__(self, key:int):
         if isinstance(self._maxFrames_, int):
-            if (key >=0 and key >= self._maxFrames_) or (key < 0 and key < -self._maxFrames_):
+            if key not in range(-self._maxFrames_, self._maxFrames_):
                 raise KeyError(f"Frame index{key}  out of range {(-self._maxFrames_, self._maxFrames_-1)}")
         
         # NOTE: return the key when nothing is mapped to it

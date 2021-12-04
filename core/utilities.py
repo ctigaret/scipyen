@@ -3379,7 +3379,8 @@ def name_lookup(container: typing.Sequence, name:str,
     return names.index(name)
 
 def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int]],
-                     index: typing.Optional[typing.Union[str, int, collections.abc.Sequence, np.ndarray, range, slice]] = None) -> typing.Union[range, tuple]:
+                     index: typing.Optional[typing.Union[str, int, collections.abc.Sequence, np.ndarray, range, slice]] = None,
+                     silent:bool=False) -> typing.Union[range, tuple]:
     """Transform various indexing objects to a range or iterable of int indices.
     
     Also checks the validity of the index for an iterable of data_len samples.
@@ -3469,6 +3470,8 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
         # the sequence
         #if index >= data_len:
         if index not in range(-data_len,data_len):
+            if silent:
+                return None
             raise ValueError("Index %s is invalid for %d elements" % (index, len(data)))
         
         return (index,)
@@ -3489,10 +3492,14 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
             return tuple(prog.filter_attr(data, name=lambda x: x in index, indices_only=True))
         
         else:
+            if silent:
+                return None
             raise IndexError(f"Invalid 'index' specification {index}")
         
     elif isinstance(index, range):
         if max(index) >= data_len:
+            if silent:
+                return None
             raise IndexError("Index %s out of range for %d elements" % (index, data_len))
         
         return index # -> index IS a range
@@ -3501,12 +3508,18 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
         ndx = index.indices(data_len)
             
         if len(ndx) == 0:
+            if silent:
+                return None
             raise IndexError("Indexing %s results in an empty indexing list" % index)
         
         if max(ndx) >= data_len:
+            if silent:
+                return None
             raise IndexError("Index %s out of range for %d elements" % (index, data_len))
         
         if min(ndx) < -data_len:
+            if silent:
+                return None
             raise IndexError("Index %s out of range for %d elements" % (index, data_len))
         
         return ndx # -> ndx IS a tuple
