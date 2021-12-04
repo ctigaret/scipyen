@@ -119,12 +119,15 @@ A. use FrameIndexLookup with MultiFrameIndex (ScanDataFrameIndex):
     indices = np.full((maxFrames, 3), np.nan)
     
     
-    NOTE: see also np.sctypeDict
+    NOTE: see also np.sctypeDict, pd.Int64DType
+    
+    We need pandas Int64Dtype because they offer a NULL integer type equivalent
+    to numpy NaN or math NaN (both ich the latter are floats)
 
     field_names = ("scans", "scene", "electrophysiology")
-    mydtype = np.dtype([(("Component", 'name'), f"U{max(len(s) for s in field_names)}"), (('Frame', 'index'), int)])
+    idxdtype = np.dtype([(("Component", 'name'), f"U{max(len(s) for s in field_names)}"), (('Frame', 'index'), pd.Int64Dtype())])
     
-    idx = p
+    
     
 create indexing tuples:
     indexing_tuples = tuple(tuple(scan, 0, np.nan) for scan in range(scans frames))
