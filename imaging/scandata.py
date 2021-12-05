@@ -32,7 +32,8 @@ from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 
 from core.datazone import DataZone
 
-from core.multiframeindex import (MultiFrameIndex, FrameIndexLookup)
+from core.multiframeindex import (FrameIndexLookup, )
+#from core.multiframeindex import (MultiFrameIndex, FrameIndexLookup)
 
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType,)
 
@@ -1184,7 +1185,7 @@ class ScanData(BaseScipyenData):
         ("scansLayout",                     dict),
         ("sceneFrameAxis",                  (vigra.AxisInfo, tuple)),
         ("scansFrameAxis",                  (vigra.AxisInfo, tuple)),
-        ("framesMap",                       pd.DataFrame),
+        ("framesMap",                       FrameIndexLookup),
         )
     
     _graphics_attributes_ = (
@@ -1269,6 +1270,17 @@ class ScanData(BaseScipyenData):
             raise ValueError(f"Unknown data child component: {component}")
         
         return getattr(self, component, None)
+    
+    #@classmethod
+    #def setup_descriptor(cls, name, descr_params):
+        #args = descr_params.get("args", tuple())
+        #kwargs = descr_params.get("kwargs", {})
+        #name = descr_params.get("name", "")
+        #if not isinstance(name, str) or len(name.strip()) == 0:
+            #return
+        
+        #if name in (c[0] for c in cls._data_children_):
+            #if 
         
     @safeWrapper
     def __init__(self, scans=None, scene=None, electrophysiology=None, metadata=None, **kwargs):
@@ -1855,11 +1867,14 @@ class ScanData(BaseScipyenData):
             else:
                 val = len(kwargs[c].segments) if isinstance(kwargs[c], neo.Block) else None
                 
+            #print(f"c: {c} = {kwargs[c]}")
             field_frames[c] = val
             
         # check if we need to bother with a FrameIndexLookup
         # if all data children return same number of frames we assume all have 
         # biunivocal relationship so we do NOT use a FrameIndexLookup
+        
+        #print(field_frames)
         
         sub_nframes = tuple(v for v in field_frames.values())
         if all(v == sub_nframes[0] for v in sub_nframes[1:]):
@@ -1872,6 +1887,9 @@ class ScanData(BaseScipyenData):
         
         kwargs["framesMap"] = framesMap
             
+        # NOTE: the following sets up descriptors using the default 
+        # setup_descriptor :class: method inherited from prog.WithDescriptors
+        # 
         super().__init__(**kwargs) # BaseScipyenData/WithDescriptors
         
         # NOTE: 2021-10-28 18:36:14

@@ -56,6 +56,18 @@ class WithDescriptors(object):
     """
     @classmethod
     def setup_descriptor(cls, descr_params):
+        """Default method for setting up descriptors based on specific conditions.
+        
+        Derived :classes: that need to implement custom actions alongside the 
+        descriptor's `__set__()` method should either:
+        a) override this method to use a custom Validator
+        b) supply a property (with both getter/setter functions) for the 
+            particular descriptor (thus overriding the entire descriptor protocol)
+        c) provide an intermediary 'setter' method for that particular 
+        descriptor in order to perform the custom actions before the descriptor's
+        `__set__()` method is called
+    
+        """
         args = descr_params.get("args", tuple())
         kwargs = descr_params.get("kwargs", {})
         name = descr_params.get("name", "")
@@ -179,8 +191,8 @@ class GenericValidator(BaseValidator):
                     To compare the STRUCTURE of a dict value agains a 'template',
                     use **kwargs as detailed below.
                     
-        kwargs: maps Python types to additional criteria (NOTE: a Python type is 
-            a hashable Python object).
+        kwargs: maps Python types or special strings to additional criteria 
+            (NOTE: a Python type is a hashable Python object).
             
                 The additional criteria are ALWAYS dicts, with keys (str) mapped
                 to values of the type indicated in the table below. These mappings
@@ -191,33 +203,48 @@ class GenericValidator(BaseValidator):
                 NOTE: The table below lists the expected criteria for maximal
                 stringency; the last entry in the table sets the most generic case
             
-            Key:                    Value:
-            ------------------------------------------------------------------
-                                     
-            numpy.ndarray           {"ndim": int,
+        Key:                        Value:
+        ------------------------------------------------------------------
+                                    
+    1.  numpy.ndarray               {"ndim": int,
                                      "shape": tuple,
                                      "dtype": numpy.dtype,
                                      "kind": numpy.dtype.kind}
-                                     
-            pytyhon.Quantity        as for numpy.ndarray, plus:
-                                    {"units": python.Quantity}
                                     
-            vigra.VigraArray        as for numpy.ndarray, plus:
+    2.  pytyhon.Quantity            as for numpy.ndarray, plus:
+                                    {"units": python.Quantity}
+                                
+    3.  vigra.VigraArray            as for numpy.ndarray, plus:
                                     {"axistags": vigra.AxisTags,
                                      "order": str}
-                                     
-            vigra.AxisInfo          {"key": str,
+                                    
+    4.  vigra.AxisInfo              {"key": str,
                                      "typeFlags": vigral.AxisType
                                      "resolution": float,
                                      "description": str}
-                                     
-            dict                    { (key_name: value_type,)* }
-                        Where 'value_type' is a type
-                        
-            <any other type>        dict maping property name to type of 
-                                property value, or to a dict as in this table
-            
-            ------------------------------------------------------------------
+                                    
+    5.  dict                        { (key_name: value_type,)* }
+                                    Where 'value_type' is a type
+                    
+    6.  <any other type, except     dict mapping property name to type of 
+        for the special cases       property value, or to a dict as detailed
+        below>                      in this table
+        
+    7.  "pre_validation"            instance method or function that performs 
+                                    additional and/or actions BEFORE the value 
+                                    is validated, in this descriptor's
+                                    `__set__()`. The 
+                                
+                                    Optional, default is None
+                                
+    8.  "post_validation"           instance method or function that performs 
+                                    additional checks and/or actions AFTER the 
+                                    value is validated, in this descriptor's
+                                    `__set__()`
+                            
+                                    Optional, default is None
+                                
+        ------------------------------------------------------------------
                                      
         NOTE: Validation is performed in the following order:
         
@@ -276,11 +303,13 @@ class GenericValidator(BaseValidator):
        # NOTE: predicates must be unary predicates; 
         # will raise exceptions when called, otherwise
         self.predicates = set()
-        self.types = set()
-        self.hashables = set()
-        self.non_hashables = set()
-        self.dcriteria = dict()
+        self.types = set() # allowed value types
+        self.hashables = set() # values for hashables (can be used as keys)
+        self.non_hashables = set() # values for non-hashables - referenced by their id()
+        self.dcriteria = dict() # dictionary of criteria as in the above table
         self._allow_none_ = False
+        self._pre_validator_= None
+        self._post_validator_ = None
         
         for a in args:
             if inspect.isfunction(a):
@@ -319,9 +348,23 @@ class GenericValidator(BaseValidator):
                 self.non_hashables.add(id(a))
                 
         # NOTE: more complex predicates, where a function or method expecting
-        # an instance also takes aditinoal argument (although these can be 
+        # an instance also takes additional argument (although these can be 
         # supplied as partial functions to *args)
+        # FIXME 2021-12-05 10:52:13: 
+        # The code below does do what the docstring claims it would do! 
+        # Either edit the dosctring or modify the code to fulfill the promise in
+        # the dosctring.
         for key, val in kwargs:
+            # this clause below covers case 6 in the doscring table
+            # TODO must implement the others as well!
+            
+            if key in ("pre_validation", "post_validation"):
+                if inspect.isfunction(val):
+                    if key = "pre_validation":
+                        self._pre_validator_ = val
+                    else:
+                        self._post_validator_ = val
+            
             if isinstance(val, dict) and all(isinstance(k, str) for k in val):
                 try:
                     typ = import_name(key)
@@ -329,6 +372,14 @@ class GenericValidator(BaseValidator):
                 except:
                     continue
                 
+    def __set__(self, obj, value):
+        if self._pre_validator_ is not None:
+            self._pre_validator_(value)
+        self.validate(value)
+        if self._post_validator_ is not None:
+            self._post_validator_(value)
+        setattr(obj, self.private_name, value)
+        
     @property
     def allow_none(self):
         return self._allow_none_
@@ -350,9 +401,9 @@ class GenericValidator(BaseValidator):
             if not isinstance(value, comparand):
                 raise AttributeError(f"For {self.private_name} one of the types: {comparand} was expected; got {type(value).__name__} instead")
             
+        # NOTE: 2021-11-30 10:42:08
+        # it makes sense to validate further, only when allow_none is False
         if not self.allow_none:
-            # NOTE: 2021-11-30 10:42:08
-            # it makes sense to validate further, only when allow_none is False
             if len(self.predicates):
                 if not functools.reduce(operator.and_, self.predicates, True):
                     raise AttributeError(f"Unexpected value for {self.private_name}: {value}")

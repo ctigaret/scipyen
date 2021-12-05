@@ -196,6 +196,7 @@ def stderr_redirector(stream):
         #print(saved_stderr_fd is original_stderr_fd)
         tfile.close()
         os.close(saved_stderr_fd)
+        sys.stderr = sys.__stderr__
         #os.fsync(original_stderr_fd) # invalid argument!
         #original_stderr_fd = os.dup(saved_stderr_fd)
         #sys.stderr = io.TextIOWrapper(os.fdopen(system_stderr_fd, 'wb'))
