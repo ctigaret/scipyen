@@ -3378,7 +3378,7 @@ def name_lookup(container: typing.Sequence, name:str,
         
     return names.index(name)
 
-def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int]],
+def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series]],
                      index: typing.Optional[typing.Union[str, int, collections.abc.Sequence, np.ndarray, range, slice]] = None,
                      silent:bool=False) -> typing.Union[range, tuple]:
     """Transform various indexing objects to a range or iterable of int indices.
@@ -3390,6 +3390,13 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
     data: Sequence or int; 
         When a Sequence, the index will be verified against len(data).
         
+        When one of the pandas data types:
+            DataFrame, Series: the index will be checked against the object's 
+            'index' attribute
+            
+            pandas.core.indexes.base.Index: the index will be cheched against it
+            (useful when passing the columns attribute of a DataFrame)
+            
         When an int, 'data' is the length of a putative Sequence (hence 
         data >= 0)
     
@@ -3458,6 +3465,13 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
     elif isinstance(data, collections.abc.Sequence):
         data_len = len(data)
         
+    elif isinstance(data, (pd.Series, pd.DataFrame)):
+        data_len = len(data)
+        data = data.index
+        
+    elif isinstance(data, pd.core.indexes.base.Index):
+        data_len = len(data)
+        
     else:
         raise TypeError("Expecting an int or a sequence (tuple, list, deque) or None; got %s instead" % type(data).__name__)
     
@@ -3468,32 +3482,53 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
         # NOTE: 2020-03-12 22:40:31
         # negative values ARE supported: they simply go backwards from the end of
         # the sequence
-        #if index >= data_len:
         if index not in range(-data_len,data_len):
             if silent:
                 return None
             raise ValueError("Index %s is invalid for %d elements" % (index, len(data)))
         
+        if isinstance(data, pd.core.indexes.base.Index):
+            return (data[index], )
+        
         return (index,)
     
     if isinstance(index, str):
-        if not isinstance(data, (tuple, list)):
-            raise TypeError("Name index requires 'data' to be a sequence of objects")
-        
-        return tuple(prog.filter_attr(data, name=lambda x: x==index, indices_only=True))
+        if isinstance(data, (tuple, list)):
+            return tuple(prog.filter_attr(data, name=lambda x: x==index, indices_only=True))
+    
+        if isinstance(data, (pd.core.indexes.base.Index)):
+            if index in data:
+                return index
+                #return (list(data).index(index), )
+            
+            if not silent:
+                raise IndexError(f"Invalid 'index' specification {index}")
+                
+        raise TypeError("Name index requires 'data' to be a sequence of objects, or a pandas Index")
         
     elif isinstance(index, collections.abc.Iterable):
         if all(isinstance(v, int) and v in range(-data_len, data_len) for v in index):
+            if isinstance(data, pd.core.indexes.base.Index):
+                return (data[v] for v in index )
+            
             return index
         
         elif all(isinstance(v, str) for v in index):
             if not isinstance(data, collections.abc.Iterable):
                 raise TypeError("When indexing by name attribute (str), data must be an iterable")
-            return tuple(prog.filter_attr(data, name=lambda x: x in index, indices_only=True))
+            
+            if isinstance(data, collections.abc.Sequence):
+                return tuple(prog.filter_attr(data, name=lambda x: x in index, indices_only=True))
+            
+            if isinstance(data, pd.core.indexes.base.Index):
+                return tuple(v for v in index if v in data)
         
+                if not silent:
+                    raise IndexError(f"Invalid 'index' specification {index}")
         else:
             if silent:
                 return None
+            
             raise IndexError(f"Invalid 'index' specification {index}")
         
     elif isinstance(index, range):
@@ -3608,81 +3643,183 @@ def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)) -> i
     
     return axis
 
-def sp_loc(df, index, columns, val):
+def sp_set_loc(x, index, columns, val):
     """Assign values to pandas.SparseArray
+    Work around .loc idiom when fill value is pd.NA
     
-    See Answer 1 at
-    https://stackoverflow.com/questions/49032856/assign-values-to-sparsearray-in-pandas
-    
-    Insert data in a DataFrame with SparseDtype format
-
-    Only applicable for pandas version > 0.25
-
     Parameters:
     -----------
-    df : DataFrame with series formatted with pd.SparseDtype
+    x : DataFrame with series formatted with Pandas SparseDtype
+        Series formatted with Pandas SparseDtype
     
     index: str, or list, or slice object
         Same as one would use as first argument of .loc[]
         
     columns: str, list, or slice
         Same one would normally use as second argument of .loc[]
+        Ignored when x is a Pandas Series (just pass None to ensure the parameter 
+        is set)
         
     val: insert values
 
     Returns
     -------
-    df: DataFrame
-        Modified DataFrame
-        
-    NOTE: using mask data frames with sparse data frames (sp_df) - e.g. to 
-    replace all pd.NAs in sp_df with a value (-1 in this example):
-    
-    sp_df
-    scans  scene  electrophysiology
-    0      0      0               <NA>
-    1      1   <NA>                  1
-    2      2   <NA>               <NA>
-    
-    
-    # generate a mask
-    df_mask = ~sp_df.isna() # False in place of NA, True everywhere else
-    
-    df_mask
-    scans  scene  electrophysiology
-    0   True   True              False
-    1   True  False               True
-    2   True  False              False
-    
-    # replace ps.Na with -1, using the mask
-    sp+df = sp_df.where(df_mask, -1)
-    
-    sp_df
-    scans scene electrophysiology
-    0      0     0                -1
-    1      1    -1                 1
-    2      2    -1                -1
+    x: Modified DataFrame or Series
 
+    NOTE:
+    -------
+    Modified from Answer 1 at
+    https://stackoverflow.com/questions/49032856/assign-values-to-sparsearray-in-pandas
     
-    etc.
-        
+    'Insert data in a DataFrame with SparseDtype format'
+
+    Only applicable for pandas version > 0.25
+    
     """
+    if isinstance(x, pd.Series):
+        spdtypes = x.dtype
+        if np.any(x.isna):
+            x = np.asarray(x, dtype=np.dtype(object), order="k")
+        else:
+            x.sparse.to_dense()
+        # NOTE: 2021-12-05 22:09:29 ignore columns for a pd.Series
+        
+        x.loc[index] = val
+        x = x.astype(spdtyes)
+        return x
+    
+    # NOTE: 2021-12-05 22:02:06
+    # handle the case where columns is a slice, a list, or a pandas Index
     # Save the original sparse format for reuse later
-    spdtypes = df.dtypes[columns]
+    # trimmed-down version of full code for data frames, further below 
+    spdtypes = x.dtypes[columns]
 
-    # Convert concerned Series to dense format
-    if np.any(df[columns].isna):
-        # NOTE: see NOTE: 2021-12-04 20:06:50
-        df[columns] = np.asarray(df[columns], dtype = np.dtype(object), order = "K")
-    else:
-        # NOTE: 2021-12-04 20:06:50
-        # this fails when the sparse array has pd.NA as fill_value
-        df[columns] = df[columns].sparse.to_dense() # original code
+    if isinstance(columns, slice):
+        columns = x.columns[columns] # => pd.Index !
+    
+    if isinstance(columns, (list, pd.Index)): # tuples (not lists) are used for multi-index
+        for c in columns:
+            if np.any(x[c].isna):
+                # NOTE: see NOTE: 2021-12-04 20:06:50
+                x[c] = np.asarray(x[c], dtype = np.dtype(object), order = "K")
+            else:
+                # NOTE: 2021-12-04 20:06:50
+                # this fails when the sparse array has pd.NA as fill_value
+                x[c] = x[c].sparse.to_dense() # original code
+
+    else: 
+        # Convert concerned Series to dense format
+        if np.any(x[columns].isna):
+            # NOTE: see NOTE: 2021-12-04 20:06:50
+            x[columns] = np.asarray(x[columns], dtype = np.dtype(object), order = "K")
+        else:
+            # NOTE: 2021-12-04 20:06:50
+            # this fails when the sparse array has pd.NA as fill_value
+            x[columns] = x[columns].sparse.to_dense() # original code
 
     # Do a normal insertion with .loc[]
-    df.loc[index, columns] = val
+    x.loc[index, columns] = val
 
     # Back to the original sparse format
-    df[columns] = df[columns].astype(spdtypes)
+    if isinstance(columns, (slice, list, pd.Index)): # tuples (not lists) are used for multi-index
+        for c in columns:
+            x[c] = x[c].astype(spdtypes[c])
+    else:
+        x[columns] = x[columns].astype(spdtypes)
     
-    return df    
+    return x    
+
+def sp_get_loc(x, index, columns):
+    """Retrieve values to pandas.SparseArray
+    Work around .loc idiom when fill value is pd.NA
+    
+    See also sp_set_loc
+
+    Only applicable for pandas version > 0.25
+
+    Parameters:
+    -----------
+    x : DataFrame with series formatted with pd.SparseDtype, OR
+        Series formatted with pd.SparseDtype
+    
+    index: str, or list, or slice object
+        Same as one would use as first argument of .loc[]
+        
+    columns: str, list, or slice
+        Same one would normally use as second argument of .loc[]
+        Ignored when 'x' is a Pandas Series  (just pass None to ensure the 
+        parameter is set)
+        
+    Returns
+    -------
+    x: DataFrame, Series, or scalar
+        
+    """
+    # trimmed-down version of full code for data frames, further below 
+    if isinstance(x, pd.Series):
+        spdtypes = x.dtype
+        if np.any(x.isna):
+            x = np.asarray(x, dtype=np.dtype(object), order="k")
+        else:
+            x.sparse.to_dense()
+        # NOTE: 2021-12-05 22:09:29 ignore columns for a pd.Series
+        
+        ret = x.loc[index]
+        x = x.astype(spdtyes)
+        if isinstance(ret, pd.Series):
+            ret = ret.astype(spdtypes)
+        return ret
+    
+    # Save the original sparse format for reuse later
+    
+    # NOTE: dt.dtypes returns a Series!!! 
+    # NOTE: it is 'dtypes' not 'dtype'!
+    spdtypes = x.dtypes[columns] # this is a pd.Series with column names as row index
+    
+    if isinstance(columns, slice):
+        columns = x.columns[columns] # => pd.Index
+        #columns = [c for c in x.columns[columns]]
+    
+    if isinstance(columns, (list, pd.Index)): # tuples (not lists) are used for multi-index
+        for c in columns:
+            if np.any(x[c].isna):
+                # NOTE: see NOTE: 2021-12-04 20:06:50
+                x[c] = np.asarray(x[c], dtype = np.dtype(object), order = "K")
+            else:
+                # NOTE: 2021-12-04 20:06:50
+                # this fails when the sparse array has pd.NA as fill_value
+                x[c] = x[c].sparse.to_dense() # original code
+
+    else: 
+        # NOTE: should also cover tuples of columns (multiindex) but haven't checked yet        
+        # Convert concerned Series to dense format
+        if np.any(x[columns].isna):
+            # NOTE: see NOTE: 2021-12-04 20:06:50
+            x[columns] = np.asarray(x[columns], dtype = np.dtype(object), order = "K")
+        else:
+            # NOTE: 2021-12-04 20:06:50
+            # this fails when the sparse array has pd.NA as fill_value
+            x[columns] = x[columns].sparse.to_dense() # original code
+
+    # Access using .loc[]
+    ret = x.loc[index, columns]
+
+    # Back to the original sparse format
+    if isinstance(columns, (slice, list, pd.Index)): # tuples (not lists) are used for multi-index
+        for c in columns:
+            x[c] = x[c].astype(spdtypes[c])
+    else:
+        x[columns] = x[columns].astype(spdtypes)
+    
+    # also apply original sparse dtype to the result
+    if isinstance(ret, pd.Series):
+        if isinstance(spdtypes, pd.Series):
+            ret = ret.astype(spdtypes[ret.name])
+            
+        ret = ret.astype(spdtypes)
+        
+    elif isinstance(ret, pd.DataFrame):
+        for c in ret.columns:
+            ret[c] = ret[c].astype(spdtypes[c])
+    
+    return ret

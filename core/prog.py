@@ -55,25 +55,30 @@ class WithDescriptors(object):
     
     """
     @classmethod
-    def setup_descriptor(cls, descr_params):
+    def setup_descriptor(cls, descr_params, **kwargs):
         """Default method for setting up descriptors based on specific conditions.
         
         Derived :classes: that need to implement custom actions alongside the 
-        descriptor's `__set__()` method should either:
-        a) override this method to use a custom Validator
-        b) supply a property (with both getter/setter functions) for the 
-            particular descriptor (thus overriding the entire descriptor protocol)
-        c) provide an intermediary 'setter' method for that particular 
-        descriptor in order to perform the custom actions before the descriptor's
-        `__set__()` method is called
+        descriptor's `__set__()` method should pass the following as kwargs:
+        
+        'pre_validation' instance method or function -> performs functions BEFORE
+        value is validated in __set__()
+        
+        'post_validation' instance method or function -> performs functions BEFORE
+        value is validated in __set__()
+        
     
         """
         args = descr_params.get("args", tuple())
-        kwargs = descr_params.get("kwargs", {})
+        kw = descr_params.get("kwargs", {})
+        pre_validation = kw.pop("pre_validation", kwargs.pop("pre_validation", None))
+        post_validation = kw.pop("post_validation", kwargs.pop("post_validaton", None))
+        kw["pre_validation"] = pre_validation
+        kw["post_validation"] = post_validation
         name = descr_params.get("name", "")
         if not isinstance(name, str) or len(name.strip()) == 0:
             return
-        descriptor = GenericValidator(*args, **kwargs)
+        descriptor = GenericValidator(*args, **kw)
         descriptor.allow_none = True
         descriptor.__set_name__(cls, name)
         setattr(cls, name, descriptor)
@@ -354,23 +359,23 @@ class GenericValidator(BaseValidator):
         # The code below does do what the docstring claims it would do! 
         # Either edit the dosctring or modify the code to fulfill the promise in
         # the dosctring.
-        for key, val in kwargs:
-            # this clause below covers case 6 in the doscring table
-            # TODO must implement the others as well!
-            
+        for key, val in kwargs.items():
             if key in ("pre_validation", "post_validation"):
                 if inspect.isfunction(val):
-                    if key = "pre_validation":
+                    if key == "pre_validation":
                         self._pre_validator_ = val
                     else:
                         self._post_validator_ = val
-            
-            if isinstance(val, dict) and all(isinstance(k, str) for k in val):
-                try:
-                    typ = import_name(key)
-                    self.dcriteria[typ] = val
-                except:
-                    continue
+            else:
+                # this clause below covers case 6 in the table in docstring
+                # TODO must implement the others as well!
+                
+                if isinstance(val, dict) and all(isinstance(k, str) for k in val):
+                    try:
+                        typ = import_name(key)
+                        self.dcriteria[typ] = val
+                    except:
+                        continue
                 
     def __set__(self, obj, value):
         if self._pre_validator_ is not None:

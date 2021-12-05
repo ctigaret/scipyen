@@ -24,7 +24,7 @@ from core.quantities import(arbitrary_unit,
                             unit_quantity_from_name_or_symbol,
                             check_time_units)
 
-from core.utilities import (get_index_for_seq, sp_loc )
+from core.utilities import (get_index_for_seq, sp_set_loc )
 
 from core.datatypes import (UnitTypes, Genotypes, )
 
@@ -1956,6 +1956,15 @@ class ScanData(BaseScipyenData):
                 
                 if chindex == data:
                     pass
+                
+    def __electrophysiology_post_validator__(self, data):
+        """Adapts self frames map to the electrophysiology 
+        
+        """
+        if isinstance(self.electrophysiology, neo.Block):
+            if len(self.electrophysiology.segments) == len(self.framesMap):
+                # assume 1-2-1 corresp with the index in framesMap
+                pass
                
     @staticmethod
     def dataLayout(data, 
