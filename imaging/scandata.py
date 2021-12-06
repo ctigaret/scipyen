@@ -1957,14 +1957,80 @@ class ScanData(BaseScipyenData):
                 if chindex == data:
                     pass
                 
-    def __electrophysiology_post_validator__(self, data):
-        """Adapts self frames map to the electrophysiology 
+    def __data_post_validator__(self, fieldname):
+        """Adapts the frames map to the electrophysiology's segments.
+        
+        Sets up a default correspondence:
+        
+        If the new electrophysiology Block has fewer segments that the number of 
+        virtual frames in this ScanData object, its segment indices are mapped 
+        to the first len(segments) data master frames, and the exceeding data 
+        virtual frames are mapped to the last segment in the electrophysiology
+        block.
+        
+        If the new electrophysiology block has more segments than the number of 
+        frames in the ScanData object, the ScanData frames map is adjusted such
+        that the total number of virtual frames equals len(segments), and the 
+        scans and scene frames are mapped to the first electrophysiology
+        segments ('sweeps' or 'frames'); the exceeding segments are mapped to
+        the last frame in scans and scene.
+        
+        When the number of electrophysiology segments equals that of the virtual
+        data frames, the segment indices are mapped 1-2-1 to the virtual frames
+        in increasing order.
+        
+        For a more atomic configuration use self.setFramesRelationship() after
+        assigning to self.electrophysiology
         
         """
-        if isinstance(self.electrophysiology, neo.Block):
-            if len(self.electrophysiology.segments) == len(self.framesMap):
-                # assume 1-2-1 corresp with the index in framesMap
-                pass
+        if fieldname not in tuple(c[0] for c in self._data_children_):
+            raise ValueError(f"Unexpected field {fieldname}")
+
+        if not hasattr(self, fieldname):
+            return
+        
+        field = getattr(fieldname)
+        nframes = len(self.framesMap)
+            
+        if isinstance(field, neo.Block):
+            newframes = len(self.electrophysiology.segments)
+            
+        elif isinstance(field, list) and all(isinstance(v, vigra.VigraArray) for v in field):
+            userFrameAxis = self.scansFrameAxis if fieldname == "scans" else self.sceneFrameAxis
+            layout = proposeLayout(data, userFrameAxis = userFrameAxis)
+            newframes = layout.nFrames
+        
+        if newframes == nframes:
+            # assume 1-2-1 correspondence with the index in framesMap
+            self.framesMap[fieldname] = range(newframes)
+            
+        elif newframes < nframes:
+            value = list(range(newframes))
+            value.extend([self.framesMap.missingFieldFrameIndex for k in range(newframes, nframes)])
+                    
+            self.framesMap[fieldname] = value
+            
+        else:
+            # concatenate a new frame index lookup
+            dd = dict()
+            for c in self._data_children_:
+                name = c[0]
+                if name != fieldname:
+                    if np.any(self.framesMap[name].isna()):
+                        val = None
+                    else:
+                        val = 0
+                    dd[name] = val
+                    
+                else:
+                    dd[name] = newframes - nframes
+                    
+            fil = FrameIndexLookup(dd)
+            fil[fieldname] = range(nframes, nsegs)
+            
+            newmap = pd.concat([self.framesMap.map, fil.map], ignore_index=True)
+            
+            self.frameMap.map = newmap
                
     @staticmethod
     def dataLayout(data, 
@@ -9095,6 +9161,11 @@ class ScanData(BaseScipyenData):
         # name
         # analysis mode
         # 
+        
+    def setFramesRelationship(self, *args, **kwargs):
+        """TODO: 2021-12-05 23:11:07
+        """
+        pass
     
 
 def concatenateScanData(*data, resample=True):

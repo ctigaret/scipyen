@@ -105,6 +105,10 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
                         )
     
     _descriptor_attributes_ = _data_children_ + _data_attributes_
+    
+    _pre_validators_ = dict()
+    _post_validators_ = dict()
+    
     #@classmethod
     #def setup_descriptor(cls, descr_params):
         #args = descr_params.get("args", tuple())
@@ -121,7 +125,12 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
         for attr in self._descriptor_attributes_:
             attr_dict = parse_descriptor_specification(attr)
             proposed_value = kwargs.pop(attr[0], attr_dict["value"])
-            type(self).setup_descriptor(attr_dict)
+            kw = dict()
+            if attr_dict["name"] in self._pre_validators_:
+                kw["pre_validation"] = self._pre_validators_[attr_dict["name"]]
+            if attr_dict["name"] in self._post_validators_:
+                kw["post_validation"] = self._post_validators_[attr_dict["name"]]
+            type(self).setup_descriptor(attr_dict, **kw)
             setattr(self, attr_dict["name"], proposed_value)
             
         super().__init__(name=name, description=description, file_origin=file_origin, **kwargs)
