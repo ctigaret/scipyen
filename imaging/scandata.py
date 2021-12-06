@@ -26,7 +26,7 @@ from core.quantities import(arbitrary_unit,
 
 from core.utilities import (get_index_for_seq, sp_set_loc )
 
-from core.datatypes import (UnitTypes, Genotypes, )
+from core.datatypes import (UnitTypes, GENOTYPES, )
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 
@@ -1716,7 +1716,7 @@ class ScanData(BaseScipyenData):
         # NOTE: 2019-01-16 15:16:17
         # enable storage of custom unit type and genotype with ScanData
         
-        #self._available_genotypes_ = ["NA", "wt", "het", "hom"]
+        #self._availableGenotypes_ = ["NA", "wt", "het", "hom"]
         # NOTE: 2021-11-26 13:32:58 
         # _descriptor_attributes_
         # see BaseScipyenData
@@ -1909,9 +1909,9 @@ class ScanData(BaseScipyenData):
         
         #self._name_ = name
         
-        self._available_genotypes_ = [s for s in Genotypes]
-        self._available_unit_types_ = [s for s in UnitTypes.values()]
-        self._available_unit_types_.insert(0, "unknown")
+        self._availableGenotypes_ = [s for s in GENOTYPES]
+        self._availableUnitTypes_ = [s for s in UnitTypes.values()]
+        self._availableUnitTypes_.insert(0, "unknown")
         
         self._metadata_ = None
         self._modified_ = False
@@ -4456,7 +4456,7 @@ class ScanData(BaseScipyenData):
             
     @property
     def defaultAnalysisUnit(self):
-        return self.analysisUnit()
+        return self.analysisUnit
     
     @safeWrapper
     def analysisUnitSignal(self, landmark=None):
@@ -8633,11 +8633,11 @@ class ScanData(BaseScipyenData):
                 
     #@property
     #def availableUnitTypes(self):
-        #return self._available_unit_types_
+        #return self._availableUnitTypes_
     
     #@property
     #def availableGenotypes(self):
-        #return self._available_genotypes_
+        #return self._availableGenotypes_
         
     #@property
     #def cell(self):
@@ -8712,11 +8712,11 @@ class ScanData(BaseScipyenData):
             #for unit in self._analysis_units_:
                 #unit.field = field
     
-    #@property
-    #def unitType(self):
-        #"""Returns/sets the value of the type attribute of THIS ScanData object's analysis unit.
-        #"""
-        #return self._analysis_unit_.unit_type
+    @property
+    def unitType(self):
+        """Returns/sets the value of the type attribute of THIS ScanData object's analysis unit.
+        """
+        return self.analysisUnit.unit_type if isinstance(self.analysisUnit, AnalysisUnit) else "NA"
     
     #@unitType.setter
     #def unitType(self, value):

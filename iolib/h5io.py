@@ -675,7 +675,7 @@ from core.quantities import(arbitrary_unit,
                             unit_quantity_from_name_or_symbol,
                             name_from_unit, units_convertible)
 
-from core.datatypes import (TypeEnum,UnitTypes, Genotypes, 
+from core.datatypes import (TypeEnum,UnitTypes, GENOTYPES, 
                             is_uniform_sequence, is_uniform_collection, 
                             is_namedtuple, is_string,
                             is_numeric_string, is_numeric, 

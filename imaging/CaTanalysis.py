@@ -1602,7 +1602,7 @@ def analyseFrame(lsdata, frame, unit=None,
         # NOTE: 2018-04-09 17:14:46
         # then clauses below bring various options to a common denominator: AnalysisUnit
         
-    if len(lsdata.triggerProtocols) == 0:
+    if len(lsdata.triggers) == 0:
         raise RuntimeError("%s has no trigger protocols" % lsdata.name)
     
     if isinstance(unit, pgui.Cursor) and unit.type == pgui.GraphicsObjectType.vertical_cursor:
@@ -2607,14 +2607,14 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
             # the analysis_unit.protocols should also be defined in the scandata,
             # but check this anyway:
             for p in protocols:
-                if p not in scandata.triggerProtocols:
+                if p not in scandata.triggers:
                     raise ValueError("protocol %s associated with analysis unit %s is not found in scan data %s" % \
                         (p.name, analysis_unit.name, scandata.name))
             
         elif isinstance(protocols, (tuple, list)): # a list of names or TriggerProtocol objects -- check they belong to the data
             for p in protocols:
                 if isinstance(p, str): # protocol specified by its name
-                    if p not in [p_.name for p_ in scandata.triggerProtocols]: # check it is found in the scandata
+                    if p not in [p_.name for p_ in scandata.triggers]: # check it is found in the scandata
                         raise ValueError("protocol %s not found in scandata %s" % \
                             (p, scandata.name))
                     
@@ -2624,7 +2624,7 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
                         continue # why??? -- because one may ask for a protocol that is not necessarily present in all the specified units
                     
                 elif isinstance(p, TriggerProtocol): # protocol specified as is (TriggerProtocol object)
-                    if p not in scandata.triggerProtocols:
+                    if p not in scandata.triggers:
                         raise ValueError("protocol %s not found in scandata %s" % \
                             (p.name, scandata.name))
                     
@@ -2637,7 +2637,7 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
                     raise TypeError("'protocols' sequence must contain only str and TriggerProtocol objects; got %s instead" % type(p).__name__)
                         
         elif isinstance(protocols, str): #  a single protocol specified by name
-            if protocols not in [p.name for p in scandata.triggerProtocols]:
+            if protocols not in [p.name for p in scandata.triggers]:
                 raise ValueError("protocol %s is not found in scandata %s" % \
                     (protocols, scandata.name))
             
@@ -2649,7 +2649,7 @@ def reportUnitAnalysis(scandata, analysis_unit=None, protocols=None, frame_index
             protocols = [p for p in analysis_unit.protocols if p.name  == protocols]
             
         elif isinstance(protocols, TriggerProtocol): #  a single TriggerProtocol object
-            if protocols not in scandata.triggerProtocols:
+            if protocols not in scandata.triggers:
                 raise ValueError("protocol %s not found in scandata %s" % \
                     (protocols.name, scandata.name))
             
@@ -4797,10 +4797,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         prname = self.protocolSelectionComboBox.currentText()
         
         if prname.lower() == "all":
-            self._current_protocols_ = self._data_.triggerProtocols
+            self._current_protocols_ = self._data_.triggers
             
         elif prname.lower() == "select..." and len(self._current_protocols_) == 0:
-            pnames = [p.name for p in self._data_.triggerProtocols]
+            pnames = [p.name for p in self._data_.triggers]
             if len(pnames):
                 ret = pgui.checkboxDialogPrompt(self, "Select protocols", pnames)
                 
@@ -4809,7 +4809,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 if len(selected):
                     result = list()
                     for n in selected:
-                        result.append([p for p in self._data_.triggerProtocols if p.name == n][0])
+                        result.append([p for p in self._data_.triggers if p.name == n][0])
                         
                     self._current_protocols_ = result
                 
@@ -4817,7 +4817,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                     self._current_protocols_ = []
         
         else:
-            self._current_protocols_ = [p for p in self._data_.triggerProtocols if p.name == prname]
+            self._current_protocols_ = [p for p in self._data_.triggers if p.name == prname]
             
         return self._current_protocols_
 
@@ -5553,7 +5553,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                     else:
                         return
                     
-                self._data_.triggerProtocols = tp
+                self._data_.triggers = tp
                 #self._data_.adoptTriggerProtocols(ephysData)
 
                 self.displayFrame()
@@ -5686,8 +5686,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             
             self._data_.electrophysiology.segments[:] = segments
             
-            if len(self._data_.triggerProtocols):
-                for protocol in self._data_.triggerProtocols:
+            if len(self._data_.triggers):
+                for protocol in self._data_.triggers:
                     protocol_old_segment_index = protocol.segmentIndices()
                     
                     protocol_new_segment_index = [new_index_mapping[k] for k in protocol_old_segment_index]
@@ -5722,7 +5722,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                         #pass
                         
                 # sort the protocols in the list by the first value in their segment indices
-                self._data_.triggerProtocols.sort(key=lambda x: x.segmentIndices()[0])
+                self._data_.triggers.sort(key=lambda x: x.segmentIndices()[0])
             
                 
             self.displayFrame()
@@ -5861,7 +5861,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                     else:
                         return
                     
-                self._data_.triggerProtocols = tp
+                self._data_.triggers = tp
                 #self._data_.adoptTriggerProtocols(ephysData)
 
                 self.displayFrame()
@@ -5894,7 +5894,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             self._data_.scansBlock.segments.clear()
             self._data_.scansBlock.segments[:] = [neo.Segment() for f in range(self._data_.scansFrames)]
             
-        #for trigger_protocol in self._data_.triggerProtocols:
+        #for trigger_protocol in self._data_.triggers:
             #for index in trigger_protocol.segmentIndices():
                 #self._data_.scansBlock.segments[index].name = "Segment %d (%s)" % (index, trigger_protocol.name)
     
@@ -6407,7 +6407,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                                                 clear=True)
                 # NOTE: the events in the protocol list are already 
                 # references to the events stored in the ephys block
-                self._data_.triggerProtocols = tp
+                self._data_.triggers = tp
                 self._data_.analysisOptions = options
                     
                 self.displayFrame()
@@ -6452,7 +6452,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         if isinstance(obj, pgui.PlanarGraphics):
             self._selected_analysis_unit_ = self._data_.defineAnalysisUnit(obj, 
                                                                             scene=False,
-                                                                            protocols=self._data_.triggerProtocols)
+                                                                            protocols=self._data_.triggers)
             
             self._data_.modified=True
         
@@ -6597,7 +6597,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         newProtocol = TriggerProtocol()
         
-        segments_with_protocol = [p.segments for p in self._data_.triggerProtocols]
+        segments_with_protocol = [p.segments for p in self._data_.triggers]
         
         data_segments = [k for k in range(self._data_.scansFrames)]
         
@@ -6610,7 +6610,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             
             newProtocol.segmentIndex = protocol_free_segments
                 
-        newProtocolRowNdx = len(self._data_.triggerProtocols)
+        newProtocolRowNdx = len(self._data_.triggers)
         
         self.protocolTableWidget.insertRow(newProtocolRowNdx)
 
@@ -6655,10 +6655,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         self.protocolTableWidget.removeRow(protocolNdx)
         
-        if protocolNdx >= len(self._data_.triggerProtocols) or protocolNdx < 0:
+        if protocolNdx >= len(self._data_.triggers) or protocolNdx < 0:
             return
         
-        protocol = self._data_.triggerProtocols[protocolNdx]
+        protocol = self._data_.triggers[protocolNdx]
         
         self._data_.removeTriggerProtocol(protocol)
         
@@ -6704,8 +6704,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         #print("slot_protocolTableEdited")
         
-        if row < len(self._data_.triggerProtocols):
-            protocol = self._data_.triggerProtocols[row]
+        if row < len(self._data_.triggers):
+            protocol = self._data_.triggers[row]
             
             if col == 0: # protocol name
                 if len(value.strip()) == 0:
@@ -7839,8 +7839,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         else:
             self._data_.analysisUnit().type = val
             
-        if val not in self._data_.availableUnitTypes:
-            self._data_.availableUnitTypes.append(val)
+        if val not in self._data_._availableUnitTypes_:
+            self._data_._availableUnitTypes_.append(val)
             
         self._update_report_()
         
@@ -7858,8 +7858,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             for unit in self._data_.analysisUnits:
                 unit.genotype = val
             
-        if val not in self._data_.availableGenotypes:
-            self._data_.availableGenotypes.append(val)
+        if val not in self._data_._availableGenotypes_:
+            self._data_._availableGenotypes_.append(val)
             
         self._update_report_()
         
@@ -8882,13 +8882,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                     if len(units):
                         if len(obj.frameIndices):
                             for frame_ndx in obj.frameIndices:
-                                for p in self._data_.triggerProtocols:
+                                for p in self._data_.triggers:
                                     if frame_ndx in p.segmentIndices():
                                         if p not in units[0].protocols:
                                             units[0].protocols.append(p)
                                             
                         else:
-                            units[0].protocols[:] = self._data_.triggerProtocols
+                            units[0].protocols[:] = self._data_.triggers
                                     
                         #self._data_.renameAnalysisUnit(obj.name, units[0])
                         
@@ -9257,10 +9257,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         if self._data_ is None:
             return
         
-        if len(self._data_.triggerProtocols) == 0:
+        if len(self._data_.triggers) == 0:
             return
         
-        for protocol in self._data_.triggerProtocols:
+        for protocol in self._data_.triggers:
             if protocol.photostimulation is not None and protocol.imagingDelay is not None:
                 times = protocol.photostimulation.times - protocol.imagingDelay
                 frames = protocol.segmentIndex
@@ -10826,8 +10826,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 if genotype_index == -1:
                     self.genotypeComboBox.addItem(self._data_.genotype)
                     self.genotypeComboBox.setCurrentIndex(self.genotypeComboBox.count())
-                    if self._data_.genotype not in self._data_.availableGenotypes:
-                        self._data_.availableGenotypes.append(self._data_.genotype)
+                    if self._data_.genotype not in self._data_._availableGenotypes_:
+                        self._data_._availableGenotypes_.append(self._data_.genotype)
                 
                 else:
                     self.genotypeComboBox.setCurrentIndex(genotype_index)
@@ -10847,8 +10847,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             else:
                 #print("LSCaTWindow._update_analysis_unit_ui_fields_ no cursor")
                 self.selectCursorSpinBox.setValue(-1)
-                
-                self.analysisUnitNameLineEdit.setText(self._data_.defaultAnalysisUnit.name)
+                unitName = self._data_.defaultAnalysisUnit.name if isinstance(self._data_.defaultAnalysisUnit, AnalysisUnit) else "NA"
+                self.analysisUnitNameLineEdit.setText(unitName)
                 self.cursorXposDoubleSpinBox.setValue(0)
                 self.cursorYposDoubleSpinBox.setValue(0)
                 self.cursorXwindow.setValue(0)
@@ -10861,8 +10861,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 if unit_type_index == -1:
                     self.unitTypeComboBox.addItem(self._data_.unitType)
                     self.unitTypeComboBox.setCurrentIndex(self.unitTypeComboBox.count())
-                    if self._data_.unitType not in self._data_.availableUnitTypes:
-                        self._data_.availableUnitTypes.append(self._data_.unitType)
+                    if self._data_.unitType not in self._data_._availableUnitTypes_:
+                        self._data_._availableUnitTypes_.append(self._data_.unitType)
                 
                 else:
                     self.unitTypeComboBox.setCurrentIndex(unit_type_index)
@@ -10872,8 +10872,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 if genotype_index == -1:
                     self.genotypeComboBox.addItem(self._data_.genotype)
                     self.genotypeComboBox.setCurrentIndex(self.genotypeComboBox.count())
-                    if self._data_.genotype not in self._data_.availableGenotypes:
-                        self._data_.availableGenotypes.append(self._data_.genotype)
+                    if self._data_.genotype not in self._data_._availableGenotypes_:
+                        self._data_._availableGenotypes_.append(self._data_.genotype)
                 
                 else:
                     self.genotypeComboBox.setCurrentIndex(genotype_index)
@@ -10934,7 +10934,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             self.cellLineEdit.setText(self._data_.cell)
             self.fieldLineEdit.setText(self._data_.field)
             
-            genotypes = self._data_.availableGenotypes
+            genotypes = self._data_._availableGenotypes_
             
             self.genotypeComboBox.clear()
             self.genotypeComboBox.addItems(genotypes)
@@ -10944,8 +10944,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             if genotype_index == -1:
                 self.genotypeComboBox.addItem(self._data_.genotype)
                 self.genotypeComboBox.setCurrentIndex(self.genotypeComboBox.count())
-                if self._data_.genotype not in self._data_.availableGenotypes:
-                    self._data_.availableGenotypes.append(self._data_.genotype)
+                if self._data_.genotype not in self._data_._availableGenotypes_:
+                    self._data_._availableGenotypes_.append(self._data_.genotype)
             
             else:
                 self.genotypeComboBox.setCurrentIndex(genotype_index)
@@ -10961,12 +10961,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 
             self.ageLineEdit.setText("%s" % self._data_.age)
             
-            unit_types = self._data_.availableUnitTypes
+            unit_types = self._data_._availableUnitTypes_
             
             self.unitTypeComboBox.clear()
-            self.unitTypeComboBox.addItems(self._data_.availableUnitTypes)
+            self.unitTypeComboBox.addItems(self._data_._availableUnitTypes_)
             
-            unit_type = self._data_.analysisUnit().unit_type
+            unit_type = self._data_.analysisUnit.unit_type if isinstance(self._data_.analysisUnit, AnalysisUnit) else "NA"
 
             unit_type_index = self.unitTypeComboBox.findText(self._data_.unitType)
                 
@@ -11458,7 +11458,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                 
     @safeWrapper
     def displaySelectFrames(self):
-        if self._data_ is None or len(self._data_.triggerProtocols) == 0:
+        if self._data_ is None or len(self._data_.triggers) == 0:
             return
         
         if len(self.currentProtocols):
@@ -12122,14 +12122,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         self.protocolTableWidget.clearContents()
         self.protocolSelectionComboBox.clear()
         
-        if self._data_ is None or len(self._data_.triggerProtocols) == 0:
+        if self._data_ is None or len(self._data_.triggers) == 0:
             return
         
-        self.protocolSelectionComboBox.addItems(["All"] + [p.name for p in self._data_.triggerProtocols] + ["Select..."])
+        self.protocolSelectionComboBox.addItems(["All"] + [p.name for p in self._data_.triggers] + ["Select..."])
         
-        self.protocolTableWidget.setRowCount(len(self._data_.triggerProtocols))
+        self.protocolTableWidget.setRowCount(len(self._data_.triggers))
         
-        for k in range(len(self._data_.triggerProtocols)):
+        for k in range(len(self._data_.triggers)):
             # columns:
             # 0 = protocol name
             # 1 = presynaptic times
@@ -12138,11 +12138,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             # 4 = imaging delay
             # 5 = frame indices
             
-            self.protocolTableWidget.setItem(k, 0, QtWidgets.QTableWidgetItem(self._data_.triggerProtocols[k].name))
+            self.protocolTableWidget.setItem(k, 0, QtWidgets.QTableWidgetItem(self._data_.triggers[k].name))
             
-            if self._data_.triggerProtocols[k].presynaptic is not None:
-                evt_times = self._data_.triggerProtocols[k].presynaptic.times
-                #print("_update_protocol_display_: presyn times in %s" % self._data_.triggerProtocols[k].name, evt_times)
+            if self._data_.triggers[k].presynaptic is not None:
+                evt_times = self._data_.triggers[k].presynaptic.times
+                #print("_update_protocol_display_: presyn times in %s" % self._data_.triggers[k].name, evt_times)
                 
                 if evt_times.size == 1:
                     txt = "%g" % evt_times
@@ -12155,9 +12155,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                     
                 self.protocolTableWidget.setItem(k, 1, QtWidgets.QTableWidgetItem(txt) )
         
-            if self._data_.triggerProtocols[k].postsynaptic is not None:
-                evt_times = self._data_.triggerProtocols[k].postsynaptic.times
-                #print("_update_protocol_display_: postsyn times in %s" % self._data_.triggerProtocols[k].name, evt_times)
+            if self._data_.triggers[k].postsynaptic is not None:
+                evt_times = self._data_.triggers[k].postsynaptic.times
+                #print("_update_protocol_display_: postsyn times in %s" % self._data_.triggers[k].name, evt_times)
                  
                 if evt_times.size == 1:
                     txt = "%g" % evt_times
@@ -12170,9 +12170,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                     
                 self.protocolTableWidget.setItem(k, 2, QtWidgets.QTableWidgetItem(txt))
         
-            if self._data_.triggerProtocols[k].photostimulation is not None:
-                evt_times = self._data_.triggerProtocols[k].photostimulation.times
-                #print("_update_protocol_display_: photostim times in %s" % self._data_.triggerProtocols[k].name, evt_times)
+            if self._data_.triggers[k].photostimulation is not None:
+                evt_times = self._data_.triggers[k].photostimulation.times
+                #print("_update_protocol_display_: photostim times in %s" % self._data_.triggers[k].name, evt_times)
                 
                 if evt_times.size == 1:
                     txt = "%g" % evt_times
@@ -12184,13 +12184,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
                     
                 self.protocolTableWidget.setItem(k, 3, QtWidgets.QTableWidgetItem(txt))
                 
-            txt = "%g" % self._data_.triggerProtocols[k].imagingDelay.magnitude.flatten()[0]
+            txt = "%g" % self._data_.triggers[k].imagingDelay.magnitude.flatten()[0]
             #print("imaging delay txt", txt)
             
             self.protocolTableWidget.setItem(k, 4, QtWidgets.QTableWidgetItem(txt))
                 
-            if len(self._data_.triggerProtocols[k].segmentIndices()) > 0:
-                txt = ", ".join(["%g" % i for i in self._data_.triggerProtocols[k].segmentIndices()])
+            if len(self._data_.triggers[k].segmentIndices()) > 0:
+                txt = ", ".join(["%g" % i for i in self._data_.triggers[k].segmentIndices()])
                 self.protocolTableWidget.setItem(k, 5, QtWidgets.QTableWidgetItem(txt))
                 
         #self.protocolTableWidget.itemChanged[QtWidgets.QTableWidgetItem].connect(self.slot_protocolTableEdited, type = QtCore.Qt.QueuedConnection)
