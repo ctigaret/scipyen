@@ -1,5 +1,5 @@
-import enum, collections, numbers, configparser, itertools, inspect, warnings
-import types, typing
+import configparser, itertools, functools, inspect, warnings
+import enum, collections, numbers, types, typing
 from traitlets import Bunch
 import numpy as np
 import quantities as pq
@@ -10,7 +10,7 @@ import pandas as pd
 
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
-from core.prog import safeWrapper
+from core.prog import (safeWrapper, AttributeAdapter)
 from core.basescipyen import BaseScipyenData
 from core.traitcontainers import DataBag
 from core import quantities as cq
@@ -67,6 +67,7 @@ DEFAULTS["Channels"]["Bleed"] = DataBag()
 DEFAULTS["Channels"]["Bleed"]["Ref2Ind"] = 0.
 DEFAULTS["Channels"]["Bleed"]["Ind2Ref"] = 0.
 
+            
 class ScanData(BaseScipyenData):
     """Dummy for AnalysisUnit; clobbered below
     """
@@ -1161,7 +1162,108 @@ class ScanData(BaseScipyenData):
         frame       = 1
         volume      = 2
         
-    apiversion = (0,3)
+    class FramesMapUpdater(AttributeAdapter):
+        def __init__(self, owner=None, fieldname=None):
+            self.fieldname = fieldname
+            self.obj = owner
+            
+        def __call__(self, obj=None, value=None):
+            #print(f"FramesMapUpdater instance(obj=<{type(obj).__name__}>, value=<{type(value).__name__}>)")
+            self.updateFramesMap(value)
+            
+        def updateFramesMap(self, value):
+            """Adapts the frames map to the electrophysiology's segments.
+            
+            Sets up a default correspondence:
+            
+            If the new electrophysiology Block has fewer segments that the number of 
+            virtual frames in this ScanData object, its segment indices are mapped 
+            to the first len(segments) data master frames, and the exceeding data 
+            virtual frames are mapped to the last segment in the electrophysiology
+            block.
+            
+            If the new electrophysiology block has more segments than the number of 
+            frames in the ScanData object, the ScanData frames map is adjusted such
+            that the total number of virtual frames equals len(segments), and the 
+            scans and scene frames are mapped to the first electrophysiology
+            segments ('sweeps' or 'frames'); the exceeding segments are mapped to
+            the last frame in scans and scene.
+            
+            When the number of electrophysiology segments equals that of the virtual
+            data frames, the segment indices are mapped 1-2-1 to the virtual frames
+            in increasing order.
+            
+            For a more atomic configuration use self.setFramesRelationship() after
+            assigning to self.electrophysiology
+            
+            """
+            #  NOTE: 2021-12-06 12:42:06 
+            # this is a "postset" validator - this means that value has already
+            # been assigned to field!
+            if self.obj is None:
+                return
+            
+            if not hasattr(self.obj, "_data_children_"):
+                return
+            
+            if self.fieldname not in tuple(c[0] for c in self.obj._data_children_):
+                return
+
+            if not hasattr(self.obj, self.fieldname):
+                return
+            
+            if not hasattr(self.obj, "framesMap"):# or not isinstance(getattr(self.obj, "framesMap"), FrameIndexLookup):
+                return
+            
+            field = getattr(self.obj, self.fieldname)
+            #print(f"FramesMapUpdater.updateFramesMap(value=<{type(value).__name__}>): field = {type(field).__name__}" )
+            nframes = len(self.obj.framesMap)
+                
+            if isinstance(field, neo.Block):
+                newframes = len(field.segments)
+                
+            elif isinstance(field, list) and all(isinstance(v, vigra.VigraArray) for v in field):
+                userFrameAxis = getattr(self.obj, f"{self.fieldname}FrameAxis", None)
+                #userFrameAxis = self.obj.scansFrameAxis if self.fieldname == "scans" else self.obj.sceneFrameAxis
+                layout = proposeLayout(field, userFrameAxis = userFrameAxis)
+                newframes = layout.nFrames
+                
+            else:
+                newframes=0
+            
+            if newframes == nframes:
+                # assume 1-2-1 correspondence with the index in framesMap
+                self.obj.framesMap[self.fieldname] = range(newframes)
+                
+            elif newframes < nframes:
+                value = list(range(newframes))
+                value.extend([self.obj.framesMap.missingFieldFrameIndex for k in range(newframes, nframes)])
+                        
+                self.obj.framesMap[self.fieldname] = value
+                
+            else:
+                # concatenate a new frame index lookup
+                dd = dict()
+                for c in self.obj._data_children_:
+                    name = c[0]
+                    if name != self.fieldname:
+                        if np.any(self.obj.framesMap[name].isna()):
+                            val = None
+                        else:
+                            val = 0
+                        dd[name] = val
+                        
+                    else:
+                        dd[name] = newframes - nframes
+                        
+                fil = FrameIndexLookup(dd)
+                fil[self.fieldname] = range(nframes, nsegs)
+                
+                newmap = pd.concat([self.obj.framesMap.map, fil.map], ignore_index=True)
+                
+                self.obj.frameMap.map = newmap
+        
+    #apiversion = (0,3)
     
     # NOTE: 2021-11-30 16:07:40
     # 'triggers' is inheritd from BaseScipyenData along with others
@@ -1176,6 +1278,12 @@ class ScanData(BaseScipyenData):
         ("scansProfiles",                   neo.Block(name="Scan region scans profiles")),
         ("sceneBlock",                      neo.Block(name="Scene")),
         ("sceneProfiles",                   neo.Block(name="Scan region scene profiles")),
+        )
+    
+    _result_data_ = (
+        ("electrophysiologyResult",         pd.DataFrame),
+        ("imagingResult",                   pd.DataFrame),
+        ("result",                          pd.DataFrame),
         )
     
     _data_attributes_ = (
@@ -1208,80 +1316,84 @@ class ScanData(BaseScipyenData):
         ("type",                            ScanDataType.linescan),
         )
     
-    _descriptor_attributes_= _data_children_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ + BaseScipyenData._descriptor_attributes_
+    _descriptor_attributes_= _data_children_ + _derived_data_children_ + _result_data_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ + BaseScipyenData._descriptor_attributes_
     
-    def _get_data_frame_index_(self, index:int) -> Bunch:
-        """Returns a Bunch mapping str keys (data attribute) to int frame indices.
-        Parameters:
-        ===========
-        index: int - index of the primary data frame; 
-                this can be a negative index in which case it will behave like a 
-                negative sequence index
+    #def _get_data_frame_index_(self, index:int) -> Bunch:
+        #"""Returns a Bunch mapping str keys (data attribute) to int frame indices.
+        #Parameters:
+        #===========
+        #index: int - index of the primary data frame; 
+                #this can be a negative index in which case it will behave like a 
+                #negative sequence index
                 
-        NOTE: the primary data is "scans"; when "scans" is None or empty,
-            tyhen the primary data  is "scene" if not None and not empty
+        #NOTE: the primary data is "scans"; when "scans" is None or empty,
+            #tyhen the primary data  is "scene" if not None and not empty
         
-        """
-        ret = Bunch()
-        ret.scans = None
-        ret.scene = None
-        ret.electrophysiology = None
+        #"""
+        #ret = Bunch()
+        #ret.scans = None
+        #ret.scene = None
+        #ret.electrophysiology = None
         
-        if isinstance(self.scans, list) and len(self.scans):
-            ret.scans = get_index_for_seq(index, 
-                                          self.scans, 
-                                          self.scans)
+        #if isinstance(self.scans, list) and len(self.scans):
+            #ret.scans = get_index_for_seq(index, 
+                                          #self.scans, 
+                                          #self.scans)
             
-            if isinstance(self.scene, list):
-                ret.scene = get_index_for_seq(index, 
-                                              self.scans, 
-                                              self.scene, 
-                                              self.scene_mapping)
+            #if isinstance(self.scene, list):
+                #ret.scene = get_index_for_seq(index, 
+                                              #self.scans, 
+                                              #self.scene, 
+                                              #self.scene_mapping)
                             
-            if isinstance(self.electrophysiology, neo.Block) and len(self.electrophysiology.segments):
-                ret.electrophysiology = get_index_for_seq(index, 
-                                                          self.scans, 
-                                                          self.electrophysiology.segments, 
-                                                          self.ephys_mapping)
+            #if isinstance(self.electrophysiology, neo.Block) and len(self.electrophysiology.segments):
+                #ret.electrophysiology = get_index_for_seq(index, 
+                                                          #self.scans, 
+                                                          #self.electrophysiology.segments, 
+                                                          #self.ephys_mapping)
                 
-        elif isinstance(self.scene, list) and len(self.scene):
-            ret.scene = get_index_for_seq(index, 
-                                          self.scene, 
-                                          self.scene)
+        #elif isinstance(self.scene, list) and len(self.scene):
+            #ret.scene = get_index_for_seq(index, 
+                                          #self.scene, 
+                                          #self.scene)
             
-            if isinstance(self.electrophysiology, neo.Block) and len(self.electrophysiology.segments):
-                ret.electrophysiology = get_index_for_seq(index, 
-                                                        self.scene, 
-                                                        self.electrophysiology.segments,
-                                                        self.ephys_mapping)
+            #if isinstance(self.electrophysiology, neo.Block) and len(self.electrophysiology.segments):
+                #ret.electrophysiology = get_index_for_seq(index, 
+                                                        #self.scene, 
+                                                        #self.electrophysiology.segments,
+                                                        #self.ephys_mapping)
         
-    def _get_data_child_component_(self, component):
+    def _get_data_child_component_(self, component:str):
         """
         Parameters:
         ==========
-        component: str, one of: 
-            "electrophysiology" "ephys", "scansProfiles", "sceneProfiles", 
-            "scansBlock", "sceneBlock", "scans", "scene"
+        component: str, one of: "scans", "scene", "electrophysiology"
+        
         """
-        #if component in ("electrophysiology", "ephys"):
-            #component = ephys
-            
         if component not in (a[0] for a in self._data_children_):
             raise ValueError(f"Unknown data child component: {component}")
         
         return getattr(self, component, None)
     
-    #@classmethod
-    #def setup_descriptor(cls, name, descr_params):
-        #args = descr_params.get("args", tuple())
-        #kwargs = descr_params.get("kwargs", {})
-        #name = descr_params.get("name", "")
-        #if not isinstance(name, str) or len(name.strip()) == 0:
-            #return
+    def _get_component_nFrames_(self, component:str):
+        data = self._get_data_child_component_(component)
         
-        #if name in (c[0] for c in cls._data_children_):
-            #if 
+        if isinstance(data, neo.Block):
+            return len(data.segments)
         
+        else:
+            if isinstance(data, (tuple, list)): # scene or scans
+                if len(data) == 0:
+                    return 0
+                layout = getattr(self, f"{component}Layout", None)
+                if not isinstance(layout, dict):
+                    dataFrameAxis = getattr(self, f"{component}FrameAxis", None)
+                    layout = self.dataLayout(data, frameAxis = dataFrameAxis)
+                    setattr(self, f"{component}Layout", layout)
+                    
+                nFrames = layout.get("nFrames", 0)
+                return nFrames if isinstance(nFrames, int) else np.prod(nFrames)
+
     @safeWrapper
     def __init__(self, scans=None, scene=None, electrophysiology=None, metadata=None, **kwargs):
         """Constructs a ScanData object.
@@ -1821,6 +1933,12 @@ class ScanData(BaseScipyenData):
             self = scans.copy() # make a deep copy
             return
             
+        self._postset_validators_ = {
+            "scans": self.FramesMapUpdater(self, "scans"),
+            "scene": self.FramesMapUpdater(self, "scene"),
+            "electrophysiology": self.FramesMapUpdater(self, "electrophysiology"),
+            }
+    
         if scene is None:
             scene = kwscene
             
@@ -1853,10 +1971,6 @@ class ScanData(BaseScipyenData):
         
         kwargs["electrophysiology"] = electrophysiology
         kwargs["metadata"] = metadata
-        
-        #scansFrames = 0 if kwargs["scansLayout"] is None else kwargs["scansLayout"].nFrames if isinstance(kwargs["scansLayout"].nFrames, int) else.np.prod(kwargs["scansLayout"].nFrames)
-        #sceneFrames = 0 if kwargs["sceneLayout"] is None else kwargs["sceneLayout"].nFrames if isinstance(kwargs["sceneLayout"].nFrames, int) else.np.prod(kwargs["sceneLayout"].nFrames)
-        #ephysFrames = len(kwargs["electrophysiology"].segments) if isinstance(kwargs["electrophysiology"], neo.Block) else 0
         
         field_frames = dict((c[0], None) for c in self._data_children_)
         for c in field_frames:
@@ -1956,82 +2070,6 @@ class ScanData(BaseScipyenData):
                 
                 if chindex == data:
                     pass
-                
-    def __data_post_validator__(self, fieldname):
-        """Adapts the frames map to the electrophysiology's segments.
-        
-        Sets up a default correspondence:
-        
-        If the new electrophysiology Block has fewer segments that the number of 
-        virtual frames in this ScanData object, its segment indices are mapped 
-        to the first len(segments) data master frames, and the exceeding data 
-        virtual frames are mapped to the last segment in the electrophysiology
-        block.
-        
-        If the new electrophysiology block has more segments than the number of 
-        frames in the ScanData object, the ScanData frames map is adjusted such
-        that the total number of virtual frames equals len(segments), and the 
-        scans and scene frames are mapped to the first electrophysiology
-        segments ('sweeps' or 'frames'); the exceeding segments are mapped to
-        the last frame in scans and scene.
-        
-        When the number of electrophysiology segments equals that of the virtual
-        data frames, the segment indices are mapped 1-2-1 to the virtual frames
-        in increasing order.
-        
-        For a more atomic configuration use self.setFramesRelationship() after
-        assigning to self.electrophysiology
-        
-        """
-        if fieldname not in tuple(c[0] for c in self._data_children_):
-            raise ValueError(f"Unexpected field {fieldname}")
-
-        if not hasattr(self, fieldname):
-            return
-        
-        field = getattr(fieldname)
-        nframes = len(self.framesMap)
-            
-        if isinstance(field, neo.Block):
-            newframes = len(self.electrophysiology.segments)
-            
-        elif isinstance(field, list) and all(isinstance(v, vigra.VigraArray) for v in field):
-            userFrameAxis = self.scansFrameAxis if fieldname == "scans" else self.sceneFrameAxis
-            layout = proposeLayout(data, userFrameAxis = userFrameAxis)
-            newframes = layout.nFrames
-        
-        if newframes == nframes:
-            # assume 1-2-1 correspondence with the index in framesMap
-            self.framesMap[fieldname] = range(newframes)
-            
-        elif newframes < nframes:
-            value = list(range(newframes))
-            value.extend([self.framesMap.missingFieldFrameIndex for k in range(newframes, nframes)])
-                    
-            self.framesMap[fieldname] = value
-            
-        else:
-            # concatenate a new frame index lookup
-            dd = dict()
-            for c in self._data_children_:
-                name = c[0]
-                if name != fieldname:
-                    if np.any(self.framesMap[name].isna()):
-                        val = None
-                    else:
-                        val = 0
-                    dd[name] = val
-                    
-                else:
-                    dd[name] = newframes - nframes
-                    
-            fil = FrameIndexLookup(dd)
-            fil[fieldname] = range(nframes, nsegs)
-            
-            newmap = pd.concat([self.framesMap.map, fil.map], ignore_index=True)
-            
-            self.frameMap.map = newmap
-               
     @staticmethod
     def dataLayout(data, 
                     frameAxis:typing.Optional[vigra.AxisInfo]=None, 
@@ -8913,15 +8951,47 @@ class ScanData(BaseScipyenData):
         """
         return self._processed_
     
+    @property
+    def scanRegion(self):
+        """Alias to the self.scanTrajectory descriptor.
+        Kept for backwards compatibility
+        """
+        return self.scanTrajectory
+    
+    @scanRegion.setter
+    def scanRegion(self, value):
+        self.scanTrajectory = value
+    
     @processed.setter
     def processed(self, value:bool):
         if not isinstance(value, bool):
             raise TypeError("expecting a bool; fgot %s instead" % type(value).__name__)
         self._processed_ = value
+        
+    @property
+    def electrophysiologySweeps(self):
+        """Read-only.
+        """
+        
+        return self.nFrames("electrophysiology")
+    
+    @property
+    def electrophysiologySegments(self):
+        """Read-only. Alias to self.electrophysiologySweeps
+        """
+        
+        return self.electrophysiologySweeps
+    
+    @property
+    def electrophysiologyFrames(self):
+        """Read-only. Alias to self.electrophysiologySweeps
+        """
+        
+        return self.electrophysiologySweeps
     
     @property
     def sceneFrames(self):
-        """Read-only. Alias to nSceneFrames
+        """Read-only.
         
         Can only be changed indirectly, by either:
         1) changing the sceneFrameAxis
@@ -8930,7 +9000,7 @@ class ScanData(BaseScipyenData):
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
         """
-        return self.nSceneFrames
+        return self.nFrames("scene")
     
     @property
     def sceneChannels(self):
@@ -9000,48 +9070,8 @@ class ScanData(BaseScipyenData):
         else:
             raise ValueError("Expecting a str list with as many elements as channels (%d); got %d elements instead" % (self.sceneChannels, len(value)))
         
-    def nFrames(self, component:typing.Optional[str] = None) -> int:
-        """Returns the number of image frames(1) or data sweeps(2)
-        
-        NOTE:
-        1) For the scene and scans
-        2) For electrophysiology and 1D-data _derived_ from the scene and scans.
-        The latter contains data computed along one of the axes of an image frame,
-        such as pixel intensity along a line, etc.
-        
-        Parameters:
-        ==========
-        component: str, one of: 
-            "scans", 
-            "scene",
-            "electrophysiology", 
-            "scansProfiles", 
-            "sceneProfiles", 
-            "scansBlock", 
-            "sceneBlock", 
-        """
-        if isinstance(component, str) and len(component.strip()):
-            data = self._get_data_child_component_(component)
-            
-            if isinstance(data, neo.Block):
-                return len(data.segments)
-            
-            else:
-                if isinstance(data, (tuple, list)): # scene or scans
-                    if len(data) == 0:
-                        return 0
-                    nFrames = self.scansLayout.nFrames if compoennt == "scans" else self.sceneLayout.nFrames
-                    return nFrames if isinstance(nFrames, int) else np.prod(nFrames)
-                    #framesAxes = self.sceneFrameAxis if component == "scene" else self.scansFrameAxis
-                    #return nFrames(data[0], framesAxes) # from vigrautils
-                
-        else:
-            return len(self.framesMap)
-            #pass # prode the framesMap descriptor!
-                
-    
     @property
-    def nScansFrames(self):
+    def scansFrames(self):
         """Read-only.
         
         Can only be modifier indirectly by either:
@@ -9053,7 +9083,7 @@ class ScanData(BaseScipyenData):
         
         """
         return self.nFrames("scans")
-
+    
     @property
     def scansChannels(self):
         """The number of channels; read-only
@@ -9082,7 +9112,6 @@ class ScanData(BaseScipyenData):
             return AxesCalibration(self.scans[0])["c"].channelNames # to ensure we get a virtual channel if needed
 
         return list(itertools.chain.from_iterable((AxesCalibration(self.scans[k])["c"].channelNames for k in range(len(self.scans)))))
-                
         
     @scansChannelNames.setter
     def scansChannelNames(self, value):
@@ -9121,6 +9150,57 @@ class ScanData(BaseScipyenData):
         else:
             raise ValueError("Expecting a str list with as many elements as channels (%d); got %d elements instead" % (self.scansChannels, len(value)))
         
+    def nFrames(self, component:typing.Optional[str] = None) -> int:
+        """Returns the number of frames in the data, or a specific data component.
+        
+        For data components containing 1D signals a 'frame' (a.k.a 'sweep') 
+        corresponds to a neo.Segment; for image data, a 'frame' is a 2D slice 
+        view of the data.
+        
+        Parameters:
+        ==========
+        component: str, one of: "scans", "scene", "electrophysiology", 
+            Optional, default is None.
+            
+            
+        NOTE: Secondary (derived) data children are organized in frames and
+        have the same number of frames  or segments as the primary data children 
+        from which they are derived.
+        
+        In ScanData, the secondary data children (and their sources) are:
+        
+        scansBlock (scans) 
+            1D signals derived from ROIs or cursors in the scans (e.g., EPSCaTs 
+            for Ca2+ imaging linescans).
+            
+        scansProfiles (scans)
+            The pixel itensity profile along the scanning trajectory in the
+            scans. 
+            
+        sceneBlock (scene)
+            1D signals derived from ROIs or cursors in the scans (e.g., EPSCaTs 
+            for Ca2+ imaging linescans).
+            
+        sceneProfiles (scene)
+            The pixel itensity profile along the scanning trajectory in the
+            scene.
+            
+        """
+        if isinstance(component, str) and len(component.strip()):
+            return self._get_component_nFrames_(component)
+
+        else:
+            # NOTE: 2021-12-06 14:31:43
+            # interrogate component sizes directly; framesMap may NOT necessarily
+            # reflect the true number of frames!
+            return  max(self._get_component_nFrames_(c[0]) for c in self._data_children_)
+            #if isinstance(self.framesMap, FrameIndexLookup):
+                #nFrames = len(self.framesMap)
+            
+            #return len(self.framesMap)
+            #pass # prode the framesMap descriptor!
+                
+    
     def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
                        entity_cache):
         

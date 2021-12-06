@@ -74,12 +74,37 @@ class FrameIndexLookup(object):
             #print(objtype)
             self._obj_ = obj
             return self
+        
+        def __len__(self):
+            """Returns the number of registered component frame indices.
+            
+            A registered frame index is an int. 
+            
+            Technically this is not necessarily the same thing as the actual 
+            number of frames in the data component although the two values MAY 
+            be identical.
+            
+            The actual number of frames in the data component SHOULD be obtained
+            by directly interrogating the data component itself.
+            
+            Contrived cases include:
+            a) a component having N frames but only m < N of these are mapped to
+            a virtual data frame
+            
+            b) a component for which a virtual data frame is mapped to the 
+            "missingFrameIndex" (by default this is -1, pointing to the last 
+            available frame in the component) which means it would appear to
+            have more frames than it actually does.
+            
+            """
+            data = self() # pandas Series
+            
+            return len(data.loc[~data.isna()])
             
         def __call__(self):
             """Returns the pandas series corresponding to self._field_
             
-            The caller must ensure the appropriate indexing is applied to the 
-            result.
+            The caller is responsible for appropriate indexing into the result.
             """
             if self._field_ in self._obj_._map_.columns:
                 return self._obj_._map_.loc[:, self._field_] 
@@ -100,7 +125,8 @@ class FrameIndexLookup(object):
         def __setitem__(self, key, value):
             sp_set_loc(self._obj_._map_, key, self._field_, value)
                         
-    def __init__(self, field_frames:dict, field_missing=pd.NA, frame_missing = -1,
+    def __init__(self, field_frames:dict, 
+                 field_missing=pd.NA, frame_missing = -1, index_name="Frame",
                  **kwargs):
         """
         Parameters:
@@ -249,25 +275,15 @@ class FrameIndexLookup(object):
         # use the created dd dict to generate the map data frame
         self._map_ = pd.DataFrame(dd)
         
-        #self._map_ = pd.DataFrame(dict((field, pd.Series(range(maxFrames) if isinstance(maxFrames, int) and isinstance(field_frames[field], int) else field_missing, 
-                                                         #name=field, dtype=pd.SparseDtype("int", field_missing)))
-                                        #for field in field_frames))
+        ndxname = index_name if isinstance(index_name, str) and len(index_name.strip()) else "Frame"
         
-        # now adjust field frame index values according to each field's number of
-        # frames using frame_missing value
+        self._map_.index.name = ndxname
         
-        #for field, nframes in field_frames.items():
-            #if isinstance(nframes, int) and nframes < maxFrames:
-                #index = slice(nframes, maxFrames)
-                #self._map_ = sp_set_loc(self._map_, index, field, frame_missing)
-                
-        # finally, apply specific frame relationships in kwargs
-        
+        # finally, apply specific frame relationships in kwargs: 
         for k, v in kwargs:
             if k in field_frames: # only for named field we already know about
                 if isinstance(v, tuple):
-                    if len(v) == 2 and all(isinstance(v_, int) for v_ in v):
-                        # master_index, field frame index
+                    if len(v) == 2 and all(isinstance(v_, int) for v_ in v): # (master_index, field frame index)
                         
                         # check specified master index and field frame index are
                         # in their respective ranges, if possible
@@ -358,7 +374,7 @@ class FrameIndexLookup(object):
             if key < 0:
                 return self._map_.iloc[key, :]
         
-            return self._map_.loc[ndx, :]
+            return self._map_.loc[key, :]
         
         else:
             return sp_get_loc(self._map_, key, slice(None)) # use all columns (slice(None))
@@ -368,17 +384,24 @@ class FrameIndexLookup(object):
     def __setitem__(self, key, value):
         """Item setter
         
-        When 'key' is a str, populate the Series at column 'key' with 'value'
+        Parameters:
+        -----------
+        key: str: for indexing into the columns of DataFrame objects
+             int, range, slice, or object valid for indexing into the rows
+            of DataFrame objects
+            
+        When 'key' is a str, populate the Series at column 'key' with 'value'.
+        
         When 'key' is a row (frame) index e.g., int, range, slice, etc then
         populate the row selected by 'key' with 'value'
         
-        Value can be anything that can be accepted as rvalue for the underlying
-        'map' DataFrame.
+        value: any object suitable as rvalue (right-hand value) for the 
+            underlying 'map' DataFrame (e.g. pd.NA, int, range, sequence of int
+            and/or pd.NA).
         
-        Pandas will raise Exception if either key or value are not what are
-        expected to be, although messages will be somewhat cryptic...
+        NOTE: Pandas will raise Exception if either 'key' or 'value' are not
+            suitable, although the messages will be somewhat cryptic...
         """
-        #raise NotImplementedError("FIXME: TODO 2021-12-04 23:40:02")
         if isinstance(key, str) and key in self._map_.columns:
             sp_set_loc(self._map_, slice(None), key, value)
             return
@@ -401,7 +424,14 @@ class FrameIndexLookup(object):
                 
         else:
             sp_set_loc(self._map_, key, slice(None), value)
-                
+            
+    def _repr_pretty_(self, p, cycle):
+        p.text(f"{self.__class__.__name__} with {len(self)} frames.")
+        p.breakable()
+        p.text(f"Data components: {tuple(self.keys())}\n")
+        p.text(f"Frame Indices Map (frame index -> index of component frame or segment):\n")
+        p.pretty(self._map_)
+        #p.text(f"{self._map_}")
         
     def childFrames(self, field:str):
         if field in self._map_.columns:

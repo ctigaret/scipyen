@@ -11,8 +11,8 @@ from traitlets.utils.importstring import import_item
 from core import quantities as cq
 from core.triggerprotocols import TriggerProtocol
 from core.quantities import units_convertible
-from core.prog import (ArgumentError, OneOf, TypeValidator, GenericValidator,
-                       get_descriptors, get_properties,
+from core.prog import (ArgumentError, OneOf, DescriptorTypeValidator, DescriptorGenericValidator,
+                       AttributeAdapter, get_descriptors, get_properties,
                        parse_descriptor_specification, WithDescriptors,
                        setup_descriptor)
 
@@ -116,7 +116,7 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
         #name = descr_params.get("name", "")
         #if not isinstance(name, str) or len(name.strip()) == 0:
             #return
-        #descriptor = GenericValidator(*args, **kwargs)
+        #descriptor = DescriptorGenericValidator(*args, **kwargs)
         #descriptor.allow_none = True
         #descriptor.__set_name__(cls, name)
         #setattr(cls, name, descriptor)

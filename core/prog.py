@@ -71,16 +71,17 @@ class WithDescriptors(object):
         """
         args = descr_params.get("args", tuple())
         kw = descr_params.get("kwargs", {})
-        pre_validation = kw.pop("pre_validation", kwargs.pop("pre_validation", None))
-        post_validation = kw.pop("post_validation", kwargs.pop("post_validaton", None))
-        kw["pre_validation"] = pre_validation
-        kw["post_validation"] = post_validation
+        #pre_validation = kw.pop("pre_validation", kwargs.pop("pre_validation", None))
+        #post_validation = kw.pop("post_validation", kwargs.pop("post_validaton", None))
+        
+        #kw["pre_validation"] = pre_validation if isinstance(pre_validation, (AttributeAdapter, type(None))) else None 
+        #kw["post_validation"] = post_validation if isinstance(post_validation, (AttributeAdapter, type(None))) else None
         name = descr_params.get("name", "")
         if not isinstance(name, str) or len(name.strip()) == 0:
             return
-        descriptor = GenericValidator(*args, **kw)
+        descriptor = DescriptorGenericValidator(name, *args, **kw)
         descriptor.allow_none = True
-        descriptor.__set_name__(cls, name)
+        #descriptor.__set_name__(cls, name)
         setattr(cls, name, descriptor)
         
     @classmethod
@@ -110,14 +111,25 @@ class WithDescriptors(object):
         
 setup_descriptor = WithDescriptors.setup_descriptor
 remove_descriptor= WithDescriptors.remove_descriptor
+
+class AttributeAdapter(ABC):
+    """Abstract Base Class as a callable for pre- and post-validation
+    """
+    @abstractmethod
+    def __call__(self, obj, value):
+        pass
     
-class BaseValidator(ABC):
+class BaseDescriptorValidator(ABC):
     """Abstract superclass implementing a Python descriptor with validation.
     
     """
-    def __set_name__(self, owner, name:str):
+    def __set_name__(self, name:str):
         self.private_name = f"_{name}_"
         self.public_name = name
+        
+    #def __set_name__(self, owner, name:str):
+        #self.private_name = f"_{name}_"
+        #self.public_name = name
         
     def __get__(self, obj, objtype=None):
         return getattr(obj, self.private_name)
@@ -138,7 +150,7 @@ class BaseValidator(ABC):
     def validate(self, value):
         pass
     
-class OneOf(BaseValidator):
+class OneOf(BaseDescriptorValidator):
     def __init__(self, *options):
         self.options = set(options)
 
@@ -146,7 +158,7 @@ class OneOf(BaseValidator):
         if value not in self.options:
             raise ValueError(f'Expected {value!r} to be one of {self.options!r}')
 
-class TypeValidator(BaseValidator):
+class DescriptorTypeValidator(BaseDescriptorValidator):
     def __init__(self, *types):
         self.types = set(t for t in types if isinstance(t, type))
         
@@ -155,8 +167,8 @@ class TypeValidator(BaseValidator):
         if not isinstance(value, tuple(self.types)):
             raise TypeError(f"For {self.private_name} one of {self.types} was expected; got {type(value).__name__} instead")
         
-class GenericValidator(BaseValidator):
-    def __init__(self, *args, **kwargs):
+class DescriptorGenericValidator(BaseDescriptorValidator):
+    def __init__(self, name:str, *args, **kwargs):
         """
         args: sequence of objects or unary predicates;
             objects can be:
@@ -235,6 +247,10 @@ class GenericValidator(BaseValidator):
         for the special cases       property value, or to a dict as detailed
         below>                      in this table
         
+    ------------------------------------------------------------------
+    
+    TODO: DEPRECATED/REMOVED - MUST UPDATE DOSCTRING
+    
     7.  "pre_validation"            instance method or function that performs 
                                     additional and/or actions BEFORE the value 
                                     is validated, in this descriptor's
@@ -291,21 +307,24 @@ class GenericValidator(BaseValidator):
         
         a) pass the type as argument
         
-        e.g. GenericValidator(np.ndarray)
+        e.g. DescriptorGenericValidator(np.ndarray)
         
         b) pass a dict with the type name as key, mapped to an empty dict
         
-        e.g. GenericValidator({"np.ndarray": {}})
+        e.g. DescriptorGenericValidator({"np.ndarray": {}})
         
         CAUTION: passing the type as a named argument is a syntax error:
         
-        GenericValidator(np.ndarray = {})
+        DescriptorGenericValidator(np.ndarray = {})
         --> SyntaxError: expression cannot contain assignment, perhaps you meant "=="?
         
             
         """
+        self.private_name = f"_{name}_"
+        self.public_name = name
+        
         #from core.datatypes import (is_hashable, is_type_or_subclass)
-       # NOTE: predicates must be unary predicates; 
+        # NOTE: predicates must be unary predicates; 
         # will raise exceptions when called, otherwise
         self.predicates = set()
         self.types = set() # allowed value types
@@ -313,8 +332,8 @@ class GenericValidator(BaseValidator):
         self.non_hashables = set() # values for non-hashables - referenced by their id()
         self.dcriteria = dict() # dictionary of criteria as in the above table
         self._allow_none_ = False
-        self._pre_validator_= None
-        self._post_validator_ = None
+        #self._pre_validator_= None
+        #self._post_validator_ = None
         
         for a in args:
             if inspect.isfunction(a):
@@ -360,30 +379,37 @@ class GenericValidator(BaseValidator):
         # Either edit the dosctring or modify the code to fulfill the promise in
         # the dosctring.
         for key, val in kwargs.items():
-            if key in ("pre_validation", "post_validation"):
-                if inspect.isfunction(val):
-                    if key == "pre_validation":
-                        self._pre_validator_ = val
-                    else:
-                        self._post_validator_ = val
-            else:
-                # this clause below covers case 6 in the table in docstring
-                # TODO must implement the others as well!
-                
-                if isinstance(val, dict) and all(isinstance(k, str) for k in val):
-                    try:
-                        typ = import_name(key)
-                        self.dcriteria[typ] = val
-                    except:
-                        continue
+            #if key in ("pre_validation", "post_validation"):
+                #if inspect.isfunction(val):
+                    #if key == "pre_validation":
+                        #self._pre_validator_ = val
+                    #else:
+                        #self._post_validator_ = val
+            #else:
+            # this clause below covers case 6 in the table in docstring
+            # TODO must implement the others as well!
+            
+            if isinstance(val, dict) and all(isinstance(k, str) for k in val):
+                try:
+                    typ = import_name(key)
+                    self.dcriteria[typ] = val
+                except:
+                    continue
                 
     def __set__(self, obj, value):
-        if self._pre_validator_ is not None:
-            self._pre_validator_(value)
+        if hasattr(obj, "_preset_validators_") and isinstance(obj._preset_validators_, dict):
+            preset_validator = obj._preset_validators_.get(self.public_name, None)
+            if isinstance(preset_validator, AttributeAdapter):
+                preset_validator(obj, value)
         self.validate(value)
-        if self._post_validator_ is not None:
-            self._post_validator_(value)
         setattr(obj, self.private_name, value)
+        # NOTE: 2021-12-06 12:43:48 
+        # call postset validators ONLY AFTER the descriptor value had been set
+        # (last line of code, above)
+        if hasattr(obj, "_postset_validators_") and isinstance(obj._postset_validators_, dict):
+            postset_validator = obj._postset_validators_.get(self.public_name, None)
+            if isinstance(postset_validator, AttributeAdapter):
+                postset_validator(obj, value)
         
     @property
     def allow_none(self):
@@ -1349,7 +1375,7 @@ def parse_descriptor_specification(x:tuple) -> dict:
             attribute value will NOT be set (i.e. it is left as it is, which is 
             None by default).
             
-            This may impact on attribute validators (see prog.BaseValidator and 
+            This may impact on attribute validators (see prog.BaseDescriptorValidator and 
             derived subclasses) used to build dynamic descriptors, UNLESS the
             validator's property 'allow_none' is set to True.
                 
@@ -1626,7 +1652,7 @@ def parse_descriptor_specification(x:tuple) -> dict:
                 __check_array_attribute__(ret, x_)
                     
     # NOTE: 2021-11-29 17:27:07
-    # generate arguments for a GenericValidator
+    # generate arguments for a DescriptorGenericValidator
     type_dict = dict()
     args = list()
     kwargs = dict()
@@ -1671,7 +1697,7 @@ def parse_descriptor_specification(x:tuple) -> dict:
         
     # NOTE: keys in kwargs can only be str; however, type_dict is mapped to
     # a type or tuple of types, therefore we include the dict enclosing
-    # type_dict into the args sequence; the prog.GenericValidator will take care
+    # type_dict into the args sequence; the prog.DescriptorGenericValidator will take care
     # of it...
             
     result = {"name":ret["name"], "value": ret["default_value"], "args":tuple(args), "kwargs": kwargs}

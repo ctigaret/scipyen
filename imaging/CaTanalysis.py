@@ -9849,13 +9849,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             
         elif isinstance(data, list) and all((isinstance(v, vigra.VigraArray) for v in data)):
             if section == "scene":
-                return self._data_.nSceneFrames
+                return self._data_.sceneFrames
             
             else:
-                return self._data_.nScansFrames
+                return self._data_.scansFrames
         
         if section in ("electrophysiology", "ephys"):
-            return self._data_.nEphysSweeps
+            return self._data_.electrophysiologySweeps
         
         elif section in ("scansBlock",):
             if neoutils.is_empty(self._data_.scansBlock, ignore = (TriggerEvent, neo.Event, neo.Epoch)):
@@ -11389,7 +11389,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
         
         #self.currentFrame = 0
         self._current_frame_index_ = 0
-        self._number_of_frames_ = max([self._data_.scansFrames, self._data_.sceneFrames])
+        self._number_of_frames_ = self._data_.nFrames()
         
         if self.actionLink_vertical_scan_cursors_to_scene_point_cursors.isChecked():
             if isinstance(self._data_.scanRegion, pgui.Path) and len(self._data_.scanRegion):
