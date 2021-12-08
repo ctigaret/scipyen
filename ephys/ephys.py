@@ -2824,6 +2824,9 @@ def parse_step_waveform_signal(sig, method="state_levels", **kwargs):
     
     #print(centroids)
     
+    if len(centroids) == 0:
+        return None, None, None, None, None
+    
     label, dst = cluster.vq.vq(sig, centroids) # use un-filtered signal here
     edlabel = np.ediff1d(label, to_begin=0)
     
@@ -3850,6 +3853,7 @@ def set_relative_time_start(data, t = 0 * pq.s):
     TODO: propagate to other members of a segment as well 
     (IrregularlySampledSignal, epochs, spike trains, etc)
     """
+    from neo.core.spiketrainlist import SpikeTrainList
     if isinstance(data, neo.Block):
         for segment in data.segments:
             for isig in segment.irregularlysampledsignals:
@@ -3902,7 +3906,7 @@ def set_relative_time_start(data, t = 0 * pq.s):
                         
                     new_trains.append(spiketrain)
                         
-                segment.spiketrains[:] = new_trains
+                segment.spiketrains = SpikeTrainList(items=new_trains)
                     
                 new_events = list()
                 

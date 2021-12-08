@@ -545,7 +545,7 @@ def state_levels(x:np.ndarray, **kwargs) -> list:
         else:
             bins = int(x_range//bw)
             
-    elif isinstance(bins, int):
+    if isinstance(bins, int):
         if bins < 1:
             raise ValueError("When specified, 'bins' must be > 1; got %d instead" % bins)
         

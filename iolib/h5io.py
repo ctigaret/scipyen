@@ -2929,7 +2929,8 @@ def make_hdf5_dataset(obj, group: h5py.Group, name:typing.Optional[str]=None,
         #group[target_name] = cached_entity # make a hard link
         #return cached_entity
         
-    dset = make_dataset(obj, group, obj_attrs, target_name, compression = compression, chunks = chunks,
+    dset = make_dataset(obj, group, obj_attrs, target_name, 
+                        compression = compression, chunks = chunks,
                         track_order = track_order, entity_cache = entity_cache)
     
     #dset.attrs.update(obj_attrs)
@@ -2939,7 +2940,7 @@ def make_hdf5_dataset(obj, group: h5py.Group, name:typing.Optional[str]=None,
     return dset
 
 @singledispatch
-def make_dataset(obj, group:h5py.Group, name, attrs:dict,
+def make_dataset(obj, group:h5py.Group, attrs:dict, name:str,
                  compression:typing.Optional[str]="gzip", 
                  chunks:typing.Optional[bool] = None,
                  track_order=True, entity_cache = None):
@@ -2961,7 +2962,7 @@ def make_dataset(obj, group:h5py.Group, name, attrs:dict,
     return dset
 
 @make_dataset.register(type(None))
-def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
+def _(obj, group, attrs:dict, name:str, compression, chunks, track_order, entity_cache):
     cached_entity = get_cached_entity(entity_cache, obj)
     if isinstance(cached_entity, h5py.Dataset):
         group[target_name] = cached_entity # make a hard link

@@ -2538,8 +2538,10 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
     
     sig: neo.AnalogSignal with one channel
     
-    iinj:       neo.AnalogSignal with the actual current injection step 
+    iinj: neo.AnalogSignal with the actual current injection step 
                 (without any tail that might have been added to sig)
+            or a tuple (t_start, t_stop) in pq.s: the start/stop times of the 
+            injection step
     
     times: 
         numpy or Quantity array in units compatible with the time units of sig
@@ -2628,7 +2630,10 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
             after = intervals.min()
             
         else:
-            after = iinj.t_stop - starts[0]
+            if isinstance(iinj, tuple):
+                after = iinj[1] - starts[0]
+            else:
+                after = iinj.t_stop - starts[0]
             #raise ValueError("Cannot calculate minimum ISI for a single waveform")
         
     if after is None:
@@ -3012,7 +3017,7 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, rtol = 1e-5, at
     return fast_rise_start_times, fast_rise_stop_times, peak_times#, waves, dwaves
         
 
-def extract_AP_train(vm:neo.AnalogSignal,im:neo.AnalogSignal,
+def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple],
                      tail:pq.Quantity=0.5*pq.s,
                      method:str="state_levels",
                      box_size:numbers.Number=0, 
@@ -3023,6 +3028,9 @@ def extract_AP_train(vm:neo.AnalogSignal,im:neo.AnalogSignal,
                      resample_with_rate:(pq.Quantity, type(None)) = None):
 
     """
+    im: analog signal with current injection recording, or a tuple of three
+        elements: I hold (pA), t_start *(pq.s) and t_stop (pq.s)
+        
     tail: non-negative scalar Quantity (units: "s"); default is 0.5 s
         duration of the analyzed Vm trace after beyond the end of depolarizing 
         current injection step;
@@ -3115,38 +3123,49 @@ def extract_AP_train(vm:neo.AnalogSignal,im:neo.AnalogSignal,
                 raise ValueError("resample_with_rate (%s) and resample_with_period (%s) are incompatible" % (resample_with_rate, resample_with_period))
     
 
-    d, u, inj, c, l = ephys.parse_step_waveform_signal(im,
-                                                          method=method,
-                                                          box_size=box_size, 
-                                                          adcres=adcres,
-                                                          adcrange=adcrange,
-                                                          adcscale=adcscale)
-    
-    
-    #print(f"d = {d} ({type(d)}), u = {u} ({type(u)})")
-    if d.ndim> 0:
-        d = d[0]
-    if u.ndim > 0:
-        u = u[0]
-    #if d < u:
-        #raise RuntimeError("Expecting a depolarizing current injection; got a hyperpolarizing current injection instead")
-    
-    
-    #vstep = vm.time_slice(u,d)
-    if d > u:
-        vstep = vm.time_slice(u,d + tail)
-        istep = im.time_slice(u,d)
-        
-    elif d < u:
-        vstep = vm.time_slice(d,u + tail)
-        istep = im.time_slice(d,u)
-        inj *= -1.0
-        
+    if isinstance(im, neo.AnalogSignal):
+        try:
+            d, u, inj, c, l = ephys.parse_step_waveform_signal(im,
+                                                                method=method,
+                                                                box_size=box_size, 
+                                                                adcres=adcres,
+                                                                adcrange=adcrange,
+                                                                adcscale=adcscale)
+            
+            
+            #print(f"d = {d} ({type(d)}), u = {u} ({type(u)})")
+            if d.ndim> 0:
+                d = d[0]
+            if u.ndim > 0:
+                u = u[0]
+            #if d < u:
+                #raise RuntimeError("Expecting a depolarizing current injection; got a hyperpolarizing current injection instead")
+            
+            
+            #vstep = vm.time_slice(u,d)
+            if d > u:
+                vstep = vm.time_slice(u,d + tail)
+                istep = im.time_slice(u,d)
+                
+            elif d < u:
+                vstep = vm.time_slice(d,u + tail)
+                istep = im.time_slice(d,u)
+                inj *= -1.0
+                
+            else:
+                vstep = vm.time_slice(d, d + tail)
+                istep = im.time_slice(d, d + tail)
+                
+            Ihold = istep.mean()
+        except:
+            print("Cannot parse current injection signal; use manually entered Ihold, start and stop times instead\n\n\n")
+            raise
+            
     else:
-        vstep = vm.time_slice(d, d + tail)
-        istep = im.time_slice(d, d + tail)
-        
-    Ihold = istep.mean()
+        Ihold = im[0]
+        inj = Ihold
+        vstep = vm.time_slice(im[1], im[2] + tail)
+        istep = im[1:]
     
     #print("extract_AP_train: Ihold", Ihold)
     #print("extract_AP_train: Iinj", inj)
@@ -4542,6 +4561,7 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
     if isinstance(ImSignal, str):
         ImSignal = ephys.get_index_of_named_signal(block.segments[0], ImSignal)
         
+        
     #times = None
     
     if isinstance(head, numbers.Number):
@@ -4591,6 +4611,11 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
                         "an integer, a sequence of integers, a range or a slice, " + \
                         "all in the interval [0:%d)." % len(block.segments))
     
+    
+    #if isinstance(ImSignal, tuple):
+        #if len(ImSignal) != len(sgm):
+            #raise ValueError(f"When a tuple, ImSignal must contain {len(sgm)} segments for this data")
+    
     i_steps = list()
     v_steps = list()
     
@@ -4599,13 +4624,16 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
     for k, segment in enumerate(sgm):
         im = segment.analogsignals[ImSignal]
         vm = segment.analogsignals[VmSignal]
-        
-        d,u,_,_,_ = ephys.parse_step_waveform_signal(im)
-        
-        start_stop = list((d,u))
+        if isinstance(im, neo.AnalogSignal):
+            d,u,_,_,_ = ephys.parse_step_waveform_signal(im)
+            
+            start_stop = list((d,u))
 
-        start_stop.sort()
-        
+            start_stop.sort()
+            
+        else:
+            start_stop = im[1:]
+            
         start_stop[0] -= head
         start_stop[1] += tail
         
@@ -4615,16 +4643,17 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
         if start_stop[1] > im.t_stop: # FIXME if this happens then we're in trouble
             start_stop[1] = im.t_stop
             
+        vstep = vm.time_slice(start_stop[0], start_stop[1]).copy() # so that block stays unchanged
+        v_steps.append(vstep.magnitude)
         
         istep = im.time_slice(start_stop[0], start_stop[1]).copy() # avoid references
-        vstep = vm.time_slice(start_stop[0], start_stop[1]).copy() # so that block stays unchanged
+        i_steps.append(istep.magnitude)
+            
         
         # reset the time domain, but use the same units else this breaks the AnalogSignal API
         #istep.t_start = 0 * istep.times.units
         #vstep.t_start = 0 * vstep.times.units
         
-        i_steps.append(istep.magnitude)
-        v_steps.append(vstep.magnitude)
         
     i_steps_signal = neo.AnalogSignal(np.concatenate(i_steps, axis=1), \
                                     units = block.segments[0].analogsignals[ImSignal].units, \
@@ -4774,6 +4803,9 @@ def analyse_AP_step_injection_series(data, **kwargs):
     
     delta_I: python quantity (pA), float scalar, or None: size of the current injection increment
         When None (defaut) the value will be determined from the Im signal
+        
+    Istart, Istop: time quantities for current step injection, or None
+        When given, all segments in the block must start at the same time
         
     Iinj: None (default), or sequence of current injection values. When not None,
         this must contain as many elements as injection steps, and these must be
@@ -5110,7 +5142,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
     ret["Depolarising_steps"] = list()
     
     kwargs["VmSignal"] = VmSignal
-    kwargs["ImSignal"] = ImSignal
+    #kwargs["ImSignal"] = ImSignal # use this for each segmentm, below!
     kwargs["thr"] = thr
     
     Iinj_0 = kwargs.pop("Iinj_0", None)
@@ -5118,7 +5150,10 @@ def analyse_AP_step_injection_series(data, **kwargs):
     
     Iinj = kwargs.pop("Iinj", None)
     
-    if isinstance(Iinj_0, float):
+    Istart = kwargs.pop("Istart", None)
+    Istop = kwargs.pop("Istop", None)
+    
+    if isinstance(Iinj_0, (float, int)):
         Iinj_0 = Iinj_0 * pq.pA
         
     elif isinstance(Iinj_0, pq.Quantity):
@@ -5136,7 +5171,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
     
     #kwargs["Iinj_0"] = Iinj_0
     
-    if isinstance(delta_I, float):
+    if isinstance(delta_I, (float, int)):
         delta_I = delta_I * pq.pA
         
     elif isinstance(delta_I, pq.Quantity):
@@ -5154,11 +5189,21 @@ def analyse_AP_step_injection_series(data, **kwargs):
     
     #kwargs["delta_I"] = delta_I
     
+    #NOTE: set up the of current injection amplitudes
+    # this is based on either:
+    # Iinj_0 and delta_I if given, or
+    # Iinj itself
+    # to be supplied together with Istart, Istop
+    # for use when current injection params would fail
+    
     if Iinj is None:
         if all([v is not None for v in (Iinj_0, delta_I)]):
             i_max = Iinj_0 + delta_I * (len(segments)-1)
             
             Iinj = np.linspace(Iinj_0, i_max, num=len(segments))
+            
+            if not isinstance(Iinj, pq.Quantity):
+                Iinj *= pq.pA
             
     elif isinstance(Iinj, (tuple, list)):
         if len(Iinj) != len(segments):
@@ -5186,14 +5231,17 @@ def analyse_AP_step_injection_series(data, **kwargs):
     else:
         raise TypeError("Unexpected type for Iinj: %s" % type(Iinj).__name__)
             
-    #print(kwargs)
     
     try:
         #__train_analysis_loop__(segments, ret, apIEI, apFrequency, nAPs,
                                 #apThr, apLatency, **kwargs)
         for k, segment in enumerate(segments):
+            if all(isinstance(v, pq.Quantity) for v in (Iinj, Istart, Istop)):
+                im = (Iinj[k], Istart, Istop)
+            else:
+                im = ImSignal
             #print("segment %d" %k)
-            step_result, vstep = analyse_AP_step_injection(segment, **kwargs)
+            step_result, vstep = analyse_AP_step_injection(segment, ImSignal = im, **kwargs)
             
             if Iinj is not None:
                 # override the value measured from the Im signal
@@ -7353,13 +7401,20 @@ def analyse_AP_step_injection(segment,
     
     if isinstance(VmSignal, str):
         VmSignal = ephys.get_index_of_named_signal(segment, VmSignal)
-        
-    if isinstance(ImSignal, str):
-        ImSignal = ephys.get_index_of_named_signal(segment, ImSignal)
-        
-    im = segment.analogsignals[ImSignal].copy()
     
     vm = segment.analogsignals[VmSignal].copy()
+        
+    if isinstance(ImSignal, str):
+        im = segments.analogsignals[ephys.get_index_of_named_signal(segment, ImSignal)].copy()
+        
+    elif isinstance(ImSignal, int):
+        im = segment.analogsignals[ImSignal].copy()
+        
+    elif isinstance(ImSignal, tuple) and len(ImSignal) == 3:
+        im = ImSignal
+    else:
+        raise TypeError(f"ImSignal expected a str (signal name) int signal index) or a triplet (amplitude, start & stop times); got {ImSignal} instad")
+                
     
     # down, up, inj, centroids, label
     # down = time point of the up-down transition

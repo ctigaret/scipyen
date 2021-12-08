@@ -64,7 +64,6 @@
     <addaction name="actionOpen"/>
     <addaction name="menuImport"/>
     <addaction name="actionSave"/>
-    <addaction name="actionSave_pickle"/>
     <addaction name="actionChange_Working_Directory"/>
     <addaction name="separator"/>
     <addaction name="separator"/>
@@ -134,7 +133,8 @@
     </sizepolicy>
    </property>
    <property name="windowIcon">
-    <iconset theme="user-home"/>
+    <iconset theme="user-home">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="features">
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
@@ -253,7 +253,8 @@ NOTE: you can click anywhere in the row to select</string>
     </sizepolicy>
    </property>
    <property name="windowIcon">
-    <iconset theme="folder-recent"/>
+    <iconset theme="folder-recent">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="features">
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
@@ -370,7 +371,8 @@ NOTE: you can click anywhere in the row to select</string>
     </sizepolicy>
    </property>
    <property name="windowIcon">
-    <iconset theme="folder"/>
+    <iconset theme="folder">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="features">
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>

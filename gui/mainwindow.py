@@ -3060,12 +3060,19 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 exportCSVAction.setWhatsThis("Export variables as comma-separated ASCII file")
                 exportCSVAction.hovered.connect(self._slot_showActionStatusMessage_)
 
-        saveVars = cm.addAction("Save (Pickle) selected variables")
-        saveVars.setToolTip("Save selected variables as pickle files")
-        saveVars.setStatusTip("Save selected variables as pickle files")
-        saveVars.setWhatsThis("Save selected variables as pickle files")
+        saveVars = cm.addAction("Save selected variables (HDF5)")
+        saveVars.setToolTip("Save selected variables as HDF5 files")
+        saveVars.setStatusTip("Save selected variables as HDF5 files")
+        saveVars.setWhatsThis("Save selected variables as HDF5 files")
         saveVars.triggered.connect(self.slot_saveSelectedVariables)
         saveVars.hovered.connect(self._slot_showActionStatusMessage_)
+        
+        pickleVars = cm.addAction("Save selected variables (Pickle)")
+        pickleVars.setToolTip("Save selected variables as Pickle files")
+        pickleVars.setStatusTip("Save selected variables as Pickle files")
+        pickleVars.setWhatsThis("Save selected variables as Pickle files")
+        pickleVars.triggered.connect(self.slot_saveSelectedVariables)
+        pickleVars.hovered.connect(self._slot_showActionStatusMessage_)
         
         delVars = cm.addAction("Delete")
         delVars.setToolTip("Delete selected variables")
@@ -3288,7 +3295,8 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             
             for n in varNames:
                 if not isinstance(self.workspace[n], (QtWidgets.QWidget)):
-                    pio.savePickleFile(self.workspace[n], n)
+                    pio.saveHDF5(self.workspace[n], n)
+                    #pio.savePickleFile(self.workspace[n], n)
                     
             #QtWidgets.QApplication.restoreOverrideCursor()
             self.unsetCursor()
@@ -3719,7 +3727,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         self.actionReload_Plugins.triggered.connect(self.slot_reloadPlugins)
         self.actionSave.triggered.connect(self.slot_saveFile)
         self.actionChange_Working_Directory.triggered.connect(self.slot_selectWorkDir)
-        self.actionSave_pickle.triggered.connect(self.slot_saveSelectedVariables)
+        #self.actionSave_pickle.triggered.connect(self.slot_saveSelectedVariables)
         
         # NOTE: 2017-07-07 22:14:40
         # Shortcut to delete selected items in workspaceView
@@ -5165,7 +5173,6 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
 
         return ret
     
-    # TODO: diverge onto HDF5 and bioformats handling
     def _saveImageFile_(self, data, fName):
         try:
             pio.saveImageFile(data, fName)
@@ -5188,14 +5195,13 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         to a specific file type e.g., VigraArrays are saved as images or volumes
         (according to their dimensions, see pictio.saveImageFile),
         other data types are saved as a Python pickle file i.e., are serialized.
-            TODO provide write ops for other data types, in particular HDF5, 
             
             
         If more than one variable is selected, then calls slot_saveSelectedVariables
         where all selected vars are serialised individually to pickle files.
         
         TODO If no variable is selected then offer to save the workspace contents to
-        a pickle file (as a dict!!!)
+        a HDF5 file (as a dict!!!)
             
             
         
@@ -5210,25 +5216,64 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
             varname = self.workspaceModel.item(selectedItems[0].row(),0).text()
             
             if type(self.workspace[varname]).__name__ == 'VigraArray':
-                fileFilt = 'All Image Types (' + ' '.join([''.join(i) for i in zip('*' * len(pio.SUPPORTED_IMAGE_TYPES), '.' * len(pio.SUPPORTED_IMAGE_TYPES), pio.SUPPORTED_IMAGE_TYPES)]) + ');;' +\
-                            ';;'.join('{I} (*.{i});;'.format(I=i.upper(), i=i) for i in pio.SUPPORTED_IMAGE_TYPES)
+                fileFilters = list()
+                fileFilters.append("HDF5 (*.h5)")
+                imageFileFilters = list()
+                imageFileFilters.append('All Image Types ('+ ' '.join([''.join(i) for i in zip('*' * len(pio.SUPPORTED_IMAGE_TYPES), '.' * len(pio.SUPPORTED_IMAGE_TYPES), pio.SUPPORTED_IMAGE_TYPES)]) + ')')
+                imageFileFilters.extend(['{I} (*.{i})'.format(I=i.upper(), i=i) for i in pio.SUPPORTED_IMAGE_TYPES])
+                fileFilters.extend(imageFileFilters)
+                fileFilters.append("Pickle (*pkl)")
+                fileFilt = ';;'.join(fileFilters)
+                
+                #fileFilt = 'All Image Types (' + ' '.join([''.join(i) for i in zip('*' * len(pio.SUPPORTED_IMAGE_TYPES), '.' * len(pio.SUPPORTED_IMAGE_TYPES), pio.SUPPORTED_IMAGE_TYPES)]) + ');;' +\
+                            #';;'.join('{I} (*.{i});;'.format(I=i.upper(), i=i) for i in pio.SUPPORTED_IMAGE_TYPES)
                 
                 targetDir = self.recentDirectories[0]
                 
                 if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
-                    fileName = str(QtWidgets.QFileDialog.getSaveFileName(self, caption=u'Save Image File', filter=fileFilt, directory = targetDir))
+                    fileName, file_flt = str(QtWidgets.QFileDialog.getSaveFileName(self, caption=u'Save Image File', filter=fileFilt, directory = targetDir))
                     
                 else:
-                    fileName = str(QtWidgets.QFileDialog.getSaveFileName(self, caption=u'Save Image File', filter=fileFilt))
+                    fileName, file_flt = str(QtWidgets.QFileDialog.getSaveFileName(self, caption=u'Save Image File', filter=fileFilt))
 
                 if len(fileName) > 0:
-                    if self._saveImageFile_(self.workspace[varname], fileName):
-                        self._addRecentFile_(fileName)
+                    data = self.workspace[varname]
+                    if file_flt in imageFileFilters:
+                        if self._saveImageFile_(data, fileName):
+                            self._addRecentFile_(fileName)
+                            
+                    else:
+                        if file_flt.startswith("HDF5"):
+                            pio.saveHDF(data, varname)
                         
-            else: # TODO: FIXME write code for more data types (HDF5, ...)
-                errMsgDlg = QtWidgets.QErrorMessage(self)
-                errMsgDlg.setWindowTitle("Not implemented for this variable type")
-                errMsgDlg.showMessage("Not implemented for this variable type")
+                        else:
+                            pio.savePickleFile(data,varname)
+                        
+                        
+            else:
+                fileFilters = list()
+                fileFilters.append("HDF5 (*.h5)")
+                fileFilters.append("Pickle (*pkl)")
+                fileFilt = ';;'.join(fileFilters)
+                targetDir = self.recentDirectories[0]
+                
+                if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
+                    fileName, file_flt = str(QtWidgets.QFileDialog.getSaveFileName(self, caption=u'Save Image File', filter=fileFilt, directory = targetDir))
+                    
+                else:
+                    fileName, file_flt = str(QtWidgets.QFileDialog.getSaveFileName(self, caption=u'Save Image File', filter=fileFilt))
+
+
+                if len(fileName) > 0:
+                    data = self.workspace[varname]
+                    if file_flt.startswith("HDF5"):
+                        pio.saveHDF5(data, varname)
+                    
+                    else:
+                        pio.savePickleFile(data,varname)
+                #errMsgDlg = QtWidgets.QErrorMessage(self)
+                #errMsgDlg.setWindowTitle("Not implemented for this variable type")
+                #errMsgDlg.showMessage("Not implemented for this variable type")
                 
         
         else:

@@ -51,6 +51,7 @@ from core.workspacefunctions import (user_workspace, assignin, debug_scipyen,
                                      get_symbol_in_namespace,)
 from imaging import (axisutils, axiscalibration, scandata, )
 from imaging.axisutils import *
+from iolib import h5io
 
 #import datatypes
 #### END pict.core modules
@@ -442,6 +443,13 @@ def __ndArray2csv__(data, writer):
     for l in data:
         writer.writerow(l)
         
+        
+def loadHDF5File(fName:str):
+    """FIXME/TODO 2021-12-08 12:19:08
+    """
+    raise NotImplementedError("Not yet...")
+    with h5py.File(fName) as h5file:
+        data = h5io.read_hdf5(h5file)
     
 # NOTE: 2017-09-21 16:34:21
 # BioFormats dumped mid 2017 because there are no good python ports to it
@@ -1799,7 +1807,8 @@ fileLoaders["application/axon-binary-file"] = loadAxonFile
 fileLoaders["application/x-crossover-atf"] = loadAxonTextFile
 fileLoaders["application/axon-text-file"] = loadAxonTextFile
 fileLoaders["application/x-pickle"] = loadPickleFile
-fileLoaders["application/x-hdf"] = loadNixIOFile
+fileLoaders["application/x-hdf"] = loadHDF5File
+#fileLoaders["application/x-hdf"] = loadNixIOFile
 fileLoaders["text/xml"] = loadXMLFile
 fileLoaders["text/plain"] = loadTextFile
 fileLoaders["application/x-matlab"] = loadMatlab
@@ -2046,6 +2055,15 @@ def loadFile(fName):
             #obj_group = f.create_group("object", track_order=True)
             
     #f.close()
+    
+@safeWrapper
+def saveHDF5(data, fileName):
+    (name,extn) = os.path.splitext(fileName)
+    if isinstance(extn, str) and len(extn.strip())==0 or extn not in (".h5", ".hdf5"):
+        fileName += ".h5"
+        
+    with h5py.File(fileName, mode="w") as h5file:
+        h5io.make_hdf5_entity(data, h5file, name=name)
     
 @safeWrapper
 def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None, 
