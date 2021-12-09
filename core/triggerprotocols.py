@@ -2094,7 +2094,7 @@ def parse_trigger_protocols(src, return_source:typing.Optional[bool]=False):
                 if len(pp):
                     for p_ in pp:
                         p_.updateSegmentIndex(protocol.segmentIndices())
-                        print("p_", p_)
+                        #print("p_", p_)
                         
                 else:
                     protocol_list.append(protocol)

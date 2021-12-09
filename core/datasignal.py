@@ -1,5 +1,5 @@
 from copy import deepcopy
-import numbers
+import numbers, warnings
 import numpy as np
 
 import quantities as pq
@@ -13,6 +13,7 @@ from neo.core import container
 from neo.core.dataobject import DataObject, ArrayDict
 
 from core.quantities import (units_convertible, name_from_unit)
+from core.strutils import is_path #, is_pathname_valid
 
 
 def _new_DataSignal(cls, signal, units=None, domain_units=None, dtype=None, copy=True,
@@ -126,12 +127,75 @@ class DataSignal(BaseSignal):
                 array_annotations=None, **annotations):
         
         # NOTE: try & sort out the mess from pickles saved with prev APIs
+        # WARNING: 2021-12-09 21:45:08 This is NOT guaranteed to succeed
+        # if trying to load an old pickle fails, you're better off going to the
+        # original data !
+        
+        #strings  = {"name":None,"file_origin":None, "description": None}
+        
+        quants = {"units": None, "time_units": None}
+        
+        #domainargs = {"t_start": None, "sampling_period":None, "sampling_rate":None}
+        
+        #annots    = {"array_annotations":None, "annotations": None}
+        
+        dtypes   = {"dtype":None}
+        
+        bools = {"copy": None}
+        
+        
+        call_args = {"units": units,
+                    "time_units": time_units,
+                    "dtype": dtype,
+                    "copy": copy,
+                    "t_start": t_start,
+                    "sampling_period": sampling_period,
+                    "sampling_rate": sampling_rate,
+                    "name": name,
+                    "file_origin": file_origin,
+                    "description": description,
+                    "array_annotations": array_annotations,
+                    "annotations": annotations,
+            }
+        
+        for k,v in call_args.items():
+            if isinstance(v, bool): # there is onyl one bool arg expected
+                bools["copy"] = v
+                
+            elif isinstance(v, np.dtype): # there is only one dtype arg expected
+                dtypes["dtype"] = v
+
+            elif isinstance(v, pq.Quantity):
+                if v.size == 1: # a scalar ; note signal is treated from the outset
+                    # precedence: units, time_units, t_start, sampling_period, sampling_rate
+                    if quants["units"] is None:
+                        if isinstance(signal, pq.Quantity):
+                            quants["units"] = signal.units
+                            
+                        else:
+                            quants["units"] = v.units
+                            
+        obj = pq.Quantity(signal, units=quants["units"], dtype=dtypes["dtype"], copy=bools["copy"]).view(cls)
+        
+        if obj.ndim == 1:
+            obj.shape = (-1,1)
+        obj.segment=None
+        obj.channel_index=None
+
+        return obj
+    def __init__(self, signal, units=None, time_units = None, dtype=None, copy=True, 
+                 t_start=0*pq.dimensionless, sampling_rate=None, sampling_period=None,
+                 name=None, file_origin=None, description=None, 
+                 array_annotations=None, **annotations):
+        
+        """DataSignal constructor.
+        """
         
         strings  = {"name":None,"file_origin":None, "description": None}
         
-        unitvals = {"units": None, "time_units": None}
+        quants = {"units": None, "time_units": None}
         
-        domainvals = {"t_start": None, "sampling_period":None, "sampling_rate":None}
+        domainargs = {"t_start": None, "sampling_period":None, "sampling_rate":None}
         
         annots    = {"array_annotations":None, "annotations": None}
         
@@ -154,221 +218,97 @@ class DataSignal(BaseSignal):
                     "annotations": annotations,
             }
         
-        #print("call_args", call_args)
-
-        #k_v = list(call_args.items())
-
-        #print("\n")
-        #for kv in k_v:
-            #k = kv[0]
-            #v = kv[1]
-            
         for k,v in call_args.items():
             #print(f"before: {k}, {v}, {type(v).__name__}")
-            if isinstance(v, bool):
+            if isinstance(v, bool): # there is onyl one bool arg expected
                 bools["copy"] = v
-                #print(f"\tfound {k}, {v}, {type(v).__name__}")
-                #call_args[k] = None
-                #call_args["copy"] = v
                 
-            elif isinstance(v, np.dtype):
+            elif isinstance(v, np.dtype): # there is only one dtype arg expected
                 dtypes["dtype"] = v
-                #print(f"\tfound {k}, {v}, {type(v).__name__}")
-                #call_args[k] = None
-                #call_args["dtype"] = v
-                
+
             elif isinstance(v, str):
-                
-                print(f"\tfound {k}, {v}, {type(v).__name__}")
-                if not isinstance(call_args["name"], str):
-                    call_args[k] = None
-                    call_args["name"] = v
-                    
-                elif not isinstance(call_args["description"], str):
-                    call_args[k] = None
-                    call_args["description"] = v
-                    
-                elif not isinstance(call_args["file_origin"], str):
-                    call_args[k] = None
-                    call_args["file_origin"] = v
-                    
+                # there are 3 str args expected: name, file_origin and description; brrrr...
+                if is_path(v):
+                    # likely a file path name
+                    strings["file_origin"] = v
+                elif strings["name"] is None: # give precedence to name
+                    strings["name"] = v
+                else:
+                    strings["description"] = v
                     
             elif isinstance(v, dict):
-                if isinstance(v, ArrayDict):
-                    print(f"\tfound {k}, {v}, {type(v).__name__}")
-                    if k != "array_annotations":
-                        print(f"\tset up array_annotations to {v}")
-                        call_args[k] = None
-                        call_args["array_annotations"] = v
-                else:
-                    print(f"\tfound {k}, {v}, {type(v).__name__}")
+                if isinstance(v, ArrayDict): # only array_annotations are ArrayDict
+                    annots["array_annotations"] = v
                     
-                    if len(v) == signal.shape[1] and (not isinstance(call_args["array_annotations"], ArrayDict) or len(call_args["array_annotations"]) == 0):
-                        if k != "array_annotations":
-                            call_args[k] = None
-                            print(f"\tset up array_annotations to {v}")
-                            call_args["array_annotations"] = v
+                elif isinstance(v, dict): # can be array_annotations or anotations; brrr...
+                    if len(v) == signal.shape[1]: # likely array annotations, too
+                        if annots["array_annotations"] is None:
+                            arr_ann = ArrayDict(signal.shape[1])
+                            for ka,va in v.items():
+                                arr_ann[ka] = va
+                            annots["array_annotations"] = arr_ann
+                        else:
+                            annots["annotations"] = v
+                            
                     else:
-                        if k != "annotations":
-                            call_args[k] = None
-                            print(f"\tset up annotations to {v}")
-                            call_args["annotations"] = v
-                    
-                    
+                        annots["annotations"] = v
+                        
             elif isinstance(v, pq.Quantity):
-                print(f"\tfound {k}, {v}, {type(v).__name__}")
-                #if call_args["t_start"]
-                    
-            print(f"after: {k}, {call_args[k]}, {type(call_args[k]).__name__}")
+                if v.size == 1: # a scalar ; note signal is treated from the outset
+                    # precedence: units, time_units, t_start, sampling_period, sampling_rate
+                    if quants["time_units"] is None:
+                        quants["time_units"] = v.units
+                        
+                    elif domainargs["t_start"] is None:
+                        domainargs["t_start"] = v
+                        
+                    elif domainargs["sampling_period"] is None:
+                        domainargs["sampling_period"] = v
+                        
+                    elif domainargs["sampling_rate"] is None:
+                        domainargs["sampling_rate"] = v
+                        
+        #print("strings", strings)
+        #print("quants", quants)
+        #print("domainargs", domainargs)
+        #print("annots", annots)
+        #print("call_args", call_args)
+        
+        # let's checkout domainargs and units
+        # get sampling period & rate out of the way first
+        #s_rate = None
+        #s_per = None
+        #t_units = None
+        
+        
+        if isinstance(domainargs["sampling_period"], pq.Quantity):
+            #print("sampling_period", domainargs["sampling_period"])
+            if units_convertible(1/domainargs["sampling_period"], quants["time_units"]):
+                domainargs["sampling_rate"] = domainargs["sampling_period"]
+                domainargs["sampling_period"] = 1/domainargs["sampling_period"]
+                
+        if isinstance(domainargs["sampling_rate"], pq.Quantity):
+            if units_convertible(domainargs["sampling_rate"], quants["time_units"]):
+                domainargs["sampling_period"] = 1/domainargs["sampling_rate"]
+                
+        if all(isinstance(d, pq.Quantity) for d in (domainargs["t_start"], domainargs["sampling_period"])) :
+            if domainargs["t_start"] == 1/domainargs["sampling_period"]:
+                sr = domainargs["sampling_period"]
+                domainargs["sampling_period"] = domainargs["t_start"]
+                domainargs["sampling_rate"] = sr
+                domainargs["t_start"] = 0 * quants["time_units"]
             
-                
-        print("call_args", call_args)
-                
-        dtype = call_args["dtype"]
-        copy = call_args["copy"]
-        name = call_args["name"]
-        sampling_period = call_args["sampling_period"]
-        sampling_rate = call_args["sampling_rate"]
-        t_start = call_args["t_start"]
-        units = call_args["units"]
-        array_annotations = call_args["array_annotations"]
-        annotations = call_args["annotations"]
-        description = call_args["description"]
-        file_origin = call_args["file_origin"]
-        
-                
-        #print("args", args)
-            
-        
-        dtyp = dtype if isinstance(dtype, np.dtype) else np.dtype("float64")
-        
-        cpy =copy if isinstance(copy , bool) else True
-        
-        
-        if units is None:
-            if not hasattr(signal, "units"):
-                units = pq.dimensionless
-                
-        elif isinstance(signal, pq.Quantity):
-            if units != signal.units:
-                signal = signal.rescale(units)
-                
-        domain_units = time_units if isinstance(time_units, pq.Quantity) else t_start.units if isinstance(t_start, pq.Quantity) else None
-            #domain_units = time_units if isinstance(time_units, pq.Quantity) else origin.units if isinstance(origin, pq.Quantity) else t_start.units if isinstance(t_start, pq.Quantity) else None
-        
-        #print(type(signal), type(units), type(dtype), type(copy))
-        obj = pq.Quantity(signal, units=units, dtype=dtyp, copy=cpy).view(cls)
-        
-        origin = t_start
-        
-        if not isinstance(origin, np.ndarray):
-            if not isinstance(origin, numbers.Number):
-                raise TypeError("origin or t_start must be scalar numbers or scalar arrays")
-            
-            try:
-                origin = np.array(origin) # will raise 
-            except:
-                raise TypeError("origin or t_start must be scalar numbers or scalar arrays")
-            
-        if origin.size > 1:
-            raise TypeError("origin or t_start must be scalars arrays or numbers")
-        
-        if not isinstance(domain_units, pq.Quantity):
-            if isinstance(signal, neo.core.basesignal.BaseSignal):
-                domain_units = signal.times.units
+        elif all(isinstance(d, pq.Quantity) for d in (domainargs["t_start"], domainargs["sampling_rate"])) :
+            if domainargs["t_start"] == 1/domainargs["sampling_rate"]:
+                domainargs["sampling_period"] = domainargs["t_start"]
+                domainargs["t_start"] = 0 * quants["time_units"]
 
-            elif isinstance(origin, pq.Quantity):
-                domain_units = origin.units
-                    
-            else:
-                domain_units = pq.dimensionless
-                    
-        if not isinstance(origin, pq.Quantity):
-            if isinstance(domain_units, pq.Quantity):
-                origin *= domain_units
-            
-
-        obj._origin = origin
-                
-        print("obj._origin", obj._origin)
-
-        if obj.ndim == 1:
-            obj.shape = (-1,1)
-            
-        if sampling_period is None:
-            # sampling period not given
-            if sampling_rate is None:
-                # sampling period not given and sampling rate not given =>
-                # set default sampling_period
-                obj._sampling_period = 1 * obj._origin.units # default sampling period
-                
-            elif isinstance(sampling_rate, pq.Quantity): # calculate from sampling rate if given
-                # sampling period not given, sampling rate given as Quantity =>
-                # calculate sampling_period from given sampling_rate
-                if obj._origin.units == pq.dimensionless and sampling_rate.units != pq.dimensionless:
-                    obj._origin = origin.magnitude * (1/sampling_rate).units
-                    
-                if sampling_rate.units != 1/obj._origin.units:
-                    raise TypeError("Mismatch between sampling rate units and object units: %s and %s" % (sampling_rate.units, obj._origin.units))
-                
-                elif sampling_rate.size > 1:
-                    raise TypeError("Sampling rate is expected to be a scalar quantity; got %s instead" % sampling_rate)
-                
-                else:
-                    obj._sampling_period = 1/sampling_rate
-                    
-            elif isinstance(sampling_rate, numbers.Real):
-                # sampling period not given; sampling rate given as a unitless scalar
-                # => caluclate sampling period
-                if sampling_rate <= 0:
-                    raise ValueError("Sampling rate must have a strictly positive value; got %g instead" % sampling_rate)
-                
-                obj._sampling_period = 1/(sampling_rate * obj._origin.units)
-                
-            else:
-                raise TypeError("Sampling rate expected to be a scalar python quantity; got %s instead" % (type(sampling_rate).__name__))
-            
-        elif isinstance(sampling_period, pq.Quantity):
-            # sampling period given; disregard sampling rate if given at all
-            if obj._origin.units == pq.dimensionless and sampling_period.units != pq.dimensionless:
-                obj._origin = origin.magnitude * sampling_period.units
-                
-            if sampling_period.units != obj._origin.units:
-                # CAUTION: 2021-12-09 16:15:16
-                # this may ben the sampling rate:
-                if units_convertible(obj._origin.units, 1/sampling_period.units):
-                    obj._sampling_period = 1/sampling_period
-                elif not units_convertible(obj._origin.units, sampling_period.units):
-                    raise TypeError(f"Sampling period units {sampling_period.units} are incompatible with signal domain units {obj._origin.units}")
-            
-            elif sampling_period.size > 1:
-                raise TypeError("Sampling period is expected to be a scalar quantity; got %s instead" % sampling_period)
-            
-            else:
-                obj._sampling_period = sampling_period
-                
-        elif isinstance(sampling_period, numbers.Real):
-            if sampling_period <= 0:
-                raise ValueError("Sampling period must be strictly positive; got %g instead" % sampling_period)
-            
-            obj._sampling_period = sampling_period * obj._origin.units
+        DataObject.__init__(self, name=strings["name"], file_origin=strings["file_origin"], 
+                         description=strings["description"], 
+                         array_annotations=annots["array_annotations"], **annots["annotations"])
         
-        obj.segment=None
-        obj.channel_index=None
-
-        return obj
-    
-    def __init__(self, signal, units=None, dtype=None, copy=True, 
-                 t_start=0*pq.dimensionless, sampling_rate=None, sampling_period=None,
-                 name=None, file_origin=None, description=None, 
-                 array_annotations=None, **annotations):
-        
-        """DataSignal constructor.
-        """
-        
-        DataObject.__init__(self, name=name, file_origin=file_origin, 
-                         description=description, 
-                         array_annotations=array_annotations, **annotations)
+        self._origin = domainargs["t_start"]
+        self._sampling_period = domainargs["sampling_period"]
         
         self.__domain_name__ = name_from_unit(self.domain)
         

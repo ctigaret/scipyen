@@ -1373,6 +1373,12 @@ def proposeLayout(img:vigra.VigraArray,
         
         By default (False) the function returns vigra.AxisInfo objects for the
         above.
+        
+        WARNING: AxisInfo obejcts are NOT serializable; if the layout
+        returned by this function is meant to be serialized (pikcled), or used 
+        in an object intended to be serialized (pickled), then set:
+        
+        `indices=True` 
     
     Returns:
     ========

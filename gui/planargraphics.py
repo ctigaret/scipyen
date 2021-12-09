@@ -6310,11 +6310,14 @@ class Path(PlanarGraphics):
             for o in self._objects_:
                 o._currentframe_ = currentframe
             
+            xx = [o.x for o in self._objects_ if o is not None and o.x is not None]
             
-            x = min([o.x for o in self._objects_ if o is not None])
-            y = min([o.y for o in self._objects_ if o is not None])
+            yy = [o.y for o in self._objects_ if o is not None and o.y is not None]
+            
+            x = min(xx) if len(xx) else None
+            y = min(yy) if len(yy) else None
 
-            self._position_ = (x,y)
+            self._position_ = (x,y) if all(v is not None for v in (x,y)) else (0.,0.)
 
     def __reduce__(self):
         return __new_planar_graphic__, (self.__class__, 

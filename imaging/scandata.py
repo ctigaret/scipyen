@@ -1291,8 +1291,12 @@ class ScanData(BaseScipyenData):
         ("scansAxesCalibration",            list,   AxesCalibration),
         ("sceneLayout",                     dict),
         ("scansLayout",                     dict),
-        ("sceneFrameAxis",                  (vigra.AxisInfo, tuple)),
-        ("scansFrameAxis",                  (vigra.AxisInfo, tuple)),
+        #("sceneFrameAxis",                  (vigra.AxisInfo, tuple)),
+        #("scansFrameAxis",                  (vigra.AxisInfo, tuple)),
+        # NOTE: 2021-12-09 23:24:13
+        # vigra.AxisInfo is NOT serializable !
+        ("sceneFrameAxis",                  (int, tuple)),
+        ("scansFrameAxis",                  (int, tuple)),
         ("framesMap",                       FrameIndexLookup),
         )
     
@@ -2110,7 +2114,7 @@ class ScanData(BaseScipyenData):
         if isinstance(data, vigra.VigraArray):
             # CAUTION 2021-12-03 10:21:58
             # this layout has axisInfo objects, not indices
-            layout = proposeLayout(data, userFrameAxis = frameAxis)
+            layout = proposeLayout(data, userFrameAxis = frameAxis, indices = True)
             #nFrames, widthAxisInfo, heightAxisInfo, channelAxisInfo, frameAxisInfo = proposeLayout(data, userFrameAxis = frameAxis)
             
             if isinstance(axescal, AxesCalibration) and all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(axescal.axiskeys, data.axistags)):
@@ -2134,8 +2138,8 @@ class ScanData(BaseScipyenData):
                 if not all([s.channels == data[0].channels for s in data[1:]]):
                     raise TypeError("Image arrays in a sequence must have the same number of channels")
 
-                layout = proposeLayout(data[0], userFrameAxis = frameAxis)
-
+                layout = proposeLayout(data[0], userFrameAxis = frameAxis, indices = True)
+                
                 if isinstance(axescal, (tuple, list)):
                     if len(axescal) != len(data):
                         raise ValueError(f"Axes calibration expected to be a sequence with as many elements as 'data' ({len(data)}; got {len(axescal)} instead)")

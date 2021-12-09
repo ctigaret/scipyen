@@ -11342,18 +11342,23 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):#, WorkspaceGuiMixin):
             #print("LSCaTWindow _parsedata_ %s" % newdata.name)
             default_options = scanDataOptions()
             
-            if "Discrimination" not in newdata.analysisOptions:
-                newdata.analysisOptions["Discrimination"] = collections.OrderedDict()
-                newdata.analysisOptions["Discrimination"].update(default_options["Discrimination"])
-                        
-            if "2D" in newdata.analysisOptions["Discrimination"]:
-                newdata.analysisOptions["Discrimination"]["Discr_2D"] = newdata.analysisOptions["Discrimination"]["2D"]
-                newdata.analysisOptions["Discrimination"].pop("2D", None)
-
-            if "data_2D" in newdata.analysisOptions["Discrimination"]:
-                newdata.analysisOptions["Discrimination"]["Discr_2D"] = newdata.analysisOptions["Discrimination"]["data_2D"]
-                newdata.analysisOptions["Discrimination"].pop("data_2D", None)
+            try: # old pickles don't have analysisOptions descriptors!
+                analysisOptions = newdata.analysisOptions 
+            except:
+                analysisOptions = dict()
                 
+            if "Discrimination" not in analysisOptions:
+                analysisOptions["Discrimination"] = collections.OrderedDict()
+                analysisOptions["Discrimination"].update(default_options["Discrimination"])
+                        
+            #if "2D" not in in analysisOptions["Discrimination"]:
+                #newdata.analysisOptions["Discrimination"]["Discr_2D"] = newdata.analysisOptions["Discrimination"]["2D"]
+                #newdata.analysisOptions["Discrimination"].pop("2D", None)
+
+            #if "data_2D" in newdata.analysisOptions["Discrimination"]:
+                #newdata.analysisOptions["Discrimination"]["Discr_2D"] = newdata.analysisOptions["Discrimination"]["data_2D"]
+                #newdata.analysisOptions["Discrimination"].pop("data_2D", None)
+            
             if hasattr(newdata, "cell"):
                 newdata.cell = strutils.str2symbol(newdata.cell)
                 

@@ -131,7 +131,7 @@ from iolib import pictio as pio
 
 #### BEGIN pict.core modules
 import core.signalprocessing as sgp
-from core import (xmlutils, strutils, neoevent, neoepoch, neoutils, )
+from core import (xmlutils, strutils, neoutils, )
 from core.neoutils import (get_non_empty_spike_trains,get_non_empty_events,
                            normalized_signal_index,
                            check_ephys_data, check_ephys_data_collection,

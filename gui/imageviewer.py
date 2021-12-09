@@ -4205,14 +4205,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                         if self.frameAxis is not None:
                             #if isinstance(self.frameAxis, vigra.AxisInfo):
                             if isinstance(self.frameAxis, int):
-                                frameAxis = self._data_axistags.index(self.frameAxis)
-                                if frameAxis >= self._data_.ndim:
+                                if self.frameAxis >= self._data_.ndim:
                                     raise RuntimeError(f"frame axis {self.frameAxis} not found in the image")
-                                #if self.frameAxis not in self._data_.axistags:
-                                    #raise RuntimeError("frame axis %s not found in the image" % self.frameAxis.key)
-                                
-                                #zAxisKey = self.frameAxis.key
-                                #frameAxisIndex = self._data_.axistags.index(zAxisKey)
+                                frameAxis = self._data_.axistags[self.frameAxis]
+                                zAxisKey = frameAxis.key
                                 
                                 if self._axes_calibration_:
                                     cz = self._axes_calibration_[frameAxis.key].calibratedMeasure(self._current_frame_index_)

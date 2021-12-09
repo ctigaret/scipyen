@@ -665,13 +665,6 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,
                                                    import_from="gui") #  so that resources can be imported too
 
 
-# NOTE: 2017-05-07 20:18:37
-# overwrite neo's Epoch with our own
-#import neoepoch
-#neo.core.epoch.Epoch = neoepoch.Epoch
-#neo.core.Epoch = neoepoch.Epoch
-#neo.Epoch = neoepoch.Epoch
-
 """
 NOTE: 2020-02-14 16:54:19 LTP options revamp
 NOTATIONS: Im = membrane current; Vm = membrane potential
