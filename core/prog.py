@@ -20,14 +20,8 @@ from contextlib import (contextmanager, ContextDecorator,)
 import numpy as np
 import neo, vigra
 import quantities as pq
-from . import patchneo
 from . import workspacefunctions
 from .workspacefunctions import debug_scipyen
-#from . import patchneo as patchneo
-#from . import neoevent as neoevent
-#from . import neoepoch as neoepoch
-
-from iolib import jsonio
 
 CALLABLES = (types.FunctionType, types.MethodType,
              types.WrapperDescriptorType, types.MethodWrapperType,
@@ -537,7 +531,8 @@ class Timer(object):
 # ### BEGIN module functions
 
 def classify_signature(sig, funcname:typing.Optional[str]=None,
-                       modname:typing.Optional[str]=None) -> SignatureDict:
+                       modname:typing.Optional[str]=None,
+                       verbose:bool=False) -> SignatureDict:
     """A dictionary-like presentation of an inspect.Signature object.
     
     Useful especially in generic initialization of objects based 
@@ -611,17 +606,45 @@ def classify_signature(sig, funcname:typing.Optional[str]=None,
         
     if not isinstance(qualname, str) or len(qualname.strip()) == 0:
         qualname = None
+        
+    posonly_params = dict()
+    named_params = dict()
+    varkw_params = dict()
+    varpos_params = dict()
     
-    pos_params = dict((parname, None if val.annotation is Parameter.empty else val.annotation) for parname, val in sig.parameters.items() if val.kind is Parameter.POSITIONAL_ONLY)
+    for parname, val in sig.parameters.items():
+        if verbose:
+            print("parameter name:", parname, "value:", val, "kind:", val.kind, "default:", val.default, "annotation:", val.annotation)
+        
+        if val.kind is Parameter.POSITIONAL_ONLY:
+            posonly_params[parname] = None if val.annotation is Parameter.empty else val.annotation
+            
+        elif val.kind is Parameter.POSITIONAL_OR_KEYWORD:
+            if val.kind is Parameter.VAR_KEYWORD:
+                varkw_params[parname] = None if val.annotation is Parameter.empty else val.annotation
+            elif val.kind is Parameter.VAR_POSITIONAL:
+                varpos_params[parname] = None if val.annotation is Parameter.empty else val.annotation
+            else:
+                named_params[parname] = (None if val.default is Parameter.empty else val.default, 
+                                         None if val.annotation is Parameter.empty else val.annotation)
+                
+        elif val.kind is Parameter.VAR_KEYWORD:
+            varkw_params[parname] = None if val.annotation is Parameter.empty else val.annotation
+            
+        elif val.kind is Parameter.VAR_POSITIONAL:
+            varpos_params[parname] = None if val.annotation is Parameter.empty else val.annotation
+                
     
-    named_params = dict((parname, (None if val.default is Parameter.empty else val.default, None if val.annotation is Parameter.empty else val.annotation)) for (parname, val) in sig.parameters.items() if parname not in ("cls", "self") and parname not in pos_params and val.kind not in (Parameter.VAR_KEYWORD, Parameter.VAR_POSITIONAL))
+    #posonly_params = dict((parname, None if val.annotation is Parameter.empty else val.annotation) for parname, val in sig.parameters.items() if val.kind is Parameter.POSITIONAL_ONLY)
     
-    varkw_params = dict((parname, None if val.annotation is Parameter.empty else val.annotation) for parname, val in sig.parameters.items() if val.kind is Parameter.VAR_KEYWORD)
+    #named_params = dict((parname, (None if val.default is Parameter.empty else val.default, None if val.annotation is Parameter.empty else val.annotation)) for (parname, val) in sig.parameters.items() if parname not in ("cls", "self") and parname not in posonly_params and val.kind == Parameter.POSITIONAL_OR_KEYWORD and val.kind not in (Parameter.VAR_KEYWORD, Parameter.VAR_POSITIONAL))
     
-    varpos_params = dict((parname, None if val.annotation is Parameter.empty else val.annotation) for parname, val in sig.parameters.items() if val.kind is Parameter.VAR_POSITIONAL)
+    #varkw_params = dict((parname, None if val.annotation is Parameter.empty else val.annotation) for parname, val in sig.parameters.items() if val.kind is Parameter.VAR_KEYWORD)
+    
+    #varpos_params = dict((parname, None if val.annotation is Parameter.empty else val.annotation) for parname, val in sig.parameters.items() if val.kind is Parameter.VAR_POSITIONAL)
     
     return SignatureDict(name = funcname, qualname = qualname, module = modname,
-                         positional = pos_params, named = named_params, 
+                         positional = posonly_params, named = named_params, 
                          varpos = varpos_params, varkw = varkw_params,
                          returns = sig.return_annotation)
 
@@ -656,108 +679,6 @@ def stringify_signature(f:typing.Union[types.FunctionType, inspect.Signature, Si
     
     return "".join(func)
     
-def check_neo_patch(exc_info:tuple):
-    stack_summary = traceback.extract_tb(exc_info[2])
-    frame_names = [f.name for f in stack_summary]
-    
-    last_frame_summary = stack_summary[-1]
-    
-    obj_name = last_frame_summary.name
-    
-    print(obj_name)
-    
-    return identify_neo_patch(obj_name)
-    
-    #if any([s in last_frame_summary.name.lower() for s in  ("neo", "event", "epoch", "analogsignalarray", "analogsignal", "irregularlysampledsignal")]):
-    #if any([s in obj_name.lower() for s in  patchneo.patches.keys()]):
-        #module_name = inspect.getmodulename(last_frame_summary.filename)
-        
-    #for key in patchneo.patches.keys():
-        #if obj_name in key:
-            #return (key, patchneo.patches[key])
-        
-def identify_neo_patch(obj_name):
-    if debug_scipyen():
-        print("\nLooking for possible patch for %s" % obj_name)
-        
-    for key in patchneo.patches.keys():
-        if obj_name in key:
-            val = patchneo.patches[key]
-            if debug_scipyen():
-                print("\t Found patch", val, "for", key)
-            return (key, val)
-    
-    
-def import_module(name, package=None):
-    """An approximate implementation of import."""
-    absolute_name = importlib.util.resolve_name(name, package)
-    try:
-        return sys.modules[absolute_name]
-    except KeyError:
-        pass
-
-    path = None
-    
-    if '.' in absolute_name:
-        parent_name, _, child_name = absolute_name.rpartition('.')
-        parent_module = import_module(parent_name)
-        path = parent_module.__spec__.submodule_search_locations
-        
-    if debug_scipyen():
-        print("import_module: path =", path)
-        
-    for finder in sys.meta_path:
-        if hasattr(finder, "find_spec"):
-            spec = finder.find_spec(absolute_name, path)
-            if spec is not None:
-                break
-    else:
-        raise ImportError(f'No module named {absolute_name!r}')
-        
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    sys.modules[absolute_name] = module
-    
-    if path is not None:
-        setattr(parent_module, child_name, module)
-        
-    return module
-
-def import_relocated_module(mname):
-    spec = get_relocated_module_spec(mname)
-    
-    if spec is not None:
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        sys.modules[mname] = module
-    
-def get_relocated_module_spec(mname, scipyen_path=None):
-        #print("get_relocated_module_spec: modname =", mname)
-        
-        if isinstance(scipyen_path, str) and os.path.isdir(scipyen_path):
-            file_path = os.path.join(*(scipyen_path, "%s.py" % mname))
-            
-        else:
-            if scipyen_path is None:
-                scipyen_path = pathlib.Path(sys.path[0]) # this is where scipyen is located
-                
-            elif not isinstance(scipyen_path, pathlib.Path):
-                raise ValueError("scipyen_path expected to be a valid directory path string, a pathlib.Path, or None; got %s instead\n" % scipyen_path)
-            
-            
-            mloc = list(scipyen_path.glob("**/%s.py" % mname))
-            
-            if len(mloc)==0: # py source file not found
-                raise FileNotFoundError("Could not find a module source file for %s\n" % mname)
-            
-            
-            file_path = os.path.join(*mloc[0].parts)
-        
-        #print("get_relocated_module_spec: file_path =", file_path)
-        
-        if isinstance(file_path, str) and len(file_path):
-            return importlib.util.spec_from_file_location(mname, file_path)
-        
 def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
     log = file if hasattr(file, "write") else sys.stderr
     traceback.print_stack(file=log)

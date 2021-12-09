@@ -7405,7 +7405,7 @@ def analyse_AP_step_injection(segment,
     vm = segment.analogsignals[VmSignal].copy()
         
     if isinstance(ImSignal, str):
-        im = segments.analogsignals[ephys.get_index_of_named_signal(segment, ImSignal)].copy()
+        im = segment.analogsignals[ephys.get_index_of_named_signal(segment, ImSignal)].copy()
         
     elif isinstance(ImSignal, int):
         im = segment.analogsignals[ImSignal].copy()

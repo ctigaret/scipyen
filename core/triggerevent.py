@@ -24,8 +24,14 @@ def _new_DataMark(cls, places = None, labels=None, units=None, name=None,
                   file_origin=None, description=None, mark_type=None,
                   segment=None, array_annotations=None, annotations={}):
     if not isinstance(annotations, dict):
-        annotations = dict()
-    
+        if annotations is None:
+            annotations = dict()
+        else:
+            try:
+                annotations = dict(annotations)
+            except:
+                annotations = dict() # just so that we aren't left hanging out
+                
     e = cls(places=places, labels=labels, units=units, name=name, 
             mark_type=mark_type, file_origin=file_origin, 
             description=description, array_annotations=array_annotations,
@@ -35,20 +41,28 @@ def _new_DataMark(cls, places = None, labels=None, units=None, name=None,
     
     return e
 
-#def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None, 
-               #file_origin=None, description=None, event_type=None,
-               #segment=None, array_annotations=None, annotations={}):
-    #if not isinstance(annotations, dict):
-        #annotations = dict()
+def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None, 
+               file_origin=None, description=None, event_type=None,
+               segment=None, array_annotations=None, annotations={}):
+    """Keep for old pickles
+    """
+    if not isinstance(annotations, dict):
+        if annotations is None:
+            annotations = dict()
+        else:
+            try:
+                annotations = dict(annotations)
+            except:
+                annotations = dict() # just so that we aren't left hanging out
+                
+    e = TriggerEvent(times=times, labels=labels, units=units,name=name,
+                      file_origin=file_origin, description=description, 
+                      event_type=event_type, array_annotations=array_annotations,
+                      **annotations)
     
-    #e = TriggerEvent(times=times, labels=labels, units=units,name=name,
-                      #file_origin=file_origin, description=description, 
-                      #event_type=event_type, array_annotations=array_annotations,
-                      #**annotations)
+    e.segment=segment
     
-    #e.segment=segment
-    
-    #return e
+    return e
     
 class MarkType(TypeEnum):
     """Some standard data mark types

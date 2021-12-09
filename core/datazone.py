@@ -12,6 +12,15 @@ def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
              name=None, segment=None, description=None, file_origin=None,
              array_annotations=None, annotations=None):
     
+    if not isinstance(annotations, dict):
+        if annotations is None:
+            annotations = dict()
+        else:
+            try:
+                annotations = dict(annotations)
+            except:
+                annotations = dict() # just so that we aren't left hanging out
+        
     obj = DataZone(places=places, extents=extents, labels=labels,
                    units=units,name=name,file_origin=file_origin,
                    description=description,array_annotations=array_annotations,

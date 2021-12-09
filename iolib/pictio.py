@@ -44,11 +44,14 @@ from core import (xmlutils, strutils, datatypes, datasignal,
                   triggerprotocols, neoutils,)
 
 
-from core.prog import (ContextExecutor, safeWrapper, check_neo_patch, 
+from core.prog import (ContextExecutor, safeWrapper,)
+
+from core.monkey import (check_neo_patch, 
                        identify_neo_patch,  import_relocated_module)
 
 from core.workspacefunctions import (user_workspace, assignin, debug_scipyen,
                                      get_symbol_in_namespace,)
+
 from imaging import (axisutils, axiscalibration, scandata, )
 from imaging.axisutils import *
 from iolib import h5io
@@ -449,7 +452,8 @@ def loadHDF5File(fName:str):
     """
     raise NotImplementedError("Not yet...")
     with h5py.File(fName) as h5file:
-        data = h5io.read_hdf5(h5file)
+        return h5io.read_hdf5(h5file)
+        
     
 # NOTE: 2017-09-21 16:34:21
 # BioFormats dumped mid 2017 because there are no good python ports to it
@@ -1314,6 +1318,7 @@ def custom_unpickle(src:typing.Union[str, io.BufferedReader]):#,
         
     return ret
 
+@safeWrapper
 def loadPickleFile(fileName):
     """Loads pickled data.
     ATTENTION: 
@@ -1327,9 +1332,18 @@ def loadPickleFile(fileName):
     Moreover it will fail to load neo objects created with older neo versions.
     
     """
-    with open(fileName, mode="rb") as fileSrc:
-        result = pickle.load(fileSrc)
+    from core import patchneo as pneo
+    try:
+        pneo.patch_neo_new()
+        with open(fileName, mode="rb") as fileSrc:
+            ret = pickle.load(fileSrc)
+        pneo.restore_neo_new()
+    except:
+        pneo.restore_neo_new()
+        raise
+    return ret
         
+    
             
 def savePickleFile(val, fileName, protocol=None):
     #if inspect.isfunction(val): # DO NOT attempt to pickle unbound functions

@@ -1,8 +1,9 @@
 """Small patches to neo.Epoch and neo.Events
 """
 
-__all__ = ["neo"]
+#__all__ = ["neo"]
 
+import inspect
 from copy import deepcopy, copy
 import numpy as np
 import quantities as pq
@@ -16,7 +17,16 @@ from neo.core.baseneo import BaseNeo, _check_annotations
 from core.neoevent import (_new_Event_v1, _new_Event_v2,)
 from core.neoepoch import _new_Epoch_v1
 
+from core.prog import (safeWrapper, classify_signature,)
+
 #neo.io.axonio.AxonRawIO = _axonrawio.AxonRawIO_v1
+
+original ={"neo.core.analogsignal._new_AnalogSignalArray": neo.core.analogsignal._new_AnalogSignalArray,
+           "neo.core.irregularlysampledsignal._new_IrregularlySampledSignal":neo.core.irregularlysampledsignal._new_IrregularlySampledSignal,
+           "neo.core.spiketrain._new_spiketrain":neo.core.spiketrain._new_spiketrain,
+           "neo.core.epoch._new_epoch": neo.core.epoch._new_epoch,
+           "neo.core.event._new_event": neo.core.event._new_event,
+           } 
 
 def _normalize_array_annotations_v1(value, length):
     """Check consistency of array annotations
@@ -172,9 +182,12 @@ def _new_AnalogSignalArray_v2(cls, signal, units=None, dtype=None, copy=True, t_
     obj.segment = segment
     return obj
 
-def _new_AnalogSignalArray_v1(cls, signal, units=None, dtype=None, copy=True, t_start=0 * pq.s,
-                           sampling_rate=None, sampling_period=None, name=None, file_origin=None,
-                           description=None, annotations=None, channel_index=None, segment=None):
+def _new_AnalogSignalArray_v1(cls, signal, units=None, dtype=None, copy=True, 
+                              t_start=0 * pq.s, 
+                              sampling_rate=None, sampling_period=None, name=None, 
+                              file_origin=None,
+                              description=None, annotations=None, 
+                              channel_index=None, segment=None):
     '''
     A function to map AnalogSignal.__new__ to function that
         does not do the unit checking. This is needed for pickle to work.
@@ -188,6 +201,48 @@ def _new_AnalogSignalArray_v1(cls, signal, units=None, dtype=None, copy=True, t_
     obj.channel_index = channel_index
     obj.segment = segment
     return obj
+
+def _new_AnalogSignalArray(*args, **kwargs):
+    #print("kwargs", kwargs)
+    original_f = original["neo.core.analogsignal._new_AnalogSignalArray"]
+    sig = classify_signature(original_f)
+    sig_named = list(sig.named.keys())
+    named = dict()
+    var = list()
+    #varkw = dict()
+    
+    #k = 0
+    
+    # first eat up the *args - CAUTION these may contain named params, but 
+    # 'without' the names ... place these into args
+    
+    for k, a in enumerate(args):
+        if k < len(sig.positional):
+            var.append(a)
+            
+        elif k in range(len(sig.positional), len(sig_named)):
+            var.append(a)
+            #name = sig_named[k-len(sig.positional)]
+            #val = sig.named[name]
+            #named[name] = a
+        
+        # NOTE: if there is an excess of positional parameters, leave them out
+        #else:
+            #var.append(a)
+    # now eat up kwargs - distribute across named or a new kw
+    kw = list(kwargs.keys())
+    
+    for k in kw:
+        v = kwargs.pop(k)
+        if k in sig.named:
+            named[k] = v
+            
+    #print("var", var)
+    #print("named", named)
+    #print("kwargs", kwargs)
+    #print(sig)
+            
+    return original["neo.core.analogsignal._new_AnalogSignalArray"](*var, **named, **kwargs)
 
 def _new_spiketrain_v1(cls, signal, t_stop, units=None, dtype=None, copy=True,
                     sampling_rate=1.0 * pq.Hz, t_start=0.0 * pq.s, waveforms=None, left_sweep=None,
@@ -250,8 +305,39 @@ def _new_IrregularlySampledSignal_v1(cls, times, signal, units=None, time_units=
            #"neo.core.epoch._new_epoch": _new_Epoch_v1,
            #"neo.core.event._new_event": _new_Event_v2}
            
-patches = {"neo.core.analogsignal._new_AnalogSignalArray": _new_AnalogSignalArray_v2,
+patches = {"neo.core.analogsignal._new_AnalogSignalArray": _new_AnalogSignalArray,
            "neo.core.irregularlysampledsignal._new_IrregularlySampledSignal": _new_IrregularlySampledSignal_v1,
            "neo.core.spiketrain._new_spiketrain": _new_spiketrain_v1,
            "neo.core.epoch._new_epoch": _new_Epoch_v1,
-           "neo.core.event._new_event": _new_Event_v2}
+           "neo.core.event._new_event": _new_Event_v2,
+           }
+
+@safeWrapper
+def patch_neo_new():
+    for key, value in patches.items():
+        try:
+            objpath = key.split('.')
+            fname = objpath[-1]
+            module = eval('.'.join(objpath[:-1]))
+            if inspect.ismodule(module):
+                setattr(module, fname, value)
+                
+        except:
+            print(f"Cannot patch function {key}")
+            raise
+            
+@safeWrapper
+def restore_neo_new():
+    for key, value in original.items():
+        try:
+            objpath = key.split('.')
+            fname = objpath[-1]
+            module = eval('.'.join(objpath[:-1]))
+            if inspect.ismodule(module):
+                setattr(module, fname, value)
+                
+        except:
+            print(f"Cannot restore patched function {key}")
+            raise
+            
+        

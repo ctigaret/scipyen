@@ -2894,3 +2894,5 @@ def getAxisOrigin(axisinfo):
     
     return axcal.getOrigin(axisinfo.key)
     
+# NOTE: for old pickles
+AxisCalibration = AxisCalibrationData

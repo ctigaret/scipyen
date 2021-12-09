@@ -3060,18 +3060,18 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 exportCSVAction.setWhatsThis("Export variables as comma-separated ASCII file")
                 exportCSVAction.hovered.connect(self._slot_showActionStatusMessage_)
 
-        saveVars = cm.addAction("Save selected variables (HDF5)")
+        saveVars = cm.addAction("Save as HDF5")
         saveVars.setToolTip("Save selected variables as HDF5 files")
         saveVars.setStatusTip("Save selected variables as HDF5 files")
         saveVars.setWhatsThis("Save selected variables as HDF5 files")
         saveVars.triggered.connect(self.slot_saveSelectedVariables)
         saveVars.hovered.connect(self._slot_showActionStatusMessage_)
         
-        pickleVars = cm.addAction("Save selected variables (Pickle)")
+        pickleVars = cm.addAction("Save as Pickle")
         pickleVars.setToolTip("Save selected variables as Pickle files")
         pickleVars.setStatusTip("Save selected variables as Pickle files")
         pickleVars.setWhatsThis("Save selected variables as Pickle files")
-        pickleVars.triggered.connect(self.slot_saveSelectedVariables)
+        pickleVars.triggered.connect(self.slot_pickleSelectedVariables)
         pickleVars.hovered.connect(self._slot_showActionStatusMessage_)
         
         delVars = cm.addAction("Delete")
@@ -3297,6 +3297,39 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
                 if not isinstance(self.workspace[n], (QtWidgets.QWidget)):
                     pio.saveHDF5(self.workspace[n], n)
                     #pio.savePickleFile(self.workspace[n], n)
+                    
+            #QtWidgets.QApplication.restoreOverrideCursor()
+            self.unsetCursor()
+            
+        except Exception as e:
+            traceback.print_exc()
+            #QtWidgets.QApplication.restoreOverrideCursor()
+            self.unsetCursor()
+            
+    @pyqtSlot()
+    @safeWrapper
+    def slot_pickleSelectedVariables(self):
+        indexList = self.workspaceView.selectedIndexes()
+        
+        if len(indexList) == 0:
+            return
+        
+        varSet = set()
+        
+        for i in indexList:
+            varSet.add(self.workspaceModel.item(i.row(),0).text())
+            
+        varNames = sorted([n for n in varSet])
+            
+        self.setCursor(QtCore.Qt.WaitCursor)
+        
+        try:
+            #QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+            
+            for n in varNames:
+                if not isinstance(self.workspace[n], (QtWidgets.QWidget)):
+                    #pio.saveHDF5(self.workspace[n], n)
+                    pio.savePickleFile(self.workspace[n], n)
                     
             #QtWidgets.QApplication.restoreOverrideCursor()
             self.unsetCursor()
@@ -4795,7 +4828,7 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes() \
                          if item.column() == 0]# list of QModelIndex
         
-        parentFolders = utilities.unique([os.path.dirname(self.fileSystemModel.filePath(item)) for item in selectedItems])
+        parentFolders = unique([os.path.dirname(self.fileSystemModel.filePath(item)) for item in selectedItems])
         
         for folder in parentFolders:
             self.slot_systemOpenFileOrFolder(folder)
@@ -4966,6 +4999,10 @@ class ScipyenWindow(WindowManager, __UI_MainWindow__, WorkspaceGuiMixin):
         if self.loadDiskFile(fName):
             #self._addRecentFile_(fName, fileReader) # done inside loadDiskFile
             self.workspaceModel.update()
+            
+    #@safeWrapper
+    #def saveVariables(self):
+        #pass
             
     @pyqtSlot()
     @safeWrapper
