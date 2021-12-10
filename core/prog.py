@@ -31,81 +31,6 @@ CALLABLES = (types.FunctionType, types.MethodType,
 class ArgumentError(Exception):
     pass
 
-class WithDescriptors(object):
-    """ Base for classes that create their own descriptors.
-    
-    A descriptor is specified in the :class: definition as tuples 
-    (see 'BaseScipyenData' in module core.basescipyen and the function
-    'parse_descriptor_specification', defined in this module)
-    
-    Together with the validator classes (Python descriptors) defined in this
-    module, this forms a trimmed down framework for the implementation of the 
-    Python's descriptors protocol, mostly useful for code factoring.
-    
-    These descriptors DO NOT implement trait observer design pattern as found in 
-    the 'traitlets' package (used throughout jupyter/IPython, and in Scipyen) and
-    therefore they ARE NOT a replacement, nor are they intended for use with, 
-    'HasDescriptors' classes in the traitlet package.
-    
-    """
-    @classmethod
-    def setup_descriptor(cls, descr_params, **kwargs):
-        """Default method for setting up descriptors based on specific conditions.
-        
-        Derived :classes: that need to implement custom actions alongside the 
-        descriptor's `__set__()` method should pass the following as kwargs:
-        
-        'pre_validation' instance method or function -> performs functions BEFORE
-        value is validated in __set__()
-        
-        'post_validation' instance method or function -> performs functions BEFORE
-        value is validated in __set__()
-        
-    
-        """
-        args = descr_params.get("args", tuple())
-        kw = descr_params.get("kwargs", {})
-        #pre_validation = kw.pop("pre_validation", kwargs.pop("pre_validation", None))
-        #post_validation = kw.pop("post_validation", kwargs.pop("post_validaton", None))
-        
-        #kw["pre_validation"] = pre_validation if isinstance(pre_validation, (AttributeAdapter, type(None))) else None 
-        #kw["post_validation"] = post_validation if isinstance(post_validation, (AttributeAdapter, type(None))) else None
-        name = descr_params.get("name", "")
-        if not isinstance(name, str) or len(name.strip()) == 0:
-            return
-        descriptor = DescriptorGenericValidator(name, *args, **kw)
-        descriptor.allow_none = True
-        #descriptor.__set_name__(cls, name)
-        setattr(cls, name, descriptor)
-        
-    @classmethod
-    def remove_descriptor(cls, name):
-        if hasattr(cls, name):
-            delattr(cls, name)
-            
-    def _repr_pretty_(self, p, cycle):
-        p.text(self.__class__.__name__)
-        p.breakable()
-        properties = tuple(d for d in get_descriptors(type(self)) if not d.startswith("_"))
-        if len(properties)==0:
-            properties = sorted(tuple(k for k in self.__dict__ if not k.startswith("_")))
-        first = True
-        for pr in properties:
-            if hasattr(self, pr):
-                value = getattr(self, pr)
-                if first:
-                    first = False
-                else:
-                    p.breakable()
-                    
-                with p.group(indent=-1):
-                    p.text(f"{pr}:")
-                    p.pretty(value)
-                
-        
-setup_descriptor = WithDescriptors.setup_descriptor
-remove_descriptor= WithDescriptors.remove_descriptor
-
 class AttributeAdapter(ABC):
     """Abstract Base Class as a callable for pre- and post-validation
     """
@@ -114,23 +39,57 @@ class AttributeAdapter(ABC):
         pass
     
 class BaseDescriptorValidator(ABC):
-    """Abstract superclass implementing a Python descriptor with validation.
+    """Abstract superclass that implements a Python descriptor with validation.
+    
+    The descriptor operated on a private attribute of the owner by exposing a
+    public name to the user as getter/setter accessor.
     
     """
-    def __set_name__(self, name:str):
+    @staticmethod
+    def get_private_name(name:str) -> str:
+        """Find out what private name thus would operate on
+        """
+        return f"_{name}_"
+    
+    def __set_name__(self, name:str) -> None:
+        """Call this in the implementation's __init__
+        """
         self.private_name = f"_{name}_"
         self.public_name = name
         
-    #def __set_name__(self, owner, name:str):
-        #self.private_name = f"_{name}_"
-        #self.public_name = name
-        
-    def __get__(self, obj, objtype=None):
+    def __get__(self, obj, objtype=None) -> object:
         return getattr(obj, self.private_name)
     
-    def __set__(self, obj, value):
+    def __set__(self, obj, value) -> None:
+        """Assigns a new value to the private attribute accessed by the descriptor.
+        
+        The value is first validated by calling the 'validate' method of the 
+        descriptor validator, which MUST be implemented in subclasses of 
+        BaseDescriptorValidator. the validated value is then assigned to the 
+        private attribute that is wrapped by this descriptor
+        
+        If the descriptor owner contains at least one of the dict attributes
+        '_preset_hooks_' and '_postset_hooks_' mapping the descriptor's public
+        name to an AttributeAdapter instance, then the adapter instance will be
+        called BEFORE (respectively, AFTER)  validation of 'value' and its
+        assignment.
+        
+        """
+        if hasattr(obj, "_preset_hooks_") and isinstance(obj._preset_hooks_, dict):
+            preset_validator = obj._preset_hooks_.get(self.public_name, None)
+            if isinstance(preset_validator, AttributeAdapter):
+                preset_validator(obj, value)
+                
         self.validate(value)
         setattr(obj, self.private_name, value)
+        
+        # NOTE: 2021-12-06 12:43:48 
+        # call postset hooks ONLY AFTER the descriptor value had been set
+        # (last line of code, above)
+        if hasattr(obj, "_postset_hooks_") and isinstance(obj._postset_hooks_, dict):
+            postset_validator = obj._postset_hooks_.get(self.public_name, None)
+            if isinstance(postset_validator, AttributeAdapter):
+                postset_validator(obj, value)
         
     def __delete__(self, obj):
         if hasattr(obj, self.private_name):
@@ -145,7 +104,7 @@ class BaseDescriptorValidator(ABC):
         pass
     
 class OneOf(BaseDescriptorValidator):
-    def __init__(self, *options):
+    def __init__(self, name:str,/, *options):
         self.options = set(options)
 
     def validate(self, value):
@@ -153,7 +112,7 @@ class OneOf(BaseDescriptorValidator):
             raise ValueError(f'Expected {value!r} to be one of {self.options!r}')
 
 class DescriptorTypeValidator(BaseDescriptorValidator):
-    def __init__(self, *types):
+    def __init__(self, name:str,/,*types):
         self.types = set(t for t in types if isinstance(t, type))
         
     def validate(self, value):
@@ -162,7 +121,7 @@ class DescriptorTypeValidator(BaseDescriptorValidator):
             raise TypeError(f"For {self.private_name} one of {self.types} was expected; got {type(value).__name__} instead")
         
 class DescriptorGenericValidator(BaseDescriptorValidator):
-    def __init__(self, name:str, *args, **kwargs):
+    def __init__(self, name:str, /, *args, **kwargs):
         """
         args: sequence of objects or unary predicates;
             objects can be:
@@ -216,51 +175,33 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
             
         Key:                        Value:
         ------------------------------------------------------------------
+                                        
+        1.  numpy.ndarray               {"ndim": int,
+                                        "shape": tuple,
+                                        "dtype": numpy.dtype,
+                                        "kind": numpy.dtype.kind}
+                                        
+        2.  pytyhon.Quantity            as for numpy.ndarray, plus:
+                                        {"units": python.Quantity}
                                     
-    1.  numpy.ndarray               {"ndim": int,
-                                     "shape": tuple,
-                                     "dtype": numpy.dtype,
-                                     "kind": numpy.dtype.kind}
-                                    
-    2.  pytyhon.Quantity            as for numpy.ndarray, plus:
-                                    {"units": python.Quantity}
-                                
-    3.  vigra.VigraArray            as for numpy.ndarray, plus:
-                                    {"axistags": vigra.AxisTags,
-                                     "order": str}
-                                    
-    4.  vigra.AxisInfo              {"key": str,
-                                     "typeFlags": vigral.AxisType
-                                     "resolution": float,
-                                     "description": str}
-                                    
-    5.  dict                        { (key_name: value_type,)* }
-                                    Where 'value_type' is a type
-                    
-    6.  <any other type, except     dict mapping property name to type of 
-        for the special cases       property value, or to a dict as detailed
-        below>                      in this table
+        3.  vigra.VigraArray            as for numpy.ndarray, plus:
+                                        {"axistags": vigra.AxisTags,
+                                        "order": str}
+                                        
+        4.  vigra.AxisInfo              {"key": str,
+                                        "typeFlags": vigral.AxisType
+                                        "resolution": float,
+                                        "description": str}
+                                        
+        5.  dict                        { (key_name: value_type,)* }
+                                        Where 'value_type' is a type
+                        
+        6.  <any other type, except     dict mapping property name to type of 
+            for the special cases       property value, or to a dict as detailed
+            below>                      in this table
         
-    ------------------------------------------------------------------
-    
-    TODO: DEPRECATED/REMOVED - MUST UPDATE DOSCTRING
-    
-    7.  "pre_validation"            instance method or function that performs 
-                                    additional and/or actions BEFORE the value 
-                                    is validated, in this descriptor's
-                                    `__set__()`. The 
-                                
-                                    Optional, default is None
-                                
-    8.  "post_validation"           instance method or function that performs 
-                                    additional checks and/or actions AFTER the 
-                                    value is validated, in this descriptor's
-                                    `__set__()`
-                            
-                                    Optional, default is None
-                                
         ------------------------------------------------------------------
-                                     
+    
         NOTE: Validation is performed in the following order:
         
         1) if args contains types or str elements that can be resolved to types, 
@@ -373,13 +314,6 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
         # Either edit the dosctring or modify the code to fulfill the promise in
         # the dosctring.
         for key, val in kwargs.items():
-            #if key in ("pre_validation", "post_validation"):
-                #if inspect.isfunction(val):
-                    #if key == "pre_validation":
-                        #self._pre_validator_ = val
-                    #else:
-                        #self._post_validator_ = val
-            #else:
             # this clause below covers case 6 in the table in docstring
             # TODO must implement the others as well!
             
@@ -390,20 +324,6 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                 except:
                     continue
                 
-    def __set__(self, obj, value):
-        if hasattr(obj, "_preset_validators_") and isinstance(obj._preset_validators_, dict):
-            preset_validator = obj._preset_validators_.get(self.public_name, None)
-            if isinstance(preset_validator, AttributeAdapter):
-                preset_validator(obj, value)
-        self.validate(value)
-        setattr(obj, self.private_name, value)
-        # NOTE: 2021-12-06 12:43:48 
-        # call postset validators ONLY AFTER the descriptor value had been set
-        # (last line of code, above)
-        if hasattr(obj, "_postset_validators_") and isinstance(obj._postset_validators_, dict):
-            postset_validator = obj._postset_validators_.get(self.public_name, None)
-            if isinstance(postset_validator, AttributeAdapter):
-                postset_validator(obj, value)
         
     @property
     def allow_none(self):
@@ -1626,3 +1546,199 @@ def parse_descriptor_specification(x:tuple) -> dict:
     return result
 
         
+class WithDescriptors(object):
+    """ Base for classes that create their own descriptors.
+    
+    A descriptor is specified in the :class: definition as the :class: attribute
+    '_descriptor_attributes_' (a tuple of tuples).
+    
+    Each elements in the '_descriptor_attributes_' tuple contains at least two 
+    elements, where:
+    
+    1) the first element is always a str: the public name of the descriptor, 
+        i.e. the name under which the user accesses the underlying data as if an 
+        instance attribute)
+        
+    2) an object (the default value, type specification, validation parameters,
+        see the documentation for the `parse_descriptor_specification` function 
+        in this module, and 'BaseScipyenData' in module core.basescipyen for 
+        concrete examples)
+    
+    Together with the validator classes (Python descriptors) defined in this
+    module, and with AttributeAdapter, this provides framework implementing the
+    Python's descriptors protocol, useful for code factoring.
+    
+    In addition, derived :classes: wishing to execute additional code either 
+    immediately before, or after a value is set to a descriptor, also need to
+    contain the attributes '_preset_hooks_' and '_postset_hooks_', respectively.
+    
+    These are dictionaries that map public descriptor names (as given in 
+    '_descriptor_attributes_') to instances of AttributeAdapter.
+    
+    An AttributeAdapter instance is a callable that performs certain actions on
+    the attributes of its owner whenever a descriptor is 'set' to a certain
+    value. These action do not necessarily validate the new value, unless the
+    descriptors is implemented by types other than BaseDescriptorValidator (or
+    its subclasses defined here).
+    
+    
+    NOTE:
+    
+    These descriptors DO NOT implement the trait observer design pattern as found
+    in the 'traitlets' package (https://traitlets.readthedocs.io/en/stable/).
+    Therefore they are ARE NOT a replacement for, nor are they intended for use 
+    with, the 'HasDescriptors' classes in the 'traitlets' package.
+    
+    
+    """
+    # Tuple of attribute public name (str) to attribute specification, see the
+    # 'parse_descriptor_specification' function in this module, for details.
+    _descriptor_attributes_ = tuple()
+    
+    # Maps a public attribute name (see above) to an instance of AttributeAdapter
+    # only needed for those descriptors that execute collateral code in the 
+    # owner, BEFORE validating (optional) then setting the value via the 
+    # descriptor's '__set__()' method; when present, the AttributeAdapter is 
+    # called from the descriptor's '__set__()' method.
+    #
+    # The AttributeAdapter may also perform validation especially where the 
+    # descriptor does NOT provide its own 'validate' method (which is also called
+    # from the descriptor's '__set__()' method)
+    #
+    _preset_hooks_ = dict()
+    
+    # Maps a public attribute name (see above) to an instance of AttributeAdapter
+    # only needed for those descriptors that execute collateral code in the 
+    # owner, AFTER setting the value via the descriptor's '__set__()' method;
+    # when present, the AttributeAdapter is called from the descriptor's 
+    # '__set__()' method.
+    #
+    # Since the postset hook is called AFTER value validation and assignment 
+    # inside the descriptor's '__set__()' method, any further validation performed
+    # by the AttributeAdapter instances here are ignored.
+    #
+    _postset_hooks_ = dict()
+    
+    # allow for subclasses to set up their own descriptor protocol implementation
+    # BUT with the constraints that the implementation's initializer MUST take
+    # one mandatory name (str) parameter
+    _descriptor_impl_ = DescriptorGenericValidator
+    
+    @classmethod
+    def setup_descriptor(cls, descr_params, **kwargs):
+        """Default method for setting up descriptors based on specific conditions.
+        
+        This will dynamically generate instances of DescriptorGenericValidator.
+        These objects implement the Python's descriptor protocol - i.e. they
+        behave like `property` objects, by providing `__get__()` and `__set__()`
+        methods whenever a private attribute is accessed or assigned to, 
+        respectively, in the owner instance of type `cls`.
+        
+        Classes derived from WithDescriptors and expecting to execute cutsom code 
+        inside the descriptor's __set__() method, also need to define at least
+        one of two dictionary attributes called 
+        '_preset_hooks_' and '_postset_hooks_'.
+        
+        These dictionaries are expected to map the descriptor's public name (i.e.
+        the name under which the underlying data descriptor is accessed by the 
+        :class: public API) to an AttributeAdapter instance (emulated callable)
+        which is then called by the __set__() method to perform those custom
+        actions, either BEFORE ('_preset_hooks_') or AFTER 
+        ('_postset_hooks_) the value is validated and assigned to the 
+        descriptor data.
+        
+        NOTE: the __set__() method of any BaseDescriptorValidator (from which
+        DescriptorGenericValidator inherit) already define a 'validate' method
+        that checks the value set for assignment conforms with a set of criteria.
+        
+        The 'preset' and 'postset' hooks are intended to perform computations 
+        intended to modify other attributes of the instance owner of the
+        descriptor based on the new value (to be) assigned to the descriptor, 
+        rather than validate and/or modify this value.
+        
+        See AttributeAdapter for details.
+    
+        """
+        args = descr_params.get("args", tuple())
+        kw = descr_params.get("kwargs", {})
+        name = descr_params.get("name", "")
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            return
+        
+        desc_impl = getattr(cls, "_descriptor_impl_", None)
+        if desc_impl is None:
+            desc_impl = DescriptorGenericValidator
+        
+        descriptor = desc_impl(name, *args, **kw)
+        descriptor.allow_none = True
+        setattr(cls, name, descriptor)
+        
+    @classmethod
+    def remove_descriptor(cls, name):
+        if hasattr(cls, name):
+            delattr(cls, name)
+            
+    def __init__(self, *args, **kwargs):
+       for attr in self._descriptor_attributes_:
+            attr_dict = parse_descriptor_specification(attr)
+            proposed_value = kwargs.pop(attr[0], attr_dict["value"])
+            kw = dict()
+            type(self).setup_descriptor(attr_dict, **kw)
+            setattr(self, attr_dict["name"], proposed_value)
+            
+    def __setstate__(self, state):
+        """Restores the descriptors.
+        
+        Pickling a WithDescriptors only saves the private attributes accessed by 
+        the descriptors. Because of this, the unpickled class LACKS the public 
+        counterpart (the descriptor itself).
+        
+        This method is invoked by the Python interpreter upon unpickling
+        and tries to compensate for this shortcoming.
+        
+        NOTE: unpickling bypasses __init__() !
+        """
+        desc_impl = getattr(self, "_descriptor_impl_", None)
+        
+        if desc_impl is None:
+            desc_impl = DescriptorGenericValidator
+  
+        for attr_spec in self._descriptor_attributes_:
+            attr_dict = parse_descriptor_specification(attr_spec)
+            attr_name = desc_impl.get_private_name(attr_spec[0])
+            # check if state brings a private attribute wrapped in a descriptor
+            # if it does, use it and remove it from state,
+            # else use default proposed by parsing
+            proposed_value = state.pop(attr_name, attr_dict["value"])
+            kw = dict()
+            type(self).setup_descriptor(attr_dict, **kw)
+            setattr(self, attr_dict["name"], proposed_value)
+            
+        # now that the state dict has been 'cleaned' of descriptor stuff, we can`
+        # use it to update the instance __dict__ as the default object.__setstate__()
+        # would do
+        self.__dict__.update(state)
+        
+    def _repr_pretty_(self, p, cycle):
+        p.text(self.__class__.__name__)
+        p.breakable()
+        properties = tuple(d for d in get_descriptors(type(self)) if not d.startswith("_"))
+        if len(properties)==0:
+            properties = sorted(tuple(k for k in self.__dict__ if not k.startswith("_")))
+        first = True
+        for pr in properties:
+            if hasattr(self, pr):
+                value = getattr(self, pr)
+                if first:
+                    first = False
+                else:
+                    p.breakable()
+                    
+                with p.group(indent=-1):
+                    p.text(f"{pr}:")
+                    p.pretty(value)
+                
+        
+setup_descriptor = WithDescriptors.setup_descriptor
+remove_descriptor= WithDescriptors.remove_descriptor
+

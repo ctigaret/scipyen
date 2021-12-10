@@ -3,5 +3,6 @@ numpy           # needed to build VIGRA
 sphinx          # needed to build VIGRA
 nose            # needed to build VIGRA
 confuse
+dill
 # PyQt5         # on Windows run 'pip install PyQt5'; On Unix must build, see:
                 # c_cpp_requirements.txt

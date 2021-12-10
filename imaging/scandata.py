@@ -72,31 +72,6 @@ class ScanData(BaseScipyenData):
     """Dummy for AnalysisUnit; clobbered below
     """
     
-#class ScanDataFrameIndex(MultiFrameIndex):
-    #def __init__(self, scans:int, scene:int, electrophysiology:int,/):
-        #super().__init__(scans=scans, scene=scene, electrophysiology=electrophysiology)
-    #@classmethod
-    #def remove_descriptor(cls, name):
-        #"""Clobbers removal of descriptors
-        #"""
-        #pass
-    
-    ## NOTE: 2021-12-01 14:43:47
-    ## interesing pogramming hack:
-    ## if this is clobbered, the fields are visible in dir and __dict__, yet not 
-    ## captured by prog.get_descriptors: it behaves a bit like an opaque object
-    #@classmethod
-    #def setup_descriptor(cls, params):
-        #"""Clobbers further addition of descriptors
-        #"""
-        #pass
-    
-    #def addField(self, name, value):
-        #"""Clobbers the addField inherited from MultiFrameIndex.
-        #Prevents adding more fields to the index.
-        #"""
-        #pass
-        
 class ScanDataOptions(DataBag):
     """Do not use
     """
@@ -1397,7 +1372,7 @@ class ScanData(BaseScipyenData):
                     
                 nFrames = layout.get("nFrames", 0)
                 return nFrames if isinstance(nFrames, int) else np.prod(nFrames)
-
+            
     @safeWrapper
     def __init__(self, scans=None, scene=None, electrophysiology=None, metadata=None, **kwargs):
         """Constructs a ScanData object.
@@ -1937,7 +1912,7 @@ class ScanData(BaseScipyenData):
             self = scans.copy() # make a deep copy
             return
             
-        self._postset_validators_ = {
+        self._postset_hooks_ = {
             "scans": self.FramesMapUpdater(self, "scans"),
             "scene": self.FramesMapUpdater(self, "scene"),
             "electrophysiology": self.FramesMapUpdater(self, "electrophysiology"),
@@ -8635,13 +8610,13 @@ class ScanData(BaseScipyenData):
             #for unit in self._analysis_units_:
                 #unit.sourceID = sourceID
                 
-    #@property
-    #def availableUnitTypes(self):
-        #return self._availableUnitTypes_
+    @property
+    def availableUnitTypes(self):
+        return self._availableUnitTypes_
     
-    #@property
-    #def availableGenotypes(self):
-        #return self._availableGenotypes_
+    @property
+    def availableGenotypes(self):
+        return self._availableGenotypes_
         
     #@property
     #def cell(self):

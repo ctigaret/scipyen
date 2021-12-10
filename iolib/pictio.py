@@ -12,10 +12,12 @@ Add signature annotations to file loaders to help file data handling
 #### BEGIN core python modules
 from __future__ import print_function
 
-import inspect, keyword, os, sys, traceback, typing, warnings, io, importlib
+import inspect, os, sys, traceback, typing, warnings, io
 import contextlib, pathlib
 # import  threading
-import pickle, pickletools, copyreg, csv, numbers, mimetypes
+import csv, numbers, mimetypes
+import dill as pickle
+#import pickle, pickletools, copyreg
 import concurrent.futures
 import collections
 #from functools import singledispatch

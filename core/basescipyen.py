@@ -106,33 +106,8 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
     
     _descriptor_attributes_ = _data_children_ + _data_attributes_
     
-    _pre_validators_ = dict()
-    _post_validators_ = dict()
-    
-    #@classmethod
-    #def setup_descriptor(cls, descr_params):
-        #args = descr_params.get("args", tuple())
-        #kwargs = descr_params.get("kwargs", {})
-        #name = descr_params.get("name", "")
-        #if not isinstance(name, str) or len(name.strip()) == 0:
-            #return
-        #descriptor = DescriptorGenericValidator(*args, **kwargs)
-        #descriptor.allow_none = True
-        #descriptor.__set_name__(cls, name)
-        #setattr(cls, name, descriptor)
-        
     def __init__(self, name=None, description=None, file_origin=None, **kwargs):
-        for attr in self._descriptor_attributes_:
-            attr_dict = parse_descriptor_specification(attr)
-            proposed_value = kwargs.pop(attr[0], attr_dict["value"])
-            kw = dict()
-            if attr_dict["name"] in self._pre_validators_:
-                kw["pre_validation"] = self._pre_validators_[attr_dict["name"]]
-            if attr_dict["name"] in self._post_validators_:
-                kw["post_validation"] = self._post_validators_[attr_dict["name"]]
-            type(self).setup_descriptor(attr_dict, **kw)
-            setattr(self, attr_dict["name"], proposed_value)
-            
+        WithDescriptors.__init__(self, *args, **kwargs)
         super().__init__(name=name, description=description, file_origin=file_origin, **kwargs)
         
     def __attr_str__(self):
