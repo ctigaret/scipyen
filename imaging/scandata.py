@@ -1270,8 +1270,8 @@ class ScanData(BaseScipyenData):
         #("scansFrameAxis",                  (vigra.AxisInfo, tuple)),
         # NOTE: 2021-12-09 23:24:13
         # vigra.AxisInfo is NOT serializable !
-        ("sceneFrameAxis",                  (int, tuple)),
-        ("scansFrameAxis",                  (int, tuple)),
+        ("sceneFrameAxis",                  (int, vigra.AxisInfo, tuple)),
+        ("scansFrameAxis",                  (int, vigra.AxisInfo, tuple)),
         ("framesMap",                       FrameIndexLookup),
         )
     
@@ -1297,51 +1297,6 @@ class ScanData(BaseScipyenData):
     
     _descriptor_attributes_= _data_children_ + _derived_data_children_ + _result_data_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ + BaseScipyenData._descriptor_attributes_
     
-    #def _get_data_frame_index_(self, index:int) -> Bunch:
-        #"""Returns a Bunch mapping str keys (data attribute) to int frame indices.
-        #Parameters:
-        #===========
-        #index: int - index of the primary data frame; 
-                #this can be a negative index in which case it will behave like a 
-                #negative sequence index
-                
-        #NOTE: the primary data is "scans"; when "scans" is None or empty,
-            #tyhen the primary data  is "scene" if not None and not empty
-        
-        #"""
-        #ret = Bunch()
-        #ret.scans = None
-        #ret.scene = None
-        #ret.electrophysiology = None
-        
-        #if isinstance(self.scans, list) and len(self.scans):
-            #ret.scans = get_index_for_seq(index, 
-                                          #self.scans, 
-                                          #self.scans)
-            
-            #if isinstance(self.scene, list):
-                #ret.scene = get_index_for_seq(index, 
-                                              #self.scans, 
-                                              #self.scene, 
-                                              #self.scene_mapping)
-                            
-            #if isinstance(self.electrophysiology, neo.Block) and len(self.electrophysiology.segments):
-                #ret.electrophysiology = get_index_for_seq(index, 
-                                                          #self.scans, 
-                                                          #self.electrophysiology.segments, 
-                                                          #self.ephys_mapping)
-                
-        #elif isinstance(self.scene, list) and len(self.scene):
-            #ret.scene = get_index_for_seq(index, 
-                                          #self.scene, 
-                                          #self.scene)
-            
-            #if isinstance(self.electrophysiology, neo.Block) and len(self.electrophysiology.segments):
-                #ret.electrophysiology = get_index_for_seq(index, 
-                                                        #self.scene, 
-                                                        #self.electrophysiology.segments,
-                                                        #self.ephys_mapping)
-        
     def _get_data_child_component_(self, component:str):
         """
         Parameters:
@@ -3563,9 +3518,6 @@ class ScanData(BaseScipyenData):
             if len(source._scan_region_scans_profiles_.segments):
                 result._scan_region_scans_profiles_.segments += source._scan_region_scans_profiles_.segments
                 
-            #else:
-                #result._scan_region_scans_profiles_.segments += [neo.Segment(name="frame_%d" % k + result._scans_frames_, index = k + result._scans_frames_) for k in range(source._scans_frames_)]
-
             if len(result.analysisUnits) > 0:
                 result.generateScanRregionProfilesFromScans()
             

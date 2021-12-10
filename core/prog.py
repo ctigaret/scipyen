@@ -104,7 +104,7 @@ class BaseDescriptorValidator(ABC):
         pass
     
 class OneOf(BaseDescriptorValidator):
-    def __init__(self, name:str,/, *options):
+    def __init__(self, name:str, /, *options):
         self.options = set(options)
 
     def validate(self, value):
@@ -112,11 +112,10 @@ class OneOf(BaseDescriptorValidator):
             raise ValueError(f'Expected {value!r} to be one of {self.options!r}')
 
 class DescriptorTypeValidator(BaseDescriptorValidator):
-    def __init__(self, name:str,/,*types):
+    def __init__(self, name:str, /, *types):
         self.types = set(t for t in types if isinstance(t, type))
         
     def validate(self, value):
-        #if type(value) not in self.types:
         if not isinstance(value, tuple(self.types)):
             raise TypeError(f"For {self.private_name} one of {self.types} was expected; got {type(value).__name__} instead")
         
@@ -258,7 +257,6 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
         self.private_name = f"_{name}_"
         self.public_name = name
         
-        #from core.datatypes import (is_hashable, is_type_or_subclass)
         # NOTE: predicates must be unary predicates; 
         # will raise exceptions when called, otherwise
         self.predicates = set()
@@ -267,8 +265,6 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
         self.non_hashables = set() # values for non-hashables - referenced by their id()
         self.dcriteria = dict() # dictionary of criteria as in the above table
         self._allow_none_ = False
-        #self._pre_validator_= None
-        #self._post_validator_ = None
         
         for a in args:
             if inspect.isfunction(a):
@@ -292,7 +288,7 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                     if is_hashable(a):
                         self.hashables.add(a)
                     else:
-                        self.non_hashables.add(a)
+                        self.non_hashables.add(id(a))
                 
             elif isinstance(a, str):
                 try:
@@ -309,7 +305,7 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
         # NOTE: more complex predicates, where a function or method expecting
         # an instance also takes additional argument (although these can be 
         # supplied as partial functions to *args)
-        # FIXME 2021-12-05 10:52:13: 
+        # FIXME 2021-12-05 10:52:13: ???
         # The code below does do what the docstring claims it would do! 
         # Either edit the dosctring or modify the code to fulfill the promise in
         # the dosctring.
@@ -1190,17 +1186,18 @@ def parse_descriptor_specification(x:tuple) -> dict:
                 it takes no parameters, else None
                 
             when a tuple:
-                this can be a tuple of types, or objects; in the former case, 
-                these are acceptable type of the of the attribute; in the latter,
-                the type of objects indicate the acceotabke types of the 
-                attribute, AND the fuirst of the obejcts in the tuple also 
-                represent the default value of the attribute
+                this can be a tuple of types, or objects; 
+                in the former case, these are the acceptable types of the 
+                attribute; 
+                in the latter, the type of objects indicate the acceptable
+                types of the attribute, AND the acceptable default values
+                when a value is not specified otherwise
                 
             antyhing else: this is the default value of the attribute, and its
                 type is the acceptable type of the attribute
                 
-            NOTE: x[1] is meant to specify the attribute type and/or its default
-            value. 
+            NOTE: x[1] is meant to specify the attribute type and/or its 
+            acceptable default value(s). 
             
             When x[1] is a single type object, a default value will be 
             instantiated with zero arguments, if possible. This attempt will 
@@ -1223,7 +1220,8 @@ def parse_descriptor_specification(x:tuple) -> dict:
         x[2]: type or tuple of types
             a) When a type or tuple of types, this is either:
                 a.1) the explicit type(s) expected for the attribute, when the
-                expected type of the attribut had not been determined yet, from x[1].
+                expected type of the attributs had not been determined yet, 
+                from x[1].
                 
                 a.2) the explicit type(s) of elements of a sequence or set 
                 elements when the attribute type determined from x[1] is a
@@ -1275,7 +1273,7 @@ def parse_descriptor_specification(x:tuple) -> dict:
     dict with the following key/values:
     
         name:str,
-        default_value: Python object,
+        default_value: Python object, or tuple of objects
         default_value_type: Python type or tuple of types
         default_value_ndim: int or None,
         default_value_dtype: numpy dtype object or None,
@@ -1415,7 +1413,8 @@ def parse_descriptor_specification(x:tuple) -> dict:
                 ret["default_value_type"] = x[1]
             else:
                 ret["default_value_type"] = tuple(type(x_) for x_ in x[1])
-                ret["default_value"] = x[0]
+                ret["default_value"] = x[1]
+                #ret["default_value"] = x[0]
             
         else:
             ret["default_value"] = x[1]
@@ -1662,14 +1661,17 @@ class WithDescriptors(object):
         args = descr_params.get("args", tuple())
         kw = descr_params.get("kwargs", {})
         name = descr_params.get("name", "")
+        defval = descr_params.get("value", None)
+        
         if not isinstance(name, str) or len(name.strip()) == 0:
             return
         
         desc_impl = getattr(cls, "_descriptor_impl_", None)
+        
         if desc_impl is None:
             desc_impl = DescriptorGenericValidator
         
-        descriptor = desc_impl(name, *args, **kw)
+        descriptor = desc_impl(name, defval, *args, **kw)
         descriptor.allow_none = True
         setattr(cls, name, descriptor)
         
@@ -1681,7 +1683,12 @@ class WithDescriptors(object):
     def __init__(self, *args, **kwargs):
        for attr in self._descriptor_attributes_:
             attr_dict = parse_descriptor_specification(attr)
-            proposed_value = kwargs.pop(attr[0], attr_dict["value"])
+            suggested_value = kwargs.pop(attr[0], attr_dict["value"])
+            if isinstance(suggested_value, tuple) and len(suggested_value):
+                proposed_value = suggested_value[0]
+            else:
+                proposed_value = suggested_value
+                
             kw = dict()
             type(self).setup_descriptor(attr_dict, **kw)
             setattr(self, attr_dict["name"], proposed_value)
@@ -1698,6 +1705,11 @@ class WithDescriptors(object):
         
         NOTE: unpickling bypasses __init__() !
         """
+        
+        #print(f"<{type(self).__name__}>: state = {list(state.keys())}")
+        
+        # first take descriptor stuff out of state and allocate/assign via the
+        # descriptor implementation
         desc_impl = getattr(self, "_descriptor_impl_", None)
         
         if desc_impl is None:
@@ -1709,12 +1721,49 @@ class WithDescriptors(object):
             # check if state brings a private attribute wrapped in a descriptor
             # if it does, use it and remove it from state,
             # else use default proposed by parsing
-            proposed_value = state.pop(attr_name, attr_dict["value"])
+            suggested_value = state.pop(attr_name, attr_dict["value"])
+            if isinstance(suggested_value, tuple) and len(suggested_value):
+                proposed_value = suggested_value[0]
+            else:
+                proposed_value = suggested_value
+                
             kw = dict()
             type(self).setup_descriptor(attr_dict, **kw)
             setattr(self, attr_dict["name"], proposed_value)
             
-        # now that the state dict has been 'cleaned' of descriptor stuff, we can`
+        # for types derived from BaseNeo, also check state against their
+        # _recommended_attrs; add annotations too, although they bypass the 
+        # descriptor mechanism - this is so that objects dating since older 
+        # Scipyen APIs might still be unpickled and return the same type as 
+        # currently defined in Scipyen
+        #
+        if isinstance(self, neo.core.baseneo.BaseNeo):
+            for attr_spec in self._recommended_attrs:
+                attr_name = desc_impl.get_private_name(attr_spec[0])
+                attr_dict = parse_descriptor_specification(attr_spec)
+                suggested_value = state.pop(attr_name, attr_dict["value"])
+                if isinstance(suggested_value, tuple) and len(suggested_value):
+                    proposed_value = suggested_value[0]
+                else:
+                    proposed_value = suggested_value
+                
+                kw=dict()
+                type(self).setup_descriptor(attr_dict, **kw)
+                setattr(self, attr_dict["name"], proposed_value)
+                
+            annots = dict()
+            
+            if "_annotations_" in state:
+                annots = state.pop("_annotations_")
+                
+            elif "annotations" in state:
+                annots = state.pop("annotations")
+                
+            neo.core.baseneo._check_annotations(annots)
+            self.annotations = annots
+            
+        # now that the state dict has been 'cleaned' of descriptor and BaseNeo 
+        # stuff, we can`
         # use it to update the instance __dict__ as the default object.__setstate__()
         # would do
         self.__dict__.update(state)

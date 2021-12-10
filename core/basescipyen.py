@@ -91,12 +91,12 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
                             ("cell",                "NA"),
                             ("genotype",            "NA"),
                             ("gender",              "NA"),
-                            ("age",                 0*pq.s),
-                            ("biometric_weight",    0*pq.g), 
-                            ("biometric_height",    0*pq.m),
+                            ("age",                 (0*pq.s, "NA")),
+                            ("biometric_weight",    (0*pq.g, "NA")), 
+                            ("biometric_height",    (0*pq.m, "NA")),
                             ("procedure_type",      "NA"),
                             ("procedure_name",      "NA"),
-                            ("procedure_dose",      0*pq.g),
+                            ("procedure_dose",      (0*pq.g, "NA")),
                             ("procedure_route",     "NA"),
                             ("procedure_schedule",  neo.Epoch()),
                             ("triggers",            list(),     TriggerProtocol),
@@ -104,10 +104,16 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
                             ("rec_datetime",        datetime),
                         )
     
-    _descriptor_attributes_ = _data_children_ + _data_attributes_
+    _descriptor_attributes_ = _data_children_ + _data_attributes_ + neo.core.baseneo.BaseNeo._recommended_attrs
     
     def __init__(self, name=None, description=None, file_origin=None, **kwargs):
-        WithDescriptors.__init__(self, *args, **kwargs)
+        WithDescriptors.__init__(self, name=None, description=None, file_origin=None, **kwargs)
+        
+        # so that we don't confuse baseneo._check_annotations in the __init__ 
+        # further below
+        for d in self._descriptor_attributes_:
+            kwargs.pop(d[0], None)
+        
         super().__init__(name=name, description=description, file_origin=file_origin, **kwargs)
         
     def __attr_str__(self):
