@@ -65,10 +65,8 @@ from . import resources_rc
 class ScipyenTableWidget(TableWidget): # TableWidget imported from pyqtgraph
     """Another simple table widget, which allows zero-based row/column indices.
     
-    Really DEPRECATED.
-    
-    Kept for diversity and inclusion but gui.tableeditor.TableEditorWidget is
-    much more useful. 
+    gui.tableeditor.TableEditorWidget does that too, and much more but is
+    too slow. 
     
     """
     def __init__(self, *args, natural_row_index=False, natural_col_index=False, **kwds):

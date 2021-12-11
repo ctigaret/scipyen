@@ -464,51 +464,70 @@ ScanData
     
 """
 
+# wading into pandas writing as HDF5
+# see https://stackoverflow.com/questions/30773073/save-pandas-dataframe-using-h5py-for-interoperabilty-with-other-hdf5-readers
+# the strategy is to create a structured numpy array
+# for multi-level DataFrame objects we use the examples at
+# https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.reset_index.html?highlight=reset_index#pandas.DataFrame.reset_index
+# df = pd.DataFrame([('bird', 389.0),
+                   #('bird', 24.0),
+                   #('mammal', 80.5),
+                   #('mammal', np.nan)],
+                  #index=['falcon', 'parrot', 'lion', 'monkey'],
+                  #columns=('class', 'max_speed'))
 
-    
-    #NOTE: 2021-10-12 09:29:38
+# index = pd.MultiIndex.from_tuples([('bird', 'falcon'),
+                                    #('bird', 'parrot'),
+                                    #('mammal', 'lion'),
+                                    #('mammal', 'monkey')],
+                                   #names=['class', 'name'])
+# columns = pd.MultiIndex.from_tuples([('speed', 'max'),
+                                     #('species', 'type')])
+# df1 = pd.DataFrame([(389.0, 'fly'),
+                   #( 24.0, 'fly'),
+                   #( 80.5, 'run'),
+                   #(np.nan, 'jump')],
+                  #index=index,
+                  #columns=columns)
 
-    #==============
-    #Design notes:
-    #==============
+# df --> 
+         #class  max_speed
+#falcon    bird      389.0
+#parrot    bird       24.0
+#lion    mammal       80.5
+#monkey  mammal        NaN   
 
-    #An object is the HDF5 File root (/)
-    
-    #Instance attributes & properties (but NEITHER methods, NOR :class: attributes)
-    #correspond to the following HDF5 structures:
-    
-    #Python types:               HDF5 Structure:          Attribute:
-    #============================================================================
-    #bool and numeric scalars    dataset                 "type": type's name
-    #sequences (list, tuple)     
-    #str                         
-    
-    
-    #Possible strategies: 
-    #A) embed a VigraArray as HDF5 in a nix.File accessed via
-    #neo.NixIO:
-    
-    #1) create a neo.NixIO file -> a physical file in the file system
-    #2) access the nix_file inside the neo_nixio file object
-    #3) access the _h5file of the nix_file
-    #4) create a group inside the _h5file using h5py API:
-    
-    #4.1) this is a HDF5 Group, NOT a nix H5Group!
-    
-    #4.2) we can create it using the strategy in nix i.e., via low-level h5py api
-        #e.g. h5g.create() a groupid, to enable group creation with order tracked
-        #and order indexed flags - see h5p api - followed by instatiation of the
-        #h5py.Group(groupid)
-        
-    #5) use the newly-created group as a fileNameOrGroup parameter to vigra.writeHDF5()
-    
-    #CAUTION: a nix.File cannot be used as context manager (i.e. one cannot
-    #use the idiom with nix.File(...) as nixfile: ...)
-    #But the neo.NixIO can be used as context manager:
-    #with neo.NixIO(...) as neo_nixio_file: ...
-        #(the underlying HDF5 file object is open in the neo.NixIO c'tor)
-    
-    #see history_snipper_scandata_vigra_export_hdf5.py
+# df1 --> 
+               #speed species
+                 #max    type
+#class  name                 
+#bird   falcon  389.0     fly
+       #parrot   24.0     fly
+#mammal lion     80.5     run
+       #monkey    NaN    jump    
+
+
+
+
+#NOTE: 2021-10-12 09:29:38
+
+
+
+#==============
+#Design notes:
+#==============
+
+#An object is the HDF5 File root (/)
+
+#Instance attributes & properties (but NEITHER methods, NOR :class: attributes)
+#correspond to the following HDF5 structures:
+
+#Python types:               HDF5 Structure:          Attribute:
+#============================================================================
+#bool and numeric scalars    dataset                 "type": type's name
+#sequences (list, tuple)     
+#str                         
+
 
 # NOTE: 2021-10-15 10:43:03
 # 
@@ -532,109 +551,6 @@ ScanData
 #   h5t     -> data type
 #   h5z     -> filter
 #   
-# vigra.impex supports read/write from/to a group, as well as a hdf5 file !
-#   operates DIRECTLY at the h5py API level - GOOD!
-#
-# neo.NixIO -> operates on actual file system files only (unlike h5py where a file 
-# is also a group!)
-#
-#   it is a layer upon nixpy ('nix' module) which is a layer over h5py
-# 
-#   IMHO, that is BAD
-#
-# =============================================================================
-# neo.NixIO:
-# =============================================================================
-#
-# init expects a file system file name
-#
-#   initializes a nix.File (see below) as the 'nix_file' attribute
-#
-#
-# =============================================================================
-# nixpy (nix) File object
-# =============================================================================
-# uses h5py low-level API to generate groups
-#
-# init, broadly, requires a physical file (checked with os.path.exists(...))
-#   this is used to create a h5py.File - which also behaves like a group - assigned
-#   to the nix.File attribute _h5file:
-#
-#       _h5file: is a h5py File object
-#           is private, there is no guarantee it won't change in the future
-#
-#   1) create h5py file ID; the file ID is generating by either
-#       create or open (depending on whether the physcial file exists or not)
-#
-#   1.a) If physical file does no exist yet => create:
-#       create a file ID object: fid = h5py.h5f.create(path, flags=h5mode, ...)
-#       
-#       fapl is always h5py.h5p.FILE_ACCESS
-#       fcpl is a h5py.h5p.PropFCID (file creation property list)
-#           with set_link_creation_order (h5py.h5p.CRT_ORDER_TRACKED | h5py.h5p.CRT_ORDER_INDEXED)
-#
-#   1.b) If physical file DOES exist: => open:
-#       create file ID object: h5py.h5f.open(path)
-#       use fapl as above
-#
-#   2) create _h5file: h5py.File(fid)
-#
-#   3) wrap the _h5file root ('/') group into a nix.H5Group object
-#       'H5Group(parent, name, create=False)' -> when create is True or name 
-#               exists in parent  this simply assigns the HDF5 group to the 
-#               'group' attribute of the H5Group object
-#
-#       if file existing:
-#           _root = H5Group(_h5file, '/') 
-#       else:
-#           _root = H5Group(_h5file, '/', create=True)
-#
-#       in either case above, the h5py.File's '/' group will be assigned to the
-#       'group' attribute of _root
-#
-#       'create' trigger the creation of a HDF5 Group through a scheme similar to
-#       that used for _h5file: create group ID then create h5py Group:
-#           gpcl = group create property list with link creation order set to 
-#           (h5py.h5p.CRT_ORDER_TRACKED | h5py.h5p.CRT_ORDER_INDEXED)
-#
-#           gid = h5py.h5g.create(parent's id, name, gpcl)
-#           group = h5py.Group(gid)
-#           
-#
-#       in either case, alias _root to _h5group
-#
-#   4) Also create two more groups - children of _root: _data and _metadata
-#   4.1) uses _root.create_group -> generates nix.H5Group ad a child, AFTER it
-#       ensures that _root is assigned to the 'group' attribute of the H5Group
-#       (more generally, parent.create_group ensures this)
-#
-#   5) Adorn h5py File _directly_ with attributes (_h5file.attrs):
-#       "created_at", "updated_at"
-#
-#        These are nix.util.time_to_str(nix.util.now_int())
-#
-#   6) set compression attribute (of the nix.File object)
-#
-#   7) Finally, set _blocks and _sections attrbutes of the nix.File object
-#       uninitialized
-#
-#   nix.File.blocks: is a nix.Container: wraps a h5py Group used as a container 
-#   for other groups
-#
-# --------------------------------------------
-#  neo.NixIO taps into _blocks and _sections
-# --------------------------------------------
-#
-# NixIO.write_block:
-#   convert neo Block to NIX Block then write to NIX file
-#
-#   looks for a NIX block with same nix_name, in nix_file.blocks
-#       if found then clean out previous nix_name block
-#           delete nix_file.block[nix_name]
-#           delete nix_file.sections[nix_name]
-#
-#       nixblock = nix_file.create_block(...)
-#       nixblock is a nix Block, inherits from nix.Entity
 
 
 import os, sys, tempfile, traceback, warnings, numbers, datetime, enum
@@ -729,6 +645,128 @@ __DEBUG__=False
 
 class HDFDataError(Exception):
     pass
+
+def df_to_sarray_0(df):
+    """
+    Convert a pandas DataFrame object to a numpy structured array.
+    This is functionally equivalent to but more efficient than
+    np.array(df.to_array())
+
+    :param df: the data frame to convert
+    :return: a numpy structured array representation of df
+    
+    NOTE: 2021-12-11 19:09:13
+    See https://stackoverflow.com/questions/30773073/save-pandas-dataframe-using-h5py-for-interoperabilty-with-other-hdf5-readers
+    
+    """
+
+    v = df.values
+    cols = df.columns
+    types = [(cols[i].encode(), df[k].dtype.type) for (i, k) in enumerate(cols)]
+    dtype = np.dtype(types)
+    z = np.zeros(v.shape[0], dtype)
+    for (i, k) in enumerate(z.dtype.names):
+        z[k] = v[:, i]
+    return z
+
+def make_col_type_0(col_type, col):
+    try:
+        if 'numpy.object_' in str(col_type.type):
+            maxlens = col.dropna().str.len()
+            if maxlens.any():
+                maxlen = maxlens.max().astype(int) 
+                col_type = h5py.string_dtype()
+                #col_type = f"U{maxlen}"
+                #col_type = ('S%s' % maxlen, 1)
+            else:
+                col_type = 'float64'
+                #col_type = 'f2'
+        return col.name, col_type
+    except:
+        print(col.name, col_type, col_type.type, type(col))
+        raise
+
+def df_to_sarray_0b(df):
+    """
+    Convert a pandas DataFrame object to a numpy structured array.
+    Also, for every column of a str type, convert it into 
+    a 'bytes' str literal of length = max(len(col)).
+
+    :param df: the data frame to convert
+    :return: a numpy structured array representation of df
+    """
+
+    v = df.values            
+    types = df.dtypes
+    numpy_struct_types = [make_col_type(types[col], df.loc[:, col]) for col in df.columns]
+    #print("numpy_struct_types", numpy_struct_types)
+    dtype = np.dtype(numpy_struct_types)
+    z = np.zeros(v.shape[0], dtype)
+    for (i, k) in enumerate(z.dtype.names):
+        # This is in case you have problems with the encoding, remove the if branch if not
+        try:
+            if dtype[i].str.startswith('|S'):
+                z[k] = df[k].str.encode('latin').astype('S')
+            else:
+                z[k] = v[:, i]
+        except:
+            print(k, v[:, i])
+            raise
+
+    return z, dtype
+
+def make_col_type(col_type, col):
+    try:
+        if 'numpy.object_' in str(col_type.type):
+            maxlens = col.dropna().str.len()
+            if maxlens.any():
+                maxlen = maxlens.max().astype(int) 
+                col_type = h5py.string_dtype()
+                #col_type = f"U{maxlen}"
+                #col_type = ('S%s' % maxlen, 1)
+            else:
+                col_type = 'float64'
+                #col_type = 'f2'
+        if isinstance(col.name, tuple):
+            col_name = "+".join(col.name)
+        else:
+            col_name = col.name
+        return col_name, col_type
+    except:
+        print(col.name, col_type, col_type.type, type(col))
+        raise
+
+def df_to_sarray(df):
+    """
+    Convert a pandas DataFrame object to a numpy structured array.
+    Also, for every column of a str type, convert it into 
+    a 'bytes' str literal of length = max(len(col)).
+
+    :param df: the data frame to convert
+    :return: a numpy structured array representation of df
+    """
+    
+    df_lin = df.reset_index()
+
+    v = df_lin.values            
+    types = df_lin.dtypes
+    numpy_struct_types = [make_col_type(types[col], df_lin.loc[:, col]) for col in df_lin.columns]
+    #print("numpy_struct_types", numpy_struct_types)
+    dtype = np.dtype(numpy_struct_types)
+    z = np.zeros(v.shape[0], dtype)
+    for (i, k) in enumerate(z.dtype.names):
+        # This is in case you have problems with the encoding, remove the if branch if not
+        try:
+            z[k] = v[:, i]
+            #if dtype[i].str.startswith('|S'):
+                #z[k] = df[k].str.encode('latin').astype('S')
+            #else:
+                #z[k] = v[:, i]
+        except:
+            print(k, v[:, i])
+            raise
+
+    return z, dtype
 
 def __mangle_name__(s):
     return f"__{s}__"
@@ -1086,11 +1124,10 @@ def make_obj_attrs(obj:typing.Any,
     
     obj:python object
     
-    as_group:bool, optional, default is False
-        When False, the returned dictionary is intended to be stored in the
-        'attrs' property of a HDF5 Dataset
-        
-        Otherwise, the returned dictionary is intended for a HDF5 Group
+    oname: str, optional, default is None
+        the name of the object (HDF5 Group or Dataset) to which the attributes
+        will be attached
+    
     """
     if isinstance(obj, prog.CALLABLES):
         return make_attr_dict (__function_or_method__ = jsonio.dumps(prog.classify_signature(obj)))
