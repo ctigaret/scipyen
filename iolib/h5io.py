@@ -715,95 +715,160 @@ class HDFDataError(Exception):
 
     #return z, dtype
     
-def pandasDtype2HF5Dtype(dtype, data, col_name):
-    categories = dict()
-    #result = {col_name: dict()} # store here names & categories for categorical columns
+#def colDtype2StructarrayDtype(col_dtype, col):
+    #categorical = dict() # store here names & categories for categorical columns
+    #try:
+        #col_dtype, col_cat = pandasDtype2HF5Dtype(col_dtype, col, col.name)
+        ##if 'numpy.object_' in str(col_dtype.type): # or: 'object' in str(col_dtype)
+        #if 'object' in str(col_dtype):
+            #maxlens = col.dropna().str.len()
+            #if maxlens.any():
+                #col_dtype = h5py.string_dtype()
+                ##maxlen = maxlens.max().astype(int) 
+                ##col_dtype = f"U{maxlen}"
+                ##col_dtype = ('S%s' % maxlen, 1)
+            #else:
+                #col_dtype = 'float64'
+                ##col_dtype = 'f2'
+                
+        #elif "category" in str(col_dtype):
+            #categories = col_dtype.categories # pd.Index
+            #if 'object' in str(categories.dtype):
+                #catlens = categories.dropna().str.len()
+                #if catlens.any():
+                    #cat_type = h5py.string_dtype()
+                    ##maxcatlen = catlens.max().astype(int)
+                    
+                #else:   
+                    #cat_type = "float64"
+                    
+            #else:
+                #pass
+            
+        #if isinstance(col.name, tuple):
+            #col_name = "+".join(col.name)
+        #else:
+            #col_name = col.name
+        #return col_name, col_dtype
+    #except:
+        #print(col.name, col_dtype, col_dtype.type, type(col))
+        #raise
+    
+def pandasDtype2HF5Dtype(dtype, col, categorical_info:dict=None):
+    """Helper function for pandas2Structarray.
+    
+    Parameters:
+    -----------
+    dtype: dtype of data frame column
+    
+    col: pandas Series: the DataFrame column in question
+    
+    categorical_info: dict; optional default is None
+        When present, is will be updated with information about the categorical
+        data in column 'col' (if it contains any)
+        
+    Returns:
+    --------
+    A tuple: (column name, column dtype) used to define the structured array
+        inside pandas2Structarray()
+        
+    Side effects:
+    -------------
+    
+    Updates the 'categorical_info' dict it is was passed as parameters AND
+    'col' contains categorical data.
+    
+    """
+    if isinstance(col.name, tuple):
+        col_name = "+".join(col.name)
+    else:
+        col_name = col.name
+        
+    print("col.name", col.name, "col_name", col_name)
+
     try:
         if "object" in str(dtype):
-            maxlens = data.dropna().str.len()
-            if maxlens.any():
-                result = h5py.string_dtype()
-                
-            else:
-                result = np.dtype("float64")
-        
-        elif "category" in str(dtype):
-            categories = dtype.categories # pd.Index
-            if "object" in str(categories.dtype):
-                catlen = categories.dropna().str.len()
-                if catlen.any():
-                    cat_dtype = h5py.string_dtype()
-                else:
-                    cat_dtype = np.dtype("int64")
-                    
-            else:
-                cat_dtype = categories.dtype
-            categorical[col_name] = {"categories": list(dtype.categories), "ordered"=dtype.ordered, "dtype"=cat_dtype}
-            result = cat_dtype
-
-def colDtype2StructarrayDtype(col_dtype, col):
-    categorical = dict() # store here names & categories for categorical columns
-    try:
-        #if 'numpy.object_' in str(col_dtype.type): # or: 'object' in str(col_dtype)
-        if 'object' in str(col_dtype):
             maxlens = col.dropna().str.len()
             if maxlens.any():
                 col_dtype = h5py.string_dtype()
-                #maxlen = maxlens.max().astype(int) 
-                #col_dtype = f"U{maxlen}"
-                #col_dtype = ('S%s' % maxlen, 1)
-            else:
-                col_dtype = 'float64'
-                #col_dtype = 'f2'
                 
-        elif "category" in str(col_dtype):
-            categories = col_dtype.categories # pd.Index
-            if 'object' in str(categories.dtype):
-                catlens = categories.dropna().str.len()
-                if catlens.any():
-                    cat_type = h5py.string_dtype()
-                    #maxcatlen = catlens.max().astype(int)
-                    
-                else:   
-                    cat_type = "float64"
+            else:
+                col_dtype = np.dtype("float64")
+        
+        elif "category" in str(dtype):
+            categories = dtype.categories # pd.Index
+            ordered = dtype.ordered
+            if "object" in str(categories.dtype):
+                catlen = categories.dropna().str.len()
+                if catlen.any():
+                    col_dtype = h5py.string_dtype()
+                else:
+                    col_dtype = np.dtype("int64")
                     
             else:
-                pass
-            
-        if isinstance(col.name, tuple):
-            col_name = "+".join(col.name)
+                col_dtype = categories.dtype
+                
+            if isinstance(categorical_info, dict):
+                categorical_info[col_name] = {"categories": np.array(categories, dtype=col_dtype),
+                                              "ordered": dtype.ordered, 
+                                             }
         else:
-            col_name = col.name
+            col_dtype = dtype
+            
         return col_name, col_dtype
     except:
-        print(col.name, col_dtype, col_dtype.type, type(col))
+        print(col.name, dtype, dtype.type, type(col))
         raise
-
+        
 def pandas2Structarray(obj):
     """
     Convert a pandas DataFrame object to a numpy structured array.
     Also, for every column of a str type, convert it into 
     a 'bytes' str literal of length = max(len(col)).
 
-    :param obj: the pandas data frame or series to convert
-    :return: a numpy structured array representation of obj
+    Parameters:
+    -----------
+    obj: the pandas data frame or series to convert
+    
+    Returns:
+    --------
+    A tuple (sarr, categorical):
+        sarr: numpy structured array representation of obj
+        categorical: dict, possibly empty, with the names of the categorical 
+            columns in 'obj' mapped to a dict with keys:
+            
+            'categories': numpy array with the categories
+            'ordered': bool (whether the category dtype is ordered or not)
+            
+            NOTE: this is empty if 'obj' does not contain any categorical data.
+            
+            When present, this is used to update the 'attrs' property of the 
+            HDF5 dataset generates with the structured array 'sarray'
     """
     
-    obj_rndx = obj.reset_index()
+    categorical_info = dict()
+    
+    # NOTE: 2021-12-13 22:16:37
+    # this alaways generates a DataFrame irrespective of whether 'obj' is a
+    # DataFrame or a Series
+    obj_rndx = obj.reset_index() # pd.DataFrame
 
     v = obj_rndx.values # np.ndarray
     obj_dtypes = obj_rndx.dtypes # pd.Series
-    numpy_struct_types = [colDtype2StructarrayDtype(obj_dtypes[col], obj_rndx.loc[:, col]) for col in obj_rndx.columns]
+    numpy_struct_types = [pandasDtype2HF5Dtype(obj_dtypes[col], obj_rndx.loc[:, col], categorical_info) for col in obj_rndx.columns]
+
     dtype = np.dtype(numpy_struct_types)
-    z = np.zeros(v.shape[0], dtype)
-    for (i, k) in enumerate(z.dtype.names):
+    
+    sarr = np.zeros(v.shape[0], dtype)
+    
+    for (i, k) in enumerate(sarr.dtype.names):
         try:
-            z[k] = v[:, i]
+            sarr[k] = v[:, i]
         except:
             print(k, v[:, i])
             raise
 
-    return z, dtype
+    return sarr, dtype, categorical_info
 
 def __mangle_name__(s):
     return f"__{s}__"
