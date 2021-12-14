@@ -782,9 +782,10 @@ def pandas2Structarray(obj):
 
     v = obj_rndx.values # np.ndarray
     obj_dtypes = obj_rndx.dtypes # pd.Series
-    numpy_struct_types = [pandasDtype2HF5Dtype(obj_dtypes[col], obj_rndx.loc[:, col], categorical_info) for col in obj_rndx.columns]
+    #numpy_struct_array_dtypes = [pandasDtype2HF5Dtype(obj_dtypes[col], obj_rndx.loc[:, col], categorical_info) for col in obj_rndx.columns]
+    original_obj_dtypes, numpy_struct_array_dtypes = zip(*list((obj_dtypes[col], pandasDtype2HF5Dtype(obj_dtypes[col], obj_rndx.loc[:, col], categorical_info)) for col in obj_rndx.columns))
 
-    dtype = np.dtype(numpy_struct_types)
+    dtype = np.dtype(numpy_struct_array_dtypes)
     
     sarr = np.zeros(v.shape[0], dtype)
     
@@ -799,7 +800,7 @@ def pandas2Structarray(obj):
             print(k, v[:, i])
             raise
 
-    return sarr, categorical_info
+    return sarr, categorical_info, original_obj_dtypes
     #return sarr, dtype, categorical_info
 
 def __mangle_name__(s):
@@ -1234,9 +1235,6 @@ def _(obj):
     attrs = dict()
     dtype = obj.dtype
     fields = dtype.fields
-    if fields:
-        print("makeDatasetAttrs<np.ndarray> dtype fields", fields )
-    #print("makeDatasetAttrs<np.ndarray>", obj)
     attrs["__dtype__"] = jsonio.dtype2json(obj.dtype)
     if fields is not None: # structured array or recarray; type is in makeDataTypeAttrs
         attrs["__dtype_fields__"] = list(f for f in obj.dtype.fields)
@@ -2620,7 +2618,7 @@ def makeHDF5Entity(obj, group:h5py.Group,
             group[target_name] = cached_entity
             return cached_entity
 
-        data, categorical_info = pandas2Structarray(obj)
+        data, categorical_info, pandas_dtypes = pandas2Structarray(obj)
         #data, datadtype, categorical_info = pandas2Structarray(obj)
         entity = group.create_group(target_name,track_order=track_order)
         

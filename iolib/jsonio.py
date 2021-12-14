@@ -254,10 +254,40 @@ def dtype2json(d:np.dtype) -> typing.Union[str, dict]:
     An alternative to the np.lib.format.dtype_to_descr
     Returns a dict for recarray dtypes; a str in any other case.
     """
+    # NOTE: 2021-12-14 22:51:17
+    # for pandas dtypes return either a str or a dict
+    # for special h5py dtypes returns a dict:
+    # * mapping original dtype (or type) as str mapped to the h5py dtype initializer(as str)
     if not isinstance(d, np.dtype):
         raise TypeError(f"Expecting a numpy dtype instance; got {type(d).__name__} instead")
     
     #print("dtype2json", d)
+    
+    if h5py.check_opaque_dtype(d): # we're on our own here
+        return {str(d): f"h5py.opaque_dtype(np.dtype('{str(d)}'))"}
+    
+    vi = h5py.check_vlen_dtype(d) # a Python (base) type
+    
+    si = h5py.check_string_dtype(d) # None, or namedtuple with fields 'encoding' and 'length'
+        
+    ei = h5py.check_enum_dtype(d) # an enum :class: or None
+    
+    if ei is not None:
+        return {ei.__name__: f"h5py.enum_dtype({ei.__name__})"}
+    
+    if vi:
+        if si: 
+            return {vi.__name__: f"h5py.string_dtype('{si.encoding}', {si.length})"}
+        else:
+            return {vi.__name__: f"h5py.vlen_dtype({vi.__name__})"}
+
+    elif si:
+        return {vi.__name__: f"h5py.string_dtype('{si.encoding}', {si.length})"}
+    
+    # now fall through...
+    
+    # TODO: check for pandas dtypes: CategoricalDType
+        
     
     fields = d.fields
     
