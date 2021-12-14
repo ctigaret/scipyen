@@ -249,7 +249,7 @@ class CustomEncoder(json.JSONEncoder):
             
         return json.JSONEncoder.default(self, obj)
     
-def dtype2json(d:np.dtype, struct:bool=False) -> typing.Union[str, dict]:
+def dtype2json(d:np.dtype) -> typing.Union[str, dict]:
     """Roundtrip numpy dtype - json string format - write side
     An alternative to the np.lib.format.dtype_to_descr
     Returns a dict for recarray dtypes; a str in any other case.
@@ -257,13 +257,18 @@ def dtype2json(d:np.dtype, struct:bool=False) -> typing.Union[str, dict]:
     if not isinstance(d, np.dtype):
         raise TypeError(f"Expecting a numpy dtype instance; got {type(d).__name__} instead")
     
+    #print("dtype2json", d)
+    
+    fields = d.fields
+    
     if d.name.startswith("record"):
         return dict((name, (dtype2json(value[0]), value[1])) for name, value in d.fields.items())
         
     else:   
-        if struct:
+        if fields is None:
+            return np.lib.format.dtype_to_descr(d) #does not perform well for structured arrays?
+        else:
             return str(d)
-        return np.lib.format.dtype_to_descr(d) #does not perform well for strutured arrays?
     
 def json2dtype(s):
     """Roundtrip numpy dtype - json string format - read side
@@ -277,10 +282,6 @@ def json2dtype(s):
                 return eval("np.dtype(" + s + ")") # for structured arrays
             except:
                 raise
-                #try:
-                    #return np.lib.format.descr_to_dtype(s)
-                #except:
-                    #raise
                 
     elif isinstance(s, dict): # for recarrays
         return np.dtype(s) 
