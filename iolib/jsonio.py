@@ -286,7 +286,21 @@ def dtype2json(d:np.dtype) -> typing.Union[str, dict]:
     
     # now fall through...
     
-    # TODO: check for pandas dtypes: CategoricalDType
+    # TODO: check for pandas dtypes: CategoricalDtype, IntervalDtype
+    # FIXME: use functions in pandas.api.types module to introspect types
+    
+    if isinstance(d, pd.CategoricalDtype):
+        # NOTE: 2021-12-15 23:29:07
+        # d.categories is a pandas Index type
+        # this may be: IntervalIndex, dtype(object), other pandas dtypes
+        categories_dtype = d.categories.dtype
+        categories = list(d.categories) #  to a list
+        category_types = list(type(x).__name__ for x in categories) # python type of category values
+        categories_dtype = d.categories.dtype # dtype of 'categories' Index 
+        return {d.name: {"categories":list(d.categories),
+                         "value_type":list(type(x) for x in d.categories),
+                         "dtype": {"name":categories_dtype.name,
+                                   "type":f"{categories_dtype.type.__name__}"}}}
         
     
     fields = d.fields
