@@ -469,43 +469,45 @@ ScanData
 # the strategy is to create a structured numpy array
 # for multi-level DataFrame objects we use the examples at
 # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.reset_index.html?highlight=reset_index#pandas.DataFrame.reset_index
-# df = pd.DataFrame([('bird', 389.0),
-                   #('bird', 24.0),
-                   #('mammal', 80.5),
-                   #('mammal', np.nan)],
-                  #index=['falcon', 'parrot', 'lion', 'monkey'],
-                  #columns=('class', 'max_speed'))
+"""
+df0 = pd.DataFrame([('bird', 389.0),
+                    ('bird', 24.0),
+                    ('mammal', 80.5),
+                    ('mammal', np.nan)],
+                   index=['falcon', 'parrot', 'lion', 'monkey'],
+                   columns=('class', 'max_speed'))
 
-# index = pd.MultiIndex.from_tuples([('bird', 'falcon'),
-                                    #('bird', 'parrot'),
-                                    #('mammal', 'lion'),
-                                    #('mammal', 'monkey')],
-                                   #names=['class', 'name'])
-# columns = pd.MultiIndex.from_tuples([('speed', 'max'),
-                                     #('species', 'type')])
-# df1 = pd.DataFrame([(389.0, 'fly'),
-                   #( 24.0, 'fly'),
-                   #( 80.5, 'run'),
-                   #(np.nan, 'jump')],
-                  #index=index,
-                  #columns=columns)
+index = pd.MultiIndex.from_tuples([('bird', 'falcon'),
+                                    ('bird', 'parrot'),
+                                    ('mammal', 'lion'),
+                                    ('mammal', 'monkey')],
+                                   names=['class', 'name'])
+columns = pd.MultiIndex.from_tuples([('speed', 'max'),
+                                     ('species', 'type')])
+df1 = pd.DataFrame([(389.0, 'fly'),
+                   ( 24.0, 'fly'),
+                   ( 80.5, 'run'),
+                   (np.nan, 'jump')],
+                  index=index,
+                  columns=columns)
 
-# df --> 
-         #class  max_speed
-#falcon    bird      389.0
-#parrot    bird       24.0
-#lion    mammal       80.5
-#monkey  mammal        NaN   
+df --> 
+         class  max_speed
+falcon    bird      389.0
+parrot    bird       24.0
+lion    mammal       80.5
+monkey  mammal        NaN   
 
-# df1 --> 
-               #speed species
-                 #max    type
-#class  name                 
-#bird   falcon  389.0     fly
-       #parrot   24.0     fly
-#mammal lion     80.5     run
-       #monkey    NaN    jump    
+df1 --> 
+               speed species
+                 max    type
+class  name                 
+bird   falcon  389.0     fly
+       parrot   24.0     fly
+mammal lion     80.5     run
+       monkey    NaN    jump    
 
+"""
 
 
 

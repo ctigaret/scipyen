@@ -5,6 +5,8 @@ import json, sys, traceback, typing, collections
 from collections import deque, namedtuple
 import numpy as np
 import quantities as pq
+import pandas as pd
+import h5py
 import vigra
 from core import quantities as cq
 
@@ -246,6 +248,21 @@ class CustomEncoder(json.JSONEncoder):
             
         elif isinstance(obj, np.dtype):
             return {"__dtype__": {"__value__": str(obj)}}
+        
+        elif pd.api.types.is_extension_array_dtype(obj):
+            return dtype2json(obj)
+        
+        elif isinstance(obj, (pd.DataFrame, pd.Index, pd.Series)):
+            raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
+        
+        elif isinstance(obj, pd.Interval):
+            return {type(obj).__name__:{"__init__":f"{type(obj).__name__}(left={obj.left}, right={obj.right}, closed={obj.closed})",
+                                        "__ns__": "pd",
+                                        "left": obj.left,
+                                        "right": obj.right,
+                                        "closed": obj.closed}}
+        
+        # TODO: pd.Period, pd.Timestamp
             
         return json.JSONEncoder.default(self, obj)
     
@@ -258,50 +275,19 @@ def dtype2json(d:np.dtype) -> typing.Union[str, dict]:
     # for pandas dtypes return either a str or a dict
     # for special h5py dtypes returns a dict:
     # * mapping original dtype (or type) as str mapped to the h5py dtype initializer(as str)
-    if not isinstance(d, np.dtype):
-        raise TypeError(f"Expecting a numpy dtype instance; got {type(d).__name__} instead")
+    if not isinstance(d, np.dtype) and not pd.api.types.is_extension_array_dtype(d):
+        raise TypeError(f"Expecting a numpy dtype, or pandas extvension dtype instance; got {type(d).__name__} instead")
     
     #print("dtype2json", d)
     
-    if h5py.check_opaque_dtype(d): # we're on our own here
-        return {str(d): f"h5py.opaque_dtype(np.dtype('{str(d)}'))"}
+    h5pyjson = h5pydtype2json(d)
     
-    vi = h5py.check_vlen_dtype(d) # a Python (base) type
+    if h5pyjson is not None:
+        return h5pyjson
     
-    si = h5py.check_string_dtype(d) # None, or namedtuple with fields 'encoding' and 'length'
-        
-    ei = h5py.check_enum_dtype(d) # an enum :class: or None
-    
-    if ei is not None:
-        return {ei.__name__: f"h5py.enum_dtype({ei.__name__})"}
-    
-    if vi:
-        if si: 
-            return {vi.__name__: f"h5py.string_dtype('{si.encoding}', {si.length})"}
-        else:
-            return {vi.__name__: f"h5py.vlen_dtype({vi.__name__})"}
-
-    elif si:
-        return {vi.__name__: f"h5py.string_dtype('{si.encoding}', {si.length})"}
-    
-    # now fall through...
-    
-    # TODO: check for pandas dtypes: CategoricalDtype, IntervalDtype
-    # FIXME: use functions in pandas.api.types module to introspect types
-    
-    if isinstance(d, pd.CategoricalDtype):
-        # NOTE: 2021-12-15 23:29:07
-        # d.categories is a pandas Index type
-        # this may be: IntervalIndex, dtype(object), other pandas dtypes
-        categories_dtype = d.categories.dtype
-        categories = list(d.categories) #  to a list
-        category_types = list(type(x).__name__ for x in categories) # python type of category values
-        categories_dtype = d.categories.dtype # dtype of 'categories' Index 
-        return {d.name: {"categories":list(d.categories),
-                         "value_type":list(type(x) for x in d.categories),
-                         "dtype": {"name":categories_dtype.name,
-                                   "type":f"{categories_dtype.type.__name__}"}}}
-        
+    pandasjson = pandasdtype2json(d)
+    if pandasjson is not None:
+        return pandasjson
     
     fields = d.fields
     
@@ -312,8 +298,172 @@ def dtype2json(d:np.dtype) -> typing.Union[str, dict]:
         if fields is None:
             return np.lib.format.dtype_to_descr(d) #does not perform well for structured arrays?
         else:
-            return str(d)
+            return d.name
     
+def h5pydtype2json(d):
+    """Checks if d is a special h5py dtype.
+    Returns a json representation (dict) if d is a h5py speciall dtype, or None.
+    """
+    if h5py.check_opaque_dtype(d): # we're on our own here
+        return {str(d): {"__init__": f"opaque_dtype(np.dtype('{str(d)}'))",
+                         "__ns__": "h5py"}}
+    else:
+        vi = h5py.check_vlen_dtype(d) # a Python (base) type
+        
+        si = h5py.check_string_dtype(d) # None, or namedtuple with fields 'encoding' and 'length'
+            
+        ei = h5py.check_enum_dtype(d) # an enum :class: or None
+        
+        if ei is not None:
+            return {ei.__name__: {"__init__": f"enum_dtype({ei.__name__})",
+                                "__ns__": "h5py"}}
+        
+        elif vi is not None:
+            if si is not None: 
+                return {vi.__name__: {"__init__": f"string_dtype('{si.encoding}', {si.length})",
+                                    "__ns__": "h5py"}}
+            else:
+                return {vi.__name__: {"__init__": f"vlen_dtype({vi.__name__})",
+                                    "__ns__": "h5py"}}
+
+        elif si is not None:
+            return {vi.__name__: {"__init__": f"string_dtype('{si.encoding}', {si.length})",
+                                "__ns__": "h5py"}}
+            
+def pandasdtype2json(d):
+    """Checks if d is a pandas extension dtype (for standard pandas extensions)
+    Returns a json representation (either str or dict) id d is a pandas extension
+    dtype; returns None otherwise.
+    """
+    
+    # NOTE: 2021-12-16 16:13:26
+    # pandas stock extension dtypes are:
+    # CategoricalDtype, IntervalDtype, PeriodDtype, SparseDtype, 
+    # DatetimeTZDtype, StringDtype, BooleanDtype, UInt*Dtype, Int*Dtype
+    #
+    # The following are NOT extension dtypes even though pd.api.types provides
+    # functions checking for these:
+    # 'datetime64', 'datetime64[ns]', 'datetime64[<unit>]' strings for numpy dtype c'tors
+    # dtype(np.complex_), dtype("complex128") etc
+    #
+    #
+    # NOTE: 2021-12-16 16:41:37
+    # pandas and datetime objects:
+    # 
+    # The most generic: pd.api.types.is_datetime64_any_dtype
+    # can be np.datetime64, np.datetime64[<unit>] or a DatetimeTZDtype dtype
+    # >>> is_datetime64_any_dtype(str) -> False
+    # >>> is_datetime64_any_dtype(int) -> False
+    # >>> is_datetime64_any_dtype(np.array(['a', 'b'])) -> False
+    # >>> is_datetime64_any_dtype(np.array([1, 2])) -> False
+    #
+    # >>> is_datetime64_any_dtype(np.datetime64) -> True # can be tz-naive
+    # >>> is_datetime64_any_dtype(DatetimeTZDtype("ns", "US/Eastern")) -> True
+    # >>> is_datetime64_any_dtype(np.array([], dtype="datetime64[ns]")) -> True
+    # >>> is_datetime64_any_dtype(pd.DatetimeIndex([1, 2, 3], dtype="datetime64[ns]")) -> True
+    #
+    # The next most generic: pd.api.types.is_datetime64_dtype
+    #
+    # >>> is_datetime64_dtype(object) -> False
+    # >>> is_datetime64_dtype([1, 2, 3]) -> False
+    # >>> is_datetime64_dtype(np.array([], dtype=int)) -> False
+    # 
+    # >>> is_datetime64_dtype(np.datetime64) -> True
+    # >>> is_datetime64_dtype(np.array([], dtype=np.datetime64)) -> True
+    #
+    # More specific (includes unit specification): pd.api.types.is_datetime64_ns_dtype
+    #
+    # >>> is_datetime64_ns_dtype(str) -> False
+    # >>> is_datetime64_ns_dtype(int) -> False
+    # >>> is_datetime64_ns_dtype(np.array(['a', 'b'])) -> False
+    # >>> is_datetime64_ns_dtype(np.array([1, 2])) -> False
+    # >>> is_datetime64_ns_dtype(np.datetime64) -> False # no unit
+    # >>> is_datetime64_ns_dtype(np.array([], dtype="datetime64")) -> False # no unit
+    # >>> is_datetime64_ns_dtype(np.array([], dtype="datetime64[ps]")) -> False # wrong unit
+    #
+    # >>> is_datetime64_ns_dtype(DatetimeTZDtype("ns", "US/Eastern")) -> True
+    # >>> is_datetime64_ns_dtype(pd.DatetimeIndex([1, 2, 3], dtype="datetime64[ns]")) -> True
+    #
+    # The most specific: pd.api.types.is_datetime64tz_dtype
+    #
+    # >>> is_datetime64tz_dtype(object) -> False
+    # >>> is_datetime64tz_dtype([1, 2, 3]) -> False
+    # >>> is_datetime64tz_dtype(pd.DatetimeIndex([1, 2, 3])) -> False # tz-naive
+    #
+    # >>> is_datetime64tz_dtype(pd.DatetimeIndex([1, 2, 3], tz="US/Eastern")) -> True
+    # >>> is_datetime64tz_dtype(DatetimeTZDtype("ns", tz="US/Eastern")) -> True
+    # >>> is_datetime64tz_dtype(.pd.Series([], dtype = DatetimeTZDtype("ns", tz="US/Eastern")) -> True
+    #
+    #
+    if pd.api.types.is_extension_array_dtype(d):
+        if pd.api.types.is_categorical_dtype(d):
+            #print("categorical", d.categories)
+            # NOTE: 2021-12-15 23:29:07
+            # d.categories is a pandas Index type
+            # this may be: IntervalIndex, dtype(object), other pandas dtypes
+            categories = list(d.categories) # convert to a list
+            ordered = d.ordered
+            categories_dtype = d.categories.dtype
+            category_types = list(type(x).__name__ for x in categories) # python type of category values
+            print("category_types", category_types)
+            categories_dtype = d.categories.dtype # dtype of 'categories' Index 
+            print(type(categories_dtype).__name__)
+            return {d.name: {"__init__": f"CategoricalDtype({categories}, ordered={ordered})",
+                             "__ns__" : "pd",
+                             "categories":categories,
+                             "value_types":list(type(x) for x in d.categories),
+                             "dtype": dtype2json(categories_dtype),
+                             "ordered": ordered}}
+        
+        elif pd.api.types.is_interval_dtype(d):
+            subtype = d.subtype
+            closed = d.closed
+            return{d.name: {"__init__": f"IntervalDtype(subtype={subtype}, closed={closed})",
+                            "__ns__": "pd"}}
+        
+        elif pd.api.types.is_period_dtype(d):
+            return {d.name: {"__init__": f"PeriodDtype(freq={d.freq.name})",
+                             "__ns__": "pd",
+                             "freq":d.freq.name}}
+            
+        
+        elif pd.api.types.is_datetime64_any_dtype(d):
+            if pd.api.types.is_datetime64tz_dtype: # extension type
+                # NOTE: 2021-12-16 17:02:46
+                # as of pandas 1.3.3: DatetimeTZDtype only supports 'ns' as unit
+                # as opposed to np.datetime64 which can have multiple flavors e.g.
+                # np.dtype("datetime64[ps]") etc
+                return {d.name: {"__init__": f"DatetimeTZDtype(unit={d.unit}, tz={d.tz.zone})",
+                                "__ns__": "pd",
+                                "unit": d.unit,
+                                "tz":d.tz.zone}}
+            
+            elif ps.api.types.is_datetime64_ns_dtype(d): # this is a numpy dtype, not sure if branch ever gets execd
+                return d.name
+            
+            elif pd.api.types.is_datetime64_dtype(d): # this is a numpy dtype, not sure if branch ever gets execd
+                return d.name
+        
+        elif pd.api.types.is_sparse(d):
+            return {d.name: {"__init__": f"SparseDtype(dtype={d.type}, fill_value={d.fill_value})",
+                             "__ns__": "pd",
+                             "dtype": d.type,
+                             "fill_value": d.fill_value}}
+        
+        elif pd.api.types.is_string_dtype(d):
+            return {d.name: {"__init__": f"StringDtype(storage={d.storage})",
+                             "__ns__": "pd",
+                             "storage": d.storage}}
+        
+        elif pd.api.types.is_period_dtype(d):
+            return {d.name: {"__init__":f"PeriodDtype(freq={d.freq.name})",
+                             "__ns__": "pd",
+                             "freq":d.freq.name}}
+        
+        else: # BooleanDtype, UInt*Dtype, Int*Dtype, Float*Dtype
+            return {d.name: {"__init__": f"{type(d).__name__}()",
+                             "__ns__":"pd"}}
+        
 def json2dtype(s):
     """Roundtrip numpy dtype - json string format - read side
     An alternative to np.lib.format.descr_to_dtype
@@ -327,7 +477,7 @@ def json2dtype(s):
             except:
                 raise
                 
-    elif isinstance(s, dict): # for recarrays
+    elif isinstance(s, dict): # for recarrays, h5py, pandas
         return np.dtype(s) 
 
 def decode_hook(dct):
