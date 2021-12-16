@@ -8,10 +8,14 @@ import quantities as pq
 import pandas as pd
 import h5py
 import vigra
+from traitlets.utils.importstring import import_item
 from core import quantities as cq
+from core.prog import ObjectDescription
 
 class CustomEncoder(json.JSONEncoder):
     """Almost complete round trip for a subset of Python types - read side.
+    
+    For now, use decode_hook() module function as counterpart for reading json
     
     Supported types:
     type
@@ -172,16 +176,24 @@ class CustomEncoder(json.JSONEncoder):
             #raise NotImplementedError(f"The {type(obj).__name__} object appears capable to write itself to JSON and is not supported here")
         
         if isinstance(obj, complex):
-            return {"__complex__", {"__value__":[obj.real, obj.imag]}}
+            
+            return {type(obj).__name__: {"__init__":,
+                                         "__module__": type(obj).__module__,
+                                         "__value__": [obj.real, obj.imag]}}
+            #return {"__complex__", {"__value__":[obj.real, obj.imag]}}
         
         if isinstance(obj, type):
-            return {"__type__": {"__value__": f"{obj.__module__}.{obj.__name__}"}}
+            return {type(obj).__name__: {"__module__": type(obj).__module__,
+                                         "__value__": f"{obj.__module__}.{obj.__name__}"}}
+            #return {"__type__": {"__value__": f"{obj.__module__}.{obj.__name__}"}}
         
         if is_namedtuple(obj):
             fields = ", ".join([f"'{field}'" for f in obj._fields])
             return {".".join([type(obj).__module__, type(obj).__name__]):
-                        {"class": "".join(["collections.namedtuple(", f"'{type(obj).__name__}', ", "(", fields, "))"]),
-                         "__value__":obj}}
+                        {"__init__": "".join(["collections.namedtuple(", f"'{type(obj).__name__}', ", "(", fields, "))"]),
+                         "__module__": tyoe(obj).__module__,
+                         "__value__":obj,
+                         "fields": fields}}
         
         if isinstance(obj, vigra.filters.Kernel1D):
             xy = vu.kernel2array(obj, True)
@@ -489,7 +501,7 @@ def decode_hook(dct):
     UnitQuantity
     Quantity
     numpy chararray, structured array, recarray and ndarray (with caveats, see
-    documentation for CustomEncoder in ths module)
+    documentation for CustomEncoder in this module)
     
     Pass this as the 'object_hook' parameter to json.load & json.loads (this is
     what the load and loads functions in this module do).
@@ -505,11 +517,13 @@ def decode_hook(dct):
             return dct
         #print("data", data)
         val = data.get("__value__", None) # may be a dict, see below for *array__
+        module = data.get("__module__", "builtins")
         
         if val is None:
             return dct
         
-        if key == "__complex__":
+        if key == "complex":
+            
             if isinstance(val, (tuple, list)) and len(val) == 2:
                 return complex(*val)
             

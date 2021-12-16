@@ -31,6 +31,51 @@ CALLABLES = (types.FunctionType, types.MethodType,
 class ArgumentError(Exception):
     pass
 
+class ObjectDescription(object):
+    """Standardized object description:
+    Attributes:
+    typename: object type name
+    typemodule: module where object type is defined
+    init: mapping: obj.__init__ signature
+    new: mapping: obj.__new__ signature
+    value: obj (instance of typename) or None
+    
+    """
+    # TODO: 2021-12-16 22:12:49
+    # bring here 
+    def __init__(self, obj=None, **kwargs):
+        self._typename_ = type(obj).__name__
+        self._typemodule_ = type(obj).__module__
+        self._init_func_ = classify_signature(obj.__init__)
+        self._new_func_ = classify_signature(obj.__new__)
+        self._value_ = kwargs.pop("value", obj)
+        self._attributes_ = kwargs
+        
+    @property
+    def typename(self):
+        return self._typename_
+    
+    @property
+    def typemodule(self):
+        return self._typemodule_
+    
+    @property
+    def init(self):
+        return self._init_func_
+    
+    @property
+    def new(self):
+        return self._new_func_
+    
+    @property
+    def value(self):
+        return self._value_
+    
+    @property
+    def attributes(self):
+        return self._attributes_
+    
+
 class AttributeAdapter(ABC):
     """Abstract Base Class as a callable for pre- and post-validation
     """
