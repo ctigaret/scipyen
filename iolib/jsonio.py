@@ -177,8 +177,7 @@ class CustomEncoder(json.JSONEncoder):
         
         if isinstance(obj, complex):
             
-            return {type(obj).__name__: {"__init__":,
-                                         "__module__": type(obj).__module__,
+            return {type(obj).__name__: {"__module__": type(obj).__module__,
                                          "__value__": [obj.real, obj.imag]}}
             #return {"__complex__", {"__value__":[obj.real, obj.imag]}}
         
@@ -191,7 +190,7 @@ class CustomEncoder(json.JSONEncoder):
             fields = ", ".join([f"'{field}'" for f in obj._fields])
             return {".".join([type(obj).__module__, type(obj).__name__]):
                         {"__init__": "".join(["collections.namedtuple(", f"'{type(obj).__name__}', ", "(", fields, "))"]),
-                         "__module__": tyoe(obj).__module__,
+                         "__module__": type(obj).__module__,
                          "__value__":obj,
                          "fields": fields}}
         

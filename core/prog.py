@@ -14,8 +14,10 @@ from abc import ABC, abstractmethod
 import enum, io, os, re, itertools, sys, time, traceback, types, typing
 import collections
 import importlib, inspect, pathlib, warnings, operator, functools
-from functools import singledispatch, update_wrapper, wraps
+from functools import (singledispatch, singledispatchmethod, 
+                       update_wrapper, wraps,)
 from contextlib import (contextmanager, ContextDecorator,)
+from traitlets.utils.importstring import import_item
 
 import numpy as np
 import neo, vigra
@@ -43,13 +45,53 @@ class ObjectDescription(object):
     """
     # TODO: 2021-12-16 22:12:49
     # bring here 
-    def __init__(self, obj=None, **kwargs):
+    def __init__(self, obj=None, *args, **kwargs):
         self._typename_ = type(obj).__name__
         self._typemodule_ = type(obj).__module__
-        self._init_func_ = classify_signature(obj.__init__)
+        if len(args):
+            self._args_ = args
+        else:
+            self._args_ = self.objargs(o)
+        #self._value_ = obj
+        self._kwargs_ = kwargs
+        
+        self._init_func_ = self._obj_init_(obj.__init__)
         self._new_func_ = classify_signature(obj.__new__)
-        self._value_ = kwargs.pop("value", obj)
-        self._attributes_ = kwargs
+        
+    @singledispatchmethod
+    def _obj_init_(self, o):
+        return classify_signature(o.__init__)
+    
+    @_obj_init_.register(complex)
+    def _(self, o:complex):
+        return f"complex({o.real}, {o.imag})"
+    
+    @_obj_init_.register(tuple)
+    def _(self, o:tuple):
+        if hasattr(o, "_fields"):
+            return f"collections."
+        
+        
+    @singledispatchmethod
+    def objargs(self, o):
+        return o
+    
+    @objargs.register(complex)
+    def _(self, o:complex):
+        return (o.real, o.imag)
+    
+    @objargs.register(type)
+    def _(self, o:type):
+        return ".".join((o.__module__, o.__name__))
+    
+    @objargs.register(tuple)
+    def _(self, o:tuple):
+        if hasattr(o, "_fields"): # named tuple
+            return tuple(getattr(o, field) for field in o._fields)
+        
+        return o
+    
+    
         
     @property
     def typename(self):
@@ -74,6 +116,15 @@ class ObjectDescription(object):
     @property
     def attributes(self):
         return self._attributes_
+    
+    #@property
+    #def value(self):
+        #return self._value_
+    
+    @property
+    def object(self):
+        klass = import_item(".".join((self.typemodule, self.typename)))
+        return klass(*self._args_, **self._kwargs_)
     
 
 class AttributeAdapter(ABC):
