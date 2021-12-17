@@ -3,6 +3,8 @@
 
 import json, sys, traceback, typing, collections
 from collections import deque, namedtuple
+from functools import (singledispatch, singledispatchmethod, 
+                       update_wrapper, wraps,)
 import numpy as np
 import quantities as pq
 import pandas as pd
@@ -10,8 +12,133 @@ import h5py
 import vigra
 from traitlets.utils.importstring import import_item
 from core import quantities as cq
-from core.prog import ObjectDescription
+from core import prog
+from core.prog import classify_signature
 
+class ObjectDescription(object):
+    """Standardized object description for non-JSON-able objects
+    Attributes:
+    typename: object type name
+    typemodule: module where object type is defined
+    init: mapping: obj.__init__ signature
+    new: mapping: obj.__new__ signature
+    value: obj (instance of typename) or None
+    
+    """
+    # TODO: 2021-12-16 22:12:49
+    # bring here 
+    def __init__(self, obj):
+        self._json_ = None
+        self._get_obj_module_type_(obj)
+        self._init_func_ = self._obj_init_(obj)
+        self._new_func_ = classify_signature(obj.__new__)
+        try:
+            self._json_ = json.JSONEncoder.default(self, o)
+        except TypeError as e:
+            self._make_json_(obj)
+        
+    def _get_obj_module_type_(self, o):
+        self._typename_ = type(obj).__qualname__
+        self._typemodule_ = type(obj).__module__
+        
+    @singledispatchmethod
+    def _make_json_(self, o):
+        self._json_ = json.JSONEncoder.default(self, o)
+    
+    @_make_json_.register(complex)
+    def _(self, o:complex):
+        self._json_ = {self.typename:{"__module__": self.typemodule,
+                                      "__obj_init__": self.init}}
+        
+    @_make_json_.register(vigra.filters.Kernel1D)
+    def _(self, o:vigra.filters.Kernel1D):
+        import vigrautils as vu
+        xy = vu.kernel2array(obj, True)
+        
+        self._json_ = {self.typename:{}}
+        
+    @singledispatchmethod
+    def _obj_init_(self, o):
+        init_sig = classify_signature(o.__init__)
+        
+    @_obj_init_.register(complex)
+    def _(self, o:complex):
+        args = self._obj_init_args_(o)
+        return f"complex{args}"
+    
+    # NOTE: str represent themselves
+    
+    @_obj_init_.register(tuple)
+    @_obj_init_.register(list)
+    def _(self, o:typing.Union[tuple, list]):
+        if hasattr(o, "_fields"):
+            fields = ",".join([f"'{f}'" for f in o._fields])
+            args = tuple(getattr(o, f) for f in o._fields)
+            if self.typemodule == "__main__":
+                klassdef = f"collections.namedtuple('{type(o).__name__}', ({fields}))"
+                return f"eval('''{klassdef}'''){args}"
+            return f"{type(o).__module__}.{type(o).__name__}(*{args})"
+        
+        
+    @_obj_init_.register(collections.deque)
+    def _(self, o:collections.deque):
+        args=tuple(o)
+        maxlen = o.maxlen
+        klassdef = ".".join((self.typemodule, self.typename))
+        return "eval('''{klassdef}''')({args}, {maxlen})".format(klassdef=klassdef, args=args, maxlen=maxlen)
+        
+    @singledispatchmethod
+    def _obj_init_args_(self, o):
+        return o
+    
+    @_obj_init_args_.register(complex)
+    def _(self, o:complex):
+        return (o.real, o.imag)
+    
+    @_obj_init_args_.register(type)
+    def _(self, o:type):
+        return ".".join((o.__module__, o.__name__))
+    
+    @_obj_init_args_.register(tuple)
+    def _(self, o:tuple):
+        if hasattr(o, "_fields"): # named tuple
+            return tuple(getattr(o, field) for field in o._fields)
+        
+        return o
+    
+    @property
+    def typename(self):
+        return self._typename_
+    
+    @property
+    def typemodule(self):
+        return self._typemodule_
+    
+    @property
+    def init(self):
+        return self._init_func_
+    
+    @property
+    def new(self):
+        return self._new_func_
+    
+    #@property
+    #def value(self):
+        #return self._value_
+    
+    #@property
+    #def attributes(self):
+        #return self._attributes_
+    
+    #@property
+    #def value(self):
+        #return self._value_
+    
+    @property
+    def object(self):
+        klass = import_item(".".join((self.typemodule, self.typename)))
+        return klass(*self._args_, **self._kwargs_)
+    
 class CustomEncoder(json.JSONEncoder):
     """Almost complete round trip for a subset of Python types - read side.
     
@@ -176,7 +303,6 @@ class CustomEncoder(json.JSONEncoder):
             #raise NotImplementedError(f"The {type(obj).__name__} object appears capable to write itself to JSON and is not supported here")
         
         if isinstance(obj, complex):
-            
             return {type(obj).__name__: {"__module__": type(obj).__module__,
                                          "__value__": [obj.real, obj.imag]}}
             #return {"__complex__", {"__value__":[obj.real, obj.imag]}}
@@ -522,7 +648,6 @@ def decode_hook(dct):
             return dct
         
         if key == "complex":
-            
             if isinstance(val, (tuple, list)) and len(val) == 2:
                 return complex(*val)
             
@@ -608,96 +733,6 @@ def decode_hook(dct):
     else:
         return dct
     
-        #try:
-                
-            #if key.startswith("__main__"):
-                #typeobj = eval(dct[typename]["class"])
-            #else:
-                #typeobj = eval(key)
-                
-            #if is_namedtuple(typeobj):
-                #return typeobj(*val)
-                
-            #return typeobj(val)
-            
-        #except:
-            #if key == "__complex__":
-                #if isinstance(val, (tuple, list)) and len(val) == 2:
-                    #return complex(*val)
-                
-                #elif isinstance(val, dict) and all(k in val for k in ("real", "imag")):
-                    #return complex(val["real"], val["imag"])
-                
-                #else:
-                    #return val
-                
-            #elif key == "__unitquantity__":
-                #return cq.unit_quantity_from_name_or_symbol(val)
-            
-            #elif key.endswith("SignatureDict"):
-                #return prog.SignatureDict(**val)
-            
-            ##elif any(e.endswith("array__") for e in dct):
-            #elif key.endswith("array__"):
-                #entry = list(dct.keys())[0]
-                #val = dct[entry]
-                #if key in ("__structarray__", "__recarray__"):
-                    #value = list(tuple(x) for x in val)
-                #else:
-                    #value = val["__value__"]
-                    
-                #if key == "__recarray__":
-                    #dtype = json2dtype(dict((name, (json2dtype(value[0]), value[1])) for name, value in data["__dtype__"].items()))
-                #else:
-                    #dtype = json2dtype(data["__dtype__"])
-                
-                #ret = np.array(value, dtype=dtype)
-                
-                #if key in ("__chararray__", "__recarray__"):
-                    #artype = eval(key.replace("__", ""), np.__dict__)
-                    #return ret.view(artype)
-                
-                #if key == "__quantityarray__":
-                    #units = cq.unit_quantity_from_name_or_symbol(data["__units__"])
-                    #return ret * units
-                
-                #if entry == "__vigraarray__":
-                    #return vigra.VigraArray(ret, axistags=vigra.AxisTags.fromJSON(data["__axistags__"]), 
-                                        #order=data.get("__order__", None))
-                    
-                #return ret
-            
-            #elif key == "__kernel1D__":
-                #xy = np.array(val)
-                #left = int(xy[0,0])
-                #right = int(xy[-1,0])
-                #values = xy[:,1]
-                #ret = vigra.filters.Kernel1D()
-                #ret.initExplicitly(left, right, values)
-                #return ret
-            
-            #elif key == "__kernel2D__":
-                #xy = np.array(val)
-                #upperLeft = (int(xy[-1,-1,0]), int(xy[-1,-1,1]))
-                #lowerRight = (int(xy[0,0,0]), int(xy[0,0,1]))
-                #values = xy[:,:,]
-                #ret = vigra.filters.Kernel2D()
-                #ret.initExplicitly(upperLeft, lowerRight, values)
-                #return ret
-            
-            #elif key == "__type__":
-                ##print("val", val)
-                #if "." in val:
-                    #components = val.split(".")
-                    #typename = components[-1]
-                    #modname = ".".join(components[:-1])
-                    ##print("modname", modname, "typename", typename)
-                    #module = sys.modules[modname]
-                    #return eval(typename, module.__dict__)
-                #else:
-                    #return eval(typename) # fingers crossed...
-                
-            
 def dumps(obj, *args, **kwargs):
     kwargs["cls"] = CustomEncoder
     return json.dumps(obj, *args, **kwargs)
