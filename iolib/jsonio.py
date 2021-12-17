@@ -29,28 +29,28 @@ class ObjectDescription(object):
     # bring here 
     def __init__(self, obj):
         self._json_ = None
-        self._get_obj_module_type_(obj)
+        self._getModuleAndtype_(obj)
         self._init_func_ = self._obj_init_(obj)
         self._new_func_ = classify_signature(obj.__new__)
         try:
             self._json_ = json.JSONEncoder.default(self, o)
         except TypeError as e:
-            self._make_json_(obj)
+            self._makeJSON_(obj)
         
-    def _get_obj_module_type_(self, o):
+    def _getModuleAndtype_(self, o):
         self._typename_ = type(obj).__qualname__
         self._typemodule_ = type(obj).__module__
         
     @singledispatchmethod
-    def _make_json_(self, o):
+    def _makeJSON_(self, o):
         self._json_ = json.JSONEncoder.default(self, o)
     
-    @_make_json_.register(complex)
+    @_makeJSON_.register(complex)
     def _(self, o:complex):
         self._json_ = {self.typename:{"__module__": self.typemodule,
                                       "__obj_init__": self.init}}
         
-    @_make_json_.register(vigra.filters.Kernel1D)
+    @_makeJSON_.register(vigra.filters.Kernel1D)
     def _(self, o:vigra.filters.Kernel1D):
         import vigrautils as vu
         xy = vu.kernel2array(obj, True)
@@ -140,9 +140,9 @@ class ObjectDescription(object):
         return klass(*self._args_, **self._kwargs_)
     
 class CustomEncoder(json.JSONEncoder):
-    """Almost complete round trip for a subset of Python types - read side.
+    """Almost complete round trip for a subset of Python types - encoding side.
     
-    For now, use decode_hook() module function as counterpart for reading json
+    To decode decode_hook() module function as counterpart for reading json
     
     Supported types:
     type
@@ -160,7 +160,7 @@ class CustomEncoder(json.JSONEncoder):
     (e.g. vigra.AxisTags' toJSON() and fromJSON())
     
     WARNING: Caveats:
-    Whiel this can be used to encode SMALL numpy arrays (including recarrays,
+    While this can be used to encode SMALL numpy arrays (including recarrays,
     structured arrays and chararrays) this is NOT recommended for storing
     large arays and arrays of complex types.
     """
@@ -295,6 +295,53 @@ class CustomEncoder(json.JSONEncoder):
     # dt = np.dtype('U25')  # 25-character string
 
     def default(self, obj):
+        # NOTE: 2021-12-17 22:59:34
+        # 1) I need to generate something simple, yet with enough information to 
+        #   reconstruct the object being encoded
+        #
+        # 2) It seems natural that the object should be encoded as a mapping of
+        #   str keys to str values (i.e., a dict, itself encoded as a JSON 
+        #   'object');
+        #
+        # 3) The main caveat of point (2) is that the output falls under the 
+        #   umbrella of dicts: how to distinguish a dict that encodes a Python 
+        #   object that is not serializable in Python, from any other dict?
+        #
+        # 4) Pandas seems to rely on generating a nested dict (with columns the
+        #   highest level): 
+        #
+        #   {column0: JSON-representation of the Series of column 0, etc}
+        #
+        #   where each Series is a dict mapping index elements to Series element
+        #   however, this has its own limtations, including:
+        #       it fails when the dataframe or series index is NOT unique and 
+        #       'orient' is 'columns' or 'index'
+        #
+        #       the JSON output needs to be decoded using Pandas.read_json, 
+        #       which does not decode IntervalDtype (and possibly other Pandas 
+        #       extension dtypes)
+        #
+        # 5) a workaround might be to generate a pickle (as a string) - but this
+        #   is too volatile
+        #
+        #
+        # 6) a better (?) workaround is to generate a dict with a single key
+        #   '__python__' mapped to a dict with a set of specific keys:
+        #
+        #       __obj_type__
+        #       __obj_module__
+        #       __args__
+        #       __kwargs__
+        #
+        #   for numpy arrays (and derived) this should also include:
+        #       __fields__ for structured arrays
+        #       __axistags__ for vigra arrays
+        #       __units__  for python quantity arrays - CAUTION these can have ndim==0
+        #
+        #   for more specialized numpy arrays: neo data objects, neo containers
+        #       not supported
+        #       
+        
         from imaging import vigrautils as vu
         from core import prog
         from core.datatypes import is_namedtuple
@@ -303,9 +350,10 @@ class CustomEncoder(json.JSONEncoder):
             #raise NotImplementedError(f"The {type(obj).__name__} object appears capable to write itself to JSON and is not supported here")
         
         if isinstance(obj, complex):
-            return {type(obj).__name__: {"__module__": type(obj).__module__,
-                                         "__value__": [obj.real, obj.imag]}}
+            #return {type(obj).__name__: {"__module__": type(obj).__module__,
+                                         #"__value__": [obj.real, obj.imag]}}
             #return {"__complex__", {"__value__":[obj.real, obj.imag]}}
+            return {type(obj).__name__, {"__value__":[obj.real, obj.imag]}}
         
         if isinstance(obj, type):
             return {type(obj).__name__: {"__module__": type(obj).__module__,
