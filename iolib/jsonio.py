@@ -15,129 +15,128 @@ from core import quantities as cq
 from core import prog
 from core.prog import classify_signature
 
-class ObjectDescription(object):
-    """Standardized object description for non-JSON-able objects
-    Attributes:
-    typename: object type name
-    typemodule: module where object type is defined
-    init: mapping: obj.__init__ signature
-    new: mapping: obj.__new__ signature
-    value: obj (instance of typename) or None
+#class ObjectDescription(object):
+    #"""Standardized object description for non-JSON-able objects
+    #Attributes:
+    #typename: object type name
+    #typemodule: module where object type is defined
+    #init: mapping: obj.__init__ signature
+    #new: mapping: obj.__new__ signature
+    #value: obj (instance of typename) or None
     
-    """
-    # TODO: 2021-12-16 22:12:49
-    # bring here 
-    def __init__(self, obj):
-        self._json_ = None
-        self._getModuleAndtype_(obj)
-        self._init_func_ = self._obj_init_(obj)
-        self._new_func_ = classify_signature(obj.__new__)
-        try:
-            self._json_ = json.JSONEncoder.default(self, o)
-        except TypeError as e:
-            self._makeJSON_(obj)
+    #"""
+    
+    #def __init__(self, obj):
+        #self._json_ = dict()
+        #self._json_.update(self._makeStub_(obj))
+        #self._init_func_ = self._obj_init_(obj)
+        #self._new_func_ = classify_signature(obj.__new__)
+        #self._makeJSON_(obj)
+        ##try:
+            ##self._json_ = json.JSONEncoder.default(self, obj)
+        ##except TypeError as e:
         
-    def _getModuleAndtype_(self, o):
-        self._typename_ = type(obj).__qualname__
-        self._typemodule_ = type(obj).__module__
+    #def _makeStub_(self, o):
+        #ret = {"__obj_type__": type(o).__qualname__,
+               #"__obj_module__": type(o).__module__}
         
-    @singledispatchmethod
-    def _makeJSON_(self, o):
-        self._json_ = json.JSONEncoder.default(self, o)
-    
-    @_makeJSON_.register(complex)
-    def _(self, o:complex):
-        self._json_ = {self.typename:{"__module__": self.typemodule,
-                                      "__obj_init__": self.init}}
+        #if isinstance(o, type):
+            #ret.update({"__type_name__": o.__qualname__,
+                        #"__type_module__": o.__module__})
+            
+        #else:
+            #ret.update({"__type_name__":type(o).__qualname__,
+                        #"__type_module__": type(o).__module__})
+            
+        #ret["__special__"] = None
+        #ret["__args__"] = tuple()
+        #ret["__kwargs__"] = dict()
+        #ret["__value__"] = None
         
-    @_makeJSON_.register(vigra.filters.Kernel1D)
-    def _(self, o:vigra.filters.Kernel1D):
-        import vigrautils as vu
-        xy = vu.kernel2array(obj, True)
-        
-        self._json_ = {self.typename:{}}
-        
-    @singledispatchmethod
-    def _obj_init_(self, o):
-        init_sig = classify_signature(o.__init__)
-        
-    @_obj_init_.register(complex)
-    def _(self, o:complex):
-        args = self._obj_init_args_(o)
-        return f"complex{args}"
+        #return ret
     
-    # NOTE: str represent themselves
+            
+    #@singledispatchmethod
+    #def _obj_init_(self, o):
+        #init_sig = classify_signature(o.__init__)
+        
+    #@_obj_init_.register(complex)
+    #def _(self, o:complex):
+        #args = self._obj_init_args_(o)
+        #return f"complex{args}"
     
-    @_obj_init_.register(tuple)
-    @_obj_init_.register(list)
-    def _(self, o:typing.Union[tuple, list]):
-        if hasattr(o, "_fields"):
-            fields = ",".join([f"'{f}'" for f in o._fields])
-            args = tuple(getattr(o, f) for f in o._fields)
-            if self.typemodule == "__main__":
-                klassdef = f"collections.namedtuple('{type(o).__name__}', ({fields}))"
-                return f"eval('''{klassdef}'''){args}"
-            return f"{type(o).__module__}.{type(o).__name__}(*{args})"
+    ## NOTE: str represent themselves
+    
+    #@_obj_init_.register(tuple)
+    #@_obj_init_.register(list)
+    #def _(self, o:typing.Union[tuple, list]):
+        #if hasattr(o, "_fields"):
+            #fields = ",".join([f"'{f}'" for f in o._fields])
+            #args = tuple(getattr(o, f) for f in o._fields)
+            #if self.typemodule == "__main__":
+                #klassdef = f"collections.namedtuple('{type(o).__name__}', ({fields}))"
+                #return f"eval('''{klassdef}'''){args}"
+            #return f"{type(o).__module__}.{type(o).__name__}(*{args})"
         
         
-    @_obj_init_.register(collections.deque)
-    def _(self, o:collections.deque):
-        args=tuple(o)
-        maxlen = o.maxlen
-        klassdef = ".".join((self.typemodule, self.typename))
-        return "eval('''{klassdef}''')({args}, {maxlen})".format(klassdef=klassdef, args=args, maxlen=maxlen)
+    #@_obj_init_.register(collections.deque)
+    #def _(self, o:collections.deque):
+        #args=tuple(o)
+        #maxlen = o.maxlen
+        #klassdef = ".".join((self.typemodule, self.typename))
+        #return "eval('''{klassdef}''')({args}, {maxlen})".format(klassdef=klassdef, args=args, maxlen=maxlen)
         
-    @singledispatchmethod
-    def _obj_init_args_(self, o):
-        return o
+    #@singledispatchmethod
+    #def _obj_init_args_(self, o):
+        #return o
     
-    @_obj_init_args_.register(complex)
-    def _(self, o:complex):
-        return (o.real, o.imag)
+    #@_obj_init_args_.register(complex)
+    #def _(self, o:complex):
+        #return (o.real, o.imag)
     
-    @_obj_init_args_.register(type)
-    def _(self, o:type):
-        return ".".join((o.__module__, o.__name__))
+    #@_obj_init_args_.register(type)
+    #def _(self, o:type):
+        #return ".".join((o.__module__, o.__name__))
     
-    @_obj_init_args_.register(tuple)
-    def _(self, o:tuple):
-        if hasattr(o, "_fields"): # named tuple
-            return tuple(getattr(o, field) for field in o._fields)
+    #@_obj_init_args_.register(tuple)
+    #def _(self, o:tuple):
+        #if hasattr(o, "_fields"): # named tuple
+            #return tuple(getattr(o, field) for field in o._fields)
         
-        return o
-    
-    @property
-    def typename(self):
-        return self._typename_
-    
-    @property
-    def typemodule(self):
-        return self._typemodule_
-    
-    @property
-    def init(self):
-        return self._init_func_
-    
-    @property
-    def new(self):
-        return self._new_func_
+        #return o
     
     #@property
-    #def value(self):
-        #return self._value_
+    #def typename(self):
+        #return self._typename_
     
     #@property
-    #def attributes(self):
-        #return self._attributes_
+    #def typemodule(self):
+        #return self._typemodule_
     
     #@property
-    #def value(self):
-        #return self._value_
+    #def init(self):
+        #return self._init_func_
     
-    @property
-    def object(self):
-        klass = import_item(".".join((self.typemodule, self.typename)))
-        return klass(*self._args_, **self._kwargs_)
+    #@property
+    #def new(self):
+        #return self._new_func_
+    
+    ##@property
+    ##def value(self):
+        ##return self._value_
+    
+    ##@property
+    ##def attributes(self):
+        ##return self._attributes_
+    
+    ##@property
+    ##def value(self):
+        ##return self._value_
+    
+    #@property
+    #def object(self):
+        #klass = import_item(".".join((self.typemodule, self.typename)))
+        #return klass(*self._args_, **self._kwargs_)
     
 class CustomEncoder(json.JSONEncoder):
     """Almost complete round trip for a subset of Python types - encoding side.
@@ -163,6 +162,44 @@ class CustomEncoder(json.JSONEncoder):
     While this can be used to encode SMALL numpy arrays (including recarrays,
     structured arrays and chararrays) this is NOT recommended for storing
     large arays and arrays of complex types.
+    
+    NOTE: general schema:
+    
+    {"__python_object__":{
+        "__obj_type__": str, name of the object's type,
+        
+        "__obj_module__": str, the name of the module where object type is defined
+        
+        "__type_name__": str; for type objects, the name of the object 
+                                (obj.'__name__');
+                                
+                              for instances, same value as __obj_type__
+                              
+        "__type_module__": str: for type objects, the name of the module where 
+                                the object (a type) is defined;
+                                
+                                for instances, same value as __obj_module__
+                                
+        "__args__": tuple; parameters for object intialization, or empty tuple
+        
+        "__kwargs__": dict; keyword parameters for object initialization, or 
+                            empty dict
+                            
+        "__subtype__": None or the str "__structarray__" (for numpy structarrays)
+        
+        "__dtype__": str; representation of the numpy dtye, or json representation
+                        of a specialized dtype (such as h5py special dtypes, or 
+                        pandas extension dtypes)
+                        
+        "__value__": str: JSON representation of the value, or None (a.k.a null)
+                            this is usually the JSON representation for objects of
+                            basic Python types that can be directly serializable
+                            in JSON using Python's stock 'json' module.
+                            
+        
+        
+        }
+    }
     """
     
     # NOTE: Note Keys in key/value pairs of JSON are always of the type str. 
@@ -294,6 +331,50 @@ class CustomEncoder(json.JSONEncoder):
     # dt = np.dtype('a25')  # 25-length zero-terminated bytes
     # dt = np.dtype('U25')  # 25-character string
 
+    def _makeStub_(self, o):
+        if isinstance(o, type):
+            ret = {"__python_type__":{"__type_name__": o.__qualname__,
+                                      "__type_module__": o.__module__}}
+        elif inspect.isfunction(o):
+            ret = {"__python_function__": dict(prog.classify_signature(o))}
+                                             
+        elif inspect.ismethod(o):
+            # NOTE/TODO: 2021-12-18 22:26:27
+            # can I differentiate between class method and instance method?
+            ret = {"__python_method__": dict(prog.classify_signature(o))}
+                                             
+        else:
+            ret = {"__python_object__":{"__obj_type__": type(o).__qualname__,
+                                        "__obj_module__": type(o).__module__,
+                                        "__args__": tuple(),
+                                        "__named__":dict(),
+                                        "__kwargs__": dict(),
+                                        "__value__": None,
+                                        "__subtype__": None,
+                                        "__dtype__": None,
+                                        }
+                  }
+        
+        return ret
+    
+    @singledispatchmethod
+    def _makeJSON_(self, o):
+        """General case for all types supported by Python's own json module
+        """
+        ret = self._make_stub_(o)
+        ret["__value__"] = json.JSONEncoder.default(self, o)
+    
+    @_makeJSON_.register(complex)
+    def _(self, o:complex):
+        ret = self._make_stub_(o)
+        ret["__args__"] = (o.real, o.imag)
+        
+    @_makeJSON_.register(vigra.filters.Kernel1D)
+    def _(self, o:vigra.filters.Kernel1D):
+        import vigrautils as vu
+        xy = vu.kernel2array(obj, True)
+        self._json_["__args__"] = xy
+        
     def default(self, obj):
         # NOTE: 2021-12-17 22:59:34
         # 1) I need to generate something simple, yet with enough information to 
@@ -326,7 +407,7 @@ class CustomEncoder(json.JSONEncoder):
         #
         #
         # 6) a better (?) workaround is to generate a dict with a single key
-        #   '__python__' mapped to a dict with a set of specific keys:
+        #   '__python_object__' mapped to a dict with a set of specific keys:
         #
         #       __obj_type__
         #       __obj_module__
@@ -339,9 +420,14 @@ class CustomEncoder(json.JSONEncoder):
         #       __units__  for python quantity arrays - CAUTION these can have ndim==0
         #
         #   for more specialized numpy arrays: neo data objects, neo containers
-        #       not supported
+        #      
         #       
-        
+        #   pandas objects
+        #
+        # 7) for base Python objects that CAN be serialized with JSON (i.e. of 
+        #   types supported by Python's json module) return their JSON 
+        #   representation
+        #
         from imaging import vigrautils as vu
         from core import prog
         from core.datatypes import is_namedtuple
@@ -353,11 +439,29 @@ class CustomEncoder(json.JSONEncoder):
             #return {type(obj).__name__: {"__module__": type(obj).__module__,
                                          #"__value__": [obj.real, obj.imag]}}
             #return {"__complex__", {"__value__":[obj.real, obj.imag]}}
-            return {type(obj).__name__, {"__value__":[obj.real, obj.imag]}}
+            #return {type(obj).__name__, {"__value__":[obj.real, obj.imag]}}
+        
+            return {"__python_object__": {"__obj_type__": type(obj).__qualname__,
+                                          "__obj_module__": type(obj).__module__,
+                                          "__type_name__": type(obj).__qualname__,
+                                          "__type_module__": type(obj).__module__,
+                                          "__args__": (obj.real, obj.imag),
+                                          "__kwargs__": None}}
         
         if isinstance(obj, type):
-            return {type(obj).__name__: {"__module__": type(obj).__module__,
-                                         "__value__": f"{obj.__module__}.{obj.__name__}"}}
+            # NOTE: for type objects __obj_module__ should indicate where the
+            # type objects itself has been defined, NOT the module of the 'type'
+            # ancestor (which is always 'builtins')
+            
+            return {"__python_object__":{"__obj_type__": type(obj).__name__,
+                                         "__obj_module__": type(obj).__module__,
+                                         "__type_name__": obj.__name__,
+                                         "__type_module__": obj.__module__,
+                                         "__args__": None, 
+                                         "__kwargs__": None}}
+        
+            #return {type(obj).__name__: {"__module__": type(obj).__module__,
+                                         #"__value__": f"{obj.__module__}.{obj.__name__}"}}
             #return {"__type__": {"__value__": f"{obj.__module__}.{obj.__name__}"}}
         
         if is_namedtuple(obj):
@@ -376,8 +480,8 @@ class CustomEncoder(json.JSONEncoder):
             xy = vu.kernel2array(obj, True)
             return {"__kernel2D__": {"__value__":xy.toList()}}
         
-        if isinstance(obj, prog.SignatureDict):
-            return {".".join([type(obj).__module__, type(obj).__qualname__]): {"__value__": obj.__dict__}}
+        #if isinstance(obj, prog.SignatureDict):
+            #return {".".join([type(obj).__module__, type(obj).__qualname__]): {"__value__": obj.__dict__}}
         
         if isinstance(obj, np.ndarray):
             # NOTE: 2021-11-16 16:21:24
@@ -451,6 +555,132 @@ class CustomEncoder(json.JSONEncoder):
             
         return json.JSONEncoder.default(self, obj)
     
+    @staticmethod
+    def decode_hook(dct):
+        if len(dct) == 1: # only work on dict with a single entry here
+            key = list(dct.keys())[0]
+            data = dct[key]
+            if data is None or not isinstance(data, dict):
+                return dct
+            #print("data", data)
+            val = data.get("__value__", None) # may be a dict, see below for *array__
+
+            if val is None:
+                module = data.get("__obj_module__", "builtins")
+                return dct
+            
+            if key == "__python_type__":
+                rep = ".".join([data["__type_module__"], data["__type_name__"]])
+                
+                return import_item(rep)
+            
+            elif key == "__python_function__":
+                rep = ".".join(data["module"], data["qualname"])
+                
+                return import_item(rep)
+            
+            elif key == "__python_method__":
+                name = data["name"]
+                qualname = data["qualname"]
+                owner = import_item("."join(qualname.strip(".")[:-1]))
+                return getattr(owner, name)
+            
+            elif key == "__python_object__":
+                if data["__value__"] is not None:
+                    return data["__value__"]
+                
+                obj_type_spec = data["__obj_type__"] if data["__obj_module__"] == "builtins" else ".".join([data["__obj_module__"], data["__obj_type__"]])
+                
+                obj_type = import_item(obj_type_spec)
+                
+                
+                    
+                if key == "complex":
+                    if isinstance(val, (tuple, list)) and len(val) == 2:
+                        return complex(*val)
+                    
+                    elif isinstance(val, dict) and all(k in val for k in ("real", "imag")):
+                        return complex(val["real"], val["imag"])
+                    
+                    else:
+                        return val
+                    
+                elif key == "__unitquantity__":
+                    return cq.unit_quantity_from_name_or_symbol(val)
+                
+                elif key.endswith("SignatureDict"):
+                    return prog.SignatureDict(**val)
+                
+                elif key == "__axistags__":
+                    return vigra.AxisTags.fromJSON(val)
+                
+                elif key == "__dtype__":
+                    return np.dtype(val)
+                    
+                elif key.endswith("array__"):
+                    #entry = list(dct.keys())[0]
+                    #val = dct[entry]
+                    if key in ("__structarray__", "__recarray__"):
+                        value = list(tuple(x) for x in val)
+                    else:
+                        value = val #["__value__"]
+                        
+                    if key == "__recarray__":
+                        dtype = json2dtype(dict((name, (json2dtype(value[0]), value[1])) for name, value in data["__dtype__"].items()))
+                    else:
+                        dtype = json2dtype(data["__dtype__"])
+                    
+                    ret = np.array(value, dtype=dtype)
+                    
+                    if key in ("__chararray__", "__recarray__"):
+                        artype = eval(key.replace("__", ""), np.__dict__)
+                        return ret.view(artype)
+                    
+                    if key == "__quantityarray__":
+                        units = cq.unit_quantity_from_name_or_symbol(data["__units__"])
+                        return ret * units
+                    
+                    if entry == "__vigraarray__":
+                        return vigra.VigraArray(ret, axistags=vigra.AxisTags.fromJSON(data["__axistags__"]), 
+                                            order=data.get("__order__", None))
+                    
+                    return ret
+            
+                elif key == "__kernel1D__":
+                    xy = np.array(val)
+                    left = int(xy[0,0])
+                    right = int(xy[-1,0])
+                    values = xy[:,1]
+                    ret = vigra.filters.Kernel1D()
+                    ret.initExplicitly(left, right, values)
+                    return ret
+                
+                elif key == "__kernel2D__":
+                    xy = np.array(val)
+                    upperLeft = (int(xy[-1,-1,0]), int(xy[-1,-1,1]))
+                    lowerRight = (int(xy[0,0,0]), int(xy[0,0,1]))
+                    values = xy[:,:,]
+                    ret = vigra.filters.Kernel2D()
+                    ret.initExplicitly(upperLeft, lowerRight, values)
+                    return ret
+                
+                elif key == "__type__":
+                    #print("val", val)
+                    if "." in val:
+                        components = val.split(".")
+                        typename = components[-1]
+                        modname = ".".join(components[:-1])
+                        #print("modname", modname, "typename", typename)
+                        module = sys.modules[modname]
+                        return eval(typename, module.__dict__)
+                    else:
+                        return eval(typename) # fingers crossed...
+                
+            else:
+                return dct
+        else:
+            return dct
+        
 def dtype2json(d:np.dtype) -> typing.Union[str, dict]:
     """Roundtrip numpy dtype - json string format - write side
     An alternative to the np.lib.format.dtype_to_descr

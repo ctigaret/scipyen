@@ -170,7 +170,8 @@ import pyqtgraph as pg
 from .prog import (safeWrapper, deprecation, 
                    filter_attr, filterfalse_attr,
                    filter_type, filterfalse_type,
-                   iter_attribute, classify_signature, SignatureDict)
+                   iter_attribute, classify_signature, 
+                   )#SignatureDict)
 
 from .datatypes import (is_string, is_vector,
                         RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)

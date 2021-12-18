@@ -18,6 +18,7 @@ from functools import (singledispatch, singledispatchmethod,
                        update_wrapper, wraps,)
 from contextlib import (contextmanager, ContextDecorator,)
 from traitlets.utils.importstring import import_item
+from traitlets import Bunch
 
 import numpy as np
 import neo, vigra
@@ -395,12 +396,10 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                                 if vval != v:
                                     raise AttributeError(f"{self.private_name} expected to have {k} with value {v}; got {vval} instead")
 
-class SignatureDict(types.SimpleNamespace):
-    def __init__(self, / , *args, **kwargs):
-        #self.__signature__ = None
-        super().__init__(*args, **kwargs)
+#class SignatureDict(Bunch):
+    #def __init__(self, / , *args, **kwargs):
+        #super().__init__(*args, **kwargs)
         
-
 class ContextExecutor(ContextDecorator):
     def __enter__(self):
         return self
@@ -451,7 +450,7 @@ class Timer(object):
 
 def classify_signature(sig, funcname:typing.Optional[str]=None,
                        modname:typing.Optional[str]=None,
-                       verbose:bool=False) -> SignatureDict:
+                       verbose:bool=False) -> Bunch:
     """A dictionary-like presentation of an inspect.Signature object.
     
     Useful especially in generic initialization of objects based 
@@ -478,7 +477,7 @@ def classify_signature(sig, funcname:typing.Optional[str]=None,
     Returns:
     --------
     
-    a types.SimpleNamespace object with the following attributes:
+    a traitlets.Bunch object with the following attributes:
     
     'name': str - the name of the callable or None
     
@@ -562,19 +561,22 @@ def classify_signature(sig, funcname:typing.Optional[str]=None,
     
     #varpos_params = dict((parname, None if val.annotation is Parameter.empty else val.annotation) for parname, val in sig.parameters.items() if val.kind is Parameter.VAR_POSITIONAL)
     
-    return SignatureDict(name = funcname, qualname = qualname, module = modname,
+    return Bunch(name = funcname, qualname = qualname, module = modname,
                          positional = posonly_params, named = named_params, 
                          varpos = varpos_params, varkw = varkw_params,
                          returns = sig.return_annotation)
 
-def stringify_signature(f:typing.Union[types.FunctionType, inspect.Signature, SignatureDict], 
+#def stringify_signature(f:typing.Union[types.FunctionType, inspect.Signature, SignatureDict], 
+                        #as_constructor:bool=False):
+def stringify_signature(f:typing.Union[types.FunctionType, inspect.Signature, Bunch], 
                         as_constructor:bool=False):
     
     if isinstance(f, (types.FunctionType, inspect.Signature)):
         f = classify_signature(f)
         
-    elif not isinstance(f, SignatureDict):
-        raise TypeError(f"Expecting a function, a function Signature, or a SignatureDict")
+    #elif not isinstance(f, SignatureDict):
+    elif not isinstance(f, Bunch):
+        raise TypeError(f"Expecting a function, a function Signature, or a traitlets.Bunch; got {type(f).__name__} instead")
     
     if f.name in ("__init__", "__new__"):
         as_constructor = True
