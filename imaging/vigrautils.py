@@ -1821,19 +1821,19 @@ def proposeLayout(img:vigra.VigraArray,
 
 @singledispatch
 def kernel2array(value:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D],
-                 compact:bool=True):
+                 compact:bool=False):
     """
     Generates a numpy array with coordinates and values for the kernel's samples
     Parameters
     ----------
     value: Kernel1D or 2D
-    compact:bool, default is True
+    compact:bool, default is False, see below for effects.
     
     Returns:
     -------
     for a 1D kernel of N samples:
         when compact is False:
-            list [X, KRN] with:
+            tuple (X, KRN) with:
                 X: 1D numpy array with shape (N,) containing kernel coordinates
                     from kernel.left() to kernel.right()
                     ATTENTION:  THE ELEMENTS ARE NOT SAMPLE INDICES!
@@ -1847,12 +1847,12 @@ def kernel2array(value:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel
                 
     for a 2D kernel (N x M samples):
         when compact is False:
-            list[XY, KRN] with:
-                XY: list [X, Y] of 2D numpy arrays with size (N,M) - these are
+            tuple (X, Y, KRN) with:
+                X, Y: 2D numpy arrays with size (N,M) - these are
                     the meshgrid with the coordinates of kernel's samples, 
                     from kernel.lowerRight() to kernel.upperLeft()
                     
-                KRN: 2D numy array with shape (N,M)
+                KRN: 2D numy array with shape (N,M) - kernel sample values
                 
         when compact is True:
             3D numy array with shape (N,M,3) where
@@ -1904,7 +1904,7 @@ def _(value, compact=False):
     y = np.array(list(value[t] for t in range(value.left(), value.right()+1)))
     
     if compact:
-        return np.concatenate([x[:,np.newaxis], y[:,np.newaxis]], axis=1)
+        return np.concatenate([x[:,np.newaxis], y[:,np.newaxis]], axis=1) # => 2D array
     
     return x, y
 
@@ -1925,10 +1925,59 @@ def _(value, compact=False):
             y[kx, ky] = value[x_, y_]
            
     if compact:
-        return np.concatenate([x[0][:,:,np.newaxis], x[1][:,:,np.newaxis], y[:,:,np.newaxis]], axis=2)
+        return np.concatenate([x[0][:,:,np.newaxis], x[1][:,:,np.newaxis], y[:,:,np.newaxis]], axis=2) # => 3D array
             
-    return x, y
+    return x[0], x[1], y
     
+def kernelfromarray(x):
+    if isinstance(x, np.ndarray):
+        if x.ndim == 3: # compact form
+            if x.shape[2] == 1: # => Kernel1D
+                left = int(x[0,0])
+                right = int(x[-1,0])
+                values = x[:,1]
+                ret = vigra.filters.Kernel1D()
+                ret.initExplicitly(left, right, values)
+                return ret
+            
+            elif x.shape[2] == 3: # => Kernel2D
+                upperLeft = (int(x[-1,-1,0]), int(x[-1,-1,1]))
+                lowerRight = (int(x[0,0,0]), int(x[0,0,1]))
+                values = x[:,:,2]
+                ret = vigra.filters.Kernel2D()
+                ret.initExplicitly(upperLeft, lowerRight, values)
+                return ret
+            
+            else:
+                raise ValueError(f"Incorrect argument shape {x.shape}")
+            
+        else:
+            raise ValueError(f"Incorrect argument dimensions {x.ndim}")
+        
+        
+    elif isinstance(x, (tuple, list)) and all(isinstance(x_, np.ndarray) and x_.ndim == 2 for x_ in x):
+        if len(x) == 2: # => Kernel1D
+            left = x[0][0,0]
+            right = x[0][-1,0]
+            values = x[1]
+            ret = vigra.filters.Kernel1D()
+            ret.initExplicitly(left, right, values)
+            return ret
+        
+        elif len(x) == 3: # => Kernel2D
+            upperLeft = (int(x[0][-1,1]), int(x[1][-1,-1]))
+            lowerRight = (int(x[0][0,0]), int(x[1][0,0]))
+            values = x[2]
+            ret = vigra.filters.Kernel2D()
+            ret.initExplicitly(upperLeft, lowerRight, values)
+            return ret
+        
+        else:
+            raise ValueError(f"Incorrect argument size {len(x)}")
+            
+    else:
+        raise TypeError(f"Expecting a tuple or numpy array; got {type(x).__name__} instead")
+        
 
 def getCalibratedAxisSize(image, axis):
     """Returns a calibrated length for "axis" in "image" VigraArray, as a python Quantity

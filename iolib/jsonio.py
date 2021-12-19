@@ -1,7 +1,7 @@
 """JSON codecs
 """
 
-import json, sys, traceback, typing, collections
+import json, sys, traceback, typing, collections, inspect
 from collections import deque, namedtuple
 from functools import (singledispatch, singledispatchmethod, 
                        update_wrapper, wraps,)
@@ -15,129 +15,6 @@ from core import quantities as cq
 from core import prog
 from core.prog import classify_signature
 
-#class ObjectDescription(object):
-    #"""Standardized object description for non-JSON-able objects
-    #Attributes:
-    #typename: object type name
-    #typemodule: module where object type is defined
-    #init: mapping: obj.__init__ signature
-    #new: mapping: obj.__new__ signature
-    #value: obj (instance of typename) or None
-    
-    #"""
-    
-    #def __init__(self, obj):
-        #self._json_ = dict()
-        #self._json_.update(self._makeStub_(obj))
-        #self._init_func_ = self._obj_init_(obj)
-        #self._new_func_ = classify_signature(obj.__new__)
-        #self._makeJSON_(obj)
-        ##try:
-            ##self._json_ = json.JSONEncoder.default(self, obj)
-        ##except TypeError as e:
-        
-    #def _makeStub_(self, o):
-        #ret = {"__obj_type__": type(o).__qualname__,
-               #"__obj_module__": type(o).__module__}
-        
-        #if isinstance(o, type):
-            #ret.update({"__type_name__": o.__qualname__,
-                        #"__type_module__": o.__module__})
-            
-        #else:
-            #ret.update({"__type_name__":type(o).__qualname__,
-                        #"__type_module__": type(o).__module__})
-            
-        #ret["__special__"] = None
-        #ret["__args__"] = tuple()
-        #ret["__kwargs__"] = dict()
-        #ret["__value__"] = None
-        
-        #return ret
-    
-            
-    #@singledispatchmethod
-    #def _obj_init_(self, o):
-        #init_sig = classify_signature(o.__init__)
-        
-    #@_obj_init_.register(complex)
-    #def _(self, o:complex):
-        #args = self._obj_init_args_(o)
-        #return f"complex{args}"
-    
-    ## NOTE: str represent themselves
-    
-    #@_obj_init_.register(tuple)
-    #@_obj_init_.register(list)
-    #def _(self, o:typing.Union[tuple, list]):
-        #if hasattr(o, "_fields"):
-            #fields = ",".join([f"'{f}'" for f in o._fields])
-            #args = tuple(getattr(o, f) for f in o._fields)
-            #if self.typemodule == "__main__":
-                #klassdef = f"collections.namedtuple('{type(o).__name__}', ({fields}))"
-                #return f"eval('''{klassdef}'''){args}"
-            #return f"{type(o).__module__}.{type(o).__name__}(*{args})"
-        
-        
-    #@_obj_init_.register(collections.deque)
-    #def _(self, o:collections.deque):
-        #args=tuple(o)
-        #maxlen = o.maxlen
-        #klassdef = ".".join((self.typemodule, self.typename))
-        #return "eval('''{klassdef}''')({args}, {maxlen})".format(klassdef=klassdef, args=args, maxlen=maxlen)
-        
-    #@singledispatchmethod
-    #def _obj_init_args_(self, o):
-        #return o
-    
-    #@_obj_init_args_.register(complex)
-    #def _(self, o:complex):
-        #return (o.real, o.imag)
-    
-    #@_obj_init_args_.register(type)
-    #def _(self, o:type):
-        #return ".".join((o.__module__, o.__name__))
-    
-    #@_obj_init_args_.register(tuple)
-    #def _(self, o:tuple):
-        #if hasattr(o, "_fields"): # named tuple
-            #return tuple(getattr(o, field) for field in o._fields)
-        
-        #return o
-    
-    #@property
-    #def typename(self):
-        #return self._typename_
-    
-    #@property
-    #def typemodule(self):
-        #return self._typemodule_
-    
-    #@property
-    #def init(self):
-        #return self._init_func_
-    
-    #@property
-    #def new(self):
-        #return self._new_func_
-    
-    ##@property
-    ##def value(self):
-        ##return self._value_
-    
-    ##@property
-    ##def attributes(self):
-        ##return self._attributes_
-    
-    ##@property
-    ##def value(self):
-        ##return self._value_
-    
-    #@property
-    #def object(self):
-        #klass = import_item(".".join((self.typemodule, self.typename)))
-        #return klass(*self._args_, **self._kwargs_)
-    
 class CustomEncoder(json.JSONEncoder):
     """Almost complete round trip for a subset of Python types - encoding side.
     
@@ -165,21 +42,38 @@ class CustomEncoder(json.JSONEncoder):
     
     NOTE: general schema:
     
-    {"__python_object__":{
-        "__obj_type__": str, name of the object's type,
+    Below, <key> is one of: 
+    "__python_type__", "__python_function__", "__python_method__", 
+    "__python_object__"
+    
+    {<key>:{
+        "__obj_type__": str; the name of the object's type,
         
-        "__obj_module__": str, the name of the module where object type is defined
+        "__obj_module__": str; the name of the module where the object's type is
+                            defined
         
         "__type_name__": str; for type objects, the name of the object 
                                 (obj.'__name__');
                                 
                               for instances, same value as __obj_type__
                               
-        "__type_module__": str: for type objects, the name of the module where 
+        "__type_module__": str; for type objects, the name of the module where 
                                 the object (a type) is defined;
                                 
                                 for instances, same value as __obj_module__
                                 
+        "__init__": str; the qualified name of initializer function or method, a 
+                    dict (the signature of the object's __init__ method), or 
+                    None
+                    
+                    When a str, this the qualified name of the function used to 
+                    create (initialize) the object.
+                    
+                    The parameters passed to this function are given in 
+                    "__args__", "__named__" and "__kwargs__", detailed below
+                    
+        "__new__": dict, or None
+        
         "__args__": tuple; parameters for object intialization, or empty tuple
         
         "__kwargs__": dict; keyword parameters for object initialization, or 
@@ -196,12 +90,40 @@ class CustomEncoder(json.JSONEncoder):
                             basic Python types that can be directly serializable
                             in JSON using Python's stock 'json' module.
                             
-        
-        
         }
     }
-    """
     
+    NOTE: Object initialization from a JSON data structure ('data'):
+    
+    a) when both data["__init__"] and data["__new__"] are None (JSON 'null')
+    
+        Uses object's type as a callable; parameters are retrieved from 
+        data["__args__"], data["__named__"],  and data["__kwargs__"]
+        
+    b) when data["__init__"] is a str that resolves to a function:
+    
+        Use the function as initializer; parameters are retrieved from 
+        data["__args__"], data["__named__"],  and data["__kwargs__"]
+        
+    c) when data["__init__"] is a dict representation of function signature:
+        c.1) When data["__init__"]["name"] is "__init__":
+        
+            creates a 'stub' object by calling the constructor:
+            
+            obj = object_type.__new__(object_type)
+            
+            then initializes the object:
+            
+            obj.__init__(...) 
+            
+            parameters for obj.__init__are retrieved from data["__args__"], 
+            data["__named__"],  and data["__kwargs__"] <-- TODO: try to match 
+            with __init__ signature
+            
+    
+    
+    """
+    #### BEGIN NOTES
     # NOTE: Note Keys in key/value pairs of JSON are always of the type str. 
     # When a dictionary is converted into JSON, all the keys of the dictionary
     # are coerced to strings. As a result of this, if a dictionary is converted 
@@ -330,50 +252,68 @@ class CustomEncoder(json.JSONEncoder):
     # dt = np.dtype('c16')  # 128-bit complex floating-point number
     # dt = np.dtype('a25')  # 25-length zero-terminated bytes
     # dt = np.dtype('U25')  # 25-character string
-
+    
+    #### END NOTES
+    
     def _makeStub_(self, o):
         if isinstance(o, type):
-            ret = {"__python_type__":{"__type_name__": o.__qualname__,
-                                      "__type_module__": o.__module__}}
+            header = "__python_type__"
+            ret = {"__type_name__": o.__qualname__,
+                   "__type_module__": o.__module__}
+            
         elif inspect.isfunction(o):
-            ret = {"__python_function__": dict(prog.classify_signature(o))}
+            header = "__python_function__"
+            ret = dict(prog.classify_signature(o))
                                              
         elif inspect.ismethod(o):
+            header = "__python_method__"
             # NOTE/TODO: 2021-12-18 22:26:27
             # can I differentiate between class method and instance method?
-            ret = {"__python_method__": dict(prog.classify_signature(o))}
+            ret = dict(prog.classify_signature(o))
                                              
         else:
-            ret = {"__python_object__":{"__obj_type__": type(o).__qualname__,
-                                        "__obj_module__": type(o).__module__,
-                                        "__args__": tuple(),
-                                        "__named__":dict(),
-                                        "__kwargs__": dict(),
-                                        "__value__": None,
-                                        "__subtype__": None,
-                                        "__dtype__": None,
-                                        }
-                  }
-        
-        return ret
+            header = "__python_object__"
+            ret = {"__obj_type__":     type(o).__qualname__,
+                   "__obj_module__":   type(o).__module__,
+                   "__init__":         None,
+                   "__new__":          None,
+                   "__args__":         tuple(),
+                   "__named__":        dict(),
+                   "__kwargs__":       dict(),
+                   "__value__":        None,
+                   "__subtype__":      None,
+                   "__dtype__":        None,
+                   }
+                  
+        return header, ret
     
     @singledispatchmethod
     def _makeJSON_(self, o):
-        """General case for all types supported by Python's own json module
+        """Almost general case
+        
         """
-        ret = self._make_stub_(o)
-        ret["__value__"] = json.JSONEncoder.default(self, o)
+        return {"__value__": json.JSONEncoder.default(self, o)}
+        
+    @_makeJSON_.register(tuple)
+    def _(self, o:tuple):
+        from core.datatypes import is_namedtuple
+        if is_namedtuple(o):
+            return {"__named__": dict((f, getattr(o,f)) for f in o._fields),
+                    "__subtype__": "collections.namedtuple"}
+        
+        return {"__value__": json.JSONEncoder.default(self, o)}
+        
     
     @_makeJSON_.register(complex)
     def _(self, o:complex):
-        ret = self._make_stub_(o)
-        ret["__args__"] = (o.real, o.imag)
+        return {"__args__": (o.real, o.imag)}
         
     @_makeJSON_.register(vigra.filters.Kernel1D)
-    def _(self, o:vigra.filters.Kernel1D):
+    @_makeJSON_.register(vigra.filters.Kernel2D)
+    def _(self, o:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D]):
         import vigrautils as vu
         xy = vu.kernel2array(obj, True)
-        self._json_["__args__"] = xy
+        return {"__args__" : list(xy)}
         
     def default(self, obj):
         # NOTE: 2021-12-17 22:59:34
@@ -453,7 +393,7 @@ class CustomEncoder(json.JSONEncoder):
             # type objects itself has been defined, NOT the module of the 'type'
             # ancestor (which is always 'builtins')
             
-            return {"__python_object__":{"__obj_type__": type(obj).__name__,
+            return {"__python_type__":{"__obj_type__": type(obj).__name__,
                                          "__obj_module__": type(obj).__module__,
                                          "__type_name__": obj.__name__,
                                          "__type_module__": obj.__module__,
@@ -472,13 +412,13 @@ class CustomEncoder(json.JSONEncoder):
                          "__value__":obj,
                          "fields": fields}}
         
-        if isinstance(obj, vigra.filters.Kernel1D):
-            xy = vu.kernel2array(obj, True)
-            return {"__kernel1D__": {"__value__":xy.toList()}}
+        #if isinstance(obj, vigra.filters.Kernel1D):
+            #xy = vu.kernel2array(obj, True)
+            #return {"__kernel1D__": {"__value__":xy.toList()}}
         
-        if isinstance(obj, vigra.filters.Kernel2D):
-            xy = vu.kernel2array(obj, True)
-            return {"__kernel2D__": {"__value__":xy.toList()}}
+        #if isinstance(obj, vigra.filters.Kernel2D):
+            #xy = vu.kernel2array(obj, True)
+            #return {"__kernel2D__": {"__value__":xy.toList()}}
         
         #if isinstance(obj, prog.SignatureDict):
             #return {".".join([type(obj).__module__, type(obj).__qualname__]): {"__value__": obj.__dict__}}
@@ -565,35 +505,101 @@ class CustomEncoder(json.JSONEncoder):
             #print("data", data)
             val = data.get("__value__", None) # may be a dict, see below for *array__
 
-            if val is None:
-                module = data.get("__obj_module__", "builtins")
-                return dct
+            #if val is None:
+                #module = data.get("__obj_module__", "builtins")
+                #return dct
             
             if key == "__python_type__":
-                rep = ".".join([data["__type_module__"], data["__type_name__"]])
-                
-                return import_item(rep)
+                if data["__type_module__"] in sys.modules:
+                    module = sys.modules[data["__type__module__"]]
+                    return eval(data["__type_name__"], module.__dict__)
+                else:
+                    rep = ".".join([data["__type_module__"], data["__type_name__"]])
+                    return import_item(rep)
             
             elif key == "__python_function__":
-                rep = ".".join(data["module"], data["qualname"])
-                
-                return import_item(rep)
+                # NOTE: 2021-12-19 12:03:05
+                # data is a dict (Bunch) produced by classify_signature
+                if data["module"] in sys.modules:
+                    module = sys.modules[data["module"]]
+                    return eval(data["qualname"], module.__dict__)
+                else:
+                    rep = ".".join(data["module"], data["qualname"])
+                    return import_item(rep)
             
             elif key == "__python_method__":
                 name = data["name"]
+                modname = data["module"]
                 qualname = data["qualname"]
-                owner = import_item("."join(qualname.strip(".")[:-1]))
-                return getattr(owner, name)
+                owner_name = ".".join(qualname.strip(".")[:-1])
+                if modname in sys.modules:
+                    module = sys.modules[modname]
+                    owner = eval(owner_name, module.__dict__)
+                    
+                else:
+                    owner = import_item(".".join([modname, owner_name]))
+                    
+                #return getattr(owner, name)
+                return inspect.getattr_static(owner, name)
             
             elif key == "__python_object__":
-                if data["__value__"] is not None:
-                    return data["__value__"]
+                args = data.get("__args__", tuple())
+                named = data.get("__named__", dict())
+                kwargs = data.get("__kwargs__", dict())
+                kwargs.update(named)
                 
-                obj_type_spec = data["__obj_type__"] if data["__obj_module__"] == "builtins" else ".".join([data["__obj_module__"], data["__obj_type__"]])
+                if data["__obj_module__"] in sys.modules: # this includes the 'builtins'
+                    obj_module = sys.modules[data["__obj_module__"]]
+                    obj_type = eval(data["__obj_type__"], obj_module.__dict__)
+                    
+                else:
+                    obj_type = import_item(".".join([data["__obj_module__"], data["__obj_type__"]]))
+                    
+                if isinstance(data["__init__"], str):
+                    init_func = import_item(data["__init__"])
+                    #return init_func(*args, **kwargs)
                 
-                obj_type = import_item(obj_type_spec)
+                elif isinstance(data["__init__"], dict) and data["__init__"]["name"] == "__init__" and data["__init__"]["module"] == data["__obj_module__"]:
+                    return obj_type(*args, **kwargs)
+                
+                elif isinstance(data["__new__"], dict) and data["__new__"]["name"] == "__new__" and data["__new__"]["module"] == data["__obj_module__"]:
+                    return obj_type.__new__(obj_type, *args, **kwargs)
+                    
+                    
+                
+                #if data["__obj_type__"] in data["__init__"]["qualname"]:
+                    ## this is an __init__ defined in obj_type
+                    
+                #elif data
                 
                 
+                if issubclass(obj_type, np.ndarray):
+                
+                    if obj_type.__name__ == "UnitQuantity":
+                        obj = cq.unit_quantity_from_name_or_symbol(args[0])
+                        
+                    #elif obj_type.__name__ == "VigraArray":
+                        
+                        
+                else:
+                    if obj_type.__name__ == "Kernel1D":
+                        xy = np.array(args[0])
+                        left = int(xy[0,0])
+                        right = int(xy[-1,0])
+                        values = xy[:,1]
+                        obj = obj_type()
+                        obj.initExplicitly(left, right, values)
+                        
+                    elif obj_type.__name__ == "Kernel2D":
+                        xy = np.array(args[0])
+                        upperLeft = (int(xy[-1,-1,0]), int(xy[-1,-1,1]))
+                        lowerRight = (int(xy[0,0,0]), int(xy[0,0,1]))
+                        values = xy[:,:,2]
+                        obj = obj_type()
+                        obj.initExplicitly(upperLeft, lowerRight, values)
+                        
+                        
+                    obj = obj_type(*args, **kwargs)
                     
                 if key == "complex":
                     if isinstance(val, (tuple, list)) and len(val) == 2:
@@ -668,13 +674,13 @@ class CustomEncoder(json.JSONEncoder):
                     #print("val", val)
                     if "." in val:
                         components = val.split(".")
-                        typename = components[-1]
+                        objName = components[-1]
                         modname = ".".join(components[:-1])
-                        #print("modname", modname, "typename", typename)
+                        #print("modname", modname, "objName", objName)
                         module = sys.modules[modname]
-                        return eval(typename, module.__dict__)
+                        return eval(objName, module.__dict__)
                     else:
-                        return eval(typename) # fingers crossed...
+                        return eval(objName) # fingers crossed...
                 
             else:
                 return dct
@@ -695,12 +701,12 @@ def dtype2json(d:np.dtype) -> typing.Union[str, dict]:
     
     #print("dtype2json", d)
     
-    h5pyjson = h5pydtype2json(d)
+    h5pyjson = h5pyDtype2JSON(d)
     
     if h5pyjson is not None:
         return h5pyjson
     
-    pandasjson = pandasdtype2json(d)
+    pandasjson = pandasDtype2JSON(d)
     if pandasjson is not None:
         return pandasjson
     
@@ -715,7 +721,7 @@ def dtype2json(d:np.dtype) -> typing.Union[str, dict]:
         else:
             return d.name
     
-def h5pydtype2json(d):
+def h5pyDtype2JSON(d):
     """Checks if d is a special h5py dtype.
     Returns a json representation (dict) if d is a h5py speciall dtype, or None.
     """
@@ -745,7 +751,7 @@ def h5pydtype2json(d):
             return {vi.__name__: {"__init__": f"string_dtype('{si.encoding}', {si.length})",
                                 "__ns__": "h5py"}}
             
-def pandasdtype2json(d):
+def pandasDtype2JSON(d):
     """Checks if d is a pandas extension dtype (for standard pandas extensions)
     Returns a json representation (either str or dict) id d is a pandas extension
     dtype; returns None otherwise.
@@ -998,13 +1004,13 @@ def decode_hook(dct):
             #print("val", val)
             if "." in val:
                 components = val.split(".")
-                typename = components[-1]
+                objName = components[-1]
                 modname = ".".join(components[:-1])
-                #print("modname", modname, "typename", typename)
+                #print("modname", modname, "objName", objName)
                 module = sys.modules[modname]
-                return eval(typename, module.__dict__)
+                return eval(objName, module.__dict__)
             else:
-                return eval(typename) # fingers crossed...
+                return eval(objName) # fingers crossed...
             
         else:
             return dct
@@ -1028,4 +1034,140 @@ def load(fp, *args, **kwargs):
     return json.load(fp, *args, **kwargs)
 
 
+def json2python(dct):
+    """
+    NOTE: general schema:
     
+    Below, <key> is one of: 
+    "__python_type__", "__python_function__", "__python_method__", 
+    "__python_object__"
+    
+    {<key>:{
+        "__obj_type__": str; the name of the object's type,
+        
+        "__obj_module__": str; the name of the module where the object's type is
+                            defined
+        
+        "__type_name__": str; for type objects, the name of the object 
+                                (obj.'__name__');
+                                
+                              for instances, same value as __obj_type__
+                              
+        "__type_module__": str; for type objects, the name of the module where 
+                                the object (a type) is defined;
+                                
+                                for instances, same value as __obj_module__
+                                
+        "__init__": str; the qualified name of initializer function or method, a 
+                    dict (the signature of the object's __init__ method), or 
+                    None
+                    
+                    When a str, this the qualified name of the function used to 
+                    create (initialize) the object.
+                    
+                    The parameters passed to this function are given in 
+                    "__args__", "__named__" and "__kwargs__", detailed below
+                    
+        "__new__": dict, or None
+        
+        "__args__": tuple; parameters for object intialization, or empty tuple
+        
+        "__kwargs__": dict; keyword parameters for object initialization, or 
+                            empty dict
+                            
+        "__subtype__": None or the str "__structarray__" (for numpy structarrays)
+        
+        "__dtype__": str; representation of the numpy dtye, or json representation
+                        of a specialized dtype (such as h5py special dtypes, or 
+                        pandas extension dtypes)
+                        
+        "__value__": str: JSON representation of the value, or None (a.k.a null)
+                            this is usually the JSON representation for objects of
+                            basic Python types that can be directly serializable
+                            in JSON using Python's stock 'json' module.
+                            
+        }
+    }
+    
+    NOTE: Object initialization from a JSON data structure ('data'):
+    
+    a) when both data["__init__"] and data["__new__"] are None (JSON 'null')
+    
+        Uses object's type as a callable; parameters are retrieved from 
+        data["__args__"], data["__named__"],  and data["__kwargs__"]
+        
+    b) when data["__init__"] is a str that resolves to a function:
+    
+        Use the function as initializer; parameters are retrieved from 
+        data["__args__"], data["__named__"],  and data["__kwargs__"]
+        
+    c) when data["__init__"] is a dict representation of function signature:
+        c.1) When data["__init__"]["name"] is "__init__":
+        
+            creates a 'stub' object by calling the constructor:
+            
+            obj = object_type.__new__(object_type)
+            
+            then initializes the object:
+            
+            obj.__init__(...) 
+            
+            parameters for obj.__init__are retrieved from data["__args__"], 
+            data["__named__"],  and data["__kwargs__"] <-- TODO: try to match 
+            with __init__ signature
+            
+    """
+    if len(dct) == 1:
+        key = list(dct.keys())[0]
+        
+        data = dct[key]
+        
+        if data is None or not isinstance(data, dict):
+            return dct
+        
+        if key == "__python_type__":
+            return resolveObject(data["__type_module__"], data["__type_name__"])
+            
+        elif key == "__python_function__":
+            return resolveObject(data["module"], data["qualname"])
+        
+        elif key == "__python_method__":
+            name = data["name"]
+            modname = data["module"]
+            qualname = data["qualname"]
+            owner_type_name = ".".join(qualname.strip(".")[:-1])
+            owner = resolveObject(data["module"], owner_type_name)
+            #return getattr(owner, name)
+            return inspect.getattr_static(owner, name)
+        
+        elif key == "__python_object__":
+            # 1) figure out object type
+            obj_type = resolveObject(data["__obj_module__"], data["__obj_type__"])
+            
+        else:
+            return dct
+            
+        
+    else:
+        return dct
+
+def resolveObject(modName, objName):
+    """Returns an object based on object's symbol and module's name.
+    
+    The object's symbol 'objName' is expected to be defined at module level in
+    the module named by modName.
+    
+    The object may be: a type, a function, or an instance created at module
+    level.
+    
+    """
+    if modName in sys.modules:
+        module = sys.modules[modName]
+        return eval(objName, module.__dict__)
+    
+    else:
+        rep = ".".join([modName, objName])
+        return import_item(rep)
+    
+def initObject(data):
+    pass
