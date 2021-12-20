@@ -18,7 +18,7 @@ from neo.core.baseneo import BaseNeo, _check_annotations
 #from core.neoevent import (_new_Event_v1, _new_Event_v2,)
 #from core.neoepoch import _new_Epoch_v1
 
-from core.prog import (safeWrapper, classify_signature,)
+from core.prog import (safeWrapper, classifySignature,)
 
 #neo.io.axonio.AxonRawIO = _axonrawio.AxonRawIO_v1
 
@@ -30,7 +30,7 @@ original ={"neo.core.analogsignal._new_AnalogSignalArray": neo.core.analogsignal
            } 
 
 def _patch_new_neo(original_f, *args, **kwargs):
-    sig = classify_signature(original_f)
+    sig = classifySignature(original_f)
     sig_named = list(sig.named.keys())
     named = dict()
     var = list()

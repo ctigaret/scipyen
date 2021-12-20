@@ -1930,31 +1930,26 @@ def _(value, compact=False):
     return x[0], x[1], y
     
 def kernelfromarray(x):
-    if isinstance(x, np.ndarray):
-        if x.ndim == 3: # compact form
-            if x.shape[2] == 1: # => Kernel1D
-                left = int(x[0,0])
-                right = int(x[-1,0])
-                values = x[:,1]
-                ret = vigra.filters.Kernel1D()
-                ret.initExplicitly(left, right, values)
-                return ret
-            
-            elif x.shape[2] == 3: # => Kernel2D
-                upperLeft = (int(x[-1,-1,0]), int(x[-1,-1,1]))
-                lowerRight = (int(x[0,0,0]), int(x[0,0,1]))
-                values = x[:,:,2]
-                ret = vigra.filters.Kernel2D()
-                ret.initExplicitly(upperLeft, lowerRight, values)
-                return ret
-            
-            else:
-                raise ValueError(f"Incorrect argument shape {x.shape}")
-            
+    if isinstance(x, np.ndarray):# compact form
+        if x.ndim == 2 and x.shape[1] == 2: # => Kernel1D
+            left = int(x[0,0])
+            right = int(x[-1,0])
+            values = x[:,1]
+            ret = vigra.filters.Kernel1D()
+            ret.initExplicitly(left, right, values)
+            return ret
+        
+        elif x.ndim == 3 and x.shape[2] == 3: # => Kernel2D
+            upperLeft = (int(x[-1,-1,0]), int(x[-1,-1,1]))
+            lowerRight = (int(x[0,0,0]), int(x[0,0,1]))
+            values = x[:,:,2]
+            ret = vigra.filters.Kernel2D()
+            ret.initExplicitly(upperLeft, lowerRight, values)
+            return ret
+        
         else:
-            raise ValueError(f"Incorrect argument dimensions {x.ndim}")
-        
-        
+            raise ValueError(f"Incorrect argument diensions or shape: {x.shape}")
+            
     elif isinstance(x, (tuple, list)) and all(isinstance(x_, np.ndarray) and x_.ndim == 2 for x_ in x):
         if len(x) == 2: # => Kernel1D
             left = x[0][0,0]

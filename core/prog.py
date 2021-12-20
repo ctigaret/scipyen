@@ -448,7 +448,7 @@ class Timer(object):
         
 # ### BEGIN module functions
 
-def classify_signature(sig, funcname:typing.Optional[str]=None,
+def classifySignature(sig, funcname:typing.Optional[str]=None,
                        modname:typing.Optional[str]=None,
                        verbose:bool=False) -> Bunch:
     """A dictionary-like presentation of an inspect.Signature object.
@@ -572,7 +572,7 @@ def stringify_signature(f:typing.Union[types.FunctionType, inspect.Signature, Bu
                         as_constructor:bool=False):
     
     if isinstance(f, (types.FunctionType, inspect.Signature)):
-        f = classify_signature(f)
+        f = classifySignature(f)
         
     #elif not isinstance(f, SignatureDict):
     elif not isinstance(f, Bunch):
@@ -1796,3 +1796,119 @@ class WithDescriptors(object):
 setup_descriptor = WithDescriptors.setup_descriptor
 remove_descriptor= WithDescriptors.remove_descriptor
 
+def resolveObject(modName, objName):
+    """Returns an object based on object's symbol and module's name.
+    
+    The object's symbol 'objName' is expected to be defined at module level in
+    the module named by modName.
+    
+    The object may be: a type, a function, or an instance created at module
+    level.
+    
+    """
+    if modName in sys.modules:
+        module = sys.modules[modName]
+        return eval(objName, module.__dict__)
+    
+    else:
+        rep = ".".join([modName, objName])
+        return import_item(rep)
+    
+#def typedDispatch(func):
+    #"""Single-dispatch decorator for generic functions operating on types.
+
+    #This is a modifed version of Python's functools.singledispatch.
+    
+    #The generic function and its implementations are expected to accept at 
+    #least one argument, which is a type object. 
+
+    #From functools.singledispatch:
+    #Transforms a function into a generic function, which can have different
+    #behaviours depending upon the the first argument, which must be a type. 
+    #The decorated function acts as the default implementation, and additional
+    #implementations can be registered using the register() attribute of the
+    #generic function.
+    
+    
+    #"""
+    #import types, weakref
+
+    #registry = {}
+    #dispatch_cache = weakref.WeakKeyDictionary()
+    #cache_token = None
+
+    #def dispatch(cls):
+        #"""generic_func.dispatch(cls) -> <function implementation>
+
+        #Runs the dispatch algorithm to return the best available implementation
+        #for the given *cls* registered on *generic_func*.
+
+        #"""
+        #nonlocal cache_token
+        #if cache_token is not None:
+            #current_token = get_cache_token()
+            #if cache_token != current_token:
+                #dispatch_cache.clear()
+                #cache_token = current_token
+        #try:
+            #impl = dispatch_cache[cls]
+        #except KeyError:
+            #try:
+                #impl = registry[cls]
+            #except KeyError:
+                #impl = _find_impl(cls, registry)
+            #dispatch_cache[cls] = impl
+        #return impl
+
+    #def register(cls, func=None):
+        #"""generic_func.register(cls, func) -> func
+
+        #Registers a new implementation for the given *cls* on a *generic_func*.
+
+        #"""
+        #nonlocal cache_token
+        #if func is None:
+            #if isinstance(cls, type):
+                #return lambda f: register(cls, f)
+            #ann = getattr(cls, '__annotations__', {})
+            #if not ann:
+                #raise TypeError(
+                    #f"Invalid first argument to `register()`: {cls!r}. "
+                    #f"Use either `@register(some_class)` or plain `@register` "
+                    #f"on an annotated function."
+                #)
+            #func = cls
+
+            ## only import typing if annotation parsing is necessary
+            #from typing import get_type_hints
+            #argname, cls = next(iter(get_type_hints(func).items()))
+            #if not isinstance(cls, type):
+                #raise TypeError(
+                    #f"Invalid annotation for {argname!r}. "
+                    #f"{cls!r} is not a class."
+                #)
+        #registry[cls] = func
+        #if cache_token is None and hasattr(cls, '__abstractmethods__'):
+            #cache_token = get_cache_token()
+        #dispatch_cache.clear()
+        #return func
+
+    #def wrapper(*args, **kw):
+        #if len(args) < 1:
+            #raise TypeError(f'{funcname} requires at least '
+                            #'1 positional argument')
+
+        ## first argument of the implementation IS expected to be a type
+        #if not isinstance(args[0], type):
+            #raise TypeError(f"first positional argument in {funcname} must be a type; got {type(args[0]).__name__} instead")
+        
+        #return dispatch(args[0])(*args, **kw)
+
+    #funcname = getattr(func, '__name__', 'singledispatch function')
+    #registry[object] = func
+    #wrapper.register = register
+    #wrapper.dispatch = dispatch
+    #wrapper.registry = types.MappingProxyType(registry)
+    #wrapper._clear_cache = dispatch_cache.clear
+    #update_wrapper(wrapper, func)
+    #return wrapper
