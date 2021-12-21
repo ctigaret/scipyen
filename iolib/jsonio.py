@@ -1,23 +1,10 @@
 """JSON codecs
+NOTE: 2021-12-21 16:11:42
+Using simplejson as json
 """
 
-import json, sys, traceback, typing, collections, inspect
-
-#### BEGIN HACK workaround named tuples
-try:
-    from _json import encode_basestring_ascii as c_encode_basestring_ascii
-except ImportError:
-    c_encode_basestring_ascii = None
-try:
-    from _json import encode_basestring as c_encode_basestring
-except ImportError:
-    c_encode_basestring = None
-try:
-    from _json import make_encoder as c_make_encoder
-except ImportError:
-    c_make_encoder = None
-#### END HACK workaround named tuples
-
+import sys, traceback, typing, collections, inspect
+import simplejson as json
 from collections import deque, namedtuple
 from functools import (singledispatch, singledispatchmethod, 
                        update_wrapper, wraps,)
@@ -31,15 +18,15 @@ from core import quantities as cq
 from core import prog
 from core.prog import classifySignature, resolveObject #, typedDispatch
 
-class NamedTupleWrapper(object):
-    """Wraps a named tuple so that it can be properly encoded/decoded in JSON
-    """
-    def __init__(self, obj):
-        from core.datatypes import is_namedtuple
-        if not is_namedtuple(obj):
-            raise TypeError(f"Expecting a named tuple; got {type(obj).__name__} instead")
+#class NamedTupleWrapper(object):
+    #"""Wraps a named tuple so that it can be properly encoded/decoded in JSON
+    #"""
+    #def __init__(self, obj):
+        #from core.datatypes import is_namedtuple
+        #if not is_namedtuple(obj):
+            #raise TypeError(f"Expecting a named tuple; got {type(obj).__name__} instead")
         
-        self.obj = obj
+        #self.obj = obj
                 
         
 
@@ -283,6 +270,13 @@ class CustomEncoder(json.JSONEncoder):
     
     #### END NOTES
     
+    #def __init__(self, *args, skipkeys=False, ensure_ascii=True,
+            #check_circular=True, allow_nan=True, sort_keys=False,
+            #indent=None, separators=None, default=None):
+        #super().__init__(*args, skipkeys=skipkeys, ensure_ascii=ensure_ascii,
+            #check_circular=check_circular, allow_nan=allow_nan, sort_keys=sort_keys,
+            #indent=indent, separators=separators, default=default)
+        
     def makeJSONStub(self, o):
         if isinstance(o, type):
             header = "__python_type__"
@@ -319,16 +313,38 @@ class CustomEncoder(json.JSONEncoder):
     
     @singledispatchmethod
     def object2JSON(self, o):
-        """Almost general case
+        """Almost general case, returning a serializable representation of obj.
+        This is one, or a combination of, the types supported by json directly:
+        
+        Python                                      JSON
+        ===================================================
+        dict, namedtuple(*)                         object
+        list, tuple                                 array
+        str                                         string
+        int, float, int- & float-derived Enums      number
+        True                                        true
+        False                                       false
+        None                                        null
+
+        *) For simplejson only !!!
+
+        The reverse correspondence is:
+        
+        JSON                Python
+        ===================================================
+        object              dict
+        array               list
+        string              str
+        number (int)        int
+        number (real)       float
+        true                True
+        false               False
+        null                None
+
         
         """
-        from core.datatypes import is_namedtuple
         hdr, ret = self.makeJSONStub(o)
-        if is_namedtuple(o):
-            ret.update({"__named__": dict((f, getattr(o.obj,f)) for f in o.obj._fields),
-                "__subtype__": "collections.namedtuple"})
-        else:
-            ret.update({"__value__": json.JSONEncoder.default(self, o)})
+        ret.update({"__value__": json.JSONEncoder.default(self, o)})
         return {hdr:ret}
     
     @object2JSON.register(type)
@@ -336,88 +352,150 @@ class CustomEncoder(json.JSONEncoder):
         hdr, ret = self.makeJSONStub(o)
         return {hdr:ret}
     
-    @object2JSON.register(NamedTupleWrapper)
-    def _(self, o:NamedTupleWrapper):
-        # NOTE: 2021-12-21 10:33:42
-        # namedtuples need to be wrapped like this in order to force json to
-        # call this encoder's default (the 'culprit' is json._make_iterencode, 
-        # which encodes the types supported by JSON directly, BEFORE ever calling
-        # encoder.default)
+    #@object2JSON.register(NamedTupleWrapper)
+    #def _(self, o:NamedTupleWrapper):
+        ## NOTE: 2021-12-21 10:33:42
+        ## namedtuples need to be wrapped like this in order to force json to
+        ## call this encoder's default (the 'culprit' is json._make_iterencode, 
+        ## which encodes the types supported by JSON directly, BEFORE ever calling
+        ## encoder.default)
         
-        return {"__named__": dict((f, getattr(o.obj,f)) for f in o.obj._fields),
-                "__subtype__": "collections.namedtuple"}
+        #return {"__named__": dict((f, getattr(o.obj,f)) for f in o.obj._fields),
+                #"__subtype__": "collections.namedtuple"}
             
     @object2JSON.register(complex)
     def _(self, o:complex):
         return {"__args__": (o.real, o.imag)}
+    
+    @object2JSON.register(deque)
+    def _(self, o:deque):
+        hdr, ret = self.makeJSONStub(o)
+        ret.update({"__value__": list(o)})
+        return {hdr:ret}
         
     @object2JSON.register(vigra.filters.Kernel1D)
     @object2JSON.register(vigra.filters.Kernel2D)
     def _(self, o:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D]):
         from imaging.vigrautils import kernel2array
+        hdr, ret = self.makeJSONStub(o)
         xy = kernel2array(o, True)
-        return {"__args__" : xy.tolist(),
-                "__init__": classifySignature(kernelfromjson)}
+        ret.update({"__args__" : xy.tolist(),
+                    "__init__": classifySignature(kernelfromjson)})
     
-    def iterencode(self, o, _one_shot=False):
-        """Overrides the json's default iterencode for namded tuples
-        FIXME: for collections, any contained namedtuple is treated as a regular
-        # tuple (see json._make_iterencode)!
-        """
-        from core.datatypes import is_namedtuple
-        print("iterencode")
-        if self.check_circular:
-            markers = {}
-        else:
-            markers = None
-        if self.ensure_ascii:
-            _encoder = encode_basestring_ascii
-        else:
-            _encoder = encode_basestring
+    #def encode(self, o):
+        #"""Return a JSON string representation of a Python data structure.
 
-        def floatstr(o, allow_nan=self.allow_nan,
-                _repr=float.__repr__, _inf=INFINITY, _neginf=-INFINITY):
-            # Check for specials.  Note that this type of test is processor
-            # and/or platform-specific, so do tests which don't depend on the
-            # internals.
+        #>>> from json.encoder import JSONEncoder
+        #>>> JSONEncoder().encode({"foo": ["bar", "baz"]})
+        #'{"foo": ["bar", "baz"]}'
 
-            if o != o:
-                text = 'NaN'
-            elif o == _inf:
-                text = 'Infinity'
-            elif o == _neginf:
-                text = '-Infinity'
-            else:
-                return _repr(o)
+        #"""
+        #print(f"CustomEncoder.encode {type(o).__name__}")
+        ## This is for extremely simple cases and benchmarks.
+        #if isinstance(o, str):
+            #if self.ensure_ascii:
+                #return encode_basestring_ascii(o)
+            #else:
+                #return encode_basestring(o)
+        ## This doesn't pass the iterator directly to ''.join() because the
+        ## exceptions aren't as detailed.  The list call should be roughly
+        ## equivalent to the PySequence_Fast that ''.join() would do.
+        #chunks = self.iterencode(o, _one_shot=True)
+        #if not isinstance(chunks, (list, tuple)):
+            #chunks = list(chunks)
+        #return ''.join(chunks)
 
-            if not allow_nan:
-                raise ValueError(
-                    "Out of range float values are not JSON compliant: " +
-                    repr(o))
+    #def iterencode(self, o, _one_shot=False):
+        #"""Overrides the json's default iterencode for namded tuples
+        #FIXME: for collections, any contained namedtuple is treated as a regular
+        ## tuple (see json._make_iterencode)!
+        #"""
+        #from core.datatypes import is_namedtuple
+        #print(f"iterencode {type(o).__name__}, one shot: {_one_shot}")
+        #if self.check_circular:
+            #markers = {}
+        #else:
+            #markers = None
+        #if self.ensure_ascii:
+            #_encoder = encode_basestring_ascii
+        #else:
+            #_encoder = encode_basestring
 
-            return text
+        #def floatstr(o, allow_nan=self.allow_nan,
+                #_repr=float.__repr__, _inf=INFINITY, _neginf=-INFINITY):
+            ## Check for specials.  Note that this type of test is processor
+            ## and/or platform-specific, so do tests which don't depend on the
+            ## internals.
 
-        if is_namedtuple(o):
-            o = NamedTupleWrapper(o)
+            #if o != o:
+                #text = 'NaN'
+            #elif o == _inf:
+                #text = 'Infinity'
+            #elif o == _neginf:
+                #text = '-Infinity'
+            #else:
+                #return _repr(o)
 
-        if (_one_shot and c_make_encoder is not None
-                and self.indent is None):
-            # NOTE: 2021-12-21 11:53:27
-            # only for one shot AND is the C encoder is available
-            _iterencode = c_make_encoder(
-                markers, self.default, _encoder, self.indent,
-                self.key_separator, self.item_separator, self.sort_keys,
-                self.skipkeys, self.allow_nan)
-        else:
-            _iterencode = _make_iterencode(
-                markers, self.default, _encoder, self.indent, floatstr,
-                self.key_separator, self.item_separator, self.sort_keys,
-                self.skipkeys, _one_shot)
-        return _iterencode(o, 0)
+            #if not allow_nan:
+                #raise ValueError(
+                    #"Out of range float values are not JSON compliant: " +
+                    #repr(o))
+
+            #return text
+
+        #if is_namedtuple(o):
+            #o = NamedTupleWrapper(o)
+
+        #if (_one_shot and c_make_encoder is not None
+                #and self.indent is None):
+            #print(f"CustomEncoder.iterencode using c_make_encoder")
+            ## NOTE: 2021-12-21 11:53:27
+            ## only for one shot AND if the C encoder is available, AND when
+            ## there is not indent ==> i.e., for a 'leaf' object
+            #_iterencode = c_make_encoder(
+                #markers, self.default, _encoder, self.indent,
+                #self.key_separator, self.item_separator, self.sort_keys,
+                #self.skipkeys, self.allow_nan)
+        #else:
+            ## NOTE: calls _iternecode recursively
+            #print(f"CustomEncoder.iterencode calling _make_iterencode")
+            #_iterencode = _make_iterencode(
+                #markers, self.default, _encoder, self.indent, floatstr,
+                #self.key_separator, self.item_separator, self.sort_keys,
+                #self.skipkeys, _one_shot)
+        #return _iterencode(o, 0)
             
         #return super().iterencode(o, _one_shot=_one_shot)
         
     def default(self, obj):
+        """Returns a serializable representation of obj.
+        This is one, or a combination of, the types supported by json directly:
+        
+        Python                                      JSON
+        ===================================================
+        dict                                        object
+        list, tuple                                 array
+        str                                         string
+        int, float, int- & float-derived Enums      number
+        True                                        true
+        False                                       false
+        None                                        null
+
+        The reverse correspondence is:
+        
+        JSON                Python
+        ===================================================
+        object              dict
+        array               list
+        string              str
+        number (int)        int
+        number (real)       float
+        true                True
+        false               False
+        null                None
+
+        
+        """
         # NOTE: 2021-12-17 22:59:34
         # 1) I need to generate something simple, yet with enough information to 
         #   reconstruct the object being encoded
@@ -1345,7 +1423,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             newline_indent = None
             separator = _item_separator
         first = True
+        print(f"_iterencode_list indent: {_current_indent_level}")
         for value in lst:
+            print(f"_iterencode_list {type(value).__name__}")
             if first:
                 first = False
             else:
@@ -1407,7 +1487,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             items = sorted(dct.items())
         else:
             items = dct.items()
+        print(f"_iterencode_dict indent: {_current_indent_level}")
         for key, value in items:
+            print(f"_iterencode_dict key: {type(key).__name__}, value: {type(value).__name__}")
             if isinstance(key, str):
                 pass
             # JavaScript is weakly typed for these, so it makes sense to
@@ -1467,6 +1549,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             del markers[markerid]
 
     def _iterencode(o, _current_indent_level):
+        print(f"_iterencode {type(o).__name__}, indent: {_current_indent_level}")
         if isinstance(o, str):
             yield _encoder(o)
         elif o is None:
