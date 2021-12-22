@@ -42,7 +42,7 @@ CHANGELOG:
 import faulthandler
 import sys, os, types, atexit, re, inspect, gc, sip, io, warnings, numbers
 import traceback, keyword, inspect, weakref, itertools, typing, functools, operator
-import json
+#import json
 from pprint import pprint
 from copy import copy, deepcopy
 import collections

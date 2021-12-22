@@ -1,10 +1,34 @@
 """JSON codecs
 NOTE: 2021-12-21 16:11:42
-Using simplejson as json
+Testing the following alternative json libs/packages:
+simplejson => NO
+    + deals with named tuples BUT 
+    - outputs as if a dict and
+    - hardcoded in C
+    
+orjson 
+    + promising for datetime & numpy arrays
+    - claims not to serialize namedtuple
+    - no JSONEncoder to inherit from; must supply a default callable.
+    - returns bytes instead of str
+    - only has dumps/loads => for file IO use context manager e.g., 
+        with open(...) as jsonfile:
+            s = orjson.dumps(...)
+            jsonfile.write(s)
+            
+    - if default is defined using single dispatch pattern, how to account for
+        the generic case (there is no 'default' encoder in orjson, that one can
+        tap into?)
+        
+    - hardcoded in C
+            
+        
 """
 
 import sys, traceback, typing, collections, inspect
-import simplejson as json
+import json
+#import simplejson as json
+import orjson
 from collections import deque, namedtuple
 from functools import (singledispatch, singledispatchmethod, 
                        update_wrapper, wraps,)
@@ -645,11 +669,11 @@ class CustomEncoder(json.JSONEncoder):
                 #else:
                     #return {entry: {"__value__": obj.magnitude.tolist(), 
                                     #"__units__": obj.units.dimensionality.string,
-                                    #"__dtype__": dtype2json(obj.dtype)}}
+                                    #"__dtype__": dtype2JSON(obj.dtype)}}
                 
             #elif isinstance(obj, vigra.VigraArray):
                 #return {entry: {"__value__": obj.tolist(),
-                                #"__dtype__": dtype2json(obj.dtype),
+                                #"__dtype__": dtype2JSON(obj.dtype),
                                 #"__axistags__":obj.axistags.toJSON(),
                                 #"__order__": obj.order}}
             
@@ -658,13 +682,13 @@ class CustomEncoder(json.JSONEncoder):
             
             #else:
                 #return {entry: {"__value__": obj.tolist(),
-                                #"__dtype__": dtype2json(obj.dtype)}}
+                                #"__dtype__": dtype2JSON(obj.dtype)}}
             
         #elif isinstance(obj, np.dtype):
             #return {"__dtype__": {"__value__": str(obj)}}
         
         #elif pd.api.types.is_extension_array_dtype(obj):
-            #return dtype2json(obj)
+            #return dtype2JSON(obj)
         
         #elif isinstance(obj, (pd.DataFrame, pd.Index, pd.Series)):
             #raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
@@ -872,7 +896,80 @@ class CustomEncoder(json.JSONEncoder):
         else:
             return dct
         
-def dtype2json(d:np.dtype) -> typing.Union[str, dict]:
+def makeJSONStub(o):
+    if isinstance(o, type):
+        header = "__python_type__"
+        ret = {"__type_name__": o.__qualname__,
+               "__type_module__": o.__module__,
+               "__type_factory__": None,
+               }
+        
+    elif inspect.isfunction(o):
+        header = "__python_function__"
+        ret = dict(prog.classifySignature(o))
+                                            
+    elif inspect.ismethod(o):
+        header = "__python_method__"
+        # NOTE/TODO: 2021-12-18 22:26:27
+        # can I differentiate between class method and instance method?
+        ret = dict(prog.classifySignature(o))
+                                            
+    else:
+        header = "__python_object__"
+        ret = {"__obj_type__":     type(o).__qualname__,
+               "__obj_module__":   type(o).__module__,
+               "__init__":         None,
+               "__new__":          None,
+               "__args__":         tuple(),
+               "__named__":        dict(),
+               "__kwargs__":       dict(),
+               "__value__":        None,
+               "__subtype__":      None,
+               "__dtype__":        None,
+               }
+                
+    return header, ret
+    
+        
+@singledispatch
+def object2JSON(o):
+    print(f"object2JSON {o}")
+    from core.datatypes import is_namedtuple
+    hrd, ret = makeJSONStub(o)
+    if is_namedtuple(o):
+        ret.update({"__named__": dict((f, getattr(o,f)) for f in o._fields),
+                    "__subtype__": "collections.namedtuple"})
+    return {hdr:ret}
+    
+@object2JSON.register(type)
+def _(o:type):
+    hdr, ret = makeJSONStub(o)
+    return {hdr:ret}
+    
+@object2JSON.register(complex)
+def _(o:complex):
+    return {"__args__": (o.real, o.imag)}
+
+@object2JSON.register(deque)
+def _(o:deque):
+    hdr, ret = makeJSONStub(o)
+    ret.update({"__value__": list(o)})
+    return {hdr:ret}
+    
+@object2JSON.register(vigra.filters.Kernel1D)
+@object2JSON.register(vigra.filters.Kernel2D)
+def _(o:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D]):
+    from imaging.vigrautils import kernel2array
+    hdr, ret = makeJSONStub(o)
+    xy = kernel2array(o, True)
+    ret.update({"__args__" : xy.tolist(),
+                "__init__": classifySignature(kernelfromjson)})
+
+
+    
+    
+        
+def dtype2JSON(d:np.dtype) -> typing.Union[str, dict]:
     """Roundtrip numpy dtype - json string format - write side
     An alternative to the np.lib.format.dtype_to_descr
     Returns a dict for recarray dtypes; a str in any other case.
@@ -884,7 +981,7 @@ def dtype2json(d:np.dtype) -> typing.Union[str, dict]:
     if not isinstance(d, np.dtype) and not pd.api.types.is_extension_array_dtype(d):
         raise TypeError(f"Expecting a numpy dtype, or pandas extvension dtype instance; got {type(d).__name__} instead")
     
-    #print("dtype2json", d)
+    #print("dtype2JSON", d)
     
     h5pyjson = h5pyDtype2JSON(d)
     
@@ -898,7 +995,7 @@ def dtype2json(d:np.dtype) -> typing.Union[str, dict]:
     fields = d.fields
     
     if d.name.startswith("record"):
-        return dict((name, (dtype2json(value[0]), value[1])) for name, value in d.fields.items())
+        return dict((name, (dtype2JSON(value[0]), value[1])) for name, value in d.fields.items())
         
     else:   
         if fields is None:
@@ -1018,7 +1115,7 @@ def pandasDtype2JSON(d):
                              "__ns__" : "pd",
                              "categories":categories,
                              "value_types":list(type(x) for x in d.categories),
-                             "dtype": dtype2json(categories_dtype),
+                             "dtype": dtype2JSON(categories_dtype),
                              "ordered": ordered}}
         
         elif pd.api.types.is_interval_dtype(d):
@@ -1384,203 +1481,203 @@ def kernelfromjson(kernelcoords:list, *args, **kwargs):
     return kernelfromarray(xy)
 
 #### BEGIN HACK workaround named tuples
-def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
-        _key_separator, _item_separator, _sort_keys, _skipkeys, _one_shot,
-        ## HACK: hand-optimized bytecode; turn globals into locals
-        ValueError=ValueError,
-        dict=dict,
-        float=float,
-        id=id,
-        int=int,
-        isinstance=isinstance,
-        list=list,
-        str=str,
-        tuple=tuple,
-        _intstr=int.__repr__,
-    ):
+#def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
+        #_key_separator, _item_separator, _sort_keys, _skipkeys, _one_shot,
+        ### HACK: hand-optimized bytecode; turn globals into locals
+        #ValueError=ValueError,
+        #dict=dict,
+        #float=float,
+        #id=id,
+        #int=int,
+        #isinstance=isinstance,
+        #list=list,
+        #str=str,
+        #tuple=tuple,
+        #_intstr=int.__repr__,
+    #):
 
-    from core.datatypes import is_namedtuple
+    #from core.datatypes import is_namedtuple
     
-    if _indent is not None and not isinstance(_indent, str):
-        _indent = ' ' * _indent
+    #if _indent is not None and not isinstance(_indent, str):
+        #_indent = ' ' * _indent
 
-    def _iterencode_list(lst, _current_indent_level):
-        if not lst:
-            yield '[]'
-            return
-        if markers is not None:
-            markerid = id(lst)
-            if markerid in markers:
-                raise ValueError("Circular reference detected")
-            markers[markerid] = lst
-        buf = '['
-        if _indent is not None:
-            _current_indent_level += 1
-            newline_indent = '\n' + _indent * _current_indent_level
-            separator = _item_separator + newline_indent
-            buf += newline_indent
-        else:
-            newline_indent = None
-            separator = _item_separator
-        first = True
-        print(f"_iterencode_list indent: {_current_indent_level}")
-        for value in lst:
-            print(f"_iterencode_list {type(value).__name__}")
-            if first:
-                first = False
-            else:
-                buf = separator
-            if isinstance(value, str):
-                yield buf + _encoder(value)
-            elif value is None:
-                yield buf + 'null'
-            elif value is True:
-                yield buf + 'true'
-            elif value is False:
-                yield buf + 'false'
-            elif isinstance(value, int):
-                # Subclasses of int/float may override __repr__, but we still
-                # want to encode them as integers/floats in JSON. One example
-                # within the standard library is IntEnum.
-                yield buf + _intstr(value)
-            elif isinstance(value, float):
-                # see comment above for int
-                yield buf + _floatstr(value)
-            else:
-                yield buf
-                if is_namedtuple(value):
-                    chunks = _iterencode(NamedTupleWrapper(value), _current_indent_level)
-                elif isinstance(value, (list, tuple)):
-                    chunks = _iterencode_list(value, _current_indent_level)
-                elif isinstance(value, dict):
-                    chunks = _iterencode_dict(value, _current_indent_level)
-                else:
-                    chunks = _iterencode(value, _current_indent_level)
-                yield from chunks
-        if newline_indent is not None:
-            _current_indent_level -= 1
-            yield '\n' + _indent * _current_indent_level
-        yield ']'
-        if markers is not None:
-            del markers[markerid]
+    #def _iterencode_list(lst, _current_indent_level):
+        #if not lst:
+            #yield '[]'
+            #return
+        #if markers is not None:
+            #markerid = id(lst)
+            #if markerid in markers:
+                #raise ValueError("Circular reference detected")
+            #markers[markerid] = lst
+        #buf = '['
+        #if _indent is not None:
+            #_current_indent_level += 1
+            #newline_indent = '\n' + _indent * _current_indent_level
+            #separator = _item_separator + newline_indent
+            #buf += newline_indent
+        #else:
+            #newline_indent = None
+            #separator = _item_separator
+        #first = True
+        #print(f"_iterencode_list indent: {_current_indent_level}")
+        #for value in lst:
+            #print(f"_iterencode_list {type(value).__name__}")
+            #if first:
+                #first = False
+            #else:
+                #buf = separator
+            #if isinstance(value, str):
+                #yield buf + _encoder(value)
+            #elif value is None:
+                #yield buf + 'null'
+            #elif value is True:
+                #yield buf + 'true'
+            #elif value is False:
+                #yield buf + 'false'
+            #elif isinstance(value, int):
+                ## Subclasses of int/float may override __repr__, but we still
+                ## want to encode them as integers/floats in JSON. One example
+                ## within the standard library is IntEnum.
+                #yield buf + _intstr(value)
+            #elif isinstance(value, float):
+                ## see comment above for int
+                #yield buf + _floatstr(value)
+            #else:
+                #yield buf
+                #if is_namedtuple(value):
+                    #chunks = _iterencode(NamedTupleWrapper(value), _current_indent_level)
+                #elif isinstance(value, (list, tuple)):
+                    #chunks = _iterencode_list(value, _current_indent_level)
+                #elif isinstance(value, dict):
+                    #chunks = _iterencode_dict(value, _current_indent_level)
+                #else:
+                    #chunks = _iterencode(value, _current_indent_level)
+                #yield from chunks
+        #if newline_indent is not None:
+            #_current_indent_level -= 1
+            #yield '\n' + _indent * _current_indent_level
+        #yield ']'
+        #if markers is not None:
+            #del markers[markerid]
 
-    def _iterencode_dict(dct, _current_indent_level):
-        if not dct:
-            yield '{}'
-            return
-        if markers is not None:
-            markerid = id(dct)
-            if markerid in markers:
-                raise ValueError("Circular reference detected")
-            markers[markerid] = dct
-        yield '{'
-        if _indent is not None:
-            _current_indent_level += 1
-            newline_indent = '\n' + _indent * _current_indent_level
-            item_separator = _item_separator + newline_indent
-            yield newline_indent
-        else:
-            newline_indent = None
-            item_separator = _item_separator
-        first = True
-        if _sort_keys:
-            items = sorted(dct.items())
-        else:
-            items = dct.items()
-        print(f"_iterencode_dict indent: {_current_indent_level}")
-        for key, value in items:
-            print(f"_iterencode_dict key: {type(key).__name__}, value: {type(value).__name__}")
-            if isinstance(key, str):
-                pass
-            # JavaScript is weakly typed for these, so it makes sense to
-            # also allow them.  Many encoders seem to do something like this.
-            elif isinstance(key, float):
-                # see comment for int/float in _make_iterencode
-                key = _floatstr(key)
-            elif key is True:
-                key = 'true'
-            elif key is False:
-                key = 'false'
-            elif key is None:
-                key = 'null'
-            elif isinstance(key, int):
-                # see comment for int/float in _make_iterencode
-                key = _intstr(key)
-            elif _skipkeys:
-                continue
-            else:
-                raise TypeError(f'keys must be str, int, float, bool or None, '
-                                f'not {key.__class__.__name__}')
-            if first:
-                first = False
-            else:
-                yield item_separator
-            yield _encoder(key)
-            yield _key_separator
-            if isinstance(value, str):
-                yield _encoder(value)
-            elif value is None:
-                yield 'null'
-            elif value is True:
-                yield 'true'
-            elif value is False:
-                yield 'false'
-            elif isinstance(value, int):
-                # see comment for int/float in _make_iterencode
-                yield _intstr(value)
-            elif isinstance(value, float):
-                # see comment for int/float in _make_iterencode
-                yield _floatstr(value)
-            else:
-                if is_namedtuple(value):
-                    chunks = _iterencode(NamedTupleWrapper(value), _current_indent_level)
-                elif isinstance(value, (list, tuple)):
-                    chunks = _iterencode_list(value, _current_indent_level)
-                elif isinstance(value, dict):
-                    chunks = _iterencode_dict(value, _current_indent_level)
-                else:
-                    chunks = _iterencode(value, _current_indent_level)
-                yield from chunks
-        if newline_indent is not None:
-            _current_indent_level -= 1
-            yield '\n' + _indent * _current_indent_level
-        yield '}'
-        if markers is not None:
-            del markers[markerid]
+    #def _iterencode_dict(dct, _current_indent_level):
+        #if not dct:
+            #yield '{}'
+            #return
+        #if markers is not None:
+            #markerid = id(dct)
+            #if markerid in markers:
+                #raise ValueError("Circular reference detected")
+            #markers[markerid] = dct
+        #yield '{'
+        #if _indent is not None:
+            #_current_indent_level += 1
+            #newline_indent = '\n' + _indent * _current_indent_level
+            #item_separator = _item_separator + newline_indent
+            #yield newline_indent
+        #else:
+            #newline_indent = None
+            #item_separator = _item_separator
+        #first = True
+        #if _sort_keys:
+            #items = sorted(dct.items())
+        #else:
+            #items = dct.items()
+        #print(f"_iterencode_dict indent: {_current_indent_level}")
+        #for key, value in items:
+            #print(f"_iterencode_dict key: {type(key).__name__}, value: {type(value).__name__}")
+            #if isinstance(key, str):
+                #pass
+            ## JavaScript is weakly typed for these, so it makes sense to
+            ## also allow them.  Many encoders seem to do something like this.
+            #elif isinstance(key, float):
+                ## see comment for int/float in _make_iterencode
+                #key = _floatstr(key)
+            #elif key is True:
+                #key = 'true'
+            #elif key is False:
+                #key = 'false'
+            #elif key is None:
+                #key = 'null'
+            #elif isinstance(key, int):
+                ## see comment for int/float in _make_iterencode
+                #key = _intstr(key)
+            #elif _skipkeys:
+                #continue
+            #else:
+                #raise TypeError(f'keys must be str, int, float, bool or None, '
+                                #f'not {key.__class__.__name__}')
+            #if first:
+                #first = False
+            #else:
+                #yield item_separator
+            #yield _encoder(key)
+            #yield _key_separator
+            #if isinstance(value, str):
+                #yield _encoder(value)
+            #elif value is None:
+                #yield 'null'
+            #elif value is True:
+                #yield 'true'
+            #elif value is False:
+                #yield 'false'
+            #elif isinstance(value, int):
+                ## see comment for int/float in _make_iterencode
+                #yield _intstr(value)
+            #elif isinstance(value, float):
+                ## see comment for int/float in _make_iterencode
+                #yield _floatstr(value)
+            #else:
+                #if is_namedtuple(value):
+                    #chunks = _iterencode(NamedTupleWrapper(value), _current_indent_level)
+                #elif isinstance(value, (list, tuple)):
+                    #chunks = _iterencode_list(value, _current_indent_level)
+                #elif isinstance(value, dict):
+                    #chunks = _iterencode_dict(value, _current_indent_level)
+                #else:
+                    #chunks = _iterencode(value, _current_indent_level)
+                #yield from chunks
+        #if newline_indent is not None:
+            #_current_indent_level -= 1
+            #yield '\n' + _indent * _current_indent_level
+        #yield '}'
+        #if markers is not None:
+            #del markers[markerid]
 
-    def _iterencode(o, _current_indent_level):
-        print(f"_iterencode {type(o).__name__}, indent: {_current_indent_level}")
-        if isinstance(o, str):
-            yield _encoder(o)
-        elif o is None:
-            yield 'null'
-        elif o is True:
-            yield 'true'
-        elif o is False:
-            yield 'false'
-        elif isinstance(o, int):
-            # see comment for int/float in _make_iterencode
-            yield _intstr(o)
-        elif isinstance(o, float):
-            # see comment for int/float in _make_iterencode
-            yield _floatstr(o)
-        elif is_namedtuple(o):
-            yield 
-        elif isinstance(o, (list, tuple)):
-            yield from _iterencode_list(o, _current_indent_level)
-        elif isinstance(o, dict):
-            yield from _iterencode_dict(o, _current_indent_level)
-        else:
-            if markers is not None:
-                markerid = id(o)
-                if markerid in markers:
-                    raise ValueError("Circular reference detected")
-                markers[markerid] = o
-            o = _default(o)
-            yield from _iterencode(o, _current_indent_level)
-            if markers is not None:
-                del markers[markerid]
+    #def _iterencode(o, _current_indent_level):
+        #print(f"_iterencode {type(o).__name__}, indent: {_current_indent_level}")
+        #if isinstance(o, str):
+            #yield _encoder(o)
+        #elif o is None:
+            #yield 'null'
+        #elif o is True:
+            #yield 'true'
+        #elif o is False:
+            #yield 'false'
+        #elif isinstance(o, int):
+            ## see comment for int/float in _make_iterencode
+            #yield _intstr(o)
+        #elif isinstance(o, float):
+            ## see comment for int/float in _make_iterencode
+            #yield _floatstr(o)
+        #elif is_namedtuple(o):
+            #yield 
+        #elif isinstance(o, (list, tuple)):
+            #yield from _iterencode_list(o, _current_indent_level)
+        #elif isinstance(o, dict):
+            #yield from _iterencode_dict(o, _current_indent_level)
+        #else:
+            #if markers is not None:
+                #markerid = id(o)
+                #if markerid in markers:
+                    #raise ValueError("Circular reference detected")
+                #markers[markerid] = o
+            #o = _default(o)
+            #yield from _iterencode(o, _current_indent_level)
+            #if markers is not None:
+                #del markers[markerid]
                 
-    return _iterencode
+    #return _iterencode
 
 #### END HACK workaround named tuples
