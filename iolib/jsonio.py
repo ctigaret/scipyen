@@ -35,6 +35,9 @@ orjson
         data. Hence on the encoding side, I can provide a 'default' to generate 
         slightly more complex JSON 'obejcts' (a.k.a. dict) adorned with class 
         and type hints
+        
+    + support for dataclass (new since Python 3.7) => we might consider using 
+        this strategy in ScanData, AnalysisUnit, Results, etc.
 """
 
 import sys, traceback, typing, collections, inspect
