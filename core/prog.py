@@ -17,6 +17,8 @@ import importlib, inspect, pathlib, warnings, operator, functools
 from functools import (singledispatch, singledispatchmethod, 
                        update_wrapper, wraps,)
 from contextlib import (contextmanager, ContextDecorator,)
+from dataclasses import MISSING
+
 from traitlets.utils.importstring import import_item
 from traitlets import Bunch
 
@@ -565,6 +567,10 @@ def classifySignature(sig, funcname:typing.Optional[str]=None,
                          positional = posonly_params, named = named_params, 
                          varpos = varpos_params, varkw = varkw_params,
                          returns = sig.return_annotation)
+
+def sig2func(dct):
+    # FIXME/TODO 2021-12-22 23:38:58
+    return
 
 #def stringify_signature(f:typing.Union[types.FunctionType, inspect.Signature, SignatureDict], 
                         #as_constructor:bool=False):
@@ -1812,7 +1818,11 @@ def resolveObject(modName, objName):
     
     else:
         rep = ".".join([modName, objName])
-        return import_item(rep)
+        try:
+            return import_item(rep)
+        except ModuleNotFoundError:
+            return MISSING
+            
     
 #def typedDispatch(func):
     #"""Single-dispatch decorator for generic functions operating on types.
