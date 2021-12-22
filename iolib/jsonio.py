@@ -7,22 +7,34 @@ simplejson => NO
     - hardcoded in C
     
 orjson 
+    + hardcoded in C, claims the fastest (in nay case faster than json, simplejson)
     + promising for datetime & numpy arrays
-    - claims not to serialize namedtuple
-    - no JSONEncoder to inherit from; must supply a default callable.
-    - returns bytes instead of str
-    - only has dumps/loads => for file IO use context manager e.g., 
+    + seems more flexible 
+    + no JSONEncoder to inherit from; must supply a default callable, quite flexible.
+        ~ claims not to serialize namedtuple but the 'default' mechanism works;
+        + the default can be a generic function (via single dispatch
+            - CAUTION: errors in the default function are not propagated; instead
+            the encoding fails with JSONEncodeError...
+    ~ returns bytes instead of str - not a problem if str is required call
+        bytes.decode("utf-8")
+        - only works with utf-8, but that's OK (I guess...)
+        
+    ~ only has dumps/loads => for file IO use context manager e.g., 
         with open(...) as jsonfile:
             s = orjson.dumps(...)
             jsonfile.write(s)
             
-    - if default is defined using single dispatch pattern, how to account for
-        the generic case (there is no 'default' encoder in orjson, that one can
-        tap into?)
+    ~ loads takes only one argument i.e., the object to deserialize, and does 
+        not accept any "optional" stuff like object-hook, etc:
+        def loads(__obj: Union[bytes, bytearray, memoryview, str]) -> Any: ...
         
-    - hardcoded in C
-            
+        loads returns the basic types: dict, list, int, float, str, bool and None
         
+        This allows for maximal flexibility (no more decode hook  malarkey) by 
+        passing the result to whataver suits your fancy to recreate the original
+        data. Hence on the encoding side, I can provide a 'default' to generate 
+        slightly more complex JSON 'obejcts' (a.k.a. dict) adorned with class 
+        and type hints
 """
 
 import sys, traceback, typing, collections, inspect
@@ -933,9 +945,8 @@ def makeJSONStub(o):
         
 @singledispatch
 def object2JSON(o):
-    print(f"object2JSON {o}")
     from core.datatypes import is_namedtuple
-    hrd, ret = makeJSONStub(o)
+    hdr, ret = makeJSONStub(o)
     if is_namedtuple(o):
         ret.update({"__named__": dict((f, getattr(o,f)) for f in o._fields),
                     "__subtype__": "collections.namedtuple"})
@@ -1300,25 +1311,43 @@ def decode_hook(dct):
     else:
         return dct
     
-def dumps(obj, *args, **kwargs):
-    from core.datatypes import is_namedtuple
-    kwargs["cls"] = CustomEncoder
-    #if is_namedtuple(obj):
-        #obj = NamedTupleWrapper(obj)
-    return json.dumps(obj, *args, **kwargs)
+#def dumps(obj, *args, **kwargs):
+    #from core.datatypes import is_namedtuple
+    #kwargs["cls"] = CustomEncoder
+    ##if is_namedtuple(obj):
+        ##obj = NamedTupleWrapper(obj)
+    #return json.dumps(obj, *args, **kwargs)
 
-def loads(s, *args, **kwargs):
-    kwargs["object_hook"] = decode_hook
-    return json.loads(s, *args, **kwargs)
-
-def dump(obj, fp, *args, **kwargs):
-    kwargs["cls"] = CustomEncoder
-    json.dump(obj,fp, *args, **kwargs)
+#def dump(obj, fp, *args, **kwargs):
+    #kwargs["cls"] = CustomEncoder
+    #json.dump(obj,fp, *args, **kwargs)
     
-def load(fp, *args, **kwargs):
-    kwargs["object_hook"] = decode_hook
-    return json.load(fp, *args, **kwargs)
 
+#def loads(s, *args, **kwargs):
+    #kwargs["object_hook"] = decode_hook
+    #return json.loads(s, *args, **kwargs)
+
+#def load(fp, *args, **kwargs):
+    #kwargs["object_hook"] = decode_hook
+    #return json.load(fp, *args, **kwargs)
+
+def dumps(obj, *args, **kwargs):
+    kwargs["default"] = object2JSON
+    return orjson.dumps(obj, *args, **kwargs).decode("uft-8")
+
+def dump(filename, obj, *args, **kwargs):
+    with open(filename, mode="wt") as jsonfile:
+        jsonfile.write(dumps(obj, *args, **kwargs))
+        
+def loads(s):
+    return orjson.loads(s)
+
+def load(filename):
+    with open(filename, mode="rt") as jsonfile:
+        s = jsonfile.read()
+        ret = orjson.loads(s)
+        
+    return ret
 
 def json2python(dct):
     """
