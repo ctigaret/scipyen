@@ -800,7 +800,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
     signal_pythonFileAdded = pyqtSignal(str)
     
     
-    # NOTE recent run scripts is managed by ScipyenWindow instance mainWindow
+    # NOTE recently run scripts is managed by ScipyenWindow instance mainWindow
     # FIXME 2021-09-18 14:16:14 Change this so that it is managed instead by 
     # ScriptManager
     # We then need to connect pasting/dropping script file onto Scipyen mainWindow
@@ -812,7 +812,6 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
         self.setupUi(self)
         WorkspaceGuiMixin.__init__(self, parent=parent)
         self._configureUI_()
-        
         
         self.setWindowTitle("Scipyen Script Manager")
         
@@ -965,8 +964,8 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
             #if isinstance(fileName, str) and len(fileName) > 0 and os.path.isfile(fileName):
                 #self.signal_pythonFileAdded.emit(fileName)
             if pio.checkFileReadAccess(fileName):
-                self._script.append(fileName)
-                #self.signal_pythonFileAdded.emit(fileName)
+                self.signal_pythonFileAdded.emit(fileName)
+                #self._scripts.append(fileName)
 
     @pyqtSlot()
     @safeWrapper
@@ -977,9 +976,9 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
         fileNames, fileFilter = QtWidgets.QFileDialog.getOpenFileNames(self, caption=u"Run python script", filter="Python script (*.py)", directory = targetDir)
         
         if pio.checkFileReadAccess(fileNames):
-            self._scripts.extend(fileNames)
-        #for fileName in fileNames:
-            #self.signal_pythonFileAdded.emit(fileName)
+            for fileName in fileNames:
+                self.signal_pythonFileAdded.emit(fileName)
+            #self._scripts.extend(fileNames)
         
         
     @pyqtSlot()

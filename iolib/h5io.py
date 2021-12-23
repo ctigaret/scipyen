@@ -574,7 +574,7 @@ from neo.core.dataobject import ArrayDict
 
 from . import jsonio # brings the CustomEncoder type and the decode_hook function
 import core
-from core.prog import (safeWrapper, classifySignature,)
+from core.prog import (safeWrapper, signature2Dict,)
 from core import prog
 from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
@@ -1058,11 +1058,11 @@ def makeDataTypeAttrs(data):
             attrs["__python_class_def__"] = prog.class_def(data)
     
         if hasattr(data, "__new__"):
-            sig_dict = classifySignature(getattr(data, "__new__"))
+            sig_dict = signature2Dict(getattr(data, "__new__"))
             attrs["__python_new__"] = jsonio.dumps(sig_dict)
             
         if hasattr(data, "__init__"):
-            init_dict = classifySignature(getattr(data, "__init__"))
+            init_dict = signature2Dict(getattr(data, "__init__"))
             attrs["__python_init__"] = jsonio.dumps(init_dict)
         
     return makeAttrDict(**attrs)
@@ -1168,7 +1168,7 @@ def makeObjAttrs(obj:typing.Any,
     """
     #print(type(obj))
     if isinstance(obj, prog.CALLABLES):
-        return makeAttrDict (__function_or_method__ = jsonio.dumps(prog.classifySignature(obj)))
+        return makeAttrDict (__function_or_method__ = jsonio.dumps(prog.signature2Dict(obj)))
     
     if obj is None:
         return makeEntryName(obj), {}

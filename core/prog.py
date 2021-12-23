@@ -14,6 +14,8 @@ from abc import ABC, abstractmethod
 import enum, io, os, re, itertools, sys, time, traceback, types, typing
 import collections
 import importlib, inspect, pathlib, warnings, operator, functools
+from inspect import Parameter, Signature
+    
 from functools import (singledispatch, singledispatchmethod, 
                        update_wrapper, wraps,)
 from contextlib import (contextmanager, ContextDecorator,)
@@ -450,9 +452,9 @@ class Timer(object):
         
 # ### BEGIN module functions
 
-def classifySignature(sig, funcname:typing.Optional[str]=None,
-                       modname:typing.Optional[str]=None,
-                       verbose:bool=False) -> Bunch:
+def signature2Dict(sig, name:typing.Optional[str]=None, 
+                   qualname:typing.Optional[str]=None,
+                   module:typing.Optional[str]=None) -> Bunch:
     """A dictionary-like presentation of an inspect.Signature object.
     
     Useful especially in generic initialization of objects based 
@@ -467,14 +469,21 @@ def classifySignature(sig, funcname:typing.Optional[str]=None,
     -----------
     sig: a callable (preferably), or an inspect.Signature object
     
-    funcname: str, optional, default None; 
-        This should be the callable's __name__ attribute and should be 
-        passed to this function when 'sig' is a Signature object
+    name: str, optional, default None; 
+        This should be the callable's __name__ attribute
         
-    modname: str, optional, default is None
-        This shoudl be the name of the module where the function is 
-        defined (callable's __module__ attribute) and should be
-        passed to thsi function when 'sig' is a Signature object.
+        REQUIRED when 'sig' is a Signature object
+        
+    qualname:str, optional, default None; 
+        This should be the callable's __qualname__ attribute
+        
+        REQUIRED when 'sig' is a Signature object
+        
+    module: str, optional, default is None
+        This should be the name of the module where the function is 
+        defined (callable's __module__ attribute)
+        
+        REQUIRED, when 'sig' is a Signature object.
         
     Returns:
     --------
@@ -488,106 +497,167 @@ def classifySignature(sig, funcname:typing.Optional[str]=None,
     'module': str - the module name where the callable was defined, 
             or None
     
-    'positional': dict - mapping name: type for positional-only 
-        parameters of the callable
-    
-    'named': dict - mapping name: (default, type) for named or positional
-        parameters of the callable
+    'positional': dict; maps name: type for positional-only 
+        parameters of the callable.
         
-    'varpos': duct - mapping name: None, with the name of the var-positional
+        These parameters are of the inspect.Parameter.POSITIONAL_ONLY kind
+    
+    'named': dict; maps name to the tuple(default value, type) for the 
+        positional or keyword parameters of the callable.
+        
+        These parameters are of inspect.Parameter.POSITIONAL_OR_KEYWORD kind.
+        
+    'varpos': dict; maps name: None, with the name of the var-positional
         parameter of the callable (e.g. 'args' when the callable signature
-        includes `*args`)
+        includes `*args`).
+        
+        These parameters are of the inspect.Parameter.VAR_POSITIONAL kind.
+        
+    'kwonly': dict; maps name to the tuple (default_value, type) for the 
+        keyword only parameters (i.e., those that can only be passed as keywords,
+        and hence they are after * or var-positional parameters, AND before
+        var-keyword parameters, in the signature).
+        
+        These parameters are of the inspect.Parameter.KEYWORD_ONLY kind.
         
     'varkw': dict - mapping of name: None, with the name of the var-kweyword
-        parametert if the callable (e.g. 'kwargs' when the callable signature
+        parameter if the callable (e.g. 'kwargs' when the callable signature
         includes `**kwargs`)
+        
+        These parameters are of the inspect.Parameter.VAR_KEYWORD kind.
         
     'returns': type, if the callable signature has an annotated return, 
         or `inspect._empty` otherwise
     
     """
-    from inspect import Parameter
+    if isinstance(sig, Signature):
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            raise ValueError(f"With Signature objects, 'funcname' is REQUIRED; got {name} instead")
     
-    qualname = funcname
+        if not isinstance(qualname, str) or len(qualname.strip()) == 0:
+            raise ValueError(f"With Signature objects, 'qualname' is REQUIRED; got {qualname} instead")
+    
+        if not isinstance(module, str) or len(module.strip()) == 0:
+            raise ValueError(f"With Signature objects, 'modname' is REQUIRED; got {module} instead")
+    
     if isinstance(sig, CALLABLES):
-        funcname = sig.__name__
-        modname = getattr(sig, "__module__", None)
+        name = sig.__name__
         qualname = sig.__qualname__
+        moduse = getattr(sig, "__module__", None)
         sig = inspect.signature(sig)
         
-    if not isinstance(sig, inspect.Signature):
+    if not isinstance(sig, Signature):
         raise TypeError(f"Expecting a Signature object, a function, or a method; got {type(sig).__name__} instead")
     
-    if not isinstance(funcname, str) or len(funcname.strip()) == 0:
-        funcname = None
-        
-    if not isinstance(modname, str) or len(modname.strip()) == 0:
-        modname = None
+    if not isinstance(name, str) or len(name.strip()) == 0:
+        raise RuntimeError(f"'name' must be a non-empty str")
         
     if not isinstance(qualname, str) or len(qualname.strip()) == 0:
-        qualname = None
+        raise RuntimeError(f"'qualname' must be a non-empty str")
         
-    posonly_params = dict()
-    named_params = dict()
-    varkw_params = dict()
-    varpos_params = dict()
+    if not isinstance(module, str) or len(module.strip()) == 0:
+        raise RuntimeError(f"'module' must be a non-empty str")
+        
+    posonly_params  = Bunch()    # POSITIONAL_ONLY
+    named_params    = Bunch()    # POSITIONAL_OR_KEYWORD
+    varpos_params   = Bunch()    # VAR_POSITIONAL
+    kwonly_params   = Bunch()    # KEYWORD_ONLY
+    varkw_params    = Bunch()    # VAR_KEYWORD
     
     for parname, val in sig.parameters.items():
-        if verbose:
-            print("parameter name:", parname, "value:", val, "kind:", val.kind, "default:", val.default, "annotation:", val.annotation)
+        #print("parameter name:", parname, "value:", val, "kind:", val.kind, "default:", val.default, "annotation:", val.annotation)
         
         if val.kind is Parameter.POSITIONAL_ONLY:
-            posonly_params[parname] = None if val.annotation is Parameter.empty else val.annotation
+            posonly_params[parname] = val.annotation
+            #posonly_params[parname] = "__empty_type__" if val.annotation is Parameter.empty else val.annotation
             
         elif val.kind is Parameter.POSITIONAL_OR_KEYWORD:
             if val.kind is Parameter.VAR_KEYWORD:
-                varkw_params[parname] = None if val.annotation is Parameter.empty else val.annotation
+                varkw_params[parname] = val.annotation
+                #varkw_params[parname] = "__empty_type__" if val.annotation is Parameter.empty else val.annotation
+                
             elif val.kind is Parameter.VAR_POSITIONAL:
-                varpos_params[parname] = None if val.annotation is Parameter.empty else val.annotation
+                varpos_params[parname] = val.annotation
+                #varpos_params[parname] = "__empty_type__" if val.annotation is Parameter.empty else val.annotation
+                
+                
+            elif val.kind is Parameter.KEYWORD_ONLY:
+                kwonly_params[parname] = (val.default, val.annotation)
+                
+                #kwonly_params[parname] = ("__empty_type__" if val.default is Parameter.empty else val.default, 
+                                          #"__empty_type__" if val.annotation is Parameter.empty else val.annotation)
+                
             else:
-                named_params[parname] = (None if val.default is Parameter.empty else val.default, 
-                                         None if val.annotation is Parameter.empty else val.annotation)
+                named_params[parname] = (val.default, val.annotation)
+                
+                #named_params[parname] = ("__empty_type__" if val.default is Parameter.empty else val.default, 
+                                         #"__empty_type__" if val.annotation is Parameter.empty else val.annotation)
                 
         elif val.kind is Parameter.VAR_KEYWORD:
-            varkw_params[parname] = None if val.annotation is Parameter.empty else val.annotation
+            varkw_params[parname] = val.annotation
+            #varkw_params[parname] = "__empty_type__" if val.annotation is Parameter.empty else val.annotation
             
         elif val.kind is Parameter.VAR_POSITIONAL:
-            varpos_params[parname] = None if val.annotation is Parameter.empty else val.annotation
+            varpos_params[parname] = val.annotation
+            #varpos_params[parname] = "__empty_type__" if val.annotation is Parameter.empty else val.annotation
+            
+        elif val.kind is Parameter.KEYWORD_ONLY:
+            kwonly_params[parname] = (val.default, val.annotation)
                 
-    
-    #posonly_params = dict((parname, None if val.annotation is Parameter.empty else val.annotation) for parname, val in sig.parameters.items() if val.kind is Parameter.POSITIONAL_ONLY)
-    
-    #named_params = dict((parname, (None if val.default is Parameter.empty else val.default, None if val.annotation is Parameter.empty else val.annotation)) for (parname, val) in sig.parameters.items() if parname not in ("cls", "self") and parname not in posonly_params and val.kind == Parameter.POSITIONAL_OR_KEYWORD and val.kind not in (Parameter.VAR_KEYWORD, Parameter.VAR_POSITIONAL))
-    
-    #varkw_params = dict((parname, None if val.annotation is Parameter.empty else val.annotation) for parname, val in sig.parameters.items() if val.kind is Parameter.VAR_KEYWORD)
-    
-    #varpos_params = dict((parname, None if val.annotation is Parameter.empty else val.annotation) for parname, val in sig.parameters.items() if val.kind is Parameter.VAR_POSITIONAL)
-    
-    return Bunch(name = funcname, qualname = qualname, module = modname,
+            #kwonly_params[parname] = ("__empty_type__" if val.default is Parameter.empty else val.default, 
+                                      #"__empty_type__" if val.annotation is Parameter.empty else val.annotation)
+                
+    return Bunch(name = name, qualname = qualname, module = module,
                          positional = posonly_params, named = named_params, 
-                         varpos = varpos_params, varkw = varkw_params,
+                         varpos = varpos_params, kwonly=kwonly_params, varkw = varkw_params,
                          returns = sig.return_annotation)
+
+def makeSignature(dct:Bunch) -> Signature:
+    parameters = list()
+    for p, val in dct.positional.items():
+        # no default value for these ones
+        parameters.append(Parameter(p, Parameter.POSITIONAL_ONLY, annotation = val))
+        
+    for p, val in dct.named.items():
+        parameters.append(Parameter(p, Parameter.POSITIONAL_OR_KEYWORD, default=val[0],
+                                    annotation=val[1]))
+        
+    for p, val in dct.varpos.items():
+        parameters.append(Parameter(p, Parameter.VAR_POSITIONAL, annotation=val))
+        
+    for p, val in dct.kwonly.items():
+        parameters.append(Parameter(p, Parameter.KEYWORD_ONLY, default=val[0], annotation=val[1]))
+        
+    for p, val in dct.varkw.items():
+        parameters.append(Parameter(p, Parameter.VAR_KEYWORD, annotation=val))
+        
+        
+    return Signature(parameters, return_annotation = dct.returns)
+        
+        
 
 def sig2func(dct):
     # FIXME/TODO 2021-12-22 23:38:58
     return
 
-#def stringify_signature(f:typing.Union[types.FunctionType, inspect.Signature, SignatureDict], 
-                        #as_constructor:bool=False):
-def stringify_signature(f:typing.Union[types.FunctionType, inspect.Signature, Bunch], 
+def signature2Str(f:typing.Union[types.FunctionType, inspect.Signature, Bunch], 
                         as_constructor:bool=False):
+    """Turns a signature dict into an executable str.
     
-    if isinstance(f, (types.FunctionType, inspect.Signature)):
-        f = classifySignature(f)
+    Parameters: 
+    ----------
+    f: function, inspect.Signature, or traitlets.Bunch (the latter being the 
+        result of a signature2Dict() call)
         
-    #elif not isinstance(f, SignatureDict):
+    """
+    if isinstance(f, (types.FunctionType, inspect.Signature)):
+        f = signature2Dict(f)
+        
     elif not isinstance(f, Bunch):
         raise TypeError(f"Expecting a function, a function Signature, or a traitlets.Bunch; got {type(f).__name__} instead")
     
     if f.name in ("__init__", "__new__"):
         as_constructor = True
-        
-        
         
     if as_constructor:
         clsname = f.qualname.split(".")[0]

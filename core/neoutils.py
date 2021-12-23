@@ -170,7 +170,7 @@ import pyqtgraph as pg
 from .prog import (safeWrapper, deprecation, 
                    filter_attr, filterfalse_attr,
                    filter_type, filterfalse_type,
-                   iter_attribute, classifySignature, 
+                   iter_attribute, signature2Dict, 
                    )#SignatureDict)
 
 from .datatypes import (is_string, is_vector,
@@ -313,7 +313,7 @@ def _(obj):
     # "varpos":     mapping  *args name: None (one element)
     # "varkw":      mapping  **kwargs name : None (one element)
     # "returns":    for __new__ or __init__ always inspect._empty
-    signature = classifySignature(type(obj).__init__)
+    signature = signature2Dict(type(obj).__init__)
     
     # NOTE: 2021-11-23 10:36:53
     # obj._quantity_attr names the parameter for the actual numeric data
@@ -390,7 +390,7 @@ def _(obj):
     # "varpos":     mapping  *args name: None (one element)
     # "varkw":      mapping  **kwargs name : None (one element)
     # "returns":    for __new__ or __init__ always inspect._empty
-    signature = classifySignature(type(obj).__new__)
+    signature = signature2Dict(type(obj).__new__)
     
     
     

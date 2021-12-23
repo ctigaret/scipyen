@@ -55,7 +55,7 @@ import vigra
 from traitlets.utils.importstring import import_item
 from core import quantities as cq
 from core import prog
-from core.prog import (classifySignature, resolveObject, MISSING )
+from core.prog import (signature2Dict, resolveObject, MISSING )
 
 def makeJSONStub(o):
     if isinstance(o, type):
@@ -71,13 +71,13 @@ def makeJSONStub(o):
         
     elif inspect.isfunction(o):
         header = "__python_function__"
-        ret = dict(prog.classifySignature(o))
+        ret = dict(prog.signature2Dict(o))
                                             
     elif inspect.ismethod(o):
         header = "__python_method__"
         # NOTE/TODO: 2021-12-18 22:26:27
         # can I differentiate between class method and instance method?
-        ret = dict(prog.classifySignature(o))
+        ret = dict(prog.signature2Dict(o))
                                             
     else:
         header = "__python_object__"
@@ -139,7 +139,7 @@ def _(o:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D]):
     hdr, ret = makeJSONStub(o)
     xy = kernel2array(o, True)
     ret.update({"__args__" : (xy.tolist(),),
-                "__init__": classifySignature(kernelfromjson)})
+                "__init__": signature2Dict(kernelfromjson)})
     return {hdr:ret}
 
 def dtype2JSON(d:np.dtype) -> typing.Union[str, dict]:
@@ -661,7 +661,6 @@ def json2python(dct):
             qualname = val["qualname"]
             owner_type_name = ".".join(qualname.strip(".")[:-1])
             owner = resolveObject(val["module"], owner_type_name)
-            #return getattr(owner, name)
             return inspect.getattr_static(owner, name)
             
         elif key == "__python_object__":
