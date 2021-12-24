@@ -313,84 +313,45 @@ def functionFactory(name, signature, callback):
     """Dynamically creates a function that wraps a call to *callback*, based
     on the provided *signature*.
     """
-    # utils to set default values when creating a ast objects
-    Loc = lambda cls, **kw: cls(annotation=None, lineno=1, col_offset=0, **kw)
-    Name = lambda id, ctx=None: Loc(ast.Name, id=id, ctx=ctx or ast.Load())
-
-    # vars for the callback call
-    call_args = []
-    call_keywords = []
-
-    # vars for the generated function signature
-    func_args = []
-    func_kwargs = []
-    func_defaults = []
-    func_kwdefaults = []
-    vararg = None
-    kwarg = None
-
-    # vars for the args with default values
-    defaults = []
-    kwdefaults = dict()
-
-    # assign args based on *signature*
-    for param in viewvalues(signature.parameters):
-        if param.default is not param.empty:
-            if param.kind in {param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD}:
-                add_to = func_defaults
-                defaults.append(param.default)
-            elif param.kind is param.KEYWORD_ONLY:
-                add_to = func_kwdefaults
-                kwdefaults[param.name] = param.default
+    MakeNode = lambda cls, **kw: cls(annotation=None, lineno=1, col_offset=0, **kw)
+    MakeName = lambda id, ctx=None: MakeNode(ast.Name, id=id, ctx=ctx or ast.Load())
+    
+    # to build the 'arguments' AST node
+    posonly = list() # => posonlyargs
+    poskwnodefs = list() # => args w/o default value
+    poskwdefs = list() # => args with default value; expand poskwnodefs with keys() and place values() in defaults
+    varpos = list() # => vararg --> single ast.arg node !
+    kwonly = dict() # => kwonlyargs, kw_defaults
+    varkw = list() #=> kwarg --> single ast.arg node !
+    
+    for param in sig.parameters.values():
+        default = param.default
+        annotation = None if param.annotation == Parameter.empty else param.annotation
+        
+        if param.kind == Parameter.POSITIONAL_ONLY: # no defaults, but possibly annotations;
+            if annotation:
+                posonly.append(ast.arg(param.name, ast.Name(annotation, ast.Load(), lineno=1, col_offset=0), 
+                                       lineno=1, col_offset=0))
             else:
-                raise TypeError("Shouldnt have defaults for other types")
-
-            if isinstance(param.default, type(None)):
-                # `ast.NameConstant` is used in PY3, but both support `ast.Name`
-                add_to.append(Name("None"))
-            elif isinstance(param.default, bool):
-                # `ast.NameConstant` is used in PY3, but both support `ast.Name`
-                add_to.append(Name(str(param.default)))
-            elif isinstance(param.default, numbers.Number):
-                add_to.append(Loc(ast.Num, n=param.default))
-            elif isinstance(param.default, str):
-                add_to.append(Loc(ast.Str, s=param.default))
-            elif isinstance(param.default, bytes):
-                add_to.append(Loc(ast.Bytes, s=param.default))
-            elif isinstance(param.default, list):
-                add_to.append(Loc(ast.List, elts=param.default, ctx=ast.Load()))
-            elif isinstance(param.default, tuple):
-                add_to.append(Loc(ast.Tuple, elts=list(param.default), ctx=ast.Load()))
-            elif isinstance(param.default, dict):
-                add_to.append(
-                    Loc(
-                        ast.Dict,
-                        keys=list(viewkeys(param.default)),
-                        values=list(viewvalues(param.default)),
-                    )
-                )
+                posonly.append(ast.arg(param.name, lineno=1, col_offset=0))
+            
+        elif param.kind == Parameter.POSITIONAL_OR_KEYWORD:
+            if default == Parameter.empty:
+                if annotation:
+                    poskwnodefs.append(ast.arg(param.name, ast.Name(annotation, ast.Load(), lineno=1, col_offset=0),
+                                               lineno=1, col_offset=0))
+                else:
+                    poskwnodefs.append(ast.arg(param.name, lineno=1, col_offset=0))
+                    
             else:
-                err = "unsupported default argument type: {}"
-                raise TypeError(err.format(type(param.default)))
-        elif param.kind is param.KEYWORD_ONLY:
-            # If it's a keyword-only arugment, we need to add a None-default
-            # value
-            func_kwdefaults.append(None)
-
-        if param.kind in {param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD}:
-            call_args.append(Name(param.name))
-            func_args.append(Loc(ast.arg, arg=param.name))
-        elif param.kind == param.VAR_POSITIONAL:
-            call_args.append(Loc(ast.Starred, value=Name(param.name), ctx=ast.Load()))
-            vararg = Loc(ast.arg, arg=param.name)
-        elif param.kind == param.KEYWORD_ONLY:
-            call_keywords.append(
-                Loc(ast.keyword, arg=param.name, value=Name(param.name))
-            )
-            func_kwargs.append(Loc(ast.arg, arg=param.name))
-        elif param.kind == param.VAR_KEYWORD:
-            call_keywords.append(Loc(ast.keyword, arg=None, value=Name(param.name)))
-            kwarg = Loc(ast.arg, arg=param.name)
+                value = ast.Constant(default, lineno=1, col_offset=0)
+                if annotation:
+                    poskwdefs.append(ast.keyword(param.name, value, ast.Name(annotation, ast.Load(), lineno=1, col_offset=0),
+                                                 lineno=1, col_offset=0))
+                else:
+                    poskwdefs.append(ast.keyword(param.name, value, lineno=1, col_offset=0))
+             
+                defaults.append(value)
 
     # generate the ast for the *callback* call
     call_ast = Loc(

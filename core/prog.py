@@ -636,9 +636,9 @@ def makeSignature(dct:Bunch) -> Signature:
         
         
 
-def sig2func(dct):
-    # FIXME/TODO 2021-12-22 23:38:58
-    return
+#def sig2func(dct):
+    ## FIXME/TODO 2021-12-22 23:38:58
+    #return
 
 def signature2Str(f:typing.Union[types.FunctionType, inspect.Signature, Bunch], 
                         as_constructor:bool=False):
