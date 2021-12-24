@@ -1167,7 +1167,7 @@ def makeObjAttrs(obj:typing.Any,
     
     """
     #print(type(obj))
-    if isinstance(obj, prog.CALLABLES):
+    if isinstance(obj, prog.CALLABLE_TYPES):
         return makeAttrDict (__function_or_method__ = jsonio.dumps(prog.signature2Dict(obj)))
     
     if obj is None:

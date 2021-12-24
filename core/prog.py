@@ -30,10 +30,10 @@ import quantities as pq
 from . import workspacefunctions
 from .workspacefunctions import debug_scipyen
 
-CALLABLES = (types.FunctionType, types.MethodType,
-             types.WrapperDescriptorType, types.MethodWrapperType,
-             types.BuiltinFunctionType, types.BuiltinMethodType,
-             types.MethodDescriptorType, types.ClassMethodDescriptorType)
+CALLABLE_TYPES = (types.FunctionType, types.MethodType,
+                  types.WrapperDescriptorType, types.MethodWrapperType,
+                  types.BuiltinFunctionType, types.BuiltinMethodType,
+                  types.MethodDescriptorType, types.ClassMethodDescriptorType)
 
 class ArgumentError(Exception):
     pass
@@ -454,7 +454,8 @@ class Timer(object):
 
 def signature2Dict(sig, name:typing.Optional[str]=None, 
                    qualname:typing.Optional[str]=None,
-                   module:typing.Optional[str]=None) -> Bunch:
+                   module:typing.Optional[str]=None,
+                   allstr:typing.Optional[bool]=False) -> Bunch:
     """A dictionary-like presentation of an inspect.Signature object.
     
     Useful especially in generic initialization of objects based 
@@ -497,8 +498,8 @@ def signature2Dict(sig, name:typing.Optional[str]=None,
     'module': str - the module name where the callable was defined, 
             or None
     
-    'positional': dict; maps name: type for positional-only 
-        parameters of the callable.
+    'positional': dict; maps name: annotation for those parameters that are
+        positional-only (BEFORE '/' in the parameters list if the callable)
         
         These parameters are of the inspect.Parameter.POSITIONAL_ONLY kind
     
@@ -507,6 +508,13 @@ def signature2Dict(sig, name:typing.Optional[str]=None,
         
         These parameters are of inspect.Parameter.POSITIONAL_OR_KEYWORD kind.
         
+        The default value for the positional or keyword parameters without a 
+        default value is set to dataclasses.MISSING.
+        
+        This is because the distinction between a positional and keyword
+        parameter is somewhat blurred, see 'About function parameters in Python'
+        below.
+                
     'varpos': dict; maps name: None, with the name of the var-positional
         parameter of the callable (e.g. 'args' when the callable signature
         includes `*args`).
@@ -529,6 +537,44 @@ def signature2Dict(sig, name:typing.Optional[str]=None,
     'returns': type, if the callable signature has an annotated return, 
         or `inspect._empty` otherwise
     
+    
+    About function parameters in Python:
+    ====================================
+    Python allows function signatures such as the following: 
+    
+    f(a, b, /, c, d=3, e=5, *args, f=6, g=7, **kwargs)
+    
+    where:
+    
+    'a', 'b' are POSITIONAL_ONLY; these are passed BEFORE the '/' in the 
+        parameters list.
+        
+    NOTE: if '/' is missing, then there are NO POSITIONAL_ONLY parameters.
+    
+    'c' is positional but is classified as POSITIONAL_OR_KEYWORD, although it
+        doesn't have a default value.
+        
+    'd', 'e' are positional parameters with default value ('keyword'-like)
+        therefore they are also classified as POSITIONAL_OR_KEYWORD.
+        
+    NOTE: POSITIONAL_OR_KEYWORD parameters ('c', 'd', 'e' in this example)
+    always appear AFTER the '/' in the parameters list, and BEFORE the varpos
+    parameter, '*args' or '*' (see below for the latter form, '*').
+    
+    If '/' is missing from the parameters list then ALL parameters BEFORE the
+    varpos ('*args' or '*') are POSITIONAL_OR_KEYWORD.
+        
+    'f', 'g' are KEYWORD_ONLY (i.e. they MUST have a default value even if it is
+        None).
+        
+    NOTE: KEYWORD_ONLY parameters are passed AFTER the varpos parameter ('*args'
+        or '*') and BEFORE the var-keyword parameter '**kwargs'.
+        
+        The '*' varpos parameter indicates that there are no varpos parameters
+        in the signature, but what follows are KEYWORD_ONLY parameters.
+            
+        
+    
     """
     if isinstance(sig, Signature):
         if not isinstance(name, str) or len(name.strip()) == 0:
@@ -540,10 +586,10 @@ def signature2Dict(sig, name:typing.Optional[str]=None,
         if not isinstance(module, str) or len(module.strip()) == 0:
             raise ValueError(f"With Signature objects, 'modname' is REQUIRED; got {module} instead")
     
-    if isinstance(sig, CALLABLES):
+    if isinstance(sig, CALLABLE_TYPES):
         name = sig.__name__
         qualname = sig.__qualname__
-        moduse = getattr(sig, "__module__", None)
+        module = getattr(sig, "__module__", None)
         sig = inspect.signature(sig)
         
     if not isinstance(sig, Signature):
@@ -555,8 +601,8 @@ def signature2Dict(sig, name:typing.Optional[str]=None,
     if not isinstance(qualname, str) or len(qualname.strip()) == 0:
         raise RuntimeError(f"'qualname' must be a non-empty str")
         
-    if not isinstance(module, str) or len(module.strip()) == 0:
-        raise RuntimeError(f"'module' must be a non-empty str")
+    #if not isinstance(module, str) or len(module.strip()) == 0:
+        #raise RuntimeError(f"'module' must be a non-empty str")
         
     posonly_params  = Bunch()    # POSITIONAL_ONLY
     named_params    = Bunch()    # POSITIONAL_OR_KEYWORD
@@ -567,45 +613,34 @@ def signature2Dict(sig, name:typing.Optional[str]=None,
     for parname, val in sig.parameters.items():
         #print("parameter name:", parname, "value:", val, "kind:", val.kind, "default:", val.default, "annotation:", val.annotation)
         
+        default = val.default
+        annotation = str(val.annotation) if allstr else val.annotation
+        
         if val.kind is Parameter.POSITIONAL_ONLY:
-            posonly_params[parname] = val.annotation
-            #posonly_params[parname] = "__empty_type__" if val.annotation is Parameter.empty else val.annotation
+            posonly_params[parname] = annotation
             
         elif val.kind is Parameter.POSITIONAL_OR_KEYWORD:
             if val.kind is Parameter.VAR_KEYWORD:
-                varkw_params[parname] = val.annotation
-                #varkw_params[parname] = "__empty_type__" if val.annotation is Parameter.empty else val.annotation
+                varkw_params[parname] = annotation
                 
             elif val.kind is Parameter.VAR_POSITIONAL:
-                varpos_params[parname] = val.annotation
-                #varpos_params[parname] = "__empty_type__" if val.annotation is Parameter.empty else val.annotation
+                varpos_params[parname] = annotation
                 
                 
             elif val.kind is Parameter.KEYWORD_ONLY:
-                kwonly_params[parname] = (val.default, val.annotation)
-                
-                #kwonly_params[parname] = ("__empty_type__" if val.default is Parameter.empty else val.default, 
-                                          #"__empty_type__" if val.annotation is Parameter.empty else val.annotation)
+                kwonly_params[parname] = (default, annotation)
                 
             else:
-                named_params[parname] = (val.default, val.annotation)
-                
-                #named_params[parname] = ("__empty_type__" if val.default is Parameter.empty else val.default, 
-                                         #"__empty_type__" if val.annotation is Parameter.empty else val.annotation)
+                named_params[parname] = (default, annotation)
                 
         elif val.kind is Parameter.VAR_KEYWORD:
-            varkw_params[parname] = val.annotation
-            #varkw_params[parname] = "__empty_type__" if val.annotation is Parameter.empty else val.annotation
+            varkw_params[parname] = annotation
             
         elif val.kind is Parameter.VAR_POSITIONAL:
-            varpos_params[parname] = val.annotation
-            #varpos_params[parname] = "__empty_type__" if val.annotation is Parameter.empty else val.annotation
+            varpos_params[parname] = annotation
             
         elif val.kind is Parameter.KEYWORD_ONLY:
-            kwonly_params[parname] = (val.default, val.annotation)
-                
-            #kwonly_params[parname] = ("__empty_type__" if val.default is Parameter.empty else val.default, 
-                                      #"__empty_type__" if val.annotation is Parameter.empty else val.annotation)
+            kwonly_params[parname] = (default, annotation)
                 
     return Bunch(name = name, qualname = qualname, module = module,
                          positional = posonly_params, named = named_params, 
@@ -1882,6 +1917,23 @@ def resolveObject(modName, objName):
     level.
     
     """
+    if modName is None: 
+        # likely in the 'builtins' module; this is the ONLY deviance we allow
+        # check to see if objName is a qualified name
+        parts = objName.split(".")
+        owner = ".".join(parts[:-1])
+        name = parts[-1]
+        if len(owner.strip()) == 0:
+            return MISSING # no owner type/module specified - no way to resolve that
+        
+        try:
+            # specifically check for builtins
+            builtins = import_item("builtins")
+            owner = eval(owner, builtins.__dict__)
+            return getattr(owner, name, MISSING)
+        except:
+            return MISSING
+    
     if modName in sys.modules:
         module = sys.modules[modName]
         return eval(objName, module.__dict__)
@@ -1894,101 +1946,3 @@ def resolveObject(modName, objName):
             return MISSING
             
     
-#def typedDispatch(func):
-    #"""Single-dispatch decorator for generic functions operating on types.
-
-    #This is a modifed version of Python's functools.singledispatch.
-    
-    #The generic function and its implementations are expected to accept at 
-    #least one argument, which is a type object. 
-
-    #From functools.singledispatch:
-    #Transforms a function into a generic function, which can have different
-    #behaviours depending upon the the first argument, which must be a type. 
-    #The decorated function acts as the default implementation, and additional
-    #implementations can be registered using the register() attribute of the
-    #generic function.
-    
-    
-    #"""
-    #import types, weakref
-
-    #registry = {}
-    #dispatch_cache = weakref.WeakKeyDictionary()
-    #cache_token = None
-
-    #def dispatch(cls):
-        #"""generic_func.dispatch(cls) -> <function implementation>
-
-        #Runs the dispatch algorithm to return the best available implementation
-        #for the given *cls* registered on *generic_func*.
-
-        #"""
-        #nonlocal cache_token
-        #if cache_token is not None:
-            #current_token = get_cache_token()
-            #if cache_token != current_token:
-                #dispatch_cache.clear()
-                #cache_token = current_token
-        #try:
-            #impl = dispatch_cache[cls]
-        #except KeyError:
-            #try:
-                #impl = registry[cls]
-            #except KeyError:
-                #impl = _find_impl(cls, registry)
-            #dispatch_cache[cls] = impl
-        #return impl
-
-    #def register(cls, func=None):
-        #"""generic_func.register(cls, func) -> func
-
-        #Registers a new implementation for the given *cls* on a *generic_func*.
-
-        #"""
-        #nonlocal cache_token
-        #if func is None:
-            #if isinstance(cls, type):
-                #return lambda f: register(cls, f)
-            #ann = getattr(cls, '__annotations__', {})
-            #if not ann:
-                #raise TypeError(
-                    #f"Invalid first argument to `register()`: {cls!r}. "
-                    #f"Use either `@register(some_class)` or plain `@register` "
-                    #f"on an annotated function."
-                #)
-            #func = cls
-
-            ## only import typing if annotation parsing is necessary
-            #from typing import get_type_hints
-            #argname, cls = next(iter(get_type_hints(func).items()))
-            #if not isinstance(cls, type):
-                #raise TypeError(
-                    #f"Invalid annotation for {argname!r}. "
-                    #f"{cls!r} is not a class."
-                #)
-        #registry[cls] = func
-        #if cache_token is None and hasattr(cls, '__abstractmethods__'):
-            #cache_token = get_cache_token()
-        #dispatch_cache.clear()
-        #return func
-
-    #def wrapper(*args, **kw):
-        #if len(args) < 1:
-            #raise TypeError(f'{funcname} requires at least '
-                            #'1 positional argument')
-
-        ## first argument of the implementation IS expected to be a type
-        #if not isinstance(args[0], type):
-            #raise TypeError(f"first positional argument in {funcname} must be a type; got {type(args[0]).__name__} instead")
-        
-        #return dispatch(args[0])(*args, **kw)
-
-    #funcname = getattr(func, '__name__', 'singledispatch function')
-    #registry[object] = func
-    #wrapper.register = register
-    #wrapper.dispatch = dispatch
-    #wrapper.registry = types.MappingProxyType(registry)
-    #wrapper._clear_cache = dispatch_cache.clear
-    #update_wrapper(wrapper, func)
-    #return wrapper

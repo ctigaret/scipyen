@@ -1,4 +1,95 @@
-"""JSON codecs
+""" JSON codecs
+
+    General schema:
+    
+    Below, <key> is one of: 
+    "__python_type__", "__python_function__", "__python_method__", 
+    "__python_object__"
+    
+    {<key>:{
+        "__instance_type__": str; the name of the object's type, when object is
+                                an instance 
+        
+        "__instance_module__": str; the name of the module where the object's 
+                            type is defined (when object is an instance)
+        
+        "__type_name__": str; for type objects, the name of the object 
+                                (obj.'__name__');
+                                
+                              for instances, same value as __instance_type__
+                              
+        "__type_module__": str; for type objects, the name of the module where 
+                                the object (a type) is defined;
+                                
+                                for instances, same value as __instance_module__
+                                
+        "__type_factory__": dict or None; 
+            
+            When a dict, it will be used when the type of the instance being
+            serialized (or the type being serialized) cannot be imported (e.g. 
+            in case of dynamically created classes such as named tuples).
+            
+            The __type_factory__ dict expects the following structure:
+            {
+                "__name__": str: name for the type factory function.
+                            This is the name of a callable to generate the 
+                            object's type (for python instances) or the type
+                            being serialized.
+
+                            The parameters passed to this function are given in 
+                            "__posonly__", "__named__", "__varpos__",
+                            "__kwonly__", and "__varkw__", explained below.
+                            
+                "__qualname__": str: qualified name of the function (e.g
+                    <object_type>.<name>)
+                    
+                "__module__": str: module where the function is defined
+                            
+                "__posonly__": tuple: values of the positional only parameters,
+                    and of the "__named__" parameters without default value
+                    
+                "__named__": dict, mapping name to value for positional or 
+                            keyword parameters, that have a default value
+                            
+                "__varpos__": tuple: values for the var-positional parameters
+                            
+                "__kwonly__": dict, mapping name to value for keyword only 
+                            parameters
+                            
+                "__varkw__": dict, mapping name to value for any additional
+                            keyword (var-keyword) parameters
+                            
+                "__signature__": None, or dict (result of prog.signature2Dict)
+            }
+            
+            The type factory will use the parameters in __args__, __named__ and 
+            __kwargs__ (see below)
+            
+        "__factory__": dict or None
+                    Object factory (either __init__ or __new__ or a factory
+                    function, represented as a dict (similar to _type_factory__
+                    as above), or None,
+                    
+                    When None, the object type will be used as callable with 
+                    no arguments.
+                
+        "__subtype__": str or None
+                When a str it is used specifically for numpy structured arrays
+                and for Pandas extension dtypes
+        
+        "__dtype__": str; representation of the numpy dtye, or json representation
+                    of a specialized dtype (such as h5py special dtypes, or 
+                    pandas extension dtypes)
+                        
+        "__value__": str: JSON representation of the value, or None (a.k.a null)
+                    this is usually the JSON representation for objects of
+                    basic Python types that can be directly serialized (either
+                    using Python's json or any other 3rd party library, e.g. 
+                    orjson)
+                            
+        }
+    }
+    
 NOTE: 2021-12-21 16:11:42
 Testing the following alternative json libs/packages:
 simplejson => NO
@@ -38,9 +129,12 @@ orjson
         
     + support for dataclass (new since Python 3.7) => we might consider using 
         this strategy in ScanData, AnalysisUnit, Results, etc.
+
+
+
 """
 
-import sys, traceback, typing, collections, inspect
+import sys, traceback, typing, collections, inspect, types
 import json
 #import simplejson as json
 import orjson
@@ -55,44 +149,73 @@ import vigra
 from traitlets.utils.importstring import import_item
 from core import quantities as cq
 from core import prog
-from core.prog import (signature2Dict, resolveObject, MISSING )
+from core.prog import (signature2Dict, resolveObject, ArgumentError, CALLABLE_TYPES, MISSING)
+
+
+
+def makeFuncStub(function:typing.Union[CALLABLE_TYPES]):
+    """Generate a stub dictionary.
+    
+    The result contains the following key/value pairs (see also general schema
+    described in the module docstring):
+    
+    "__signature__": dict, result of prog.signature2Dict
+    
+    "__posonly__": tuple: values of the positional only parameters,
+        and of the "__named__" parameters without default value
+        
+    "__named__": dict, mapping name to value for positional or 
+                keyword parameters, thart have a default value
+    "__varpos__": tuple: values for the var-positional parameters
+                
+    "__kwonly__": dict, mapping name to value for keyword only 
+                parameters
+                
+    "__varkw__": dict, mapping name to value for any additional
+                keyword (var-keyword) parameters
+                
+    
+    
+    In the stub, only the '__signature__' is initialized; the other keys are set
+    to their empty defaults (tuple() or dict()) which must be apporpriately
+    populated by one of the module functions makeJSONStub and object2JSON.
+    
+    
+    
+    """
+    if not isinstance(function, CALLABLE_TYPES):
+        raise TypeError(f"Expecting a callable type, one of {CALLABLE_TYPES}; got {type(function).__name__} instead")
+    
+    return {"__signature__":    signature2Dict(function),
+            "__posonly__":      tuple(),
+            "__named__":        dict(),
+            "__varpos__":       tuple(),
+            "__kwonly__":       dict(),
+            "__varkw__":        tuple(),
+            }
 
 def makeJSONStub(o):
     if isinstance(o, type):
         header = "__python_type__"
         ret = {"__type_name__":     o.__qualname__,
                "__type_module__":   o.__module__,
-               "__type_factory__":      {"__init__": None,
-                                         "__args__": tuple(),
-                                         "__named__": dict(),
-                                         "__kwargs__": dict(),
-                                         },
+               "__type_factory__":  None,
                }
         
     elif inspect.isfunction(o):
         header = "__python_function__"
-        ret = dict(prog.signature2Dict(o))
+        ret = makeFuncStub(o)
                                             
     elif inspect.ismethod(o):
         header = "__python_method__"
-        # NOTE/TODO: 2021-12-18 22:26:27
-        # can I differentiate between class method and instance method?
-        ret = dict(prog.signature2Dict(o))
+        ret = makeFuncStub(o)
                                             
     else:
         header = "__python_object__"
         ret = {"__instance_type__":     type(o).__qualname__,
                "__instance_module__":   type(o).__module__,
-               "__type_factory__":      {"__init__": None,
-                                         "__args__": tuple(),
-                                         "__named__": dict(),
-                                         "__kwargs__": dict(),
-                                         },
-               "__init__":              None,
-               "__new__":               None,
-               "__args__":              tuple(),
-               "__named__":             dict(),
-               "__kwargs__":            dict(),
+               "__type_factory__":      None,
+               "__factory__":           None,
                "__value__":             None,
                "__subtype__":           None,
                "__dtype__":             None,
@@ -105,10 +228,15 @@ def object2JSON(o):
     from core.datatypes import is_namedtuple
     hdr, ret = makeJSONStub(o)
     if is_namedtuple(o):
-        ret.update({"__named__": dict((f, getattr(o,f)) for f in o._fields),
-                    "__type_factory__": {"__init__": "collections.namedtuple",
-                                         "__named__": {"typename": type(o).__name__,
-                                                       "field_named": tuple(f for f in o._fields)}}})
+        type_factory = makeFuncStub(collections.namedtuple)
+        type_factory["__named__"] = {"typename": type(o).__name__,
+                                     "field_names": tuple(f for f in o._fields)}
+        ret["__type_factory__"] = type_factory
+
+        factory = makeFuncStub(type(o).__new__)
+        factory["__named__"] = dict((f, getattr(o,f)) for f in o._fields)
+        ret["__factory__"] = factory
+
     return {hdr:ret}
     
 @object2JSON.register(type)
@@ -116,14 +244,23 @@ def _(o:type):
     from core.datatypes import is_namedtuple
     hdr, ret = makeJSONStub(o)
     if is_namedtuple(o):
-        ret.update({"__type_factory__": {"__init__": "collections.namedtuple",
-                                         "__named__": {"typename": type(o).__name__,
-                                                       "field_named": tuple(f for f in o._fields)}}})
+        type_factory = makeFuncStub(collections.namedtuple)
+        type_factory["__named__"] = {"typename": type(o).__name__,
+                                     "field_names": tuple(f for f in o._fields)}
+        
+        ret["__type_factory__"] = type_factory
+        
     return {hdr:ret}
     
 @object2JSON.register(complex)
 def _(o:complex):
-    return {"__args__": (o.real, o.imag)}
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub(type(o).__new__)
+    factory["__posonly__"] = (o.real, o.imag)
+    ret["__factory__"] = factory
+    
+    return {hdr:ret}
+    
 
 @object2JSON.register(deque)
 def _(o:deque):
@@ -518,110 +655,36 @@ def load(filename):
     return ret
 
 def json2python(dct):
-    """
-    NOTE: general schema:
+    """Restores a Python object from it JSON representation.
     
-    Below, <key> is one of: 
-    "__python_type__", "__python_function__", "__python_method__", 
-    "__python_object__"
+    WARNING: Functions, and, with a few exceptions, types and method objects 
+    cannot be restored unless they are already defined in a module that can be 
+    imported at runtime.
     
-    {<key>:{
-        "__instance_type__": str; the name of the object's type, when object is
-                                an instance 
+    The exceptions are types that can be (re)created dynamically at runtime using
+    factory functions defined in modules that can be imported at runtime.
+    
+    Likewise, it may be possible to restore method objects that belong to types
+    (re)created dynamically via factory functions.
+    
+    For general schema see module docstring.
+    
+    
+    NOTE: Object initialization proceeds via the following steps:
+    
+    1) resolve object's type using object's type name and name of module where 
+        it is defined (via traitlets.utils.importstring.import_item())
         
-        "__instance_module__": str; the name of the module where the object's 
-                            type is defined (when object is an instance)
-        
-        "__type_name__": str; for type objects, the name of the object 
-                                (obj.'__name__');
-                                
-                              for instances, same value as __instance_type__
-                              
-        "__type_module__": str; for type objects, the name of the module where 
-                                the object (a type) is defined;
-                                
-                                for instances, same value as __instance_module__
-                                
-        "__type_factory__": dict or None; 
-            
-            When not None, it will be used when the type of the instance being
-            serialized (or the type being serialized) cannot be imported (e.g. 
-            in case of dynamically created classes such as named tuples).
-            
-            When a dict, it expects the following structure:
-            {
-                "__func__": str or signature dict for the type factory
-                            When a str, this is the name of a callable to generate
-                            the object's type (for python instances) or the type
-                            being serialized.
-                            When a dict, this represents the signature of a type 
-                            factory as above.
-                            The parameters passed to this function are given in 
-                            "__args__", "__named__" and "__kwargs__", detailed 
-                            next; CAUTION not to be confused with the __args__,
-                            __named__ and __kwargs__ for the constructor/initializer
-                            which are explained further below.
-                            
-                "__args__": tuple
-                "__named__": dict
-                "__kwargs__": dict
-            }
-            
-            The type factory will use the parameters in __args__, __named__ and 
-            __kwargs__ (see below)
-            
-        "__init__": one of: 
-                    :str: = the qualified name of instance initializer function 
-                    or method
-                    
-                    :dict: = the signature of the initializer function or method
-                    
-                    
-                    By default this contains the dict of the signature of the
-                    instance type __init__ method.
-                    
-        "__new__": dict, or None
-                    :str: = the qualified name of the constructor function or
-                    method
-                    
-                    :dict: = the signature of the constructor function or method
-                    
-                    The parameters passed to this function are given in 
-                    "__args__", "__named__" and "__kwargs__", detailed below
-        
-                    By default this contains the dict of the signature of the
-                    instance type __new__ method.
-                    
-        "__args__": tuple; parameters for object intialization, or empty tuple
-        
-        "__kwargs__": dict; keyword parameters for object initialization, or 
-                            empty dict
-                            
-        "__subtype__": str or None
-                When a str it is used specifically for numpy structured arrays
-                and for Pandas extension dtypes
-        
-        "__dtype__": str; representation of the numpy dtye, or json representation
-                    of a specialized dtype (such as h5py special dtypes, or 
-                    pandas extension dtypes)
-                        
-        "__value__": str: JSON representation of the value, or None (a.k.a null)
-                    this is usually the JSON representation for objects of
-                    basic Python types that can be directly serialized (either
-                    using Python's json or any other 3rd party library, e.g. 
-                    orjson)
-                            
-        }
-    }
+        if this fails, try to use __type_factory__ to recreate the object type
+        dynamically; finally, bail out if this also fails
     
+    2) initialize the object
     
+    1) when dct["__init__"] and dct["__new__"] are None (JSON 'null')
     
-    NOTE: Object initialization from a JSON data structure ('data'):
-    
-    a) when both data["__init__"] and data["__new__"] are None (JSON 'null')
-    
-        Uses object's type as a callable; parameters are retrieved from 
-        data["__args__"], data["__named__"],  and data["__kwargs__"]
+        Uses object's type as a callable; parameters are retrieved from the
+        "__posonly__", "__named__", "__varpos__", "__kwonly__" and "__varkw__"
+        entries in data.
         
     b) when data["__init__"] is a str that resolves to a function:
     
@@ -650,10 +713,18 @@ def json2python(dct):
     ret = dict()
     for key, val in dct.items():
         if key == "__python_type__":
-            return resolveObject(val["__type_module__"], val["__type_name__"])
+            ret = resolveObject(val["__type_module__"], val["__type_name__"])
+            if ret == MISSING:
+                raise RuntimeError(f"Cannot resolve {'.'.join([val['__type_module__'], val['__type_name__']])}")
+            
+            return ret
         
         elif key == "__python_function__":
-            return resolveObject(val["module"], val["qualname"])
+            ret = resolveObject(val["module"], val["qualname"])
+            if ret == MISSING:
+                raise RuntimeError(f"Cannot resolve {'.'.join([val['module'], val['qualname']])}")
+            
+            return ret
         
         elif key == "__python_method__":
             name = val["name"]
@@ -661,6 +732,9 @@ def json2python(dct):
             qualname = val["qualname"]
             owner_type_name = ".".join(qualname.strip(".")[:-1])
             owner = resolveObject(val["module"], owner_type_name)
+            if owner == MISSING:
+                raise RuntimeError(f"Cannot resolve {owner_type_name}")
+
             return inspect.getattr_static(owner, name)
             
         elif key == "__python_object__":
@@ -668,61 +742,55 @@ def json2python(dct):
             if obj_type is MISSING:
                 # NOTE: 2021-12-22 23:24:38 
                 # could not import obj_type; try to recreate it here
-                factory = val["__type_factory__"]
-                if isinstance(factory, dict):
-                    init = factory["__init__"]
-                    if isinstance(init, str):
-                        try:
-                            init = import_item(init)
-                            
-                        except:
-                            raise ValueError("fCannot resolve {init}")
+                type_factory_spec = val["__type_factory__"]
+                if isinstance(type_factory_spec, dict):
+                    signature = type_factory_spec["__signature__"]
+                    type_factory_func = resolveObject(signature["module"], 
+                                                      signature["qualname"])
+                    
+                    if type_factory_func == MISSING:
+                        raise RuntimeError(f"Cannot resolve object type")
                         
-                    elif isinstance(init, dict):
-                        init = sig2func(init) # FIXME/TODO 2021-12-22 23:38:30 see prog.
-                    
-            init_func_data = val["__init__"]
-            args = val["__args__"]
-            kwargs = val["__named__"]
-            kwargs.update(val["__kwargs__"])
-            #print(f"obj_type {obj_type}")
-            #print(f"init_func_data {init_func_data}")
-            if isinstance(init_func_data, str): 
-                # expects a fully qualified name, i.e., package.module.function
-                #   e.g., imaging.vigrautils.kernelfromarray
-                # Won't work with a method name i.e., package.module.type.method_name
-                #   e.g., imaging.scandata.ScanData.__init__
+                    if isinstance(type_factory_func, (types.FunctionType, types.MethodType)):
+                        args = type_factory_spec["__posonly__"] + type_factory_spec["__varpos__"]
+                        kwargs = dict()
+                        kwargs.update(type_factory_spec["__named__"])
+                        kwargs.update(type_factory_spec["__kwonly__"])
+                        kwargs.update(type_factory_spec["__varkw__"])
+                        
+                        obj_type = type_factory_func(*args, **kwargs)
+                        
+                    else:
+                        raise RuntimeError(f"Cannot resolve object type")
+            
+            obj_factory_spec = val["__factory__"]
+            
+            if isinstance(obj_factory_spec, dict):
+                signature = obj_factory_spec["__signature__"]
+                obj_factory = None
                 
-                init_func = import_item(init_func_data)
+                if isinstance(signature["module"], str) and len(signature["module"].strip()):
+                    obj_factory = resolveObject(signature["module"], 
+                                                signature["qualname"])
                 
-            elif isinstance(init_func_data, dict):
-                # check if this is obj_type.__init__
-                if init_func_data["name"] == "__init__" and "." in init_func_data["qualname"]:
-                    owner_type_name = ".".join(init_func_data["qualname"].split(".")[:-1])
-                    owner_type = resolveObject(init_func_data["module"], owner_type_name)
-                    
-                    if owner_type is not obj_type:
-                        raise ValueError(f"signature of '__init__' indicates has a different owner: {owner.__name__}; expecting {obj_type.__name__}")
-                    
-                    init_func = obj_type
-                    
-                elif init_func_data["name"] == "__new__" and "." in init_func_data["qualname"]:
-                    owner_type_name = ".".join(init_func_data["qualname"].split(".")[:-1])
-                    owner_type = resolveObject(init_func_data["module"], owner_type_name)
-                    
-                    if owner_type is not obj_type:
-                        raise ValueError(f"signature of '__new__' indicates a different owner: {owner.__name__}; expecting {obj_type.__name__}")
-                    
-                    init_func = inspect.getattr_static(obj_type, "__new__")
-                    
-                else:
-                    init_func_name = ".".join([init_func_data["module"], init_func_data["qualname"]])
-                    init_func = import_item(init_func_name)
-                    
-            else: # init_func_data is either None or some gobbledygook => fallback on calling obejct type as c'tor/initalizer'
-                init_func = obj_type
-                    
-            return init_func(*args, **kwargs)
+                if obj_factory in (MISSING, None):
+                    # TODO: code to verify that param specs in factory_spec match those in obj factory signature
+                    if obj_type.__name__ in signature["qualname"]:
+                        obj_factory = getattr(obj_type, signature["name"], None)
+                        args = tuple([obj_type] + list(obj_factory_spec["__posonly__"]) + list(obj_factory_spec["__varpos__"]))
+                        
+                    else:
+                        obj_factory = obj_type
+                        args = obj_factory_spec["__posonly__"] + obj_factory_spec["__varpos__"]
+                        
+                if not isinstance(obj_factory, CALLABLE_TYPES):
+                    raise RuntimeError(f"Cannot resolve object factory")
+                
+                kwargs = obj_factory_spec["__named__"]
+                kwargs.update(obj_factory_spec["__kwonly__"])
+                kwargs.update(obj_factory_spec["__varkw__"])
+            
+            return obj_factory(*args, **kwargs)
             
         else:
             ret[key] = json2python(val)
