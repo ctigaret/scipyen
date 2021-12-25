@@ -3,7 +3,7 @@
     General schema:
     
     Below, <key> is one of: 
-    "__python_type__", "__python_function__", "__python_method__", 
+    "__python_type__", "__python_function_or_method__", "__python_method__", 
     "__python_object__"
     
     {<key>:{
@@ -151,7 +151,31 @@ from core import quantities as cq
 from core import prog
 from core.prog import (signature2Dict, resolveObject, ArgumentError, CALLABLE_TYPES, MISSING)
 
+# NOTE: 2021-12-25 15:45:55
+# unfortunately, orjson does not expose supported numpy types so we need to
+# hardcode these here
 
+ORJSON_NUMPY_TYPES = (np.float64, np.float32, np.int64, np.int32, np.int8, 
+                      np.uint64, np.uint32, np.uint8, np.uintp, np.intp, 
+                      np.datetime64)
+
+ORJSON_NUMPY_DTYPES = tuple(np.dtype(t) for t in ORJSON_NUMPY_TYPES)
+
+# NOTE:2021-12-25 16:55:20
+# potential instance methods for convertion to JSON; by no means exhaustive
+# but at least covers 3rd party cases (e.g., vigra.AxisTags.toJSON, 
+# vigra.AxisTags.fromJSON, pandas.DataFrame.to_json) and Scipyen's types
+TO_JSON_INSTANCE_METHODS = ("tojson", "toJSON", "to_json", "to_JSON", 
+                            "obj2json", "obj2JSON")
+
+# NOTE: 2021-12-25 17:01:49
+# WARNING pandas.read_json is NOT a complete round trip for multiindex! 
+# As for TO_JSON_INSTANCE_METHODS this is by no means exhaustive, as it depends 
+# on 3rd party developers
+FROM_JSON_FACTORY_METHODS = ("fromjson", "fromJSON", "from_json", "from_JSON", 
+                             "objfromjson", "objfromJSON",
+                              "json2obj", "JSON2obj", "json2Obj", "JSON2OBJ",
+                             "read_json", "read_JSON", "readJSON", "readjson")
 
 def makeFuncStub(function:typing.Union[CALLABLE_TYPES]):
     """Generate a stub dictionary.
@@ -185,8 +209,12 @@ def makeFuncStub(function:typing.Union[CALLABLE_TYPES]):
     """
     if not isinstance(function, CALLABLE_TYPES):
         raise TypeError(f"Expecting a callable type, one of {CALLABLE_TYPES}; got {type(function).__name__} instead")
-    
-    return {"__signature__":    signature2Dict(function),
+    try:
+        sig = signature2Dict(function)
+    except:
+        sig = {"name": function.__name__, "qualname": function.__qualname__, "module": function.__module__}
+        
+    return {"__signature__":    sig,
             "__posonly__":      tuple(),
             "__named__":        dict(),
             "__varpos__":       tuple(),
@@ -202,12 +230,8 @@ def makeJSONStub(o):
                "__type_factory__":  None,
                }
         
-    elif inspect.isfunction(o):
-        header = "__python_function__"
-        ret = makeFuncStub(o)
-                                            
-    elif inspect.ismethod(o):
-        header = "__python_method__"
+    elif isinstance(o, CALLABLE_TYPES):
+        header = "__python_function_or_method__"
         ret = makeFuncStub(o)
                                             
     else:
@@ -222,10 +246,32 @@ def makeJSONStub(o):
                }
                 
     return header, ret
-        
+
+
+def makeH5PyOpaqueDtype(name):
+    """Required because inspect.signature fails with h5py dtype factories
+    """
+    return h5py.opaque_dtype(np.dtype(name))
+
+def makeH5PyEnumDtype(name):
+    """Required because inspect.signature fails with h5py dtype factories
+    """
+    return h5py.enum_dtype(name)
+    
+def makeH5PyStringDtype(encoding, length):
+    """Required because inspect.signature fails with h5py dtype factories
+    """
+    return h5py.string_dtype(encoding, length)
+
+def makeH5PyVlenDtype(name):
+    """Required because inspect.signature fails with h5py dtype factories
+    """
+    return h5py.vlen_dtype(name)
+
 @singledispatch
 def object2JSON(o):
     from core.datatypes import is_namedtuple
+    #print("object2JSON generic", type(o))
     hdr, ret = makeJSONStub(o)
     if is_namedtuple(o):
         type_factory = makeFuncStub(collections.namedtuple)
@@ -236,11 +282,21 @@ def object2JSON(o):
         factory = makeFuncStub(type(o).__new__)
         factory["__named__"] = dict((f, getattr(o,f)) for f in o._fields)
         ret["__factory__"] = factory
+        
+    else:
+        to_json_ndx = list(k for k,m in enumerate(TO_JSON_INSTANCE_METHODS) if isinstance(getattr(o, m, None), CALLABLE_TYPES))
+        if len(to_json_ndx):
+            to_json = getattr(o, TO_JSON_INSTANCE_METHODS[to_json_ndx[0]])
+            ret["__value__"] = to_json() # this SHOULD work for bound methods!
+        
+        else:
+            return o
 
     return {hdr:ret}
     
 @object2JSON.register(type)
 def _(o:type):
+    #print(o)
     from core.datatypes import is_namedtuple
     hdr, ret = makeJSONStub(o)
     if is_namedtuple(o):
@@ -254,6 +310,7 @@ def _(o:type):
     
 @object2JSON.register(complex)
 def _(o:complex):
+    #print(type(o))
     hdr, ret = makeJSONStub(o)
     factory = makeFuncStub(type(o).__new__)
     factory["__posonly__"] = (o.real, o.imag)
@@ -261,9 +318,9 @@ def _(o:complex):
     
     return {hdr:ret}
     
-
 @object2JSON.register(deque)
 def _(o:deque):
+    #print(type(o))
     hdr, ret = makeJSONStub(o)
     factory = makeFuncStub(type(o).__new__)
     factory["__posonly__"] = (list(o),)
@@ -274,55 +331,122 @@ def _(o:deque):
 @object2JSON.register(vigra.filters.Kernel1D)
 @object2JSON.register(vigra.filters.Kernel2D)
 def _(o:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D]):
+    #print(type(o))
     from imaging.vigrautils import kernel2array
     hdr, ret = makeJSONStub(o)
     xy = kernel2array(o, True)
     factory = makeFuncStub(kernelfromjson)
-    factory["__posonly__"] = (xy.tolist(),)
+    #factory["__posonly__"] = (xy.tolist(),) 
+    # NOtE: 2021-12-25 14:46:16
+    # this requires passing option=orjson.OPT_SERIALIZE_NUMPY to orjson.dumps
+    factory["__posonly__"] = (xy,) 
     ret["__factory__"] = factory
     return {hdr:ret}
 
-def dtype2JSON(d:np.dtype) -> typing.Union[str, dict]:
+@object2JSON.register(vigra.AxisTags)
+def _(o:vigra.AxisTags):
+    #print(f"object2JSON<vigra.AxisTags>: {type(o)}: {o}")
+    hdr, ret = makeJSONStub(o)
+    value = o.toJSON()
+    factory = makeFuncStub(type(o).fromJSON)
+    factory["__posonly__"] = (value, )
+    ret["__factory__"] = factory
+    
+    return {hdr:ret}
+
+@object2JSON.register(np.ndarray)
+def _(o:np.ndarray):
+    return orjson.dumps(o, option=orjson.OPT_SERIALIZE_NUMPY)
+
+
+@object2JSON.register(vigra.VigraArray)
+def _(o:vigra.VigraArray):
+    #print(f"object2JSON>bigra.VigraArray>: {type(o)}")
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub(vigra.VigraArray.__new__)
+    #factory["__named__"]["obj"] = o.tolist()
+    if o.dtype in ORJSON_NUMPY_DTYPES or type(o.flatten()[0]) in ORJSON_NUMPY_TYPES:
+        factory["__named__"]["obj"] = np.array(o.transposeToNumpyOrder())
+    else:
+        factory["__named__"]["obj"] = o.transposeToNumpyOrder().tolist()
+        
+    factory["__named__"]["dtype"] = o.dtype
+    factory["__named__"]["order"] = o.order
+    factory["__named__"]["axistags"] = o.axistags
+    
+    ret["__factory__"] = factory
+    #ret["__dtype__"] = o.dtype
+    
+    return {hdr:ret}
+    
+@object2JSON.register(np.dtype)
+def _(o:np.dtype):
+    hdr, ret = makeJSONStub(o)
+    # NOTE: 2021-12-25 21:47:38
+    # 1) check if o is a h5py opaque dtype
+    factory = dtype2JSON(o)
+    if factory is None:
+        raise NotImplementedError(f"Type is not supported: {o}")
+
+    ret["__factory__"] = factory
+    return {hdr:ret}
+
+def dtype2JSON(d):
+    factory = h5pyDtype2JSON(d) or pandasDtype2JSON(d) or numpyDtype2JSON(d)
+    return factory
+
+def numpyDtype2JSON(d:np.dtype) -> dict:
     """Roundtrip numpy dtype - json string format - write side
     An alternative to the np.lib.format.dtype_to_descr
     Returns a dict for recarray dtypes; a str in any other case.
     """
-    # NOTE: 2021-12-14 22:51:17
-    # for pandas dtypes return either a str or a dict
-    # for special h5py dtypes returns a dict:
-    # * mapping original dtype (or type) as str mapped to the h5py dtype initializer(as str)
-    if not isinstance(d, np.dtype) and not pd.api.types.is_extension_array_dtype(d):
-        raise TypeError(f"Expecting a numpy dtype, or pandas extvension dtype instance; got {type(d).__name__} instead")
-    
-    #print("dtype2JSON", d)
-    
-    h5pyjson = h5pyDtype2JSON(d)
-    
-    if h5pyjson is not None:
-        return h5pyjson
-    
-    pandasjson = pandasDtype2JSON(d)
-    if pandasjson is not None:
-        return pandasjson
+    if not isinstance(d, np.dtype):
+        return
     
     fields = d.fields
     
     if d.name.startswith("record"):
-        return dict((name, (dtype2JSON(value[0]), value[1])) for name, value in d.fields.items())
+        value = dict((name, (dtype2JSON(value[0]), value[1])) for name, value in d.fields.items())
         
     else:   
         if fields is None:
-            return np.lib.format.dtype_to_descr(d) #does not perform well for structured arrays?
+            value = np.lib.format.dtype_to_descr(d) # does not perform well for structured arrays?
         else:
-            return d.name
+            value = d.name
+        
+    factory = makeFuncStub(np.dtype.__new__)
+    
+    factory["__posonly__"] = (value,)
+    
+    return factory
+        
+    # NOTE: 2021-12-14 22:51:17
+    # for pandas dtypes return either a str or a dict
+    # for special h5py dtypes returns a dict:
+    # * mapping original dtype (or type) as str mapped to the h5py dtype initializer(as str)
+    #if not isinstance(d, np.dtype) and not pd.api.types.is_extension_array_dtype(d):
+        #raise TypeError(f"Expecting a numpy dtype, or pandas extvension dtype instance; got {type(d).__name__} instead")
+    
+    #print("dtype2JSON", d)
+    
+    #h5pyjson = h5pyDtype2JSON(d)
+    
+    #if h5pyjson is not None:
+        #return h5pyjson
+    
+    #pandasjson = pandasDtype2JSON(d)
+    #if pandasjson is not None:
+        #return pandasjson
     
 def h5pyDtype2JSON(d):
     """Checks if d is a special h5py dtype.
-    Returns a json representation (dict) if d is a h5py speciall dtype, or None.
+    Returns a json representation (dict) if d is a h5py special dtype, or None.
     """
+    factory = None
     if h5py.check_opaque_dtype(d): # we're on our own here
-        return {str(d): {"__init__": f"opaque_dtype(np.dtype('{str(d)}'))",
-                         "__ns__": "h5py"}}
+        factory = makeFuncStub(makeH5PyOpaqueDtype)
+        factory["__posonly__"] = (o.name,)
+        
     else:
         vi = h5py.check_vlen_dtype(d) # a Python (base) type
         
@@ -331,24 +455,27 @@ def h5pyDtype2JSON(d):
         ei = h5py.check_enum_dtype(d) # an enum :class: or None
         
         if ei is not None:
-            return {ei.__name__: {"__init__": f"enum_dtype({ei.__name__})",
-                                "__ns__": "h5py"}}
-        
+            factory = makeFuncStub(makeH5PyEnumDtype)
+            factory["__posonly__"] = (ei.__name__, )
+            
         elif vi is not None:
-            if si is not None: 
-                return {vi.__name__: {"__init__": f"string_dtype('{si.encoding}', {si.length})",
-                                    "__ns__": "h5py"}}
+            if si is not None:
+                factory = makeFuncStub(makeH5PyStringDtype)
+                factory["__posonly__"] = (si.encoding, si.length)
+                
             else:
-                return {vi.__name__: {"__init__": f"vlen_dtype({vi.__name__})",
-                                    "__ns__": "h5py"}}
-
+                factory = makeFuncStub(makeH5PyVlenDtype)
+                factory["__posonly__"] = (vi.__name__, )
+                
         elif si is not None:
-            return {vi.__name__: {"__init__": f"string_dtype('{si.encoding}', {si.length})",
-                                "__ns__": "h5py"}}
+            factory = makeFuncStub(makeH5PyStringDtype)
+            factory["__posonly__"] = (si.encoding, si.length)
+            
+    return factory
             
 def pandasDtype2JSON(d):
     """Checks if d is a pandas extension dtype (for standard pandas extensions)
-    Returns a json representation (either str or dict) id d is a pandas extension
+    Returns a json representation (either str or dict) if d is a pandas extension
     dtype; returns None otherwise.
     """
     
@@ -635,6 +762,10 @@ def decode_hook(dct):
 
 def dumps(obj, *args, **kwargs):
     kwargs["default"] = object2JSON
+    kwargs["option"] = orjson.OPT_SERIALIZE_NUMPY
+    # NOTE: if OPT_PASSTHROUGH_SUBCLASS is passed then we need to register 
+    # instances of object2JSON for dict subclasses including Bunch, etc
+    #kwargs["option"] = orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_PASSTHROUGH_SUBCLASS
     return orjson.dumps(obj, *args, **kwargs).decode("utf-8")
 
 def dump(filename, obj, *args, **kwargs):
@@ -722,14 +853,32 @@ def json2python(dct):
             
             return ret
         
-        elif key == "__python_function__":
-            ret = resolveObject(val["module"], val["qualname"])
+        elif key == "__python_function_or_method__":
+            name = val["name"]
+            modname = val["module"]
+            qualname = val["qualname"]
+            if qualname == name: # definitely a function
+                ret = resolveObject(val["module"], val["qualname"])
+                
+            else: # might be a method
+                owner_type_name = ".".join(qualname.strip(".")[:-1]) 
+                owner = resolveObject(val["module"], owner_type_name)
+                if owner == MISSING:
+                    # likely an unbound function, but check
+                    ret = resolveObject(val["module"], val["qualname"])
+                    #if ret == MISSING:
+                        #raise RuntimeError(f"Cannot resolve {owner_type_name}")
+                
+                else:
+                    ret = inspect.getattr_static(owner, name, MISSING)
+            
+            
             if ret == MISSING:
                 raise RuntimeError(f"Cannot resolve {'.'.join([val['module'], val['qualname']])}")
             
             return ret
         
-        elif key == "__python_method__":
+        elif key == "__python_method__": # this branch is now DEPRECATED 2021-12-25 22:06:51
             name = val["name"]
             modname = val["module"]
             qualname = val["qualname"]
@@ -753,7 +902,7 @@ def json2python(dct):
                                                       signature["qualname"])
                     
                     if type_factory_func == MISSING:
-                        raise RuntimeError(f"Cannot resolve object type")
+                        raise RuntimeError(f"Cannot resolve object type {obj_type}")
                         
                     if isinstance(type_factory_func, (types.FunctionType, types.MethodType)):
                         type_factory_args = type_factory_spec["__posonly__"] + type_factory_spec["__varpos__"]
@@ -771,38 +920,54 @@ def json2python(dct):
             
             obj_factory_spec = val["__factory__"]
             
-            obj_factory_args = list(obj_factory_spec["__posonly__"]) + list(obj_factory_spec["__varpos__"])
-            obj_factory_kwargs = obj_factory_spec["__named__"]
-            obj_factory_kwargs.update(obj_factory_spec["__kwonly__"])
-            obj_factory_kwargs.update(obj_factory_spec["__varkw__"])
-            
-            
             if isinstance(obj_factory_spec, dict):
-                signature = obj_factory_spec["__signature__"]
+                obj_factory_args = list(json2python(v) for v in obj_factory_spec["__posonly__"])
+                obj_factory_args.extend(list(json2python(v) for v in obj_factory_spec["__varpos__"]))
+                obj_factory_kwargs = dict((k, json2python(v)) for k, v in obj_factory_spec["__named__"].items())
+                obj_factory_kwargs.update(dict((k, json2pyton(v)) for k,v in obj_factory_spec["__kwonly__"].items()))
+                obj_factory_kwargs.update(dict((k, json2python(v)) for k,v in obj_factory_spec["__varkw__"].items()))
+            
                 obj_factory = None
                 
-                if isinstance(signature["module"], str) and len(signature["module"].strip()):
-                    obj_factory = resolveObject(signature["module"], 
-                                                signature["qualname"])
+                signature = obj_factory_spec["__signature__"]
+                
+                if isinstance(signature, dict):
+                    if isinstance(signature["module"], str) and len(signature["module"].strip()):
+                        obj_factory = resolveObject(signature["module"], 
+                                                    signature["qualname"])
+                        
+                        #print("obj_factory resolve 1", obj_factory, isinstance(obj_factory, CALLABLE_TYPES))
+                        
+                elif isinstance(signature, str):
+                    try:
+                        obj_factory = import_item(signature)
+                    except:
+                        pass
                 
                 if obj_factory in (MISSING, None):
                     # TODO: code to verify that param specs in factory_spec match those in obj factory signature
-                    if obj_type.__name__ in signature["qualname"]:
-                        obj_factory = getattr(obj_type, signature["name"], None)
+                    obj_factory = getattr(obj_type, signature["name"], None)
+                    
+                if isinstance(obj_factory, CALLABLE_TYPES):
+                    if obj_type.__name__ in getattr(obj_factory, "__qualname__", None):
                         obj_factory_args.insert(0, obj_type)
                         
-                    else:
-                        obj_factory = obj_type
-                        
-                if not isinstance(obj_factory, CALLABLE_TYPES):
-                    raise RuntimeError(f"Cannot resolve object factory")
+                else:
+                    obj_factory = obj_type # last ditch attempt
                 
+                #print("obj_factory", obj_factory)
+                
+                #if obj_type == vigra.VigraArray:
+                    
+                print("obj_factory_kwargs", obj_factory_kwargs["axistags"])
+                
+                return obj_factory(*obj_factory_args, **obj_factory_kwargs)
+            
             else:
-                obj_factory = obj_type
+                ret[key] = json2python(val["__value__"])
                 
             #print("obj_factory", obj_factory)
                 
-            return obj_factory(*obj_factory_args, **obj_factory_kwargs)
             
         else:
             ret[key] = json2python(val)

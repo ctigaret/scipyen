@@ -9,6 +9,8 @@ from __future__ import print_function
 
 import os, warnings, types, traceback, itertools
 from collections import deque
+from dataclasses import MISSING
+import math
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -61,6 +63,8 @@ from .scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from . import quickdialog
 from . import resources_rc
 #### END pict.gui modules
+
+SINGLETONS = (tuple(), None, math.inf, math.nan, np.inf, np.nan, MISSING, pd.NA)
 
 class ScipyenTableWidget(TableWidget): # TableWidget imported from pyqtgraph
     """Another simple table widget, which allows zero-based row/column indices.
@@ -234,7 +238,7 @@ class InteractiveTreeWidget(DataTreeWidget):
         
         # type-specific changes
         if isinstance(data, NestedFinder.nesting_types):
-            if id(data) in self._visited_.keys():
+            if data not in SINGLETONS and id(data) in self._visited_.keys():
                 objtype = self._visited_[id(data)][0]
                 path = "/".join(list(self._visited_[id(data)][1]))
                 if len(path.strip()) == 0:
