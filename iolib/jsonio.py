@@ -265,8 +265,10 @@ def _(o:complex):
 @object2JSON.register(deque)
 def _(o:deque):
     hdr, ret = makeJSONStub(o)
-    ret.update({"__args__": (list(o),)})
-    #ret.update({"__value__": list(o)})
+    factory = makeFuncStub(type(o).__new__)
+    factory["__posonly__"] = (list(o),)
+    factory["__named__"] = {"maxlen": o.maxlen}
+    ret["__factory__"] = factory
     return {hdr:ret}
     
 @object2JSON.register(vigra.filters.Kernel1D)
@@ -275,8 +277,9 @@ def _(o:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D]):
     from imaging.vigrautils import kernel2array
     hdr, ret = makeJSONStub(o)
     xy = kernel2array(o, True)
-    ret.update({"__args__" : (xy.tolist(),),
-                "__init__": signature2Dict(kernelfromjson)})
+    factory = makeFuncStub(kernelfromjson)
+    factory["__posonly__"] = (xy.tolist(),)
+    ret["__factory__"] = factory
     return {hdr:ret}
 
 def dtype2JSON(d:np.dtype) -> typing.Union[str, dict]:
@@ -739,6 +742,7 @@ def json2python(dct):
             
         elif key == "__python_object__":
             obj_type = resolveObject(val["__instance_module__"], val["__instance_type__"])
+
             if obj_type is MISSING:
                 # NOTE: 2021-12-22 23:24:38 
                 # could not import obj_type; try to recreate it here
@@ -752,18 +756,26 @@ def json2python(dct):
                         raise RuntimeError(f"Cannot resolve object type")
                         
                     if isinstance(type_factory_func, (types.FunctionType, types.MethodType)):
-                        args = type_factory_spec["__posonly__"] + type_factory_spec["__varpos__"]
-                        kwargs = dict()
-                        kwargs.update(type_factory_spec["__named__"])
-                        kwargs.update(type_factory_spec["__kwonly__"])
-                        kwargs.update(type_factory_spec["__varkw__"])
+                        type_factory_args = type_factory_spec["__posonly__"] + type_factory_spec["__varpos__"]
+                        type_factory_kwargs = dict()
+                        type_factory_kwargs.update(type_factory_spec["__named__"])
+                        type_factory_kwargs.update(type_factory_spec["__kwonly__"])
+                        type_factory_kwargs.update(type_factory_spec["__varkw__"])
                         
-                        obj_type = type_factory_func(*args, **kwargs)
+                        obj_type = type_factory_func(*type_factory_args, **type_factory_kwargs)
                         
                     else:
                         raise RuntimeError(f"Cannot resolve object type")
+                    
+            #print("obj_type", obj_type)
             
             obj_factory_spec = val["__factory__"]
+            
+            obj_factory_args = list(obj_factory_spec["__posonly__"]) + list(obj_factory_spec["__varpos__"])
+            obj_factory_kwargs = obj_factory_spec["__named__"]
+            obj_factory_kwargs.update(obj_factory_spec["__kwonly__"])
+            obj_factory_kwargs.update(obj_factory_spec["__varkw__"])
+            
             
             if isinstance(obj_factory_spec, dict):
                 signature = obj_factory_spec["__signature__"]
@@ -777,20 +789,20 @@ def json2python(dct):
                     # TODO: code to verify that param specs in factory_spec match those in obj factory signature
                     if obj_type.__name__ in signature["qualname"]:
                         obj_factory = getattr(obj_type, signature["name"], None)
-                        args = tuple([obj_type] + list(obj_factory_spec["__posonly__"]) + list(obj_factory_spec["__varpos__"]))
+                        obj_factory_args.insert(0, obj_type)
                         
                     else:
                         obj_factory = obj_type
-                        args = obj_factory_spec["__posonly__"] + obj_factory_spec["__varpos__"]
                         
                 if not isinstance(obj_factory, CALLABLE_TYPES):
                     raise RuntimeError(f"Cannot resolve object factory")
                 
-                kwargs = obj_factory_spec["__named__"]
-                kwargs.update(obj_factory_spec["__kwonly__"])
-                kwargs.update(obj_factory_spec["__varkw__"])
-            
-            return obj_factory(*args, **kwargs)
+            else:
+                obj_factory = obj_type
+                
+            #print("obj_factory", obj_factory)
+                
+            return obj_factory(*obj_factory_args, **obj_factory_kwargs)
             
         else:
             ret[key] = json2python(val)
