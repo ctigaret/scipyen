@@ -1936,7 +1936,13 @@ def resolveObject(modName, objName):
     
     if modName in sys.modules:
         module = sys.modules[modName]
-        return eval(objName, module.__dict__)
+        try:
+            return eval(objName, module.__dict__)
+        except:
+            #traceback.print_exc()
+            print("objName", objName)
+            print("module", module)
+            return MISSING
     
     else:
         rep = ".".join([modName, objName])
