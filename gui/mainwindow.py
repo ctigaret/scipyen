@@ -65,6 +65,7 @@ from traitlets.utils.bunch import Bunch
 
 #### BEGIN numerics & data visualization
 import numpy as np
+import numpy.ma as ma
 import pywt # wavelets
 import scipy
 from scipy import io as sio
@@ -129,22 +130,7 @@ import quantities as pq
 import xarray as xa
 
 import h5py
-#has_hdf5=False
-#try:
-    #import h5py
-    #has_hdf5=True
-#except ImporError as e:
-    #pass
-
 import vigra
-#has_vigra=False
-#try:
-    #import vigra
-    ##import vagra # simulate lack of vigra
-    #has_vigra=True
-#except ImportError:
-    #pass
-
 import neo
 #### END numerics & data visualization
 
