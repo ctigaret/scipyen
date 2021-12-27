@@ -356,7 +356,7 @@ def _(o:vigra.AxisTags):
 
 @object2JSON.register(np.ndarray)
 def _(o:np.ndarray):
-    print("object2JSON", type(o))
+    #print("object2JSON", type(o))
     hdr, ret = makeJSONStub(o)
     factory = makeFuncStub(np.array)
     factory["__posonly__"] = (o.tolist(), )
@@ -367,44 +367,30 @@ def _(o:np.ndarray):
 
 @object2JSON.register(vigra.VigraArray)
 def _(o:vigra.VigraArray):
-    #print(f"object2JSON>bigra.VigraArray>: {type(o)}")
     hdr, ret = makeJSONStub(o)
     factory = makeFuncStub(vigra.VigraArray.__new__)
-    #factory["__named__"]["obj"] = o.tolist()
-    #factory["__named__"]["obj"] = object2JSON(np.array(o.transposeToNumpyOrder()))
     if o.dtype in ORJSON_NUMPY_DTYPES or type(o.flatten()[0]) in ORJSON_NUMPY_TYPES:
         factory["__named__"]["obj"] = o.view(np.ndarray)
-        #factory["__named__"]["obj"] = o.transposeToNumpyOrder().view(np.ndarray)
-        #factory["__named__"]["obj"] = np.array(o.transposeToNumpyOrder())
     else:
         factory["__named__"]["obj"] = o.tolist()
-        #factory["__named__"]["obj"] = o.transposeToNumpyOrder().tolist()
         
-    factory["__named__"]["dtype"] = o.dtype
+    #factory["__named__"]["dtype"] = o.dtype # avoid this; it will be taken from the numpy array data
     factory["__named__"]["order"] = o.order
     factory["__named__"]["axistags"] = o.axistags
     
     ret["__factory__"] = factory
-    #ret["__dtype__"] = o.dtype
     
     return {hdr:ret}
     
 @object2JSON.register(np.dtype)
 def _(o:np.dtype):
-    return dtype2JSON(o)
-    #hdr, ret = makeJSONStub(o)
-    ## NOTE: 2021-12-25 21:47:38
-    ## 1) check if o is a h5py opaque dtype
-    #factory = dtype2JSON(o)
-    #if factory is None:
-        #raise NotImplementedError(f"Type is not supported: {o}")
+    jsonrep = h5pyDtype2JSON(o) or pandasDtype2JSON(o) or numpyDtype2JSON(o)
+    return jsonrep
+    #return dtype2JSON(o)
 
-    #ret["__factory__"] = factory
-    #return {hdr:ret}
-
-def dtype2JSON(d):
-    factory = h5pyDtype2JSON(d) or pandasDtype2JSON(d) or numpyDtype2JSON(d)
-    return factory
+#def dtype2JSON(d):
+    #jsonrep = h5pyDtype2JSON(d) or pandasDtype2JSON(d) or numpyDtype2JSON(d)
+    #return jsonrep
 
 def numpyDtype2JSON(d:np.dtype) -> dict:
     """Roundtrip numpy dtype - json string format - write side
@@ -969,13 +955,13 @@ def json2python(dct):
                 else:
                     obj_factory = obj_type # last ditch attempt
                 
-                print("obj_factory", obj_factory)
+                #print("obj_factory", obj_factory)
                 
-                for a in obj_factory_args:
-                    print("args:", type(a))
+                #for a in obj_factory_args:
+                    #print("args:", type(a))
                     
-                for k,v in obj_factory_kwargs.items():
-                    print("kwarg:", k, type(v))
+                #for k,v in obj_factory_kwargs.items():
+                    #print("kwarg:", k, type(v))
                 
                 return obj_factory(*obj_factory_args, **obj_factory_kwargs)
             
