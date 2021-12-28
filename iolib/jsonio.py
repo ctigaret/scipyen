@@ -181,7 +181,7 @@ FROM_JSON_FACTORY_METHODS = ("fromjson", "fromJSON", "from_json", "from_JSON",
                               "json2obj", "JSON2obj", "json2Obj", "JSON2OBJ",
                              "read_json", "read_JSON", "readJSON", "readjson")
 
-def makeFuncStub(function:typing.Union[CALLABLE_TYPES]):
+def makeFuncStub(function:typing.Optional[typing.Union[CALLABLE_TYPES + (str, )]]=None):
     """Generate a stub dictionary.
     
     The result contains the following key/value pairs (see also general schema
@@ -211,20 +211,38 @@ def makeFuncStub(function:typing.Union[CALLABLE_TYPES]):
     
     
     """
-    if not isinstance(function, CALLABLE_TYPES):
-        raise TypeError(f"Expecting a callable type, one of {CALLABLE_TYPES}; got {type(function).__name__} instead")
-    try:
-        sig = signature2Dict(function)
-    except:
-        sig = {"name": function.__name__, "qualname": function.__qualname__, "module": function.__module__}
-        
-    return {"__signature__":    sig,
+    stub = {"__signature__":    None,
             "__posonly__":      tuple(),
             "__named__":        dict(),
             "__varpos__":       tuple(),
             "__kwonly__":       dict(),
             "__varkw__":        dict(),
             }
+    
+    if function is None:
+        return stub
+    
+    elif isinstance(function, str):
+        stub["__signature__"] = function
+        return stub
+    
+    elif not isinstance(function, CALLABLE_TYPES):
+        raise TypeError(f"Expecting a callable type, one of {CALLABLE_TYPES}; got {type(function).__name__} instead")
+    
+    try:
+        sig = signature2Dict(function)
+    except:
+        sig = {"name": function.__name__, "qualname": function.__qualname__, "module": function.__module__}
+        
+    stub["__signature__"] = sig
+    return stub
+    #return {"__signature__":    sig,
+            #"__posonly__":      tuple(),
+            #"__named__":        dict(),
+            #"__varpos__":       tuple(),
+            #"__kwonly__":       dict(),
+            #"__varkw__":        dict(),
+            #}
 
 def makeJSONStub(o):
     if isinstance(o, type):
@@ -323,14 +341,8 @@ def _(o:np.generic):
     # FIXME/TODO 2021-12-27 23:06:03 can I do round-trip for np.void?
     hdr, ret = makeJSONStub(o)
     ret["__value__"] = str(o)
-    #if isinstance(o, np.void):
-        #ret["__value__"] = 
-    #else:
-        #ret["__value__"] = str(o)
     return {hdr:ret}
 
-#@object2JSON.register(inspect._empty)
-    
 @object2JSON.register(complex)
 def _(o:complex):
     #print(type(o))
@@ -358,7 +370,9 @@ def _(o:typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D]):
     from imaging.vigrautils import kernel2array
     hdr, ret = makeJSONStub(o)
     xy = kernel2array(o, True)
-    factory = makeFuncStub(kernelfromjson)
+    # FIXME/TODO 2021-12-27 23:42:56
+    # disentangle 'kernelFromJSON' from vigrautils so that jsonio can stand alone
+    factory = makeFuncStub(kernelFromJSON)
     #factory["__posonly__"] = (xy.tolist(),) 
     # NOtE: 2021-12-25 14:46:16
     # this requires passing option=orjson.OPT_SERIALIZE_NUMPY to orjson.dumps
@@ -396,14 +410,10 @@ def _(o:np.ndarray):
 def _(o:ma.MaskedArray):
     hdr, ret = makeJSONStub(o)
     factory = makeFuncStub(ma.array)
-    #factory["__signature__"]["named"] = Bunch()
     mask = False if o.mask is ma.nomask else o.mask.tolist()
     data = o.data.tolist()
     dtype = o.dtype
     fill_value = o.fill_value
-    #print("fill_value", fill_value, type(fill_value))
-    #print(mask)
-    #print(o.dtype)
     factory["__posonly__"] = (o.data.tolist(),)
     factory["__named__"] = {"mask": mask,
                             "dtype": o.dtype,
@@ -442,8 +452,6 @@ def _(o:vigra.VigraArray):
 @object2JSON.register(np.dtype)
 def _(o:np.dtype):
     return dtype2JSON(o)
-    #jsonrep = h5pyDtype2JSON(o) or pandasDtype2JSON(o) or numpyDtype2JSON(o)
-    #return jsonrep
 
 def dtype2JSON(d):
     """Delegates to json converter for h5py, pandas or numpy (in this order)
@@ -482,6 +490,33 @@ def numpyDtype2JSON(d:np.dtype) -> dict:
     factory["__signature__"] = "numpy.dtype"
     
     factory["__posonly__"] = (value,)
+    
+    ret["__factory__"] = factory
+    
+    return {hdr:ret}
+
+@object2JSON.register(pq.UnitQuantity)
+def _(o: pq.UnitQuantity):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub("core.quantities.unit_quantity_from_name_or_symbol")
+    factory["__posonly__"] = (o.dimensionality.string, )
+    ret["__factory__"] = factory
+    #ret["__value__"] = o.dimensionality.string
+    return {hdr:ret}
+
+@object2JSON.register(pq.Quantity)
+def _(o:pq.Quantity):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub()
+    # FIXME/TODO 2021-12-27 23:41:45
+    # disentagle this from cq module so that jsonio can be stand alone 
+    factory["__signature__"] = None
+    factory["__posonly__"] = (o.magnitude.tolist(), )
+    # NOTE: 2021-12-27 23:45:51
+    # o.units are Quantity, not UnitQuantity hence the following avoids infinite
+    # recursion
+    factory["__named__"]["units"] = o.units.dimensionality.string
+    factory["__named__"]["dtype"] = o.dtype
     
     ret["__factory__"] = factory
     
@@ -1082,8 +1117,9 @@ def json2python(dct):
             
     return ret
     
-def kernelfromjson(kernelcoords:list, *args, **kwargs):
+def kernelFromJSON(kernelcoords:list, *args, **kwargs):
     from imaging.vigrautils import kernelfromarray
     xy = np.array(kernelcoords)
     return kernelfromarray(xy)
+
 
