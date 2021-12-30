@@ -448,6 +448,31 @@ def _(o:vigra.VigraArray):
     ret["__factory__"] = factory
     
     return {hdr:ret}
+
+@object2JSON.register(pd.DataFrame)
+@object2JSON.register(pd.Series)
+def _(o:pd.DataFrame):
+    hdr, ret = makeJSONStub(o)
+    ret["__value__"] = o.to_json()
+    ret["__index__"] = {"type":{"name":type(o.index).__name__, "module": type(o.index).__module__},
+                        "names": o.index.names}
+    
+    # FIXME/TODO:2021-12-30 23:21:52
+    # do not rely on pd.DataFrame/Series.to_json
+    # specialize object2JSON for pd.Index & pd.MultiIndex
+    #if isinstance(o.index, pd.MultiIndex):
+        #ret["__index__"]["levels"] = o.index.levels
+        #ret["__index__"]["codes"] = o.index.codes
+    
+    ret["__columns__"] = {"names": o.name if isinstance(o, pd.Series) else o.columns.names}
+    
+    if isinstance(o, pd.DataFrame):
+        ret["__columns__"]["type"] = {"name":type(o.columns).__name__, "module": type(o.columns).__module__}
+        #if isinstance(o.columns, pd.MultiIndex):
+            #ret["__columns__"]["levels"] = o.columns.levels
+            #ret["__columns__"]["codes"] = o.columns.codes
+
+    return {hdr:ret}
     
 @object2JSON.register(np.dtype)
 def _(o:np.dtype):
@@ -1107,6 +1132,49 @@ def json2python(dct):
             else:
                 # fingers crossed...
                 if obj_type is not MISSING:
+                    if obj_type in (pd.DataFrame, pd.Series):
+                        ret = obj_type(orjson.loads(val["__value__"])) # reverses o.to_json() !
+                        index = val.get("__index__", None)
+                        if isinstance(index, dict):
+                            index_names = index.get("names", None)
+                            index_type_dct = index.get("type", None)
+                            if isinstance(index_type_dct, dict):
+                                index_type_name = index_type_dct.get("name", None)
+                                index_module_name = index_type_dct.get("module", None)
+                                if index_type_name and index_module_name:
+                                    index_type = resolveObject(index_module_name, index_type_name)
+                                    if index_type == pd.MultiIndex:
+                                        index_levels = index.get("levels", None)
+                                        index_codes = index.get("codes", None)
+                                        if index_levels and index_codes and index_names:
+                                            obj_index = pd.MultiIndex(levels=index_levels, 
+                                                                      codes=index_codes, 
+                                                                      names=index_names)
+                                            ret.index = obj_index
+                                            
+                        columns = val.get("__columns__", None)
+                        if isinstance(columns, dict):
+                            column_names = columns.get("names", None)
+                            if obj_type == pd.Series:
+                                ret.name = name
+                            else:
+                                columns_type_dct = columns.get("type", None)
+                                if isinstance(columns_type_dct, dict):
+                                    columns_type_name = columns_type_dct.get("name", None)
+                                    columns_module_name = columns_type_dct.get("module", None)
+                                    if columns_type_name and columns_module_name:
+                                        columns_type = resolveObject(columns_module_name,
+                                                                     columns_type_name)
+                                        if columns_type == pd.MultiIndex:
+                                            column_levels = columns.get("levels", None)
+                                            column_codes = columns.get("codes", None)
+                                            if column_levels and column_codes and column_names:
+                                                obj_columns = pd.MultiIndex(levels = column_levels,
+                                                                            codes = column_codes,
+                                                                            names = column_names)
+                                                ret.columns = obj_columns
+                            
+                        return ret
                     return obj_type(val["__value__"])
                 else:
                     ret[key] = json2python(val["__value__"])
