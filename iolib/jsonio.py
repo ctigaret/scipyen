@@ -141,6 +141,7 @@ import json
 #import simplejson as json
 import orjson
 from collections import deque, namedtuple
+import collections.abc
 from functools import (singledispatch, singledispatchmethod, 
                        update_wrapper, wraps,)
 import numpy as np
@@ -264,7 +265,7 @@ def makeJSONStub(o):
                "__factory__":           None,
                "__value__":             None,
                "__subtype__":           None,
-               #"__dtype__":             None,
+               "__dtype__":             None,
                }
                 
     return header, ret
@@ -472,6 +473,81 @@ def _(o:pd.DataFrame):
             #ret["__columns__"]["levels"] = o.columns.levels
             #ret["__columns__"]["codes"] = o.columns.codes
 
+    return {hdr:ret}
+
+@object2JSON.register(pd.Interval)
+def _(o:pd.Interval):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub("pd.Interval")
+    factory["__named__"] = {"left": o.left, "right": o.right, "closed":o.closed}
+    ret["__factory__"] = factory
+    return {hdr:ret}
+
+@object2JSON.register(pd.core.arrays.interval.IntervalArray)
+def _(o:pd.core.arrays.interval.IntervalArray):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub(type(o).__new__)
+    factory["__named__"] = {"data":o.to_numpy(),
+                            "dtype": o.dtype,
+                            "closed": o.closed}
+    ret["__factory__"] = factory
+    return {hdr:ret}
+
+@object2JSON.register(pd.Index)
+def _(o:pd.Index):
+    # NOTE: 2021-12-31 10:28:42
+    # this should work for Pandas numerical indices except RangeIndex:
+    # Int64Index, UInt64Index, Float64Index
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub(pd.Index.__new__)
+    # NOTE: 2021-12-31 09:40:52
+    # dtype inferred from the array (hopefully)
+    factory["__posonly__"] = (o.to_numpy().tolist(),)
+    factory["__named__"] = {"name": o.name}
+    ret["__factory__"] = factory
+    return {hdr:ret}
+
+@object2JSON.register(pd.RangeIndex)
+def _(o:pd.RangeIndex):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub(pd.RangeIndex.__new__)
+    factory["__named__"] = {"start": o.start,
+                            "stop": o.stop,
+                            "step": o.step,
+                            "name": o.name}
+    ret["__factory__"] = factory
+    return {hdr:ret}
+
+@object2JSON.register(pd.CategoricalIndex)
+def _(o:pd.CategoricalIndex):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub(pd.CategoricalIndex.__new__)
+    factory["__posonly__"] = (o.to_numpy(), )
+    #factory["__posonly__"] = (o.to_numpy().tolist(), )
+    factory["__named__"] = {"categories": o.categories.to_numpy(),
+                            "name": o.name}
+    factory["__dtype__"] = o.dtype
+    ret["__factory__"] = factory
+    return {hdr:ret}
+    
+@object2JSON.register(pd.IntervalIndex)
+def _(o:pd.IntervalIndex):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub(pd.IntervalIndex.__new__)
+    factory["__named__"] = {"data": o.values,
+                            "closed": o.closed,
+                            "dtype": o.dtype}
+    ret["__factory__"] = factory
+    return {hdr:ret}
+
+@object2JSON.register(pd.MultiIndex)
+def _(o:pd.Index):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub(pd.MultiIndex.__new__)
+    factory["__named__"] = {"levels": o.levels,
+                            "codes": o.codes,
+                            "names": o.names}
+    ret["__factory__"] = factory
     return {hdr:ret}
     
 @object2JSON.register(np.dtype)
@@ -903,7 +979,7 @@ def load(filename):
         
     return ret
 
-def json2python(dct):
+def json2python(jsonobj):
     """Restores a Python object from it JSON representation.
     
     WARNING: Functions, and, with a few exceptions, types and method objects 
@@ -929,7 +1005,7 @@ def json2python(dct):
     
     2) initialize the object
     
-    1) when dct["__init__"] and dct["__new__"] are None (JSON 'null')
+    1) when jsonobj["__init__"] and jsonobj["__new__"] are None (JSON 'null')
     
         Uses object's type as a callable; parameters are retrieved from the
         "__posonly__", "__named__", "__varpos__", "__kwonly__" and "__varkw__"
@@ -956,11 +1032,16 @@ def json2python(dct):
             with __init__ signature
             
     """
-    if not isinstance(dct, dict):
-        return dct
+    
+    if isinstance(jsonobj, collections.abc.Sequence):
+        ret = type(jsonobj)(tuple(json2python(v) for v in jsonobj))
+        return ret
+    
+    if not isinstance(jsonobj, dict):
+        return jsonobj
     
     ret = dict()
-    for key, val in dct.items():
+    for key, val in jsonobj.items():
         if key == "__python_type__":
             ret = resolveObject(val["__type_module__"], val["__type_name__"])
             if ret == MISSING:
@@ -1078,8 +1159,8 @@ def json2python(dct):
                 else:
                     obj_factory = obj_type # last ditch attempt
                 
-                #print("instance type", val["__instance_type__"])
-                #print("obj_factory", obj_factory)
+                print("instance type", val["__instance_type__"])
+                print("obj_factory", obj_factory)
                 
                 if obj_factory == np.dtype:
                     if len(posonly) == 1 and isinstance(posonly[0], dict):
@@ -1126,6 +1207,12 @@ def json2python(dct):
                             arr = arr.view(np.recarray)
                             
                         return ma.array(arr, mask=mask) # see NOTE: 2021-12-27 23:25:50
+                    
+                elif issubclass(obj_factory, pd.Index):
+                    data = json2python(posonly[0])
+                    
+                    
+                print("obj_factory_args", obj_factory_args)
                         
                 return obj_factory(*obj_factory_args, **obj_factory_kwargs)
             
@@ -1180,7 +1267,7 @@ def json2python(dct):
                     ret[key] = json2python(val["__value__"])
             
         else:
-            # recurse into dct value
+            # recurse into jsonobj value
             ret[key] = json2python(val)
             
     return ret
