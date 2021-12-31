@@ -522,7 +522,7 @@ def _(o:pd.RangeIndex):
 def _(o:pd.CategoricalIndex):
     hdr, ret = makeJSONStub(o)
     factory = makeFuncStub(pd.CategoricalIndex.__new__)
-    factory["__posonly__"] = (o.to_numpy(), )
+    factory["__posonly__"] = (o.to_numpy().tolist(), )
     #factory["__posonly__"] = (o.to_numpy().tolist(), )
     factory["__named__"] = {"categories": o.categories.to_numpy(),
                             "name": o.name}
@@ -554,6 +554,39 @@ def _(o:pd.Index):
 def _(o:np.dtype):
     return dtype2JSON(o)
 
+@object2JSON.register(pd.CategoricalDtype)
+def _(o:pd.CategoricalDtype):
+    # NOTE: 2021-12-31 23:06:32
+    # CategoricalDtype is NOT a subclass of numpy.dtype
+    return pandasDtype2JSON(o)
+
+@object2JSON.register(pq.UnitQuantity)
+def _(o: pq.UnitQuantity):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub("core.quantities.unit_quantity_from_name_or_symbol")
+    factory["__posonly__"] = (o.dimensionality.string, )
+    ret["__factory__"] = factory
+    #ret["__value__"] = o.dimensionality.string
+    return {hdr:ret}
+
+@object2JSON.register(pq.Quantity)
+def _(o:pq.Quantity):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub()
+    # FIXME/TODO 2021-12-27 23:41:45
+    # disentagle this from cq module so that jsonio can be stand alone 
+    factory["__signature__"] = None
+    factory["__posonly__"] = (o.magnitude.tolist(), )
+    # NOTE: 2021-12-27 23:45:51
+    # o.units are Quantity, not UnitQuantity hence the following avoids infinite
+    # recursion
+    factory["__named__"]["units"] = o.units.dimensionality.string
+    factory["__named__"]["dtype"] = o.dtype
+    
+    ret["__factory__"] = factory
+    
+    return {hdr:ret}
+    
 def dtype2JSON(d):
     """Delegates to json converter for h5py, pandas or numpy (in this order)
     Also required as intermediate for recurdive call in numpyDtype2JSON.
@@ -596,33 +629,6 @@ def numpyDtype2JSON(d:np.dtype) -> dict:
     
     return {hdr:ret}
 
-@object2JSON.register(pq.UnitQuantity)
-def _(o: pq.UnitQuantity):
-    hdr, ret = makeJSONStub(o)
-    factory = makeFuncStub("core.quantities.unit_quantity_from_name_or_symbol")
-    factory["__posonly__"] = (o.dimensionality.string, )
-    ret["__factory__"] = factory
-    #ret["__value__"] = o.dimensionality.string
-    return {hdr:ret}
-
-@object2JSON.register(pq.Quantity)
-def _(o:pq.Quantity):
-    hdr, ret = makeJSONStub(o)
-    factory = makeFuncStub()
-    # FIXME/TODO 2021-12-27 23:41:45
-    # disentagle this from cq module so that jsonio can be stand alone 
-    factory["__signature__"] = None
-    factory["__posonly__"] = (o.magnitude.tolist(), )
-    # NOTE: 2021-12-27 23:45:51
-    # o.units are Quantity, not UnitQuantity hence the following avoids infinite
-    # recursion
-    factory["__named__"]["units"] = o.units.dimensionality.string
-    factory["__named__"]["dtype"] = o.dtype
-    
-    ret["__factory__"] = factory
-    
-    return {hdr:ret}
-    
 def h5pyDtype2JSON(d):
     """Checks if d is a special h5py dtype.
     Returns a json representation (dict) if d is a h5py special dtype, or None.
@@ -730,6 +736,7 @@ def pandasDtype2JSON(d):
     #
     #
     if pd.api.types.is_extension_array_dtype(d):
+        hdr, ret = makeJSONStub(d)
         if pd.api.types.is_categorical_dtype(d):
             #print("categorical", d.categories)
             # NOTE: 2021-12-15 23:29:07
@@ -742,23 +749,38 @@ def pandasDtype2JSON(d):
             print("category_types", category_types)
             categories_dtype = d.categories.dtype # dtype of 'categories' Index 
             print(type(categories_dtype).__name__)
-            return {d.name: {"__init__": f"CategoricalDtype({categories}, ordered={ordered})",
-                             "__ns__" : "pd",
-                             "categories":categories,
-                             "value_types":list(type(x) for x in d.categories),
-                             "dtype": dtype2JSON(categories_dtype),
-                             "ordered": ordered}}
+            factory = makeFuncStub(pd.CategoricalDtype.__init__)
+            factory["__named__"] = {"categories": categories,
+                                    "ordered":ordered,
+                                    }
+            ret["__factory__"] = factory
+            return {hdr:ret}
+            
+            #return {d.name: {"__init__": f"CategoricalDtype({categories}, ordered={ordered})",
+                             #"__ns__" : "pd",
+                             #"categories":categories,
+                             #"value_types":list(type(x) for x in d.categories),
+                             #"dtype": dtype2JSON(categories_dtype),
+                             #"ordered": ordered}}
         
         elif pd.api.types.is_interval_dtype(d):
             subtype = d.subtype
             closed = d.closed
-            return{d.name: {"__init__": f"IntervalDtype(subtype={subtype}, closed={closed})",
-                            "__ns__": "pd"}}
+            factory = makeFuncStub(pd.IntervalDtype.__new__)
+            factory["__named__"] = {"subtype":subtype, "closed":closed}
+            ret["__factory__"] = factory
+            return {hdr:ret}
+            #return{d.name: {"__init__": f"IntervalDtype(subtype={subtype}, closed={closed})",
+                            #"__ns__": "pd"}}
         
         elif pd.api.types.is_period_dtype(d):
-            return {d.name: {"__init__": f"PeriodDtype(freq={d.freq.name})",
-                             "__ns__": "pd",
-                             "freq":d.freq.name}}
+            factory = makeFuncStub(pd.PeriodDtype.__new__)
+            factory["__named__"] = {"freq": d.freq.name}
+            ret["__factory__"] = factory
+            return {hdr:ret}
+            #return {d.name: {"__init__": f"PeriodDtype(freq={d.freq.name})",
+                             #"__ns__": "pd",
+                             #"freq":d.freq.name}}
             
         
         elif pd.api.types.is_datetime64_any_dtype(d):
@@ -767,36 +789,61 @@ def pandasDtype2JSON(d):
                 # as of pandas 1.3.3: DatetimeTZDtype only supports 'ns' as unit
                 # as opposed to np.datetime64 which can have multiple flavors e.g.
                 # np.dtype("datetime64[ps]") etc
-                return {d.name: {"__init__": f"DatetimeTZDtype(unit={d.unit}, tz={d.tz.zone})",
-                                "__ns__": "pd",
-                                "unit": d.unit,
-                                "tz":d.tz.zone}}
+                factory = makeFuncStub(pd.DatetimeTZDtype.__init__)
+                factory["__named__"] = {"unit":d.unit, "tz": d.tz.zone}
+                ret["__factory__"] = factory
+                return {hdr:ret}
+                #return {d.name: {"__init__": f"DatetimeTZDtype(unit={d.unit}, tz={d.tz.zone})",
+                                #"__ns__": "pd",
+                                #"unit": d.unit,
+                                #"tz":d.tz.zone}}
             
             elif ps.api.types.is_datetime64_ns_dtype(d): # this is a numpy dtype, not sure if branch ever gets execd
-                return d.name
+                return numpyDtype2JSON(d)
+                #ret["__instance_type__"] = "dtype"
+                #factory = makeFuncStub(np.dtype.__new__)
+                
+                #ret["__factory__"] = factory
+                #return d.name
             
             elif pd.api.types.is_datetime64_dtype(d): # this is a numpy dtype, not sure if branch ever gets execd
-                return d.name
+                return numpyDtype2JSON(d)
+                #return d.name
         
         elif pd.api.types.is_sparse(d):
-            return {d.name: {"__init__": f"SparseDtype(dtype={d.type}, fill_value={d.fill_value})",
-                             "__ns__": "pd",
-                             "dtype": d.type,
-                             "fill_value": d.fill_value}}
+            factory = makeFuncStub(pd.SparseDtype.__init__)
+            factory["__named__"] = {"dtype":d.type, "fill_value":d.fill_value}
+            ret["__factory__"] = factory
+            return {hdr:ret}
+            #return {d.name: {"__init__": f"SparseDtype(dtype={d.type}, fill_value={d.fill_value})",
+                             #"__ns__": "pd",
+                             #"dtype": d.type,
+                             #"fill_value": d.fill_value}}
         
         elif pd.api.types.is_string_dtype(d):
-            return {d.name: {"__init__": f"StringDtype(storage={d.storage})",
-                             "__ns__": "pd",
-                             "storage": d.storage}}
+            factory = makeFuncStub(pd.StringDtype.__init__)
+            factory["__named__"] = {"storage":d.storage}
+            ret["__factory__"] = factory
+            return {hdr:ret}
+            #return {d.name: {"__init__": f"StringDtype(storage={d.storage})",
+                             #"__ns__": "pd",
+                             #"storage": d.storage}}
         
         elif pd.api.types.is_period_dtype(d):
-            return {d.name: {"__init__":f"PeriodDtype(freq={d.freq.name})",
-                             "__ns__": "pd",
-                             "freq":d.freq.name}}
+            factory = makeFuncStub(pd.PeriodDtype.__new__)
+            factory["__named__"] = {"freq":d.freq.name}
+            ret["__factory__"] = factory
+            return {hdr:ret}
+            #return {d.name: {"__init__":f"PeriodDtype(freq={d.freq.name})",
+                             #"__ns__": "pd",
+                             #"freq":d.freq.name}}
         
         else: # BooleanDtype, UInt*Dtype, Int*Dtype, Float*Dtype
-            return {d.name: {"__init__": f"{type(d).__name__}()",
-                             "__ns__":"pd"}}
+            factory = makeFuncStub(f"{type(d)}")
+            ret["__factory__"] = factory
+            return {hdr:ret}
+            #return {d.name: {"__init__": f"{type(d).__name__}()",
+                             #"__ns__":"pd"}}
         
 #def json2dtype(s):
     #"""Roundtrip numpy dtype - json string format - read side
@@ -1033,9 +1080,9 @@ def json2python(jsonobj):
             
     """
     
-    if isinstance(jsonobj, collections.abc.Sequence):
-        ret = type(jsonobj)(tuple(json2python(v) for v in jsonobj))
-        return ret
+    #if isinstance(jsonobj, collections.abc.Sequence):
+        #ret = type(jsonobj)(tuple(json2python(v) for v in jsonobj))
+        #return ret
     
     if not isinstance(jsonobj, dict):
         return jsonobj
@@ -1208,8 +1255,9 @@ def json2python(jsonobj):
                             
                         return ma.array(arr, mask=mask) # see NOTE: 2021-12-27 23:25:50
                     
-                elif issubclass(obj_factory, pd.Index):
-                    data = json2python(posonly[0])
+                elif issubclass(obj_type, pd.Index):
+                    data = list(json2python(v) for v in posonly[0])
+                    return obj_factory(data, **obj_factory_kwargs)
                     
                     
                 print("obj_factory_args", obj_factory_args)
