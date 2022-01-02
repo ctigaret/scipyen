@@ -69,7 +69,7 @@ DEFAULTS["Channels"]["Bleed"]["Ind2Ref"] = 0.
 
             
 class ScanData(BaseScipyenData):
-    """Dummy for AnalysisUnit; clobbered below
+    """Dummy for AnalysisUnit; redefined below
     """
     
 class ScanDataOptions(DataBag):
@@ -1241,7 +1241,7 @@ class ScanData(BaseScipyenData):
     #apiversion = (0,3)
     
     # NOTE: 2021-11-30 16:07:40
-    # 'triggers' is inheritd from BaseScipyenData along with others
+    # 'triggers' is inherited from BaseScipyenData along with others
     _data_children_ = (
         ("scans",                           (list, tuple),   vigra.VigraArray),
         ("scene",                           (list, tuple),   vigra.VigraArray),
@@ -1867,6 +1867,8 @@ class ScanData(BaseScipyenData):
             self = scans.copy() # make a deep copy
             return
             
+        # TODO: 2022-01-02 23:27:59
+        # set this to method to re-read data frame layout as well
         self._postset_hooks_ = {
             "scans": self.FramesMapUpdater(self, "scans"),
             "scene": self.FramesMapUpdater(self, "scene"),
@@ -1942,10 +1944,15 @@ class ScanData(BaseScipyenData):
         
         # NOTE: 2021-10-28 18:36:14
         # also set up self._scans_axes_calibrations_ and self._scene_axes_calibrations_
-        #self._parse_image_arrays_(scene, scans, sceneFrameAxis, scansFrameAxis)
+        #DEPRECATED / OBSOLETE self._parse_image_arrays_(scene, scans, sceneFrameAxis, scansFrameAxis)
         
         #self._parse_metadata_(metadata) # will also set up channel names for scene & scans, separately
         
+        # NOTE: 2022-01-02 23:22:32
+        # metadata noe set via the descriptor mechanism (WithDescriptors)
+        self._parse_metadata_()
+        
+        self._modified_ = False
         #if isinstance(electrophysiology, neo.Block):
             #self.validateElectrophysiology(electrophysiology)
             
@@ -2148,14 +2155,16 @@ class ScanData(BaseScipyenData):
             #self._scans_axes_calibrations_ = scans_axes_calibrations
         
     @safeWrapper
-    def _parse_metadata_(self, value):
+    def _parse_metadata_(self):
         """Sets up analysis type
         """
         from gui import pictgui as pgui
         from systems.PrairieView import PVSequenceType
-        if value is None:
-            self._metadata_ = None
+        if len(self.metadata) == 0:
             return
+        #if value is None:
+            #self._metadata_ = None
+            #return
         
         # NOTE: 2017-11-15 12:06:36
         # TODO adapt this for scanimage metadata as well !
@@ -2166,11 +2175,15 @@ class ScanData(BaseScipyenData):
         # this is stored as the self._scan_region_ attribute!
         # and is DISTINCT from any of the sceneRois or sceneCursors!
         
+        value = self.metadata # save some replacing
+        
         if isinstance(value, DataBag) and hasattr(value, "type"):
             if value.type == "PVScan":
                 if value.sequences[0].attributes.sequencetype == PVSequenceType.Linescan:
-                    self._analysismode_ = ScanData.ScanDataAnalysisMode.frame
-                    self._scandatatype_ = ScanData.ScanDataType.linescan
+                    self.analysisMode = ScanData.ScanDataAnalysisMode.frame
+                    self.type = ScanData.ScanDataType.linescan
+                    #self._analysismode_ = ScanData.ScanDataAnalysisMode.frame
+                    #self._scandatatype_ = ScanData.ScanDataType.linescan
                     
                     roi = pgui.Path(*value.sequences[0].definition.coordinates)
                     
@@ -2181,15 +2194,15 @@ class ScanData(BaseScipyenData):
                     else:
                         roi.name = "scanregion"
                         
-                    self._scan_region_ = roi
+                    self.scanTrajectory = roi
+                    #self._scan_region_ = roi
                         
-            else: # TODO parse ScanImage data structures as well
-                # see NOTE: 2017-11-19 22:27:30 _analysismode_ and _scandatatype_
+            else: 
                 raise NotImplementedError("%s data not yet supported" % value.type)
             
-            self._metadata_ = value
+            #self._metadata_ = value
             
-            self._modified_ = False
+            #self._modified_ = False
                     
         else:
             raise TypeError("metadata was expected to be a DataBag or None; got %s instead" % type(self._metadata_).__name__)

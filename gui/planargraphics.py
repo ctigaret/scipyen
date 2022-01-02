@@ -817,66 +817,6 @@ class PlanarGraphics():
         
     # ### END static methods
     
-    #def _upgrade_API_(self):
-        ## NOTE: 2019-03-19 13:49:51
-        ## see TODO - make code more efficient 19c19.py
-        
-        #def __upgrade_attribute__(old_name, new_name, attr_type, default):
-            #needs_must = False
-            #if not hasattr(self, new_name):
-                #needs_must = True
-                
-            #else:
-                #attribute = getattr(self, new_name)
-                
-                #if not isinstance(attribute, attr_type):
-                    #needs_must = True
-                    
-            #if needs_must:
-                #if hasattr(self, old_name):
-                    #old_attribute = getattr(self, old_name)
-                    
-                    #if isinstance(old_attribute, attr_type):
-                        #setattr(self, new_name, old_attribute)
-                        #delattr(self, old_name)
-                        
-                    #else:
-                        #setattr(self, new_name, default)
-                        #delattr(self, old_name)
-                        
-                #else:
-                    #setattr(self, new_name, default)
-                    
-        #if hasattr(self, "apiversion") and isinstance(self.apiversion, tuple) and len(self.apiversion)>=2 and all(isinstance(v, numbers.Number) for v in self.apiversion):
-            #vernum = self.apiversion[0] + self.apiversion[1]/10
-            
-            #if vernum >= 0.2:
-                #return
-            
-        #__upgrade_attribute__("__states__", "_states_", list, list())
-        #__upgrade_attribute__("__frontends__", "_frontends_", list, list())
-        #__upgrade_attribute__("__ID__", "_ID_", type(None), None)
-        
-        #if not hasattr(self, "_currentstates_"):
-            #if hasattr(self, "__currentstate__"):
-                #setattr(self, _currentstates_, [self.__currentstate__])
-                #delattr(self, "__currentstate__")
-                
-            #elif hasattr(self, "_currentstate_"):
-                #setattr(self, "_currentstates_", [self._currentstate_])
-                #delattr(self, "_currentstate_")
-        
-        #if isinstance(self, Path):
-            #__upgrade_attribute__("__objects__", "_objects_", list, list())
-            #__upgrade_attribute__("__position__", "_position_", tuple, (float(), float()))
-            
-        #__upgrade_attribute__("__closed__", "_closed_", bool, False)
-        #__upgrade_attribute__("__linked_objects__", "_linked_objects_", dict, dict())
-        #__upgrade_attribute__("__currentframe__", "_currentframe_", int, 0)
-        
-        
-        #self.apiversion = (0,3)
-        
     def __init_from_descriptors__(self, *args, frameindex:typing.Optional[typing.Iterable]=[],
                                   currentframe:int=0) -> None:
         """This can (and should) be overloaded in subclasses

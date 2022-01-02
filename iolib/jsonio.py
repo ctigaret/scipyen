@@ -325,6 +325,13 @@ def object2JSON(o):
 
     return {hdr:ret}
 
+@object2JSON.register(type(dataclasses.MISSING))
+def _(o):
+    hdr,ret = makeJSONStub(o)
+    factory = makeFuncStub(".".join([type(o).__module__, type(o).__name__]))
+    ret["__factory__"] = factory
+    return {hdr:ret}
+
 #@object2JSON.register(tuple)
 #def _(o:tuple):
     #return ("tuple({o})")
