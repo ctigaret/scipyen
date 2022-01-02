@@ -98,12 +98,15 @@ simplejson => NO
     - hardcoded in C
     
 orjson 
-    + hardcoded in C, claims the fastest (in nay case faster than json, simplejson)
+    + hardcoded in C, claims to be the fastest (in any case faster than json, simplejson)
     + promising for datetime & numpy arrays
     + seems more flexible 
     + no JSONEncoder to inherit from; must supply a default callable, quite flexible.
         ~ claims not to serialize namedtuple but the 'default' mechanism works;
-        + the default can be a generic function (via single dispatch
+            however, I find that it is better to use my schema (despite the 
+            overhead, it is flexible enough)
+        + the 'default' can be a generic function (via single dispatch) - this
+            can also be used with Python's own json module
             - CAUTION: errors in the default function are not propagated; instead
             the encoding fails with JSONEncodeError...
     ~ returns bytes instead of str - not a problem if str is required call
@@ -130,11 +133,23 @@ orjson
     + support for dataclass (new since Python 3.7) => we might consider using 
         this strategy in ScanData, AnalysisUnit, Results, etc.
 
+    - unlike Python's own json module, it does not support +/- Infinity and NaN!
 
-
+NOTE: 2022-01-01 23:35:28
+Decided to stick with Python's own JSON as this provides (non-standard JSON) 
+    support for +/- Infinity and NaNs.
+    Disadvantages:
+    - may be slow especially for large data sets
+    - introduces potentially very large overheads (due to type and constructor
+    hints) => the output (str) is not easily human-readable
+    Advantage (MAJOR): flexible enough to store the data in text files, and pass
+    it between the main Scipyen workspace and external kernels and back (these
+    all require access to the Sciopyen's modules and 3rd party dependencies)
+    
 """
 
-import sys, traceback, typing, collections, inspect, types, dataclasses
+import sys, traceback, typing, collections, inspect, types, dataclasses, math
+import datetime, zoneinfo
 from inspect import _empty
 from dataclasses import MISSING
 import json
@@ -160,11 +175,11 @@ from core.prog import (signature2Dict, resolveObject, ArgumentError, CALLABLE_TY
 # unfortunately, orjson does not expose supported numpy types so we need to
 # hardcode these here
 
-ORJSON_NUMPY_TYPES = (np.float64, np.float32, np.int64, np.int32, np.int8, 
+JSON_NUMPY_TYPES = (np.float64, np.float32, np.int64, np.int32, np.int8, 
                       np.uint64, np.uint32, np.uint8, np.uintp, np.intp, 
                       np.datetime64)
 
-ORJSON_NUMPY_DTYPES = tuple(np.dtype(t) for t in ORJSON_NUMPY_TYPES)
+JSON_NUMPY_DTYPES = tuple(np.dtype(t) for t in JSON_NUMPY_TYPES)
 
 # NOTE:2021-12-25 16:55:20
 # potential instance methods for convertion to JSON; by no means exhaustive
@@ -237,13 +252,6 @@ def makeFuncStub(function:typing.Optional[typing.Union[CALLABLE_TYPES + (str, )]
         
     stub["__signature__"] = sig
     return stub
-    #return {"__signature__":    sig,
-            #"__posonly__":      tuple(),
-            #"__named__":        dict(),
-            #"__varpos__":       tuple(),
-            #"__kwonly__":       dict(),
-            #"__varkw__":        dict(),
-            #}
 
 def makeJSONStub(o):
     if isinstance(o, type):
@@ -294,7 +302,7 @@ def makeH5PyVlenDtype(name):
 @singledispatch
 def object2JSON(o):
     from core.datatypes import is_namedtuple
-    print("object2JSON<>", type(o))
+    #print("object2JSON<>", type(o))
     hdr, ret = makeJSONStub(o)
     if is_namedtuple(o):
         type_factory = makeFuncStub(collections.namedtuple)
@@ -316,6 +324,21 @@ def object2JSON(o):
             raise NotImplementedError(f"{type(o).__name__} objects are not yet supported")
 
     return {hdr:ret}
+
+#@object2JSON.register(tuple)
+#def _(o:tuple):
+    #return ("tuple({o})")
+
+#@object2JSON.register(float)
+#def _(o:float):
+    #print("object2JSON", o)
+    #if o in (math.nan, np.nan):
+        #return "NaN"
+    
+    #elif abs(o) in (np.inf, math.inf):
+        #return "Inf" if o > 0 else "-Inf"
+
+    #return o
 
 @object2JSON.register(Bunch)
 def _(o:Bunch):
@@ -437,7 +460,7 @@ def _(o:ma.MaskedArray):
 def _(o:vigra.VigraArray):
     hdr, ret = makeJSONStub(o)
     factory = makeFuncStub(vigra.VigraArray.__new__)
-    if o.dtype in ORJSON_NUMPY_DTYPES or type(o.flatten()[0]) in ORJSON_NUMPY_TYPES:
+    if o.dtype in JSON_NUMPY_DTYPES or type(o.flatten()[0]) in JSON_NUMPY_TYPES:
         factory["__named__"]["obj"] = o.view(np.ndarray)
     else:
         factory["__named__"]["obj"] = o.tolist()
@@ -450,29 +473,79 @@ def _(o:vigra.VigraArray):
     
     return {hdr:ret}
 
-@object2JSON.register(pd.DataFrame)
-@object2JSON.register(pd.Series)
-def _(o:pd.DataFrame):
+@object2JSON.register(datetime.timedelta)
+def _(o:datetime.timedelta):
     hdr, ret = makeJSONStub(o)
-    ret["__value__"] = o.to_json()
-    ret["__index__"] = {"type":{"name":type(o.index).__name__, "module": type(o.index).__module__},
-                        "names": o.index.names}
+    factory = makeFuncStub("datetime.timedelta")
+    factory["__named__"] = {"days":o.days,
+                            "seconds":o.seconds,
+                            "microsecond":o.microsecond}
     
-    # FIXME/TODO:2021-12-30 23:21:52
-    # do not rely on pd.DataFrame/Series.to_json
-    # specialize object2JSON for pd.Index & pd.MultiIndex
-    #if isinstance(o.index, pd.MultiIndex):
-        #ret["__index__"]["levels"] = o.index.levels
-        #ret["__index__"]["codes"] = o.index.codes
-    
-    ret["__columns__"] = {"names": o.name if isinstance(o, pd.Series) else o.columns.names}
-    
-    if isinstance(o, pd.DataFrame):
-        ret["__columns__"]["type"] = {"name":type(o.columns).__name__, "module": type(o.columns).__module__}
-        #if isinstance(o.columns, pd.MultiIndex):
-            #ret["__columns__"]["levels"] = o.columns.levels
-            #ret["__columns__"]["codes"] = o.columns.codes
+    ret["__factory__"] = factory
+    return {hdr:ret}
 
+@object2JSON.register(datetime.time)
+def _(o:datetime.time):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub("datetime.time")
+    factory["__named__"] = {"hour":o.hour,
+                            "minute":o.minute,
+                            "second":o.second,
+                            "microsecond":o.microsecond,
+                            "tzinfo":o.tzinfo}
+    ret["__factory__"] = factory
+    return {hdr:ret}
+
+@object2JSON.register(datetime.tzinfo)
+def _(o:datetime.tzinfo):
+    hdr,ret = makeJSONStub(o)
+    factory = makeFuncStub(".".join((type(o).__module__, type(o).__name__)))
+    factory["__named__"] = {"offset":o.utcoffset(None),
+                            "name":o.tzname(None)}
+    ret["__factory__"] = factory
+    return {hdr:ret}
+    
+
+@object2JSON.register(datetime.timezone)
+def _(o:datetime.timezone):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub("datetime.timezone")
+    factory["__named__"] = {"offset":o.utcoffset(None),
+                            "name":o.tzname(None)}
+    ret["__factory__"] = factory
+    return {hdr:ret}
+
+@object2JSON.register(datetime.date)
+def _(o:datetime.date):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub("datetime.date")
+    factory["__named__"] = {"year":o.year,
+                            "month":o.month,
+                            "day":o.day}
+    ret["__factory__"] = factory
+    return {hdr:ret}
+
+@object2JSON.register(datetime.datetime)
+def _(o:datetime.datetime):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub("datetime.datetime")
+    factory["__named__"] = {"year":o.year,
+                            "month":o.month,
+                            "day":o.day,
+                            "hour":o.hour,
+                            "minute":o.minute,
+                            "second":o.second,
+                            "microsecond":o.microsecond,
+                            "tzinfo":o.tzinfo}
+    ret["__factory__"] = factory
+    return {hdr:ret}
+
+@object2JSON.register(zoneinfo.ZoneInfo)
+def _(o:zoneinfo.ZoneInfo):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub("zoneinfo.ZoneInfo")
+    factory["__posonly__"] = (o.key,)
+    ret["__factory__"] = factory
     return {hdr:ret}
 
 @object2JSON.register(pd.Interval)
@@ -491,6 +564,43 @@ def _(o:pd.core.arrays.interval.IntervalArray):
                             "dtype": o.dtype,
                             "closed": o.closed}
     ret["__factory__"] = factory
+    return {hdr:ret}
+
+@object2JSON.register(pd.DataFrame)
+def _(o:pd.DataFrame):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub("pd.DataFrame")
+    #factory["__posonly__"] = (list(o.loc[i,:].to_numpy().tolist() for i in o.index), )
+    factory["__posonly__"] = (list(o.iloc[i,:].to_numpy().tolist() for i in range(len(o))), )
+    factory["__named__"] = {"index": o.index,
+                            "columns": o.columns} 
+    ret["__factory__"] = factory
+    return {hdr:ret}
+    
+@object2JSON.register(pd.Series)
+def _(o:pd.Series):
+    hdr, ret = makeJSONStub(o)
+    factory = makeFuncStub("pd.Series")
+    #print(o.name)
+    factory["__posonly__"] = (o.to_numpy().tolist(),)
+    factory["__named__"] = {"index": o.index,
+                            "dtype": o.dtype,
+                            "name": str(o.name)}
+    
+    ret["__factory__"] = factory
+    return {hdr:ret}
+
+@object2JSON.register(type(pd.NA))
+def _(o:type(pd.NA)):
+    hdr, ret = makeJSONStub(o)
+    ret["__value__"] = tuple()
+    return {hdr:ret}
+    #return "NA"
+    
+@object2JSON.register(pd.Timestamp)
+def _(o:pd.Timestamp):
+    hdr, ret = makeJSONStub(o)
+    ret["__value__"] = str(o)
     return {hdr:ret}
 
 @object2JSON.register(pd.Index)
@@ -524,8 +634,11 @@ def _(o:pd.CategoricalIndex):
     factory = makeFuncStub(pd.CategoricalIndex.__new__)
     factory["__posonly__"] = (o.to_numpy().tolist(), )
     #factory["__posonly__"] = (o.to_numpy().tolist(), )
-    factory["__named__"] = {"categories": o.categories.to_numpy(),
+    factory["__named__"] = {"categories": o.categories.to_numpy().tolist(),
                             "name": o.name}
+    # NOTE: 2022-01-01 13:19:44
+    # Cannot specify `categories` or `ordered` together with `dtype`.
+                            #"dtype":o.dtype}
     factory["__dtype__"] = o.dtype
     ret["__factory__"] = factory
     return {hdr:ret}
@@ -617,6 +730,7 @@ def numpyDtype2JSON(d:np.dtype) -> dict:
         
     else:   
         if fields is None:
+            print("dtype:", d)
             value = np.lib.format.dtype_to_descr(d) # does not perform well for structured arrays?
         else:
             value = dict((name, (dtype2JSON(value[0]), *value[1:])) for name, value in d.fields.items())
@@ -746,10 +860,10 @@ def pandasDtype2JSON(d):
             ordered = d.ordered
             categories_dtype = d.categories.dtype
             category_types = list(type(x).__name__ for x in categories) # python type of category values
-            print("category_types", category_types)
+            #print("category_types", category_types)
             categories_dtype = d.categories.dtype # dtype of 'categories' Index 
-            print(type(categories_dtype).__name__)
-            factory = makeFuncStub(pd.CategoricalDtype.__init__)
+            #print(type(categories_dtype).__name__)
+            factory = makeFuncStub("pd.CategoricalDtype")
             factory["__named__"] = {"categories": categories,
                                     "ordered":ordered,
                                     }
@@ -773,15 +887,24 @@ def pandasDtype2JSON(d):
             #return{d.name: {"__init__": f"IntervalDtype(subtype={subtype}, closed={closed})",
                             #"__ns__": "pd"}}
         
+        #elif pd.api.types.is_period_dtype(d):
+            #factory = makeFuncStub(pd.PeriodDtype.__new__)
+            #factory["__named__"] = {"freq": d.freq.name}
+            #ret["__factory__"] = factory
+            #return {hdr:ret}
+            ##return {d.name: {"__init__": f"PeriodDtype(freq={d.freq.name})",
+                             ##"__ns__": "pd",
+                             ##"freq":d.freq.name}}
+            
         elif pd.api.types.is_period_dtype(d):
             factory = makeFuncStub(pd.PeriodDtype.__new__)
-            factory["__named__"] = {"freq": d.freq.name}
+            factory["__named__"] = {"freq":d.freq.name}
             ret["__factory__"] = factory
             return {hdr:ret}
-            #return {d.name: {"__init__": f"PeriodDtype(freq={d.freq.name})",
+            #return {d.name: {"__init__":f"PeriodDtype(freq={d.freq.name})",
                              #"__ns__": "pd",
                              #"freq":d.freq.name}}
-            
+        
         
         elif pd.api.types.is_datetime64_any_dtype(d):
             if pd.api.types.is_datetime64tz_dtype: # extension type
@@ -789,7 +912,7 @@ def pandasDtype2JSON(d):
                 # as of pandas 1.3.3: DatetimeTZDtype only supports 'ns' as unit
                 # as opposed to np.datetime64 which can have multiple flavors e.g.
                 # np.dtype("datetime64[ps]") etc
-                factory = makeFuncStub(pd.DatetimeTZDtype.__init__)
+                factory = makeFuncStub("pd.DatetimeTZDtype")
                 factory["__named__"] = {"unit":d.unit, "tz": d.tz.zone}
                 ret["__factory__"] = factory
                 return {hdr:ret}
@@ -811,7 +934,7 @@ def pandasDtype2JSON(d):
                 #return d.name
         
         elif pd.api.types.is_sparse(d):
-            factory = makeFuncStub(pd.SparseDtype.__init__)
+            factory = makeFuncStub("pd.SparseDtype")
             factory["__named__"] = {"dtype":d.type, "fill_value":d.fill_value}
             ret["__factory__"] = factory
             return {hdr:ret}
@@ -821,7 +944,7 @@ def pandasDtype2JSON(d):
                              #"fill_value": d.fill_value}}
         
         elif pd.api.types.is_string_dtype(d):
-            factory = makeFuncStub(pd.StringDtype.__init__)
+            factory = makeFuncStub("pd.StringDtype")
             factory["__named__"] = {"storage":d.storage}
             ret["__factory__"] = factory
             return {hdr:ret}
@@ -829,17 +952,8 @@ def pandasDtype2JSON(d):
                              #"__ns__": "pd",
                              #"storage": d.storage}}
         
-        elif pd.api.types.is_period_dtype(d):
-            factory = makeFuncStub(pd.PeriodDtype.__new__)
-            factory["__named__"] = {"freq":d.freq.name}
-            ret["__factory__"] = factory
-            return {hdr:ret}
-            #return {d.name: {"__init__":f"PeriodDtype(freq={d.freq.name})",
-                             #"__ns__": "pd",
-                             #"freq":d.freq.name}}
-        
         else: # BooleanDtype, UInt*Dtype, Int*Dtype, Float*Dtype
-            factory = makeFuncStub(f"{type(d)}")
+            factory = makeFuncStub(f"pd.{type(d).__name__}")
             ret["__factory__"] = factory
             return {hdr:ret}
             #return {d.name: {"__init__": f"{type(d).__name__}()",
@@ -985,39 +1099,44 @@ def decode_hook(dct):
         ##obj = NamedTupleWrapper(obj)
     #return json.dumps(obj, *args, **kwargs)
 
-#def dump(obj, fp, *args, **kwargs):
-    #kwargs["cls"] = CustomEncoder
-    #json.dump(obj,fp, *args, **kwargs)
-    
-
 #def loads(s, *args, **kwargs):
     #kwargs["object_hook"] = decode_hook
     #return json.loads(s, *args, **kwargs)
 
-#def load(fp, *args, **kwargs):
-    #kwargs["object_hook"] = decode_hook
-    #return json.load(fp, *args, **kwargs)
 
+def dump(obj, fp, *args, **kwargs):
+    kwargs["default"] = object2JSON
+    #kwargs["cls"] = CustomEncoder
+    json.dump(obj,fp, *args, **kwargs)
+    
 def dumps(obj, *args, **kwargs):
     kwargs["default"] = object2JSON
     #kwargs["option"] = orjson.OPT_SERIALIZE_NUMPY
     # NOTE: if OPT_PASSTHROUGH_SUBCLASS is passed then we need to register 
     # instances of object2JSON for dict subclasses including Bunch, etc
     #kwargs["option"] = orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_PASSTHROUGH_SUBCLASS
-    return orjson.dumps(obj, *args, **kwargs).decode("utf-8")
+    #return orjson.dumps(obj, *args, **kwargs).decode("utf-8")
+    return json.dumps(obj, *args, **kwargs)
 
-def dump(filename, obj, *args, **kwargs):
-    with open(filename, mode="wt") as jsonfile:
-        jsonfile.write(dumps(obj, *args, **kwargs))
+#def dump(filename, obj, *args, **kwargs):
+    #with open(filename, mode="wt") as jsonfile:
+        #jsonfile.write(dumps(obj, *args, **kwargs))
+
+def load(fp, *args, **kwargs):
+    #kwargs["object_hook"] = decode_hook
+    ret = json.load(fp, *args, **kwargs)
+    return json2python(ret)
         
 def loads(s):
-    ret = orjson.loads(s)
+    #ret = orjson.loads(s)
+    ret = json.loads(s)
+    return json2python(ret)
     
-    if isinstance(ret, dict):
-        return json2python(ret)
+    #if isinstance(ret, dict):
+        #return json2python(ret)
         
-    else:
-        return ret
+    #else:
+        #return ret
 
 def load(filename):
     with open(filename, mode="rt") as jsonfile:
@@ -1083,6 +1202,12 @@ def json2python(jsonobj):
     #if isinstance(jsonobj, collections.abc.Sequence):
         #ret = type(jsonobj)(tuple(json2python(v) for v in jsonobj))
         #return ret
+        
+    if isinstance(jsonobj, list):
+        return list(json2python(v) for v in jsonobj)
+    
+    if isinstance(jsonobj, tuple):
+        return tuple(json2python(v) for v in jsonobj)
     
     if not isinstance(jsonobj, dict):
         return jsonobj
@@ -1206,8 +1331,8 @@ def json2python(jsonobj):
                 else:
                     obj_factory = obj_type # last ditch attempt
                 
-                print("instance type", val["__instance_type__"])
-                print("obj_factory", obj_factory)
+                #print("instance type", val["__instance_type__"])
+                #print("obj_factory", obj_factory)
                 
                 if obj_factory == np.dtype:
                     if len(posonly) == 1 and isinstance(posonly[0], dict):
@@ -1247,76 +1372,28 @@ def json2python(jsonobj):
                         # no 'fill_value' for masked structarrays (because
                         # these have fill_value numpy.void, which json doesn't
                         # support); hence the fill value will fallback to the 
-                        # defaultset in the c'tor
+                        # default set in the c'tor
                         #fill_value = obj_factory_kwargs["fill_value"]
                         arr = np.array(data, dtype=dtype)
                         if val["__subtype__"] == "recarray":
                             arr = arr.view(np.recarray)
                             
                         return ma.array(arr, mask=mask) # see NOTE: 2021-12-27 23:25:50
-                    
-                elif issubclass(obj_type, pd.Index):
-                    data = list(json2python(v) for v in posonly[0])
-                    return obj_factory(data, **obj_factory_kwargs)
-                    
-                    
-                print("obj_factory_args", obj_factory_args)
-                        
+                
+                #print("obj_factory", obj_factory)
                 return obj_factory(*obj_factory_args, **obj_factory_kwargs)
             
             else:
                 # fingers crossed...
                 if obj_type is not MISSING:
-                    if obj_type in (pd.DataFrame, pd.Series):
-                        ret = obj_type(orjson.loads(val["__value__"])) # reverses o.to_json() !
-                        index = val.get("__index__", None)
-                        if isinstance(index, dict):
-                            index_names = index.get("names", None)
-                            index_type_dct = index.get("type", None)
-                            if isinstance(index_type_dct, dict):
-                                index_type_name = index_type_dct.get("name", None)
-                                index_module_name = index_type_dct.get("module", None)
-                                if index_type_name and index_module_name:
-                                    index_type = resolveObject(index_module_name, index_type_name)
-                                    if index_type == pd.MultiIndex:
-                                        index_levels = index.get("levels", None)
-                                        index_codes = index.get("codes", None)
-                                        if index_levels and index_codes and index_names:
-                                            obj_index = pd.MultiIndex(levels=index_levels, 
-                                                                      codes=index_codes, 
-                                                                      names=index_names)
-                                            ret.index = obj_index
-                                            
-                        columns = val.get("__columns__", None)
-                        if isinstance(columns, dict):
-                            column_names = columns.get("names", None)
-                            if obj_type == pd.Series:
-                                ret.name = name
-                            else:
-                                columns_type_dct = columns.get("type", None)
-                                if isinstance(columns_type_dct, dict):
-                                    columns_type_name = columns_type_dct.get("name", None)
-                                    columns_module_name = columns_type_dct.get("module", None)
-                                    if columns_type_name and columns_module_name:
-                                        columns_type = resolveObject(columns_module_name,
-                                                                     columns_type_name)
-                                        if columns_type == pd.MultiIndex:
-                                            column_levels = columns.get("levels", None)
-                                            column_codes = columns.get("codes", None)
-                                            if column_levels and column_codes and column_names:
-                                                obj_columns = pd.MultiIndex(levels = column_levels,
-                                                                            codes = column_codes,
-                                                                            names = column_names)
-                                                ret.columns = obj_columns
-                            
-                        return ret
                     return obj_type(val["__value__"])
+                
                 else:
-                    ret[key] = json2python(val["__value__"])
+                    ret[json2python(key)] = json2python(val["__value__"])
             
         else:
             # recurse into jsonobj value
-            ret[key] = json2python(val)
+            ret[json2python(key)] = json2python(val)
             
     return ret
     
