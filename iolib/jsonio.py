@@ -154,7 +154,7 @@ from inspect import _empty
 from dataclasses import MISSING
 import json
 #import simplejson as json
-import orjson
+#import orjson
 from collections import deque, namedtuple
 import collections.abc
 from functools import (singledispatch, singledispatchmethod, 
