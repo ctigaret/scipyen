@@ -1137,13 +1137,43 @@ class ScanData(BaseScipyenData):
         frame       = 1
         volume      = 2
         
-    class FramesMapUpdater(AttributeAdapter):
+    class ScanDataImageSetter(AttributeAdapter):
         def __init__(self, owner=None, fieldname=None):
             self.fieldname = fieldname
             self.obj = owner
             
         def __call__(self, obj=None, value=None):
-            #print(f"FramesMapUpdater instance(obj=<{type(obj).__name__}>, value=<{type(value).__name__}>)")
+            self.parseImageData(value)
+            
+        def parseImageData(self, value):
+            if self.obj is None:
+                return
+            
+            if not hasattr(self.obj, "_data_children_"):
+                return
+            
+            if self.fieldname not in ("scans", "scene"):
+                return
+
+            if not hasattr(self.obj, self.fieldname):
+                return
+            
+            frameAxis = getattr(obj, f"{self.fieldname}FrameAxis", None)
+            axesCalibrations = getattr(obj, f"{self.fieldName}AxesCalibration", None)
+            
+            data, layout, axesCalibrations = obj.imageDataLayout(value, 
+                                                                 frameAxis = frameAxis,
+                                                                 axescal = axesCalibrations)
+            
+        
+        
+    class ScanDataFramesMapUpdater(AttributeAdapter):
+        def __init__(self, owner=None, fieldname=None):
+            self.fieldname = fieldname
+            self.obj = owner
+            
+        def __call__(self, obj=None, value=None):
+            #print(f"ScanDataFramesMapUpdater instance(obj=<{type(obj).__name__}>, value=<{type(value).__name__}>)")
             self.updateFramesMap(value)
             
         def updateFramesMap(self, value):
@@ -1191,7 +1221,7 @@ class ScanData(BaseScipyenData):
                 return
             
             field = getattr(self.obj, self.fieldname)
-            #print(f"FramesMapUpdater.updateFramesMap(value=<{type(value).__name__}>): field = {type(field).__name__}" )
+            #print(f"ScanDataFramesMapUpdater.updateFramesMap(value=<{type(value).__name__}>): field = {type(field).__name__}" )
             nframes = len(self.obj.framesMap)
                 
             if isinstance(field, neo.Block):
@@ -1278,7 +1308,7 @@ class ScanData(BaseScipyenData):
     _graphics_attributes_ = (
         ("scansCursors",                    dict, Cursor),
         ("scansRois",                       dict, PlanarGraphics),
-        ("scanTrajectory",                  PlanarGraphics),
+        ("scanTrajectory",                  (PlanarGraphics, type(None))),
         ("sceneCursors",                    dict, Cursor),
         ("sceneRois",                       dict, PlanarGraphics),
         )
@@ -1322,7 +1352,7 @@ class ScanData(BaseScipyenData):
                 layout = getattr(self, f"{component}Layout", None)
                 if not isinstance(layout, dict):
                     dataFrameAxis = getattr(self, f"{component}FrameAxis", None)
-                    layout = self.dataLayout(data, frameAxis = dataFrameAxis)
+                    layout = self.imageDataLayout(data, frameAxis = dataFrameAxis)
                     setattr(self, f"{component}Layout", layout)
                     
                 nFrames = layout.get("nFrames", 0)
@@ -1641,7 +1671,7 @@ class ScanData(BaseScipyenData):
         #
         
         # END comments
-       
+        # BEGIN old stuff
         #self.apiversion = (0,3) # MAJOR, MINOR
         #print("ScanData.__init__ start")
         # user-defined (meta) data
@@ -1840,9 +1870,14 @@ class ScanData(BaseScipyenData):
         # a set of nested analysis units defined within the data -- all analysis units
         # in this set are landmark-based and thus are different from self._analysis_unit_
         #self._analysis_units_ = set() 
+        # END old stuff
         
         #self._name_ = name
         
+        if isinstance(scans, ScanData):
+            self = scans.copy() # make a deep copy
+            return
+            
         self._availableGenotypes_ = [s for s in GENOTYPES]
         self._availableUnitTypes_ = [s for s in UnitTypes.values()]
         self._availableUnitTypes_.insert(0, "unknown")
@@ -1862,17 +1897,16 @@ class ScanData(BaseScipyenData):
         
         if scans is None:
             scans = kwscans
+
+        self._preset_hooks_ = {
+            "scans" = self.ScanDataImageSetter(self, "scans")
+            "scene" = self.ScanDataImageSetter(self, "scene")
+            }
             
-        if isinstance(scans, ScanData):
-            self = scans.copy() # make a deep copy
-            return
-            
-        # TODO: 2022-01-02 23:27:59
-        # set this to method to re-read data frame layout as well
         self._postset_hooks_ = {
-            "scans": self.FramesMapUpdater(self, "scans"),
-            "scene": self.FramesMapUpdater(self, "scene"),
-            "electrophysiology": self.FramesMapUpdater(self, "electrophysiology"),
+            "scans": self.ScanDataFramesMapUpdater(self, "scans"),
+            "scene": self.ScanDataFramesMapUpdater(self, "scene"),
+            "electrophysiology": self.ScanDataFramesMapUpdater(self, "electrophysiology"),
             }
     
         if scene is None:
@@ -1892,17 +1926,17 @@ class ScanData(BaseScipyenData):
         scansLayout = kwargs.pop("scansLayout", None)
         scansAxesCalibration = kwargs.pop("scansAxesCalibration", None)
         
-        scene, scene_layout, scene_axes_cal = self.dataLayout(scene, sceneFrameAxis, sceneAxesCalibration)
-        scans, scans_layout, scans_axes_cal = self.dataLayout(scans, scansFrameAxis, scansAxesCalibration)
+        scene, scene_layout, scene_axes_cal = self.imageDataLayout(scene, sceneFrameAxis, sceneAxesCalibration)
+        scans, scans_layout, scans_axes_cal = self.imageDataLayout(scans, scansFrameAxis, scansAxesCalibration)
         
         kwargs["scene"] = scene
         kwargs["sceneLayout"] = scene_layout if sceneLayout is None else sceneLayout
-        kwargs["sceneFrameAxis"] = kwargs["sceneLayout"].frames
+        kwargs["sceneFrameAxis"] = None if kwargs["sceneLayout"] is None else kwargs["sceneLayout"].frames
         kwargs["sceneAxesCalibration"] = scene_axes_cal if sceneAxesCalibration is None else sceneAxesCalibration
         
         kwargs["scans"] = scans
         kwargs["scansLayout"] = scans_layout if scansLayout is None else scansLayout
-        kwargs["scansFrameAxis"] = kwargs["scansLayout"].frames
+        kwargs["scansFrameAxis"] = None if kwargs["scansLayout"] is None else kwargs["scansLayout"].frames
         kwargs["scansAxesCalibration"] = scans_axes_cal if scansAxesCalibration is None else scansAxesCalibration
         
         kwargs["electrophysiology"] = electrophysiology
@@ -1958,7 +1992,7 @@ class ScanData(BaseScipyenData):
             
         #elif isinstance(triggers, (tuple, list)) and all([isinstance(t, TriggerProtocol) for t in triggers]):
             #self._trigger_protocols_[:] = triggers
-        
+    
     def __str__(self):
         """
         FIXME/TODO adapt to a new scenario where all scene image data is a single
@@ -2012,12 +2046,12 @@ class ScanData(BaseScipyenData):
                 if chindex == data:
                     pass
     @staticmethod
-    def dataLayout(data, 
+    def imageDataLayout(data, 
                     frameAxis:typing.Optional[vigra.AxisInfo]=None, 
                     horizontalAxis:typing.Optional[vigra.AxisInfo]=None, 
                     verticalAxis:typing.Optional[vigra.AxisInfo]=None, 
-                    axescal:typing.Optional[AxesCalibration]=None,
-                    electrophysiology:typing.Optional[neo.Block]=None):
+                    axescal:typing.Optional[AxesCalibration]=None):
+                    #electrophysiology:typing.Optional[neo.Block]=None):
         """ Proposes an axes layout and axes calibration for the data.
         
         See also imaging.vigrautils.proposeLayout()
@@ -2025,24 +2059,52 @@ class ScanData(BaseScipyenData):
         Returns
         --------
         
-        A dict with the following key/value pairs:
+        The tuple (data, layout, axes_calibration):
         
-        'images': list containing at least one VigraArray objects.
+        'data': list containing at least one VigraArray objects, or None.
             The arrays have identical shapes and axistag keys.
             
-        'horizontal': int: the index of the array axis corresponding to the 
-            'horizontal' dimension of the arrays in 'images' (for display
-            purposes)
-        
-        'vertical': int: the index of the array axis corresponding to the 
-            'vertical' dimension of the arrays in 'image' (for display purposes)
+        'layout': traitlets.Bunch or None. When a Bunch, it maps the following
+            key/value pairs:
             
-        'frames': int, or tuple of int: the index, or indices, of the array axis
-            (or axes) along which data 'frames' are defined (NOTE arrays with more
-            than 3 dimensions may have mode than one 'frame' axis, see 
-            gui.imageviewer.ImageViewer and imaging.vigrautils.proposeLayout()
-            for details)
-            
+            'nFrames':      int;
+                            This is the total number of 2D data 
+                            slices (or frames) that can be displayed in a 2D 
+                            viewer one at a time.
+                            
+                            The 'frames' are defined along the data array axis 
+                            that is orthogonal to the display plane. For more
+                            details see imaging.vigrautils.proposeLayout().
+                            
+            'horizontal':   int; 
+                            Index - or dimension - of the horizontal axis.
+                            This is the axis corresponding to the 'horizontal'
+                            dimension (or aspect) of the data for the purpose of
+                            being displayed in a 2D image viewer.
+                            
+            'vertical':     int;
+                            Index - or dimension - of the vertical axis
+                            This is the axis corresponding to the 'vertical'
+                            dimension (or aspect) of the data for the purpose of
+                            being displayed in a 2D image viewer.
+                            
+            'channels':     int; 
+                            Index - or dimension - of the channels axis
+                            For VigraArray objects, the size of the image data
+                            array on this dimension (or axis) indicates the
+                            number of data channels in each pixel.
+                            
+            'frames':       int; 
+                            Index - or dimenson - of the frames axis
+                            This is the axis (or axes) along which 2D data 
+                            frames (or slices) are taken to be displayed one at
+                            a time in a 2D image viewer.
+                            
+            For a detailed explanation of the concept of frames and frames axis
+            see imaging.vigrautils.proposeLayout()
+
+        'axes_calibration': an imaging.axiscalibration.AxesCalibration object, 
+                            or None.
         
         """
         if not isinstance(data, (vigra.VigraArray, tuple, list)):
@@ -2117,10 +2179,10 @@ class ScanData(BaseScipyenData):
         1) adapt to a new scenario where all scene image data is a single  multi-channel VigraArray
 
         """
-        new_scene, scene_frame_axis, scene_axes_calibrations = self.dataLayout(scene, frameAxis=sceneFrameAxis)
+        new_scene, scene_frame_axis, scene_axes_calibrations = self.imageDataLayout(scene, frameAxis=sceneFrameAxis)
         
         #print(new_scene)
-        new_scans, scans_frame_axis, scans_axes_calibrations = self.dataLayout(scans, frameAxis=scansFrameAxis)
+        new_scans, scans_frame_axis, scans_axes_calibrations = self.imageDataLayout(scans, frameAxis=scansFrameAxis)
 
         if new_scene is not None:
             self.sceneCursors.clear()
@@ -2160,7 +2222,7 @@ class ScanData(BaseScipyenData):
         """
         from gui import pictgui as pgui
         from systems.PrairieView import PVSequenceType
-        if len(self.metadata) == 0:
+        if self.metadata is None or len(self.metadata) == 0:
             return
         #if value is None:
             #self._metadata_ = None

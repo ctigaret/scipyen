@@ -66,6 +66,8 @@ class BaseDescriptorValidator(ABC):
         self.public_name = name
         
     def __get__(self, obj, objtype=None) -> object:
+        """Implements access to a data descriptor value (attribute access).
+        """
         return getattr(obj, self.private_name)
     
     def __set__(self, obj, value) -> None:
@@ -79,25 +81,27 @@ class BaseDescriptorValidator(ABC):
         If the descriptor owner contains at least one of the dict attributes
         '_preset_hooks_' and '_postset_hooks_' mapping the descriptor's public
         name to an AttributeAdapter instance, then the adapter instance will be
-        called BEFORE (respectively, AFTER)  validation of 'value' and its
-        assignment.
+        called BEFORE (respectively, AFTER)  assignment of 'value' to descriptor.
         
         """
-        if hasattr(obj, "_preset_hooks_") and isinstance(obj._preset_hooks_, dict):
-            preset_validator = obj._preset_hooks_.get(self.public_name, None)
-            if isinstance(preset_validator, AttributeAdapter):
-                preset_validator(obj, value)
-                
+        # NOTE: 2022-01-03 20:45:48
+        # value should be validated BEFORE anything
         self.validate(value)
+        
+        if hasattr(obj, "_preset_hooks_") and isinstance(obj._preset_hooks_, dict):
+            preset_func = obj._preset_hooks_.get(self.public_name, None)
+            if isinstance(preset_func, AttributeAdapter):
+                preset_func(obj, value)
+                
         setattr(obj, self.private_name, value)
         
         # NOTE: 2021-12-06 12:43:48 
         # call postset hooks ONLY AFTER the descriptor value had been set
         # (last line of code, above)
         if hasattr(obj, "_postset_hooks_") and isinstance(obj._postset_hooks_, dict):
-            postset_validator = obj._postset_hooks_.get(self.public_name, None)
-            if isinstance(postset_validator, AttributeAdapter):
-                postset_validator(obj, value)
+            postset_func = obj._postset_hooks_.get(self.public_name, None)
+            if isinstance(postset_func, AttributeAdapter):
+                postset_func(obj, value)
         
     def __delete__(self, obj):
         if hasattr(obj, self.private_name):
@@ -1292,22 +1296,25 @@ def parse_descriptor_specification(x:tuple) -> dict:
         x[0]: str, name of the attribute
         
         x[1]: str, type, tuple of types or anyhing else
-            when a :str: is if first tested for a dotted type name ; if a dotted
-                type name this is interpreted as the type of the attribute's
-                value; otherwise it is taken as the default value of a str-type 
-                attribute;
+            when a :str: is if first tested for a dotted type name ; if this is
+                a dotted type name then it is interpreted as the type of the 
+                attribute's value; otherwise it is taken as the default value 
+                of a str-type attribute;
                 
-            when a type or tuple of types: this is the default value type of the
-                attribute, and the default value is the default constructor if 
-                it takes no parameters, else None
+            when a type: this is the default value type of the attribute, and 
+                the default value is the default constructor if it takes no 
+                parameters, else None;
                 
             when a tuple:
-                this can be a tuple of types, or objects; 
-                in the former case, these are the acceptable types of the 
-                attribute; 
-                in the latter, the type of objects indicate the acceptable
-                types of the attribute, AND the acceptable default values
-                when a value is not specified otherwise
+                this can be a tuple of types, or a tuple of instances; 
+                * tuple of types: these are the acceptable types of the attribute
+                
+                    - when the first element is a dict, this indicated that the 
+                    attribute is a dict; the rest of the type objects in the
+                    tuple indicate acceptable types for the dict's values
+                
+                * tuple of instances: these are acceptable default values for the
+                attribute; their types indicate acceptable types of the attribute
                 
             antyhing else: this is the default value of the attribute, and its
                 type is the acceptable type of the attribute
@@ -1749,27 +1756,25 @@ class WithDescriptors(object):
         methods whenever a private attribute is accessed or assigned to, 
         respectively, in the owner instance of type `cls`.
         
-        Classes derived from WithDescriptors and expecting to execute cutsom code 
-        inside the descriptor's __set__() method, also need to define at least
-        one of two dictionary attributes called 
+        Derived classes that expect to execute custom code besides the validation
+        iof the new value, inside the  descriptor's __set__() method, need to 
+        define at least one of two dictionary attributes called 
         '_preset_hooks_' and '_postset_hooks_'.
         
         These dictionaries are expected to map the descriptor's public name (i.e.
         the name under which the underlying data descriptor is accessed by the 
-        :class: public API) to an AttributeAdapter instance (emulated callable)
-        which is then called by the __set__() method to perform those custom
-        actions, either BEFORE ('_preset_hooks_') or AFTER 
-        ('_postset_hooks_) the value is validated and assigned to the 
-        descriptor data.
+        :class: public API) to an AttributeAdapter instance. Attribute adapters
+        are callables executed by the __set__() method to perform those custom
+        actions, either BEFORE ('_preset_hooks_') or AFTER ('_postset_hooks_) 
+        the validation of the new value and its assignment to the descriptor.
         
         NOTE: the __set__() method of any BaseDescriptorValidator (from which
         DescriptorGenericValidator inherit) already define a 'validate' method
         that checks the value set for assignment conforms with a set of criteria.
         
-        The 'preset' and 'postset' hooks are intended to perform computations 
-        intended to modify other attributes of the instance owner of the
-        descriptor based on the new value (to be) assigned to the descriptor, 
-        rather than validate and/or modify this value.
+        The 'preset' and 'postset' hooks only perform computations intended to 
+        modify other attributes of the instance owner of the descriptor, based 
+        on the new value (to be) assigned to the descriptor.
         
         See AttributeAdapter for details.
     
