@@ -984,7 +984,7 @@ class PlanarGraphics():
 
         #print("PlanarGraphics (%s).__init__ *args" % self.__class__.__name__, *args)
         
-        self.apiversion = (0,3)
+        #self.apiversion = (0,3)
             
         # NOTE: 2018-02-09 17:35:42
         # maps a planar graphic object to a tuples of three elements:
@@ -1141,13 +1141,6 @@ class PlanarGraphics():
                     # see NOTE: 2020-11-30 16:38:45 about frameindex
                     self.__init_from_states__(args[0], frameindex=frameindex, 
                                              currentframe=currentframe)
-                    #self.__init_from_state__(args[0], frameindex=frameindex, 
-                                             #currentframe=currentframe)
-                    
-                #elif isinstance(args[0], str): # text PlanarGraphics
-                    ## see NOTE: 2020-11-30 16:38:45 about frameindex
-                    #self.__init_from_descriptors__(*args, frameindex=frameindex,
-                                                   #currentframe=currentframe)
                         
             else:# NOTE: many var-positional arguments
                 # When present, these can only be primitive types (scalars, str):
@@ -1174,7 +1167,7 @@ class PlanarGraphics():
                 self._applyFrameIndex_(frameindex)
                 
                 if isinstance(self, Cursor):
-                    if graphicstype is None:# or not graphicstype & PlanarGraphicsType.allCursorTypes:
+                    if graphicstype is None:
                         self._planar_graphics_type_ = PlanarGraphicsType.crosshair_cursor
                         
                     else:
@@ -1240,10 +1233,6 @@ class PlanarGraphics():
         if len(self._states_) > 0:
             states = self._states_
             
-            #if not any([(s.z_frame is None or s.z_frame < 0) for s in states]):
-            #if not any([s.z_frame is None for s in states]):
-                #states = sorted(self._states_, key = lambda x: x.z_frame)
-                
             states_str = list()
             for state in states:
                 states_str.append(", ".join(["%s=%s" % (key, state[key]) for key in self._planar_descriptors_] + ["z_frame=%s" % state.z_frame]))
@@ -1257,9 +1246,6 @@ class PlanarGraphics():
     
     def __repr__(self):
         return " ".join([self.__class__.__name__, ", type:", getattr(self._planar_graphics_type_, "name", "None"), ", name:", self._ID_])
-    #"def" __eq__(self, other):
-        ## TODO
-        
 
     def __call__(self, path:typing.Optional[QtGui.QPainterPath]=None, 
                 frame:typing.Optional[int]=None, closed:typing.Optional[bool]=None,
@@ -1325,7 +1311,7 @@ class PlanarGraphics():
             if isinstance(state, (DataBag, dict)):
                 return state[name]
         
-        else:
+        elif hasattr(self, name):
             return object.__getattribute__(self, name)
             
     def __setattr__(self, name, value):
@@ -4043,8 +4029,7 @@ class PlanarGraphics():
                 
             return
         
-        if values is None or (isinstance(values, (tuple, list, range, dict)) and \
-                              (len(values)==0 or None in values)): # trivial
+        if values is None or ((isinstance(values, (tuple, list, range)) and (len(values)==0 ))): # trivial
             # remove any framelinks;
             # leave a single frameless state
             # remove the other states
